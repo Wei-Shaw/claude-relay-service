@@ -1,7 +1,7 @@
 <template>
   <div class="flex h-full flex-col gap-4 md:gap-6">
     <!-- 限制配置 / 聚合模式提示 -->
-    <div class="card flex h-full flex-col p-4 md:p-6">
+    <div ref="limitCardEl" class="card flex h-full flex-col p-4 md:p-6">
       <h3
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
@@ -12,16 +12,14 @@
       <!-- 多 Key 模式下的聚合统计信息 -->
       <div v-if="multiKeyMode && aggregatedStats" class="space-y-4">
         <!-- API Keys 概况 -->
-        <div
-          class="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:from-blue-900/20 dark:to-indigo-900/20"
-        >
+        <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
           <div class="mb-3 flex items-center justify-between">
             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
               <i class="fas fa-layer-group mr-2 text-blue-500" />
               API Keys 概况
             </span>
             <span
-              class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-800 dark:text-blue-200"
+              class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-gray-900 dark:bg-blue-800 dark:text-blue-200 dark:text-white"
             >
               {{ aggregatedStats.activeKeys }}/{{ aggregatedStats.totalKeys }}
             </span>
@@ -43,9 +41,7 @@
         </div>
 
         <!-- 聚合统计数据 -->
-        <div
-          class="rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 p-4 dark:from-purple-900/20 dark:to-pink-900/20"
-        >
+        <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
           <div class="mb-3 flex items-center">
             <i class="fas fa-chart-pie mr-2 text-purple-500" />
             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">聚合统计摘要</span>
@@ -120,19 +116,13 @@
               </span>
             </span>
           </div>
-          <div
+          <Progress
             v-if="statsData.limits.dailyCostLimit > 0"
-            class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
-          >
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :class="getDailyCostProgressColor()"
-              :style="{ width: getDailyCostProgress() + '%' }"
-            />
-          </div>
-          <div v-else class="h-2 w-full rounded-full bg-gray-200">
-            <div class="h-2 rounded-full bg-green-500" style="width: 0%" />
-          </div>
+            size="md"
+            :value="getDailyCostProgress()"
+            :variant="getDailyCostProgressVariant()"
+          />
+          <Progress v-else size="md" :value="0" variant="success" />
         </div>
 
         <!-- 总费用限制 -->
@@ -152,19 +142,13 @@
               </span>
             </span>
           </div>
-          <div
+          <Progress
             v-if="statsData.limits.totalCostLimit > 0"
-            class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
-          >
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :class="getTotalCostProgressColor()"
-              :style="{ width: getTotalCostProgress() + '%' }"
-            />
-          </div>
-          <div v-else class="h-2 w-full rounded-full bg-gray-200">
-            <div class="h-2 rounded-full bg-blue-500" style="width: 0%" />
-          </div>
+            size="md"
+            :value="getTotalCostProgress()"
+            :variant="getTotalCostProgressVariant()"
+          />
+          <Progress v-else size="md" :value="0" variant="default" />
         </div>
 
         <!-- Opus 模型周费用限制 -->
@@ -179,13 +163,11 @@
               }}
             </span>
           </div>
-          <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :class="getOpusWeeklyCostProgressColor()"
-              :style="{ width: getOpusWeeklyCostProgress() + '%' }"
-            />
-          </div>
+          <Progress
+            size="md"
+            :value="getOpusWeeklyCostProgress()"
+            :variant="getOpusWeeklyCostProgressVariant()"
+          />
         </div>
 
         <!-- 时间窗口限制 -->
@@ -226,55 +208,60 @@
         </div>
 
         <!-- 其他限制信息 -->
-        <div class="space-y-4 border-t border-gray-100 pt-3 dark:border-gray-700">
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">并发限制</span>
-            <span class="text-sm font-medium text-gray-900 md:text-base">
-              <span v-if="statsData.limits.concurrencyLimit > 0">
-                {{ statsData.limits.concurrencyLimit }}
+        <div class="space-y-3 border-t border-gray-100 pt-4 dark:border-gray-700 md:space-y-4">
+          <!-- 并发限制 -->
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">
+                并发限制
               </span>
-              <span v-else class="flex items-center gap-1">
-                <i class="fas fa-infinity text-gray-400" />
-              </span>
-            </span>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">模型限制</span>
-            <span class="text-sm font-medium text-gray-900 md:text-base">
-              <span v-if="hasModelRestrictions" class="text-orange-600">
-                <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
-                限制 {{ statsData.restrictions.restrictedModels.length }} 个模型
-              </span>
-              <span v-else class="text-green-600">
-                <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
-                允许所有模型
-              </span>
-            </span>
-          </div>
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">客户端限制</span>
-              <span class="text-sm font-medium text-gray-900 md:text-base">
-                <span v-if="hasClientRestrictions" class="text-orange-600">
-                  <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
-                  限 {{ statsData.restrictions.allowedClients.length }} 种客户端使用
+              <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+                <span v-if="statsData.limits.concurrencyLimit > 0">
+                  {{ statsData.limits.concurrencyLimit }}
                 </span>
-                <span v-else class="text-green-600">
-                  <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
-                  允许所有客户端
+                <span v-else class="flex items-center gap-1">
+                  <i class="fas fa-infinity" />
                 </span>
               </span>
             </div>
-            <div
-              v-if="hasClientRestrictions"
-              class="flex flex-wrap gap-2 rounded-lg bg-blue-50 p-2 dark:bg-blue-900/20 md:p-3"
-            >
+          </div>
+
+          <!-- 模型限制 -->
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">
+                模型限制
+              </span>
+              <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+                <span v-if="hasModelRestrictions">
+                  限制 {{ statsData.restrictions.restrictedModels.length }} 个模型
+                </span>
+                <span v-else>允许所有模型</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- 客户端限制 -->
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">
+                客户端限制
+              </span>
+              <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+                <span v-if="hasClientRestrictions">
+                  限 {{ statsData.restrictions.allowedClients.length }} 种客户端使用
+                </span>
+                <span v-else> 允许所有客户端 </span>
+              </span>
+            </div>
+
+            <!-- 客户端列表 -->
+            <div v-if="hasClientRestrictions" class="mt-2 flex flex-wrap gap-2">
               <span
                 v-for="client in statsData.restrictions.allowedClients"
                 :key="client"
-                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300 md:text-sm"
+                class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-id-badge" />
                 {{ client }}
               </span>
             </div>
@@ -284,7 +271,7 @@
     </div>
 
     <!-- 详细限制信息 -->
-    <div v-if="hasModelRestrictions" class="card !overflow-visible p-4 md:p-6">
+    <div v-if="hasModelRestrictions" ref="detailCardEl" class="card !overflow-visible p-4 md:p-6">
       <h3
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
@@ -293,7 +280,7 @@
       </h3>
 
       <div
-        class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20 md:p-4"
+        class="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20 md:p-4"
       >
         <h4
           class="mb-2 flex items-center text-sm font-bold text-amber-800 dark:text-amber-300 md:mb-3 md:text-base"
@@ -305,7 +292,7 @@
           <div
             v-for="model in statsData.restrictions.restrictedModels"
             :key="model"
-            class="rounded border border-amber-200 bg-white px-2 py-1 text-xs dark:border-amber-700 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
+            class="rounded border border-amber-300 bg-white px-2 py-1 text-xs dark:border-amber-600 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
           >
             <i class="fas fa-ban mr-1 text-xs text-red-500 md:mr-2" />
             <span class="break-all text-gray-800 dark:text-gray-200">{{ model }}</span>
@@ -321,13 +308,66 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import WindowCountdown from '@/components/apikeys/WindowCountdown.vue'
+import { Progress } from '@/ui'
 
 const apiStatsStore = useApiStatsStore()
 const { statsData, multiKeyMode, aggregatedStats, invalidKeys } = storeToRefs(apiStatsStore)
+
+const limitCardEl = ref(null)
+const detailCardEl = ref(null)
+
+const attachStyleDebugLogs = (el, tag) => {
+  if (!el) return () => {}
+
+  const emit = (eventName) => {
+    const cs = window.getComputedStyle(el)
+    const rect = el.getBoundingClientRect()
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/505c3121-92ef-4065-960e-e40e247b44f0', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'LimitConfig.vue:style-debug',
+        message: 'LimitConfig card computed style snapshot',
+        data: {
+          tag,
+          eventName,
+          className: el.className,
+          boxShadow: cs.boxShadow,
+          transform: cs.transform,
+          position: cs.position,
+          zIndex: cs.zIndex,
+          backgroundColor: cs.backgroundColor,
+          borderRadius: cs.borderRadius,
+          rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
+        },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'A'
+      })
+    }).catch(() => {})
+    // #endregion
+  }
+
+  const onEnter = () => emit('mouseenter')
+  const onLeave = () => emit('mouseleave')
+
+  el.addEventListener('mouseenter', onEnter)
+  el.addEventListener('mouseleave', onLeave)
+
+  // initial snapshot
+  emit('mounted')
+
+  return () => {
+    el.removeEventListener('mouseenter', onEnter)
+    el.removeEventListener('mouseleave', onLeave)
+  }
+}
 
 const hasModelRestrictions = computed(() => {
   const restriction = statsData.value?.restrictions
@@ -349,6 +389,20 @@ const hasClientRestrictions = computed(() => {
   )
 })
 
+let detachLimitCardLogs = null
+let detachDetailCardLogs = null
+
+onMounted(async () => {
+  await nextTick()
+  detachLimitCardLogs = attachStyleDebugLogs(limitCardEl.value, 'limit-config')
+  detachDetailCardLogs = attachStyleDebugLogs(detailCardEl.value, 'detail-restrictions')
+})
+
+onUnmounted(() => {
+  if (typeof detachLimitCardLogs === 'function') detachLimitCardLogs()
+  if (typeof detachDetailCardLogs === 'function') detachDetailCardLogs()
+})
+
 // 获取每日费用进度
 const getDailyCostProgress = () => {
   if (!statsData.value.limits.dailyCostLimit || statsData.value.limits.dailyCostLimit === 0)
@@ -358,12 +412,12 @@ const getDailyCostProgress = () => {
   return Math.min(percentage, 100)
 }
 
-// 获取每日费用进度条颜色
-const getDailyCostProgressColor = () => {
+// 获取每日费用进度条变体
+const getDailyCostProgressVariant = () => {
   const progress = getDailyCostProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-green-500'
+  if (progress >= 100) return 'error'
+  if (progress >= 80) return 'warning'
+  return 'success'
 }
 
 // 获取总费用进度
@@ -375,12 +429,12 @@ const getTotalCostProgress = () => {
   return Math.min(percentage, 100)
 }
 
-// 获取总费用进度条颜色
-const getTotalCostProgressColor = () => {
+// 获取总费用进度条变体
+const getTotalCostProgressVariant = () => {
   const progress = getTotalCostProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-blue-500'
+  if (progress >= 100) return 'error'
+  if (progress >= 80) return 'warning'
+  return 'success'
 }
 
 // 获取Opus周费用进度
@@ -395,12 +449,12 @@ const getOpusWeeklyCostProgress = () => {
   return Math.min(percentage, 100)
 }
 
-// 获取Opus周费用进度条颜色
-const getOpusWeeklyCostProgressColor = () => {
+// 获取Opus周费用进度条变体
+const getOpusWeeklyCostProgressVariant = () => {
   const progress = getOpusWeeklyCostProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-indigo-500' // 使用紫色表示Opus模型
+  if (progress >= 100) return 'error'
+  if (progress >= 80) return 'warning'
+  return 'default' // 使用默认黑色表示Opus模型
 }
 
 // 格式化数字
@@ -423,39 +477,13 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* 卡片样式 - 使用CSS变量 */
+/* 卡片样式 - 与 Stats 页面其它卡片保持一致（token-based） */
 .card {
-  background: var(--surface-color);
-  border-radius: 16px;
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-}
-
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.15),
-    0 10px 10px -5px rgba(0, 0, 0, 0.08);
-}
-
-:global(.dark) .card:hover {
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.5),
-    0 10px 10px -5px rgba(0, 0, 0, 0.35);
+  transition: var(--transition-all);
 }
 </style>

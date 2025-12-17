@@ -4,7 +4,7 @@
       <h3
         class="mb-3 flex items-center text-xl font-bold text-gray-900 dark:text-gray-100 sm:mb-4 sm:text-2xl"
       >
-        <i class="fas fa-graduation-cap mr-2 text-blue-600 sm:mr-3" />
+        <i class="fas fa-graduation-cap mr-2 text-gray-700 dark:text-gray-300 sm:mr-3" />
         Claude Code 使用教程
       </h3>
       <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-lg">
@@ -14,14 +14,14 @@
 
     <!-- 系统选择标签 -->
     <div class="mb-4 sm:mb-8">
-      <div class="flex flex-wrap gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-800 sm:gap-2 sm:p-2">
+      <div class="flex flex-wrap gap-1 rounded bg-gray-100 p-1 dark:bg-gray-800 sm:gap-2 sm:p-2">
         <button
           v-for="system in tutorialSystems"
           :key="system.key"
           :class="[
             'flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-300 sm:gap-2 sm:px-6 sm:py-3 sm:text-sm',
             activeTutorialSystem === system.key
-              ? 'bg-white text-blue-600 shadow-sm dark:bg-blue-600 dark:text-white dark:shadow-blue-500/40'
+              ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white dark:shadow-gray-500/40'
               : 'text-gray-600 hover:bg-white/50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
           ]"
           @click="activeTutorialSystem = system.key"
@@ -40,7 +40,7 @@
           class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
         >
           <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 text-xs font-bold text-white dark:bg-gray-600 sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >1</span
           >
           安装 Node.js 环境
@@ -50,12 +50,12 @@
         </p>
 
         <div
-          class="mb-4 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-blue-500/40 dark:from-blue-950/30 dark:to-indigo-950/30 sm:mb-4 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-gray-300 bg-gray-100 p-4 dark:border-gray-600 dark:bg-gray-700 sm:mb-4 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
           >
-            <i class="fab fa-windows mr-2 text-blue-600" />
+            <i class="fab fa-windows mr-2 text-gray-700 dark:text-gray-300" />
             Windows 安装方法
           </h5>
           <div class="mb-3 sm:mb-4">
@@ -101,12 +101,12 @@
             </div>
           </div>
           <div
-            class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+            class="rounded-lg border border-gray-300 bg-gray-100 p-3 dark:border-gray-600 dark:bg-gray-700 sm:p-4"
           >
-            <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-300 sm:text-base">
+            <h6 class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-200 sm:text-base">
               Windows 注意事项
             </h6>
-            <ul class="space-y-1 text-xs text-blue-700 dark:text-blue-300 sm:text-sm sm:text-xs">
+            <ul class="space-y-1 text-xs text-gray-700 dark:text-gray-300 sm:text-sm sm:text-xs">
               <li>• 建议使用 PowerShell 而不是 CMD</li>
               <li>• 如果遇到权限问题，尝试以管理员身份运行</li>
               <li>• 某些杀毒软件可能会误报，需要添加白名单</li>
@@ -149,7 +149,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 p-4 dark:border-green-500/40 dark:from-green-950/30 dark:to-emerald-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-green-100 bg-green-50 p-4 dark:border-green-500/40 dark:bg-green-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -173,12 +173,12 @@
           </p>
 
           <div
-            class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+            class="mt-4 rounded-lg border border-gray-300 bg-gray-100 p-3 dark:border-gray-600 dark:bg-gray-700 sm:p-4"
           >
-            <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-300 sm:text-base">
+            <h6 class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-200 sm:text-base">
               提示
             </h6>
-            <ul class="space-y-1 text-xs text-blue-700 dark:text-blue-300 sm:text-sm">
+            <ul class="space-y-1 text-xs text-gray-700 dark:text-gray-300 sm:text-sm">
               <li>• 建议使用 PowerShell 而不是 CMD，功能更强大</li>
               <li>• 如果遇到权限问题，以管理员身份运行 PowerShell</li>
             </ul>
@@ -217,7 +217,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:bg-purple-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -291,7 +291,7 @@
                   [System.EnvironmentVariableTarget]::User)
                 </div>
               </div>
-              <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
+              <p class="mt-2 text-xs text-gray-700 dark:text-gray-300">
                 💡 设置后需要重新打开 PowerShell 窗口才能生效。
               </p>
             </div>
@@ -330,10 +330,10 @@
 
         <!-- 验证环境变量设置 -->
         <div
-          class="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+          class="mt-6 rounded-lg border border-gray-300 bg-gray-100 p-3 dark:border-gray-600 dark:bg-gray-700 sm:p-4"
         >
-          <h6 class="mb-2 font-medium text-blue-800 dark:text-blue-300">验证环境变量设置</h6>
-          <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
+          <h6 class="mb-2 font-medium text-gray-900 dark:text-gray-200">验证环境变量设置</h6>
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
             设置完环境变量后，可以通过以下命令验证是否设置成功：
           </p>
 
@@ -364,14 +364,14 @@
           </div>
 
           <div class="mt-3 space-y-2">
-            <p class="text-sm text-blue-700 dark:text-blue-300">
+            <p class="text-sm text-gray-700 dark:text-gray-300">
               <strong>预期输出示例：</strong>
             </p>
             <div class="rounded bg-gray-100 p-2 font-mono text-sm dark:bg-gray-700">
               <div>{{ currentBaseUrl }}</div>
               <div>cr_xxxxxxxxxxxxxxxxxx</div>
             </div>
-            <p class="text-xs text-blue-700 dark:text-blue-300">
+            <p class="text-xs text-gray-700 dark:text-gray-300">
               💡 如果输出为空或显示变量名本身，说明环境变量设置失败，请重新设置。
             </p>
           </div>
@@ -444,7 +444,7 @@
                   [System.EnvironmentVariableTarget]::User)
                 </div>
               </div>
-              <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
+              <p class="mt-2 text-xs text-gray-700 dark:text-gray-300">
                 💡 设置后需要重新打开 PowerShell 窗口才能生效。
               </p>
             </div>
@@ -576,7 +576,7 @@
         <h5
           class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
         >
-          <i class="fas fa-terminal mr-2 text-blue-600" />
+          <i class="fas fa-terminal mr-2 text-gray-700 dark:text-gray-300" />
           配置 Droid CLI
         </h5>
         <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
@@ -588,12 +588,12 @@
           >。
         </p>
         <div
-          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+          class="rounded-lg border border-gray-300 bg-gray-100 p-3 dark:border-gray-600 dark:bg-gray-700 sm:p-4"
         >
-          <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
+          <h6 class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-200 sm:text-base">
             配置文件示例
           </h6>
-          <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
             将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
           </p>
           <div
@@ -607,7 +607,7 @@
               {{ line }}
             </div>
           </div>
-          <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
+          <p class="mt-3 text-xs text-gray-700 dark:text-gray-300 sm:text-sm">
             💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
           </p>
         </div>
@@ -624,7 +624,7 @@
           开始使用 Claude Code
         </h4>
         <div
-          class="rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:p-6"
+          class="rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:bg-orange-950/30 sm:p-6"
         >
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             现在你可以开始使用 Claude Code 了！
@@ -744,7 +744,7 @@
           class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
         >
           <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 text-xs font-bold text-white dark:bg-gray-600 sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >1</span
           >
           安装 Node.js 环境
@@ -754,7 +754,7 @@
         </p>
 
         <div
-          class="mb-4 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-slate-50 p-4 dark:border-gray-700 dark:from-gray-800 dark:to-slate-800 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -852,7 +852,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:bg-purple-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -915,7 +915,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:bg-orange-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1227,7 +1227,7 @@
         <h5
           class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
         >
-          <i class="fas fa-terminal mr-2 text-blue-600" />
+          <i class="fas fa-terminal mr-2 text-gray-700 dark:text-gray-300" />
           配置 Droid CLI
         </h5>
         <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
@@ -1240,12 +1240,12 @@
           快速打开配置目录。
         </p>
         <div
-          class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+          class="rounded-lg border border-gray-300 bg-gray-100 p-3 dark:border-gray-600 dark:bg-gray-700 sm:p-4"
         >
-          <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
+          <h6 class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-200 sm:text-base">
             配置文件示例
           </h6>
-          <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
             将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
           </p>
           <div
@@ -1259,7 +1259,7 @@
               {{ line }}
             </div>
           </div>
-          <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
+          <p class="mt-3 text-xs text-gray-700 dark:text-gray-300 sm:text-sm">
             💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
           </p>
         </div>
@@ -1277,7 +1277,7 @@
           开始使用 Claude Code
         </h4>
         <div
-          class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
+          class="rounded border border-yellow-100 bg-yellow-50 p-4 dark:border-yellow-500/40 dark:bg-yellow-950/30 sm:p-6"
         >
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
             现在你可以开始使用 Claude Code 了！
@@ -1405,7 +1405,7 @@
           class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
         >
           <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 text-xs font-bold text-white dark:bg-gray-600 sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
             >1</span
           >
           安装 Node.js 环境
@@ -1415,7 +1415,7 @@
         </p>
 
         <div
-          class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-red-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-red-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:bg-orange-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1501,7 +1501,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 dark:border-purple-500/40 dark:from-purple-950/30 dark:to-pink-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-purple-100 bg-purple-50 p-4 dark:border-purple-500/40 dark:bg-purple-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1564,7 +1564,7 @@
         </h4>
 
         <div
-          class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 dark:border-orange-500/40 dark:from-orange-950/30 dark:to-yellow-950/30 sm:mb-6 sm:p-6"
+          class="mb-4 rounded border border-orange-100 bg-orange-50 p-4 dark:border-orange-500/40 dark:bg-orange-950/30 sm:mb-6 sm:p-6"
         >
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -1868,7 +1868,7 @@
           <h5
             class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
           >
-            <i class="fas fa-terminal mr-2 text-blue-600" />
+            <i class="fas fa-terminal mr-2 text-gray-700 dark:text-gray-300" />
             配置 Droid CLI
           </h5>
           <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
@@ -1883,12 +1883,12 @@
             打开目录。
           </p>
           <div
-            class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-950/30 sm:p-4"
+            class="rounded-lg border border-gray-300 bg-gray-100 p-3 dark:border-gray-600 dark:bg-gray-700 sm:p-4"
           >
-            <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-200 sm:text-base">
+            <h6 class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-200 sm:text-base">
               配置文件示例
             </h6>
-            <p class="mb-3 text-sm text-blue-700 dark:text-blue-200">
+            <p class="mb-3 text-sm text-gray-700 dark:text-gray-300">
               将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
             </p>
             <div
@@ -1902,7 +1902,7 @@
                 {{ line }}
               </div>
             </div>
-            <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
+            <p class="mt-3 text-xs text-gray-700 dark:text-gray-300 sm:text-sm">
               💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
             </p>
           </div>
@@ -1920,7 +1920,7 @@
             开始使用 Claude Code
           </h4>
           <div
-            class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:border-yellow-500/40 dark:from-yellow-950/30 dark:to-amber-950/30 sm:p-6"
+            class="rounded border border-yellow-100 bg-yellow-50 p-4 dark:border-yellow-500/40 dark:bg-yellow-950/30 sm:p-6"
           >
             <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
               现在你可以开始使用 Claude Code 了！
@@ -2054,14 +2054,12 @@
       </div>
 
       <!-- 结尾 -->
-      <div
-        class="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-center text-white sm:p-6"
-      >
+      <div class="rounded bg-gray-700 p-4 text-center text-white dark:bg-gray-600 sm:p-6">
         <h5 class="mb-2 text-lg font-semibold sm:text-xl">🎉 恭喜你！</h5>
-        <p class="mb-3 text-sm text-blue-100 sm:mb-4 sm:text-base">
+        <p class="mb-3 text-sm text-gray-200 sm:mb-4 sm:text-base">
           你已经成功安装并配置了 Claude Code，现在可以开始享受 AI 编程助手带来的便利了。
         </p>
-        <p class="text-xs text-blue-200 sm:text-sm">
+        <p class="text-xs text-gray-300 sm:text-sm">
           如果在使用过程中遇到任何问题，可以查看官方文档或社区讨论获取帮助。
         </p>
       </div>
@@ -2271,19 +2269,10 @@ const droidCliConfigLines = computed(() => [
 }
 
 .tutorial-content {
-  animation: fadeIn 0.3s ease-in-out;
+  /* Animation removed for immediate display */
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* @keyframes fadeIn removed */
 
 code {
   font-family: 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -2291,15 +2280,6 @@ code {
 
 .tutorial-content h4 {
   scroll-margin-top: 100px;
-}
-
-.tutorial-content .bg-gradient-to-r {
-  transition: all 0.2s ease;
-}
-
-.tutorial-content .bg-gradient-to-r:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* 暗色主题优化 */
@@ -2318,7 +2298,7 @@ html.dark :deep(.bg-gray-700) {
 html.dark :deep(button.bg-gray-800) {
   background-color: #3b82f6 !important;
   border: 1px solid rgba(59, 130, 246, 0.8);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
   color: #ffffff !important;
 }
 
@@ -2356,14 +2336,13 @@ html.dark :deep(code.rounded) {
   padding: 0.125rem 0.375rem;
 }
 
-/* 注意事项框 - 蓝色系列 */
-html.dark :deep(.border-blue-200) {
-  border-color: rgba(59, 130, 246, 0.5) !important;
+/* 注意事项框 - 灰色系列 (替代蓝色) */
+html.dark :deep(.border-gray-300) {
+  border-color: rgba(107, 114, 128, 0.6) !important;
 }
 
-html.dark :deep(.bg-blue-50) {
-  background-color: rgba(37, 99, 235, 0.15) !important;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+html.dark :deep(.bg-gray-100) {
+  background-color: rgba(55, 65, 81, 0.5) !important;
 }
 
 /* 成功提示框 - 绿色系列 */
@@ -2401,33 +2380,7 @@ html.dark :deep(.border-purple-200) {
   border-color: rgba(168, 85, 247, 0.5) !important;
 }
 
-/* 渐变背景优化 */
-html.dark :deep(.from-purple-50) {
-  background: linear-gradient(
-    to right,
-    rgba(168, 85, 247, 0.15),
-    rgba(236, 72, 153, 0.15)
-  ) !important;
-  border: 1px solid rgba(168, 85, 247, 0.3);
-}
-
-html.dark :deep(.from-blue-50) {
-  background: linear-gradient(
-    to right,
-    rgba(59, 130, 246, 0.15),
-    rgba(99, 102, 241, 0.15)
-  ) !important;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-html.dark :deep(.from-green-50) {
-  background: linear-gradient(
-    to right,
-    rgba(34, 197, 94, 0.15),
-    rgba(16, 185, 129, 0.15)
-  ) !important;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
+/* Flat design - no gradients */
 
 /* 文字对比度优化 - 提高可读性 */
 html.dark :deep(.text-gray-400) {
@@ -2444,19 +2397,6 @@ html.dark :deep(.text-gray-700) {
 
 html.dark :deep(.text-gray-800) {
   color: #f3f4f6 !important;
-}
-
-/* 彩色文字优化 - 提高亮度 */
-html.dark :deep(.text-blue-600) {
-  color: #60a5fa !important;
-}
-
-html.dark :deep(.text-blue-700) {
-  color: #60a5fa !important;
-}
-
-html.dark :deep(.text-blue-800) {
-  color: #93c5fd !important;
 }
 
 html.dark :deep(.text-green-700) {
@@ -2509,10 +2449,6 @@ html.dark :deep(.bg-white) {
 /* 边框颜色统一优化 */
 html.dark :deep(.border-purple-700) {
   border-color: rgba(168, 85, 247, 0.6) !important;
-}
-
-html.dark :deep(.border-blue-100) {
-  border-color: rgba(59, 130, 246, 0.4) !important;
 }
 
 html.dark :deep(.border-green-100) {

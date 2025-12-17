@@ -1,131 +1,131 @@
 <template>
-  <div class="min-h-screen p-4 md:p-6" :class="isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'">
-    <!-- 顶部导航 -->
-    <div class="glass-strong mb-6 rounded-3xl p-4 shadow-xl md:mb-8 md:p-6">
-      <div class="flex flex-col items-center justify-between gap-4 md:flex-row">
-        <LogoTitle
-          :loading="oemLoading"
-          :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : '使用教程'"
-          :title="oemSettings.siteName"
-        />
-        <div class="flex items-center gap-2 md:gap-4">
-          <!-- 主题切换按钮 -->
-          <div class="flex items-center">
-            <ThemeToggle mode="dropdown" />
-          </div>
-
-          <!-- 分隔线 -->
-          <div
-            v-if="oemSettings.ldapEnabled || oemSettings.showAdminButton !== false"
-            class="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent opacity-50 dark:via-gray-600"
+  <!--
+    NOTE:
+    Some components rely on the presence of a `.dark` ancestor (Tailwind `dark:` variants
+    and scoped `:global(.dark) ...` selectors). We always add/remove `.dark` on this
+    view root so dark styling works reliably for this standalone public page.
+  -->
+  <div
+    class="api-stats-page min-h-screen"
+    :class="[{ dark: isDarkMode }, isDarkMode ? 'page-bg-dark' : 'page-bg']"
+  >
+    <!-- Header -->
+    <div class="page-header">
+      <div class="container">
+        <div class="header-content">
+          <LogoTitle
+            :loading="oemLoading"
+            :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
+            :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : '使用教程'"
+            :title="oemSettings.siteName"
           />
+          <div class="header-actions">
+            <!-- 主题切换按钮 -->
+            <ThemeToggle />
 
-          <!-- 用户登录按钮 (仅在 LDAP 启用时显示) -->
-          <router-link
-            v-if="oemSettings.ldapEnabled"
-            class="user-login-button flex items-center gap-2 rounded-2xl px-4 py-2 text-white transition-all duration-300 md:px-5 md:py-2.5"
-            to="/user-login"
-          >
-            <i class="fas fa-user text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">用户登录</span>
-          </router-link>
-          <!-- 管理后台按钮 -->
-          <router-link
-            v-if="oemSettings.showAdminButton !== false"
-            class="admin-button-refined flex items-center gap-2 rounded-2xl px-4 py-2 transition-all duration-300 md:px-5 md:py-2.5"
-            to="/dashboard"
-          >
-            <i class="fas fa-shield-alt text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">管理后台</span>
-          </router-link>
+            <!-- 用户登录按钮 -->
+            <router-link
+              v-if="oemSettings.ldapEnabled"
+              style="text-decoration: none"
+              to="/user-login"
+            >
+              <Button variant="secondary">
+                <i class="fas fa-user" />
+                <span>用户登录</span>
+              </Button>
+            </router-link>
+
+            <!-- 管理后台按钮 -->
+            <router-link
+              v-if="oemSettings.showAdminButton !== false"
+              style="text-decoration: none"
+              to="/dashboard"
+            >
+              <Button variant="primary">
+                <i class="fas fa-shield-alt" />
+                <span>管理后台</span>
+              </Button>
+            </router-link>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Tab 切换 -->
-    <div class="mb-6 md:mb-8">
-      <div class="flex justify-center">
-        <div
-          class="inline-flex w-full max-w-md rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl md:w-auto"
-        >
-          <button
-            :class="['tab-pill-button', currentTab === 'stats' ? 'active' : '']"
+    <!-- Tab navigation -->
+    <div class="tabs-section">
+      <div class="container">
+        <div class="tabs-wrapper">
+          <Button
+            class="tab-button-wrapper"
+            :variant="currentTab === 'stats' ? 'primary' : 'ghost'"
             @click="currentTab = 'stats'"
           >
-            <i class="fas fa-chart-line mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">统计查询</span>
-          </button>
-          <button
-            :class="['tab-pill-button', currentTab === 'tutorial' ? 'active' : '']"
+            <i class="fas fa-chart-line" />
+            <span>统计查询</span>
+          </Button>
+          <Button
+            class="tab-button-wrapper"
+            :variant="currentTab === 'tutorial' ? 'primary' : 'ghost'"
             @click="currentTab = 'tutorial'"
           >
-            <i class="fas fa-graduation-cap mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">使用教程</span>
-          </button>
+            <i class="fas fa-graduation-cap" />
+            <span>使用教程</span>
+          </Button>
         </div>
       </div>
     </div>
 
-    <!-- 统计内容 -->
-    <div v-if="currentTab === 'stats'" class="tab-content">
-      <!-- API Key 输入区域 -->
-      <ApiKeyInput />
+    <!-- Main content -->
+    <div class="container">
+      <!-- 统计内容 -->
+      <div v-if="currentTab === 'stats'" class="content-wrapper">
+        <!-- API Key 输入区域 -->
+        <ApiKeyInput />
 
-      <!-- 错误提示 -->
-      <div v-if="error" class="mb-6 md:mb-8">
-        <div
-          class="rounded-xl border border-red-500/30 bg-red-500/20 p-3 text-sm text-red-800 backdrop-blur-sm dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200 md:p-4 md:text-base"
-        >
-          <i class="fas fa-exclamation-triangle mr-2" />
-          {{ error }}
+        <!-- 错误提示 -->
+        <div v-if="error" class="error-card">
+          <i class="fas fa-exclamation-triangle" />
+          <span>{{ error }}</span>
         </div>
-      </div>
 
-      <!-- 统计数据展示区域 -->
-      <div v-if="statsData" class="fade-in">
-        <div class="glass-strong rounded-3xl p-4 shadow-xl md:p-6">
+        <!-- 统计数据展示区域 -->
+        <div v-if="statsData" class="stats-section">
           <!-- 时间范围选择器 -->
-          <div class="mb-4 border-b border-gray-200 pb-4 dark:border-gray-700 md:mb-6 md:pb-6">
-            <div
-              class="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center md:gap-4"
-            >
-              <div class="flex items-center gap-2 md:gap-3">
-                <i class="fas fa-clock text-base text-blue-500 md:text-lg" />
-                <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg"
-                  >统计时间范围</span
-                >
-              </div>
-              <div class="flex w-full items-center gap-2 md:w-auto">
-                <button
-                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
-                  :class="['period-btn', { active: statsPeriod === 'daily' }]"
-                  :disabled="loading || modelStatsLoading"
-                  @click="switchPeriod('daily')"
-                >
-                  <i class="fas fa-calendar-day text-xs md:text-sm" />
-                  今日
-                </button>
-                <button
-                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
-                  :class="['period-btn', { active: statsPeriod === 'monthly' }]"
-                  :disabled="loading || modelStatsLoading"
-                  @click="switchPeriod('monthly')"
-                >
-                  <i class="fas fa-calendar-alt text-xs md:text-sm" />
-                  本月
-                </button>
-                <!-- 测试按钮 - 仅在单Key模式下显示 -->
-                <button
-                  v-if="!multiKeyMode"
-                  class="test-btn flex items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:gap-2 md:px-6 md:text-sm"
-                  :disabled="loading"
-                  @click="openTestModal"
-                >
-                  <i class="fas fa-vial text-xs md:text-sm" />
-                  测试
-                </button>
-              </div>
+          <div class="period-selector">
+            <div class="period-label">
+              <i class="fas fa-clock" />
+              <span>统计时间范围</span>
+            </div>
+            <div class="period-buttons">
+              <Button
+                :disabled="loading || modelStatsLoading"
+                size="sm"
+                :variant="statsPeriod === 'daily' ? 'primary' : 'secondary'"
+                @click="switchPeriod('daily')"
+              >
+                <i class="fas fa-calendar-day" />
+                <span>今日</span>
+              </Button>
+              <Button
+                :disabled="loading || modelStatsLoading"
+                size="sm"
+                :variant="statsPeriod === 'monthly' ? 'primary' : 'secondary'"
+                @click="switchPeriod('monthly')"
+              >
+                <i class="fas fa-calendar-alt" />
+                <span>本月</span>
+              </Button>
+              <!-- 测试按钮 -->
+              <Button
+                v-if="!multiKeyMode"
+                :disabled="loading"
+                size="sm"
+                variant="primary"
+                @click="openTestModal"
+              >
+                <i class="fas fa-vial" />
+                <span>测试</span>
+              </Button>
             </div>
           </div>
 
@@ -133,15 +133,13 @@
           <StatsOverview />
 
           <!-- Token 分布和限制配置 -->
-          <div
-            class="mb-6 mt-6 grid grid-cols-1 gap-4 md:mb-8 md:mt-8 md:gap-6 xl:grid-cols-2 xl:items-stretch"
-          >
-            <TokenDistribution class="h-full" />
+          <div class="stats-grid">
+            <TokenDistribution />
             <template v-if="multiKeyMode">
-              <AggregatedStatsCard class="h-full" />
+              <AggregatedStatsCard />
             </template>
             <template v-else>
-              <LimitConfig class="h-full" />
+              <LimitConfig />
             </template>
           </div>
 
@@ -149,12 +147,12 @@
           <ModelUsageStats />
         </div>
       </div>
-    </div>
 
-    <!-- 教程内容 -->
-    <div v-if="currentTab === 'tutorial'" class="tab-content">
-      <div class="glass-strong rounded-3xl shadow-xl">
-        <TutorialView />
+      <!-- 教程内容 -->
+      <div v-if="currentTab === 'tutorial'" class="content-wrapper">
+        <div class="content-card">
+          <TutorialView />
+        </div>
       </div>
     </div>
 
@@ -184,6 +182,7 @@ import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import TutorialView from './TutorialView.vue'
 import ApiKeyTestModal from '@/components/apikeys/ApiKeyTestModal.vue'
+import { Button } from '@/ui'
 
 const route = useRoute()
 const apiStatsStore = useApiStatsStore()
@@ -241,9 +240,7 @@ const handleKeyDown = (event) => {
 
 // 初始化
 onMounted(() => {
-  // API Stats Page loaded
-
-  // 初始化主题（因为该页面不在 MainLayout 内）
+  // 初始化主题
   themeStore.initTheme()
 
   // 加载 OEM 设置
@@ -283,388 +280,569 @@ watch(apiKey, (newValue) => {
 </script>
 
 <style scoped>
-/* 渐变背景 */
-.gradient-bg {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
-  background-attachment: fixed;
+/* Background */
+.page-bg {
+  background: #fafafa;
   min-height: 100vh;
-  position: relative;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
-/* 暗色模式的渐变背景 */
-.gradient-bg-dark {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
-  background-attachment: fixed;
+.page-bg-dark {
+  background: #000;
   min-height: 100vh;
-  position: relative;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
-.gradient-bg::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background:
-    radial-gradient(circle at 20% 80%, rgba(240, 147, 251, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(102, 126, 234, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* 暗色模式的背景覆盖 */
-.gradient-bg-dark::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background:
-    radial-gradient(circle at 20% 80%, rgba(100, 116, 139, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(71, 85, 105, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(30, 41, 59, 0.1) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* 玻璃态效果 - 使用CSS变量 */
-.glass-strong {
-  background: var(--glass-strong-color);
-  backdrop-filter: blur(25px);
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  position: relative;
-  z-index: 1;
-}
-
-/* 暗色模式的玻璃态效果 */
-:global(.dark) .glass-strong {
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(55, 65, 81, 0.3),
-    inset 0 1px 0 rgba(75, 85, 99, 0.2);
-}
-
-/* 标题渐变 */
-.header-title {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-}
-
-/* 用户登录按钮 */
-.user-login-button {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  text-decoration: none;
-  box-shadow:
-    0 4px 12px rgba(52, 211, 153, 0.25),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  position: relative;
-  overflow: hidden;
-  font-weight: 600;
-}
-
-/* 暗色模式下的用户登录按钮 */
-:global(.dark) .user-login-button {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  border: 1px solid rgba(52, 211, 153, 0.4);
-  color: white;
-  box-shadow:
-    0 4px 12px rgba(52, 211, 153, 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1);
-}
-
-.user-login-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.user-login-button:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow:
-    0 8px 20px rgba(52, 211, 153, 0.35),
-    inset 0 1px 1px rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.user-login-button:hover::before {
-  opacity: 1;
-}
-
-/* 暗色模式下的悬停效果 */
-:global(.dark) .user-login-button:hover {
-  box-shadow:
-    0 8px 20px rgba(52, 211, 153, 0.4),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  border-color: rgba(52, 211, 153, 0.5);
-}
-
-.user-login-button:active {
-  transform: translateY(-1px) scale(1);
-}
-
-/* 确保图标和文字在所有模式下都清晰可见 */
-.user-login-button i,
-.user-login-button span {
-  position: relative;
-  z-index: 1;
-}
-
-/* 管理后台按钮 - 精致版本 */
-.admin-button-refined {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  text-decoration: none;
-  box-shadow:
-    0 4px 12px rgba(102, 126, 234, 0.25),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  position: relative;
-  overflow: hidden;
-  font-weight: 600;
-}
-
-/* 暗色模式下的管理后台按钮 */
-:global(.dark) .admin-button-refined {
-  background: rgba(55, 65, 81, 0.8);
-  border: 1px solid rgba(107, 114, 128, 0.4);
-  color: #f3f4f6;
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.05);
-}
-
-.admin-button-refined::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.admin-button-refined:hover {
-  transform: translateY(-2px) scale(1.02);
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-  box-shadow:
-    0 8px 20px rgba(118, 75, 162, 0.35),
-    inset 0 1px 1px rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: white;
-}
-
-.admin-button-refined:hover::before {
-  opacity: 1;
-}
-
-/* 暗色模式下的悬停效果 */
-:global(.dark) .admin-button-refined:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-color: rgba(147, 51, 234, 0.4);
-  box-shadow:
-    0 8px 20px rgba(102, 126, 234, 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.admin-button-refined:active {
-  transform: translateY(-1px) scale(1);
-}
-
-/* 确保图标和文字在所有模式下都清晰可见 */
-.admin-button-refined i,
-.admin-button-refined span {
-  position: relative;
-  z-index: 1;
-}
-
-/* 时间范围按钮 */
-.period-btn {
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
-  font-weight: 500;
-  letter-spacing: 0.025em;
+/* Container */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
   transition: all 0.3s ease;
-  border: none;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+}
+
+/* Header Section */
+.page-header {
+  border-bottom: 1px solid #eaeaea;
+  background: #fff;
+  padding: 24px 0;
+  margin-bottom: 48px;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.api-stats-page.dark .page-header {
+  background: #000;
+  border-bottom-color: #333;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+/* Button System */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 40px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
   cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn:active {
+  /* transform effect removed */
+}
+
+.btn i {
+  font-size: 14px;
+}
+
+.btn:hover i {
+  /* transform effect removed */
+}
+
+.btn-primary {
+  background: #000;
+  border-color: #000;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+}
+
+.api-stats-page.dark .btn-primary {
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+.api-stats-page.dark .btn-primary:hover {
+  background: #e5e5e5;
+  border-color: #e5e5e5;
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary {
+  background: transparent;
+  border-color: #eaeaea;
+  color: #666;
+}
+
+.btn-secondary:hover {
+  border-color: #000;
+  color: #000;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.api-stats-page.dark .btn-secondary {
+  border-color: #333;
+  color: #999;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
+}
+
+.api-stats-page.dark .btn-secondary:hover {
+  border-color: #fff;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
+}
+
+/* Tabs Navigation */
+.tabs-section {
+  margin-bottom: 48px;
+  transition: all 0.3s ease;
+}
+
+.tabs-wrapper {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #eaeaea;
+  transition: border-color 0.3s ease;
+}
+
+.api-stats-page.dark .tabs-wrapper {
+  border-bottom-color: #333;
+}
+
+.tab-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.15s ease;
+  position: relative;
+  bottom: -1px;
+}
+
+.tab-button i {
+  font-size: 14px;
+  transition: transform 0.15s ease;
+}
+
+.tab-button:hover {
+  color: #000;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.tab-button:hover i {
+  transform: scale(1.1);
+}
+
+.api-stats-page.dark .tab-button {
+  color: #999;
+}
+
+.api-stats-page.dark .tab-button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-button.active {
+  color: #000;
+  border-bottom-color: #000;
+}
+
+.tab-button.active i {
+  transform: scale(1.05);
+}
+
+.api-stats-page.dark .tab-button.active {
+  color: #fff;
+  border-bottom-color: #fff;
+}
+
+/* Content Wrapper */
+.content-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding-bottom: 64px;
+  transition: all 0.3s ease;
+}
+
+/* Error Card */
+.error-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #ff0000;
+  border-radius: 8px;
+  color: #ff0000;
+  font-size: 14px;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+  box-shadow: 0 2px 4px rgba(255, 0, 0, 0.1);
+}
+
+.error-card i {
+  font-size: 16px;
+  transition: transform 0.2s ease;
+}
+
+.error-card:hover i {
+  transform: scale(1.1);
+}
+
+.api-stats-page.dark .error-card {
+  background: #1a0000;
+  border-color: #ff3333;
+  color: #ff6666;
+  box-shadow: 0 2px 4px rgba(255, 51, 51, 0.2);
+}
+
+/* Stats Section */
+.stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Period Selector */
+.period-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  flex-wrap: wrap;
+  gap: 16px;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.period-selector:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.api-stats-page.dark .period-selector {
+  background: #000;
+  border-color: #333;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
+}
+
+.api-stats-page.dark .period-selector:hover {
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
+}
+
+.period-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+  transition: color 0.3s ease;
+}
+
+.api-stats-page.dark .period-label {
+  color: #fff;
+}
+
+.period-label i {
+  font-size: 16px;
+  color: #666;
+  transition:
+    color 0.3s ease,
+    transform 0.2s ease;
+}
+
+.period-selector:hover .period-label i {
+  /* transform: rotate(15deg); */
+}
+
+.api-stats-page.dark .period-label i {
+  color: #999;
+}
+
+.period-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Period Buttons */
+.period-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid #eaeaea;
+  color: #666;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.period-btn i {
+  font-size: 14px;
+  transition: transform 0.15s ease;
+}
+
+.period-btn:hover:not(:disabled) {
+  border-color: #000;
+  color: #000;
+  background: rgba(0, 0, 0, 0.03);
+  /* transform: translateY(-1px); */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.period-btn:hover:not(:disabled) i {
+  /* transform: scale(1.1); */
 }
 
 .period-btn.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  box-shadow:
-    0 10px 15px -3px rgba(102, 126, 234, 0.3),
-    0 4px 6px -2px rgba(102, 126, 234, 0.05);
-  transform: translateY(-1px);
+  background: #000;
+  border-color: #000;
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-.period-btn:not(.active) {
-  color: #374151;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(229, 231, 235, 0.5);
+.period-btn.active i {
+  transform: scale(1.05);
 }
 
-:global(html.dark) .period-btn:not(.active) {
-  color: #e5e7eb;
-  background: rgba(55, 65, 81, 0.4);
-  border: 1px solid rgba(75, 85, 99, 0.5);
+.period-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
-.period-btn:not(.active):hover {
-  background: rgba(255, 255, 255, 0.8);
-  color: #1f2937;
-  border-color: rgba(209, 213, 219, 0.8);
+.period-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-:global(html.dark) .period-btn:not(.active):hover {
-  background: rgba(75, 85, 99, 0.6);
-  color: #ffffff;
-  border-color: rgba(107, 114, 128, 0.8);
+.api-stats-page.dark .period-btn {
+  border-color: #333;
+  color: #999;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
-/* 测试按钮样式 */
+.api-stats-page.dark .period-btn:hover:not(:disabled) {
+  border-color: #fff;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.08);
+}
+
+.api-stats-page.dark .period-btn.active {
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.2);
+}
+
+/* Test Button */
 .test-btn {
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0.025em;
-  transition: all 0.3s ease;
-  border: none;
+  background: #0070f3;
+  border: 1px solid #0070f3;
+  color: #fff;
   cursor: pointer;
-  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
-  color: white;
-  box-shadow:
-    0 4px 10px -2px rgba(6, 182, 212, 0.3),
-    0 2px 4px -1px rgba(6, 182, 212, 0.1);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 112, 243, 0.2);
+}
+
+.test-btn i {
+  font-size: 14px;
+  transition: transform 0.15s ease;
 }
 
 .test-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow:
-    0 8px 15px -3px rgba(6, 182, 212, 0.4),
-    0 4px 6px -2px rgba(6, 182, 212, 0.15);
+  background: #0060df;
+  border-color: #0060df;
+  /* transform: translateY(-1px); */
+  box-shadow: 0 4px 8px rgba(0, 112, 243, 0.15);
+}
+
+.test-btn:hover:not(:disabled) i {
+  /* transform: scale(1.1); */
+}
+
+.test-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .test-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
 }
 
-/* Tab 胶囊按钮样式 */
-.tab-pill-button {
-  padding: 0.5rem 1rem;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.8);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  flex: 1;
-  justify-content: center;
+.api-stats-page.dark .test-btn {
+  background: #0080ff;
+  border-color: #0080ff;
+  box-shadow: 0 2px 4px rgba(0, 128, 255, 0.15);
 }
 
-/* 暗夜模式下的Tab按钮基础样式 */
-:global(html.dark) .tab-pill-button {
-  color: rgba(209, 213, 219, 0.8);
+.api-stats-page.dark .test-btn:hover:not(:disabled) {
+  background: #0070f3;
+  border-color: #0070f3;
+  box-shadow: 0 4px 8px rgba(0, 128, 255, 0.2);
 }
 
-@media (min-width: 768px) {
-  .tab-pill-button {
-    padding: 0.625rem 1.25rem;
-    flex: none;
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 
-.tab-pill-button:hover {
-  color: white;
-  background: rgba(255, 255, 255, 0.1);
+/* Content Card */
+.content-card {
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  overflow: hidden;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-:global(html.dark) .tab-pill-button:hover {
-  color: #f3f4f6;
-  background: rgba(100, 116, 139, 0.2);
+.content-card:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
-.tab-pill-button.active {
-  background: white;
-  color: #764ba2;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+.api-stats-page.dark .content-card {
+  background: #000;
+  border-color: #333;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.02);
 }
 
-:global(html.dark) .tab-pill-button.active {
-  background: rgba(71, 85, 105, 0.9);
-  color: #f3f4f6;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.3),
-    0 2px 4px -1px rgba(0, 0, 0, 0.2);
+.api-stats-page.dark .content-card:hover {
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
 }
 
-.tab-pill-button i {
-  font-size: 0.875rem;
-}
-
-/* Tab 内容切换动画 */
-.tab-content {
-  animation: tabFadeIn 0.4s ease-out;
-}
-
-@keyframes tabFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+/* Responsive */
+@media (max-width: 768px) {
+  .page-header {
+    padding: 16px 0;
+    margin-bottom: 32px;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
-/* 动画效果 */
-.fade-in {
-  animation: fadeIn 0.6s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
+  .tabs-section {
+    margin-bottom: 32px;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .content-wrapper {
+    gap: 24px;
+    padding-bottom: 48px;
+  }
+
+  .period-selector {
+    padding: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .period-buttons {
+    width: 100%;
+  }
+
+  .period-btn,
+  .test-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .stats-section {
+    gap: 24px;
   }
 }
 </style>

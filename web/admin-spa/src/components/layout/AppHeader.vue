@@ -1,7 +1,7 @@
 <template>
   <!-- 顶部导航 -->
   <div
-    class="glass-strong mb-4 rounded-xl p-3 shadow-xl sm:mb-6 sm:rounded-2xl sm:p-4 md:mb-8 md:rounded-3xl md:p-6"
+    class="mb-4 border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:mb-6 sm:p-4 md:mb-8 md:p-6"
     style="z-index: 10; position: relative"
   >
     <div class="flex flex-col items-center justify-between gap-3 sm:flex-row sm:gap-4">
@@ -13,18 +13,17 @@
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
           subtitle="管理后台"
           :title="oemSettings.siteName"
-          title-class="text-white dark:text-gray-100"
         >
           <template #after-title>
             <!-- 版本信息 -->
             <div class="flex items-center gap-1 sm:gap-2">
-              <span class="font-mono text-xs text-gray-400 dark:text-gray-500 sm:text-sm"
+              <span class="font-mono text-xs text-gray-500 dark:text-gray-400 sm:text-sm"
                 >v{{ versionInfo.current || '...' }}</span
               >
               <!-- 更新提示 -->
               <a
                 v-if="versionInfo.hasUpdate"
-                class="inline-flex animate-pulse items-center gap-1 rounded-full border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-colors hover:bg-green-600"
+                class="inline-flex animate-pulse items-center gap-1 rounded border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-colors hover:bg-green-600 dark:border-green-500 dark:bg-green-600 dark:hover:bg-green-500"
                 :href="versionInfo.releaseInfo?.htmlUrl || '#'"
                 target="_blank"
                 title="有新版本可用"
@@ -39,25 +38,21 @@
       <!-- 主题切换和用户菜单 -->
       <div class="flex items-center gap-2 sm:gap-4">
         <!-- 主题切换按钮 -->
-        <div class="flex items-center">
-          <ThemeToggle mode="dropdown" />
-        </div>
+        <ThemeToggle />
 
         <!-- 分隔线 -->
-        <div
-          class="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent opacity-50 dark:via-gray-600"
-        />
+        <div class="h-8 w-px bg-gray-200 dark:bg-gray-700" />
 
         <!-- 用户菜单 -->
         <div class="user-menu-container relative">
           <button
-            class="user-menu-button flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 sm:px-4 sm:py-2.5"
+            class="user-menu-button flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-all duration-200 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 sm:px-4 sm:py-2.5"
             @click="userMenuOpen = !userMenuOpen"
           >
-            <i class="fas fa-user-circle text-sm sm:text-base" />
+            <i class="fas fa-user-circle text-sm text-gray-600 dark:text-gray-400 sm:text-base" />
             <span class="hidden sm:inline">{{ currentUser.username || 'Admin' }}</span>
             <i
-              class="fas fa-chevron-down ml-1 text-xs transition-transform duration-200"
+              class="fas fa-chevron-down ml-1 text-xs text-gray-500 transition-transform duration-200 dark:text-gray-400"
               :class="{ 'rotate-180': userMenuOpen }"
             />
           </button>
@@ -65,8 +60,8 @@
           <!-- 悬浮菜单 -->
           <div
             v-if="userMenuOpen"
-            class="user-menu-dropdown absolute right-0 top-full mt-2 w-48 rounded-xl border border-gray-200 bg-white py-2 shadow-xl dark:border-gray-700 dark:bg-gray-800 sm:w-56"
-            style="z-index: 999999"
+            class="user-menu-dropdown absolute right-0 top-full mt-2 w-48 rounded-md border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800 dark:shadow-2xl sm:w-56"
+            style="z-index: var(--z-dropdown, 10)"
             @click.stop
           >
             <!-- 版本信息 -->
@@ -87,7 +82,7 @@
                   >
                 </div>
                 <a
-                  class="block w-full rounded-lg bg-green-500 px-3 py-1.5 text-center text-sm text-white transition-colors hover:bg-green-600"
+                  class="block w-full rounded-md bg-green-500 px-3 py-1.5 text-center text-sm text-white transition-colors hover:bg-green-600"
                   :href="versionInfo.releaseInfo?.htmlUrl || '#'"
                   target="_blank"
                 >
@@ -102,25 +97,23 @@
               </div>
               <div v-else class="mt-2 text-center">
                 <!-- 已是最新版提醒 -->
-                <transition mode="out-in" name="fade">
-                  <div
-                    v-if="versionInfo.noUpdateMessage"
-                    key="message"
-                    class="inline-block rounded-lg border border-green-200 bg-green-100 px-3 py-1.5 dark:border-green-800 dark:bg-green-900/30"
-                  >
-                    <p class="text-xs font-medium text-green-700 dark:text-green-400">
-                      <i class="fas fa-check-circle mr-1" />当前已是最新版本
-                    </p>
-                  </div>
-                  <button
-                    v-else
-                    key="button"
-                    class="text-xs text-blue-500 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                    @click="checkForUpdates()"
-                  >
-                    <i class="fas fa-sync-alt mr-1" />检查更新
-                  </button>
-                </transition>
+                <div
+                  v-if="versionInfo.noUpdateMessage"
+                  key="message"
+                  class="inline-block rounded-md border border-green-200 bg-green-100 px-3 py-1.5 dark:border-green-800 dark:bg-green-900/30"
+                >
+                  <p class="text-xs font-medium text-green-700 dark:text-green-400">
+                    <i class="fas fa-check-circle mr-1" />当前已是最新版本
+                  </p>
+                </div>
+                <button
+                  v-else
+                  key="button"
+                  class="text-xs text-blue-500 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  @click="checkForUpdates()"
+                >
+                  <i class="fas fa-sync-alt mr-1" />检查更新
+                </button>
               </div>
             </div>
 
@@ -156,9 +149,9 @@
       <div class="mb-6 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div
-            class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600"
+            class="flex h-10 w-10 items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800"
           >
-            <i class="fas fa-key text-white" />
+            <i class="fas fa-key text-gray-700 dark:text-gray-300" />
           </div>
           <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">修改账户信息</h3>
         </div>
@@ -244,7 +237,7 @@
 
         <div class="flex gap-3 pt-4">
           <button
-            class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            class="flex-1 rounded-md bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             type="button"
             @click="closeChangePasswordModal"
           >
@@ -463,24 +456,7 @@ onUnmounted(() => {
 /* 用户菜单按钮样式 */
 .user-menu-button {
   position: relative;
-  overflow: hidden;
   min-height: 38px;
-}
-
-/* 添加光泽效果 */
-.user-menu-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
-}
-
-.user-menu-button:hover::before {
-  left: 100%;
 }
 
 /* 用户菜单样式优化 */
@@ -500,13 +476,5 @@ onUnmounted(() => {
   }
 }
 
-/* fade过渡动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+/* fade过渡动画 - removed for immediate display */
 </style>

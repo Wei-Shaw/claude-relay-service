@@ -1,38 +1,29 @@
 <template>
-  <div class="flex items-center gap-4">
+  <div class="logo-title-wrapper">
     <!-- Logo区域 -->
     <div
-      class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-300/30 bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-sm dark:border-gray-600/30 dark:from-blue-600/20 dark:to-purple-600/20"
+      class="logo-container !border !border-gray-200 !bg-white dark:!border-gray-700 dark:!bg-gray-900"
     >
       <template v-if="!loading">
-        <img
-          v-if="logoSrc"
-          alt="Logo"
-          class="h-8 w-8 object-contain"
-          :src="logoSrc"
-          @error="handleLogoError"
-        />
-        <i v-else class="fas fa-cloud text-xl text-gray-700 dark:text-gray-300" />
+        <img v-if="logoSrc" alt="Logo" class="logo-image" :src="logoSrc" @error="handleLogoError" />
+        <i v-else class="fas fa-cloud logo-icon !text-gray-600 dark:!text-gray-400" />
       </template>
-      <div v-else class="h-8 w-8 animate-pulse rounded bg-gray-300/50 dark:bg-gray-600/50" />
+      <div v-else class="logo-skeleton !bg-gray-200 dark:!bg-gray-700" />
     </div>
 
     <!-- 标题区域 -->
-    <div class="flex min-h-[48px] flex-col justify-center">
-      <div class="flex items-center gap-3">
+    <div class="title-section">
+      <div class="title-row">
         <template v-if="!loading && title">
-          <h1 :class="['header-title text-2xl font-bold leading-tight', titleClass]">
+          <h1 class="site-title !text-gray-900 dark:!text-white">
             {{ title }}
           </h1>
         </template>
-        <div
-          v-else-if="loading"
-          class="h-8 w-64 animate-pulse rounded bg-gray-300/50 dark:bg-gray-600/50"
-        />
+        <div v-else-if="loading" class="title-skeleton !bg-gray-200 dark:!bg-gray-700" />
         <!-- 插槽用于版本信息等额外内容 -->
         <slot name="after-title" />
       </div>
-      <p v-if="subtitle" class="mt-0.5 text-sm leading-tight text-gray-600 dark:text-gray-400">
+      <p v-if="subtitle" class="site-subtitle !text-gray-600 dark:!text-gray-400">
         {{ subtitle }}
       </p>
     </div>
@@ -56,10 +47,6 @@ defineProps({
   logoSrc: {
     type: String,
     default: ''
-  },
-  titleClass: {
-    type: String,
-    default: 'text-gray-900'
   }
 })
 
@@ -70,25 +57,135 @@ const handleLogoError = (e) => {
 </script>
 
 <style scoped>
-/* 骨架屏动画 */
+/* ============================================
+   LOGO TITLE COMPONENT - DARK MODE READY
+   ============================================ */
+.logo-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Logo Container */
+.logo-container {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.logo-image {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.logo-icon {
+  font-size: 20px;
+  transition: color 0.3s ease;
+}
+
+/* Logo Skeleton */
+.logo-skeleton {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  transition: background-color 0.3s ease;
+}
+
+/* Title Section */
+.title-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 48px;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.site-title {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+  letter-spacing: -0.02em;
+  transition: color 0.3s ease;
+}
+
+.site-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  transition: color 0.3s ease;
+}
+
+/* Title Skeleton */
+.title-skeleton {
+  width: 256px;
+  height: 32px;
+  border-radius: 6px;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  transition: background-color 0.3s ease;
+}
+
+/* Pulse Animation */
 @keyframes pulse {
   0% {
-    opacity: 0.7;
+    opacity: 1;
   }
   50% {
-    opacity: 0.4;
+    opacity: 0.5;
   }
   100% {
-    opacity: 0.7;
+    opacity: 1;
   }
 }
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  .logo-title-wrapper {
+    gap: 12px;
+  }
 
-/* 标题样式 */
-.header-title {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  .logo-container {
+    width: 40px;
+    height: 40px;
+  }
+
+  .logo-image {
+    width: 24px;
+    height: 24px;
+  }
+
+  .logo-icon {
+    font-size: 18px;
+  }
+
+  .site-title {
+    font-size: 20px;
+  }
+
+  .site-subtitle {
+    font-size: 13px;
+  }
+
+  .title-skeleton {
+    width: 180px;
+    height: 28px;
+  }
 }
 </style>

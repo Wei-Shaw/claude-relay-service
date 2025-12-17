@@ -3,8 +3,12 @@
     <!-- 触发器 -->
     <div
       ref="triggerRef"
-      class="relative flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm transition-all duration-200 hover:shadow-md dark:border-gray-600 dark:bg-gray-800"
-      :class="[isOpen && 'border-blue-400 shadow-md']"
+      class="relative flex cursor-pointer items-center gap-2 border border-gray-200 bg-white px-3 py-2 transition-all duration-200 dark:border-gray-600 dark:bg-gray-800"
+      :class="[isOpen && 'border-gray-900 dark:border-white']"
+      :style="{
+        borderRadius: '5px',
+        boxShadow: isOpen ? '0 4px 12px rgba(0, 0, 0, 0.08)' : 'none'
+      }"
       @click="toggleDropdown"
     >
       <i v-if="icon" :class="['fas', icon, 'text-sm', iconColor]"></i>
@@ -23,48 +27,43 @@
 
     <!-- 下拉选项 - 使用 Teleport 将其移动到 body -->
     <Teleport to="body">
-      <transition
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="transform scale-95 opacity-0"
-        enter-to-class="transform scale-100 opacity-100"
-        leave-active-class="transition duration-150 ease-in"
-        leave-from-class="transform scale-100 opacity-100"
-        leave-to-class="transform scale-95 opacity-0"
+      <div
+        v-if="isOpen"
+        ref="dropdownRef"
+        class="fixed z-[9999] min-w-max overflow-hidden border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+        :style="{
+          ...dropdownStyle,
+          borderRadius: '5px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
+        }"
       >
-        <div
-          v-if="isOpen"
-          ref="dropdownRef"
-          class="fixed z-[9999] min-w-max overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
-          :style="dropdownStyle"
-        >
-          <div class="max-h-60 overflow-y-auto py-1">
-            <div
-              v-for="option in options"
-              :key="option.value"
-              class="flex cursor-pointer items-center gap-2 whitespace-nowrap py-2 text-sm transition-colors duration-150"
-              :class="[
-                isSelected(option.value)
-                  ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                  : option.isGroup
-                    ? 'bg-gray-50 font-semibold text-gray-800 dark:bg-gray-700/50 dark:text-gray-200'
-                    : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
-              ]"
-              :style="{
-                paddingLeft: option.indent ? `${12 + option.indent * 16}px` : '12px',
-                paddingRight: '12px'
-              }"
-              @click="selectOption(option)"
-            >
-              <i v-if="option.icon" :class="['fas', option.icon, 'text-xs']"></i>
-              <span>{{ option.label }}</span>
-              <i
-                v-if="isSelected(option.value)"
-                class="fas fa-check ml-auto pl-3 text-xs text-blue-600 dark:text-blue-400"
-              ></i>
-            </div>
+        <div class="max-h-60 overflow-y-auto py-1">
+          <div
+            v-for="option in options"
+            :key="option.value"
+            class="flex cursor-pointer items-center gap-2 whitespace-nowrap py-2 text-sm transition-colors duration-150"
+            :class="[
+              isSelected(option.value)
+                ? 'bg-gray-100 font-medium text-gray-900 dark:bg-gray-700 dark:text-white'
+                : option.isGroup
+                  ? 'bg-gray-50 font-semibold text-gray-800 dark:bg-gray-700/50 dark:text-gray-200'
+                  : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+            ]"
+            :style="{
+              paddingLeft: option.indent ? `${12 + option.indent * 16}px` : '12px',
+              paddingRight: '12px'
+            }"
+            @click="selectOption(option)"
+          >
+            <i v-if="option.icon" :class="['fas', option.icon, 'text-xs']"></i>
+            <span>{{ option.label }}</span>
+            <i
+              v-if="isSelected(option.value)"
+              class="fas fa-check ml-auto pl-3 text-xs text-gray-900 dark:text-white"
+            ></i>
           </div>
         </div>
-      </transition>
+      </div>
     </Teleport>
   </div>
 </template>

@@ -7,7 +7,7 @@
           <div class="flex items-center">
             <div class="flex flex-shrink-0 items-center">
               <svg
-                class="h-8 w-8 text-blue-600 dark:text-blue-400"
+                class="h-8 w-8 text-gray-900 dark:text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -27,7 +27,7 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'overview'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
                       : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('overview')"
@@ -38,7 +38,7 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'api-keys'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
                       : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('api-keys')"
@@ -49,7 +49,7 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'usage'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
                       : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('usage')"
@@ -60,7 +60,7 @@
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'tutorial'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
                       : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   ]"
                   @click="handleTabChange('tutorial')"
@@ -76,7 +76,7 @@
             </div>
 
             <!-- 主题切换按钮 -->
-            <ThemeToggle mode="icon" />
+            <ThemeToggle />
 
             <button
               class="rounded-md px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
@@ -171,7 +171,7 @@
               <div class="flex items-center">
                 <div class="flex-shrink-0">
                   <svg
-                    class="h-6 w-6 text-blue-400"
+                    class="h-6 w-6 text-gray-600 dark:text-gray-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -292,11 +292,9 @@
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
                   <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Role</dt>
                   <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
-                    <span
-                      class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                    >
+                    <Badge size="sm" variant="neutral">
                       {{ userProfile?.role || 'user' }}
-                    </span>
+                    </Badge>
                   </dd>
                 </div>
                 <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5">
@@ -345,6 +343,7 @@ import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import UserApiKeysManager from '@/components/user/UserApiKeysManager.vue'
 import UserUsageStats from '@/components/user/UserUsageStats.vue'
 import TutorialView from '@/views/TutorialView.vue'
+import { Badge } from '@/ui'
 
 const router = useRouter()
 const userStore = useUserStore()

@@ -1,5 +1,19 @@
 {
-  "watch": ["src"],
+  "watch": ["src", "config"],
   "ext": "js,json",
-  "exec": "npm run lint && node src/app.js"
+  "ignore": [
+    "**/*.test.js",
+    "**/*.spec.js",
+    "node_modules/**",
+    "logs/**",
+    "data/**",
+    ".git/**",
+    "web/**"
+  ],
+  "exec": "node src/app.js",
+  "delay": 500,
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "verbose": true
 }

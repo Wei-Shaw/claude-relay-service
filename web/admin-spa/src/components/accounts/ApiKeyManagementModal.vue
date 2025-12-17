@@ -7,7 +7,7 @@
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 sm:h-10 sm:w-10 sm:rounded-xl"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10 sm:rounded"
             >
               <i class="fas fa-key text-sm text-white sm:text-base" />
             </div>
@@ -22,7 +22,7 @@
           </div>
           <div class="flex items-center gap-2">
             <button
-              class="flex items-center gap-2 rounded-lg border border-purple-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-purple-600 shadow-sm transition-all duration-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-600/60 dark:bg-purple-900/20 dark:text-purple-200 dark:hover:border-purple-500 dark:hover:bg-purple-900/40 dark:hover:text-purple-100 dark:focus:ring-purple-500/40 sm:text-sm"
+              class="flex items-center gap-2 rounded-lg border border-purple-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-purple-600 transition-all duration-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-600/60 dark:bg-purple-900/20 dark:text-purple-200 dark:hover:border-purple-500 dark:hover:bg-purple-900/40 dark:hover:text-purple-100 dark:focus:ring-purple-500/40 sm:text-sm"
               :disabled="loading || apiKeys.length === 0 || copyingAll"
               @click="copyAllApiKeys"
             >
@@ -65,7 +65,7 @@
           <div class="mb-4 space-y-3">
             <!-- 工具栏：筛选、搜索和操作 -->
             <div
-              class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+              class="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
             >
               <!-- 第一行：筛选和搜索 -->
               <div class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -78,7 +78,7 @@
                       :class="[
                         'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                         statusFilter === 'all'
-                          ? 'bg-purple-500 text-white shadow-sm'
+                          ? 'bg-purple-500 text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
                       ]"
                       @click="statusFilter = 'all'"
@@ -89,7 +89,7 @@
                       :class="[
                         'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                         statusFilter === 'active'
-                          ? 'bg-green-500 text-white shadow-sm'
+                          ? 'bg-green-500 text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
                       ]"
                       @click="statusFilter = 'active'"
@@ -101,7 +101,7 @@
                       :class="[
                         'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                         statusFilter === 'error'
-                          ? 'bg-red-500 text-white shadow-sm'
+                          ? 'bg-red-500 text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
                       ]"
                       @click="statusFilter = 'error'"
@@ -130,7 +130,7 @@
                       :class="[
                         'rounded-md px-2.5 py-2 text-xs font-medium transition-colors',
                         searchMode === 'fuzzy'
-                          ? 'bg-purple-500 text-white shadow-sm'
+                          ? 'bg-purple-500 text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
                       ]"
                       title="模糊搜索：包含查询字符串即可"
@@ -143,7 +143,7 @@
                       :class="[
                         'rounded-md px-2.5 py-2 text-xs font-medium transition-colors',
                         searchMode === 'exact'
-                          ? 'bg-purple-500 text-white shadow-sm'
+                          ? 'bg-purple-500 text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
                       ]"
                       title="精确搜索：完全匹配完整 Key"
@@ -167,7 +167,7 @@
                     >批量操作：</span
                   >
                   <button
-                    class="group rounded-md bg-gradient-to-r from-red-500 to-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-600 hover:to-red-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="group rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="errorKeysCount === 0 || batchDeleting"
                     title="删除所有异常状态的 API Key"
                     @click="deleteAllErrorKeys"
@@ -176,7 +176,7 @@
                     删除异常
                   </button>
                   <button
-                    class="group rounded-md bg-gradient-to-r from-red-600 to-red-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-700 hover:to-red-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="group rounded-md bg-red-700 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="apiKeys.length === 0 || batchDeleting"
                     title="删除所有 API Key"
                     @click="deleteAllKeys"
@@ -186,7 +186,7 @@
                   </button>
                   <div class="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600"></div>
                   <button
-                    class="rounded-md bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-600 hover:to-blue-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:hover:bg-gray-100"
                     :disabled="errorKeysCount === 0"
                     title="导出所有异常状态的 API Key"
                     @click="exportKeys('error')"
@@ -195,7 +195,7 @@
                     导出异常
                   </button>
                   <button
-                    class="rounded-md bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:hover:bg-gray-100"
                     :disabled="apiKeys.length === 0"
                     title="导出所有 API Key"
                     @click="exportKeys('all')"
@@ -222,7 +222,7 @@
             <div
               v-for="(apiKey, index) in paginatedApiKeys"
               :key="index"
-              class="relative rounded-lg border border-gray-200 bg-white p-4 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+              class="relative rounded-lg border border-gray-200 bg-white p-4 transition-all dark:border-gray-700 dark:bg-gray-800"
             >
               <!-- 左上角错误状态码角标 -->
               <div
@@ -232,7 +232,7 @@
                 class="absolute -left-2 -top-2 z-10"
               >
                 <span
-                  class="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-sm"
+                  class="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
                   :class="[
                     apiKey.status === 'error'
                       ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'

@@ -3,11 +3,12 @@
     <!-- 触发器按钮 -->
     <button
       ref="triggerRef"
-      class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+      class="flex h-8 w-8 items-center justify-center border border-gray-200 bg-white text-gray-600 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
       :class="[
         isOpen &&
-          'border-blue-400 bg-blue-50 text-blue-600 dark:border-blue-500 dark:bg-blue-900/30 dark:text-blue-400'
+          'border-gray-900 bg-gray-100 text-gray-900 dark:border-white dark:bg-gray-700 dark:text-white'
       ]"
+      style="border-radius: 5px"
       title="更多操作"
       @click.stop="toggleDropdown"
     >
@@ -16,32 +17,27 @@
 
     <!-- 下拉菜单 - 使用 Teleport 避免被父容器裁剪 -->
     <Teleport to="body">
-      <transition
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="transform scale-95 opacity-0"
-        enter-to-class="transform scale-100 opacity-100"
-        leave-active-class="transition duration-150 ease-in"
-        leave-from-class="transform scale-100 opacity-100"
-        leave-to-class="transform scale-95 opacity-0"
+      <div
+        v-if="isOpen"
+        ref="dropdownRef"
+        class="fixed z-[9999] min-w-[140px] overflow-hidden border border-gray-200 bg-white py-1 dark:border-gray-600 dark:bg-gray-800"
+        :style="{
+          ...dropdownStyle,
+          borderRadius: '5px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
+        }"
       >
-        <div
-          v-if="isOpen"
-          ref="dropdownRef"
-          class="fixed z-[9999] min-w-[140px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
-          :style="dropdownStyle"
+        <button
+          v-for="action in actions"
+          :key="action.key"
+          class="flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm transition-colors duration-150"
+          :class="getActionClass(action)"
+          @click.stop="handleAction(action)"
         >
-          <button
-            v-for="action in actions"
-            :key="action.key"
-            class="flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm transition-colors duration-150"
-            :class="getActionClass(action)"
-            @click.stop="handleAction(action)"
-          >
-            <i :class="['fas', action.icon, 'w-4 text-center text-xs']"></i>
-            <span>{{ action.label }}</span>
-          </button>
-        </div>
-      </transition>
+          <i :class="['fas', action.icon, 'w-4 text-center text-xs']"></i>
+          <span>{{ action.label }}</span>
+        </button>
+      </div>
     </Teleport>
   </div>
 </template>
@@ -68,7 +64,7 @@ const getActionClass = (action) => {
   const colorMap = {
     purple: 'text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20',
     indigo: 'text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20',
-    blue: 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20',
+    blue: 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700',
     green: 'text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20',
     orange: 'text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20',
     red: 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20',

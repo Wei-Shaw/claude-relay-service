@@ -4,14 +4,14 @@
   >
     <!-- 主题切换按钮 -->
     <div class="fixed right-4 top-4 z-10">
-      <ThemeToggle mode="dropdown" />
+      <ThemeToggle />
     </div>
 
     <div class="w-full max-w-md space-y-8">
       <div>
         <div class="mx-auto flex h-12 w-auto items-center justify-center">
           <svg
-            class="h-8 w-8 text-blue-600 dark:text-blue-400"
+            class="h-8 w-8 text-gray-900 dark:text-white"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -47,7 +47,7 @@
                 id="username"
                 v-model="form.username"
                 autocomplete="username"
-                class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-400 dark:focus:ring-blue-400 sm:text-sm"
+                class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-black focus:outline-none focus:ring-black dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-white dark:focus:ring-white sm:text-sm"
                 :disabled="loading"
                 name="username"
                 placeholder="Enter your username"
@@ -69,7 +69,7 @@
                 id="password"
                 v-model="form.password"
                 autocomplete="current-password"
-                class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-400 dark:focus:ring-blue-400 sm:text-sm"
+                class="relative block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-black focus:outline-none focus:ring-black dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-white dark:focus:ring-white sm:text-sm"
                 :disabled="loading"
                 name="password"
                 placeholder="Enter your password"
@@ -101,7 +101,7 @@
 
           <div>
             <button
-              class="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-400 dark:focus:ring-offset-gray-800"
+              class="group relative flex w-full justify-center rounded-md border border-transparent bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-100 dark:focus:ring-white dark:focus:ring-offset-gray-800"
               :disabled="loading || !form.username || !form.password"
               type="submit"
             >
@@ -133,7 +133,7 @@
 
           <div class="text-center">
             <router-link
-              class="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              class="text-sm text-gray-700 hover:text-black dark:text-gray-300 dark:hover:text-white"
               to="/admin-login"
             >
               Admin Login

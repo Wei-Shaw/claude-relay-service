@@ -2,14 +2,13 @@
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">代理设置 (可选)</h4>
-      <label class="flex cursor-pointer items-center">
-        <input
-          v-model="proxy.enabled"
-          class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500"
-          type="checkbox"
-        />
-        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">启用代理</span>
-      </label>
+      <Checkbox
+        v-model="proxy.enabled"
+        :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+        label="启用代理"
+        :label-class="'flex cursor-pointer items-center'"
+        :text-class="'ml-2 text-sm text-gray-700 dark:text-gray-300'"
+      />
     </div>
 
     <div
@@ -17,7 +16,9 @@
       class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-800"
     >
       <div class="mb-3 flex items-start gap-3">
-        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-500">
+        <div
+          class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-500 dark:bg-gray-600"
+        >
           <i class="fas fa-server text-sm text-white" />
         </div>
         <div class="flex-1">
@@ -109,20 +110,14 @@
       </div>
 
       <div class="space-y-4">
-        <div class="flex items-center">
-          <input
-            id="proxyAuth"
-            v-model="showAuth"
-            class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500"
-            type="checkbox"
-          />
-          <label
-            class="ml-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300"
-            for="proxyAuth"
-          >
-            需要身份验证
-          </label>
-        </div>
+        <Checkbox
+          id="proxyAuth"
+          v-model="showAuth"
+          :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+          label="需要身份验证"
+          :label-class="'flex items-center'"
+          :text-class="'ml-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300'"
+        />
 
         <div v-if="showAuth" class="grid grid-cols-2 gap-4">
           <div>
@@ -160,9 +155,9 @@
       </div>
 
       <div
-        class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/30"
+        class="rounded-lg border border-gray-300 bg-blue-50 p-3 dark:border-gray-700 dark:bg-blue-900/30"
       >
-        <p class="text-xs text-blue-700 dark:text-blue-300">
+        <p class="text-xs text-gray-900 dark:text-blue-300 dark:text-white">
           <i class="fas fa-info-circle mr-1" />
           <strong>提示：</strong
           >代理设置将用于所有与此账户相关的API请求。请确保代理服务器支持HTTPS流量转发。
@@ -174,6 +169,7 @@
 
 <script setup>
 import { ref, watch, onUnmounted } from 'vue'
+import { Checkbox } from '@/ui'
 
 const props = defineProps({
   modelValue: {

@@ -1,7 +1,27 @@
 <template>
   <div>
+    <!-- Skeleton Loading -->
+    <div v-if="loading && !dashboardData.totalApiKeys">
+      <!-- 主要统计骨架 -->
+      <div
+        class="mb-4 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 md:mb-8 md:gap-6 lg:grid-cols-4"
+      >
+        <div v-for="i in 8" :key="i" class="stat-card">
+          <div class="skeleton skeleton-text mb-2" style="width: 60%; height: 16px"></div>
+          <div class="skeleton skeleton-text mb-2" style="width: 80%; height: 32px"></div>
+          <div class="skeleton skeleton-text" style="width: 50%; height: 14px"></div>
+        </div>
+      </div>
+      <!-- 图表骨架 -->
+      <div class="mb-8">
+        <div class="skeleton skeleton-text mb-4" style="width: 30%; height: 24px"></div>
+        <div class="skeleton skeleton-rect" style="height: 400px"></div>
+      </div>
+    </div>
+
     <!-- 主要统计 -->
     <div
+      v-else
       class="mb-4 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 md:mb-8 md:gap-6 lg:grid-cols-4"
     >
       <div class="stat-card">
@@ -17,7 +37,7 @@
               活跃: {{ dashboardData.activeApiKeys || 0 }}
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-600">
+          <div class="stat-icon flex-shrink-0 bg-gray-700 dark:bg-gray-600">
             <i class="fas fa-key" />
           </div>
         </div>
@@ -151,7 +171,7 @@
               </span>
             </p>
           </div>
-          <div class="stat-icon ml-2 flex-shrink-0 bg-gradient-to-br from-green-500 to-green-600">
+          <div class="stat-icon ml-2 flex-shrink-0 bg-gray-700 dark:bg-gray-600">
             <i class="fas fa-user-circle" />
           </div>
         </div>
@@ -170,7 +190,7 @@
               总请求: {{ formatNumber(dashboardData.totalRequests || 0) }}
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-purple-500 to-purple-600">
+          <div class="stat-icon flex-shrink-0 bg-gray-700 dark:bg-gray-600">
             <i class="fas fa-chart-line" />
           </div>
         </div>
@@ -189,7 +209,7 @@
               运行时间: {{ formattedUptime }}
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-yellow-500 to-orange-500">
+          <div class="stat-icon flex-shrink-0 bg-gray-700 dark:bg-gray-600">
             <i class="fas fa-heartbeat" />
           </div>
         </div>
@@ -250,7 +270,7 @@
               </div>
             </div>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-indigo-500 to-indigo-600">
+          <div class="stat-icon flex-shrink-0 bg-gray-700 dark:bg-gray-600">
             <i class="fas fa-coins" />
           </div>
         </div>
@@ -306,7 +326,7 @@
               </div>
             </div>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-emerald-500 to-emerald-600">
+          <div class="stat-icon flex-shrink-0 bg-gray-700 dark:bg-gray-600">
             <i class="fas fa-database" />
           </div>
         </div>
@@ -329,7 +349,7 @@
               </span>
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-orange-500 to-orange-600">
+          <div class="stat-icon flex-shrink-0 bg-gray-700 dark:bg-gray-600">
             <i class="fas fa-tachometer-alt" />
           </div>
         </div>
@@ -352,7 +372,7 @@
               </span>
             </p>
           </div>
-          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-rose-500 to-rose-600">
+          <div class="stat-icon flex-shrink-0 bg-gray-700 dark:bg-gray-600">
             <i class="fas fa-rocket" />
           </div>
         </div>
@@ -376,7 +396,7 @@
               :class="[
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 dateFilter.preset === option.value && dateFilter.type === 'preset'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="setDateFilterPreset(option.value)"
@@ -391,7 +411,7 @@
               :class="[
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 trendGranularity === 'day'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="setTrendGranularity('day')"
@@ -402,7 +422,7 @@
               :class="[
                 'rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 trendGranularity === 'hour'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="setTrendGranularity('hour')"
@@ -441,7 +461,7 @@
                 <input v-model="autoRefreshEnabled" class="peer sr-only" type="checkbox" />
                 <!-- 更小的开关 -->
                 <div
-                  class="peer relative h-5 w-9 rounded-full bg-gray-300 transition-all duration-200 after:absolute after:left-[2px] after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 after:content-[''] peer-checked:bg-blue-500 peer-checked:after:translate-x-4 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:bg-gray-600 dark:after:bg-gray-300 dark:peer-focus:ring-blue-600"
+                  class="peer relative h-5 w-9 rounded-full bg-gray-300 transition-all duration-200 after:absolute after:left-[2px] after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 after:content-[''] peer-checked:bg-gray-900 peer-checked:after:translate-x-4 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gray-400 dark:bg-gray-600 dark:after:bg-gray-300 dark:peer-checked:bg-white dark:peer-focus:ring-gray-500"
                 />
                 <span
                   class="ml-2.5 flex select-none items-center gap-1 text-sm font-medium text-gray-600 dark:text-gray-300"
@@ -450,7 +470,7 @@
                   <span>自动刷新</span>
                   <span
                     v-if="autoRefreshEnabled"
-                    class="ml-1 font-mono text-xs text-blue-600 transition-opacity"
+                    class="ml-1 font-mono text-xs text-gray-900 transition-opacity dark:text-white"
                     :class="refreshCountdown > 0 ? 'opacity-100' : 'opacity-0'"
                   >
                     {{ refreshCountdown }}s
@@ -460,15 +480,16 @@
             </div>
 
             <!-- 刷新按钮 -->
-            <button
-              class="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-blue-600 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700 sm:gap-2"
+            <Button
               :disabled="isRefreshing"
+              size="sm"
               title="立即刷新数据"
+              variant="secondary"
               @click="refreshAllData()"
             >
-              <i :class="['fas fa-sync-alt text-xs', { 'animate-spin': isRefreshing }]" />
+              <i :class="['fas fa-sync-alt', { 'animate-spin': isRefreshing }]" />
               <span class="hidden sm:inline">{{ isRefreshing ? '刷新中' : '刷新' }}</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -552,11 +573,9 @@
                   <td
                     class="hidden px-2 py-2 text-right text-xs font-medium sm:table-cell sm:px-4 sm:text-sm"
                   >
-                    <span
-                      class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                    >
+                    <Badge size="sm" variant="neutral">
                       {{ calculatePercentage(stat.allTokens, dashboardModelStats) }}%
-                    </span>
+                    </Badge>
                   </td>
                 </tr>
               </tbody>
@@ -588,7 +607,7 @@
               :class="[
                 'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                 apiKeysTrendMetric === 'requests'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="((apiKeysTrendMetric = 'requests'), updateApiKeysUsageTrendChart())"
@@ -600,7 +619,7 @@
               :class="[
                 'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                 apiKeysTrendMetric === 'tokens'
-                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               ]"
               @click="((apiKeysTrendMetric = 'tokens'), updateApiKeysUsageTrendChart())"
@@ -642,7 +661,7 @@
                 :class="[
                   'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                   accountUsageGroup === option.value
-                    ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                    ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                     : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
                 ]"
                 @click="handleAccountUsageGroupChange(option.value)"
@@ -682,12 +701,14 @@ import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
 import Chart from 'chart.js/auto'
+import { Badge, Button } from '@/ui'
 
 const dashboardStore = useDashboardStore()
 const themeStore = useThemeStore()
 const { isDarkMode } = storeToRefs(themeStore)
 
 const {
+  loading,
   dashboardData,
   costsData,
   dashboardModelStats,
@@ -1620,5 +1641,34 @@ onUnmounted(() => {
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* Skeleton styles */
+.skeleton {
+  background: linear-gradient(90deg, #fafafa 25%, #eaeaea 50%, #fafafa 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+:global(.dark) .skeleton {
+  background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-text {
+  width: 100%;
+}
+
+.skeleton-rect {
+  width: 100%;
 }
 </style>

@@ -1,8 +1,10 @@
 <template>
-  <div class="glass-strong mb-8 rounded-3xl p-6">
+  <div
+    class="mb-8 rounded border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900"
+  >
     <div class="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-      <h2 class="flex items-center text-xl font-bold text-gray-800">
-        <i class="fas fa-chart-area mr-2 text-blue-500" />
+      <h2 class="flex items-center text-xl font-bold text-gray-900 dark:text-gray-100">
+        <i class="fas fa-chart-area mr-2 text-gray-600 dark:text-gray-400" />
         使用趋势
       </h2>
 
@@ -83,16 +85,16 @@ const createChart = () => {
         {
           label: '请求次数',
           data: dashboardStore.trendData.map((item) => item.requests),
-          borderColor: '#667eea',
-          backgroundColor: getGradient(ctx, '#667eea', 0.1),
+          borderColor: '#000',
+          backgroundColor: getGradient(ctx, '#000', 0.05),
           yAxisID: 'y',
           tension: 0.4
         },
         {
           label: 'Token使用量',
           data: dashboardStore.trendData.map((item) => item.tokens),
-          borderColor: '#f093fb',
-          backgroundColor: getGradient(ctx, '#f093fb', 0.1),
+          borderColor: '#666',
+          backgroundColor: getGradient(ctx, '#666', 0.05),
           yAxisID: 'y1',
           tension: 0.4
         }

@@ -35,16 +35,44 @@ async function shouldRejectDueToOverload(apiKeyId, timeoutMs, queueConfig, maxQu
     // 🔑 先检查当前队列长度
     const currentQueueCount = await redis.getConcurrencyQueueCount(apiKeyId).catch(() => 0)
 
-    // 队列为空，说明系统已恢复，跳过健康检查
-    if (currentQueueCount === 0) {
-      return { reject: false, reason: 'queue_empty', currentQueueCount: 0 }
-    }
-
     // 🔑 关键改进：只有当队列接近满载时才进行健康检查
     // 队列长度 <= maxQueueSize * 0.5 时，认为系统有足够余量，跳过健康检查
     // 这避免了在队列较短时过于保守地拒绝请求
     // 使用 ceil 确保小队列（如 maxQueueSize=3）时阈值为 2，即队列 <=1 时跳过
     const queueLoadThreshold = Math.ceil(maxQueueSize * 0.5)
+
+    // 获取该 API Key 的等待时间样本（先获取，用于历史数据检查）
+    const waitTimes = await redis.getQueueWaitTimes(apiKeyId)
+    const stats = calculateWaitTimeStats(waitTimes)
+
+    // 修复：即使队列为空，也要检查历史数据以防止竞态条件绕过
+    // 如果最近有过载历史（有足够样本且P90高），仍然拒绝新请求
+    if (currentQueueCount === 0) {
+      // 如果没有足够历史数据，确实说明系统已恢复
+      if (!stats || stats.sampleCount < 10 || stats.p90Unreliable) {
+        return { reject: false, reason: 'queue_empty_no_history', currentQueueCount: 0 }
+      }
+
+      // 检查历史过载情况
+      const threshold = queueConfig.concurrentRequestQueueHealthThreshold || 0.8
+      const maxAllowedP90 = timeoutMs * threshold
+
+      if (stats.p90 >= maxAllowedP90) {
+        return {
+          reject: true,
+          reason: 'historical_overload',
+          estimatedWaitMs: stats.p90,
+          timeoutMs,
+          threshold,
+          sampleCount: stats.sampleCount,
+          currentQueueCount: 0,
+          maxQueueSize
+        }
+      }
+
+      return { reject: false, reason: 'queue_empty', currentQueueCount: 0 }
+    }
+
     if (currentQueueCount <= queueLoadThreshold) {
       return {
         reject: false,
@@ -54,10 +82,6 @@ async function shouldRejectDueToOverload(apiKeyId, timeoutMs, queueConfig, maxQu
         maxQueueSize
       }
     }
-
-    // 获取该 API Key 的等待时间样本
-    const waitTimes = await redis.getQueueWaitTimes(apiKeyId)
-    const stats = calculateWaitTimeStats(waitTimes)
 
     // 样本不足（< 10），跳过健康检查，避免冷启动误判
     if (!stats || stats.sampleCount < 10) {
@@ -707,8 +731,9 @@ const authenticateApiKey = async (req, res, next) => {
           })
         }
 
-        // 5. 尝试进入排队（原子操作：先增加再检查，避免竞态条件）
+        // 5. 尝试进入排队（原子操作：先增加再检查,避免竞态条件）
         let queueIncremented = false
+        let slot = null
         try {
           const newQueueCount = await redis.incrConcurrencyQueue(
             validation.keyData.id,
@@ -775,7 +800,7 @@ const authenticateApiKey = async (req, res, next) => {
           // 外层 catch 块会重复减少计数（finally 已经减过一次）
           queueIncremented = false
 
-          const slot = await waitForConcurrencySlot(req, res, validation.keyData.id, {
+          slot = await waitForConcurrencySlot(req, res, validation.keyData.id, {
             concurrencyLimit,
             requestId,
             leaseSeconds,
@@ -901,10 +926,11 @@ const authenticateApiKey = async (req, res, next) => {
               .catch((e) => logger.error('Failed to cleanup queue count after error:', e))
           }
 
-          // 2. 防御性清理：如果 waitForConcurrencySlot 内部获取了槽位但在返回前异常
-          //    虽然这种情况极少发生（统计记录的异常会被内部捕获），但为了安全起见
-          //    尝试释放可能已获取的槽位。decrConcurrency 使用 ZREM，即使成员不存在也安全
-          if (hasConcurrencySlot) {
+          // 2. 修复：防御性清理槽位 - 检查 slot.acquired 而不仅是 hasConcurrencySlot
+          //    因为 waitForConcurrencySlot 可能返回 { acquired: true } 但在设置
+          //    hasConcurrencySlot = true 之前抛出异常（如 socket 验证失败）
+          //    decrConcurrency 使用 ZREM，即使成员不存在也安全
+          if (hasConcurrencySlot || (slot && slot.acquired)) {
             hasConcurrencySlot = false
             await redis
               .decrConcurrency(validation.keyData.id, requestId)
@@ -924,132 +950,146 @@ const authenticateApiKey = async (req, res, next) => {
       let concurrencyDecremented = false
       let leaseRenewInterval = null
 
-      if (renewIntervalMs > 0) {
-        // 🔴 关键修复：添加最大刷新次数限制，防止租约永不过期
-        // 默认最大生存时间为 10 分钟，可通过环境变量配置
-        const maxLifetimeMinutes = parseInt(process.env.CONCURRENCY_MAX_LIFETIME_MINUTES) || 10
-        const maxRefreshCount = Math.ceil((maxLifetimeMinutes * 60 * 1000) / renewIntervalMs)
-        let refreshCount = 0
+      // 修复：使用 try-catch 包裹定时器创建和事件监听器注册，防止异常导致定时器泄漏
+      try {
+        if (renewIntervalMs > 0) {
+          // 🔴 关键修复：添加最大刷新次数限制，防止租约永不过期
+          // 默认最大生存时间为 10 分钟，可通过环境变量配置
+          const maxLifetimeMinutes = parseInt(process.env.CONCURRENCY_MAX_LIFETIME_MINUTES) || 10
+          const maxRefreshCount = Math.ceil((maxLifetimeMinutes * 60 * 1000) / renewIntervalMs)
+          let refreshCount = 0
 
-        leaseRenewInterval = setInterval(() => {
-          refreshCount++
+          leaseRenewInterval = setInterval(() => {
+            refreshCount++
 
-          // 超过最大刷新次数，强制停止并清理
-          if (refreshCount > maxRefreshCount) {
-            logger.warn(
-              `⚠️ Lease refresh exceeded max count (${maxRefreshCount}) for key ${validation.keyData.id} (${validation.keyData.name}), forcing cleanup after ${maxLifetimeMinutes} minutes`
-            )
-            // 清理定时器
+            // 超过最大刷新次数，强制停止并清理
+            if (refreshCount > maxRefreshCount) {
+              logger.warn(
+                `⚠️ Lease refresh exceeded max count (${maxRefreshCount}) for key ${validation.keyData.id} (${validation.keyData.name}), forcing cleanup after ${maxLifetimeMinutes} minutes`
+              )
+              // 清理定时器
+              if (leaseRenewInterval) {
+                clearInterval(leaseRenewInterval)
+                leaseRenewInterval = null
+              }
+              // 强制减少并发计数（如果还没减少）
+              if (!concurrencyDecremented) {
+                concurrencyDecremented = true
+                redis.decrConcurrency(validation.keyData.id, requestId).catch((error) => {
+                  logger.error(
+                    `Failed to decrement concurrency after max refresh for key ${validation.keyData.id}:`,
+                    error
+                  )
+                })
+              }
+              return
+            }
+
+            redis
+              .refreshConcurrencyLease(validation.keyData.id, requestId, leaseSeconds)
+              .catch((error) => {
+                logger.error(
+                  `Failed to refresh concurrency lease for key ${validation.keyData.id}:`,
+                  error
+                )
+              })
+          }, renewIntervalMs)
+
+          if (typeof leaseRenewInterval.unref === 'function') {
+            leaseRenewInterval.unref()
+          }
+        }
+
+        const decrementConcurrency = async () => {
+          if (!concurrencyDecremented) {
+            concurrencyDecremented = true
+            hasConcurrencySlot = false
             if (leaseRenewInterval) {
               clearInterval(leaseRenewInterval)
               leaseRenewInterval = null
             }
-            // 强制减少并发计数（如果还没减少）
-            if (!concurrencyDecremented) {
-              concurrencyDecremented = true
-              redis.decrConcurrency(validation.keyData.id, requestId).catch((error) => {
-                logger.error(
-                  `Failed to decrement concurrency after max refresh for key ${validation.keyData.id}:`,
-                  error
-                )
-              })
-            }
-            return
-          }
-
-          redis
-            .refreshConcurrencyLease(validation.keyData.id, requestId, leaseSeconds)
-            .catch((error) => {
+            try {
+              const newCount = await redis.decrConcurrency(validation.keyData.id, requestId)
+              logger.api(
+                `📉 Decremented concurrency for key: ${validation.keyData.id} (${validation.keyData.name}), new count: ${newCount}`
+              )
+            } catch (error) {
               logger.error(
-                `Failed to refresh concurrency lease for key ${validation.keyData.id}:`,
+                `Failed to decrement concurrency for key ${validation.keyData.id}:`,
                 error
               )
-            })
-        }, renewIntervalMs)
-
-        if (typeof leaseRenewInterval.unref === 'function') {
-          leaseRenewInterval.unref()
-        }
-      }
-
-      const decrementConcurrency = async () => {
-        if (!concurrencyDecremented) {
-          concurrencyDecremented = true
-          hasConcurrencySlot = false
-          if (leaseRenewInterval) {
-            clearInterval(leaseRenewInterval)
-            leaseRenewInterval = null
-          }
-          try {
-            const newCount = await redis.decrConcurrency(validation.keyData.id, requestId)
-            logger.api(
-              `📉 Decremented concurrency for key: ${validation.keyData.id} (${validation.keyData.name}), new count: ${newCount}`
-            )
-          } catch (error) {
-            logger.error(`Failed to decrement concurrency for key ${validation.keyData.id}:`, error)
+            }
           }
         }
-      }
-      // 升级为完整清理函数（包含 leaseRenewInterval 清理逻辑）
-      // 此时请求已通过认证，后续由 res.close/req.close 事件触发清理
-      if (hasConcurrencySlot) {
-        concurrencyCleanup = decrementConcurrency
-      }
+        // 升级为完整清理函数（包含 leaseRenewInterval 清理逻辑）
+        // 此时请求已通过认证，后续由 res.close/req.close 事件触发清理
+        if (hasConcurrencySlot) {
+          concurrencyCleanup = decrementConcurrency
+        }
 
-      // 监听最可靠的事件（避免重复监听）
-      // res.on('close') 是最可靠的，会在连接关闭时触发
-      res.once('close', () => {
-        logger.api(
-          `🔌 Response closed for key: ${validation.keyData.id} (${validation.keyData.name})`
-        )
-        decrementConcurrency()
-      })
+        // 监听最可靠的事件（避免重复监听）
+        // res.on('close') 是最可靠的，会在连接关闭时触发
+        res.once('close', () => {
+          logger.api(
+            `🔌 Response closed for key: ${validation.keyData.id} (${validation.keyData.name})`
+          )
+          decrementConcurrency()
+        })
 
-      // req.on('close') 作为备用，处理请求端断开
-      req.once('close', () => {
-        logger.api(
-          `🔌 Request closed for key: ${validation.keyData.id} (${validation.keyData.name})`
-        )
-        decrementConcurrency()
-      })
+        // req.on('close') 作为备用，处理请求端断开
+        req.once('close', () => {
+          logger.api(
+            `🔌 Request closed for key: ${validation.keyData.id} (${validation.keyData.name})`
+          )
+          decrementConcurrency()
+        })
 
-      req.once('aborted', () => {
-        logger.warn(
-          `⚠️ Request aborted for key: ${validation.keyData.id} (${validation.keyData.name})`
-        )
-        decrementConcurrency()
-      })
+        req.once('aborted', () => {
+          logger.warn(
+            `⚠️ Request aborted for key: ${validation.keyData.id} (${validation.keyData.name})`
+          )
+          decrementConcurrency()
+        })
 
-      req.once('error', (error) => {
-        logger.error(
-          `❌ Request error for key ${validation.keyData.id} (${validation.keyData.name}):`,
-          error
-        )
-        decrementConcurrency()
-      })
+        req.once('error', (error) => {
+          logger.error(
+            `❌ Request error for key ${validation.keyData.id} (${validation.keyData.name}):`,
+            error
+          )
+          decrementConcurrency()
+        })
 
-      res.once('error', (error) => {
-        logger.error(
-          `❌ Response error for key ${validation.keyData.id} (${validation.keyData.name}):`,
-          error
-        )
-        decrementConcurrency()
-      })
+        res.once('error', (error) => {
+          logger.error(
+            `❌ Response error for key ${validation.keyData.id} (${validation.keyData.name}):`,
+            error
+          )
+          decrementConcurrency()
+        })
 
-      // res.on('finish') 处理正常完成的情况
-      res.once('finish', () => {
-        logger.api(
-          `✅ Response finished for key: ${validation.keyData.id} (${validation.keyData.name})`
-        )
-        decrementConcurrency()
-      })
+        // res.on('finish') 处理正常完成的情况
+        res.once('finish', () => {
+          logger.api(
+            `✅ Response finished for key: ${validation.keyData.id} (${validation.keyData.name})`
+          )
+          decrementConcurrency()
+        })
 
-      // 存储并发信息到请求对象，便于后续处理
-      req.concurrencyInfo = {
-        apiKeyId: validation.keyData.id,
-        apiKeyName: validation.keyData.name,
-        requestId,
-        decrementConcurrency
+        // 存储并发信息到请求对象，便于后续处理
+        req.concurrencyInfo = {
+          apiKeyId: validation.keyData.id,
+          apiKeyName: validation.keyData.name,
+          requestId,
+          decrementConcurrency
+        }
+      } catch (setupError) {
+        // 修复：如果设置定时器或事件监听器时出错，确保清理定时器
+        if (leaseRenewInterval) {
+          clearInterval(leaseRenewInterval)
+          leaseRenewInterval = null
+        }
+        logger.error('Failed to setup lease renewal or event listeners:', setupError)
+        throw setupError
       }
     }
 

@@ -5,7 +5,10 @@
   "main": "src/app.js",
   "scripts": {
     "start": "npm run lint && node src/app.js",
-    "dev": "nodemon",
+    "dev": "concurrently -n \"backend,frontend\" -c \"cyan,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "nodemon",
+    "dev:frontend": "cd web/admin-spa && npm run dev",
+    "dev:full": "npm run dev",
     "build:web": "cd web/admin-spa && npm run build",
     "install:web": "cd web/admin-spa && npm install",
     "update:pricing": "node scripts/update-model-pricing.js",
@@ -77,6 +80,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.8.9",
+    "concurrently": "^9.2.1",
     "eslint": "^8.53.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",

@@ -1,9 +1,10 @@
 <template>
-  <div id="app">
+  <!-- Root container for the Vue app (avoid duplicate #app id in DOM) -->
+  <div class="app-root">
     <router-view />
 
     <!-- 全局组件 -->
-    <ToastNotification ref="toastRef" />
+    <Toaster position="top-right" />
     <ConfirmDialog ref="confirmRef" />
   </div>
 </template>
@@ -12,12 +13,11 @@
 import { onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
-import ToastNotification from '@/components/common/ToastNotification.vue'
+import Toaster from '@/components/ui/Toaster.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
-const toastRef = ref()
 const confirmRef = ref()
 
 onMounted(() => {
@@ -36,7 +36,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-#app {
+.app-root {
   min-height: 100vh;
 }
 </style>

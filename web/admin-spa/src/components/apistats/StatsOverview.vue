@@ -10,8 +10,8 @@
             class="header-icon"
             :class="
               multiKeyMode
-                ? 'fas fa-layer-group text-purple-500'
-                : 'fas fa-info-circle text-blue-500'
+                ? 'fas fa-layer-group text-gray-700 dark:text-gray-400'
+                : 'fas fa-info-circle text-gray-700 dark:text-gray-400'
             "
           />
           <h3 class="header-title">{{ multiKeyMode ? '批量查询概要' : 'API Key 信息' }}</h3>
@@ -130,7 +130,7 @@
       <!-- 使用统计概览 -->
       <div class="card-section">
         <header class="section-header">
-          <i class="header-icon fas fa-chart-bar text-green-500" />
+          <i class="header-icon fas fa-chart-bar text-gray-700 dark:text-gray-400" />
           <h3 class="header-title">使用统计概览</h3>
           <span class="header-tag">{{ statsPeriod === 'daily' ? '今日' : '本月' }}</span>
         </header>
@@ -142,7 +142,7 @@
             <p class="metric-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}请求数</p>
           </div>
           <div class="metric-card">
-            <p class="metric-value text-blue-600 dark:text-sky-300">
+            <p class="metric-value text-gray-900 dark:text-gray-100 dark:text-sky-300">
               {{ formatNumber(currentPeriodData.allTokens) }}
             </p>
             <p class="metric-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}Token 数</p>
@@ -265,7 +265,7 @@
             </div>
             <p
               v-else
-              class="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300"
+              class="rounded bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300"
             >
               暂无额度使用数据
             </p>
@@ -435,12 +435,12 @@ const formatSessionRemaining = (minutes) => {
 }
 
 const getSessionProgressBarClass = (status, account) => {
-  if (!status) return 'bg-gradient-to-r from-blue-500 to-indigo-500'
-  if (account?.rateLimitStatus?.isRateLimited) return 'bg-gradient-to-r from-red-500 to-red-600'
+  if (!status) return 'bg-black dark:bg-white'
+  if (account?.rateLimitStatus?.isRateLimited) return 'bg-red-600'
   const normalized = String(status).toLowerCase()
-  if (normalized === 'rejected') return 'bg-gradient-to-r from-red-500 to-red-600'
-  if (normalized === 'allowed_warning') return 'bg-gradient-to-r from-yellow-500 to-orange-500'
-  return 'bg-gradient-to-r from-blue-500 to-indigo-500'
+  if (normalized === 'rejected') return 'bg-red-600'
+  if (normalized === 'allowed_warning') return 'bg-orange-500'
+  return 'bg-black dark:bg-white'
 }
 
 const normalizeCodexUsagePercent = (usageItem) => {
@@ -467,10 +467,10 @@ const normalizeCodexUsagePercent = (usageItem) => {
 
 const getCodexUsageBarClass = (usageItem) => {
   const percent = normalizeCodexUsagePercent(usageItem)
-  if (percent === null) return 'bg-gradient-to-r from-gray-300 to-gray-400'
-  if (percent >= 90) return 'bg-gradient-to-r from-red-500 to-red-600'
-  if (percent >= 75) return 'bg-gradient-to-r from-yellow-500 to-orange-500'
-  return 'bg-gradient-to-r from-emerald-500 to-teal-500'
+  if (percent === null) return 'bg-gray-400'
+  if (percent >= 90) return 'bg-red-600'
+  if (percent >= 75) return 'bg-orange-500'
+  return 'bg-black dark:bg-white'
 }
 
 const getCodexUsageWidth = (usageItem) => {
@@ -510,148 +510,289 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 
 <style scoped>
 .card-section {
-  @apply flex h-full flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-md dark:border-slate-700/60 dark:bg-slate-900/70 md:p-6;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--card-padding);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+  box-shadow: var(--shadow-card);
 }
 
-:global(.dark) .card-section {
-  backdrop-filter: blur(10px);
-}
-
-.section-header {
-  @apply mb-4 flex items-center gap-3;
-}
-
-.header-icon {
-  @apply text-base md:text-lg;
-}
-
-.header-title {
-  @apply text-lg font-semibold text-slate-900 dark:text-slate-100 md:text-xl;
-}
-
-.header-tag {
-  @apply ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-300;
-}
-
-.info-grid {
-  @apply grid gap-3 md:gap-4;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-}
-
-@media (min-width: 768px) {
-  .info-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 768px) {
+  .card-section {
+    padding: var(--card-padding-sm);
   }
 }
 
-@media (min-width: 1280px) {
+/* Section Header */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: 0;
+}
+
+.header-icon {
+  font-size: var(--font-size-xl);
+}
+
+.header-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.header-tag {
+  margin-left: auto;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+}
+
+/* Info Grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+@media (max-width: 768px) {
   .info-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
 .info-item {
-  @apply rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/60;
-  min-height: 86px;
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .info-label {
-  @apply text-xs uppercase tracking-wide text-slate-400;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  margin-bottom: var(--space-2);
 }
 
 .info-value {
-  @apply mt-2 text-sm text-slate-800 dark:text-slate-100;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  word-break: break-word;
 }
 
+/* Contributor Items */
 .contributor-item {
-  @apply flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
 }
 
+/* Metric Grid */
 .metric-grid {
-  @apply grid grid-cols-2 gap-3 md:gap-4;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .metric-grid {
+    gap: var(--space-3);
+  }
 }
 
 .metric-card {
-  @apply rounded-xl border border-slate-200 bg-white/70 p-4 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/60;
+  padding: var(--card-gap);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  text-align: center;
 }
 
 .metric-value {
-  @apply text-xl font-semibold md:text-2xl;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  margin-bottom: var(--space-2);
+}
+
+@media (max-width: 768px) {
+  .metric-value {
+    font-size: var(--font-size-3xl);
+  }
 }
 
 .metric-label {
-  @apply mt-1 text-xs text-slate-500 dark:text-slate-300;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
 }
 
+/* Account Card */
 .account-card {
-  @apply rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900/60;
+  padding: var(--card-gap);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  transition: var(--transition-all);
+}
+
+.account-card:hover {
+  border-color: var(--border-strong);
 }
 
 .account-icon {
-  @apply inline-flex h-10 w-10 items-center justify-center rounded-full text-white;
+  width: var(--size-button-md);
+  height: var(--size-button-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  color: var(--color-white);
 }
 
 .icon-claude {
-  @apply bg-gradient-to-br from-purple-500 to-purple-600;
+  background: var(--color-black);
+}
+
+:global(.dark) .icon-claude {
+  background: var(--color-white);
+  color: var(--color-black);
 }
 
 .icon-openai {
-  @apply bg-gradient-to-br from-sky-500 to-indigo-500;
+  background: var(--color-gray-600);
+}
+
+:global(.dark) .icon-openai {
+  background: var(--text-muted);
+  color: var(--color-black);
 }
 
 .account-name {
-  @apply text-sm font-semibold text-slate-900 dark:text-slate-100;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
 .account-sub {
-  @apply text-xs text-slate-500 dark:text-slate-400;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
 }
 
 .rate-badge {
-  @apply rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium dark:bg-slate-800;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
 }
 
+/* Progress */
 .progress-row {
-  @apply flex items-center gap-2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .progress-track {
-  @apply h-1.5 flex-1 rounded-full bg-slate-200 dark:bg-slate-700;
+  flex: 1;
+  height: 6px;
+  background: var(--border-default);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
 .progress-bar {
-  @apply h-1.5 rounded-full transition-all duration-300;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  transition: width var(--transition-slow);
 }
 
 .progress-value {
-  @apply text-xs font-semibold text-slate-600 dark:text-slate-200;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: right;
 }
 
+/* Quota Row */
 .quota-row {
-  @apply rounded-xl border border-slate-200 bg-white/60 p-3 dark:border-slate-700 dark:bg-slate-900/50;
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
 }
 
 .quota-header {
-  @apply mb-2 flex items-center justify-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
 }
 
 .quota-tag {
-  @apply inline-flex min-w-[34px] justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: var(--space-1) 10px;
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-xl);
 }
 
 .tag-indigo {
-  @apply bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+:global(.dark) .tag-indigo {
+  background: #312e81;
+  color: #a5b4fc;
 }
 
 .tag-blue {
-  @apply bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-200;
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+:global(.dark) .tag-blue {
+  background: #0c4a6e;
+  color: #7dd3fc;
 }
 
 .quota-percent {
-  @apply text-xs font-semibold text-slate-600 dark:text-slate-200;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
 }
 
 .quota-foot {
-  @apply mt-1 text-[11px] text-slate-400 dark:text-slate-300;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: var(--space-2);
 }
 </style>

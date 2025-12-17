@@ -7,7 +7,7 @@
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10 sm:rounded"
             >
               <i class="fas fa-edit text-sm text-white sm:text-base" />
             </div>
@@ -83,7 +83,7 @@
                   <span
                     v-for="(tag, index) in form.tags"
                     :key="'selected-' + index"
-                    class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                    class="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   >
                     {{ tag }}
                     <button
@@ -106,7 +106,7 @@
                   <button
                     v-for="tag in unselectedTags"
                     :key="'available-' + tag"
-                    class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
+                    class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-blue-100 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:text-white dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
                     type="button"
                     @click="selectTag(tag)"
                   >
@@ -147,11 +147,11 @@
 
           <!-- 速率限制设置 -->
           <div
-            class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/20"
+            class="rounded-lg border border-gray-300 bg-blue-50 p-3 dark:border-gray-700 dark:bg-blue-900/20"
           >
             <div class="mb-2 flex items-center gap-2">
               <div
-                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-blue-500"
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
               >
                 <i class="fas fa-tachometer-alt text-xs text-white" />
               </div>
@@ -208,10 +208,12 @@
 
               <!-- 示例说明 -->
               <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                <h5 class="mb-1 text-xs font-semibold text-blue-800 dark:text-blue-400">
+                <h5
+                  class="mb-1 text-xs font-semibold text-gray-900 dark:text-blue-400 dark:text-white"
+                >
                   💡 使用示例
                 </h5>
-                <div class="space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
+                <div class="space-y-0.5 text-xs text-gray-900 dark:text-blue-300 dark:text-white">
                   <div>
                     <strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求
                   </div>
@@ -389,19 +391,15 @@
 
           <!-- 激活账号 -->
           <div>
-            <div class="mb-3 flex items-center">
-              <input
+            <div class="mb-3">
+              <Checkbox
                 id="editIsActive"
                 v-model="form.isActive"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                type="checkbox"
+                :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                label="激活账号"
+                :label-class="'flex items-center'"
+                :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
-              <label
-                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
-                for="editIsActive"
-              >
-                激活账号
-              </label>
             </div>
             <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">
               取消勾选将禁用此 API Key，暂停所有请求，客户端返回 401 错误
@@ -416,7 +414,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="all"
                 />
@@ -425,7 +423,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="claude"
                 />
@@ -434,7 +432,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="gemini"
                 />
@@ -443,7 +441,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="openai"
                 />
@@ -452,7 +450,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="droid"
                 />
@@ -470,7 +468,7 @@
                 >专属账号绑定</label
               >
               <button
-                class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+                class="flex items-center gap-1 text-sm text-gray-900 transition-colors hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:text-gray-100 dark:text-white dark:hover:text-blue-300"
                 :disabled="accountsLoading"
                 title="刷新账号列表"
                 type="button"
@@ -564,19 +562,15 @@
           </div>
 
           <div>
-            <div class="mb-3 flex items-center">
-              <input
+            <div class="mb-3">
+              <Checkbox
                 id="editEnableModelRestriction"
                 v-model="form.enableModelRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                type="checkbox"
+                :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                label="启用模型限制"
+                :label-class="'flex items-center'"
+                :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
-              <label
-                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
-                for="editEnableModelRestriction"
-              >
-                启用模型限制
-              </label>
             </div>
 
             <div v-if="form.enableModelRestriction" class="space-y-3">
@@ -655,19 +649,15 @@
 
           <!-- 客户端限制 -->
           <div>
-            <div class="mb-3 flex items-center">
-              <input
+            <div class="mb-3">
+              <Checkbox
                 id="editEnableClientRestriction"
                 v-model="form.enableClientRestriction"
-                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                type="checkbox"
+                :input-class="'h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                label="启用客户端限制"
+                :label-class="'flex items-center'"
+                :text-class="'ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300'"
               />
-              <label
-                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
-                for="editEnableClientRestriction"
-              >
-                启用客户端限制
-              </label>
             </div>
 
             <div v-if="form.enableClientRestriction" class="space-y-3">
@@ -680,21 +670,21 @@
                 </p>
                 <div class="space-y-2">
                   <div v-for="client in supportedClients" :key="client.id" class="flex items-start">
-                    <input
+                    <Checkbox
                       :id="`edit_client_${client.id}`"
                       v-model="form.allowedClients"
-                      class="mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500"
-                      type="checkbox"
+                      :input-class="'mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+                      :label-class="'flex items-start'"
+                      :text-class="'ml-2 flex-1 cursor-pointer'"
                       :value="client.id"
-                    />
-                    <label class="ml-2 flex-1 cursor-pointer" :for="`edit_client_${client.id}`">
+                    >
                       <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                         client.name
                       }}</span>
                       <span class="block text-xs text-gray-500 dark:text-gray-400">{{
                         client.description
                       }}</span>
-                    </label>
+                    </Checkbox>
                   </div>
                 </div>
               </div>
@@ -703,7 +693,7 @@
 
           <div class="flex gap-3 pt-4">
             <button
-              class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              class="flex-1 rounded bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               type="button"
               @click="$emit('close')"
             >
@@ -732,6 +722,7 @@ import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import { apiClient } from '@/config/api'
 import AccountSelector from '@/components/common/AccountSelector.vue'
+import { Checkbox } from '@/ui'
 
 const props = defineProps({
   apiKey: {

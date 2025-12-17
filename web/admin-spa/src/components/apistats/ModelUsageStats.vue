@@ -1,82 +1,60 @@
 <template>
-  <div class="card p-4 md:p-6">
-    <div class="mb-4 md:mb-6">
-      <h3
-        class="flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:text-xl"
-      >
-        <span class="flex items-center">
-          <i class="fas fa-robot mr-2 text-sm text-indigo-500 md:mr-3 md:text-base" />
+  <div class="model-card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <span class="title-text">
+          <i class="fas fa-robot title-icon" />
           模型使用统计
         </span>
-        <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
-          >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
-        >
+        <span class="title-period">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
       </h3>
     </div>
 
     <!-- 模型统计加载状态 -->
-    <div v-if="modelStatsLoading" class="py-6 text-center md:py-8">
-      <i
-        class="fas fa-spinner loading-spinner mb-2 text-xl text-gray-600 dark:text-gray-400 md:text-2xl"
-      />
-      <p class="text-sm text-gray-600 dark:text-gray-400 md:text-base">加载模型统计数据中...</p>
+    <div v-if="modelStatsLoading" class="loading-state">
+      <i class="fas fa-spinner loading-spinner" />
+      <p class="loading-text">加载模型统计数据中...</p>
     </div>
 
     <!-- 模型统计数据 -->
-    <div v-else-if="modelStats.length > 0" class="space-y-3 md:space-y-4">
-      <div v-for="(model, index) in modelStats" :key="index" class="model-usage-item">
-        <div class="mb-2 flex items-start justify-between md:mb-3">
-          <div class="min-w-0 flex-1">
-            <h4 class="break-all text-base font-bold text-gray-900 dark:text-gray-100 md:text-lg">
-              {{ model.model }}
-            </h4>
-            <p class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
-              {{ model.requests }} 次请求
-            </p>
+    <div v-else-if="modelStats.length > 0" class="models-list">
+      <div v-for="(model, index) in modelStats" :key="index" class="model-item">
+        <div class="model-header">
+          <div class="model-info">
+            <h4 class="model-name">{{ model.model }}</h4>
+            <p class="model-requests">{{ model.requests }} 次请求</p>
           </div>
-          <div class="ml-3 flex-shrink-0 text-right">
-            <div class="text-base font-bold text-green-600 md:text-lg">
-              {{ model.formatted?.total || '$0.000000' }}
-            </div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">总费用</div>
+          <div class="model-cost">
+            <div class="cost-value">{{ model.formatted?.total || '$0.000000' }}</div>
+            <div class="cost-label">总费用</div>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 text-xs md:grid-cols-4 md:gap-3 md:text-sm">
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">输入 Token</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.inputTokens) }}
-            </div>
+        <div class="model-stats">
+          <div class="stat-box">
+            <div class="stat-label">输入 Token</div>
+            <div class="stat-value">{{ formatNumber(model.inputTokens) }}</div>
           </div>
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">输出 Token</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.outputTokens) }}
-            </div>
+          <div class="stat-box">
+            <div class="stat-label">输出 Token</div>
+            <div class="stat-value">{{ formatNumber(model.outputTokens) }}</div>
           </div>
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">缓存创建</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.cacheCreateTokens) }}
-            </div>
+          <div class="stat-box">
+            <div class="stat-label">缓存创建</div>
+            <div class="stat-value">{{ formatNumber(model.cacheCreateTokens) }}</div>
           </div>
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">缓存读取</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.cacheReadTokens) }}
-            </div>
+          <div class="stat-box">
+            <div class="stat-label">缓存读取</div>
+            <div class="stat-value">{{ formatNumber(model.cacheReadTokens) }}</div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 无模型数据 -->
-    <div v-else class="py-6 text-center text-gray-500 dark:text-gray-400 md:py-8">
-      <i class="fas fa-chart-pie mb-3 text-2xl md:text-3xl" />
-      <p class="text-sm md:text-base">
-        暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据
-      </p>
+    <div v-else class="empty-state">
+      <i class="fas fa-chart-pie empty-icon" />
+      <p class="empty-text">暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据</p>
     </div>
   </div>
 </template>
@@ -108,88 +86,79 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* 卡片样式 - 使用CSS变量 */
-.card {
-  background: var(--surface-color);
-  border-radius: 16px;
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.model-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--card-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+  box-shadow: var(--shadow-card);
 }
 
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-}
-
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.15),
-    0 10px 10px -5px rgba(0, 0, 0, 0.08);
-}
-
-:global(.dark) .card:hover {
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.5),
-    0 10px 10px -5px rgba(0, 0, 0, 0.35);
-}
-
-/* 模型使用项样式 - 使用CSS变量 */
-.model-usage-item {
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 12px;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-@media (min-width: 768px) {
-  .model-usage-item {
-    padding: 16px;
+@media (max-width: 768px) {
+  .model-card {
+    padding: var(--card-padding-sm);
   }
 }
 
-.model-usage-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+/* Card Header */
+.card-header {
+  margin-bottom: var(--space-1);
 }
 
-.model-usage-item:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  border-color: rgba(255, 255, 255, 0.3);
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-:global(.dark) .model-usage-item:hover {
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.4),
-    0 4px 6px -2px rgba(0, 0, 0, 0.25);
-  border-color: rgba(75, 85, 99, 0.6);
+.title-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }
 
-/* 加载动画 */
+.title-icon {
+  font-size: var(--font-size-xl);
+  color: #374151;
+}
+
+:global(.dark) .title-icon {
+  color: #9ca3af;
+}
+
+.title-period {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-secondary);
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12) var(--space-6);
+  gap: var(--space-4);
+}
+
 .loading-spinner {
+  font-size: var(--font-size-3xl);
+  color: var(--text-secondary);
   animation: spin 1s linear infinite;
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
+}
+
+.loading-text {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
 }
 
 @keyframes spin {
@@ -201,20 +170,136 @@ const formatNumber = (num) => {
   }
 }
 
-/* 响应式优化 */
+/* Models List */
+.models-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Model Item */
+.model-item {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--card-gap);
+  transition: var(--transition-all);
+}
+
+.model-item:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-subtle);
+}
+
 @media (max-width: 768px) {
-  .model-usage-item .grid {
-    grid-template-columns: 1fr 1fr;
+  .model-item {
+    padding: var(--space-4);
+  }
+}
+
+/* Model Header */
+.model-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.model-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  word-break: break-word;
+  margin-bottom: var(--space-1);
+}
+
+.model-requests {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.model-cost {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.cost-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-green);
+  margin-bottom: 2px;
+}
+
+:global(.dark) .cost-value {
+  color: #34d399;
+}
+
+.cost-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* Model Stats */
+.model-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .model-stats {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
 @media (max-width: 480px) {
-  .model-usage-item {
-    padding: 10px;
-  }
-
-  .model-usage-item .grid {
+  .model-stats {
     grid-template-columns: 1fr;
   }
+}
+
+.stat-box {
+  padding: var(--space-3);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.stat-value {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12) var(--space-6);
+  gap: var(--space-4);
+}
+
+.empty-icon {
+  font-size: var(--font-size-4xl);
+  color: var(--text-muted);
+}
+
+.empty-text {
+  font-size: var(--font-size-base);
+  color: var(--text-muted);
 }
 </style>

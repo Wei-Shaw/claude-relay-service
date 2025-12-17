@@ -1,30 +1,40 @@
 <template>
   <div class="space-y-1">
     <div class="flex items-center justify-between text-xs">
-      <span class="text-gray-500">{{ label }}</span>
-      <span v-if="windowState === 'active'" class="font-medium text-gray-700">
-        <i class="fas fa-clock mr-1 text-blue-500" />
+      <span class="text-gray-600 dark:text-gray-400">{{ label }}</span>
+      <span v-if="windowState === 'active'" class="font-medium text-gray-900 dark:text-gray-100">
+        <i class="fas fa-clock mr-1 text-gray-600 dark:text-gray-400" />
         {{ formatTime(remainingSeconds) }}
       </span>
-      <span v-else-if="windowState === 'expired'" class="font-medium text-orange-600">
+      <span
+        v-else-if="windowState === 'expired'"
+        class="font-medium text-orange-600 dark:text-orange-400"
+      >
         <i class="fas fa-sync-alt mr-1" />
         窗口已过期
       </span>
-      <span v-else-if="windowState === 'notStarted'" class="font-medium text-gray-500">
+      <span
+        v-else-if="windowState === 'notStarted'"
+        class="font-medium text-gray-500 dark:text-gray-400"
+      >
         <i class="fas fa-pause-circle mr-1" />
         窗口未激活
       </span>
-      <span v-else class="font-medium text-gray-400"> {{ rateLimitWindow }} 分钟 </span>
+      <span v-else class="font-medium text-gray-400 dark:text-gray-500">
+        {{ rateLimitWindow }} 分钟
+      </span>
     </div>
 
     <!-- 进度条（仅在有限制时显示） -->
     <div v-if="showProgress" class="space-y-0.5">
       <div v-if="hasRequestLimit" class="space-y-0.5">
         <div class="flex items-center justify-between text-xs">
-          <span class="text-gray-400">请求</span>
-          <span class="text-gray-600"> {{ currentRequests || 0 }}/{{ requestLimit }} </span>
+          <span class="text-gray-500 dark:text-gray-400">请求</span>
+          <span class="text-gray-700 dark:text-gray-300">
+            {{ currentRequests || 0 }}/{{ requestLimit }}
+          </span>
         </div>
-        <div class="h-1 w-full rounded-full bg-gray-200">
+        <div class="h-1 w-full rounded-full bg-gray-200 dark:bg-gray-700">
           <div
             class="h-1 rounded-full transition-all duration-300"
             :class="getRequestProgressColor()"
@@ -36,12 +46,12 @@
       <!-- Token限制（向后兼容） -->
       <div v-if="hasTokenLimit" class="space-y-0.5">
         <div class="flex items-center justify-between text-xs">
-          <span class="text-gray-400">Token</span>
-          <span class="text-gray-600">
+          <span class="text-gray-500 dark:text-gray-400">Token</span>
+          <span class="text-gray-700 dark:text-gray-300">
             {{ formatTokenCount(currentTokens || 0) }}/{{ formatTokenCount(tokenLimit) }}
           </span>
         </div>
-        <div class="h-1 w-full rounded-full bg-gray-200">
+        <div class="h-1 w-full rounded-full bg-gray-200 dark:bg-gray-700">
           <div
             class="h-1 rounded-full transition-all duration-300"
             :class="getTokenProgressColor()"
@@ -53,12 +63,12 @@
       <!-- 费用限制（新功能） -->
       <div v-if="hasCostLimit" class="space-y-0.5">
         <div class="flex items-center justify-between text-xs">
-          <span class="text-gray-400">费用</span>
-          <span class="text-gray-600">
+          <span class="text-gray-500 dark:text-gray-400">费用</span>
+          <span class="text-gray-700 dark:text-gray-300">
             ${{ (currentCost || 0).toFixed(2) }}/${{ costLimit.toFixed(2) }}
           </span>
         </div>
-        <div class="h-1 w-full rounded-full bg-gray-200">
+        <div class="h-1 w-full rounded-full bg-gray-200 dark:bg-gray-700">
           <div
             class="h-1 rounded-full transition-all duration-300"
             :class="getCostProgressColor()"
@@ -69,7 +79,10 @@
     </div>
 
     <!-- 额外提示信息 -->
-    <div v-if="windowState === 'active' && showTooltip" class="text-xs text-gray-500">
+    <div
+      v-if="windowState === 'active' && showTooltip"
+      class="text-xs text-gray-600 dark:text-gray-400"
+    >
       <i class="fas fa-info-circle mr-1" />
       <span v-if="remainingSeconds < 60">即将重置</span>
       <span v-else-if="remainingSeconds < 300"
@@ -205,9 +218,9 @@ const getRequestProgress = () => {
 
 const getRequestProgressColor = () => {
   const progress = getRequestProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-blue-500'
+  if (progress >= 100) return 'bg-red-600 dark:bg-red-500'
+  if (progress >= 80) return 'bg-orange-500 dark:bg-orange-400'
+  return 'bg-black dark:bg-white'
 }
 
 const getTokenProgress = () => {
@@ -218,9 +231,9 @@ const getTokenProgress = () => {
 
 const getTokenProgressColor = () => {
   const progress = getTokenProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-purple-500'
+  if (progress >= 100) return 'bg-red-600 dark:bg-red-500'
+  if (progress >= 80) return 'bg-orange-500 dark:bg-orange-400'
+  return 'bg-black dark:bg-white'
 }
 
 const getCostProgress = () => {
@@ -231,9 +244,9 @@ const getCostProgress = () => {
 
 const getCostProgressColor = () => {
   const progress = getCostProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-green-500'
+  if (progress >= 100) return 'bg-red-600 dark:bg-red-500'
+  if (progress >= 80) return 'bg-orange-500 dark:bg-orange-400'
+  return 'bg-black dark:bg-white'
 }
 
 // 更新倒计时

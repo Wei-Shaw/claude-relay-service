@@ -20,277 +20,269 @@
 
     <!-- 下拉菜单 -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-100"
-        enter-from-class="transform opacity-0 scale-95"
-        enter-to-class="transform opacity-100 scale-100"
-        leave-active-class="transition ease-in duration-75"
-        leave-from-class="transform opacity-100 scale-100"
-        leave-to-class="transform opacity-0 scale-95"
+      <div
+        v-if="showDropdown"
+        ref="dropdownRef"
+        class="absolute z-50 flex flex-col border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+        :style="{
+          ...dropdownStyle,
+          borderRadius: '5px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
+        }"
       >
-        <div
-          v-if="showDropdown"
-          ref="dropdownRef"
-          class="absolute z-50 flex flex-col rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
-          :style="dropdownStyle"
-        >
-          <!-- 搜索框 -->
-          <div class="flex-shrink-0 border-b border-gray-200 p-3 dark:border-gray-600">
-            <div class="relative">
-              <input
-                ref="searchInput"
-                v-model="searchQuery"
-                class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                placeholder="搜索账号名称..."
-                style="padding-left: 40px; padding-right: 36px"
-                type="text"
-                @input="handleSearch"
-              />
-              <i
-                class="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500"
-              />
-              <button
-                v-if="searchQuery"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400"
-                type="button"
-                @click="clearSearch"
-              >
-                <i class="fas fa-times text-sm" />
-              </button>
+        <!-- 搜索框 -->
+        <div class="flex-shrink-0 border-b border-gray-200 p-3 dark:border-gray-600">
+          <div class="relative">
+            <input
+              ref="searchInput"
+              v-model="searchQuery"
+              class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              placeholder="搜索账号名称..."
+              style="padding-left: 40px; padding-right: 36px"
+              type="text"
+              @input="handleSearch"
+            />
+            <i
+              class="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500"
+            />
+            <button
+              v-if="searchQuery"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400"
+              type="button"
+              @click="clearSearch"
+            >
+              <i class="fas fa-times text-sm" />
+            </button>
+          </div>
+        </div>
+
+        <!-- 选项列表 -->
+        <div class="custom-scrollbar flex-1 overflow-y-auto">
+          <!-- 特殊选项 -->
+          <div
+            v-if="specialOptionsList.length > 0"
+            class="border-b border-gray-200 dark:border-gray-600"
+          >
+            <div
+              v-for="option in specialOptionsList"
+              :key="`special-${option.value}`"
+              class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+              :class="{ 'bg-gray-100 dark:bg-gray-700': modelValue === option.value }"
+              @click="selectAccount(option.value)"
+            >
+              <span class="text-gray-700 dark:text-gray-300">{{ option.label }}</span>
+              <span v-if="option.description" class="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                {{ option.description }}
+              </span>
             </div>
           </div>
 
-          <!-- 选项列表 -->
-          <div class="custom-scrollbar flex-1 overflow-y-auto">
-            <!-- 特殊选项 -->
+          <!-- 默认选项 -->
+          <div
+            class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+            :class="{ 'bg-gray-100 dark:bg-gray-700': !modelValue }"
+            @click="selectAccount(null)"
+          >
+            <span class="text-gray-700 dark:text-gray-300">{{ defaultOptionText }}</span>
+          </div>
+
+          <!-- 分组选项 -->
+          <div v-if="filteredGroups.length > 0">
             <div
-              v-if="specialOptionsList.length > 0"
-              class="border-b border-gray-200 dark:border-gray-600"
+              class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
             >
-              <div
-                v-for="option in specialOptionsList"
-                :key="`special-${option.value}`"
-                class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-                :class="{ 'bg-blue-50 dark:bg-blue-900/20': modelValue === option.value }"
-                @click="selectAccount(option.value)"
-              >
-                <span class="text-gray-700 dark:text-gray-300">{{ option.label }}</span>
-                <span
-                  v-if="option.description"
-                  class="ml-2 text-xs text-gray-400 dark:text-gray-500"
+              调度分组
+            </div>
+            <div
+              v-for="group in filteredGroups"
+              :key="`group:${group.id}`"
+              class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+              :class="{ 'bg-gray-100 dark:bg-gray-700': modelValue === `group:${group.id}` }"
+              @click="selectAccount(`group:${group.id}`)"
+            >
+              <div class="flex items-center justify-between">
+                <span class="text-gray-700 dark:text-gray-300">{{ group.name }}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400"
+                  >{{ group.memberCount || 0 }} 个成员</span
                 >
-                  {{ option.description }}
+              </div>
+            </div>
+          </div>
+
+          <!-- OAuth 账号 -->
+          <div v-if="filteredOAuthAccounts.length > 0">
+            <div
+              class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+            >
+              {{
+                platform === 'claude'
+                  ? 'Claude OAuth 专属账号'
+                  : platform === 'openai'
+                    ? 'OpenAI 专属账号'
+                    : platform === 'droid'
+                      ? 'Droid 专属账号'
+                      : platform === 'gemini'
+                        ? 'Gemini OAuth 专属账号'
+                        : 'OAuth 专属账号'
+              }}
+            </div>
+            <div
+              v-for="account in filteredOAuthAccounts"
+              :key="account.id"
+              class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+              :class="{ 'bg-gray-100 dark:bg-gray-700': modelValue === account.id }"
+              @click="selectAccount(account.id)"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
+                  <span
+                    class="ml-2 rounded-full px-2 py-0.5 text-xs"
+                    :class="
+                      account.isActive
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : account.status === 'unauthorized'
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    "
+                  >
+                    {{ getAccountStatusText(account) }}
+                  </span>
+                </div>
+                <span class="text-xs text-gray-400 dark:text-gray-500">
+                  {{ formatDate(account.createdAt) }}
                 </span>
               </div>
             </div>
+          </div>
 
-            <!-- 默认选项 -->
+          <!-- Console 账号（仅 Claude） -->
+          <div v-if="platform === 'claude' && filteredConsoleAccounts.length > 0">
             <div
+              class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+            >
+              Claude Console 专属账号
+            </div>
+            <div
+              v-for="account in filteredConsoleAccounts"
+              :key="account.id"
               class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-              :class="{ 'bg-blue-50 dark:bg-blue-900/20': !modelValue }"
-              @click="selectAccount(null)"
+              :class="{
+                'bg-gray-100 dark:bg-gray-700': modelValue === `console:${account.id}`
+              }"
+              @click="selectAccount(`console:${account.id}`)"
             >
-              <span class="text-gray-700 dark:text-gray-300">{{ defaultOptionText }}</span>
-            </div>
-
-            <!-- 分组选项 -->
-            <div v-if="filteredGroups.length > 0">
-              <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
-              >
-                调度分组
-              </div>
-              <div
-                v-for="group in filteredGroups"
-                :key="`group:${group.id}`"
-                class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-                :class="{ 'bg-blue-50 dark:bg-blue-900/20': modelValue === `group:${group.id}` }"
-                @click="selectAccount(`group:${group.id}`)"
-              >
-                <div class="flex items-center justify-between">
-                  <span class="text-gray-700 dark:text-gray-300">{{ group.name }}</span>
-                  <span class="text-xs text-gray-500 dark:text-gray-400"
-                    >{{ group.memberCount || 0 }} 个成员</span
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
+                  <span
+                    class="ml-2 rounded-full px-2 py-0.5 text-xs"
+                    :class="
+                      account.isActive
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : account.status === 'unauthorized'
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    "
                   >
-                </div>
-              </div>
-            </div>
-
-            <!-- OAuth 账号 -->
-            <div v-if="filteredOAuthAccounts.length > 0">
-              <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
-              >
-                {{
-                  platform === 'claude'
-                    ? 'Claude OAuth 专属账号'
-                    : platform === 'openai'
-                      ? 'OpenAI 专属账号'
-                      : platform === 'droid'
-                        ? 'Droid 专属账号'
-                        : platform === 'gemini'
-                          ? 'Gemini OAuth 专属账号'
-                          : 'OAuth 专属账号'
-                }}
-              </div>
-              <div
-                v-for="account in filteredOAuthAccounts"
-                :key="account.id"
-                class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-                :class="{ 'bg-blue-50 dark:bg-blue-900/20': modelValue === account.id }"
-                @click="selectAccount(account.id)"
-              >
-                <div class="flex items-center justify-between">
-                  <div>
-                    <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
-                    <span
-                      class="ml-2 rounded-full px-2 py-0.5 text-xs"
-                      :class="
-                        account.isActive
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : account.status === 'unauthorized'
-                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      "
-                    >
-                      {{ getAccountStatusText(account) }}
-                    </span>
-                  </div>
-                  <span class="text-xs text-gray-400 dark:text-gray-500">
-                    {{ formatDate(account.createdAt) }}
+                    {{ getAccountStatusText(account) }}
                   </span>
                 </div>
+                <span class="text-xs text-gray-400 dark:text-gray-500">
+                  {{ formatDate(account.createdAt) }}
+                </span>
               </div>
-            </div>
-
-            <!-- Console 账号（仅 Claude） -->
-            <div v-if="platform === 'claude' && filteredConsoleAccounts.length > 0">
-              <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
-              >
-                Claude Console 专属账号
-              </div>
-              <div
-                v-for="account in filteredConsoleAccounts"
-                :key="account.id"
-                class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-                :class="{
-                  'bg-blue-50 dark:bg-blue-900/20': modelValue === `console:${account.id}`
-                }"
-                @click="selectAccount(`console:${account.id}`)"
-              >
-                <div class="flex items-center justify-between">
-                  <div>
-                    <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
-                    <span
-                      class="ml-2 rounded-full px-2 py-0.5 text-xs"
-                      :class="
-                        account.isActive
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : account.status === 'unauthorized'
-                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      "
-                    >
-                      {{ getAccountStatusText(account) }}
-                    </span>
-                  </div>
-                  <span class="text-xs text-gray-400 dark:text-gray-500">
-                    {{ formatDate(account.createdAt) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- OpenAI-Responses 账号（仅 OpenAI） -->
-            <div v-if="platform === 'openai' && filteredOpenAIResponsesAccounts.length > 0">
-              <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
-              >
-                OpenAI-Responses 专属账号
-              </div>
-              <div
-                v-for="account in filteredOpenAIResponsesAccounts"
-                :key="account.id"
-                class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-                :class="{
-                  'bg-blue-50 dark:bg-blue-900/20': modelValue === `responses:${account.id}`
-                }"
-                @click="selectAccount(`responses:${account.id}`)"
-              >
-                <div class="flex items-center justify-between">
-                  <div>
-                    <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
-                    <span
-                      class="ml-2 rounded-full px-2 py-0.5 text-xs"
-                      :class="
-                        account.isActive === 'true' || account.isActive === true
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : account.status === 'rate_limited'
-                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      "
-                    >
-                      {{ getAccountStatusText(account) }}
-                    </span>
-                  </div>
-                  <span class="text-xs text-gray-400 dark:text-gray-500">
-                    {{ formatDate(account.createdAt) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Gemini-API 账号（仅 Gemini） -->
-            <div v-if="platform === 'gemini' && filteredGeminiApiAccounts.length > 0">
-              <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
-              >
-                Gemini-API 专属账号
-              </div>
-              <div
-                v-for="account in filteredGeminiApiAccounts"
-                :key="account.id"
-                class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
-                :class="{
-                  'bg-blue-50 dark:bg-blue-900/20': modelValue === `api:${account.id}`
-                }"
-                @click="selectAccount(`api:${account.id}`)"
-              >
-                <div class="flex items-center justify-between">
-                  <div>
-                    <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
-                    <span
-                      class="ml-2 rounded-full px-2 py-0.5 text-xs"
-                      :class="
-                        account.isActive === 'true' || account.isActive === true
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : account.status === 'rate_limited'
-                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      "
-                    >
-                      {{ getAccountStatusText(account) }}
-                    </span>
-                  </div>
-                  <span class="text-xs text-gray-400 dark:text-gray-500">
-                    {{ formatDate(account.createdAt) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 无搜索结果 -->
-            <div
-              v-if="searchQuery && !hasResults"
-              class="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
-            >
-              <i class="fas fa-search mb-2 text-2xl" />
-              <p class="text-sm">没有找到匹配的账号</p>
             </div>
           </div>
+
+          <!-- OpenAI-Responses 账号（仅 OpenAI） -->
+          <div v-if="platform === 'openai' && filteredOpenAIResponsesAccounts.length > 0">
+            <div
+              class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+            >
+              OpenAI-Responses 专属账号
+            </div>
+            <div
+              v-for="account in filteredOpenAIResponsesAccounts"
+              :key="account.id"
+              class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+              :class="{
+                'bg-gray-100 dark:bg-gray-700': modelValue === `responses:${account.id}`
+              }"
+              @click="selectAccount(`responses:${account.id}`)"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
+                  <span
+                    class="ml-2 rounded-full px-2 py-0.5 text-xs"
+                    :class="
+                      account.isActive === 'true' || account.isActive === true
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : account.status === 'rate_limited'
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    "
+                  >
+                    {{ getAccountStatusText(account) }}
+                  </span>
+                </div>
+                <span class="text-xs text-gray-400 dark:text-gray-500">
+                  {{ formatDate(account.createdAt) }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gemini-API 账号（仅 Gemini） -->
+          <div v-if="platform === 'gemini' && filteredGeminiApiAccounts.length > 0">
+            <div
+              class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+            >
+              Gemini-API 专属账号
+            </div>
+            <div
+              v-for="account in filteredGeminiApiAccounts"
+              :key="account.id"
+              class="cursor-pointer px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+              :class="{
+                'bg-gray-100 dark:bg-gray-700': modelValue === `api:${account.id}`
+              }"
+              @click="selectAccount(`api:${account.id}`)"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
+                  <span
+                    class="ml-2 rounded-full px-2 py-0.5 text-xs"
+                    :class="
+                      account.isActive === 'true' || account.isActive === true
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : account.status === 'rate_limited'
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    "
+                  >
+                    {{ getAccountStatusText(account) }}
+                  </span>
+                </div>
+                <span class="text-xs text-gray-400 dark:text-gray-500">
+                  {{ formatDate(account.createdAt) }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 无搜索结果 -->
+          <div
+            v-if="searchQuery && !hasResults"
+            class="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
+          >
+            <i class="fas fa-search mb-2 text-2xl" />
+            <p class="text-sm">没有找到匹配的账号</p>
+          </div>
         </div>
-      </Transition>
+      </div>
     </Teleport>
   </div>
 </template>
@@ -704,9 +696,10 @@ watch(showDropdown, (newVal) => {
 </script>
 
 <style scoped>
+/* Custom scrollbar */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e0 #f7fafc;
+  scrollbar-color: #eaeaea #fafafa;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -714,15 +707,31 @@ watch(showDropdown, (newVal) => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #f7fafc;
+  background: #fafafa;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #cbd5e0;
+  background-color: #eaeaea;
   border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #a0aec0;
+  background-color: #9e9e9e;
+}
+
+.dark .custom-scrollbar {
+  scrollbar-color: #333 #1f1f1f;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: #1f1f1f;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #333;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #424242;
 }
 </style>

@@ -1,0 +1,232 @@
+/* ============================================
+   Design Tokens - Single Source of Truth
+   Use these tokens throughout the application
+   ============================================ */
+
+:root {
+  /* ============================================
+     COLOR TOKENS
+     ============================================ */
+
+  /* Base Colors */
+  --color-black: #000;
+  --color-white: #fff;
+
+  /* Gray Scale */
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #eaeaea;
+  --color-gray-300: #e0e0e0;
+  --color-gray-400: #bdbdbd;
+  --color-gray-500: #9e9e9e;
+  --color-gray-600: #666;
+  --color-gray-700: #424242;
+  --color-gray-800: #212121;
+  --color-gray-900: #000;
+
+  /* Accent Colors */
+  --color-blue: #0070f3;
+  --color-blue-dark: #0051bb;
+  --color-red: #e00;
+  --color-red-dark: #c00;
+  --color-orange: #f5a623;
+  --color-green: #10b981;
+
+  /* Semantic Colors - Light Mode */
+  --bg-primary: var(--color-gray-50);
+  --bg-secondary: var(--color-white);
+  --bg-tertiary: var(--color-gray-100);
+  --bg-card: var(--color-white);
+  --bg-card-hover: var(--color-gray-100);
+  --bg-elevated: var(--color-gray-50);
+
+  --border-default: var(--color-gray-200);
+  --border-strong: var(--color-black);
+  --border-subtle: var(--color-gray-300);
+
+  --text-primary: var(--color-black);
+  --text-secondary: var(--color-gray-600);
+  --text-muted: #999;
+
+  /* ============================================
+     SPACING TOKENS
+     ============================================ */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Component-specific spacing */
+  --card-padding: var(--space-6);
+  --card-padding-sm: var(--space-5);
+  --card-gap: var(--space-5);
+
+  /* ============================================
+     SIZING TOKENS
+     ============================================ */
+
+  --size-button-sm: 32px;
+  --size-button-md: 40px;
+  --size-button-lg: 48px;
+
+  --size-input-sm: 32px;
+  --size-input-md: 40px;
+  --size-input-lg: 48px;
+
+  --size-icon-sm: 16px;
+  --size-icon-md: 20px;
+  --size-icon-lg: 24px;
+
+  /* ============================================
+     BORDER RADIUS TOKENS
+     ============================================ */
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  --radius-button: 5px;
+  --radius-card: var(--radius-lg);
+  --radius-input: 5px;
+
+  /* ============================================
+     TYPOGRAPHY TOKENS
+     ============================================ */
+
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.8125rem; /* 13px */
+  --font-size-base: 0.875rem; /* 14px */
+  --font-size-md: 0.9375rem; /* 15px */
+  --font-size-lg: 1rem; /* 16px */
+  --font-size-xl: 1.125rem; /* 18px */
+  --font-size-2xl: 1.25rem; /* 20px */
+  --font-size-3xl: 1.5rem; /* 24px */
+  --font-size-4xl: 2rem; /* 32px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.6;
+
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+
+  /* ============================================
+     TRANSITION TOKENS
+     ============================================ */
+
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  --transition-colors:
+    color var(--transition-base), background-color var(--transition-base),
+    border-color var(--transition-base);
+
+  --transition-transform: transform var(--transition-fast);
+
+  --transition-all: all var(--transition-base);
+
+  /* ============================================
+     SHADOW TOKENS
+     ============================================ */
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 8px 30px rgba(0, 0, 0, 0.12);
+
+  --shadow-card: var(--shadow-sm);
+  --shadow-card-hover: var(--shadow-md);
+
+  /* ============================================
+     Z-INDEX TOKENS
+     ============================================ */
+
+  --z-base: 1;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-tooltip: 60;
+  --z-toast: 100;
+
+  /* ============================================
+    Vercel / DS-compatible tokens (subset)
+    These mirror the token names used in `vercel_css/`
+    ============================================ */
+
+  /* Background */
+  --ds-background-100: var(--bg-secondary);
+  --ds-background-200: var(--bg-primary);
+
+  /* Grays */
+  --ds-gray-1000: var(--text-primary);
+  --ds-gray-900: var(--text-secondary);
+  --ds-gray-700: var(--color-gray-600);
+
+  /* Alpha grays (used for borders/dividers) */
+  --ds-gray-alpha-200: rgba(0, 0, 0, 0.06);
+  --ds-gray-alpha-400: rgba(0, 0, 0, 0.12);
+  --ds-gray-alpha-600: rgba(0, 0, 0, 0.2);
+
+  /* Shadow helpers */
+  --ds-shadow-border-small: 0 0 0 1px var(--border-default);
+
+  /* Focus ring (Vercel style uses box-shadow, not outline) */
+  --ds-focus-ring: 0 0 0 4px rgba(0, 112, 243, 0.25);
+  --ds-focus-ring-error: 0 0 0 4px rgba(238, 0, 0, 0.18);
+}
+
+/* ============================================
+   DARK MODE TOKENS
+   ============================================ */
+
+.dark {
+  /* Backgrounds */
+  --bg-primary: var(--color-black);
+  --bg-secondary: #1f1f1f;
+  --bg-tertiary: #2a2a2a;
+  --bg-card: var(--color-black);
+  --bg-card-hover: #0a0a0a;
+  --bg-elevated: #0a0a0a;
+
+  /* Borders */
+  --border-default: #333;
+  --border-strong: var(--color-white);
+  --border-subtle: #444;
+
+  /* Text */
+  --text-primary: var(--color-white);
+  --text-secondary: #999;
+  --text-muted: var(--color-gray-600);
+
+  /* Shadows (adjusted for dark mode) */
+  --shadow-sm: 0 1px 2px rgba(255, 255, 255, 0.02);
+  --shadow-md: 0 2px 4px rgba(255, 255, 255, 0.05);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 8px 30px rgba(0, 0, 0, 0.4);
+
+  --shadow-card: var(--shadow-sm);
+  --shadow-card-hover: var(--shadow-md);
+
+  /* DS alpha grays tuned for dark backgrounds */
+  --ds-gray-alpha-200: rgba(255, 255, 255, 0.08);
+  --ds-gray-alpha-400: rgba(255, 255, 255, 0.14);
+  --ds-gray-alpha-600: rgba(255, 255, 255, 0.22);
+}

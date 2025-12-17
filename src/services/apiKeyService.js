@@ -1085,6 +1085,8 @@ class ApiKeyService {
 
       // 计算费用（支持详细的缓存类型）- 添加错误处理
       let costInfo = { totalCost: 0, ephemeral5mCost: 0, ephemeral1hCost: 0 }
+      let costCalculationFailed = false
+
       try {
         const pricingService = require('./pricingService')
         // 确保 pricingService 已初始化
@@ -1097,25 +1099,13 @@ class ApiKeyService {
         // 验证计算结果
         if (!costInfo || typeof costInfo.totalCost !== 'number') {
           logger.error(`❌ Invalid cost calculation result for model ${model}:`, costInfo)
-          // 使用 CostCalculator 作为后备
-          const CostCalculator = require('../utils/costCalculator')
-          const fallbackCost = CostCalculator.calculateCost(usageObject, model)
-          if (fallbackCost && fallbackCost.costs && fallbackCost.costs.total > 0) {
-            logger.warn(
-              `⚠️ Using fallback cost calculation for ${model}: $${fallbackCost.costs.total}`
-            )
-            costInfo = {
-              totalCost: fallbackCost.costs.total,
-              ephemeral5mCost: 0,
-              ephemeral1hCost: 0
-            }
-          } else {
-            costInfo = { totalCost: 0, ephemeral5mCost: 0, ephemeral1hCost: 0 }
-          }
+          throw new Error('Invalid cost calculation result')
         }
       } catch (pricingError) {
         logger.error(`❌ Failed to calculate cost for model ${model}:`, pricingError)
         logger.error(`   Usage object:`, JSON.stringify(usageObject))
+        costCalculationFailed = true
+
         // 使用 CostCalculator 作为后备
         try {
           const CostCalculator = require('../utils/costCalculator')
@@ -1129,10 +1119,18 @@ class ApiKeyService {
               ephemeral5mCost: 0,
               ephemeral1hCost: 0
             }
+            costCalculationFailed = false // 后备计算成功
           }
         } catch (fallbackError) {
           logger.error(`❌ Fallback cost calculation also failed:`, fallbackError)
         }
+      }
+
+      // CRITICAL: 如果成本计算完全失败且有 token 使用，拒绝记录以防止数据损坏
+      if (costCalculationFailed && totalTokens > 0) {
+        const errorMsg = `Cannot record usage: cost calculation failed for model ${model} with ${totalTokens} tokens. This would cause data corruption (tokens recorded with $0 cost).`
+        logger.error(`❌ ${errorMsg}`)
+        throw new Error(errorMsg)
       }
 
       // 提取详细的缓存创建数据
@@ -1144,7 +1142,7 @@ class ApiKeyService {
         ephemeral1hTokens = usageObject.cache_creation.ephemeral_1h_input_tokens || 0
       }
 
-      // 记录API Key级别的使用统计 - 这个必须执行
+      // 记录API Key级别的使用统计 - 只有在成本计算成功时才执行
       await redis.incrementTokenUsage(
         keyId,
         totalTokens,
@@ -1445,11 +1443,9 @@ class ApiKeyService {
   }
 
   // 🔒 哈希API Key
+  // 修复：使用 HMAC 替代简单的哈希拼接，防止长度扩展攻击
   _hashApiKey(apiKey) {
-    return crypto
-      .createHash('sha256')
-      .update(apiKey + config.security.encryptionKey)
-      .digest('hex')
+    return crypto.createHmac('sha256', config.security.encryptionKey).update(apiKey).digest('hex')
   }
 
   // 📈 获取使用统计
@@ -1753,35 +1749,53 @@ class ApiKeyService {
         boundKeys = allKeys.filter((key) => key[field] === accountId)
       }
 
-      // 批量解绑
+      // 批量解绑 - 修复：追踪每个 key 的解绑结果
+      const results = { success: [], failed: [] }
+
       for (const key of boundKeys) {
-        const updates = {}
-        if (accountType === 'openai-responses') {
-          updates.openaiAccountId = null
-        } else if (accountType === 'gemini-api') {
-          updates.geminiAccountId = null
-        } else if (accountType === 'claude-console') {
-          updates.claudeConsoleAccountId = null
-        } else {
-          updates[field] = null
+        try {
+          const updates = {}
+          if (accountType === 'openai-responses') {
+            updates.openaiAccountId = null
+          } else if (accountType === 'gemini-api') {
+            updates.geminiAccountId = null
+          } else if (accountType === 'claude-console') {
+            updates.claudeConsoleAccountId = null
+          } else {
+            updates[field] = null
+          }
+
+          await this.updateApiKey(key.id, updates)
+          results.success.push({ keyId: key.id, name: key.name })
+          logger.info(
+            `✅ 自动解绑 API Key ${key.id} (${key.name}) 从 ${accountType} 账号 ${accountId}`
+          )
+        } catch (error) {
+          results.failed.push({ keyId: key.id, name: key.name, error: error.message })
+          logger.error(`❌ 解绑 API Key ${key.id} (${key.name}) 失败:`, error)
         }
-
-        await this.updateApiKey(key.id, updates)
-        logger.info(
-          `✅ 自动解绑 API Key ${key.id} (${key.name}) 从 ${accountType} 账号 ${accountId}`
-        )
       }
 
-      if (boundKeys.length > 0) {
+      if (results.success.length > 0) {
         logger.success(
-          `🔓 成功解绑 ${boundKeys.length} 个 API Key 从 ${accountType} 账号 ${accountId}`
+          `🔓 成功解绑 ${results.success.length} 个 API Key 从 ${accountType} 账号 ${accountId}`
         )
       }
 
-      return boundKeys.length
+      if (results.failed.length > 0) {
+        logger.warn(`⚠️ ${results.failed.length} 个 API Key 解绑失败，请检查日志`)
+      }
+
+      // 修复：返回详细结果对象而不是简单的成功数量
+      return {
+        total: boundKeys.length,
+        success: results.success.length,
+        failed: results.failed.length,
+        details: results
+      }
     } catch (error) {
       logger.error(`❌ 解绑 API Keys 失败 (${accountType} 账号 ${accountId}):`, error)
-      return 0
+      throw error // 修复：抛出错误而不是静默返回 0
     }
   }
 

@@ -1,69 +1,51 @@
 <template>
-  <div class="card h-full p-4 md:p-6">
-    <h3
-      class="mb-3 flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:mb-4 md:text-xl"
-    >
-      <span class="flex items-center">
-        <i class="fas fa-chart-pie mr-2 text-sm text-orange-500 md:mr-3 md:text-base" />
-        使用占比
-      </span>
-      <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
-        >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
-      >
-    </h3>
+  <div class="flex h-full flex-col">
+    <div class="aggregated-card">
+      <h3 class="card-title">
+        <span class="title-text">
+          <i class="fas fa-chart-pie title-icon" />
+          使用占比
+        </span>
+        <span class="title-period">({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span>
+      </h3>
 
-    <div v-if="aggregatedStats && individualStats.length > 0" class="space-y-2 md:space-y-3">
-      <!-- 各Key使用占比列表 -->
-      <div v-for="(stat, index) in topKeys" :key="stat.apiId" class="relative">
-        <div class="mb-1 flex items-center justify-between text-sm">
-          <span class="truncate font-medium text-gray-700 dark:text-gray-300">
-            {{ stat.name || `Key ${index + 1}` }}
-          </span>
-          <span class="text-xs text-gray-600 dark:text-gray-400">
-            {{ calculatePercentage(stat) }}%
-          </span>
-        </div>
-        <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-          <div
-            class="h-2 rounded-full transition-all duration-300"
-            :class="getProgressColor(index)"
-            :style="{ width: calculatePercentage(stat) + '%' }"
+      <div v-if="aggregatedStats && individualStats.length > 0" class="keys-list">
+        <!-- 各Key使用占比列表 -->
+        <div v-for="(stat, index) in topKeys" :key="stat.apiId" class="key-item">
+          <div class="key-header">
+            <span class="key-name">{{ stat.name || `Key ${index + 1}` }}</span>
+            <span class="key-percentage">{{ calculatePercentage(stat) }}%</span>
+          </div>
+          <Progress
+            size="md"
+            :value="calculatePercentage(stat)"
+            :variant="getProgressVariant(index)"
           />
+          <div class="key-stats">
+            <span class="key-requests"
+              >{{ formatNumber(getStatUsage(stat)?.requests || 0) }}次</span
+            >
+            <span class="key-cost">{{ getStatUsage(stat)?.formattedCost || '$0.00' }}</span>
+          </div>
         </div>
-        <div
-          class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
-        >
-          <span>{{ formatNumber(getStatUsage(stat)?.requests || 0) }}次</span>
-          <span>{{ getStatUsage(stat)?.formattedCost || '$0.00' }}</span>
+
+        <!-- 其他Keys汇总 -->
+        <div v-if="otherKeysCount > 0" class="other-keys">
+          <span class="other-label">其他 {{ otherKeysCount }} 个Keys</span>
+          <span class="other-percentage">{{ otherPercentage }}%</span>
         </div>
       </div>
 
-      <!-- 其他Keys汇总 -->
-      <div v-if="otherKeysCount > 0" class="border-t border-gray-200 pt-2 dark:border-gray-700">
-        <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-          <span>其他 {{ otherKeysCount }} 个Keys</span>
-          <span>{{ otherPercentage }}%</span>
-        </div>
+      <!-- 单个Key模式提示 -->
+      <div v-else-if="!multiKeyMode" class="empty-state">
+        <i class="fas fa-chart-pie empty-icon" />
+        <p class="empty-text">使用占比仅在多Key查询时显示</p>
       </div>
-    </div>
 
-    <!-- 单个Key模式提示 -->
-    <div
-      v-else-if="!multiKeyMode"
-      class="flex h-32 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      <div class="text-center">
-        <i class="fas fa-chart-pie mb-2 text-2xl" />
-        <p>使用占比仅在多Key查询时显示</p>
+      <div v-else class="empty-state">
+        <i class="fas fa-chart-pie empty-icon" />
+        <span class="empty-text">暂无数据</span>
       </div>
-    </div>
-
-    <div
-      v-else
-      class="flex h-32 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      <i class="fas fa-chart-pie mr-2" />
-      暂无数据
     </div>
   </div>
 </template>
@@ -72,6 +54,7 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
+import { Progress } from '@/ui'
 
 const apiStatsStore = useApiStatsStore()
 const { aggregatedStats, individualStats, statsPeriod, multiKeyMode } = storeToRefs(apiStatsStore)
@@ -139,10 +122,10 @@ const calculatePercentage = (stat) => {
   return Math.round(percentage)
 }
 
-// 获取进度条颜色
-const getProgressColor = (index) => {
-  const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-pink-500']
-  return colors[index] || 'bg-gray-400'
+// 获取进度条变体
+const getProgressVariant = (index) => {
+  const variants = ['success', 'success', 'default', 'warning', 'error']
+  return variants[index] || 'default'
 }
 
 // 格式化数字
@@ -164,39 +147,155 @@ const formatNumber = (num) => {
 </script>
 
 <style scoped>
-/* 卡片样式 - 使用CSS变量 */
-.card {
-  background: var(--surface-color);
-  border-radius: 16px;
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+.aggregated-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--card-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+  box-shadow: var(--shadow-card);
+}
+
+@media (max-width: 768px) {
+  .aggregated-card {
+    padding: var(--card-padding-sm);
+  }
+}
+
+/* Card Title */
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.title-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.title-icon {
+  font-size: var(--font-size-xl);
+  color: #f97316;
+}
+
+:global(.dark) .title-icon {
+  color: #fb923c;
+}
+
+.title-period {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-secondary);
+}
+
+/* Keys List */
+.keys-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.key-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.key-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.key-name {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
   overflow: hidden;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+.key-percentage {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.15),
-    0 10px 10px -5px rgba(0, 0, 0, 0.08);
+.key-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
 }
 
-:global(.dark) .card:hover {
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.5),
-    0 10px 10px -5px rgba(0, 0, 0, 0.35);
+.key-requests {
+  font-weight: var(--font-weight-medium);
+}
+
+.key-cost {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-green);
+}
+
+:global(.dark) .key-cost {
+  color: #34d399;
+}
+
+/* Other Keys */
+.other-keys {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.other-label {
+  font-weight: var(--font-weight-medium);
+}
+
+.other-percentage {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12) var(--space-6);
+  gap: var(--space-4);
+  min-height: 200px;
+}
+
+.empty-icon {
+  font-size: var(--font-size-4xl);
+  color: var(--text-muted);
+}
+
+.empty-text {
+  font-size: var(--font-size-base);
+  color: var(--text-muted);
+  text-align: center;
 }
 </style>

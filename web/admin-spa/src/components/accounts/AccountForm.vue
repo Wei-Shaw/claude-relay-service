@@ -7,7 +7,7 @@
         <div class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-green-600 sm:h-10 sm:w-10 sm:rounded-xl"
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100 sm:h-10 sm:w-10 sm:rounded"
             >
               <i class="fas fa-user-circle text-sm text-white sm:text-base" />
             </div>
@@ -77,15 +77,15 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'claude'
-                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-md dark:from-indigo-900/20 dark:to-purple-900/20'
-                        : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600'
+                        ? 'border-gray-900 bg-white dark:border-gray-100 dark:bg-gray-800'
+                        : 'border-gray-200 bg-white hover:border-indigo-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600'
                     ]"
                     @click="selectPlatformGroup('claude')"
                   >
                     <div class="p-3">
                       <div class="flex items-center justify-between">
                         <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-purple-600"
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-brain text-sm text-white"></i>
                         </div>
@@ -108,15 +108,15 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'openai'
-                        ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md dark:from-emerald-900/20 dark:to-teal-900/20'
-                        : 'border-gray-200 bg-white hover:border-emerald-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-emerald-600'
+                        ? 'border-gray-900 bg-white dark:border-gray-100 dark:bg-gray-800'
+                        : 'border-gray-200 bg-white hover:border-emerald-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-emerald-600'
                     ]"
                     @click="selectPlatformGroup('openai')"
                   >
                     <div class="p-3">
                       <div class="flex items-center justify-between">
                         <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-600"
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-600"
                         >
                           <svg
                             class="h-5 w-5 text-white"
@@ -148,21 +148,21 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'gemini'
-                        ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md dark:from-blue-900/20 dark:to-indigo-900/20'
-                        : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600'
+                        ? 'border-gray-900 bg-white dark:border-gray-100 dark:bg-gray-800'
+                        : 'border-gray-200 bg-white hover:border-blue-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600'
                     ]"
                     @click="selectPlatformGroup('gemini')"
                   >
                     <div class="p-3">
                       <div class="flex items-center justify-between">
                         <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600"
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fab fa-google text-sm text-white"></i>
                         </div>
                         <div
                           v-if="platformGroup === 'gemini'"
-                          class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500"
+                          class="flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
@@ -179,15 +179,15 @@
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
                     :class="[
                       platformGroup === 'droid'
-                        ? 'border-rose-500 bg-gradient-to-br from-rose-50 to-orange-50 shadow-md dark:from-rose-900/20 dark:to-orange-900/20'
-                        : 'border-gray-200 bg-white hover:border-rose-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-600'
+                        ? 'border-gray-900 bg-white dark:border-gray-100 dark:bg-gray-800'
+                        : 'border-gray-200 bg-white hover:border-rose-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-600'
                     ]"
                     @click="selectPlatformGroup('droid')"
                   >
                     <div class="p-3">
                       <div class="flex items-center justify-between">
                         <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-rose-500 to-orange-500"
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-robot text-sm text-white"></i>
                         </div>
@@ -209,7 +209,7 @@
                 <!-- 子平台选择器 -->
                 <div
                   v-if="platformGroup"
-                  class="animate-fadeIn rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
+                  class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
                 >
                   <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                     选择具体平台类型：
@@ -416,7 +416,7 @@
                         :class="[
                           form.platform === 'azure_openai'
                             ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
+                            : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-800'
                         ]"
                       >
                         <input
@@ -426,7 +426,9 @@
                           value="azure_openai"
                         />
                         <div class="flex items-center gap-2">
-                          <i class="fab fa-microsoft text-sm text-blue-600 dark:text-blue-400"></i>
+                          <i
+                            class="fab fa-microsoft text-sm text-gray-900 dark:text-blue-400 dark:text-gray-100"
+                          ></i>
                           <div>
                             <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Azure</span
@@ -438,7 +440,7 @@
                         </div>
                         <div
                           v-if="form.platform === 'azure_openai'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
@@ -452,7 +454,7 @@
                         :class="[
                           form.platform === 'gemini'
                             ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
+                            : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-800'
                         ]"
                       >
                         <input
@@ -462,7 +464,9 @@
                           value="gemini"
                         />
                         <div class="flex items-center gap-2">
-                          <i class="fab fa-google text-sm text-blue-600 dark:text-blue-400"></i>
+                          <i
+                            class="fab fa-google text-sm text-gray-900 dark:text-blue-400 dark:text-gray-100"
+                          ></i>
                           <div>
                             <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
                               >Gemini Cli</span
@@ -472,7 +476,7 @@
                         </div>
                         <div
                           v-if="form.platform === 'gemini'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-900 dark:bg-gray-100"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
@@ -561,7 +565,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.addType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="oauth"
                   />
@@ -574,7 +578,7 @@
                 <label v-if="form.platform === 'claude'" class="flex cursor-pointer items-center">
                   <input
                     v-model="form.addType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="setup-token"
                   />
@@ -583,7 +587,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.addType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="manual"
                   />
@@ -594,7 +598,7 @@
                 <label v-if="form.platform === 'droid'" class="flex cursor-pointer items-center">
                   <input
                     v-model="form.addType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="apikey"
                   />
@@ -642,7 +646,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.accountType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="shared"
                   />
@@ -651,7 +655,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.accountType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="dedicated"
                   />
@@ -660,7 +664,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.accountType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="group"
                   />
@@ -733,25 +737,21 @@
                     >
                       暂无可用分组
                     </div>
-                    <label
+                    <Checkbox
                       v-for="group in filteredGroups"
                       :key="group.id"
-                      class="flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-600"
+                      v-model="form.groupIds"
+                      :input-class="'rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                      :label-class="'flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-600'"
+                      :text-class="'text-sm text-gray-700 dark:text-gray-200'"
+                      :value="group.id"
                     >
-                      <input
-                        v-model="form.groupIds"
-                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                        type="checkbox"
-                        :value="group.id"
-                      />
-                      <span class="text-sm text-gray-700 dark:text-gray-200">
-                        {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
-                      </span>
-                    </label>
+                      {{ group.name }} ({{ group.memberCount || 0 }} 个成员)
+                    </Checkbox>
                     <!-- 新建分组选项 -->
                     <div class="border-t pt-2 dark:border-gray-600">
                       <button
-                        class="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        class="flex items-center gap-2 text-sm text-gray-900 hover:text-gray-900 dark:text-blue-400 dark:text-gray-100 dark:text-white dark:hover:text-blue-300"
                         type="button"
                         @click="handleNewGroup"
                       >
@@ -762,7 +762,7 @@
                   </div>
                 </div>
                 <button
-                  class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                  class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:focus:ring-white"
                   type="button"
                   @click="refreshGroups"
                 >
@@ -791,13 +791,15 @@
                       某些 Google 账号（特别是绑定了 Google Cloud 的账号）会被识别为 Workspace
                       账号，需要提供额外的项目 ID。
                     </p>
-                    <div class="mt-2 rounded border border-yellow-300 bg-white p-2">
+                    <div
+                      class="mt-2 rounded border border-yellow-300 bg-white p-2 dark:border-yellow-600 dark:bg-gray-800"
+                    >
                       <p class="mb-1 font-medium">如何获取项目 ID：</p>
                       <ol class="ml-2 list-inside list-decimal space-y-1">
                         <li>
                           访问
                           <a
-                            class="font-medium text-blue-600 hover:underline"
+                            class="font-medium text-gray-900 hover:underline dark:text-gray-100"
                             href="https://console.cloud.google.com/welcome"
                             target="_blank"
                             >Google Cloud Console</a
@@ -872,10 +874,10 @@
                 <p v-if="errors.region" class="mt-1 text-xs text-red-500">
                   {{ errors.region }}
                 </p>
-                <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div class="mt-2 rounded-lg border border-gray-300 bg-blue-50 p-3">
                   <div class="flex items-start gap-2">
-                    <i class="fas fa-info-circle mt-0.5 text-blue-600" />
-                    <div class="text-xs text-blue-700">
+                    <i class="fas fa-info-circle mt-0.5 text-gray-900 dark:text-gray-100" />
+                    <div class="text-xs text-gray-900 dark:text-white">
                       <p class="mb-1 font-medium">常用 AWS 区域参考：</p>
                       <div class="grid grid-cols-2 gap-1 text-xs">
                         <span>• us-east-1 (美国东部)</span>
@@ -885,7 +887,9 @@
                         <span>• ap-northeast-1 (东京)</span>
                         <span>• eu-central-1 (法兰克福)</span>
                       </div>
-                      <p class="mt-2 text-blue-600">💡 请输入完整的区域代码，如 us-east-1</p>
+                      <p class="mt-2 text-gray-900 dark:text-gray-100">
+                        💡 请输入完整的区域代码，如 us-east-1
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -919,7 +923,7 @@
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   留空将使用系统默认模型。支持 inference profile ID 或 ARN
                 </p>
-                <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div class="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
                   <div class="flex items-start gap-2">
                     <i class="fas fa-info-circle mt-0.5 text-amber-600" />
                     <div class="text-xs text-amber-700">
@@ -1048,13 +1052,14 @@
                     :key="model"
                     class="flex cursor-pointer items-center"
                   >
-                    <input
+                    <Checkbox
                       v-model="form.supportedModels"
-                      class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                      type="checkbox"
+                      :input-class="'mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                      :label="model"
+                      :label-class="'flex cursor-pointer items-center'"
+                      :text-class="'text-sm text-gray-700 dark:text-gray-300'"
                       :value="model"
                     />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ model }}</span>
                   </label>
                 </div>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1069,14 +1074,13 @@
                   >限流机制</label
                 >
                 <div class="mb-3">
-                  <label class="inline-flex cursor-pointer items-center">
-                    <input
-                      v-model="form.enableRateLimit"
-                      class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
-                      type="checkbox"
-                    />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
-                  </label>
+                  <Checkbox
+                    v-model="form.enableRateLimit"
+                    :input-class="'mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700'"
+                    label="启用限流机制"
+                    :label-class="'inline-flex cursor-pointer items-center'"
+                    :text-class="'text-sm text-gray-700 dark:text-gray-300'"
+                  />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     启用后，当账号返回429错误时将暂停调度一段时间
                   </p>
@@ -1202,7 +1206,7 @@
                     class="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all"
                     :class="
                       modelRestrictionMode === 'whitelist'
-                        ? 'bg-blue-500 text-white shadow-md'
+                        ? 'bg-blue-500 text-white'
                         : 'border border-gray-300 text-gray-600 hover:border-blue-300 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500'
                     "
                     type="button"
@@ -1215,7 +1219,7 @@
                     class="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all"
                     :class="
                       modelRestrictionMode === 'mapping'
-                        ? 'bg-purple-500 text-white shadow-md'
+                        ? 'bg-purple-500 text-white'
                         : 'border border-gray-300 text-gray-600 hover:border-purple-300 dark:border-gray-600 dark:text-gray-400 dark:hover:border-purple-500'
                     "
                     type="button"
@@ -1229,7 +1233,7 @@
                 <!-- 白名单模式 -->
                 <div v-if="modelRestrictionMode === 'whitelist'">
                   <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
-                    <p class="text-xs text-blue-700 dark:text-blue-400">
+                    <p class="text-xs text-gray-900 dark:text-blue-400 dark:text-white">
                       <i class="fas fa-info-circle mr-1" />
                       选择允许使用此账户的模型。留空表示支持所有模型。
                     </p>
@@ -1247,15 +1251,15 @@
                           : 'border-gray-300'
                       "
                     >
-                      <input
+                      <Checkbox
                         v-model="allowedModels"
-                        class="mr-2 text-blue-600 focus:ring-blue-500"
-                        type="checkbox"
+                        :input-class="'mr-2 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white'"
+                        :label-class="'flex cursor-pointer items-center'"
+                        :text-class="'text-sm font-medium text-gray-700 dark:text-gray-300'"
                         :value="model.value"
-                      />
-                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
-                        model.label
-                      }}</span>
+                      >
+                        {{ model.label }}
+                      </Checkbox>
                     </label>
                   </div>
 
@@ -1317,7 +1321,7 @@
                   <!-- 快捷添加按钮 -->
                   <div class="mt-3 flex flex-wrap gap-2">
                     <button
-                      class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                      class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-gray-900 transition-colors hover:bg-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:text-white dark:hover:bg-blue-900/50"
                       type="button"
                       @click="
                         addPresetMapping('claude-opus-4-5-20251101', 'claude-opus-4-5-20251101')
@@ -1404,14 +1408,13 @@
                   >限流机制</label
                 >
                 <div class="mb-3">
-                  <label class="inline-flex cursor-pointer items-center">
-                    <input
-                      v-model="form.enableRateLimit"
-                      class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
-                      type="checkbox"
-                    />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">启用限流机制</span>
-                  </label>
+                  <Checkbox
+                    v-model="form.enableRateLimit"
+                    :input-class="'mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700'"
+                    label="启用限流机制"
+                    :label-class="'inline-flex cursor-pointer items-center'"
+                    :text-class="'text-sm text-gray-700 dark:text-gray-300'"
+                  />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     启用后，当账号返回429错误时将暂停调度一段时间
                   </p>
@@ -1439,16 +1442,14 @@
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >上游错误处理</label
                 >
-                <label class="inline-flex cursor-pointer items-center">
-                  <input
-                    v-model="form.disableAutoProtection"
-                    class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
-                    type="checkbox"
-                  />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">
-                    上游错误不自动暂停调度
-                  </span>
-                </label>
+                <Checkbox
+                  v-model="form.disableAutoProtection"
+                  :input-class="'mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700'"
+                  :label-class="'inline-flex cursor-pointer items-center'"
+                  :text-class="'text-sm text-gray-700 dark:text-gray-300'"
+                >
+                  上游错误不自动暂停调度
+                </Checkbox>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   勾选后遇到 401/400/429/529 等上游错误仅记录日志并透传，不自动禁用或限流
                 </p>
@@ -1591,7 +1592,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.subscriptionType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="claude_max"
                   />
@@ -1600,7 +1601,7 @@
                 <label class="flex cursor-pointer items-center">
                   <input
                     v-model="form.subscriptionType"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="radio"
                     value="claude_pro"
                   />
@@ -1615,13 +1616,13 @@
 
             <!-- Claude 5小时限制自动停止调度选项 -->
             <div v-if="form.platform === 'claude'" class="mt-4">
-              <label class="flex items-start">
-                <input
-                  v-model="form.autoStopOnWarning"
-                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="checkbox"
-                />
-                <div class="ml-3">
+              <Checkbox
+                v-model="form.autoStopOnWarning"
+                :input-class="'mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'flex items-start'"
+                :text-class="'ml-3'"
+              >
+                <div>
                   <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
                     5小时使用量接近限制时自动停止调度
                   </span>
@@ -1629,18 +1630,18 @@
                     当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。
                   </p>
                 </div>
-              </label>
+              </Checkbox>
             </div>
 
             <!-- Claude User-Agent 版本配置 -->
             <div v-if="form.platform === 'claude'" class="mt-4">
-              <label class="flex items-start">
-                <input
-                  v-model="form.useUnifiedUserAgent"
-                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="checkbox"
-                />
-                <div class="ml-3">
+              <Checkbox
+                v-model="form.useUnifiedUserAgent"
+                :input-class="'mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white'"
+                :label-class="'flex items-start'"
+                :text-class="'ml-3'"
+              >
+                <div>
                   <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
                     使用统一 Claude Code 版本
                   </span>
@@ -1674,7 +1675,7 @@
                     </p>
                   </div>
                 </div>
-              </label>
+              </Checkbox>
             </div>
 
             <!-- Claude 统一客户端标识配置 -->
@@ -1682,7 +1683,7 @@
               <label class="flex items-start">
                 <input
                   v-model="form.useUnifiedClientId"
-                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="checkbox"
                   @change="handleUnifiedClientIdChange"
                 />
@@ -1702,7 +1703,7 @@
                           >客户端标识 ID</span
                         >
                         <button
-                          class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                          class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-gray-900 transition-colors hover:bg-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:text-white dark:hover:bg-blue-900/50"
                           type="button"
                           @click="regenerateClientId"
                         >
@@ -1714,13 +1715,13 @@
                         <code
                           class="block w-full select-all break-all rounded bg-gray-100 px-3 py-2 font-mono text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300"
                         >
-                          <span class="text-blue-600 dark:text-blue-400">{{
+                          <span class="text-gray-900 dark:text-blue-400 dark:text-gray-100">{{
                             form.unifiedClientId.substring(0, 8)
                           }}</span
                           ><span class="text-gray-500 dark:text-gray-500">{{
                             form.unifiedClientId.substring(8, 56)
                           }}</span
-                          ><span class="text-blue-600 dark:text-blue-400">{{
+                          ><span class="text-gray-900 dark:text-blue-400 dark:text-gray-100">{{
                             form.unifiedClientId.substring(56)
                           }}</span>
                         </code>
@@ -1763,11 +1764,11 @@
                 form.platform !== 'azure_openai' &&
                 form.platform !== 'openai-responses'
               "
-              class="space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4"
+              class="space-y-4 rounded-lg border border-gray-300 bg-blue-50 p-4"
             >
               <div class="mb-4 flex items-start gap-3">
                 <div
-                  class="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500"
+                  class="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
                 >
                   <i class="fas fa-info text-sm text-white" />
                 </div>
@@ -1777,28 +1778,28 @@
                   </h5>
                   <p
                     v-if="form.platform === 'claude'"
-                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                    class="mb-2 text-sm text-gray-900 dark:text-blue-300 dark:text-white"
                   >
                     请输入有效的 Claude Access Token。如果您有 Refresh
                     Token，建议也一并填写以支持自动刷新。
                   </p>
                   <p
                     v-else-if="form.platform === 'gemini'"
-                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                    class="mb-2 text-sm text-gray-900 dark:text-blue-300 dark:text-white"
                   >
                     请输入有效的 Gemini Access Token。如果您有 Refresh
                     Token，建议也一并填写以支持自动刷新。
                   </p>
                   <p
                     v-else-if="form.platform === 'openai'"
-                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                    class="mb-2 text-sm text-gray-900 dark:text-blue-300 dark:text-white"
                   >
                     请输入有效的 OpenAI Access Token。如果您有 Refresh
                     Token，建议也一并填写以支持自动刷新。
                   </p>
                   <p
                     v-else-if="form.platform === 'droid'"
-                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                    class="mb-2 text-sm text-gray-900 dark:text-blue-300 dark:text-white"
                   >
                     请输入有效的 Droid Access Token，并同时提供 Refresh Token 以支持自动刷新。
                   </p>
@@ -1811,7 +1812,7 @@
                     </p>
                     <p
                       v-if="form.platform === 'claude'"
-                      class="text-xs text-blue-800 dark:text-blue-300"
+                      class="text-xs text-gray-900 dark:text-blue-300 dark:text-white"
                     >
                       请从已登录 Claude Code 的机器上获取
                       <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
@@ -1821,7 +1822,7 @@
                     </p>
                     <p
                       v-else-if="form.platform === 'gemini'"
-                      class="text-xs text-blue-800 dark:text-blue-300"
+                      class="text-xs text-gray-900 dark:text-blue-300 dark:text-white"
                     >
                       请从已登录 Gemini CLI 的机器上获取
                       <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
@@ -1831,14 +1832,14 @@
                     </p>
                     <p
                       v-else-if="form.platform === 'openai'"
-                      class="text-xs text-blue-800 dark:text-blue-300"
+                      class="text-xs text-gray-900 dark:text-blue-300 dark:text-white"
                     >
                       请从已登录 OpenAI 账户的机器上获取认证凭证， 或通过 OAuth 授权流程获取 Access
                       Token。
                     </p>
                     <p
                       v-else-if="form.platform === 'droid'"
-                      class="text-xs text-blue-800 dark:text-blue-300"
+                      class="text-xs text-gray-900 dark:text-blue-300 dark:text-white"
                     >
                       请从已完成授权的 Droid CLI 或 Factory.ai 导出的凭证中获取 Access Token 与
                       Refresh Token。
@@ -1846,7 +1847,7 @@
                   </div>
                   <p
                     v-if="form.platform !== 'droid'"
-                    class="text-xs text-blue-600 dark:text-blue-400"
+                    class="text-xs text-gray-900 dark:text-blue-400 dark:text-gray-100"
                   >
                     💡 如果未填写 Refresh Token，Token 过期后需要手动更新。
                   </p>
@@ -2023,7 +2024,7 @@
 
             <div class="flex gap-3 pt-4">
               <button
-                class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                class="flex-1 rounded bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 type="button"
                 @click="$emit('close')"
               >
@@ -2075,11 +2076,11 @@
           <!-- Claude Setup Token流程 -->
           <div v-if="form.platform === 'claude'">
             <div
-              class="rounded-lg border border-blue-200 bg-blue-50 p-6 dark:border-blue-700 dark:bg-blue-900/30"
+              class="rounded-lg border border-gray-300 bg-blue-50 p-6 dark:border-gray-700 dark:bg-blue-900/30"
             >
               <div class="flex items-start gap-4">
                 <div
-                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500"
+                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
                 >
                   <i class="fas fa-key text-white" />
                 </div>
@@ -2090,31 +2091,33 @@
 
                   <!-- 授权方式选择 -->
                   <div class="mb-4">
-                    <p class="mb-3 text-sm font-medium text-blue-800 dark:text-blue-300">
+                    <p
+                      class="mb-3 text-sm font-medium text-gray-900 dark:text-blue-300 dark:text-white"
+                    >
                       选择授权方式：
                     </p>
                     <div class="flex flex-wrap gap-4">
                       <label class="flex cursor-pointer items-center">
                         <input
                           v-model="authMethod"
-                          class="mr-2 text-blue-600 focus:ring-blue-500"
+                          class="mr-2 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
                           type="radio"
                           value="manual"
                           @change="onAuthMethodChange"
                         />
-                        <span class="text-sm text-blue-800 dark:text-blue-300">
+                        <span class="text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                           <i class="fas fa-link mr-1" />手动授权
                         </span>
                       </label>
                       <label class="flex cursor-pointer items-center">
                         <input
                           v-model="authMethod"
-                          class="mr-2 text-blue-600 focus:ring-blue-500"
+                          class="mr-2 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
                           type="radio"
                           value="cookie"
                           @change="onAuthMethodChange"
                         />
-                        <span class="text-sm text-blue-800 dark:text-blue-300">
+                        <span class="text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                           <i class="fas fa-cookie mr-1" />Cookie 自动授权
                         </span>
                       </label>
@@ -2123,7 +2126,7 @@
 
                   <!-- 手动授权流程 -->
                   <div v-if="authMethod === 'manual'" class="space-y-4">
-                    <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
+                    <p class="mb-4 text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                       请按照以下步骤通过 Setup Token 完成 Claude 账户的授权：
                     </p>
                     <!-- 步骤1: 生成授权链接 -->
@@ -2171,7 +2174,7 @@
                               </button>
                             </div>
                             <button
-                              class="text-xs text-blue-600 hover:text-blue-700"
+                              class="text-xs text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:text-white"
                               @click="regenerateSetupTokenAuthUrl"
                             >
                               <i class="fas fa-sync-alt mr-1" />重新生成
@@ -2195,7 +2198,7 @@
                           <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
                             在浏览器中打开链接并完成授权
                           </p>
-                          <p class="mb-2 text-sm text-blue-700 dark:text-blue-300">
+                          <p class="mb-2 text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                             请在新标签页中打开授权链接，登录您的 Claude 账户并授权 Claude Code。
                           </p>
                           <div
@@ -2225,7 +2228,7 @@
                           <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
                             输入 Authorization Code
                           </p>
-                          <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
+                          <p class="mb-3 text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                             授权完成后，从返回页面复制 Authorization Code，并粘贴到下方输入框：
                           </p>
                           <div class="space-y-3">
@@ -2254,7 +2257,7 @@
 
                   <!-- Cookie自动授权流程 -->
                   <div v-if="authMethod === 'cookie'" class="space-y-4">
-                    <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
+                    <p class="mb-4 text-sm text-gray-900 dark:text-blue-300 dark:text-white">
                       使用 sessionKey 自动完成授权，无需手动打开链接。
                     </p>
 
@@ -2269,7 +2272,7 @@
                             <i class="fas fa-cookie text-blue-500" />sessionKey
                             <span
                               v-if="parsedSessionKeyCount > 1"
-                              class="rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
+                              class="rounded-full bg-gray-900 px-2 py-0.5 text-xs text-white dark:bg-gray-100"
                             >
                               {{ parsedSessionKeyCount }} 个
                             </span>
@@ -2283,7 +2286,7 @@
                           />
                           <p
                             v-if="parsedSessionKeyCount > 1"
-                            class="mt-1 text-xs text-blue-600 dark:text-blue-400"
+                            class="mt-1 text-xs text-gray-900 dark:text-blue-400 dark:text-gray-100"
                           >
                             <i class="fas fa-info-circle mr-1" />
                             将批量创建 {{ parsedSessionKeyCount }} 个账户
@@ -2296,7 +2299,7 @@
                         <!-- 帮助说明 -->
                         <div>
                           <button
-                            class="flex items-center text-xs text-blue-600 hover:text-blue-700"
+                            class="flex items-center text-xs text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:text-white"
                             type="button"
                             @click="showSessionKeyHelp = !showSessionKeyHelp"
                           >
@@ -2365,7 +2368,7 @@
 
           <div class="flex gap-3 pt-4">
             <button
-              class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              class="flex-1 rounded bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               type="button"
               @click="oauthStep = 1"
             >
@@ -2420,7 +2423,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.accountType"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="shared"
                 />
@@ -2429,7 +2432,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.accountType"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="dedicated"
                 />
@@ -2438,7 +2441,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.accountType"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="group"
                 />
@@ -2518,7 +2521,7 @@
                   >
                     <input
                       v-model="form.groupIds"
-                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      class="rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                       type="checkbox"
                       :value="group.id"
                     />
@@ -2529,7 +2532,7 @@
                   <!-- 新建分组选项 -->
                   <div class="border-t pt-2 dark:border-gray-600">
                     <button
-                      class="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      class="flex items-center gap-2 text-sm text-gray-900 hover:text-gray-900 dark:text-blue-400 dark:text-gray-100 dark:text-white dark:hover:text-blue-300"
                       type="button"
                       @click="handleNewGroup"
                     >
@@ -2540,7 +2543,7 @@
                 </div>
               </div>
               <button
-                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:focus:ring-white"
                 type="button"
                 @click="refreshGroups"
               >
@@ -2574,7 +2577,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.subscriptionType"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="claude_max"
                 />
@@ -2583,7 +2586,7 @@
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.subscriptionType"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                   type="radio"
                   value="claude_pro"
                 />
@@ -2601,7 +2604,7 @@
             <label class="flex items-start">
               <input
                 v-model="form.autoStopOnWarning"
-                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                class="mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                 type="checkbox"
               />
               <div class="ml-3">
@@ -2620,7 +2623,7 @@
             <label class="flex items-start">
               <input
                 v-model="form.useUnifiedUserAgent"
-                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                class="mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                 type="checkbox"
               />
               <div class="ml-3">
@@ -2665,7 +2668,7 @@
             <label class="flex items-start">
               <input
                 v-model="form.useUnifiedClientId"
-                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                class="mt-1 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                 type="checkbox"
                 @change="handleUnifiedClientIdChange"
               />
@@ -2685,7 +2688,7 @@
                         >客户端标识 ID</span
                       >
                       <button
-                        class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                        class="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-medium text-gray-900 transition-colors hover:bg-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:text-white dark:hover:bg-blue-900/50"
                         type="button"
                         @click="regenerateClientId"
                       >
@@ -2697,13 +2700,13 @@
                       <code
                         class="block w-full select-all break-all rounded bg-gray-100 px-3 py-2 font-mono text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300"
                       >
-                        <span class="text-blue-600 dark:text-blue-400">{{
+                        <span class="text-gray-900 dark:text-blue-400 dark:text-gray-100">{{
                           form.unifiedClientId.substring(0, 8)
                         }}</span
                         ><span class="text-gray-500 dark:text-gray-500">{{
                           form.unifiedClientId.substring(8, 56)
                         }}</span
-                        ><span class="text-blue-600 dark:text-blue-400">{{
+                        ><span class="text-gray-900 dark:text-blue-400 dark:text-gray-100">{{
                           form.unifiedClientId.substring(56)
                         }}</span>
                       </code>
@@ -2809,19 +2812,7 @@
                   ${{ calculateCurrentUsage().toFixed(4) }} / ${{ form.dailyQuota.toFixed(2) }}
                 </span>
               </div>
-              <div class="relative h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                <div
-                  class="absolute left-0 top-0 h-full rounded-full transition-all"
-                  :class="
-                    usagePercentage >= 90
-                      ? 'bg-red-500'
-                      : usagePercentage >= 70
-                        ? 'bg-yellow-500'
-                        : 'bg-green-500'
-                  "
-                  :style="{ width: `${Math.min(usagePercentage, 100)}%` }"
-                />
-              </div>
+              <Progress size="md" :value="Math.min(usagePercentage, 100)" :variant="usageVariant" />
               <div class="mt-2 flex items-center justify-between text-xs">
                 <span class="text-gray-500 dark:text-gray-400">
                   剩余: ${{ Math.max(0, form.dailyQuota - calculateCurrentUsage()).toFixed(2) }}
@@ -2887,7 +2878,7 @@
               <!-- 白名单模式 -->
               <div v-if="modelRestrictionMode === 'whitelist'">
                 <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
-                  <p class="text-xs text-blue-700 dark:text-blue-400">
+                  <p class="text-xs text-gray-900 dark:text-blue-400 dark:text-white">
                     <i class="fas fa-info-circle mr-1" />
                     选择允许使用此账户的模型。留空表示支持所有模型。
                   </p>
@@ -2907,7 +2898,7 @@
                   >
                     <input
                       v-model="allowedModels"
-                      class="mr-2 text-blue-600 focus:ring-blue-500"
+                      class="mr-2 text-gray-900 focus:ring-gray-900 dark:text-gray-100 dark:focus:ring-white"
                       type="checkbox"
                       :value="model.value"
                     />
@@ -2975,7 +2966,7 @@
                 <!-- 快捷添加按钮 -->
                 <div class="mt-3 flex flex-wrap gap-2">
                   <button
-                    class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                    class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-gray-900 transition-colors hover:bg-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:text-white dark:hover:bg-blue-900/50"
                     type="button"
                     @click="
                       addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
@@ -3081,7 +3072,7 @@
                 <label class="inline-flex cursor-pointer items-center">
                   <input
                     v-model="form.enableRateLimit"
-                    class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    class="mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700"
                     type="checkbox"
                   />
                   <span class="text-sm text-gray-700">启用限流机制</span>
@@ -3113,7 +3104,7 @@
               <label class="inline-flex cursor-pointer items-center">
                 <input
                   v-model="form.disableAutoProtection"
-                  class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                  class="mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700"
                   type="checkbox"
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">
@@ -3314,10 +3305,10 @@
                 placeholder="例如：us-east-1"
                 type="text"
               />
-              <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div class="mt-2 rounded-lg border border-gray-300 bg-blue-50 p-3">
                 <div class="flex items-start gap-2">
-                  <i class="fas fa-info-circle mt-0.5 text-blue-600" />
-                  <div class="text-xs text-blue-700">
+                  <i class="fas fa-info-circle mt-0.5 text-gray-900 dark:text-gray-100" />
+                  <div class="text-xs text-gray-900 dark:text-white">
                     <p class="mb-1 font-medium">常用 AWS 区域参考：</p>
                     <div class="grid grid-cols-2 gap-1 text-xs">
                       <span>• us-east-1 (美国东部)</span>
@@ -3376,7 +3367,7 @@
                 <label class="inline-flex cursor-pointer items-center">
                   <input
                     v-model="form.enableRateLimit"
-                    class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    class="mr-2 rounded border-gray-300 text-gray-900 focus:border-gray-900 focus:ring focus:ring-gray-300 dark:text-gray-100 dark:focus:border-white dark:focus:ring-gray-700"
                     type="checkbox"
                   />
                   <span class="text-sm text-gray-700">启用限流机制</span>
@@ -3489,7 +3480,7 @@
                 >
                   <input
                     v-model="form.supportedModels"
-                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    class="mr-2 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:ring-white"
                     type="checkbox"
                     :value="model"
                   />
@@ -3560,19 +3551,19 @@
                   </span>
                 </div>
                 <div
-                  class="relative grid h-11 grid-cols-3 overflow-hidden rounded-2xl border border-purple-200/80 bg-gradient-to-r from-purple-50/80 via-white to-purple-50/80 shadow-inner dark:border-purple-700/70 dark:from-purple-900/40 dark:via-purple-900/20 dark:to-purple-900/40"
+                  class="relative grid h-11 grid-cols-3 overflow-hidden rounded border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800"
                 >
                   <span
-                    class="pointer-events-none absolute inset-y-0 rounded-2xl bg-gradient-to-r from-purple-500/90 via-purple-600 to-indigo-500/90 shadow-lg ring-1 ring-purple-100/80 transition-all duration-300 ease-out dark:from-purple-500/70 dark:via-purple-600/70 dark:to-indigo-500/70 dark:ring-purple-400/30"
+                    class="pointer-events-none absolute inset-y-0 rounded bg-black ring-1 ring-gray-300 transition-all duration-300 ease-out dark:bg-white dark:ring-gray-600"
                     :style="apiKeyModeSliderStyle"
                   />
                   <button
                     v-for="option in apiKeyModeOptions"
                     :key="option.value"
-                    class="relative z-10 flex items-center justify-center rounded-2xl px-2 text-xs font-semibold transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 dark:focus-visible:ring-purple-400/60"
+                    class="relative z-10 flex items-center justify-center rounded px-2 text-xs font-semibold transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 dark:focus-visible:ring-purple-400/60"
                     :class="
                       form.apiKeyUpdateMode === option.value
-                        ? 'text-white drop-shadow-sm'
+                        ? 'text-white'
                         : 'text-purple-500/80 hover:text-purple-700 dark:text-purple-200/70 dark:hover:text-purple-100'
                     "
                     type="button"
@@ -3609,7 +3600,7 @@
               form.platform !== 'azure_openai' &&
               form.platform !== 'openai-responses'
             "
-            class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/30"
+            class="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-600 dark:bg-amber-900/30"
           >
             <div class="mb-4 flex items-start gap-3">
               <div
@@ -3674,7 +3665,7 @@
 
           <div class="flex gap-3 pt-4">
             <button
-              class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              class="flex-1 rounded bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               type="button"
               @click="$emit('close')"
             >
@@ -3734,6 +3725,7 @@ import OAuthFlow from './OAuthFlow.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import GroupManagementModal from './GroupManagementModal.vue'
 import ApiKeyManagementModal from './ApiKeyManagementModal.vue'
+import { Progress, Checkbox } from '@/ui'
 
 const props = defineProps({
   account: {
@@ -4192,6 +4184,14 @@ const usagePercentage = computed(() => {
   }
   const currentUsage = calculateCurrentUsage()
   return (currentUsage / form.value.dailyQuota) * 100
+})
+
+// 进度条变体（基于使用百分比）
+const usageVariant = computed(() => {
+  const percentage = usagePercentage.value
+  if (percentage >= 90) return 'error'
+  if (percentage >= 70) return 'warning'
+  return 'success'
 })
 
 // 当前账户的 API Key 数量（仅用于展示）
@@ -6262,18 +6262,5 @@ watch(
 </script>
 
 <style scoped>
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
-}
+/* Animation removed for immediate display */
 </style>

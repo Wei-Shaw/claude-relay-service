@@ -2,10 +2,7 @@
   <Teleport to="body">
     <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
       <!-- 背景遮罩 -->
-      <div
-        class="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm"
-        @click="$emit('close')"
-      />
+      <div class="fixed inset-0 bg-gray-900 bg-opacity-50" @click="$emit('close')" />
 
       <!-- 模态框内容 -->
       <div class="modal-content relative mx-auto w-full max-w-lg p-8">
@@ -13,7 +10,7 @@
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div
-              class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600"
+              class="flex h-10 w-10 items-center justify-center rounded bg-gray-900 dark:bg-gray-100"
             >
               <i class="fas fa-clock text-white" />
             </div>
@@ -35,7 +32,7 @@
         <div class="space-y-6">
           <!-- 当前状态显示 -->
           <div
-            class="rounded-lg border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-4 dark:border-gray-600 dark:from-gray-700 dark:to-gray-800"
+            class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-800"
           >
             <div class="flex items-center justify-between">
               <div>
@@ -60,7 +57,7 @@
                 </p>
               </div>
               <div
-                class="flex h-12 w-12 items-center justify-center rounded-lg bg-white shadow-sm dark:bg-gray-700"
+                class="flex h-12 w-12 items-center justify-center rounded-lg bg-white dark:bg-gray-700"
               >
                 <i
                   :class="[
@@ -86,7 +83,7 @@
                 :class="[
                   'rounded-lg px-3 py-2 text-sm font-medium transition-all',
                   localForm.expireDuration === option.value
-                    ? 'bg-blue-500 text-white shadow-md'
+                    ? 'bg-blue-500 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                 ]"
                 @click="selectQuickOption(option.value)"
@@ -97,7 +94,7 @@
                 :class="[
                   'rounded-lg px-3 py-2 text-sm font-medium transition-all',
                   localForm.expireDuration === 'custom'
-                    ? 'bg-blue-500 text-white shadow-md'
+                    ? 'bg-blue-500 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                 ]"
                 @click="selectQuickOption('custom')"
@@ -109,7 +106,7 @@
           </div>
 
           <!-- 自定义日期选择 -->
-          <div v-if="localForm.expireDuration === 'custom'" class="animate-fadeIn">
+          <div v-if="localForm.expireDuration === 'custom'">
             <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >选择日期和时间</label
             >
@@ -128,11 +125,13 @@
           <!-- 预览新的过期时间 -->
           <div
             v-if="localForm.expiresAt !== account.expiresAt"
-            class="rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-blue-700 dark:from-blue-900/20 dark:to-indigo-900/20"
+            class="rounded-lg border border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="mb-1 text-xs font-medium text-blue-700 dark:text-blue-400">
+                <p
+                  class="mb-1 text-xs font-medium text-gray-900 dark:text-blue-400 dark:text-white"
+                >
                   <i class="fas fa-arrow-right mr-1" />
                   新的到期时间
                 </p>
@@ -154,7 +153,7 @@
                 </p>
               </div>
               <div
-                class="flex h-12 w-12 items-center justify-center rounded-lg bg-white shadow-sm dark:bg-gray-700"
+                class="flex h-12 w-12 items-center justify-center rounded-lg bg-white dark:bg-gray-700"
               >
                 <i class="fas fa-check text-lg text-green-500" />
               </div>
@@ -398,20 +397,7 @@ defineExpose({
 </script>
 
 <style scoped>
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.2s ease-out;
-}
+/* Animation removed for immediate display */
 
 .loading-spinner {
   width: 16px;

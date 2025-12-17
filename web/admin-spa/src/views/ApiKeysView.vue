@@ -18,55 +18,57 @@
               :class="[
                 'whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium',
                 activeTab === 'active'
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white'
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-300'
               ]"
               @click="activeTab = 'active'"
             >
               活跃 API Keys
-              <span
-                v-if="apiKeys.length > 0"
-                class="ml-2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:bg-gray-700 dark:text-gray-100"
-              >
+              <Badge v-if="apiKeys.length > 0" count size="sm" variant="neutral">
                 {{ apiKeys.length }}
-              </span>
+              </Badge>
             </button>
             <button
               :class="[
                 'whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium',
                 activeTab === 'deleted'
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white'
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-300'
               ]"
               @click="loadDeletedApiKeys"
             >
               已删除 API Keys
-              <span
-                v-if="deletedApiKeys.length > 0"
-                class="ml-2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:bg-gray-700 dark:text-gray-100"
-              >
+              <Badge v-if="deletedApiKeys.length > 0" count size="sm" variant="neutral">
                 {{ deletedApiKeys.length }}
-              </span>
+              </Badge>
             </button>
           </nav>
         </div>
 
         <!-- Tab Content -->
+        <!-- Skeleton Loading for initial load -->
+        <div v-if="apiKeysLoading && apiKeys.length === 0" class="tab-panel">
+          <div class="space-y-3">
+            <div v-for="i in 5" :key="i" class="skeleton-card">
+              <div class="skeleton skeleton-text mb-2" style="width: 40%; height: 20px"></div>
+              <div class="skeleton skeleton-text mb-2" style="width: 70%; height: 16px"></div>
+              <div class="skeleton skeleton-text" style="width: 50%; height: 16px"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- 活跃 API Keys Tab Panel -->
-        <div v-if="activeTab === 'active'" class="tab-panel">
+        <div v-else-if="activeTab === 'active'" class="tab-panel">
           <!-- 工具栏区域 - 添加 mb-4 增加与表格的间距 -->
           <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <!-- 左侧：查询筛选器组 -->
             <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <!-- 时间范围筛选 -->
               <div class="group relative min-w-[140px]">
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <CustomDropdown
                   v-model="globalDateFilter.preset"
                   icon="fa-calendar-alt"
-                  icon-color="text-blue-500"
+                  icon-color="text-gray-700"
                   :options="timeRangeDropdownOptions"
                   placeholder="选择时间范围"
                   @change="handleTimeRangeChange"
@@ -96,9 +98,6 @@
 
               <!-- 标签筛选器 -->
               <div class="group relative min-w-[140px]">
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <div class="relative">
                   <CustomDropdown
                     v-model="selectedTagFilter"
@@ -109,7 +108,7 @@
                   />
                   <span
                     v-if="selectedTagFilter"
-                    class="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-xs text-white shadow-sm"
+                    class="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-xs text-white"
                   >
                     {{ selectedTagCount }}
                   </span>
@@ -118,9 +117,6 @@
 
               <!-- 模型筛选器 -->
               <div class="group relative min-w-[140px]">
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
                 <div class="relative">
                   <CustomDropdown
                     v-model="selectedModels"
@@ -132,7 +128,7 @@
                   />
                   <span
                     v-if="selectedModels.length > 0"
-                    class="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white shadow-sm"
+                    class="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white"
                   >
                     {{ selectedModels.length }}
                   </span>
@@ -151,13 +147,10 @@
                   />
                 </div>
                 <div class="group relative flex-1">
-                  <div
-                    class="pointer-events-none absolute -inset-0.5 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                  ></div>
                   <div class="relative flex items-center">
                     <input
                       v-model="searchKeyword"
-                      class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 shadow-sm transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
+                      class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pl-9 text-sm text-gray-700 placeholder-gray-400 transition-all duration-200 hover:border-gray-300 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:hover:border-gray-500"
                       :placeholder="
                         searchMode === 'bindingAccount'
                           ? '搜索所属账号...'
@@ -183,78 +176,53 @@
             <!-- 右侧：操作按钮组 -->
             <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <!-- 刷新按钮 -->
-              <button
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
-                :disabled="apiKeysLoading"
-                @click="loadApiKeys()"
-              >
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-green-500 to-teal-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
+              <Button :disabled="apiKeysLoading" variant="secondary" @click="loadApiKeys()">
                 <i
                   :class="[
-                    'fas relative text-green-500',
+                    'fas text-green-500',
                     apiKeysLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt'
                   ]"
                 />
-                <span class="relative">刷新</span>
-              </button>
+                <span>刷新</span>
+              </Button>
 
               <!-- 选择/取消选择按钮 -->
-              <button
-                class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                @click="toggleSelectionMode"
-              >
+              <Button variant="secondary" @click="toggleSelectionMode">
                 <i :class="showCheckboxes ? 'fas fa-times' : 'fas fa-check-square'"></i>
                 <span>{{ showCheckboxes ? '取消选择' : '选择' }}</span>
-              </button>
+              </Button>
 
               <!-- 导出数据按钮 -->
-              <button
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
-                @click="exportToExcel"
-              >
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-green-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
-                <i class="fas fa-file-excel relative text-emerald-500" />
-                <span class="relative">导出数据</span>
-              </button>
+              <Button variant="secondary" @click="exportToExcel">
+                <i class="fas fa-file-excel text-emerald-500" />
+                <span>导出数据</span>
+              </Button>
 
               <!-- 批量编辑按钮 - 移到刷新按钮旁边 -->
-              <button
+              <Button
                 v-if="selectedApiKeys.length > 0"
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 sm:w-auto"
+                variant="secondary"
                 @click="openBatchEditModal()"
               >
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
-                <i class="fas fa-edit relative text-blue-600 dark:text-blue-400" />
-                <span class="relative">编辑选中 ({{ selectedApiKeys.length }})</span>
-              </button>
+                <i class="fas fa-edit text-gray-700 dark:text-gray-300" />
+                <span>编辑选中 ({{ selectedApiKeys.length }})</span>
+              </Button>
 
               <!-- 批量删除按钮 - 移到刷新按钮旁边 -->
-              <button
+              <Button
                 v-if="selectedApiKeys.length > 0"
-                class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
+                variant="danger"
                 @click="batchDeleteApiKeys()"
               >
-                <div
-                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
-                ></div>
-                <i class="fas fa-trash relative text-red-600 dark:text-red-400" />
-                <span class="relative">删除选中 ({{ selectedApiKeys.length }})</span>
-              </button>
+                <i class="fas fa-trash text-red-600 dark:text-red-400" />
+                <span>删除选中 ({{ selectedApiKeys.length }})</span>
+              </Button>
 
               <!-- 创建按钮 -->
-              <button
-                class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg sm:w-auto"
-                @click.stop="openCreateApiKeyModal"
-              >
+              <Button variant="primary" @click.stop="openCreateApiKeyModal">
                 <i class="fas fa-plus"></i>
                 <span>创建新 Key</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -277,20 +245,17 @@
           <div v-else class="table-wrapper hidden md:block">
             <div class="table-container">
               <table class="w-full">
-                <thead
-                  class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100/90 backdrop-blur-sm dark:from-gray-700 dark:to-gray-800/90"
-                >
+                <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th
                       v-if="shouldShowCheckboxes"
                       class="checkbox-column sticky left-0 z-20 min-w-[50px] px-3 py-4 text-left"
                     >
                       <div class="flex items-center">
-                        <input
+                        <Checkbox
                           v-model="selectAllChecked"
-                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           :indeterminate="isIndeterminate"
-                          type="checkbox"
+                          :input-class="'h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400 dark:text-white dark:focus:ring-gray-500'"
                           @change="handleSelectAll"
                         />
                       </div>
@@ -434,7 +399,7 @@
                           ? 'bg-white dark:bg-gray-800/40'
                           : 'bg-gray-50/70 dark:bg-gray-700/30',
                         'border-b-2 border-gray-200/80 dark:border-gray-700/50',
-                        'hover:bg-blue-50/60 hover:shadow-sm dark:hover:bg-blue-900/20'
+                        'hover:bg-gray-100 dark:hover:bg-gray-700'
                       ]"
                     >
                       <td
@@ -442,10 +407,9 @@
                         class="checkbox-column sticky left-0 z-10 px-3 py-3"
                       >
                         <div class="flex items-center">
-                          <input
+                          <Checkbox
                             v-model="selectedApiKeys"
-                            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            type="checkbox"
+                            :input-class="'h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400 dark:text-white dark:focus:ring-gray-500'"
                             :value="key.id"
                             @change="updateSelectAllState"
                           />
@@ -573,13 +537,14 @@
                       <!-- 标签列 -->
                       <td class="px-3 py-3">
                         <div class="flex flex-wrap gap-1">
-                          <span
+                          <Badge
                             v-for="tag in key.tags || []"
                             :key="tag"
-                            class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                            size="sm"
+                            variant="neutral"
                           >
                             {{ tag }}
-                          </span>
+                          </Badge>
                           <span
                             v-if="!key.tags || key.tags.length === 0"
                             class="text-xs text-gray-400"
@@ -618,7 +583,7 @@
                         <!-- 已加载状态 -->
                         <template v-else-if="getCachedStats(key.id)">
                           <span
-                            class="font-semibold text-blue-600 dark:text-blue-400"
+                            class="font-semibold text-green-600 dark:text-green-400"
                             style="font-size: 14px"
                           >
                             {{ getCachedStats(key.id).formattedCost || '$0.00' }}
@@ -834,7 +799,7 @@
                           <!-- 未激活状态 -->
                           <span
                             v-if="key.expirationMode === 'activation' && !key.isActivated"
-                            class="inline-flex items-center text-blue-600 dark:text-blue-400"
+                            class="inline-flex items-center text-gray-600 dark:text-gray-400"
                             style="font-size: 13px"
                           >
                             <i class="fas fa-pause-circle mr-1 text-xs" />
@@ -912,7 +877,7 @@
                             <span class="ml-1">模型</span>
                           </button>
                           <button
-                            class="rounded px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-900 dark:hover:bg-blue-900/20"
+                            class="rounded px-2 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                             title="编辑"
                             @click="openEditApiKeyModal(key)"
                           >
@@ -1002,14 +967,15 @@
                               模型使用分布
                             </h5>
                             <div class="flex items-center gap-2">
-                              <span
+                              <Badge
                                 v-if="
                                   apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0
                                 "
-                                class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                                size="sm"
+                                variant="neutral"
                               >
                                 {{ apiKeyModelStats[key.id].length }} 个模型
-                              </span>
+                              </Badge>
 
                               <!-- API Keys日期筛选器 -->
                               <div class="flex items-center gap-1">
@@ -1022,7 +988,7 @@
                                       'rounded px-2 py-1 text-xs font-medium transition-colors',
                                       getApiKeyDateFilter(key.id).preset === option.value &&
                                       getApiKeyDateFilter(key.id).type === 'preset'
-                                        ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                                        ? 'bg-white text-gray-900 dark:bg-gray-800 dark:text-white'
                                         : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                                     ]"
                                     @click="setApiKeyDateFilterPreset(option.value, key.id)"
@@ -1066,7 +1032,7 @@
                                 暂无模型使用数据
                               </p>
                               <button
-                                class="ml-2 flex items-center gap-1 text-sm text-blue-500 transition-colors hover:text-blue-700"
+                                class="ml-2 flex items-center gap-1 text-sm text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
                                 title="重置筛选条件并刷新"
                                 @click="resetApiKeyDateFilter(key.id)"
                               >
@@ -1087,7 +1053,7 @@
                             <div
                               v-for="stat in apiKeyModelStats[key.id]"
                               :key="stat.model"
-                              class="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 transition-all duration-200 hover:border-indigo-300 hover:shadow-lg dark:border-gray-600 dark:from-gray-800 dark:to-gray-700 dark:hover:border-indigo-500"
+                              class="rounded border border-gray-200 bg-white p-4 transition-all duration-200 hover:border-indigo-300 dark:border-gray-600 dark:bg-gray-800 dark:hover:border-indigo-500"
                             >
                               <div class="mb-3 flex items-start justify-between">
                                 <div class="flex-1">
@@ -1095,10 +1061,9 @@
                                     class="mb-1 block text-sm font-semibold text-gray-800 dark:text-gray-200"
                                     >{{ stat.model }}</span
                                   >
-                                  <span
-                                    class="rounded-full bg-blue-50 px-2 py-1 text-xs text-gray-500 dark:bg-blue-900/30 dark:text-gray-400"
-                                    >{{ stat.requests }} 次请求</span
-                                  >
+                                  <Badge size="sm" variant="neutral">
+                                    {{ stat.requests }} 次请求
+                                  </Badge>
                                 </div>
                               </div>
 
@@ -1174,18 +1139,16 @@
                               </div>
 
                               <!-- 进度条 -->
-                              <div
-                                class="mt-3 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700"
-                              >
-                                <div
-                                  class="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-500"
-                                  :style="{
-                                    width:
-                                      calculateApiKeyModelPercentage(
-                                        stat.allTokens,
-                                        apiKeyModelStats[key.id]
-                                      ) + '%'
-                                  }"
+                              <div class="mt-3">
+                                <Progress
+                                  size="md"
+                                  :value="
+                                    calculateApiKeyModelPercentage(
+                                      stat.allTokens,
+                                      apiKeyModelStats[key.id]
+                                    )
+                                  "
+                                  variant="success"
                                 />
                               </div>
                               <div class="mt-1 text-right">
@@ -1204,7 +1167,7 @@
                           <!-- 总计统计，仅在有数据时显示 -->
                           <div
                             v-if="apiKeyModelStats[key.id] && apiKeyModelStats[key.id].length > 0"
-                            class="mt-4 rounded-lg border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 p-3 dark:border-indigo-700 dark:from-indigo-900/20 dark:to-purple-900/20"
+                            class="mt-4 rounded border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-700 dark:bg-indigo-900/20"
                           >
                             <div class="flex items-center justify-between text-sm">
                               <span
@@ -1248,19 +1211,14 @@
 
           <!-- 移动端卡片视图 -->
           <div v-if="!apiKeysLoading && sortedApiKeys.length > 0" class="space-y-3 md:hidden">
-            <div
-              v-for="key in paginatedApiKeys"
-              :key="key.id"
-              class="card p-4 transition-shadow hover:shadow-lg"
-            >
+            <div v-for="key in paginatedApiKeys" :key="key.id" class="card p-4">
               <!-- 卡片头部 -->
               <div class="mb-3 flex items-start justify-between">
                 <div class="flex items-center gap-3">
-                  <input
+                  <Checkbox
                     v-if="shouldShowCheckboxes"
                     v-model="selectedApiKeys"
-                    class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    type="checkbox"
+                    :input-class="'mt-1 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:text-white dark:focus:ring-white'"
                     :value="key.id"
                     @change="updateSelectAllState"
                   />
@@ -1273,22 +1231,9 @@
                     </p>
                   </div>
                 </div>
-                <span
-                  :class="[
-                    'inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold',
-                    key.isActive
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                  ]"
-                >
-                  <div
-                    :class="[
-                      'mr-1.5 h-1.5 w-1.5 rounded-full',
-                      key.isActive ? 'bg-green-500' : 'bg-red-500'
-                    ]"
-                  />
+                <Badge dot size="sm" :variant="key.isActive ? 'success' : 'error'">
                   {{ key.isActive ? '活跃' : '已停用' }}
-                </span>
+                </Badge>
               </div>
 
               <!-- 账户绑定信息 -->
@@ -1387,7 +1332,7 @@
                       globalDateFilter.type === 'custom' ? '累计统计' : '今日使用'
                     }}</span>
                     <button
-                      class="text-xs text-blue-600 hover:text-blue-800"
+                      class="text-xs text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
                       @click="showUsageDetails(key)"
                     >
                       <i class="fas fa-chart-line mr-1" />详情
@@ -1579,7 +1524,7 @@
                       {{ key.expiresAt ? formatDate(key.expiresAt) : '永不过期' }}
                     </span>
                     <button
-                      class="inline-flex h-5 w-5 items-center justify-center rounded text-gray-300 transition-all duration-200 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-900/20"
+                      class="inline-flex h-5 w-5 items-center justify-center rounded text-gray-300 transition-all duration-200 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                       title="编辑过期时间"
                       @click.stop="startEditExpiry(key)"
                     >
@@ -1598,19 +1543,15 @@
 
               <!-- 标签 -->
               <div v-if="key.tags && key.tags.length > 0" class="mb-3 flex flex-wrap gap-1">
-                <span
-                  v-for="tag in key.tags"
-                  :key="tag"
-                  class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                >
+                <Badge v-for="tag in key.tags" :key="tag" size="sm" variant="neutral">
                   {{ tag }}
-                </span>
+                </Badge>
               </div>
 
               <!-- 操作按钮 -->
               <div class="mt-3 flex gap-2 border-t border-gray-100 pt-3 dark:border-gray-600">
                 <button
-                  class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50"
+                  class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-gray-50 px-3 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   @click="showUsageDetails(key)"
                 >
                   <i class="fas fa-chart-line" />
@@ -1669,7 +1610,7 @@
                 <span class="text-xs text-gray-600 dark:text-gray-400 sm:text-sm">每页显示</span>
                 <select
                   v-model="pageSize"
-                  class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 transition-colors hover:border-gray-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:text-sm"
+                  class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 transition-colors hover:border-gray-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:focus:ring-white sm:text-sm"
                 >
                   <option v-for="size in pageSizeOptions" :key="size" :value="size">
                     {{ size }}
@@ -1712,7 +1653,7 @@
                   :class="[
                     'rounded-md px-2 py-1 text-xs font-medium sm:px-3 sm:text-sm',
                     page === currentPage
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
                       : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
                   ]"
                   @click="currentPage = page"
@@ -1781,9 +1722,7 @@
             <div class="table-wrapper">
               <div class="table-container">
                 <table class="w-full">
-                  <thead
-                    class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100/90 backdrop-blur-sm dark:from-gray-700 dark:to-gray-800/90"
-                  >
+                  <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th
                         class="name-column sticky left-0 z-20 min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -1848,7 +1787,7 @@
                       <td class="name-column sticky left-0 z-10 px-3 py-3">
                         <div class="flex items-center">
                           <div
-                            class="mr-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600"
+                            class="mr-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-red-600"
                           >
                             <i class="fas fa-trash text-[10px] text-white" />
                           </div>
@@ -1868,7 +1807,7 @@
                           <!-- Claude OAuth 绑定 -->
                           <div v-if="key.claudeAccountId" class="flex items-center gap-1 text-xs">
                             <span
-                              class="inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                              class="inline-flex items-center rounded border border-gray-300 bg-white px-1.5 py-0.5 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                             >
                               <i class="fas fa-robot mr-1 text-[10px]" />
                               Claude OAuth
@@ -1908,7 +1847,10 @@
                       <!-- 创建者 -->
                       <td v-if="isLdapEnabled" class="px-3 py-3">
                         <div class="text-xs">
-                          <span v-if="key.createdBy === 'admin'" class="text-blue-600">
+                          <span
+                            v-if="key.createdBy === 'admin'"
+                            class="text-gray-900 dark:text-gray-100"
+                          >
                             <i class="fas fa-user-shield mr-1 text-xs" />
                             管理员
                           </span>
@@ -1932,7 +1874,10 @@
                       <!-- 删除者 -->
                       <td class="px-3 py-3">
                         <div class="text-xs">
-                          <span v-if="key.deletedByType === 'admin'" class="text-blue-600">
+                          <span
+                            v-if="key.deletedByType === 'admin'"
+                            class="text-gray-900 dark:text-gray-100"
+                          >
                             <i class="fas fa-user-shield mr-1 text-xs" />
                             {{ key.deletedBy }}
                           </span>
@@ -2136,6 +2081,7 @@ import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
+import { Progress, Badge, Checkbox, Button } from '@/ui'
 
 // 响应式数据
 const router = useRouter()
@@ -4904,14 +4850,14 @@ onUnmounted(() => {
   z-index: 12;
 }
 
-/* 确保操作列在浅色模式下有正确的背景 - 使用纯色避免滚动时重叠 */
+/* 确保操作列在浅色模式下有正确的背景 - 使用纯色避免滚动时重叠 (flat design) */
 .table-container thead .operations-column {
   z-index: 30;
-  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
+  background: #fafafa;
 }
 
 .dark .table-container thead .operations-column {
-  background: linear-gradient(to bottom, #374151, #1f2937);
+  background: #1f2937;
 }
 
 /* tbody 中的操作列背景处理 - 使用纯色避免滚动时重叠 */
@@ -4941,11 +4887,9 @@ onUnmounted(() => {
 }
 
 .table-container tbody .operations-column {
-  box-shadow: -8px 0 12px -8px rgba(15, 23, 42, 0.16);
 }
 
 .dark .table-container tbody .operations-column {
-  box-shadow: -8px 0 12px -8px rgba(30, 41, 59, 0.45);
 }
 
 /* 固定左侧列（复选框和名称列）*/
@@ -4955,16 +4899,16 @@ onUnmounted(() => {
   z-index: 12;
 }
 
-/* 表头左侧固定列背景 - 使用纯色避免滚动时重叠 */
+/* 表头左侧固定列背景 - 使用纯色避免滚动时重叠 (flat design) */
 .table-container thead .checkbox-column,
 .table-container thead .name-column {
   z-index: 30;
-  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
+  background: #fafafa;
 }
 
 .dark .table-container thead .checkbox-column,
 .dark .table-container thead .name-column {
-  background: linear-gradient(to bottom, #374151, #1f2937);
+  background: #1f2937;
 }
 
 /* tbody 中的左侧固定列背景处理 - 使用纯色避免滚动时重叠 */
@@ -5001,11 +4945,9 @@ onUnmounted(() => {
 
 /* 名称列右侧阴影（分隔效果） */
 .table-container tbody .name-column {
-  box-shadow: 8px 0 12px -8px rgba(15, 23, 42, 0.16);
 }
 
 .dark .table-container tbody .name-column {
-  box-shadow: 8px 0 12px -8px rgba(30, 41, 59, 0.45);
 }
 
 .loading-spinner {
@@ -5027,7 +4969,7 @@ onUnmounted(() => {
 }
 
 .api-key-date-picker :deep(.el-input__inner) {
-  @apply border-gray-300 bg-white focus:border-blue-500 focus:ring-blue-500;
+  @apply border-gray-300 bg-white focus:border-gray-900 focus:ring-gray-900 dark:focus:border-white dark:focus:ring-white;
 }
 
 .api-key-date-picker :deep(.el-range-separator) {
@@ -5036,7 +4978,7 @@ onUnmounted(() => {
 
 /* 自定义日期范围选择器高度对齐 */
 .custom-date-range-picker :deep(.el-input__wrapper) {
-  @apply h-[38px] rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800;
+  @apply h-[38px] rounded-lg border border-gray-200 bg-white transition-all duration-200 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800;
 }
 .custom-date-range-picker :deep(.el-input__inner) {
   @apply h-full py-2 text-sm font-medium text-gray-700 dark:text-gray-200;
@@ -5047,5 +4989,35 @@ onUnmounted(() => {
 }
 .custom-date-range-picker :deep(.el-range-separator) {
   @apply mx-2 text-gray-500;
+}
+
+/* Skeleton Loading Styles */
+.skeleton-card {
+  @apply border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900;
+  border-radius: 8px;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #fafafa 25%, #eaeaea 50%, #fafafa 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+:global(.dark) .skeleton {
+  background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-text {
+  width: 100%;
 }
 </style>

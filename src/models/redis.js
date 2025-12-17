@@ -133,14 +133,19 @@ class RedisClient {
     const key = `apikey:${keyId}`
     const client = this.getClientSafe()
 
+    // 使用 MULTI/EXEC 事务确保原子性，防止与 deleteApiKey 的竞态条件
+    const multi = client.multi()
+
     // 维护哈希映射表（用于快速查找）
     // hashedKey参数是实际的哈希值，用于建立映射
     if (hashedKey) {
-      await client.hset('apikey:hash_map', hashedKey, keyId)
+      multi.hset('apikey:hash_map', hashedKey, keyId)
     }
 
-    await client.hset(key, keyData)
-    await client.expire(key, 86400 * 365) // 1年过期
+    multi.hset(key, keyData)
+    multi.expire(key, 86400 * 365) // 1年过期
+
+    await multi.exec()
   }
 
   async getApiKey(keyId) {
@@ -150,15 +155,24 @@ class RedisClient {
 
   async deleteApiKey(keyId) {
     const key = `apikey:${keyId}`
+    const client = this.getClientSafe()
 
     // 获取要删除的API Key哈希值，以便从映射表中移除
-    const keyData = await this.client.hgetall(key)
+    const keyData = await client.hgetall(key)
+
+    // 使用 MULTI/EXEC 事务确保原子性，防止与 setApiKey 的竞态条件
+    const multi = client.multi()
+
     if (keyData && keyData.apiKey) {
       // keyData.apiKey现在存储的是哈希值，直接从映射表删除
-      await this.client.hdel('apikey:hash_map', keyData.apiKey)
+      multi.hdel('apikey:hash_map', keyData.apiKey)
     }
 
-    return await this.client.del(key)
+    multi.del(key)
+
+    const results = await multi.exec()
+    // 返回 del 命令的结果（最后一个命令）
+    return results[results.length - 1][1]
   }
 
   async getAllApiKeys() {
@@ -428,8 +442,8 @@ class RedisClient {
       return { id: keyId, ...keyData }
     }
 
-    // 如果数据不存在，清理映射表
-    await this.client.hdel('apikey:hash_map', hashedKey)
+    // 不进行防御性清理，避免与 setApiKey 的竞态条件
+    // deleteApiKey 会负责清理映射表，setApiKey 会覆盖旧的映射
     return null
   }
 
