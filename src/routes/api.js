@@ -111,11 +111,7 @@ async function handleMessagesRequest(req, res) {
     const startTime = Date.now()
 
     // Claude 服务权限校验，阻止未授权的 Key
-    if (
-      req.apiKey.permissions &&
-      req.apiKey.permissions !== 'all' &&
-      req.apiKey.permissions !== 'claude'
-    ) {
+    if (!apiKeyService.hasPermission(req.apiKey.permissions, 'claude')) {
       return res.status(403).json({
         error: {
           type: 'permission_error',
