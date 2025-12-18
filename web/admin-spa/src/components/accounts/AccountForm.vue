@@ -1320,10 +1320,10 @@
                       class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                       type="button"
                       @click="
-                        addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
+                        addPresetMapping('claude-opus-4-5-20251101', 'claude-opus-4-5-20251101')
                       "
                     >
-                      + Sonnet 4
+                      + Opus 4.5
                     </button>
                     <button
                       class="rounded-lg bg-indigo-100 px-3 py-1 text-xs text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50"
@@ -1333,24 +1333,6 @@
                       "
                     >
                       + Sonnet 4.5
-                    </button>
-                    <button
-                      class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
-                      type="button"
-                      @click="
-                        addPresetMapping('claude-opus-4-1-20250805', 'claude-opus-4-1-20250805')
-                      "
-                    >
-                      + Opus 4.1
-                    </button>
-                    <button
-                      class="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition-colors hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
-                      type="button"
-                      @click="
-                        addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')
-                      "
-                    >
-                      + Haiku 3.5
                     </button>
                     <button
                       class="rounded-lg bg-emerald-100 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
