@@ -942,7 +942,11 @@ router.get('/claude-accounts/:accountId/test-config', authenticateAdmin, async (
       data: {
         accountId,
         platform: 'claude',
-        config: testConfig || { enabled: false, cronExpression: '0 8 * * *', model: 'claude-sonnet-4-5-20250929' }
+        config: testConfig || {
+          enabled: false,
+          cronExpression: '0 8 * * *',
+          model: 'claude-sonnet-4-5-20250929'
+        }
       }
     })
   } catch (error) {
