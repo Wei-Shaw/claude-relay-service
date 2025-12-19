@@ -186,7 +186,7 @@ router.post('/accounts/:accountId/balance/script/test', authenticateAdmin, async
     }
 
     const payload = req.body || {}
-    const scriptBody = payload.scriptBody
+    const { scriptBody } = payload
     if (!scriptBody) {
       return res.status(400).json({ success: false, error: '脚本内容不能为空' })
     }
