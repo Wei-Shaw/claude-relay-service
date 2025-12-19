@@ -123,13 +123,9 @@ class AccountTestSchedulerService {
           }
           // 配置变了，停止旧任务
           existingTask.task.stop()
-          logger.info(
-            `🔄 Updating cron task for ${accountKey}: ${cronExpression}, model: ${model}`
-          )
+          logger.info(`🔄 Updating cron task for ${accountKey}: ${cronExpression}, model: ${model}`)
         } else {
-          logger.info(
-            `➕ Creating cron task for ${accountKey}: ${cronExpression}, model: ${model}`
-          )
+          logger.info(`➕ Creating cron task for ${accountKey}: ${cronExpression}, model: ${model}`)
         }
 
         // 创建新的 cron 任务
