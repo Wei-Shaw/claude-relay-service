@@ -140,7 +140,10 @@ router.get('/accounts/:accountId/balance/script', authenticateAdmin, async (req,
       return res.status(valid.status).json({ success: false, error: valid.error })
     }
 
-    const config = await accountBalanceService.redis.getBalanceScriptConfig(valid.platform, accountId)
+    const config = await accountBalanceService.redis.getBalanceScriptConfig(
+      valid.platform,
+      accountId
+    )
     return res.json({ success: true, data: config || null })
   } catch (error) {
     logger.error('获取余额脚本配置失败', error)
@@ -176,9 +179,10 @@ router.post('/accounts/:accountId/balance/script/test', authenticateAdmin, async
     }
 
     if (!isBalanceScriptEnabled()) {
-      return res
-        .status(403)
-        .json({ success: false, error: '余额脚本功能已禁用（可通过 BALANCE_SCRIPT_ENABLED=true 启用）' })
+      return res.status(403).json({
+        success: false,
+        error: '余额脚本功能已禁用（可通过 BALANCE_SCRIPT_ENABLED=true 启用）'
+      })
     }
 
     const payload = req.body || {}
