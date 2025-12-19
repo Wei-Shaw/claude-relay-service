@@ -91,7 +91,8 @@ class ClaudeAccountService {
       useUnifiedClientId = false, // 是否使用统一的客户端标识
       unifiedClientId = '', // 统一的客户端标识
       expiresAt = null, // 账户订阅到期时间
-      extInfo = null // 额外扩展信息
+      extInfo = null, // 额外扩展信息
+      maxConcurrency = 0 // 账户级用户消息串行队列：0=使用全局配置，>0=强制启用串行
     } = options
 
     const accountId = uuidv4()
@@ -136,7 +137,9 @@ class ClaudeAccountService {
         // 账户订阅到期时间
         subscriptionExpiresAt: expiresAt || '',
         // 扩展信息
-        extInfo: normalizedExtInfo ? JSON.stringify(normalizedExtInfo) : ''
+        extInfo: normalizedExtInfo ? JSON.stringify(normalizedExtInfo) : '',
+        // 账户级用户消息串行队列限制
+        maxConcurrency: maxConcurrency.toString()
       }
     } else {
       // 兼容旧格式
@@ -168,7 +171,9 @@ class ClaudeAccountService {
         // 账户订阅到期时间
         subscriptionExpiresAt: expiresAt || '',
         // 扩展信息
-        extInfo: normalizedExtInfo ? JSON.stringify(normalizedExtInfo) : ''
+        extInfo: normalizedExtInfo ? JSON.stringify(normalizedExtInfo) : '',
+        // 账户级用户消息串行队列限制
+        maxConcurrency: maxConcurrency.toString()
       }
     }
 
@@ -574,7 +579,9 @@ class ClaudeAccountService {
             // 添加停止原因
             stoppedReason: account.stoppedReason || null,
             // 扩展信息
-            extInfo: parsedExtInfo
+            extInfo: parsedExtInfo,
+            // 账户级用户消息串行队列限制
+            maxConcurrency: parseInt(account.maxConcurrency || '0', 10)
           }
         })
       )
@@ -666,7 +673,8 @@ class ClaudeAccountService {
         'useUnifiedClientId',
         'unifiedClientId',
         'subscriptionExpiresAt',
-        'extInfo'
+        'extInfo',
+        'maxConcurrency'
       ]
       const updatedData = { ...accountData }
       let shouldClearAutoStopFields = false
@@ -681,7 +689,7 @@ class ClaudeAccountService {
             updatedData[field] = this._encryptSensitiveData(value)
           } else if (field === 'proxy') {
             updatedData[field] = value ? JSON.stringify(value) : ''
-          } else if (field === 'priority') {
+          } else if (field === 'priority' || field === 'maxConcurrency') {
             updatedData[field] = value.toString()
           } else if (field === 'subscriptionInfo') {
             // 处理订阅信息更新

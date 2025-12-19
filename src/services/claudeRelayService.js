@@ -210,7 +210,17 @@ class ClaudeRelayService {
           logger.error('❌ accountId missing for queue lock in relayRequest')
           throw new Error('accountId missing for queue lock')
         }
-        const queueResult = await userMessageQueueService.acquireQueueLock(accountId)
+        // 获取账户信息以检查账户级串行队列配置
+        const accountForQueue = await claudeAccountService.getAccount(accountId)
+        const accountConfig = accountForQueue
+          ? { maxConcurrency: parseInt(accountForQueue.maxConcurrency || '0', 10) }
+          : null
+        const queueResult = await userMessageQueueService.acquireQueueLock(
+          accountId,
+          null,
+          null,
+          accountConfig
+        )
         if (!queueResult.acquired && !queueResult.skipped) {
           // 区分 Redis 后端错误和队列超时
           const isBackendError = queueResult.error === 'queue_backend_error'
@@ -1314,7 +1324,17 @@ class ClaudeRelayService {
           logger.error('❌ accountId missing for queue lock in relayStreamRequestWithUsageCapture')
           throw new Error('accountId missing for queue lock')
         }
-        const queueResult = await userMessageQueueService.acquireQueueLock(accountId)
+        // 获取账户信息以检查账户级串行队列配置
+        const accountForQueue = await claudeAccountService.getAccount(accountId)
+        const accountConfig = accountForQueue
+          ? { maxConcurrency: parseInt(accountForQueue.maxConcurrency || '0', 10) }
+          : null
+        const queueResult = await userMessageQueueService.acquireQueueLock(
+          accountId,
+          null,
+          null,
+          accountConfig
+        )
         if (!queueResult.acquired && !queueResult.skipped) {
           // 区分 Redis 后端错误和队列超时
           const isBackendError = queueResult.error === 'queue_backend_error'
