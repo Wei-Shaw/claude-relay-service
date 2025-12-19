@@ -128,7 +128,8 @@ describe('AccountBalanceService', () => {
 
     const mockRedis = buildMockRedis()
     mockRedis.getBalanceScriptConfig.mockResolvedValue({
-      scriptBody: '({ request: { url: \"http://example.com\" }, extractor: function(){ return {} } })'
+      scriptBody:
+        '({ request: { url: \"http://example.com\" }, extractor: function(){ return {} } })'
     })
 
     const service = new AccountBalanceService({ redis: mockRedis, logger: mockLogger })
@@ -156,7 +157,8 @@ describe('AccountBalanceService', () => {
 
     const mockRedis = buildMockRedis()
     mockRedis.getBalanceScriptConfig.mockResolvedValue({
-      scriptBody: '({ request: { url: \"http://example.com\" }, extractor: function(){ return {} } })'
+      scriptBody:
+        '({ request: { url: \"http://example.com\" }, extractor: function(){ return {} } })'
     })
 
     const service = new AccountBalanceService({ redis: mockRedis, logger: mockLogger })
