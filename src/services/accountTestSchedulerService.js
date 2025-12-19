@@ -14,8 +14,6 @@ class AccountTestSchedulerService {
     // 定期刷新配置的间隔 (毫秒)
     this.refreshIntervalMs = 60 * 1000
     this.refreshInterval = null
-    // 测试并发限制
-    this.maxConcurrentTests = 3
     // 当前正在测试的账户
     this.testingAccounts = new Set()
     // 是否已启动
@@ -28,6 +26,10 @@ class AccountTestSchedulerService {
    * @returns {boolean}
    */
   validateCronExpression(cronExpression) {
+    // 长度检查（防止 DoS）
+    if (!cronExpression || cronExpression.length > 100) {
+      return false
+    }
     return cron.validate(cronExpression)
   }
 
@@ -85,41 +87,53 @@ class AccountTestSchedulerService {
       const platforms = ['claude', 'gemini', 'openai']
       const activeAccountKeys = new Set()
 
-      for (const platform of platforms) {
-        const enabledAccounts = await redis.getEnabledTestAccounts(platform)
+      // 并行加载所有平台的配置
+      const allEnabledAccounts = await Promise.all(
+        platforms.map((platform) =>
+          redis
+            .getEnabledTestAccounts(platform)
+            .then((accounts) => accounts.map((acc) => ({ ...acc, platform })))
+            .catch((error) => {
+              logger.warn(`⚠️ Failed to load test accounts for platform ${platform}:`, error)
+              return []
+            })
+        )
+      )
 
-        for (const { accountId, cronExpression, model } of enabledAccounts) {
-          if (!cronExpression) {
-            logger.warn(
-              `⚠️ Account ${accountId} (${platform}) has no valid cron expression, skipping`
-            )
+      // 展平平台数据
+      const flatAccounts = allEnabledAccounts.flat()
+
+      for (const { accountId, cronExpression, model, platform } of flatAccounts) {
+        if (!cronExpression) {
+          logger.warn(
+            `⚠️ Account ${accountId} (${platform}) has no valid cron expression, skipping`
+          )
+          continue
+        }
+
+        const accountKey = `${platform}:${accountId}`
+        activeAccountKeys.add(accountKey)
+
+        // 检查是否需要更新任务
+        const existingTask = this.scheduledTasks.get(accountKey)
+        if (existingTask) {
+          // 如果 cron 表达式和模型都没变，不需要更新
+          if (existingTask.cronExpression === cronExpression && existingTask.model === model) {
             continue
           }
-
-          const accountKey = `${platform}:${accountId}`
-          activeAccountKeys.add(accountKey)
-
-          // 检查是否需要更新任务
-          const existingTask = this.scheduledTasks.get(accountKey)
-          if (existingTask) {
-            // 如果 cron 表达式和模型都没变，不需要更新
-            if (existingTask.cronExpression === cronExpression && existingTask.model === model) {
-              continue
-            }
-            // 配置变了，停止旧任务
-            existingTask.task.stop()
-            logger.info(
-              `🔄 Updating cron task for ${accountKey}: ${cronExpression}, model: ${model}`
-            )
-          } else {
-            logger.info(
-              `➕ Creating cron task for ${accountKey}: ${cronExpression}, model: ${model}`
-            )
-          }
-
-          // 创建新的 cron 任务
-          this._createCronTask(accountId, platform, cronExpression, model)
+          // 配置变了，停止旧任务
+          existingTask.task.stop()
+          logger.info(
+            `🔄 Updating cron task for ${accountKey}: ${cronExpression}, model: ${model}`
+          )
+        } else {
+          logger.info(
+            `➕ Creating cron task for ${accountKey}: ${cronExpression}, model: ${model}`
+          )
         }
+
+        // 创建新的 cron 任务
+        this._createCronTask(accountId, platform, cronExpression, model)
       }
 
       // 清理已删除或禁用的账户任务
@@ -397,7 +411,6 @@ class AccountTestSchedulerService {
     return {
       running: this.isStarted,
       refreshIntervalMs: this.refreshIntervalMs,
-      maxConcurrentTests: this.maxConcurrentTests,
       scheduledTasksCount: this.scheduledTasks.size,
       scheduledTasks: tasks,
       currentlyTesting: Array.from(this.testingAccounts)

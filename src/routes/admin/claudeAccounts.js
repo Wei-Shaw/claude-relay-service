@@ -9,6 +9,7 @@ const router = express.Router()
 const claudeAccountService = require('../../services/claudeAccountService')
 const claudeRelayService = require('../../services/claudeRelayService')
 const accountGroupService = require('../../services/accountGroupService')
+const accountTestSchedulerService = require('../../services/accountTestSchedulerService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
@@ -959,7 +960,7 @@ router.put('/claude-accounts/:accountId/test-config', authenticateAdmin, async (
   const { enabled, cronExpression, model } = req.body
 
   try {
-    // 验证参数
+    // 验证 enabled 参数
     if (typeof enabled !== 'boolean') {
       return res.status(400).json({
         error: 'Invalid parameter',
@@ -967,7 +968,7 @@ router.put('/claude-accounts/:accountId/test-config', authenticateAdmin, async (
       })
     }
 
-    // 验证 cron 表达式
+    // 验证 cronExpression 参数
     if (!cronExpression || typeof cronExpression !== 'string') {
       return res.status(400).json({
         error: 'Invalid parameter',
@@ -975,23 +976,38 @@ router.put('/claude-accounts/:accountId/test-config', authenticateAdmin, async (
       })
     }
 
-    // 使用 node-cron 验证表达式
-    const cron = require('node-cron')
-    if (!cron.validate(cronExpression)) {
+    // 限制 cronExpression 长度防止 DoS
+    const MAX_CRON_LENGTH = 100
+    if (cronExpression.length > MAX_CRON_LENGTH) {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: `cronExpression too long (max ${MAX_CRON_LENGTH} characters)`
+      })
+    }
+
+    // 使用 service 的方法验证 cron 表达式
+    if (!accountTestSchedulerService.validateCronExpression(cronExpression)) {
       return res.status(400).json({
         error: 'Invalid parameter',
         message: `Invalid cron expression: ${cronExpression}. Format: "minute hour day month weekday" (e.g., "0 8 * * *" for daily at 8:00)`
       })
     }
 
-    // 验证模型（可选，有默认值）
+    // 验证模型参数
     const testModel = model || 'claude-sonnet-4-5-20250929'
+    if (typeof testModel !== 'string' || testModel.length > 256) {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: 'model must be a valid string (max 256 characters)'
+      })
+    }
 
     // 检查账户是否存在
     const account = await claudeAccountService.getAccount(accountId)
     if (!account) {
       return res.status(404).json({
-        error: 'Account not found'
+        error: 'Account not found',
+        message: `Claude account ${accountId} not found`
       })
     }
 
@@ -1033,7 +1049,8 @@ router.post('/claude-accounts/:accountId/test-sync', authenticateAdmin, async (r
     const account = await claudeAccountService.getAccount(accountId)
     if (!account) {
       return res.status(404).json({
-        error: 'Account not found'
+        error: 'Account not found',
+        message: `Claude account ${accountId} not found`
       })
     }
 

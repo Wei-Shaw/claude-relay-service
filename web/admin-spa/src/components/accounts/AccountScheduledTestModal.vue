@@ -221,6 +221,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { API_PREFIX } from '@/config/api'
+import { showToast } from '@/utils/toast'
 
 const props = defineProps({
   show: {
@@ -326,7 +327,7 @@ async function loadConfig() {
       }
     }
   } catch (err) {
-    console.error('Failed to load test config:', err)
+    showToast('加载配置失败: ' + err.message, 'error')
   } finally {
     loading.value = false
   }
@@ -363,15 +364,15 @@ async function saveConfig() {
     })
 
     if (res.ok) {
+      showToast('配置已保存', 'success')
       emit('saved')
       handleClose()
     } else {
       const errorData = await res.json().catch(() => ({}))
-      alert(errorData.message || '保存失败')
+      showToast(errorData.message || '保存失败', 'error')
     }
   } catch (err) {
-    console.error('Failed to save test config:', err)
-    alert('保存失败: ' + err.message)
+    showToast('保存失败: ' + err.message, 'error')
   } finally {
     saving.value = false
   }

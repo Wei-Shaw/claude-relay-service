@@ -3181,6 +3181,7 @@ redisClient.scanConcurrencyQueueStatsKeys = async function () {
 
 const ACCOUNT_TEST_HISTORY_MAX = 5 // 保留最近5次测试记录
 const ACCOUNT_TEST_HISTORY_TTL = 86400 * 30 // 30天过期
+const ACCOUNT_TEST_CONFIG_TTL = 86400 * 365 // 测试配置保留1年（用户通常长期使用）
 
 /**
  * 保存账户测试结果
@@ -3300,6 +3301,8 @@ redisClient.saveAccountTestConfig = async function (accountId, platform, testCon
       model: testConfig.model || 'claude-sonnet-4-5-20250929', // 默认模型
       updatedAt: new Date().toISOString()
     })
+    // 设置过期时间（1年）
+    await client.expire(key, ACCOUNT_TEST_CONFIG_TTL)
   } catch (error) {
     logger.error(`Failed to save test config for ${accountId}:`, error)
   }
