@@ -1320,10 +1320,10 @@
                       class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                       type="button"
                       @click="
-                        addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
+                        addPresetMapping('claude-opus-4-5-20251101', 'claude-opus-4-5-20251101')
                       "
                     >
-                      + Sonnet 4
+                      + Opus 4.5
                     </button>
                     <button
                       class="rounded-lg bg-indigo-100 px-3 py-1 text-xs text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50"
@@ -1333,24 +1333,6 @@
                       "
                     >
                       + Sonnet 4.5
-                    </button>
-                    <button
-                      class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
-                      type="button"
-                      @click="
-                        addPresetMapping('claude-opus-4-1-20250805', 'claude-opus-4-1-20250805')
-                      "
-                    >
-                      + Opus 4.1
-                    </button>
-                    <button
-                      class="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition-colors hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
-                      type="button"
-                      @click="
-                        addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')
-                      "
-                    >
-                      + Haiku 3.5
                     </button>
                     <button
                       class="rounded-lg bg-emerald-100 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
@@ -1650,6 +1632,25 @@
               </label>
             </div>
 
+            <!-- Claude 账户级串行队列开关 -->
+            <div v-if="form.platform === 'claude'" class="mt-4">
+              <label class="flex items-start">
+                <input
+                  v-model="form.serialQueueEnabled"
+                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                />
+                <div class="ml-3">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    启用账户级串行队列
+                  </span>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    开启后强制该账户的用户消息串行处理，忽略全局串行队列设置。适用于并发限制较低的账户。
+                  </p>
+                </div>
+              </label>
+            </div>
+
             <!-- Claude User-Agent 版本配置 -->
             <div v-if="form.platform === 'claude'" class="mt-4">
               <label class="flex items-start">
@@ -1843,7 +1844,7 @@
                     >
                       请从已登录 Gemini CLI 的机器上获取
                       <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
-                        >~/.config/gemini/credentials.json</code
+                        >~/.config/.gemini/oauth_creds.json</code
                       >
                       文件中的凭证。
                     </p>
@@ -2628,6 +2629,25 @@
                 </span>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   当系统检测到账户接近5小时使用限制时，自动暂停调度该账户。进入新的时间窗口后会自动恢复调度。
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <!-- Claude 账户级串行队列开关（编辑模式） -->
+          <div v-if="form.platform === 'claude'" class="mt-4">
+            <label class="flex items-start">
+              <input
+                v-model="form.serialQueueEnabled"
+                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+              />
+              <div class="ml-3">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  启用账户级串行队列
+                </span>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  开启后强制该账户的用户消息串行处理，忽略全局串行队列设置。适用于并发限制较低的账户。
                 </p>
               </div>
             </label>
@@ -3967,6 +3987,7 @@ const form = ref({
   useUnifiedUserAgent: props.account?.useUnifiedUserAgent || false, // 使用统一Claude Code版本
   useUnifiedClientId: props.account?.useUnifiedClientId || false, // 使用统一的客户端标识
   unifiedClientId: props.account?.unifiedClientId || '', // 统一的客户端标识
+  serialQueueEnabled: (props.account?.maxConcurrency || 0) > 0, // 账户级串行队列开关
   groupId: '',
   groupIds: [],
   projectId: props.account?.projectId || '',
@@ -4556,6 +4577,7 @@ const buildClaudeAccountData = (tokenInfo, accountName, clientId) => {
     useUnifiedUserAgent: form.value.useUnifiedUserAgent || false,
     useUnifiedClientId: form.value.useUnifiedClientId || false,
     unifiedClientId: clientId,
+    maxConcurrency: form.value.serialQueueEnabled ? 1 : 0,
     subscriptionInfo: {
       accountType: form.value.subscriptionType || 'claude_max',
       hasClaudeMax: form.value.subscriptionType === 'claude_max',
@@ -4693,6 +4715,7 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
+      data.maxConcurrency = form.value.serialQueueEnabled ? 1 : 0
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -5016,6 +5039,7 @@ const createAccount = async () => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
+      data.maxConcurrency = form.value.serialQueueEnabled ? 1 : 0
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -5406,6 +5430,7 @@ const updateAccount = async () => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
+      data.maxConcurrency = form.value.serialQueueEnabled ? 1 : 0
       // 更新订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -6009,6 +6034,7 @@ watch(
         useUnifiedUserAgent: newAccount.useUnifiedUserAgent || false,
         useUnifiedClientId: newAccount.useUnifiedClientId || false,
         unifiedClientId: newAccount.unifiedClientId || '',
+        serialQueueEnabled: (newAccount.maxConcurrency || 0) > 0,
         groupId: groupId,
         groupIds: [],
         projectId: newAccount.projectId || '',

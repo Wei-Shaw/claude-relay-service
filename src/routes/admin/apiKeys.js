@@ -945,6 +945,30 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
     }
 
+    // 🔧 FIX: 对于 "全部时间" 时间范围，直接使用 allTimeCost
+    // 因为 usage:*:model:daily:* 键有 30 天 TTL，旧数据已经过期
+    if (timeRange === 'all' && allTimeCost > 0) {
+      logger.debug(`📊 使用 allTimeCost 计算 timeRange='all': ${allTimeCost}`)
+
+      return {
+        requests: 0, // 旧数据详情不可用
+        tokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreateTokens: 0,
+        cacheReadTokens: 0,
+        cost: allTimeCost,
+        formattedCost: CostCalculator.formatCost(allTimeCost),
+        // 实时限制数据（始终返回，不受时间范围影响）
+        dailyCost,
+        currentWindowCost,
+        windowRemainingSeconds,
+        windowStartTime,
+        windowEndTime,
+        allTimeCost
+      }
+    }
+
     // 只在启用了窗口限制时查询窗口数据
     if (rateLimitWindow > 0) {
       const costCountKey = `rate_limit:cost:${keyId}`
@@ -1006,12 +1030,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   const modelStatsMap = new Map()
   let totalRequests = 0
 
-  // 用于去重：只统计日数据，避免与月数据重复
+  // 用于去重：先统计月数据，避免与日数据重复
   const dailyKeyPattern = /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
   const monthlyKeyPattern = /usage:.+:model:monthly:(.+):\d{4}-\d{2}$/
-
-  // 检查是否有日数据
-  const hasDailyData = uniqueKeys.some((key) => dailyKeyPattern.test(key))
+  const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
 
   for (let i = 0; i < results.length; i++) {
     const [err, data] = results[i]
@@ -1038,8 +1060,12 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       continue
     }
 
-    // 如果有日数据，则跳过月数据以避免重复
-    if (hasDailyData && isMonthly) {
+    // 跳过当前月的月数据
+    if (isMonthly && key.includes(`:${currentMonth}`)) {
+      continue
+    }
+    // 跳过非当前月的日数据
+    if (!isMonthly && !key.includes(`:${currentMonth}-`)) {
       continue
     }
 
