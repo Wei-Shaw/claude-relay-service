@@ -585,7 +585,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       unifiedClientId,
       expiresAt,
       extInfo,
-      maxConcurrency
+      maxConcurrency,
+      interceptWarmup
     } = req.body
 
     if (!name) {
@@ -631,7 +632,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       unifiedClientId: unifiedClientId || '', // 统一的客户端标识
       expiresAt: expiresAt || null, // 账户订阅到期时间
       extInfo: extInfo || null,
-      maxConcurrency: maxConcurrency || 0 // 账户级串行队列：0=使用全局配置，>0=强制启用
+      maxConcurrency: maxConcurrency || 0, // 账户级串行队列：0=使用全局配置，>0=强制启用
+      interceptWarmup: interceptWarmup === true // 拦截预热请求：默认为false
     })
 
     // 如果是分组类型，将账户添加到分组

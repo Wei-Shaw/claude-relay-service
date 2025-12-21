@@ -92,7 +92,8 @@ class ClaudeAccountService {
       unifiedClientId = '', // 统一的客户端标识
       expiresAt = null, // 账户订阅到期时间
       extInfo = null, // 额外扩展信息
-      maxConcurrency = 0 // 账户级用户消息串行队列：0=使用全局配置，>0=强制启用串行
+      maxConcurrency = 0, // 账户级用户消息串行队列：0=使用全局配置，>0=强制启用串行
+      interceptWarmup = false // 拦截预热请求（标题生成、Warmup等）
     } = options
 
     const accountId = uuidv4()
@@ -139,7 +140,9 @@ class ClaudeAccountService {
         // 扩展信息
         extInfo: normalizedExtInfo ? JSON.stringify(normalizedExtInfo) : '',
         // 账户级用户消息串行队列限制
-        maxConcurrency: maxConcurrency.toString()
+        maxConcurrency: maxConcurrency.toString(),
+        // 拦截预热请求
+        interceptWarmup: interceptWarmup.toString()
       }
     } else {
       // 兼容旧格式
@@ -173,7 +176,9 @@ class ClaudeAccountService {
         // 扩展信息
         extInfo: normalizedExtInfo ? JSON.stringify(normalizedExtInfo) : '',
         // 账户级用户消息串行队列限制
-        maxConcurrency: maxConcurrency.toString()
+        maxConcurrency: maxConcurrency.toString(),
+        // 拦截预热请求
+        interceptWarmup: interceptWarmup.toString()
       }
     }
 
@@ -221,7 +226,8 @@ class ClaudeAccountService {
       useUnifiedUserAgent,
       useUnifiedClientId,
       unifiedClientId,
-      extInfo: normalizedExtInfo
+      extInfo: normalizedExtInfo,
+      interceptWarmup
     }
   }
 
@@ -581,7 +587,9 @@ class ClaudeAccountService {
             // 扩展信息
             extInfo: parsedExtInfo,
             // 账户级用户消息串行队列限制
-            maxConcurrency: parseInt(account.maxConcurrency || '0', 10)
+            maxConcurrency: parseInt(account.maxConcurrency || '0', 10),
+            // 拦截预热请求
+            interceptWarmup: account.interceptWarmup === 'true'
           }
         })
       )
@@ -674,7 +682,8 @@ class ClaudeAccountService {
         'unifiedClientId',
         'subscriptionExpiresAt',
         'extInfo',
-        'maxConcurrency'
+        'maxConcurrency',
+        'interceptWarmup'
       ]
       const updatedData = { ...accountData }
       let shouldClearAutoStopFields = false

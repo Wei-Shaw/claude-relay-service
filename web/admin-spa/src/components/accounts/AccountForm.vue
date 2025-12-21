@@ -1651,6 +1651,28 @@
               </label>
             </div>
 
+            <!-- 拦截预热请求开关（Claude 和 Claude Console） -->
+            <div
+              v-if="form.platform === 'claude' || form.platform === 'claude-console'"
+              class="mt-4"
+            >
+              <label class="flex items-start">
+                <input
+                  v-model="form.interceptWarmup"
+                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                />
+                <div class="ml-3">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    拦截预热请求
+                  </span>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    启用后，对标题生成、Warmup 等低价值请求直接返回模拟响应，不消耗上游 API 额度
+                  </p>
+                </div>
+              </label>
+            </div>
+
             <!-- Claude User-Agent 版本配置 -->
             <div v-if="form.platform === 'claude'" class="mt-4">
               <label class="flex items-start">
@@ -2648,6 +2670,25 @@
                 </span>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   开启后强制该账户的用户消息串行处理，忽略全局串行队列设置。适用于并发限制较低的账户。
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <!-- 拦截预热请求开关（Claude 和 Claude Console 编辑模式） -->
+          <div v-if="form.platform === 'claude' || form.platform === 'claude-console'" class="mt-4">
+            <label class="flex items-start">
+              <input
+                v-model="form.interceptWarmup"
+                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+              />
+              <div class="ml-3">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  拦截预热请求
+                </span>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  启用后，对标题生成、Warmup 等低价值请求直接返回模拟响应，不消耗上游 API 额度
                 </p>
               </div>
             </label>
@@ -3988,6 +4029,8 @@ const form = ref({
   useUnifiedClientId: props.account?.useUnifiedClientId || false, // 使用统一的客户端标识
   unifiedClientId: props.account?.unifiedClientId || '', // 统一的客户端标识
   serialQueueEnabled: (props.account?.maxConcurrency || 0) > 0, // 账户级串行队列开关
+  interceptWarmup:
+    props.account?.interceptWarmup === true || props.account?.interceptWarmup === 'true', // 拦截预热请求
   groupId: '',
   groupIds: [],
   projectId: props.account?.projectId || '',
@@ -4574,6 +4617,7 @@ const buildClaudeAccountData = (tokenInfo, accountName, clientId) => {
     claudeAiOauth: claudeOauthPayload,
     priority: form.value.priority || 50,
     autoStopOnWarning: form.value.autoStopOnWarning || false,
+    interceptWarmup: form.value.interceptWarmup || false,
     useUnifiedUserAgent: form.value.useUnifiedUserAgent || false,
     useUnifiedClientId: form.value.useUnifiedClientId || false,
     unifiedClientId: clientId,
@@ -5131,6 +5175,7 @@ const createAccount = async () => {
       // 上游错误处理（仅 Claude Console）
       if (form.value.platform === 'claude-console') {
         data.disableAutoProtection = !!form.value.disableAutoProtection
+        data.interceptWarmup = !!form.value.interceptWarmup
       }
       // 额度管理字段
       data.dailyQuota = form.value.dailyQuota || 0
@@ -5427,6 +5472,7 @@ const updateAccount = async () => {
 
       data.priority = form.value.priority || 50
       data.autoStopOnWarning = form.value.autoStopOnWarning || false
+      data.interceptWarmup = form.value.interceptWarmup || false
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
@@ -5463,6 +5509,8 @@ const updateAccount = async () => {
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
       // 上游错误处理
       data.disableAutoProtection = !!form.value.disableAutoProtection
+      // 拦截预热请求
+      data.interceptWarmup = !!form.value.interceptWarmup
       // 额度管理字段
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
@@ -6031,6 +6079,8 @@ watch(
         accountType: newAccount.accountType || 'shared',
         subscriptionType: subscriptionType,
         autoStopOnWarning: newAccount.autoStopOnWarning || false,
+        interceptWarmup:
+          newAccount.interceptWarmup === true || newAccount.interceptWarmup === 'true',
         useUnifiedUserAgent: newAccount.useUnifiedUserAgent || false,
         useUnifiedClientId: newAccount.useUnifiedClientId || false,
         unifiedClientId: newAccount.unifiedClientId || '',
