@@ -408,6 +408,8 @@ export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
 
 如果该文件不存在，请手动创建。Windows 用户路径为 `C:\Users\你的用户名\.claude\config.json`。
 
+> 💡 **IntelliJ IDEA 用户推荐**：[Claude Code Plus](https://github.com/touwaeriol/claude-code-plus) - 将 Claude Code 直接集成到 IDE，支持代码理解、文件读写、命令执行。插件市场搜索 `Claude Code Plus` 即可安装。
+
 **Gemini CLI 设置环境变量：**
 
 **方式一（推荐）：通过 Gemini Assist API 方式访问**
