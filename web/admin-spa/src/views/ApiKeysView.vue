@@ -2124,7 +2124,7 @@ import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useClientsStore } from '@/stores/clients'
 import { useAuthStore } from '@/stores/auth'
-import * as XLSX from 'xlsx-js-style'
+import ExcelJS from 'exceljs'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -4424,7 +4424,7 @@ const clearSearch = () => {
 }
 
 // 导出数据到Excel
-const exportToExcel = () => {
+const exportToExcel = async () => {
   try {
     // 准备导出的数据 - 简化版本
     const exportData = sortedApiKeys.value.map((key) => {
@@ -4569,126 +4569,125 @@ const exportToExcel = () => {
     })
 
     // 创建工作簿
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.json_to_sheet(exportData)
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('用量统计')
 
-    // 获取工作表范围
-    const range = XLSX.utils.decode_range(ws['!ref'])
-
-    // 设置列宽
+    // 获取表头
     const headers = Object.keys(exportData[0] || {})
-    const columnWidths = headers.map((header) => {
+
+    // 设置列
+    worksheet.columns = headers.map((header) => {
       // 基本信息字段
-      if (header === 'ID') return { wch: 40 }
-      if (header === '名称') return { wch: 25 }
-      if (header === '描述') return { wch: 30 }
-      if (header === 'API密钥') return { wch: 45 }
-      if (header === '标签') return { wch: 20 }
+      if (header === 'ID') return { header, key: header, width: 40 }
+      if (header === '名称') return { header, key: header, width: 25 }
+      if (header === '描述') return { header, key: header, width: 30 }
+      if (header === 'API密钥') return { header, key: header, width: 45 }
+      if (header === '标签') return { header, key: header, width: 20 }
 
       // 时间字段
-      if (header.includes('时间')) return { wch: 20 }
+      if (header.includes('时间')) return { header, key: header, width: 20 }
 
       // 限制字段
-      if (header.includes('限制')) return { wch: 15 }
-      if (header.includes('费用')) return { wch: 15 }
-      if (header.includes('Token')) return { wch: 15 }
-      if (header.includes('请求')) return { wch: 12 }
+      if (header.includes('限制')) return { header, key: header, width: 15 }
+      if (header.includes('费用')) return { header, key: header, width: 15 }
+      if (header.includes('Token')) return { header, key: header, width: 15 }
+      if (header.includes('请求')) return { header, key: header, width: 12 }
 
       // 账户绑定字段
-      if (header.includes('账户')) return { wch: 30 }
+      if (header.includes('账户')) return { header, key: header, width: 30 }
 
       // 权限配置字段
       if (header.includes('权限') || header.includes('模型') || header.includes('客户端'))
-        return { wch: 20 }
+        return { header, key: header, width: 20 }
 
       // 激活配置字段
-      if (header.includes('激活') || header.includes('过期')) return { wch: 18 }
+      if (header.includes('激活') || header.includes('过期'))
+        return { header, key: header, width: 18 }
 
       // 默认宽度
-      return { wch: 15 }
+      return { header, key: header, width: 15 }
     })
-    ws['!cols'] = columnWidths
 
-    // 应用样式到标题行
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C })
-      if (!ws[cellAddress]) continue
+    // 添加数据行
+    exportData.forEach((data) => {
+      worksheet.addRow(data)
+    })
 
-      const header = headers[C]
+    // 样式化标题行
+    const headerRow = worksheet.getRow(1)
+    headerRow.eachCell((cell, colNumber) => {
+      const header = headers[colNumber - 1]
       const isModelColumn = header && header.includes('_')
 
-      ws[cellAddress].s = {
-        fill: {
-          fgColor: { rgb: isModelColumn ? '70AD47' : '4472C4' }
-        },
-        font: {
-          color: { rgb: 'FFFFFF' },
-          bold: true,
-          sz: 12
-        },
-        alignment: {
-          horizontal: 'center',
-          vertical: 'center'
-        },
-        border: {
-          top: { style: 'thin', color: { rgb: '2F5597' } },
-          bottom: { style: 'thin', color: { rgb: '2F5597' } },
-          left: { style: 'thin', color: { rgb: '2F5597' } },
-          right: { style: 'thin', color: { rgb: '2F5597' } }
-        }
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: isModelColumn ? 'FF70AD47' : 'FF4472C4' }
       }
-    }
+      cell.font = {
+        color: { argb: 'FFFFFFFF' },
+        bold: true,
+        size: 12
+      }
+      cell.alignment = {
+        horizontal: 'center',
+        vertical: 'middle'
+      }
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF2F5597' } },
+        bottom: { style: 'thin', color: { argb: 'FF2F5597' } },
+        left: { style: 'thin', color: { argb: 'FF2F5597' } },
+        right: { style: 'thin', color: { argb: 'FF2F5597' } }
+      }
+    })
 
-    // 应用样式到数据行
-    for (let R = 1; R <= range.e.r; ++R) {
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
-        if (!ws[cellAddress]) continue
+    // 样式化数据行
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return // 跳过标题行
 
-        const header = headers[C]
-        const value = ws[cellAddress].v
+      row.eachCell((cell, colNumber) => {
+        const header = headers[colNumber - 1]
+        const value = cell.value
 
         // 基础样式
-        const cellStyle = {
-          font: { sz: 11 },
-          border: {
-            top: { style: 'thin', color: { rgb: 'D3D3D3' } },
-            bottom: { style: 'thin', color: { rgb: 'D3D3D3' } },
-            left: { style: 'thin', color: { rgb: 'D3D3D3' } },
-            right: { style: 'thin', color: { rgb: 'D3D3D3' } }
-          }
+        cell.font = { size: 11 }
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+          bottom: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+          left: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+          right: { style: 'thin', color: { argb: 'FFD3D3D3' } }
         }
 
         // 偶数行背景色
-        if (R % 2 === 0) {
-          cellStyle.fill = { fgColor: { rgb: 'F2F2F2' } }
+        if (rowNumber % 2 === 0) {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF2F2F2' }
+          }
         }
 
         // 根据列类型设置对齐和特殊样式
         if (header === '名称') {
-          cellStyle.alignment = { horizontal: 'left', vertical: 'center' }
+          cell.alignment = { horizontal: 'left', vertical: 'middle' }
         } else if (header === '标签') {
-          cellStyle.alignment = { horizontal: 'left', vertical: 'center' }
+          cell.alignment = { horizontal: 'left', vertical: 'middle' }
           if (value === '无') {
-            cellStyle.font = { ...cellStyle.font, color: { rgb: '999999' }, italic: true }
+            cell.font = { size: 11, color: { argb: 'FF999999' }, italic: true }
           }
         } else if (header === '最后使用时间') {
-          cellStyle.alignment = { horizontal: 'right', vertical: 'center' }
+          cell.alignment = { horizontal: 'right', vertical: 'middle' }
           if (value === '从未使用') {
-            cellStyle.font = { ...cellStyle.font, color: { rgb: '999999' }, italic: true }
+            cell.font = { size: 11, color: { argb: 'FF999999' }, italic: true }
           }
         } else if (header && header.includes('费用')) {
-          cellStyle.alignment = { horizontal: 'right', vertical: 'center' }
-          cellStyle.font = { ...cellStyle.font, color: { rgb: '0066CC' }, bold: true }
+          cell.alignment = { horizontal: 'right', vertical: 'middle' }
+          cell.font = { size: 11, color: { argb: 'FF0066CC' }, bold: true }
         } else if (header && (header.includes('Token') || header.includes('请求'))) {
-          cellStyle.alignment = { horizontal: 'right', vertical: 'center' }
+          cell.alignment = { horizontal: 'right', vertical: 'middle' }
         }
-
-        ws[cellAddress].s = cellStyle
-      }
-    }
-
-    XLSX.utils.book_append_sheet(wb, ws, '用量统计')
+      })
+    })
 
     // 生成文件名（包含时间戳和筛选条件）
     const now = new Date()
@@ -4717,7 +4716,16 @@ const exportToExcel = () => {
     const filename = `API_Keys_用量统计_${timeRangeLabel}_${timestamp}.xlsx`
 
     // 导出文件
-    XLSX.writeFile(wb, filename)
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    window.URL.revokeObjectURL(url)
 
     showToast(`成功导出 ${exportData.length} 条API Key用量数据`, 'success')
   } catch (error) {
