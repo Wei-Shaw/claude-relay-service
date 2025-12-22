@@ -657,6 +657,7 @@ git push origin main
 | 2025-12-15 | v1.1.235 | 同步 6 个提交 (v1.1.234-235) | 无冲突 | ✅ 成功 | Opus 4.5快捷映射、Console header白名单、API Key成本计算修复 |
 | 2025-12-19 | v1.1.236 | 同步 11 个提交 | 无冲突 | ✅ 成功 | Cron定时测试功能、OpenAI调度priority修复、全时间统计修复 |
 | 2025-12-20 | v1.1.237 | 同步 2 个提交 | 无冲突 | ✅ 成功 | Claude单账户串行队列支持（maxConcurrency配置） |
+| 2025-12-22 | v1.1.238 | 同步 9 个提交 | 无冲突 | ✅ 成功 | 预热请求拦截(interceptWarmup)、遥测端点适配、Claude Code Plus推荐 |
 
 **下次更新请在此添加记录**
 
