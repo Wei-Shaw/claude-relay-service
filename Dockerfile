@@ -1,4 +1,17 @@
-# 🎯 前端构建阶段
+# 🎯 后端依赖阶段 (与前端构建并行)
+FROM node:18-alpine AS backend-deps
+
+# 📁 设置工作目录
+WORKDIR /app
+
+# 📦 复制 package 文件
+COPY package*.json ./
+
+# 🔽 安装依赖 (生产环境) - 使用 BuildKit 缓存加速
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --only=production
+
+# 🎯 前端构建阶段 (与后端依赖并行)
 FROM node:18-alpine AS frontend-builder
 
 # 📁 设置工作目录
@@ -7,8 +20,9 @@ WORKDIR /app/web/admin-spa
 # 📦 复制前端依赖文件
 COPY web/admin-spa/package*.json ./
 
-# 🔽 安装前端依赖
-RUN npm ci
+# 🔽 安装前端依赖 - 使用 BuildKit 缓存加速
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # 📋 复制前端源代码
 COPY web/admin-spa/ ./
@@ -34,17 +48,16 @@ RUN apk add --no-cache \
 # 📁 设置工作目录
 WORKDIR /app
 
-# 📦 复制 package 文件
+# 📦 复制 package 文件 (用于版本信息等)
 COPY package*.json ./
 
-# 🔽 安装依赖 (生产环境)
-RUN npm ci --only=production && \
-    npm cache clean --force
+# 📦 从后端依赖阶段复制 node_modules (已预装好)
+COPY --from=backend-deps /app/node_modules ./node_modules
 
 # 📋 复制应用代码
 COPY . .
 
-# 📦 从构建阶段复制前端产物
+# 📦 从前端构建阶段复制前端产物
 COPY --from=frontend-builder /app/web/admin-spa/dist /app/web/admin-spa/dist
 
 # 🔧 复制并设置启动脚本权限

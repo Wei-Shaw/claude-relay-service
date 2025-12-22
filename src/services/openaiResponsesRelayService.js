@@ -1,6 +1,7 @@
 const axios = require('axios')
 const ProxyHelper = require('../utils/proxyHelper')
 const logger = require('../utils/logger')
+const { filterForOpenAI } = require('../utils/headerFilter')
 const openaiResponsesAccountService = require('./openaiResponsesAccountService')
 const apiKeyService = require('./apiKeyService')
 const unifiedOpenAIScheduler = require('./unifiedOpenAIScheduler')
@@ -73,9 +74,9 @@ class OpenAIResponsesRelayService {
       const targetUrl = `${fullAccount.baseApi}${req.path}`
       logger.info(`🎯 Forwarding to: ${targetUrl}`)
 
-      // 构建请求头
+      // 构建请求头 - 使用统一的 headerFilter 移除 CDN headers
       const headers = {
-        ...this._filterRequestHeaders(req.headers),
+        ...filterForOpenAI(req.headers),
         Authorization: `Bearer ${fullAccount.apiKey}`,
         'Content-Type': 'application/json'
       }
@@ -425,9 +426,9 @@ class OpenAIResponsesRelayService {
       const lines = data.split('\n')
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
+        if (line.startsWith('data:')) {
           try {
-            const jsonStr = line.slice(6)
+            const jsonStr = line.slice(5).trim()
             if (jsonStr === '[DONE]') {
               continue
             }
@@ -810,29 +811,10 @@ class OpenAIResponsesRelayService {
     return { resetsInSeconds, errorData }
   }
 
-  // 过滤请求头
+  // 过滤请求头 - 已迁移到 headerFilter 工具类
+  // 此方法保留用于向后兼容，实际使用 filterForOpenAI()
   _filterRequestHeaders(headers) {
-    const filtered = {}
-    const skipHeaders = [
-      'host',
-      'content-length',
-      'authorization',
-      'x-api-key',
-      'x-cr-api-key',
-      'connection',
-      'upgrade',
-      'sec-websocket-key',
-      'sec-websocket-version',
-      'sec-websocket-extensions'
-    ]
-
-    for (const [key, value] of Object.entries(headers)) {
-      if (!skipHeaders.includes(key.toLowerCase())) {
-        filtered[key] = value
-      }
-    }
-
-    return filtered
+    return filterForOpenAI(headers)
   }
 
   // 估算费用（简化版本，实际应该根据不同的定价模型）

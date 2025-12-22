@@ -1,8 +1,10 @@
 const express = require('express')
 const apiKeyService = require('../../services/apiKeyService')
+const ccrAccountService = require('../../services/ccrAccountService')
 const claudeAccountService = require('../../services/claudeAccountService')
 const claudeConsoleAccountService = require('../../services/claudeConsoleAccountService')
 const geminiAccountService = require('../../services/geminiAccountService')
+const geminiApiAccountService = require('../../services/geminiApiAccountService')
 const openaiAccountService = require('../../services/openaiAccountService')
 const openaiResponsesAccountService = require('../../services/openaiResponsesAccountService')
 const droidAccountService = require('../../services/droidAccountService')
@@ -13,6 +15,65 @@ const CostCalculator = require('../../utils/costCalculator')
 const pricingService = require('../../services/pricingService')
 
 const router = express.Router()
+
+const accountTypeNames = {
+  claude: 'Claude官方',
+  'claude-console': 'Claude Console',
+  ccr: 'Claude Console Relay',
+  openai: 'OpenAI',
+  'openai-responses': 'OpenAI Responses',
+  gemini: 'Gemini',
+  'gemini-api': 'Gemini API',
+  droid: 'Droid',
+  unknown: '未知渠道'
+}
+
+const resolveAccountByPlatform = async (accountId, platform) => {
+  const serviceMap = {
+    claude: claudeAccountService,
+    'claude-console': claudeConsoleAccountService,
+    gemini: geminiAccountService,
+    'gemini-api': geminiApiAccountService,
+    openai: openaiAccountService,
+    'openai-responses': openaiResponsesAccountService,
+    droid: droidAccountService,
+    ccr: ccrAccountService
+  }
+
+  if (platform && serviceMap[platform]) {
+    try {
+      const account = await serviceMap[platform].getAccount(accountId)
+      if (account) {
+        return { ...account, platform }
+      }
+    } catch (error) {
+      logger.debug(`⚠️ Failed to get account ${accountId} from ${platform}: ${error.message}`)
+    }
+  }
+
+  for (const [platformName, service] of Object.entries(serviceMap)) {
+    try {
+      const account = await service.getAccount(accountId)
+      if (account) {
+        return { ...account, platform: platformName }
+      }
+    } catch (error) {
+      logger.debug(`⚠️ Failed to get account ${accountId} from ${platformName}: ${error.message}`)
+    }
+  }
+
+  return null
+}
+
+const getApiKeyName = async (keyId) => {
+  try {
+    const keyData = await redis.getApiKey(keyId)
+    return keyData?.name || keyData?.label || keyId
+  } catch (error) {
+    logger.debug(`⚠️ Failed to get API key name for ${keyId}: ${error.message}`)
+    return keyId
+  }
+}
 
 // 📊 账户使用统计
 
@@ -148,7 +209,6 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
           accountData = await geminiAccountService.getAccount(accountId)
           break
         case 'gemini-api': {
-          const geminiApiAccountService = require('../../services/geminiApiAccountService')
           accountData = await geminiApiAccountService.getAccount(accountId)
           break
         }
@@ -369,7 +429,9 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         logger.info(`  endDate (raw): ${endDate}`)
         logger.info(`  startTime (parsed): ${startTime.toISOString()}`)
         logger.info(`  endTime (parsed): ${endTime.toISOString()}`)
-        logger.info(`  System timezone offset: ${require('../../../config/config').system.timezoneOffset || 8}`)
+        logger.info(
+          `  System timezone offset: ${require('../../../config/config').system.timezoneOffset || 8}`
+        )
       } else {
         // 默认最近24小时
         endTime = new Date()
@@ -890,7 +952,6 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
         })
       ]
     } else if (group === 'gemini') {
-      const geminiApiAccountService = require('../../services/geminiApiAccountService')
       const [geminiAccounts, geminiApiAccounts] = await Promise.all([
         geminiAccountService.getAllAccounts(),
         geminiApiAccountService.getAllAccounts(true)
@@ -1815,6 +1876,630 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     return res
       .status(500)
       .json({ error: 'Failed to calculate usage costs', message: error.message })
+  }
+})
+
+// 获取 API Key 的请求记录时间线
+router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const {
+      page = 1,
+      pageSize = 50,
+      startDate,
+      endDate,
+      model,
+      accountId,
+      sortOrder = 'desc'
+    } = req.query
+
+    const pageNumber = Math.max(parseInt(page, 10) || 1, 1)
+    const pageSizeNumber = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200)
+    const normalizedSortOrder = sortOrder === 'asc' ? 'asc' : 'desc'
+
+    const startTime = startDate ? new Date(startDate) : null
+    const endTime = endDate ? new Date(endDate) : null
+
+    if (
+      (startDate && Number.isNaN(startTime?.getTime())) ||
+      (endDate && Number.isNaN(endTime?.getTime()))
+    ) {
+      return res.status(400).json({ success: false, error: 'Invalid date range' })
+    }
+
+    if (startTime && endTime && startTime > endTime) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Start date must be before or equal to end date' })
+    }
+
+    const apiKeyInfo = await redis.getApiKey(keyId)
+    if (!apiKeyInfo || Object.keys(apiKeyInfo).length === 0) {
+      return res.status(404).json({ success: false, error: 'API key not found' })
+    }
+
+    const rawRecords = await redis.getUsageRecords(keyId, 5000)
+
+    const accountServices = [
+      { type: 'claude', getter: (id) => claudeAccountService.getAccount(id) },
+      { type: 'claude-console', getter: (id) => claudeConsoleAccountService.getAccount(id) },
+      { type: 'ccr', getter: (id) => ccrAccountService.getAccount(id) },
+      { type: 'openai', getter: (id) => openaiAccountService.getAccount(id) },
+      { type: 'openai-responses', getter: (id) => openaiResponsesAccountService.getAccount(id) },
+      { type: 'gemini', getter: (id) => geminiAccountService.getAccount(id) },
+      { type: 'gemini-api', getter: (id) => geminiApiAccountService.getAccount(id) },
+      { type: 'droid', getter: (id) => droidAccountService.getAccount(id) }
+    ]
+
+    const accountCache = new Map()
+    const resolveAccountInfo = async (id, type) => {
+      if (!id) {
+        return null
+      }
+
+      const cacheKey = `${type || 'any'}:${id}`
+      if (accountCache.has(cacheKey)) {
+        return accountCache.get(cacheKey)
+      }
+
+      let servicesToTry = type
+        ? accountServices.filter((svc) => svc.type === type)
+        : accountServices
+
+      // 若渠道改名或传入未知类型，回退尝试全量服务，避免漏解析历史账号
+      if (!servicesToTry.length) {
+        servicesToTry = accountServices
+      }
+
+      for (const service of servicesToTry) {
+        try {
+          const account = await service.getter(id)
+          if (account) {
+            const info = {
+              id,
+              name: account.name || account.email || id,
+              type: service.type,
+              status: account.status || account.isActive
+            }
+            accountCache.set(cacheKey, info)
+            return info
+          }
+        } catch (error) {
+          logger.debug(`⚠️ Failed to resolve account ${id} via ${service.type}: ${error.message}`)
+        }
+      }
+
+      accountCache.set(cacheKey, null)
+      return null
+    }
+
+    const toUsageObject = (record) => ({
+      input_tokens: record.inputTokens || 0,
+      output_tokens: record.outputTokens || 0,
+      cache_creation_input_tokens: record.cacheCreateTokens || 0,
+      cache_read_input_tokens: record.cacheReadTokens || 0,
+      cache_creation: record.cacheCreation || record.cache_creation || null
+    })
+
+    const withinRange = (record) => {
+      if (!record.timestamp) {
+        return false
+      }
+      const ts = new Date(record.timestamp)
+      if (Number.isNaN(ts.getTime())) {
+        return false
+      }
+      if (startTime && ts < startTime) {
+        return false
+      }
+      if (endTime && ts > endTime) {
+        return false
+      }
+      return true
+    }
+
+    const filteredRecords = rawRecords.filter((record) => {
+      if (!withinRange(record)) {
+        return false
+      }
+      if (model && record.model !== model) {
+        return false
+      }
+      if (accountId && record.accountId !== accountId) {
+        return false
+      }
+      return true
+    })
+
+    filteredRecords.sort((a, b) => {
+      const aTime = new Date(a.timestamp).getTime()
+      const bTime = new Date(b.timestamp).getTime()
+      if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+        return 0
+      }
+      return normalizedSortOrder === 'asc' ? aTime - bTime : bTime - aTime
+    })
+
+    const summary = {
+      totalRequests: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreateTokens: 0,
+      cacheReadTokens: 0,
+      totalTokens: 0,
+      totalCost: 0
+    }
+
+    const modelSet = new Set()
+    const accountOptionMap = new Map()
+    let earliestTimestamp = null
+    let latestTimestamp = null
+
+    for (const record of filteredRecords) {
+      const usage = toUsageObject(record)
+      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const computedCost =
+        typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const totalTokens =
+        record.totalTokens ||
+        usage.input_tokens +
+          usage.output_tokens +
+          usage.cache_creation_input_tokens +
+          usage.cache_read_input_tokens
+
+      summary.totalRequests += 1
+      summary.inputTokens += usage.input_tokens
+      summary.outputTokens += usage.output_tokens
+      summary.cacheCreateTokens += usage.cache_creation_input_tokens
+      summary.cacheReadTokens += usage.cache_read_input_tokens
+      summary.totalTokens += totalTokens
+      summary.totalCost += computedCost
+
+      if (record.model) {
+        modelSet.add(record.model)
+      }
+
+      if (record.accountId) {
+        const normalizedType = record.accountType || 'unknown'
+        if (!accountOptionMap.has(record.accountId)) {
+          accountOptionMap.set(record.accountId, {
+            id: record.accountId,
+            accountTypes: new Set([normalizedType])
+          })
+        } else {
+          accountOptionMap.get(record.accountId).accountTypes.add(normalizedType)
+        }
+      }
+
+      if (record.timestamp) {
+        const ts = new Date(record.timestamp)
+        if (!Number.isNaN(ts.getTime())) {
+          if (!earliestTimestamp || ts < earliestTimestamp) {
+            earliestTimestamp = ts
+          }
+          if (!latestTimestamp || ts > latestTimestamp) {
+            latestTimestamp = ts
+          }
+        }
+      }
+    }
+
+    const totalRecords = filteredRecords.length
+    const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / pageSizeNumber) : 0
+    const safePage = totalPages > 0 ? Math.min(pageNumber, totalPages) : 1
+    const startIndex = (safePage - 1) * pageSizeNumber
+    const pageRecords =
+      totalRecords === 0 ? [] : filteredRecords.slice(startIndex, startIndex + pageSizeNumber)
+
+    const enrichedRecords = []
+    for (const record of pageRecords) {
+      const usage = toUsageObject(record)
+      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const computedCost =
+        typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const totalTokens =
+        record.totalTokens ||
+        usage.input_tokens +
+          usage.output_tokens +
+          usage.cache_creation_input_tokens +
+          usage.cache_read_input_tokens
+
+      const accountInfo = await resolveAccountInfo(record.accountId, record.accountType)
+      const resolvedAccountType = accountInfo?.type || record.accountType || 'unknown'
+
+      enrichedRecords.push({
+        timestamp: record.timestamp,
+        model: record.model || 'unknown',
+        accountId: record.accountId || null,
+        accountName: accountInfo?.name || null,
+        accountStatus: accountInfo?.status ?? null,
+        accountType: resolvedAccountType,
+        accountTypeName: accountTypeNames[resolvedAccountType] || '未知渠道',
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cacheCreateTokens: usage.cache_creation_input_tokens,
+        cacheReadTokens: usage.cache_read_input_tokens,
+        ephemeral5mTokens: record.ephemeral5mTokens || 0,
+        ephemeral1hTokens: record.ephemeral1hTokens || 0,
+        totalTokens,
+        isLongContextRequest: record.isLongContext || record.isLongContextRequest || false,
+        cost: Number(computedCost.toFixed(6)),
+        costFormatted:
+          record.costFormatted ||
+          costData?.formatted?.total ||
+          CostCalculator.formatCost(computedCost),
+        costBreakdown: record.costBreakdown || {
+          input: costData?.costs?.input || 0,
+          output: costData?.costs?.output || 0,
+          cacheCreate: costData?.costs?.cacheWrite || 0,
+          cacheRead: costData?.costs?.cacheRead || 0,
+          total: costData?.costs?.total || computedCost
+        },
+        responseTime: record.responseTime || null
+      })
+    }
+
+    const accountOptions = []
+    for (const option of accountOptionMap.values()) {
+      const types = Array.from(option.accountTypes || [])
+
+      // 优先按历史出现的 accountType 解析，若失败则回退全量解析
+      let resolvedInfo = null
+      for (const type of types) {
+        resolvedInfo = await resolveAccountInfo(option.id, type)
+        if (resolvedInfo && resolvedInfo.name) {
+          break
+        }
+      }
+      if (!resolvedInfo) {
+        resolvedInfo = await resolveAccountInfo(option.id)
+      }
+
+      const chosenType = resolvedInfo?.type || types[0] || 'unknown'
+      const chosenTypeName = accountTypeNames[chosenType] || '未知渠道'
+
+      if (!resolvedInfo) {
+        logger.warn(`⚠️ 保留无法解析的账户筛选项: ${option.id}, types=${types.join(',') || 'none'}`)
+      }
+
+      accountOptions.push({
+        id: option.id,
+        name: resolvedInfo?.name || option.id,
+        accountType: chosenType,
+        accountTypeName: chosenTypeName,
+        rawTypes: types
+      })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        records: enrichedRecords,
+        pagination: {
+          currentPage: safePage,
+          pageSize: pageSizeNumber,
+          totalRecords,
+          totalPages,
+          hasNextPage: totalPages > 0 && safePage < totalPages,
+          hasPreviousPage: totalPages > 0 && safePage > 1
+        },
+        filters: {
+          startDate: startTime ? startTime.toISOString() : null,
+          endDate: endTime ? endTime.toISOString() : null,
+          model: model || null,
+          accountId: accountId || null,
+          sortOrder: normalizedSortOrder
+        },
+        apiKeyInfo: {
+          id: keyId,
+          name: apiKeyInfo.name || apiKeyInfo.label || keyId
+        },
+        summary: {
+          ...summary,
+          totalCost: Number(summary.totalCost.toFixed(6)),
+          avgCost:
+            summary.totalRequests > 0
+              ? Number((summary.totalCost / summary.totalRequests).toFixed(6))
+              : 0
+        },
+        availableFilters: {
+          models: Array.from(modelSet),
+          accounts: accountOptions,
+          dateRange: {
+            earliest: earliestTimestamp ? earliestTimestamp.toISOString() : null,
+            latest: latestTimestamp ? latestTimestamp.toISOString() : null
+          }
+        }
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get API key usage records:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to get API key usage records', message: error.message })
+  }
+})
+
+// 获取账户的请求记录时间线
+router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const {
+      platform,
+      page = 1,
+      pageSize = 50,
+      startDate,
+      endDate,
+      model,
+      apiKeyId,
+      sortOrder = 'desc'
+    } = req.query
+
+    const pageNumber = Math.max(parseInt(page, 10) || 1, 1)
+    const pageSizeNumber = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200)
+    const normalizedSortOrder = sortOrder === 'asc' ? 'asc' : 'desc'
+
+    const startTime = startDate ? new Date(startDate) : null
+    const endTime = endDate ? new Date(endDate) : null
+
+    if (
+      (startDate && Number.isNaN(startTime?.getTime())) ||
+      (endDate && Number.isNaN(endTime?.getTime()))
+    ) {
+      return res.status(400).json({ success: false, error: 'Invalid date range' })
+    }
+
+    if (startTime && endTime && startTime > endTime) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Start date must be before or equal to end date' })
+    }
+
+    const accountInfo = await resolveAccountByPlatform(accountId, platform)
+    if (!accountInfo) {
+      return res.status(404).json({ success: false, error: 'Account not found' })
+    }
+
+    const allApiKeys = await apiKeyService.getAllApiKeys(true)
+    const apiKeyNameCache = new Map(
+      allApiKeys.map((key) => [key.id, key.name || key.label || key.id])
+    )
+
+    let keysToUse = apiKeyId ? allApiKeys.filter((key) => key.id === apiKeyId) : allApiKeys
+    if (apiKeyId && keysToUse.length === 0) {
+      keysToUse = [{ id: apiKeyId }]
+    }
+
+    const toUsageObject = (record) => ({
+      input_tokens: record.inputTokens || 0,
+      output_tokens: record.outputTokens || 0,
+      cache_creation_input_tokens: record.cacheCreateTokens || 0,
+      cache_read_input_tokens: record.cacheReadTokens || 0,
+      cache_creation: record.cacheCreation || record.cache_creation || null
+    })
+
+    const withinRange = (record) => {
+      if (!record.timestamp) {
+        return false
+      }
+      const ts = new Date(record.timestamp)
+      if (Number.isNaN(ts.getTime())) {
+        return false
+      }
+      if (startTime && ts < startTime) {
+        return false
+      }
+      if (endTime && ts > endTime) {
+        return false
+      }
+      return true
+    }
+
+    const filteredRecords = []
+    const modelSet = new Set()
+    const apiKeyOptionMap = new Map()
+    let earliestTimestamp = null
+    let latestTimestamp = null
+
+    const batchSize = 10
+    for (let i = 0; i < keysToUse.length; i += batchSize) {
+      const batch = keysToUse.slice(i, i + batchSize)
+      const batchResults = await Promise.all(
+        batch.map(async (key) => {
+          try {
+            const records = await redis.getUsageRecords(key.id, 5000)
+            return { keyId: key.id, records: records || [] }
+          } catch (error) {
+            logger.debug(`⚠️ Failed to get usage records for key ${key.id}: ${error.message}`)
+            return { keyId: key.id, records: [] }
+          }
+        })
+      )
+
+      for (const { keyId, records } of batchResults) {
+        const apiKeyName = apiKeyNameCache.get(keyId) || (await getApiKeyName(keyId))
+        for (const record of records) {
+          if (record.accountId !== accountId) {
+            continue
+          }
+          if (!withinRange(record)) {
+            continue
+          }
+          if (model && record.model !== model) {
+            continue
+          }
+
+          const accountType = record.accountType || accountInfo.platform || 'unknown'
+          const normalizedModel = record.model || 'unknown'
+
+          modelSet.add(normalizedModel)
+          apiKeyOptionMap.set(keyId, { id: keyId, name: apiKeyName })
+
+          if (record.timestamp) {
+            const ts = new Date(record.timestamp)
+            if (!Number.isNaN(ts.getTime())) {
+              if (!earliestTimestamp || ts < earliestTimestamp) {
+                earliestTimestamp = ts
+              }
+              if (!latestTimestamp || ts > latestTimestamp) {
+                latestTimestamp = ts
+              }
+            }
+          }
+
+          filteredRecords.push({
+            ...record,
+            model: normalizedModel,
+            accountType,
+            apiKeyId: keyId,
+            apiKeyName
+          })
+        }
+      }
+    }
+
+    filteredRecords.sort((a, b) => {
+      const aTime = new Date(a.timestamp).getTime()
+      const bTime = new Date(b.timestamp).getTime()
+      if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+        return 0
+      }
+      return normalizedSortOrder === 'asc' ? aTime - bTime : bTime - aTime
+    })
+
+    const summary = {
+      totalRequests: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreateTokens: 0,
+      cacheReadTokens: 0,
+      totalTokens: 0,
+      totalCost: 0
+    }
+
+    for (const record of filteredRecords) {
+      const usage = toUsageObject(record)
+      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const computedCost =
+        typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const totalTokens =
+        record.totalTokens ||
+        usage.input_tokens +
+          usage.output_tokens +
+          usage.cache_creation_input_tokens +
+          usage.cache_read_input_tokens
+
+      summary.totalRequests += 1
+      summary.inputTokens += usage.input_tokens
+      summary.outputTokens += usage.output_tokens
+      summary.cacheCreateTokens += usage.cache_creation_input_tokens
+      summary.cacheReadTokens += usage.cache_read_input_tokens
+      summary.totalTokens += totalTokens
+      summary.totalCost += computedCost
+    }
+
+    const totalRecords = filteredRecords.length
+    const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / pageSizeNumber) : 0
+    const safePage = totalPages > 0 ? Math.min(pageNumber, totalPages) : 1
+    const startIndex = (safePage - 1) * pageSizeNumber
+    const pageRecords =
+      totalRecords === 0 ? [] : filteredRecords.slice(startIndex, startIndex + pageSizeNumber)
+
+    const enrichedRecords = []
+    for (const record of pageRecords) {
+      const usage = toUsageObject(record)
+      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const computedCost =
+        typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const totalTokens =
+        record.totalTokens ||
+        usage.input_tokens +
+          usage.output_tokens +
+          usage.cache_creation_input_tokens +
+          usage.cache_read_input_tokens
+
+      enrichedRecords.push({
+        timestamp: record.timestamp,
+        model: record.model || 'unknown',
+        apiKeyId: record.apiKeyId,
+        apiKeyName: record.apiKeyName,
+        accountId,
+        accountName: accountInfo.name || accountInfo.email || accountId,
+        accountType: record.accountType,
+        accountTypeName: accountTypeNames[record.accountType] || '未知渠道',
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cacheCreateTokens: usage.cache_creation_input_tokens,
+        cacheReadTokens: usage.cache_read_input_tokens,
+        ephemeral5mTokens: record.ephemeral5mTokens || 0,
+        ephemeral1hTokens: record.ephemeral1hTokens || 0,
+        totalTokens,
+        isLongContextRequest: record.isLongContext || record.isLongContextRequest || false,
+        cost: Number(computedCost.toFixed(6)),
+        costFormatted:
+          record.costFormatted ||
+          costData?.formatted?.total ||
+          CostCalculator.formatCost(computedCost),
+        costBreakdown: record.costBreakdown || {
+          input: costData?.costs?.input || 0,
+          output: costData?.costs?.output || 0,
+          cacheCreate: costData?.costs?.cacheWrite || 0,
+          cacheRead: costData?.costs?.cacheRead || 0,
+          total: costData?.costs?.total || computedCost
+        },
+        responseTime: record.responseTime || null
+      })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        records: enrichedRecords,
+        pagination: {
+          currentPage: safePage,
+          pageSize: pageSizeNumber,
+          totalRecords,
+          totalPages,
+          hasNextPage: totalPages > 0 && safePage < totalPages,
+          hasPreviousPage: totalPages > 0 && safePage > 1
+        },
+        filters: {
+          startDate: startTime ? startTime.toISOString() : null,
+          endDate: endTime ? endTime.toISOString() : null,
+          model: model || null,
+          apiKeyId: apiKeyId || null,
+          platform: accountInfo.platform,
+          sortOrder: normalizedSortOrder
+        },
+        accountInfo: {
+          id: accountId,
+          name: accountInfo.name || accountInfo.email || accountId,
+          platform: accountInfo.platform || platform || 'unknown',
+          status: accountInfo.status ?? accountInfo.isActive ?? null
+        },
+        summary: {
+          ...summary,
+          totalCost: Number(summary.totalCost.toFixed(6)),
+          avgCost:
+            summary.totalRequests > 0
+              ? Number((summary.totalCost / summary.totalRequests).toFixed(6))
+              : 0
+        },
+        availableFilters: {
+          models: Array.from(modelSet),
+          apiKeys: Array.from(apiKeyOptionMap.values()),
+          dateRange: {
+            earliest: earliestTimestamp ? earliestTimestamp.toISOString() : null,
+            latest: latestTimestamp ? latestTimestamp.toISOString() : null
+          }
+        }
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get account usage records:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to get account usage records', message: error.message })
   }
 })
 

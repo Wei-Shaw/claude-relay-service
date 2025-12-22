@@ -9,6 +9,7 @@ const router = express.Router()
 const claudeAccountService = require('../../services/claudeAccountService')
 const claudeRelayService = require('../../services/claudeRelayService')
 const accountGroupService = require('../../services/accountGroupService')
+const accountTestSchedulerService = require('../../services/accountTestSchedulerService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
@@ -277,7 +278,7 @@ router.post('/claude-accounts/oauth-with-cookie', authenticateAdmin, async (req,
 
     logger.info('🍪 Starting Cookie-based OAuth authorization', {
       sessionKeyLength: trimmedSessionKey.length,
-      sessionKeyPrefix: trimmedSessionKey.substring(0, 10) + '...',
+      sessionKeyPrefix: `${trimmedSessionKey.substring(0, 10)}...`,
       hasProxy: !!proxy
     })
 
@@ -326,7 +327,7 @@ router.post('/claude-accounts/setup-token-with-cookie', authenticateAdmin, async
 
     logger.info('🍪 Starting Cookie-based Setup Token authorization', {
       sessionKeyLength: trimmedSessionKey.length,
-      sessionKeyPrefix: trimmedSessionKey.substring(0, 10) + '...',
+      sessionKeyPrefix: `${trimmedSessionKey.substring(0, 10)}...`,
       hasProxy: !!proxy
     })
 
@@ -583,7 +584,9 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       useUnifiedClientId,
       unifiedClientId,
       expiresAt,
-      extInfo
+      extInfo,
+      maxConcurrency,
+      interceptWarmup
     } = req.body
 
     if (!name) {
@@ -628,7 +631,9 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       useUnifiedClientId: useUnifiedClientId === true, // 默认为false
       unifiedClientId: unifiedClientId || '', // 统一的客户端标识
       expiresAt: expiresAt || null, // 账户订阅到期时间
-      extInfo: extInfo || null
+      extInfo: extInfo || null,
+      maxConcurrency: maxConcurrency || 0, // 账户级串行队列：0=使用全局配置，>0=强制启用
+      interceptWarmup: interceptWarmup === true // 拦截预热请求：默认为false
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -900,6 +905,221 @@ router.post('/claude-accounts/:accountId/test', authenticateAdmin, async (req, r
   } catch (error) {
     logger.error(`❌ Failed to test Claude OAuth account:`, error)
     // 错误已在服务层处理，这里仅做日志记录
+  }
+})
+
+// ============================================================================
+// 账户定时测试相关端点
+// ============================================================================
+
+// 获取账户测试历史
+router.get('/claude-accounts/:accountId/test-history', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+
+  try {
+    const history = await redis.getAccountTestHistory(accountId, 'claude')
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        platform: 'claude',
+        history
+      }
+    })
+  } catch (error) {
+    logger.error(`❌ Failed to get test history for account ${accountId}:`, error)
+    return res.status(500).json({
+      error: 'Failed to get test history',
+      message: error.message
+    })
+  }
+})
+
+// 获取账户定时测试配置
+router.get('/claude-accounts/:accountId/test-config', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+
+  try {
+    const testConfig = await redis.getAccountTestConfig(accountId, 'claude')
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        platform: 'claude',
+        config: testConfig || {
+          enabled: false,
+          cronExpression: '0 8 * * *',
+          model: 'claude-sonnet-4-5-20250929'
+        }
+      }
+    })
+  } catch (error) {
+    logger.error(`❌ Failed to get test config for account ${accountId}:`, error)
+    return res.status(500).json({
+      error: 'Failed to get test config',
+      message: error.message
+    })
+  }
+})
+
+// 设置账户定时测试配置
+router.put('/claude-accounts/:accountId/test-config', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+  const { enabled, cronExpression, model } = req.body
+
+  try {
+    // 验证 enabled 参数
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: 'enabled must be a boolean'
+      })
+    }
+
+    // 验证 cronExpression 参数
+    if (!cronExpression || typeof cronExpression !== 'string') {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: 'cronExpression is required and must be a string'
+      })
+    }
+
+    // 限制 cronExpression 长度防止 DoS
+    const MAX_CRON_LENGTH = 100
+    if (cronExpression.length > MAX_CRON_LENGTH) {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: `cronExpression too long (max ${MAX_CRON_LENGTH} characters)`
+      })
+    }
+
+    // 使用 service 的方法验证 cron 表达式
+    if (!accountTestSchedulerService.validateCronExpression(cronExpression)) {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: `Invalid cron expression: ${cronExpression}. Format: "minute hour day month weekday" (e.g., "0 8 * * *" for daily at 8:00)`
+      })
+    }
+
+    // 验证模型参数
+    const testModel = model || 'claude-sonnet-4-5-20250929'
+    if (typeof testModel !== 'string' || testModel.length > 256) {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: 'model must be a valid string (max 256 characters)'
+      })
+    }
+
+    // 检查账户是否存在
+    const account = await claudeAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({
+        error: 'Account not found',
+        message: `Claude account ${accountId} not found`
+      })
+    }
+
+    // 保存配置
+    await redis.saveAccountTestConfig(accountId, 'claude', {
+      enabled,
+      cronExpression,
+      model: testModel
+    })
+
+    logger.success(
+      `📝 Updated test config for Claude account ${accountId}: enabled=${enabled}, cronExpression=${cronExpression}, model=${testModel}`
+    )
+
+    return res.json({
+      success: true,
+      message: 'Test config updated successfully',
+      data: {
+        accountId,
+        platform: 'claude',
+        config: { enabled, cronExpression, model: testModel }
+      }
+    })
+  } catch (error) {
+    logger.error(`❌ Failed to update test config for account ${accountId}:`, error)
+    return res.status(500).json({
+      error: 'Failed to update test config',
+      message: error.message
+    })
+  }
+})
+
+// 手动触发账户测试（非流式，返回JSON结果）
+router.post('/claude-accounts/:accountId/test-sync', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+
+  try {
+    // 检查账户是否存在
+    const account = await claudeAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({
+        error: 'Account not found',
+        message: `Claude account ${accountId} not found`
+      })
+    }
+
+    logger.info(`🧪 Manual sync test triggered for Claude account: ${accountId}`)
+
+    // 执行测试
+    const testResult = await claudeRelayService.testAccountConnectionSync(accountId)
+
+    // 保存测试结果到历史
+    await redis.saveAccountTestResult(accountId, 'claude', testResult)
+    await redis.setAccountLastTestTime(accountId, 'claude')
+
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        platform: 'claude',
+        result: testResult
+      }
+    })
+  } catch (error) {
+    logger.error(`❌ Failed to run sync test for account ${accountId}:`, error)
+    return res.status(500).json({
+      error: 'Failed to run test',
+      message: error.message
+    })
+  }
+})
+
+// 批量获取多个账户的测试历史
+router.post('/claude-accounts/batch-test-history', authenticateAdmin, async (req, res) => {
+  const { accountIds } = req.body
+
+  try {
+    if (!Array.isArray(accountIds) || accountIds.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: 'accountIds must be a non-empty array'
+      })
+    }
+
+    // 限制批量查询数量
+    const limitedIds = accountIds.slice(0, 100)
+
+    const accounts = limitedIds.map((accountId) => ({
+      accountId,
+      platform: 'claude'
+    }))
+
+    const historyMap = await redis.getAccountsTestHistory(accounts)
+
+    return res.json({
+      success: true,
+      data: historyMap
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get batch test history:', error)
+    return res.status(500).json({
+      error: 'Failed to get batch test history',
+      message: error.message
+    })
   }
 })
 

@@ -284,7 +284,7 @@
     </div>
 
     <!-- 详细限制信息 -->
-    <div v-if="hasModelRestrictions" class="card p-4 md:p-6">
+    <div v-if="hasModelRestrictions" class="card !overflow-visible p-4 md:p-6">
       <h3
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
@@ -301,7 +301,7 @@
           <i class="fas fa-robot mr-1 text-xs md:mr-2 md:text-sm" />
           受限模型列表
         </h4>
-        <div class="space-y-1 md:space-y-2">
+        <div class="max-h-64 space-y-1 overflow-y-auto pr-1 md:max-h-80 md:space-y-2">
           <div
             v-for="model in statsData.restrictions.restrictedModels"
             :key="model"

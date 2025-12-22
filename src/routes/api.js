@@ -11,6 +11,14 @@ const logger = require('../utils/logger')
 const { getEffectiveModel, parseVendorPrefixedModel } = require('../utils/modelHelper')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
+const claudeRelayConfigService = require('../services/claudeRelayConfigService')
+const claudeAccountService = require('../services/claudeAccountService')
+const claudeConsoleAccountService = require('../services/claudeConsoleAccountService')
+const {
+  isWarmupRequest,
+  buildMockWarmupResponse,
+  sendMockWarmupStream
+} = require('../utils/warmupInterceptor')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const router = express.Router()
 
@@ -35,6 +43,73 @@ function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '') 
       logger.error(`❌ Failed to update rate limit counters${label}:`, error)
       return { totalTokens: 0, totalCost: 0 }
     })
+}
+
+/**
+ * 判断是否为旧会话（污染的会话）
+ * Claude Code 发送的请求特点：
+ * - messages 数组通常只有 1 个元素
+ * - 历史对话记录嵌套在单个 message 的 content 数组中
+ * - content 数组中包含 <system-reminder> 开头的系统注入内容
+ *
+ * 污染会话的特征：
+ * 1. messages.length > 1
+ * 2. messages.length === 1 但 content 中有多个用户输入
+ * 3. "warmup" 请求：单条简单消息 + 无 tools（真正新会话会带 tools）
+ *
+ * @param {Object} body - 请求体
+ * @returns {boolean} 是否为旧会话
+ */
+function isOldSession(body) {
+  const messages = body?.messages
+  const tools = body?.tools
+
+  if (!messages || messages.length === 0) {
+    return false
+  }
+
+  // 1. 多条消息 = 旧会话
+  if (messages.length > 1) {
+    return true
+  }
+
+  // 2. 单条消息，分析 content
+  const firstMessage = messages[0]
+  const content = firstMessage?.content
+
+  if (!content) {
+    return false
+  }
+
+  // 如果 content 是字符串，只有一条输入，需要检查 tools
+  if (typeof content === 'string') {
+    // 有 tools = 正常新会话，无 tools = 可疑
+    return !tools || tools.length === 0
+  }
+
+  // 如果 content 是数组，统计非 system-reminder 的元素
+  if (Array.isArray(content)) {
+    const userInputs = content.filter((item) => {
+      if (item.type !== 'text') {
+        return false
+      }
+      const text = item.text || ''
+      // 剔除以 <system-reminder> 开头的
+      return !text.trimStart().startsWith('<system-reminder>')
+    })
+
+    // 多个用户输入 = 旧会话
+    if (userInputs.length > 1) {
+      return true
+    }
+
+    // Warmup 检测：单个消息 + 无 tools = 旧会话
+    if (userInputs.length === 1 && (!tools || tools.length === 0)) {
+      return true
+    }
+  }
+
+  return false
 }
 
 // 🔧 共享的消息处理函数
@@ -122,12 +197,42 @@ async function handleMessagesRequest(req, res) {
     )
 
     if (isStream) {
+      // 🔍 检查客户端连接是否仍然有效（可能在并发排队等待期间断开）
+      if (res.destroyed || res.socket?.destroyed || res.writableEnded) {
+        logger.warn(
+          `⚠️ Client disconnected before stream response could start for key: ${req.apiKey?.name || 'unknown'}`
+        )
+        return undefined
+      }
+
       // 流式响应 - 只使用官方真实usage数据
       res.setHeader('Content-Type', 'text/event-stream')
       res.setHeader('Cache-Control', 'no-cache')
       res.setHeader('Connection', 'keep-alive')
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('X-Accel-Buffering', 'no') // 禁用 Nginx 缓冲
+      // ⚠️ 检查 headers 是否已发送（可能在排队心跳时已设置）
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        // ⚠️ 关键修复：尊重 auth.js 提前设置的 Connection: close
+        // 当并发队列功能启用时，auth.js 会设置 Connection: close 来禁用 Keep-Alive
+        // 这里只在没有设置过 Connection 头时才设置 keep-alive
+        const existingConnection = res.getHeader('Connection')
+        if (!existingConnection) {
+          res.setHeader('Connection', 'keep-alive')
+        } else {
+          logger.api(
+            `🔌 [STREAM] Preserving existing Connection header: ${existingConnection} for key: ${req.apiKey?.name || 'unknown'}`
+          )
+        }
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('X-Accel-Buffering', 'no') // 禁用 Nginx 缓冲
+      } else {
+        logger.debug(
+          `📤 [STREAM] Headers already sent, skipping setHeader for key: ${req.apiKey?.name || 'unknown'}`
+        )
+      }
 
       // 禁用 Nagle 算法，确保数据立即发送
       if (res.socket && typeof res.socket.setNoDelay === 'function') {
@@ -141,6 +246,56 @@ async function handleMessagesRequest(req, res) {
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(req.body)
 
+      // 🔒 全局会话绑定验证
+      let forcedAccount = null
+      let needSessionBinding = false
+      let originalSessionIdForBinding = null
+
+      try {
+        const globalBindingEnabled = await claudeRelayConfigService.isGlobalSessionBindingEnabled()
+
+        if (globalBindingEnabled) {
+          const originalSessionId = claudeRelayConfigService.extractOriginalSessionId(req.body)
+
+          if (originalSessionId) {
+            const validation = await claudeRelayConfigService.validateNewSession(
+              req.body,
+              originalSessionId
+            )
+
+            if (!validation.valid) {
+              logger.api(
+                `❌ Session binding validation failed: ${validation.code} for session ${originalSessionId}`
+              )
+              return res.status(403).json({
+                error: {
+                  type: 'session_binding_error',
+                  message: validation.error
+                }
+              })
+            }
+
+            // 如果已有绑定，使用绑定的账户
+            if (validation.binding) {
+              forcedAccount = validation.binding
+              logger.api(
+                `🔗 Using bound account for session ${originalSessionId}: ${forcedAccount.accountId}`
+              )
+            }
+
+            // 标记需要在调度成功后建立绑定
+            if (validation.isNewSession) {
+              needSessionBinding = true
+              originalSessionIdForBinding = originalSessionId
+              logger.api(`📝 New session detected, will create binding: ${originalSessionId}`)
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('❌ Error in global session binding check:', error)
+        // 配置服务出错时不阻断请求
+      }
+
       // 使用统一调度选择账号（传递请求的模型）
       const requestedModel = req.body.model
       let accountId
@@ -149,10 +304,21 @@ async function handleMessagesRequest(req, res) {
         const selection = await unifiedClaudeScheduler.selectAccountForApiKey(
           req.apiKey,
           sessionHash,
-          requestedModel
+          requestedModel,
+          forcedAccount
         )
         ;({ accountId, accountType } = selection)
       } catch (error) {
+        // 处理会话绑定账户不可用的错误
+        if (error.code === 'SESSION_BINDING_ACCOUNT_UNAVAILABLE') {
+          const errorMessage = await claudeRelayConfigService.getSessionBindingErrorMessage()
+          return res.status(403).json({
+            error: {
+              type: 'session_binding_error',
+              message: errorMessage
+            }
+          })
+        }
         if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
           const limitMessage = claudeRelayService._buildStandardRateLimitMessage(
             error.rateLimitEndAt
@@ -168,6 +334,57 @@ async function handleMessagesRequest(req, res) {
           return
         }
         throw error
+      }
+
+      // 🔗 在成功调度后建立会话绑定（仅 claude-official 类型）
+      // claude-official 只接受：1) 新会话 2) 已绑定的会话
+      if (
+        needSessionBinding &&
+        originalSessionIdForBinding &&
+        accountId &&
+        accountType === 'claude-official'
+      ) {
+        // 🚫 检测旧会话（污染的会话）
+        if (isOldSession(req.body)) {
+          const cfg = await claudeRelayConfigService.getConfig()
+          logger.warn(
+            `🚫 Old session rejected: sessionId=${originalSessionIdForBinding}, messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, isOldSession=true`
+          )
+          return res.status(400).json({
+            error: {
+              type: 'session_binding_error',
+              message: cfg.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。'
+            }
+          })
+        }
+
+        // 创建绑定
+        try {
+          await claudeRelayConfigService.setOriginalSessionBinding(
+            originalSessionIdForBinding,
+            accountId,
+            accountType
+          )
+        } catch (bindingError) {
+          logger.warn(`⚠️ Failed to create session binding:`, bindingError)
+        }
+      }
+
+      // 🔥 预热请求拦截检查（在转发之前）
+      if (accountType === 'claude-official' || accountType === 'claude-console') {
+        const account =
+          accountType === 'claude-official'
+            ? await claudeAccountService.getAccount(accountId)
+            : await claudeConsoleAccountService.getAccount(accountId)
+
+        if (account?.interceptWarmup === 'true' && isWarmupRequest(req.body)) {
+          logger.api(`🔥 Warmup request intercepted for account: ${account.name} (${accountId})`)
+          if (isStream) {
+            return sendMockWarmupStream(res, req.body.model)
+          } else {
+            return res.json(buildMockWarmupResponse(req.body.model))
+          }
+        }
       }
 
       // 根据账号类型选择对应的转发服务并调用
@@ -494,14 +711,112 @@ async function handleMessagesRequest(req, res) {
         }
       }, 1000) // 1秒后检查
     } else {
+      // 🔍 检查客户端连接是否仍然有效（可能在并发排队等待期间断开）
+      if (res.destroyed || res.socket?.destroyed || res.writableEnded) {
+        logger.warn(
+          `⚠️ Client disconnected before non-stream request could start for key: ${req.apiKey?.name || 'unknown'}`
+        )
+        return undefined
+      }
+
       // 非流式响应 - 只使用官方真实usage数据
       logger.info('📄 Starting non-streaming request', {
         apiKeyId: req.apiKey.id,
         apiKeyName: req.apiKey.name
       })
 
+      // 📊 监听 socket 事件以追踪连接状态变化
+      const nonStreamSocket = res.socket
+      let _clientClosedConnection = false
+      let _socketCloseTime = null
+
+      if (nonStreamSocket) {
+        const onSocketEnd = () => {
+          _clientClosedConnection = true
+          _socketCloseTime = Date.now()
+          logger.warn(
+            `⚠️ [NON-STREAM] Socket 'end' event - client sent FIN | key: ${req.apiKey?.name}, ` +
+              `requestId: ${req.requestId}, elapsed: ${Date.now() - startTime}ms`
+          )
+        }
+        const onSocketClose = () => {
+          _clientClosedConnection = true
+          logger.warn(
+            `⚠️ [NON-STREAM] Socket 'close' event | key: ${req.apiKey?.name}, ` +
+              `requestId: ${req.requestId}, elapsed: ${Date.now() - startTime}ms, ` +
+              `hadError: ${nonStreamSocket.destroyed}`
+          )
+        }
+        const onSocketError = (err) => {
+          logger.error(
+            `❌ [NON-STREAM] Socket error | key: ${req.apiKey?.name}, ` +
+              `requestId: ${req.requestId}, error: ${err.message}`
+          )
+        }
+
+        nonStreamSocket.once('end', onSocketEnd)
+        nonStreamSocket.once('close', onSocketClose)
+        nonStreamSocket.once('error', onSocketError)
+
+        // 清理监听器（在响应结束后）
+        res.once('finish', () => {
+          nonStreamSocket.removeListener('end', onSocketEnd)
+          nonStreamSocket.removeListener('close', onSocketClose)
+          nonStreamSocket.removeListener('error', onSocketError)
+        })
+      }
+
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(req.body)
+
+      // 🔒 全局会话绑定验证（非流式）
+      let forcedAccountNonStream = null
+      let needSessionBindingNonStream = false
+      let originalSessionIdForBindingNonStream = null
+
+      try {
+        const globalBindingEnabled = await claudeRelayConfigService.isGlobalSessionBindingEnabled()
+
+        if (globalBindingEnabled) {
+          const originalSessionId = claudeRelayConfigService.extractOriginalSessionId(req.body)
+
+          if (originalSessionId) {
+            const validation = await claudeRelayConfigService.validateNewSession(
+              req.body,
+              originalSessionId
+            )
+
+            if (!validation.valid) {
+              logger.api(
+                `❌ Session binding validation failed (non-stream): ${validation.code} for session ${originalSessionId}`
+              )
+              return res.status(403).json({
+                error: {
+                  type: 'session_binding_error',
+                  message: validation.error
+                }
+              })
+            }
+
+            if (validation.binding) {
+              forcedAccountNonStream = validation.binding
+              logger.api(
+                `🔗 Using bound account for session (non-stream) ${originalSessionId}: ${forcedAccountNonStream.accountId}`
+              )
+            }
+
+            if (validation.isNewSession) {
+              needSessionBindingNonStream = true
+              originalSessionIdForBindingNonStream = originalSessionId
+              logger.api(
+                `📝 New session detected (non-stream), will create binding: ${originalSessionId}`
+              )
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('❌ Error in global session binding check (non-stream):', error)
+      }
 
       // 使用统一调度选择账号（传递请求的模型）
       const requestedModel = req.body.model
@@ -511,10 +826,20 @@ async function handleMessagesRequest(req, res) {
         const selection = await unifiedClaudeScheduler.selectAccountForApiKey(
           req.apiKey,
           sessionHash,
-          requestedModel
+          requestedModel,
+          forcedAccountNonStream
         )
         ;({ accountId, accountType } = selection)
       } catch (error) {
+        if (error.code === 'SESSION_BINDING_ACCOUNT_UNAVAILABLE') {
+          const errorMessage = await claudeRelayConfigService.getSessionBindingErrorMessage()
+          return res.status(403).json({
+            error: {
+              type: 'session_binding_error',
+              message: errorMessage
+            }
+          })
+        }
         if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
           const limitMessage = claudeRelayService._buildStandardRateLimitMessage(
             error.rateLimitEndAt
@@ -525,6 +850,55 @@ async function handleMessagesRequest(req, res) {
           })
         }
         throw error
+      }
+
+      // 🔗 在成功调度后建立会话绑定（非流式，仅 claude-official 类型）
+      // claude-official 只接受：1) 新会话 2) 已绑定的会话
+      if (
+        needSessionBindingNonStream &&
+        originalSessionIdForBindingNonStream &&
+        accountId &&
+        accountType === 'claude-official'
+      ) {
+        // 🚫 检测旧会话（污染的会话）
+        if (isOldSession(req.body)) {
+          const cfg = await claudeRelayConfigService.getConfig()
+          logger.warn(
+            `🚫 Old session rejected (non-stream): sessionId=${originalSessionIdForBindingNonStream}, messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, isOldSession=true`
+          )
+          return res.status(400).json({
+            error: {
+              type: 'session_binding_error',
+              message: cfg.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。'
+            }
+          })
+        }
+
+        // 创建绑定
+        try {
+          await claudeRelayConfigService.setOriginalSessionBinding(
+            originalSessionIdForBindingNonStream,
+            accountId,
+            accountType
+          )
+        } catch (bindingError) {
+          logger.warn(`⚠️ Failed to create session binding (non-stream):`, bindingError)
+        }
+      }
+
+      // 🔥 预热请求拦截检查（非流式，在转发之前）
+      if (accountType === 'claude-official' || accountType === 'claude-console') {
+        const account =
+          accountType === 'claude-official'
+            ? await claudeAccountService.getAccount(accountId)
+            : await claudeConsoleAccountService.getAccount(accountId)
+
+        if (account?.interceptWarmup === 'true' && isWarmupRequest(req.body)) {
+          logger.api(
+            `🔥 Warmup request intercepted (non-stream) for account: ${account.name} (${accountId})`
+          )
+          return res.json(buildMockWarmupResponse(req.body.model))
+        }
       }
 
       // 根据账号类型选择对应的转发服务
@@ -611,6 +985,15 @@ async function handleMessagesRequest(req, res) {
         bodyLength: response.body ? response.body.length : 0
       })
 
+      // 🔍 检查客户端连接是否仍然有效
+      // 在长时间请求过程中，客户端可能已经断开连接（超时、用户取消等）
+      if (res.destroyed || res.socket?.destroyed || res.writableEnded) {
+        logger.warn(
+          `⚠️ Client disconnected before non-stream response could be sent for key: ${req.apiKey?.name || 'unknown'}`
+        )
+        return undefined
+      }
+
       res.status(response.statusCode)
 
       // 设置响应头，避免 Content-Length 和 Transfer-Encoding 冲突
@@ -676,10 +1059,12 @@ async function handleMessagesRequest(req, res) {
           logger.warn('⚠️ No usage data found in Claude API JSON response')
         }
 
+        // 使用 Express 内建的 res.json() 发送响应（简单可靠）
         res.json(jsonData)
       } catch (parseError) {
         logger.warn('⚠️ Failed to parse Claude API response as JSON:', parseError.message)
         logger.info('📄 Raw response body:', response.body)
+        // 使用 Express 内建的 res.send() 发送响应（简单可靠）
         res.send(response.body)
       }
 
@@ -824,7 +1209,8 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
     // 可选：根据 API Key 的模型限制过滤
     let filteredModels = models
     if (req.apiKey.enableModelRestriction && req.apiKey.restrictedModels?.length > 0) {
-      filteredModels = models.filter((model) => req.apiKey.restrictedModels.includes(model.id))
+      // 将 restrictedModels 视为黑名单：过滤掉受限模型
+      filteredModels = models.filter((model) => !req.apiKey.restrictedModels.includes(model.id))
     }
 
     res.json({
@@ -965,15 +1351,47 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
     })
   }
 
+  // 🔗 会话绑定验证（与 messages 端点保持一致）
+  const originalSessionId = claudeRelayConfigService.extractOriginalSessionId(req.body)
+  const sessionValidation = await claudeRelayConfigService.validateNewSession(
+    req.body,
+    originalSessionId
+  )
+
+  if (!sessionValidation.valid) {
+    logger.warn(
+      `🚫 Session binding validation failed (count_tokens): ${sessionValidation.code} for session ${originalSessionId}`
+    )
+    return res.status(400).json({
+      error: {
+        type: 'session_binding_error',
+        message: sessionValidation.error
+      }
+    })
+  }
+
+  // 🔗 检测旧会话（污染的会话）- 仅对需要绑定的新会话检查
+  if (sessionValidation.isNewSession && originalSessionId) {
+    if (isOldSession(req.body)) {
+      const cfg = await claudeRelayConfigService.getConfig()
+      logger.warn(
+        `🚫 Old session rejected (count_tokens): sessionId=${originalSessionId}, messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, isOldSession=true`
+      )
+      return res.status(400).json({
+        error: {
+          type: 'session_binding_error',
+          message: cfg.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。'
+        }
+      })
+    }
+  }
+
   logger.info(`🔢 Processing token count request for key: ${req.apiKey.name}`)
 
   const sessionHash = sessionHelper.generateSessionHash(req.body)
   const requestedModel = req.body.model
   const maxAttempts = 2
   let attempt = 0
-
-  // 引入 claudeConsoleAccountService 用于检查 count_tokens 可用性
-  const claudeConsoleAccountService = require('../services/claudeConsoleAccountService')
 
   const processRequest = async () => {
     const { accountId, accountType } = await unifiedClaudeScheduler.selectAccountForApiKey(
@@ -1168,6 +1586,11 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
       return
     }
   }
+})
+
+// Claude Code 客户端遥测端点 - 返回成功响应避免 404 日志
+router.post('/api/event_logging/batch', (req, res) => {
+  res.status(200).json({ success: true })
 })
 
 module.exports = router

@@ -77,7 +77,21 @@ const getActionClass = (action) => {
   return colorMap[action.color] || colorMap.gray
 }
 
+const instanceId = Symbol('action-dropdown')
+const handleGlobalOpen = (event) => {
+  if (event?.detail?.id !== instanceId) {
+    closeDropdown()
+  }
+}
+
 const toggleDropdown = async () => {
+  if (!isOpen.value) {
+    window.dispatchEvent(
+      new CustomEvent('action-dropdown-open', {
+        detail: { id: instanceId }
+      })
+    )
+  }
   isOpen.value = !isOpen.value
   if (isOpen.value) {
     await nextTick()
@@ -102,7 +116,8 @@ const updateDropdownPosition = () => {
 
   const trigger = triggerRef.value.getBoundingClientRect()
   const dropdownHeight = 200 // 预估高度
-  const dropdownWidth = 160 // 预估宽度
+  const dropdownWidth = 180 // 预估宽度，略大以减少遮挡
+  const gap = 8
   const spaceBelow = window.innerHeight - trigger.bottom
   const spaceAbove = trigger.top
   const spaceRight = window.innerWidth - trigger.right
@@ -112,16 +127,16 @@ const updateDropdownPosition = () => {
 
   // 计算垂直位置
   if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
-    top = trigger.bottom + 4
+    top = trigger.bottom + gap
   } else {
-    top = trigger.top - dropdownHeight - 4
+    top = trigger.top - dropdownHeight - gap
   }
 
-  // 计算水平位置 - 优先显示在左侧（因为按钮在右侧固定列）
-  if (spaceLeft >= dropdownWidth) {
-    left = trigger.left - dropdownWidth + trigger.width
-  } else if (spaceRight >= dropdownWidth) {
-    left = trigger.left
+  // 计算水平位置 - 优先向右展开，避免遮挡左侧内容
+  if (spaceRight >= dropdownWidth + gap) {
+    left = trigger.right + gap
+  } else if (spaceLeft >= dropdownWidth + gap) {
+    left = trigger.left - dropdownWidth - gap + trigger.width
   } else {
     left = window.innerWidth - dropdownWidth - 10
   }
@@ -164,11 +179,13 @@ onMounted(() => {
   window.addEventListener('scroll', handleScroll, true)
   window.addEventListener('resize', handleResize)
   document.addEventListener('click', handleClickOutside)
+  window.addEventListener('action-dropdown-open', handleGlobalOpen)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', handleScroll, true)
   window.removeEventListener('resize', handleResize)
   document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('action-dropdown-open', handleGlobalOpen)
 })
 </script>

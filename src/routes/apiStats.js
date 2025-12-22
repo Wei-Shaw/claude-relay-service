@@ -206,74 +206,85 @@ router.post('/api/user-stats', async (req, res) => {
     // 获取验证结果中的完整keyData（包含isActive状态和cost信息）
     const fullKeyData = keyData
 
-    // 计算总费用 - 使用与模型统计相同的逻辑（按模型分别计算）
+    // 🔧 FIX: 使用 allTimeCost 而不是扫描月度键
+    // 计算总费用 - 优先使用持久化的总费用计数器
     let totalCost = 0
     let formattedCost = '$0.000000'
 
     try {
       const client = redis.getClientSafe()
 
-      // 获取所有月度模型统计（与model-stats接口相同的逻辑）
-      const allModelKeys = await client.keys(`usage:${keyId}:model:monthly:*:*`)
-      const modelUsageMap = new Map()
+      // 读取累积的总费用（没有 TTL 的持久键）
+      const totalCostKey = `usage:cost:total:${keyId}`
+      const allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
 
-      for (const key of allModelKeys) {
-        const modelMatch = key.match(/usage:.+:model:monthly:(.+):(\d{4}-\d{2})$/)
-        if (!modelMatch) {
-          continue
-        }
+      if (allTimeCost > 0) {
+        totalCost = allTimeCost
+        formattedCost = CostCalculator.formatCost(allTimeCost)
+        logger.debug(`📊 使用 allTimeCost 计算用户统计: ${allTimeCost}`)
+      } else {
+        // Fallback: 如果 allTimeCost 为空（旧键），尝试月度键
+        const allModelKeys = await client.keys(`usage:${keyId}:model:monthly:*:*`)
+        const modelUsageMap = new Map()
 
-        const model = modelMatch[1]
-        const data = await client.hgetall(key)
-
-        if (data && Object.keys(data).length > 0) {
-          if (!modelUsageMap.has(model)) {
-            modelUsageMap.set(model, {
-              inputTokens: 0,
-              outputTokens: 0,
-              cacheCreateTokens: 0,
-              cacheReadTokens: 0
-            })
+        for (const key of allModelKeys) {
+          const modelMatch = key.match(/usage:.+:model:monthly:(.+):(\d{4}-\d{2})$/)
+          if (!modelMatch) {
+            continue
           }
 
-          const modelUsage = modelUsageMap.get(model)
-          modelUsage.inputTokens += parseInt(data.inputTokens) || 0
-          modelUsage.outputTokens += parseInt(data.outputTokens) || 0
-          modelUsage.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0
-          modelUsage.cacheReadTokens += parseInt(data.cacheReadTokens) || 0
-        }
-      }
+          const model = modelMatch[1]
+          const data = await client.hgetall(key)
 
-      // 按模型计算费用并汇总
-      for (const [model, usage] of modelUsageMap) {
-        const usageData = {
-          input_tokens: usage.inputTokens,
-          output_tokens: usage.outputTokens,
-          cache_creation_input_tokens: usage.cacheCreateTokens,
-          cache_read_input_tokens: usage.cacheReadTokens
-        }
+          if (data && Object.keys(data).length > 0) {
+            if (!modelUsageMap.has(model)) {
+              modelUsageMap.set(model, {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheCreateTokens: 0,
+                cacheReadTokens: 0
+              })
+            }
 
-        const costResult = CostCalculator.calculateCost(usageData, model)
-        totalCost += costResult.costs.total
-      }
-
-      // 如果没有模型级别的详细数据，回退到总体数据计算
-      if (modelUsageMap.size === 0 && fullKeyData.usage?.total?.allTokens > 0) {
-        const usage = fullKeyData.usage.total
-        const costUsage = {
-          input_tokens: usage.inputTokens || 0,
-          output_tokens: usage.outputTokens || 0,
-          cache_creation_input_tokens: usage.cacheCreateTokens || 0,
-          cache_read_input_tokens: usage.cacheReadTokens || 0
+            const modelUsage = modelUsageMap.get(model)
+            modelUsage.inputTokens += parseInt(data.inputTokens) || 0
+            modelUsage.outputTokens += parseInt(data.outputTokens) || 0
+            modelUsage.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0
+            modelUsage.cacheReadTokens += parseInt(data.cacheReadTokens) || 0
+          }
         }
 
-        const costResult = CostCalculator.calculateCost(costUsage, 'claude-3-5-sonnet-20241022')
-        totalCost = costResult.costs.total
-      }
+        // 按模型计算费用并汇总
+        for (const [model, usage] of modelUsageMap) {
+          const usageData = {
+            input_tokens: usage.inputTokens,
+            output_tokens: usage.outputTokens,
+            cache_creation_input_tokens: usage.cacheCreateTokens,
+            cache_read_input_tokens: usage.cacheReadTokens
+          }
 
-      formattedCost = CostCalculator.formatCost(totalCost)
+          const costResult = CostCalculator.calculateCost(usageData, model)
+          totalCost += costResult.costs.total
+        }
+
+        // 如果没有模型级别的详细数据，回退到总体数据计算
+        if (modelUsageMap.size === 0 && fullKeyData.usage?.total?.allTokens > 0) {
+          const usage = fullKeyData.usage.total
+          const costUsage = {
+            input_tokens: usage.inputTokens || 0,
+            output_tokens: usage.outputTokens || 0,
+            cache_creation_input_tokens: usage.cacheCreateTokens || 0,
+            cache_read_input_tokens: usage.cacheReadTokens || 0
+          }
+
+          const costResult = CostCalculator.calculateCost(costUsage, 'claude-3-5-sonnet-20241022')
+          totalCost = costResult.costs.total
+        }
+
+        formattedCost = CostCalculator.formatCost(totalCost)
+      }
     } catch (error) {
-      logger.warn(`Failed to calculate detailed cost for key ${keyId}:`, error)
+      logger.warn(`Failed to calculate cost for key ${keyId}:`, error)
       // 回退到简单计算
       if (fullKeyData.usage?.total?.allTokens > 0) {
         const usage = fullKeyData.usage.total

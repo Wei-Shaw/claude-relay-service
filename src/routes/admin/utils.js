@@ -33,7 +33,9 @@ function mapExpiryField(updates, accountType, accountId) {
   if ('expiresAt' in mappedUpdates) {
     mappedUpdates.subscriptionExpiresAt = mappedUpdates.expiresAt
     delete mappedUpdates.expiresAt
-    logger.info(`Mapping expiresAt to subscriptionExpiresAt for ${accountType} account ${accountId}`)
+    logger.info(
+      `Mapping expiresAt to subscriptionExpiresAt for ${accountType} account ${accountId}`
+    )
   }
   return mappedUpdates
 }
