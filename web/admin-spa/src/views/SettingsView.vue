@@ -194,6 +194,45 @@
                   </td>
                 </tr>
 
+                <!-- 公开统计概览 -->
+                <tr class="table-row">
+                  <td class="w-48 whitespace-nowrap px-6 py-4">
+                    <div class="flex items-center">
+                      <div
+                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-emerald-600"
+                      >
+                        <i class="fas fa-chart-bar text-xs text-white" />
+                      </div>
+                      <div>
+                        <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          公开统计
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">登录页展示</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <div class="flex items-center">
+                      <label class="inline-flex cursor-pointer items-center">
+                        <input
+                          v-model="oemSettings.publicStatsEnabled"
+                          class="peer sr-only"
+                          type="checkbox"
+                        />
+                        <div
+                          class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800"
+                        ></div>
+                        <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
+                          oemSettings.publicStatsEnabled ? '显示统计概览' : '隐藏统计概览'
+                        }}</span>
+                      </label>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      启用后，未登录用户可在首页看到服务状态、模型使用分布等概览信息
+                    </p>
+                  </td>
+                </tr>
+
                 <!-- 操作按钮 -->
                 <tr>
                   <td class="px-6 py-6" colspan="2">
@@ -342,6 +381,39 @@
                 </label>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
                   隐藏后，用户需要直接访问 /admin/login 页面登录
+                </p>
+              </div>
+            </div>
+
+            <!-- 公开统计卡片 -->
+            <div class="glass-card p-4">
+              <div class="mb-3 flex items-center gap-3">
+                <div
+                  class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-md"
+                >
+                  <i class="fas fa-chart-bar"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">公开统计</h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">在登录页展示统计概览</p>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <label class="inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="oemSettings.publicStatsEnabled"
+                    class="peer sr-only"
+                    type="checkbox"
+                  />
+                  <div
+                    class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800"
+                  ></div>
+                  <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
+                    oemSettings.publicStatsEnabled ? '显示统计概览' : '隐藏统计概览'
+                  }}</span>
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  启用后，未登录用户可在首页看到服务状态、模型使用分布等概览信息
                 </p>
               </div>
             </div>
@@ -2467,7 +2539,8 @@ const saveOemSettings = async () => {
       siteName: oemSettings.value.siteName,
       siteIcon: oemSettings.value.siteIcon,
       siteIconData: oemSettings.value.siteIconData,
-      showAdminButton: oemSettings.value.showAdminButton
+      showAdminButton: oemSettings.value.showAdminButton,
+      publicStatsEnabled: oemSettings.value.publicStatsEnabled
     }
     const result = await settingsStore.saveOemSettings(settings)
     if (result && result.success) {

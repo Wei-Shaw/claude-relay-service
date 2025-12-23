@@ -9,6 +9,7 @@ export const useSettingsStore = defineStore('settings', () => {
     siteIcon: '',
     siteIconData: '',
     showAdminButton: true, // 控制管理后台按钮的显示
+    publicStatsEnabled: false, // 是否在首页显示公开统计概览
     updatedAt: null
   })
 
@@ -66,6 +67,7 @@ export const useSettingsStore = defineStore('settings', () => {
       siteIcon: '',
       siteIconData: '',
       showAdminButton: true,
+      publicStatsEnabled: false,
       updatedAt: null
     }
 

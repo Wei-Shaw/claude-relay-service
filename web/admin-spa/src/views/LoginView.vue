@@ -5,9 +5,11 @@
       <ThemeToggle mode="dropdown" />
     </div>
 
-    <div
-      class="glass-strong w-full max-w-md rounded-xl p-6 shadow-2xl sm:rounded-2xl sm:p-8 md:rounded-3xl md:p-10"
-    >
+    <div class="flex w-full max-w-4xl flex-col items-center gap-6 lg:flex-row lg:items-start">
+      <!-- 登录卡片 -->
+      <div
+        class="glass-strong w-full max-w-md rounded-xl p-6 shadow-2xl sm:rounded-2xl sm:p-8 md:rounded-3xl md:p-10"
+      >
       <div class="mb-6 text-center sm:mb-8">
         <!-- 使用自定义布局来保持登录页面的居中大logo样式 -->
         <div
@@ -92,6 +94,15 @@
         <i class="fas fa-exclamation-triangle mr-2" />{{ authStore.loginError }}
       </div>
     </div>
+
+      <!-- 公开统计概览 -->
+      <div
+        v-if="authStore.oemSettings.publicStatsEnabled && authStore.publicStats"
+        class="w-full max-w-md lg:max-w-sm"
+      >
+        <PublicStatsOverview />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -100,6 +111,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import PublicStatsOverview from '@/components/common/PublicStatsOverview.vue'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()

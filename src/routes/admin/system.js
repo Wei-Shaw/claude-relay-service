@@ -4,6 +4,10 @@ const path = require('path')
 const axios = require('axios')
 const claudeCodeHeadersService = require('../../services/claudeCodeHeadersService')
 const claudeAccountService = require('../../services/claudeAccountService')
+const claudeConsoleAccountService = require('../../services/claudeConsoleAccountService')
+const geminiAccountService = require('../../services/geminiAccountService')
+const bedrockAccountService = require('../../services/bedrockAccountService')
+const droidAccountService = require('../../services/droidAccountService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
@@ -254,30 +258,37 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
 
 // ==================== OEM 设置管理 ====================
 
+// 默认OEM设置
+const defaultOemSettings = {
+  siteName: 'Claude Relay Service',
+  siteIcon: '',
+  siteIconData: '', // Base64编码的图标数据
+  showAdminButton: true, // 是否显示管理后台按钮
+  publicStatsEnabled: false, // 是否在首页显示公开统计概览
+  updatedAt: new Date().toISOString()
+}
+
+// 获取OEM设置的辅助函数
+async function getOemSettings() {
+  const client = redis.getClient()
+  const oemSettings = await client.get('oem:settings')
+
+  let settings = { ...defaultOemSettings }
+  if (oemSettings) {
+    try {
+      settings = { ...defaultOemSettings, ...JSON.parse(oemSettings) }
+    } catch (err) {
+      logger.warn('⚠️ Failed to parse OEM settings, using defaults:', err.message)
+    }
+  }
+  return settings
+}
+
 // 获取OEM设置（公开接口，用于显示）
 // 注意：这个端点没有 authenticateAdmin 中间件，因为前端登录页也需要访问
 router.get('/oem-settings', async (req, res) => {
   try {
-    const client = redis.getClient()
-    const oemSettings = await client.get('oem:settings')
-
-    // 默认设置
-    const defaultSettings = {
-      siteName: 'Claude Relay Service',
-      siteIcon: '',
-      siteIconData: '', // Base64编码的图标数据
-      showAdminButton: true, // 是否显示管理后台按钮
-      updatedAt: new Date().toISOString()
-    }
-
-    let settings = defaultSettings
-    if (oemSettings) {
-      try {
-        settings = { ...defaultSettings, ...JSON.parse(oemSettings) }
-      } catch (err) {
-        logger.warn('⚠️ Failed to parse OEM settings, using defaults:', err.message)
-      }
-    }
+    const settings = await getOemSettings()
 
     // 添加 LDAP 启用状态到响应中
     return res.json({
@@ -296,7 +307,7 @@ router.get('/oem-settings', async (req, res) => {
 // 更新OEM设置
 router.put('/oem-settings', authenticateAdmin, async (req, res) => {
   try {
-    const { siteName, siteIcon, siteIconData, showAdminButton } = req.body
+    const { siteName, siteIcon, siteIconData, showAdminButton, publicStatsEnabled } = req.body
 
     // 验证输入
     if (!siteName || typeof siteName !== 'string' || siteName.trim().length === 0) {
@@ -328,6 +339,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       siteIcon: (siteIcon || '').trim(),
       siteIconData: (siteIconData || '').trim(), // Base64数据
       showAdminButton: showAdminButton !== false, // 默认为true
+      publicStatsEnabled: publicStatsEnabled === true, // 默认为false
       updatedAt: new Date().toISOString()
     }
 
@@ -397,5 +409,215 @@ router.post('/claude-code-version/clear', authenticateAdmin, async (req, res) =>
     })
   }
 })
+
+// ==================== 公开统计概览 ====================
+
+// 获取公开统计数据（无需认证，用于首页展示）
+// 只在 publicStatsEnabled 开启时返回数据
+router.get('/public-stats', async (req, res) => {
+  try {
+    // 检查是否启用了公开统计
+    const settings = await getOemSettings()
+    if (!settings.publicStatsEnabled) {
+      return res.json({
+        success: true,
+        enabled: false,
+        data: null
+      })
+    }
+
+    // 辅助函数：规范化布尔值
+    const normalizeBoolean = (value) => value === true || value === 'true'
+    const isRateLimitedFlag = (status) => {
+      if (!status) return false
+      if (typeof status === 'string') return status === 'limited'
+      if (typeof status === 'object') return status.isRateLimited === true
+      return false
+    }
+
+    // 并行获取统计数据
+    const [
+      claudeAccounts,
+      claudeConsoleAccounts,
+      geminiAccounts,
+      bedrockAccountsResult,
+      droidAccounts,
+      todayStats,
+      modelStats
+    ] = await Promise.all([
+      claudeAccountService.getAllAccounts(),
+      claudeConsoleAccountService.getAllAccounts(),
+      geminiAccountService.getAllAccounts(),
+      bedrockAccountService.getAllAccounts(),
+      droidAccountService.getAllAccounts(),
+      redis.getTodayStats(),
+      getPublicModelStats()
+    ])
+
+    const bedrockAccounts = bedrockAccountsResult.success ? bedrockAccountsResult.data : []
+
+    // 计算各平台正常账户数
+    const normalClaudeAccounts = claudeAccounts.filter(
+      (acc) =>
+        acc.isActive &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        acc.schedulable !== false &&
+        !(acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited)
+    ).length
+    const normalClaudeConsoleAccounts = claudeConsoleAccounts.filter(
+      (acc) =>
+        acc.isActive &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        acc.schedulable !== false &&
+        !(acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited)
+    ).length
+    const normalGeminiAccounts = geminiAccounts.filter(
+      (acc) =>
+        acc.isActive &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        acc.schedulable !== false &&
+        !(
+          acc.rateLimitStatus === 'limited' ||
+          (acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited)
+        )
+    ).length
+    const normalBedrockAccounts = bedrockAccounts.filter(
+      (acc) =>
+        acc.isActive &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        acc.schedulable !== false &&
+        !(acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited)
+    ).length
+    const normalDroidAccounts = droidAccounts.filter(
+      (acc) =>
+        normalizeBoolean(acc.isActive) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        normalizeBoolean(acc.schedulable) &&
+        !isRateLimitedFlag(acc.rateLimitStatus)
+    ).length
+
+    // 计算总正常账户数
+    const totalNormalAccounts =
+      normalClaudeAccounts +
+      normalClaudeConsoleAccounts +
+      normalGeminiAccounts +
+      normalBedrockAccounts +
+      normalDroidAccounts
+
+    // 判断服务状态
+    const isHealthy = redis.isConnected && totalNormalAccounts > 0
+
+    // 构建公开统计数据（脱敏后的数据）
+    const publicStats = {
+      // 服务状态
+      serviceStatus: isHealthy ? 'healthy' : 'degraded',
+      uptime: process.uptime(),
+
+      // 平台可用性（只显示是否有可用账户，不显示具体数量）
+      platforms: {
+        claude: normalClaudeAccounts + normalClaudeConsoleAccounts > 0,
+        gemini: normalGeminiAccounts > 0,
+        bedrock: normalBedrockAccounts > 0,
+        droid: normalDroidAccounts > 0
+      },
+
+      // 今日统计
+      todayStats: {
+        requests: todayStats.requestsToday || 0,
+        tokens: todayStats.tokensToday || 0,
+        inputTokens: todayStats.inputTokensToday || 0,
+        outputTokens: todayStats.outputTokensToday || 0
+      },
+
+      // 模型使用分布（只返回模型名和请求占比，不返回具体数量）
+      modelDistribution: modelStats,
+
+      // 系统时区
+      systemTimezone: config.system.timezoneOffset || 8
+    }
+
+    return res.json({
+      success: true,
+      enabled: true,
+      data: publicStats
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get public stats:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get public stats',
+      message: error.message
+    })
+  }
+})
+
+// 获取公开模型统计的辅助函数
+async function getPublicModelStats() {
+  try {
+    const client = redis.getClientSafe()
+    const today = redis.getDateStringInTimezone()
+    const pattern = `usage:model:daily:*:${today}`
+    const keys = await client.keys(pattern)
+
+    if (keys.length === 0) {
+      return []
+    }
+
+    // 模型名标准化
+    const normalizeModelName = (model) => {
+      if (!model || model === 'unknown') return model
+      if (model.includes('.anthropic.') || model.includes('.claude')) {
+        let normalized = model.replace(/^[a-z0-9-]+\./, '')
+        normalized = normalized.replace('anthropic.', '')
+        normalized = normalized.replace(/-v\d+:\d+$/, '')
+        return normalized
+      }
+      return model.replace(/-v\d+:\d+|:latest$/, '')
+    }
+
+    // 聚合模型数据
+    const modelStatsMap = new Map()
+    let totalRequests = 0
+
+    for (const key of keys) {
+      const match = key.match(/usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/)
+      if (!match) continue
+
+      const rawModel = match[1]
+      const normalizedModel = normalizeModelName(rawModel)
+      const data = await client.hgetall(key)
+
+      if (data && Object.keys(data).length > 0) {
+        const requests = parseInt(data.requests) || 0
+        totalRequests += requests
+
+        const stats = modelStatsMap.get(normalizedModel) || { requests: 0 }
+        stats.requests += requests
+        modelStatsMap.set(normalizedModel, stats)
+      }
+    }
+
+    // 转换为数组并计算占比
+    const modelStats = []
+    for (const [model, stats] of modelStatsMap) {
+      modelStats.push({
+        model,
+        percentage: totalRequests > 0 ? Math.round((stats.requests / totalRequests) * 100) : 0
+      })
+    }
+
+    // 按占比排序，取前5个
+    modelStats.sort((a, b) => b.percentage - a.percentage)
+    return modelStats.slice(0, 5)
+  } catch (error) {
+    logger.warn('⚠️ Failed to get public model stats:', error.message)
+    return []
+  }
+}
 
 module.exports = router
