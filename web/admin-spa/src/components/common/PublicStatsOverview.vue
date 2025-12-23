@@ -68,78 +68,34 @@
       </div>
     </div>
 
-    <!-- Token使用趋势 -->
-    <div
-      v-if="
-        authStore.publicStats.showOptions?.tokenTrends && authStore.publicStats.tokenTrends?.length
-      "
-      class="mt-4"
-    >
-      <div class="section-title">Token 使用趋势（近7天）</div>
-      <div class="trend-chart">
-        <div
-          v-for="(item, index) in authStore.publicStats.tokenTrends"
-          :key="index"
-          class="trend-bar-wrapper"
-        >
-          <div
-            class="trend-bar trend-bar-tokens"
-            :style="{ height: `${getTrendBarHeight(item.tokens, 'tokens')}%` }"
-            :title="`${formatDate(item.date)}: ${formatTokens(item.tokens)} tokens`"
-          ></div>
-          <div class="trend-label">{{ formatDateShort(item.date) }}</div>
+    <!-- 趋势图表（三合一双Y轴折线图） -->
+    <div v-if="hasAnyTrendData" class="mt-4">
+      <div class="section-title">使用趋势（近7天）</div>
+      <div class="chart-container">
+        <Line :data="chartData" :options="chartOptions" />
+      </div>
+      <!-- 图例 -->
+      <div class="chart-legend">
+        <div v-if="authStore.publicStats.showOptions?.tokenTrends" class="legend-item">
+          <span class="legend-dot legend-tokens"></span>
+          <span class="legend-text">Tokens</span>
+        </div>
+        <div v-if="authStore.publicStats.showOptions?.apiKeysTrends" class="legend-item">
+          <span class="legend-dot legend-keys"></span>
+          <span class="legend-text">活跃 Keys</span>
+        </div>
+        <div v-if="authStore.publicStats.showOptions?.accountTrends" class="legend-item">
+          <span class="legend-dot legend-accounts"></span>
+          <span class="legend-text">活跃账号</span>
         </div>
       </div>
     </div>
 
-    <!-- API Keys 使用趋势 -->
-    <div
-      v-if="
-        authStore.publicStats.showOptions?.apiKeysTrends &&
-        authStore.publicStats.apiKeysTrends?.length
-      "
-      class="mt-4"
-    >
-      <div class="section-title">API Keys 活跃趋势（近7天）</div>
-      <div class="trend-chart">
-        <div
-          v-for="(item, index) in authStore.publicStats.apiKeysTrends"
-          :key="index"
-          class="trend-bar-wrapper"
-        >
-          <div
-            class="trend-bar trend-bar-keys"
-            :style="{ height: `${getTrendBarHeight(item.activeKeys, 'apiKeys')}%` }"
-            :title="`${formatDate(item.date)}: ${item.activeKeys} 个活跃 Key`"
-          ></div>
-          <div class="trend-label">{{ formatDateShort(item.date) }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 账号使用趋势 -->
-    <div
-      v-if="
-        authStore.publicStats.showOptions?.accountTrends &&
-        authStore.publicStats.accountTrends?.length
-      "
-      class="mt-4"
-    >
-      <div class="section-title">账号活跃趋势（近7天）</div>
-      <div class="trend-chart">
-        <div
-          v-for="(item, index) in authStore.publicStats.accountTrends"
-          :key="index"
-          class="trend-bar-wrapper"
-        >
-          <div
-            class="trend-bar trend-bar-accounts"
-            :style="{ height: `${getTrendBarHeight(item.activeAccounts, 'accounts')}%` }"
-            :title="`${formatDate(item.date)}: ${item.activeAccounts} 个活跃账号`"
-          ></div>
-          <div class="trend-label">{{ formatDateShort(item.date) }}</div>
-        </div>
-      </div>
+    <!-- 暂无趋势数据 -->
+    <div v-else-if="hasTrendOptionsEnabled" class="empty-state mt-4">
+      <i class="fas fa-chart-line empty-icon"></i>
+      <p class="empty-text">暂无趋势数据</p>
+      <p class="empty-hint">数据将在有请求后自动更新</p>
     </div>
   </div>
 
@@ -147,13 +103,237 @@
   <div v-else-if="authStore.publicStatsLoading" class="public-stats-loading">
     <div class="loading-spinner"></div>
   </div>
+
+  <!-- 无数据状态 -->
+  <div v-else class="public-stats-empty">
+    <i class="fas fa-chart-pie empty-icon"></i>
+    <p class="empty-text">暂无统计数据</p>
+  </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { Line } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js'
+
+// 注册 Chart.js 组件
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 const authStore = useAuthStore()
+
+// 检查是否有任何趋势选项启用
+const hasTrendOptionsEnabled = computed(() => {
+  const opts = authStore.publicStats?.showOptions
+  return opts?.tokenTrends || opts?.apiKeysTrends || opts?.accountTrends
+})
+
+// 检查是否有实际趋势数据
+const hasAnyTrendData = computed(() => {
+  const stats = authStore.publicStats
+  if (!stats) return false
+
+  const opts = stats.showOptions || {}
+  const hasTokens = opts.tokenTrends && stats.tokenTrends?.length > 0
+  const hasKeys = opts.apiKeysTrends && stats.apiKeysTrends?.length > 0
+  const hasAccounts = opts.accountTrends && stats.accountTrends?.length > 0
+
+  return hasTokens || hasKeys || hasAccounts
+})
+
+// 图表数据
+const chartData = computed(() => {
+  const stats = authStore.publicStats
+  if (!stats) return { labels: [], datasets: [] }
+
+  const opts = stats.showOptions || {}
+
+  // 获取日期标签（优先使用 tokenTrends）
+  const labels =
+    stats.tokenTrends?.map((t) => formatDateShort(t.date)) ||
+    stats.apiKeysTrends?.map((t) => formatDateShort(t.date)) ||
+    stats.accountTrends?.map((t) => formatDateShort(t.date)) ||
+    []
+
+  const datasets = []
+
+  // Token 趋势（左Y轴）
+  if (opts.tokenTrends && stats.tokenTrends?.length > 0) {
+    datasets.push({
+      label: 'Tokens',
+      data: stats.tokenTrends.map((t) => t.tokens),
+      borderColor: 'rgb(59, 130, 246)',
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      yAxisID: 'y',
+      tension: 0.3,
+      fill: true,
+      pointRadius: 3,
+      pointHoverRadius: 5
+    })
+  }
+
+  // API Keys 趋势（右Y轴）
+  if (opts.apiKeysTrends && stats.apiKeysTrends?.length > 0) {
+    datasets.push({
+      label: '活跃 Keys',
+      data: stats.apiKeysTrends.map((t) => t.activeKeys),
+      borderColor: 'rgb(34, 197, 94)',
+      backgroundColor: 'rgba(34, 197, 94, 0.1)',
+      yAxisID: 'y1',
+      tension: 0.3,
+      fill: false,
+      pointRadius: 3,
+      pointHoverRadius: 5
+    })
+  }
+
+  // 账号趋势（右Y轴）
+  if (opts.accountTrends && stats.accountTrends?.length > 0) {
+    datasets.push({
+      label: '活跃账号',
+      data: stats.accountTrends.map((t) => t.activeAccounts),
+      borderColor: 'rgb(168, 85, 247)',
+      backgroundColor: 'rgba(168, 85, 247, 0.1)',
+      yAxisID: 'y1',
+      tension: 0.3,
+      fill: false,
+      pointRadius: 3,
+      pointHoverRadius: 5
+    })
+  }
+
+  return { labels, datasets }
+})
+
+// 图表配置
+const chartOptions = computed(() => {
+  const isDark = document.documentElement.classList.contains('dark')
+  const textColor = isDark ? 'rgba(156, 163, 175, 1)' : 'rgba(107, 114, 128, 1)'
+  const gridColor = isDark ? 'rgba(75, 85, 99, 0.3)' : 'rgba(229, 231, 235, 0.8)'
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        backgroundColor: isDark ? 'rgba(31, 41, 55, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+        titleColor: isDark ? '#e5e7eb' : '#1f2937',
+        bodyColor: isDark ? '#d1d5db' : '#4b5563',
+        borderColor: isDark ? 'rgba(75, 85, 99, 0.5)' : 'rgba(229, 231, 235, 1)',
+        borderWidth: 1,
+        padding: 10,
+        displayColors: true,
+        callbacks: {
+          label: function (context) {
+            let label = context.dataset.label || ''
+            if (label) {
+              label += ': '
+            }
+            if (context.dataset.yAxisID === 'y') {
+              label += formatTokens(context.parsed.y)
+            } else {
+              label += context.parsed.y
+            }
+            return label
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          color: gridColor,
+          drawBorder: false
+        },
+        ticks: {
+          color: textColor,
+          font: {
+            size: 10
+          }
+        }
+      },
+      y: {
+        type: 'linear',
+        display: true,
+        position: 'left',
+        min: 0,
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Tokens',
+          color: 'rgb(59, 130, 246)',
+          font: {
+            size: 10
+          }
+        },
+        grid: {
+          color: gridColor,
+          drawBorder: false
+        },
+        ticks: {
+          color: textColor,
+          font: {
+            size: 10
+          },
+          callback: function (value) {
+            return formatTokensShort(value)
+          }
+        }
+      },
+      y1: {
+        type: 'linear',
+        display: true,
+        position: 'right',
+        min: 0,
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: '数量',
+          color: 'rgb(34, 197, 94)',
+          font: {
+            size: 10
+          }
+        },
+        grid: {
+          drawOnChartArea: false
+        },
+        ticks: {
+          color: textColor,
+          font: {
+            size: 10
+          },
+          stepSize: 1
+        }
+      }
+    }
+  }
+})
 
 // 格式化运行时间
 function formatUptime(seconds) {
@@ -192,6 +372,18 @@ function formatTokens(tokens) {
   return tokens.toString()
 }
 
+// 格式化 tokens（简短版，用于Y轴）
+function formatTokensShort(tokens) {
+  if (tokens >= 1000000000) {
+    return (tokens / 1000000000).toFixed(0) + 'B'
+  } else if (tokens >= 1000000) {
+    return (tokens / 1000000).toFixed(0) + 'M'
+  } else if (tokens >= 1000) {
+    return (tokens / 1000).toFixed(0) + 'K'
+  }
+  return tokens.toString()
+}
+
 // 获取平台图标
 function getPlatformIcon(platform) {
   const icons = {
@@ -225,16 +417,6 @@ function formatModelName(model) {
   return model
 }
 
-// 格式化日期
-function formatDate(dateStr) {
-  if (!dateStr) return ''
-  const parts = dateStr.split('-')
-  if (parts.length === 3) {
-    return `${parts[1]}月${parts[2]}日`
-  }
-  return dateStr
-}
-
 // 格式化日期（短格式）
 function formatDateShort(dateStr) {
   if (!dateStr) return ''
@@ -243,24 +425,6 @@ function formatDateShort(dateStr) {
     return `${parts[1]}/${parts[2]}`
   }
   return dateStr
-}
-
-// 计算趋势图柱高度
-const maxValues = computed(() => {
-  const stats = authStore.publicStats
-  if (!stats) return { tokens: 1, apiKeys: 1, accounts: 1 }
-
-  return {
-    tokens: Math.max(...(stats.tokenTrends?.map((t) => t.tokens) || [1]), 1),
-    apiKeys: Math.max(...(stats.apiKeysTrends?.map((t) => t.activeKeys) || [1]), 1),
-    accounts: Math.max(...(stats.accountTrends?.map((t) => t.activeAccounts) || [1]), 1)
-  }
-})
-
-function getTrendBarHeight(value, type) {
-  const max = maxValues.value[type] || 1
-  const height = (value / max) * 100
-  return Math.max(height, 5) // 最小高度5%
 }
 </script>
 
@@ -379,39 +543,65 @@ function getTrendBarHeight(value, type) {
   @apply w-10 text-right text-gray-500 dark:text-gray-400;
 }
 
-/* 趋势图表 */
-.trend-chart {
-  @apply flex h-24 items-end justify-between gap-1 rounded-lg bg-gray-50 p-2 dark:bg-gray-700/50;
+/* 图表容器 */
+.chart-container {
+  @apply rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50;
+  height: 180px;
 }
 
-.trend-bar-wrapper {
-  @apply flex flex-1 flex-col items-center;
+/* 图例 */
+.chart-legend {
+  @apply mt-2 flex flex-wrap items-center justify-center gap-4;
 }
 
-.trend-bar {
-  @apply w-full max-w-8 rounded-t transition-all duration-300;
-  min-height: 4px;
+.legend-item {
+  @apply flex items-center gap-1.5;
 }
 
-.trend-bar-tokens {
-  @apply bg-gradient-to-t from-blue-500 to-blue-400;
+.legend-dot {
+  @apply inline-block h-2.5 w-2.5 rounded-full;
 }
 
-.trend-bar-keys {
-  @apply bg-gradient-to-t from-green-500 to-green-400;
+.legend-tokens {
+  @apply bg-blue-500;
 }
 
-.trend-bar-accounts {
-  @apply bg-gradient-to-t from-purple-500 to-purple-400;
+.legend-keys {
+  @apply bg-green-500;
 }
 
-.trend-label {
-  @apply mt-1 text-center text-[10px] text-gray-500 dark:text-gray-400;
+.legend-accounts {
+  @apply bg-purple-500;
+}
+
+.legend-text {
+  @apply text-xs text-gray-600 dark:text-gray-400;
+}
+
+/* 空状态 */
+.empty-state {
+  @apply flex flex-col items-center justify-center rounded-lg bg-gray-50 py-6 dark:bg-gray-700/50;
+}
+
+.empty-icon {
+  @apply mb-2 text-2xl text-gray-400 dark:text-gray-500;
+}
+
+.empty-text {
+  @apply text-sm text-gray-500 dark:text-gray-400;
+}
+
+.empty-hint {
+  @apply mt-1 text-xs text-gray-400 dark:text-gray-500;
 }
 
 /* 加载状态 */
 .public-stats-loading {
   @apply flex items-center justify-center py-8;
+}
+
+.public-stats-empty {
+  @apply flex flex-col items-center justify-center rounded-xl border border-gray-200/50 bg-white/80 py-8 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/80;
 }
 
 .loading-spinner {
