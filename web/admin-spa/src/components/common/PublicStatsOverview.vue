@@ -27,7 +27,7 @@
         class="platform-badge"
         :class="{ available: available, unavailable: !available }"
       >
-        <i :class="getPlatformIcon(platform)" class="mr-1"></i>
+        <i class="mr-1" :class="getPlatformIcon(platform)"></i>
         <span>{{ getPlatformName(platform) }}</span>
       </div>
     </div>
