@@ -499,7 +499,6 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
         // 记录使用统计
         if (!usageReported && totalUsage.totalTokenCount > 0) {
           try {
-            const apiKeyService = require('../services/apiKeyService')
             await apiKeyService.recordUsage(
               apiKeyData.id,
               totalUsage.promptTokenCount || 0,
@@ -580,7 +579,6 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       // 记录使用统计
       if (openaiResponse.usage) {
         try {
-          const apiKeyService = require('../services/apiKeyService')
           await apiKeyService.recordUsage(
             apiKeyData.id,
             openaiResponse.usage.prompt_tokens || 0,

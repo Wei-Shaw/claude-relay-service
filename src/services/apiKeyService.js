@@ -43,20 +43,28 @@ const ACCOUNT_CATEGORY_MAP = {
  * @returns {array} - 权限数组，空数组表示全部服务
  */
 function normalizePermissions(permissions) {
-  if (!permissions) return [] // 空 = 全部服务
-  if (Array.isArray(permissions)) return permissions
+  if (!permissions) {
+    return [] // 空 = 全部服务
+  }
+  if (Array.isArray(permissions)) {
+    return permissions
+  }
   // 尝试解析 JSON 字符串（新格式存储）
   if (typeof permissions === 'string') {
     if (permissions.startsWith('[')) {
       try {
         const parsed = JSON.parse(permissions)
-        if (Array.isArray(parsed)) return parsed
+        if (Array.isArray(parsed)) {
+          return parsed
+        }
       } catch (e) {
         // 解析失败，继续处理为普通字符串
       }
     }
     // 旧格式 'all' 转为空数组
-    if (permissions === 'all') return []
+    if (permissions === 'all') {
+      return []
+    }
     // 旧单个字符串转为数组
     return [permissions]
   }
