@@ -45,8 +45,14 @@
     </div>
 
     <!-- 模型使用分布 -->
-    <div v-if="authStore.publicStats.modelDistribution?.length > 0" class="mt-4">
-      <div class="mb-2 text-center text-xs text-gray-600 dark:text-gray-400">模型使用分布</div>
+    <div
+      v-if="
+        authStore.publicStats.showOptions?.modelDistribution &&
+        authStore.publicStats.modelDistribution?.length > 0
+      "
+      class="mt-4"
+    >
+      <div class="section-title">模型使用分布</div>
       <div class="model-distribution">
         <div
           v-for="model in authStore.publicStats.modelDistribution"
@@ -61,6 +67,80 @@
         </div>
       </div>
     </div>
+
+    <!-- Token使用趋势 -->
+    <div
+      v-if="
+        authStore.publicStats.showOptions?.tokenTrends && authStore.publicStats.tokenTrends?.length
+      "
+      class="mt-4"
+    >
+      <div class="section-title">Token 使用趋势（近7天）</div>
+      <div class="trend-chart">
+        <div
+          v-for="(item, index) in authStore.publicStats.tokenTrends"
+          :key="index"
+          class="trend-bar-wrapper"
+        >
+          <div
+            class="trend-bar trend-bar-tokens"
+            :style="{ height: `${getTrendBarHeight(item.tokens, 'tokens')}%` }"
+            :title="`${formatDate(item.date)}: ${formatTokens(item.tokens)} tokens`"
+          ></div>
+          <div class="trend-label">{{ formatDateShort(item.date) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Keys 使用趋势 -->
+    <div
+      v-if="
+        authStore.publicStats.showOptions?.apiKeysTrends &&
+        authStore.publicStats.apiKeysTrends?.length
+      "
+      class="mt-4"
+    >
+      <div class="section-title">API Keys 活跃趋势（近7天）</div>
+      <div class="trend-chart">
+        <div
+          v-for="(item, index) in authStore.publicStats.apiKeysTrends"
+          :key="index"
+          class="trend-bar-wrapper"
+        >
+          <div
+            class="trend-bar trend-bar-keys"
+            :style="{ height: `${getTrendBarHeight(item.activeKeys, 'apiKeys')}%` }"
+            :title="`${formatDate(item.date)}: ${item.activeKeys} 个活跃 Key`"
+          ></div>
+          <div class="trend-label">{{ formatDateShort(item.date) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 账号使用趋势 -->
+    <div
+      v-if="
+        authStore.publicStats.showOptions?.accountTrends &&
+        authStore.publicStats.accountTrends?.length
+      "
+      class="mt-4"
+    >
+      <div class="section-title">账号活跃趋势（近7天）</div>
+      <div class="trend-chart">
+        <div
+          v-for="(item, index) in authStore.publicStats.accountTrends"
+          :key="index"
+          class="trend-bar-wrapper"
+        >
+          <div
+            class="trend-bar trend-bar-accounts"
+            :style="{ height: `${getTrendBarHeight(item.activeAccounts, 'accounts')}%` }"
+            :title="`${formatDate(item.date)}: ${item.activeAccounts} 个活跃账号`"
+          ></div>
+          <div class="trend-label">{{ formatDateShort(item.date) }}</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 加载状态 -->
@@ -70,6 +150,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -143,6 +224,44 @@ function formatModelName(model) {
   }
   return model
 }
+
+// 格式化日期
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  const parts = dateStr.split('-')
+  if (parts.length === 3) {
+    return `${parts[1]}月${parts[2]}日`
+  }
+  return dateStr
+}
+
+// 格式化日期（短格式）
+function formatDateShort(dateStr) {
+  if (!dateStr) return ''
+  const parts = dateStr.split('-')
+  if (parts.length === 3) {
+    return `${parts[1]}/${parts[2]}`
+  }
+  return dateStr
+}
+
+// 计算趋势图柱高度
+const maxValues = computed(() => {
+  const stats = authStore.publicStats
+  if (!stats) return { tokens: 1, apiKeys: 1, accounts: 1 }
+
+  return {
+    tokens: Math.max(...(stats.tokenTrends?.map((t) => t.tokens) || [1]), 1),
+    apiKeys: Math.max(...(stats.apiKeysTrends?.map((t) => t.activeKeys) || [1]), 1),
+    accounts: Math.max(...(stats.accountTrends?.map((t) => t.activeAccounts) || [1]), 1)
+  }
+})
+
+function getTrendBarHeight(value, type) {
+  const max = maxValues.value[type] || 1
+  const height = (value / max) * 100
+  return Math.max(height, 5) // 最小高度5%
+}
 </script>
 
 <style scoped>
@@ -160,6 +279,11 @@ function formatModelName(model) {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* 章节标题 */
+.section-title {
+  @apply mb-2 text-center text-xs text-gray-600 dark:text-gray-400;
 }
 
 /* 状态徽章 */
@@ -253,6 +377,36 @@ function formatModelName(model) {
 
 .model-percentage {
   @apply w-10 text-right text-gray-500 dark:text-gray-400;
+}
+
+/* 趋势图表 */
+.trend-chart {
+  @apply flex h-24 items-end justify-between gap-1 rounded-lg bg-gray-50 p-2 dark:bg-gray-700/50;
+}
+
+.trend-bar-wrapper {
+  @apply flex flex-1 flex-col items-center;
+}
+
+.trend-bar {
+  @apply w-full max-w-8 rounded-t transition-all duration-300;
+  min-height: 4px;
+}
+
+.trend-bar-tokens {
+  @apply bg-gradient-to-t from-blue-500 to-blue-400;
+}
+
+.trend-bar-keys {
+  @apply bg-gradient-to-t from-green-500 to-green-400;
+}
+
+.trend-bar-accounts {
+  @apply bg-gradient-to-t from-purple-500 to-purple-400;
+}
+
+.trend-label {
+  @apply mt-1 text-center text-[10px] text-gray-500 dark:text-gray-400;
 }
 
 /* 加载状态 */

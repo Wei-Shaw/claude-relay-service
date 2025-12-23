@@ -265,6 +265,11 @@ const defaultOemSettings = {
   siteIconData: '', // Base64编码的图标数据
   showAdminButton: true, // 是否显示管理后台按钮
   publicStatsEnabled: false, // 是否在首页显示公开统计概览
+  // 公开统计显示选项
+  publicStatsShowModelDistribution: true, // 显示模型使用分布
+  publicStatsShowTokenTrends: false, // 显示Token使用趋势
+  publicStatsShowApiKeysTrends: false, // 显示API Keys使用趋势
+  publicStatsShowAccountTrends: false, // 显示账号使用趋势
   updatedAt: new Date().toISOString()
 }
 
@@ -307,7 +312,17 @@ router.get('/oem-settings', async (req, res) => {
 // 更新OEM设置
 router.put('/oem-settings', authenticateAdmin, async (req, res) => {
   try {
-    const { siteName, siteIcon, siteIconData, showAdminButton, publicStatsEnabled } = req.body
+    const {
+      siteName,
+      siteIcon,
+      siteIconData,
+      showAdminButton,
+      publicStatsEnabled,
+      publicStatsShowModelDistribution,
+      publicStatsShowTokenTrends,
+      publicStatsShowApiKeysTrends,
+      publicStatsShowAccountTrends
+    } = req.body
 
     // 验证输入
     if (!siteName || typeof siteName !== 'string' || siteName.trim().length === 0) {
@@ -340,6 +355,11 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       siteIconData: (siteIconData || '').trim(), // Base64数据
       showAdminButton: showAdminButton !== false, // 默认为true
       publicStatsEnabled: publicStatsEnabled === true, // 默认为false
+      // 公开统计显示选项
+      publicStatsShowModelDistribution: publicStatsShowModelDistribution !== false, // 默认为true
+      publicStatsShowTokenTrends: publicStatsShowTokenTrends === true, // 默认为false
+      publicStatsShowApiKeysTrends: publicStatsShowApiKeysTrends === true, // 默认为false
+      publicStatsShowAccountTrends: publicStatsShowAccountTrends === true, // 默认为false
       updatedAt: new Date().toISOString()
     }
 
@@ -534,11 +554,39 @@ router.get('/public-stats', async (req, res) => {
         outputTokens: todayStats.outputTokensToday || 0
       },
 
-      // 模型使用分布（只返回模型名和请求占比，不返回具体数量）
-      modelDistribution: modelStats,
-
       // 系统时区
-      systemTimezone: config.system.timezoneOffset || 8
+      systemTimezone: config.system.timezoneOffset || 8,
+
+      // 显示选项
+      showOptions: {
+        modelDistribution: settings.publicStatsShowModelDistribution !== false,
+        tokenTrends: settings.publicStatsShowTokenTrends === true,
+        apiKeysTrends: settings.publicStatsShowApiKeysTrends === true,
+        accountTrends: settings.publicStatsShowAccountTrends === true
+      }
+    }
+
+    // 根据设置添加可选数据
+    if (settings.publicStatsShowModelDistribution !== false) {
+      publicStats.modelDistribution = modelStats
+    }
+
+    // 获取趋势数据（最近7天）
+    if (
+      settings.publicStatsShowTokenTrends ||
+      settings.publicStatsShowApiKeysTrends ||
+      settings.publicStatsShowAccountTrends
+    ) {
+      const trendData = await getPublicTrendData(settings)
+      if (settings.publicStatsShowTokenTrends && trendData.tokenTrends) {
+        publicStats.tokenTrends = trendData.tokenTrends
+      }
+      if (settings.publicStatsShowApiKeysTrends && trendData.apiKeysTrends) {
+        publicStats.apiKeysTrends = trendData.apiKeysTrends
+      }
+      if (settings.publicStatsShowAccountTrends && trendData.accountTrends) {
+        publicStats.accountTrends = trendData.accountTrends
+      }
     }
 
     return res.json({
@@ -618,6 +666,124 @@ async function getPublicModelStats() {
     logger.warn('⚠️ Failed to get public model stats:', error.message)
     return []
   }
+}
+
+// 获取公开趋势数据的辅助函数（最近7天）
+async function getPublicTrendData(settings) {
+  const result = {
+    tokenTrends: null,
+    apiKeysTrends: null,
+    accountTrends: null
+  }
+
+  try {
+    const client = redis.getClientSafe()
+    const days = 7
+
+    // 生成最近7天的日期列表
+    const dates = []
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      dates.push(redis.getDateStringInTimezone(date))
+    }
+
+    // Token使用趋势
+    if (settings.publicStatsShowTokenTrends) {
+      const tokenTrends = []
+      for (const dateStr of dates) {
+        const pattern = `usage:model:daily:*:${dateStr}`
+        const keys = await client.keys(pattern)
+
+        let dayTokens = 0
+        let dayRequests = 0
+        for (const key of keys) {
+          const data = await client.hgetall(key)
+          if (data) {
+            dayTokens += (parseInt(data.inputTokens) || 0) + (parseInt(data.outputTokens) || 0)
+            dayRequests += parseInt(data.requests) || 0
+          }
+        }
+
+        tokenTrends.push({
+          date: dateStr,
+          tokens: dayTokens,
+          requests: dayRequests
+        })
+      }
+      result.tokenTrends = tokenTrends
+    }
+
+    // API Keys使用趋势（脱敏：只显示总数，不显示具体Key）
+    if (settings.publicStatsShowApiKeysTrends) {
+      const apiKeysTrends = []
+      for (const dateStr of dates) {
+        const pattern = `usage:apikey:daily:*:${dateStr}`
+        const keys = await client.keys(pattern)
+
+        let dayRequests = 0
+        let dayTokens = 0
+        let activeKeys = 0
+
+        for (const key of keys) {
+          const data = await client.hgetall(key)
+          if (data) {
+            const requests = parseInt(data.requests) || 0
+            if (requests > 0) {
+              activeKeys++
+              dayRequests += requests
+              dayTokens += (parseInt(data.inputTokens) || 0) + (parseInt(data.outputTokens) || 0)
+            }
+          }
+        }
+
+        apiKeysTrends.push({
+          date: dateStr,
+          activeKeys,
+          requests: dayRequests,
+          tokens: dayTokens
+        })
+      }
+      result.apiKeysTrends = apiKeysTrends
+    }
+
+    // 账号使用趋势（脱敏：只显示总数，不显示具体账号）
+    if (settings.publicStatsShowAccountTrends) {
+      const accountTrends = []
+      for (const dateStr of dates) {
+        const pattern = `usage:account:daily:*:${dateStr}`
+        const keys = await client.keys(pattern)
+
+        let dayRequests = 0
+        let dayTokens = 0
+        let activeAccounts = 0
+
+        for (const key of keys) {
+          const data = await client.hgetall(key)
+          if (data) {
+            const requests = parseInt(data.requests) || 0
+            if (requests > 0) {
+              activeAccounts++
+              dayRequests += requests
+              dayTokens += (parseInt(data.inputTokens) || 0) + (parseInt(data.outputTokens) || 0)
+            }
+          }
+        }
+
+        accountTrends.push({
+          date: dateStr,
+          activeAccounts,
+          requests: dayRequests,
+          tokens: dayTokens
+        })
+      }
+      result.accountTrends = accountTrends
+    }
+  } catch (error) {
+    logger.warn('⚠️ Failed to get public trend data:', error.message)
+  }
+
+  return result
 }
 
 module.exports = router

@@ -230,6 +230,53 @@
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       启用后，未登录用户可在首页看到服务状态、模型使用分布等概览信息
                     </p>
+                    <!-- 公开统计显示选项 -->
+                    <div
+                      v-if="oemSettings.publicStatsEnabled"
+                      class="mt-4 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700/50"
+                    >
+                      <p class="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        选择要公开显示的数据：
+                      </p>
+                      <label class="flex items-center gap-2">
+                        <input
+                          v-model="oemSettings.publicStatsShowModelDistribution"
+                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                          type="checkbox"
+                        />
+                        <span class="text-sm text-gray-700 dark:text-gray-300">模型使用分布</span>
+                      </label>
+                      <label class="flex items-center gap-2">
+                        <input
+                          v-model="oemSettings.publicStatsShowTokenTrends"
+                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                          type="checkbox"
+                        />
+                        <span class="text-sm text-gray-700 dark:text-gray-300"
+                          >Token 使用趋势（近7天）</span
+                        >
+                      </label>
+                      <label class="flex items-center gap-2">
+                        <input
+                          v-model="oemSettings.publicStatsShowApiKeysTrends"
+                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                          type="checkbox"
+                        />
+                        <span class="text-sm text-gray-700 dark:text-gray-300"
+                          >API Keys 活跃趋势（近7天）</span
+                        >
+                      </label>
+                      <label class="flex items-center gap-2">
+                        <input
+                          v-model="oemSettings.publicStatsShowAccountTrends"
+                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                          type="checkbox"
+                        />
+                        <span class="text-sm text-gray-700 dark:text-gray-300"
+                          >账号活跃趋势（近7天）</span
+                        >
+                      </label>
+                    </div>
                   </td>
                 </tr>
 
@@ -415,6 +462,53 @@
                 <p class="text-xs text-gray-500 dark:text-gray-400">
                   启用后，未登录用户可在首页看到服务状态、模型使用分布等概览信息
                 </p>
+                <!-- 公开统计显示选项 (移动端) -->
+                <div
+                  v-if="oemSettings.publicStatsEnabled"
+                  class="mt-4 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-700/50"
+                >
+                  <p class="text-xs font-medium text-gray-700 dark:text-gray-300">
+                    选择要公开显示的数据：
+                  </p>
+                  <label class="flex items-center gap-2">
+                    <input
+                      v-model="oemSettings.publicStatsShowModelDistribution"
+                      class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="checkbox"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300">模型使用分布</span>
+                  </label>
+                  <label class="flex items-center gap-2">
+                    <input
+                      v-model="oemSettings.publicStatsShowTokenTrends"
+                      class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="checkbox"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300"
+                      >Token 使用趋势（近7天）</span
+                    >
+                  </label>
+                  <label class="flex items-center gap-2">
+                    <input
+                      v-model="oemSettings.publicStatsShowApiKeysTrends"
+                      class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="checkbox"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300"
+                      >API Keys 活跃趋势（近7天）</span
+                    >
+                  </label>
+                  <label class="flex items-center gap-2">
+                    <input
+                      v-model="oemSettings.publicStatsShowAccountTrends"
+                      class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="checkbox"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300"
+                      >账号活跃趋势（近7天）</span
+                    >
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -2540,7 +2634,11 @@ const saveOemSettings = async () => {
       siteIcon: oemSettings.value.siteIcon,
       siteIconData: oemSettings.value.siteIconData,
       showAdminButton: oemSettings.value.showAdminButton,
-      publicStatsEnabled: oemSettings.value.publicStatsEnabled
+      publicStatsEnabled: oemSettings.value.publicStatsEnabled,
+      publicStatsShowModelDistribution: oemSettings.value.publicStatsShowModelDistribution,
+      publicStatsShowTokenTrends: oemSettings.value.publicStatsShowTokenTrends,
+      publicStatsShowApiKeysTrends: oemSettings.value.publicStatsShowApiKeysTrends,
+      publicStatsShowAccountTrends: oemSettings.value.publicStatsShowAccountTrends
     }
     const result = await settingsStore.saveOemSettings(settings)
     if (result && result.success) {
