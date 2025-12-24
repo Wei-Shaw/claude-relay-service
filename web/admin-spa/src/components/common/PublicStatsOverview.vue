@@ -79,18 +79,8 @@
             formatPeriodLabel(authStore.publicStats.modelDistributionPeriod)
           }}</span>
         </div>
-        <div class="model-distribution">
-          <div
-            v-for="model in authStore.publicStats.modelDistribution"
-            :key="model.model"
-            class="model-bar-item"
-          >
-            <div class="model-name">{{ formatModelName(model.model) }}</div>
-            <div class="model-bar">
-              <div class="model-bar-fill" :style="{ width: `${model.percentage}%` }"></div>
-            </div>
-            <div class="model-percentage">{{ model.percentage }}%</div>
-          </div>
+        <div class="model-chart-container">
+          <Doughnut :data="modelChartData" :options="modelChartOptions" />
         </div>
       </div>
     </div>
@@ -141,13 +131,14 @@
 <script setup>
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { Line } from 'vue-chartjs'
+import { Line, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
@@ -160,6 +151,7 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
@@ -187,7 +179,96 @@ const hasAnyTrendData = computed(() => {
   return hasTokens || hasKeys || hasAccounts
 })
 
-// 图表数据
+// 模型分布颜色
+const modelColors = [
+  'rgb(99, 102, 241)', // indigo
+  'rgb(59, 130, 246)', // blue
+  'rgb(16, 185, 129)', // emerald
+  'rgb(245, 158, 11)', // amber
+  'rgb(239, 68, 68)', // red
+  'rgb(139, 92, 246)', // violet
+  'rgb(236, 72, 153)', // pink
+  'rgb(20, 184, 166)' // teal
+]
+
+// 模型分布环形图数据
+const modelChartData = computed(() => {
+  const stats = authStore.publicStats
+  if (!stats?.modelDistribution?.length) {
+    return { labels: [], datasets: [] }
+  }
+
+  const models = stats.modelDistribution
+  return {
+    labels: models.map((m) => formatModelName(m.model)),
+    datasets: [
+      {
+        data: models.map((m) => m.percentage),
+        backgroundColor: models.map((_, i) => modelColors[i % modelColors.length]),
+        borderColor: 'transparent',
+        borderWidth: 0,
+        hoverOffset: 4
+      }
+    ]
+  }
+})
+
+// 模型分布环形图选项
+const modelChartOptions = computed(() => {
+  const isDark = document.documentElement.classList.contains('dark')
+  const textColor = isDark ? 'rgb(156, 163, 175)' : 'rgb(107, 114, 128)'
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '60%',
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: {
+          color: textColor,
+          padding: 12,
+          usePointStyle: true,
+          pointStyle: 'circle',
+          font: {
+            size: 11
+          },
+          generateLabels: (chart) => {
+            const data = chart.data
+            if (data.labels.length && data.datasets.length) {
+              return data.labels.map((label, i) => ({
+                text: `${label} ${data.datasets[0].data[i]}%`,
+                fillStyle: data.datasets[0].backgroundColor[i],
+                strokeStyle: 'transparent',
+                lineWidth: 0,
+                pointStyle: 'circle',
+                hidden: false,
+                index: i
+              }))
+            }
+            return []
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+        titleColor: isDark ? 'rgb(243, 244, 246)' : 'rgb(17, 24, 39)',
+        bodyColor: isDark ? 'rgb(209, 213, 219)' : 'rgb(75, 85, 99)',
+        borderColor: isDark ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.5)',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
+        callbacks: {
+          label: (context) => {
+            return ` ${context.label}: ${context.parsed}%`
+          }
+        }
+      }
+    }
+  }
+})
+
+// 趋势图表数据
 const chartData = computed(() => {
   const stats = authStore.publicStats
   if (!stats) return { labels: [], datasets: [] }
@@ -591,33 +672,18 @@ function formatDateShort(dateStr) {
   @apply text-xs text-gray-500 dark:text-gray-400;
 }
 
-/* 模型分布 */
-.model-distribution {
-  @apply space-y-2.5;
+/* 模型分布环形图容器 */
+.model-chart-container {
+  height: 160px;
 }
 
-.model-bar-item {
-  @apply flex items-center gap-3 text-sm;
+@media (min-width: 768px) {
+  .model-chart-container {
+    height: 180px;
+  }
 }
 
-.model-name {
-  @apply w-24 truncate text-gray-600 dark:text-gray-400 md:w-32;
-}
-
-.model-bar {
-  @apply relative h-2 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700;
-}
-
-.model-bar-fill {
-  @apply absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-500;
-  transition: width 0.5s ease-out;
-}
-
-.model-percentage {
-  @apply w-10 text-right text-gray-500 dark:text-gray-400;
-}
-
-/* 图表容器 */
+/* 趋势图表容器 */
 .chart-container {
   @apply rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50;
   height: 180px;
