@@ -82,9 +82,7 @@
 
     <!-- 状态概览内容 -->
     <div v-if="currentTab === 'overview'" class="tab-content">
-      <div class="mx-auto max-w-2xl">
-        <PublicStatsOverview />
-      </div>
+      <PublicStatsOverview />
     </div>
 
     <!-- 统计内容 -->

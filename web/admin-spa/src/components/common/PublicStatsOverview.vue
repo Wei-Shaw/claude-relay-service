@@ -1,81 +1,103 @@
 <template>
   <div v-if="authStore.publicStats" class="public-stats-overview">
-    <!-- 服务状态徽章 -->
-    <div class="mb-4 flex items-center justify-center gap-2">
-      <div
-        class="status-badge"
-        :class="{
-          'status-healthy': authStore.publicStats.serviceStatus === 'healthy',
-          'status-degraded': authStore.publicStats.serviceStatus === 'degraded'
-        }"
-      >
-        <span class="status-dot"></span>
-        <span class="status-text">{{
-          authStore.publicStats.serviceStatus === 'healthy' ? '服务正常' : '服务降级'
-        }}</span>
-      </div>
-      <span class="text-xs text-gray-500 dark:text-gray-400">
-        运行 {{ formatUptime(authStore.publicStats.uptime) }}
-      </span>
-    </div>
-
-    <!-- 平台可用性指示器 -->
-    <div class="mb-4 flex flex-wrap justify-center gap-2">
-      <div
-        v-for="(available, platform) in authStore.publicStats.platforms"
-        :key="platform"
-        class="platform-badge"
-        :class="{ available: available, unavailable: !available }"
-      >
-        <i class="mr-1" :class="getPlatformIcon(platform)"></i>
-        <span>{{ getPlatformName(platform) }}</span>
-      </div>
-    </div>
-
-    <!-- 今日统计 -->
-    <div class="stats-grid">
-      <div class="stat-item">
-        <div class="stat-value">{{ formatNumber(authStore.publicStats.todayStats.requests) }}</div>
-        <div class="stat-label">今日请求</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">{{ formatTokens(authStore.publicStats.todayStats.tokens) }}</div>
-        <div class="stat-label">今日 Tokens</div>
-      </div>
-    </div>
-
-    <!-- 模型使用分布 -->
-    <div
-      v-if="
-        authStore.publicStats.showOptions?.modelDistribution &&
-        authStore.publicStats.modelDistribution?.length > 0
-      "
-      class="mt-4"
-    >
-      <div class="section-title">
-        模型使用分布
-        <span class="period-label">{{
-          formatPeriodLabel(authStore.publicStats.modelDistributionPeriod)
-        }}</span>
-      </div>
-      <div class="model-distribution">
+    <!-- 顶部状态栏：服务状态 + 平台可用性 -->
+    <div class="header-section">
+      <div class="flex items-center gap-2">
         <div
-          v-for="model in authStore.publicStats.modelDistribution"
-          :key="model.model"
-          class="model-bar-item"
+          class="status-badge"
+          :class="{
+            'status-healthy': authStore.publicStats.serviceStatus === 'healthy',
+            'status-degraded': authStore.publicStats.serviceStatus === 'degraded'
+          }"
         >
-          <div class="model-name">{{ formatModelName(model.model) }}</div>
-          <div class="model-bar">
-            <div class="model-bar-fill" :style="{ width: `${model.percentage}%` }"></div>
+          <span class="status-dot"></span>
+          <span class="status-text">{{
+            authStore.publicStats.serviceStatus === 'healthy' ? '服务正常' : '服务降级'
+          }}</span>
+        </div>
+        <span class="text-xs text-gray-500 dark:text-gray-400">
+          运行 {{ formatUptime(authStore.publicStats.uptime) }}
+        </span>
+      </div>
+      <div class="flex flex-wrap justify-center gap-2 md:justify-end">
+        <div
+          v-for="(available, platform) in authStore.publicStats.platforms"
+          :key="platform"
+          class="platform-badge"
+          :class="{ available: available, unavailable: !available }"
+        >
+          <i class="mr-1" :class="getPlatformIcon(platform)"></i>
+          <span>{{ getPlatformName(platform) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主内容区：今日统计 + 模型分布 -->
+    <div class="main-content">
+      <!-- 左侧：今日统计 -->
+      <div class="stats-section">
+        <div class="section-title-left">今日统计</div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value">
+              {{ formatNumber(authStore.publicStats.todayStats.requests) }}
+            </div>
+            <div class="stat-label">请求数</div>
           </div>
-          <div class="model-percentage">{{ model.percentage }}%</div>
+          <div class="stat-item">
+            <div class="stat-value">
+              {{ formatTokens(authStore.publicStats.todayStats.tokens) }}
+            </div>
+            <div class="stat-label">Tokens</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">
+              {{ formatTokens(authStore.publicStats.todayStats.inputTokens) }}
+            </div>
+            <div class="stat-label">输入</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">
+              {{ formatTokens(authStore.publicStats.todayStats.outputTokens) }}
+            </div>
+            <div class="stat-label">输出</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：模型使用分布 -->
+      <div
+        v-if="
+          authStore.publicStats.showOptions?.modelDistribution &&
+          authStore.publicStats.modelDistribution?.length > 0
+        "
+        class="model-section"
+      >
+        <div class="section-title-left">
+          模型使用分布
+          <span class="period-label">{{
+            formatPeriodLabel(authStore.publicStats.modelDistributionPeriod)
+          }}</span>
+        </div>
+        <div class="model-distribution">
+          <div
+            v-for="model in authStore.publicStats.modelDistribution"
+            :key="model.model"
+            class="model-bar-item"
+          >
+            <div class="model-name">{{ formatModelName(model.model) }}</div>
+            <div class="model-bar">
+              <div class="model-bar-fill" :style="{ width: `${model.percentage}%` }"></div>
+            </div>
+            <div class="model-percentage">{{ model.percentage }}%</div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- 趋势图表（三合一双Y轴折线图） -->
-    <div v-if="hasAnyTrendData" class="mt-4">
-      <div class="section-title">使用趋势（近7天）</div>
+    <div v-if="hasAnyTrendData" class="chart-section">
+      <div class="section-title-left">使用趋势（近7天）</div>
       <div class="chart-container">
         <Line :data="chartData" :options="chartOptions" />
       </div>
@@ -97,7 +119,7 @@
     </div>
 
     <!-- 暂无趋势数据 -->
-    <div v-else-if="hasTrendOptionsEnabled" class="empty-state mt-4">
+    <div v-else-if="hasTrendOptionsEnabled" class="empty-state">
       <i class="fas fa-chart-line empty-icon"></i>
       <p class="empty-text">暂无趋势数据</p>
       <p class="empty-hint">数据将在有请求后自动更新</p>
@@ -447,7 +469,7 @@ function formatDateShort(dateStr) {
 
 <style scoped>
 .public-stats-overview {
-  @apply rounded-xl border border-gray-200/50 bg-white/80 p-4 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/80;
+  @apply rounded-xl border border-gray-200/50 bg-white/80 p-4 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/80 md:p-6;
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -462,14 +484,44 @@ function formatDateShort(dateStr) {
   }
 }
 
-/* 章节标题 */
+/* 顶部状态栏 */
+.header-section {
+  @apply mb-4 flex flex-col items-center justify-between gap-3 border-b border-gray-200 pb-4 dark:border-gray-700 md:mb-6 md:flex-row md:pb-6;
+}
+
+/* 主内容区 */
+.main-content {
+  @apply grid gap-4 md:grid-cols-2 md:gap-6;
+}
+
+/* 统计区块 */
+.stats-section {
+  @apply rounded-lg bg-gray-50/50 p-4 dark:bg-gray-700/30;
+}
+
+/* 模型区块 */
+.model-section {
+  @apply rounded-lg bg-gray-50/50 p-4 dark:bg-gray-700/30;
+}
+
+/* 图表区块 */
+.chart-section {
+  @apply mt-4 rounded-lg bg-gray-50/50 p-4 dark:bg-gray-700/30 md:mt-6;
+}
+
+/* 章节标题（居中） */
 .section-title {
   @apply mb-2 text-center text-xs text-gray-600 dark:text-gray-400;
 }
 
+/* 章节标题（左对齐） */
+.section-title-left {
+  @apply mb-3 text-sm font-medium text-gray-700 dark:text-gray-300;
+}
+
 /* 时间范围标签 */
 .period-label {
-  @apply ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500 dark:bg-gray-700 dark:text-gray-400;
+  @apply ml-1 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-normal text-gray-500 dark:bg-gray-600 dark:text-gray-400;
 }
 
 /* 状态徽章 */
@@ -528,11 +580,11 @@ function formatDateShort(dateStr) {
 }
 
 .stat-item {
-  @apply rounded-lg bg-gray-50 p-3 text-center dark:bg-gray-700/50;
+  @apply rounded-lg bg-white p-3 text-center shadow-sm dark:bg-gray-800/50;
 }
 
 .stat-value {
-  @apply text-lg font-bold text-gray-900 dark:text-gray-100;
+  @apply text-lg font-bold text-gray-900 dark:text-gray-100 md:text-xl;
 }
 
 .stat-label {
@@ -541,15 +593,15 @@ function formatDateShort(dateStr) {
 
 /* 模型分布 */
 .model-distribution {
-  @apply space-y-2;
+  @apply space-y-2.5;
 }
 
 .model-bar-item {
-  @apply flex items-center gap-2 text-xs;
+  @apply flex items-center gap-3 text-sm;
 }
 
 .model-name {
-  @apply w-20 truncate text-gray-600 dark:text-gray-400;
+  @apply w-24 truncate text-gray-600 dark:text-gray-400 md:w-32;
 }
 
 .model-bar {
