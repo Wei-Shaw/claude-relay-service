@@ -267,6 +267,7 @@ const defaultOemSettings = {
   publicStatsEnabled: false, // 是否在首页显示公开统计概览
   // 公开统计显示选项
   publicStatsShowModelDistribution: true, // 显示模型使用分布
+  publicStatsModelDistributionPeriod: 'today', // 模型使用分布时间范围: today, 24h, 7d, 30d, all
   publicStatsShowTokenTrends: false, // 显示Token使用趋势
   publicStatsShowApiKeysTrends: false, // 显示API Keys使用趋势
   publicStatsShowAccountTrends: false, // 显示账号使用趋势
@@ -319,6 +320,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       showAdminButton,
       publicStatsEnabled,
       publicStatsShowModelDistribution,
+      publicStatsModelDistributionPeriod,
       publicStatsShowTokenTrends,
       publicStatsShowApiKeysTrends,
       publicStatsShowAccountTrends
@@ -349,6 +351,12 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       }
     }
 
+    // 验证时间范围值
+    const validPeriods = ['today', '24h', '7d', '30d', 'all']
+    const periodValue = validPeriods.includes(publicStatsModelDistributionPeriod)
+      ? publicStatsModelDistributionPeriod
+      : 'today'
+
     const settings = {
       siteName: siteName.trim(),
       siteIcon: (siteIcon || '').trim(),
@@ -357,6 +365,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       publicStatsEnabled: publicStatsEnabled === true, // 默认为false
       // 公开统计显示选项
       publicStatsShowModelDistribution: publicStatsShowModelDistribution !== false, // 默认为true
+      publicStatsModelDistributionPeriod: periodValue, // 时间范围
       publicStatsShowTokenTrends: publicStatsShowTokenTrends === true, // 默认为false
       publicStatsShowApiKeysTrends: publicStatsShowApiKeysTrends === true, // 默认为false
       publicStatsShowAccountTrends: publicStatsShowAccountTrends === true, // 默认为false
@@ -449,9 +458,15 @@ router.get('/public-stats', async (req, res) => {
     // 辅助函数：规范化布尔值
     const normalizeBoolean = (value) => value === true || value === 'true'
     const isRateLimitedFlag = (status) => {
-      if (!status) return false
-      if (typeof status === 'string') return status === 'limited'
-      if (typeof status === 'object') return status.isRateLimited === true
+      if (!status) {
+        return false
+      }
+      if (typeof status === 'string') {
+        return status === 'limited'
+      }
+      if (typeof status === 'object') {
+        return status.isRateLimited === true
+      }
       return false
     }
 
@@ -471,7 +486,7 @@ router.get('/public-stats', async (req, res) => {
       bedrockAccountService.getAllAccounts(),
       droidAccountService.getAllAccounts(),
       redis.getTodayStats(),
-      getPublicModelStats()
+      getPublicModelStats(settings.publicStatsModelDistributionPeriod || 'today')
     ])
 
     const bedrockAccounts = bedrockAccountsResult.success ? bedrockAccountsResult.data : []
@@ -568,7 +583,9 @@ router.get('/public-stats', async (req, res) => {
 
     // 根据设置添加可选数据
     if (settings.publicStatsShowModelDistribution !== false) {
-      publicStats.modelDistribution = modelStats
+      // modelStats 现在返回 { stats: [], period }
+      publicStats.modelDistribution = modelStats.stats
+      publicStats.modelDistributionPeriod = modelStats.period
     }
 
     // 获取趋势数据（最近7天）
@@ -605,20 +622,70 @@ router.get('/public-stats', async (req, res) => {
 })
 
 // 获取公开模型统计的辅助函数
-async function getPublicModelStats() {
+// period: 'today' | '24h' | '7d' | '30d' | 'all'
+async function getPublicModelStats(period = 'today') {
   try {
     const client = redis.getClientSafe()
     const today = redis.getDateStringInTimezone()
-    const pattern = `usage:model:daily:*:${today}`
-    const keys = await client.keys(pattern)
+    const tzDate = redis.getDateInTimezone()
 
-    if (keys.length === 0) {
-      return []
+    // 根据period生成日期范围
+    const getDatePatterns = () => {
+      const patterns = []
+
+      if (period === 'today') {
+        patterns.push(`usage:model:daily:*:${today}`)
+      } else if (period === '24h') {
+        // 过去24小时 = 今天 + 昨天
+        patterns.push(`usage:model:daily:*:${today}`)
+        const yesterday = new Date(tzDate)
+        yesterday.setDate(yesterday.getDate() - 1)
+        patterns.push(`usage:model:daily:*:${redis.getDateStringInTimezone(yesterday)}`)
+      } else if (period === '7d') {
+        // 过去7天
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(tzDate)
+          date.setDate(date.getDate() - i)
+          patterns.push(`usage:model:daily:*:${redis.getDateStringInTimezone(date)}`)
+        }
+      } else if (period === '30d') {
+        // 过去30天
+        for (let i = 0; i < 30; i++) {
+          const date = new Date(tzDate)
+          date.setDate(date.getDate() - i)
+          patterns.push(`usage:model:daily:*:${redis.getDateStringInTimezone(date)}`)
+        }
+      } else if (period === 'all') {
+        // 所有数据
+        patterns.push('usage:model:daily:*')
+      } else {
+        // 默认今天
+        patterns.push(`usage:model:daily:*:${today}`)
+      }
+
+      return patterns
+    }
+
+    const patterns = getDatePatterns()
+    let allKeys = []
+
+    for (const pattern of patterns) {
+      const keys = await client.keys(pattern)
+      allKeys.push(...keys)
+    }
+
+    // 去重
+    allKeys = [...new Set(allKeys)]
+
+    if (allKeys.length === 0) {
+      return { stats: [], period }
     }
 
     // 模型名标准化
     const normalizeModelName = (model) => {
-      if (!model || model === 'unknown') return model
+      if (!model || model === 'unknown') {
+        return model
+      }
       if (model.includes('.anthropic.') || model.includes('.claude')) {
         let normalized = model.replace(/^[a-z0-9-]+\./, '')
         normalized = normalized.replace('anthropic.', '')
@@ -632,9 +699,11 @@ async function getPublicModelStats() {
     const modelStatsMap = new Map()
     let totalRequests = 0
 
-    for (const key of keys) {
+    for (const key of allKeys) {
       const match = key.match(/usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/)
-      if (!match) continue
+      if (!match) {
+        continue
+      }
 
       const rawModel = match[1]
       const normalizedModel = normalizeModelName(rawModel)
@@ -661,10 +730,10 @@ async function getPublicModelStats() {
 
     // 按占比排序，取前5个
     modelStats.sort((a, b) => b.percentage - a.percentage)
-    return modelStats.slice(0, 5)
+    return { stats: modelStats.slice(0, 5), period }
   } catch (error) {
     logger.warn('⚠️ Failed to get public model stats:', error.message)
-    return []
+    return { stats: [], period }
   }
 }
 

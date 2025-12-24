@@ -10,6 +10,11 @@ export const useSettingsStore = defineStore('settings', () => {
     siteIconData: '',
     showAdminButton: true, // 控制管理后台按钮的显示
     publicStatsEnabled: false, // 是否在首页显示公开统计概览
+    publicStatsShowModelDistribution: true,
+    publicStatsModelDistributionPeriod: 'today', // 时间范围: today, 24h, 7d, 30d, all
+    publicStatsShowTokenTrends: false,
+    publicStatsShowApiKeysTrends: false,
+    publicStatsShowAccountTrends: false,
     updatedAt: null
   })
 

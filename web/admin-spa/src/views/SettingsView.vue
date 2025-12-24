@@ -1082,21 +1082,42 @@
                 选择要公开显示的数据：
               </p>
               <div class="grid gap-3 sm:grid-cols-2">
-                <label
-                  class="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700"
+                <div
+                  class="rounded-lg border border-gray-200 bg-white p-3 transition-colors dark:border-gray-600 dark:bg-gray-800"
                 >
-                  <input
-                    v-model="oemSettings.publicStatsShowModelDistribution"
-                    class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-700"
-                    type="checkbox"
-                  />
-                  <div>
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >模型使用分布</span
-                    >
-                    <p class="text-xs text-gray-500 dark:text-gray-400">显示各模型的使用占比</p>
+                  <label class="flex cursor-pointer items-center gap-3">
+                    <input
+                      v-model="oemSettings.publicStatsShowModelDistribution"
+                      class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="checkbox"
+                    />
+                    <div>
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >模型使用分布</span
+                      >
+                      <p class="text-xs text-gray-500 dark:text-gray-400">显示各模型的使用占比</p>
+                    </div>
+                  </label>
+                  <div v-if="oemSettings.publicStatsShowModelDistribution" class="mt-3 pl-7">
+                    <div class="mb-1.5 text-xs text-gray-500 dark:text-gray-400">时间范围</div>
+                    <div class="inline-flex rounded-lg bg-gray-100 p-0.5 dark:bg-gray-700/50">
+                      <button
+                        v-for="option in modelDistributionPeriodOptions"
+                        :key="option.value"
+                        class="rounded-md px-2.5 py-1 text-xs font-medium transition-all"
+                        :class="
+                          oemSettings.publicStatsModelDistributionPeriod === option.value
+                            ? 'bg-white text-green-600 shadow-sm dark:bg-gray-600 dark:text-green-400'
+                            : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+                        "
+                        type="button"
+                        @click="oemSettings.publicStatsModelDistributionPeriod = option.value"
+                      >
+                        {{ option.label }}
+                      </button>
+                    </div>
                   </div>
-                </label>
+                </div>
                 <label
                   class="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700"
                 >
@@ -1764,6 +1785,15 @@ defineOptions({
 // 使用settings store
 const settingsStore = useSettingsStore()
 const { loading, saving, oemSettings } = storeToRefs(settingsStore)
+
+// 模型使用分布时间范围选项
+const modelDistributionPeriodOptions = [
+  { value: 'today', label: '今天' },
+  { value: '24h', label: '24小时' },
+  { value: '7d', label: '7天' },
+  { value: '30d', label: '30天' },
+  { value: 'all', label: '全部' }
+]
 
 // 组件refs
 const iconFileInput = ref()
@@ -2613,6 +2643,8 @@ const saveOemSettings = async () => {
       showAdminButton: oemSettings.value.showAdminButton,
       publicStatsEnabled: oemSettings.value.publicStatsEnabled,
       publicStatsShowModelDistribution: oemSettings.value.publicStatsShowModelDistribution,
+      publicStatsModelDistributionPeriod:
+        oemSettings.value.publicStatsModelDistributionPeriod || 'today',
       publicStatsShowTokenTrends: oemSettings.value.publicStatsShowTokenTrends,
       publicStatsShowApiKeysTrends: oemSettings.value.publicStatsShowApiKeysTrends,
       publicStatsShowAccountTrends: oemSettings.value.publicStatsShowAccountTrends

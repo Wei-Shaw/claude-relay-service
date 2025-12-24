@@ -52,7 +52,12 @@
       "
       class="mt-4"
     >
-      <div class="section-title">模型使用分布</div>
+      <div class="section-title">
+        模型使用分布
+        <span class="period-label">{{
+          formatPeriodLabel(authStore.publicStats.modelDistributionPeriod)
+        }}</span>
+      </div>
       <div class="model-distribution">
         <div
           v-for="model in authStore.publicStats.modelDistribution"
@@ -384,6 +389,18 @@ function formatTokensShort(tokens) {
   return tokens.toString()
 }
 
+// 格式化时间范围标签
+function formatPeriodLabel(period) {
+  const labels = {
+    today: '今天',
+    '24h': '过去24小时',
+    '7d': '过去7天',
+    '30d': '过去30天',
+    all: '全部'
+  }
+  return labels[period] || labels['today']
+}
+
 // 获取平台图标
 function getPlatformIcon(platform) {
   const icons = {
@@ -448,6 +465,11 @@ function formatDateShort(dateStr) {
 /* 章节标题 */
 .section-title {
   @apply mb-2 text-center text-xs text-gray-600 dark:text-gray-400;
+}
+
+/* 时间范围标签 */
+.period-label {
+  @apply ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500 dark:bg-gray-700 dark:text-gray-400;
 }
 
 /* 状态徽章 */
