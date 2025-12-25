@@ -36,15 +36,28 @@ class OpenAIToClaudeConverter {
 
     // 如果 OpenAI 请求中包含系统消息,提取并检查
     const systemMessage = this._extractSystemMessage(openaiRequest.messages)
-    if (systemMessage && systemMessage.includes('You are currently in Xcode')) {
-      // Xcode 系统提示词
+
+    const passThroughSystemPrompt =
+      String(process.env.CRS_PASSTHROUGH_SYSTEM_PROMPT || '').toLowerCase() === 'true'
+
+    if (
+      systemMessage &&
+      (passThroughSystemPrompt || systemMessage.includes('You are currently in Xcode'))
+    ) {
       claudeRequest.system = systemMessage
-      logger.info(
-        `🔍 Xcode request detected, using Xcode system prompt (${systemMessage.length} chars)`
-      )
+
+      if (systemMessage.includes('You are currently in Xcode')) {
+        logger.info(
+          `🔍 Xcode request detected, using Xcode system prompt (${systemMessage.length} chars)`
+        )
+      } else {
+        logger.info(
+          `🧩 Using caller-provided system prompt (${systemMessage.length} chars) because CRS_PASSTHROUGH_SYSTEM_PROMPT=true`
+        )
+      }
       logger.debug(`📋 System prompt preview: ${systemMessage.substring(0, 150)}...`)
     } else {
-      // 使用 Claude Code 默认系统提示词
+      // 默认行为：兼容 Claude Code（忽略外部 system）
       claudeRequest.system = claudeCodeSystemMessage
       logger.debug(
         `📋 Using Claude Code default system prompt${systemMessage ? ' (ignored custom prompt)' : ''}`
