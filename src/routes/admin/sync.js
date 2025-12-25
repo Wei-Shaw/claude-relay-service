@@ -191,8 +191,12 @@ router.get('/sync/export-accounts', authenticateAdmin, async (req, res) => {
         token_type: 'Bearer'
       }
       // 🔧 Add auth info as top-level credentials fields
-      if (orgUuid) credentials.org_uuid = orgUuid
-      if (accountUuid) credentials.account_uuid = accountUuid
+      if (orgUuid) {
+        credentials.org_uuid = orgUuid
+      }
+      if (accountUuid) {
+        credentials.account_uuid = accountUuid
+      }
 
       // 🔧 Store complete original CRS data in extra
       const extra = {
@@ -337,9 +341,15 @@ router.get('/sync/export-accounts', authenticateAdmin, async (req, res) => {
           token_type: 'Bearer'
         }
         // 🔧 Add auth info as top-level credentials fields
-        if (account.accountId) credentials.chatgpt_account_id = account.accountId
-        if (account.chatgptUserId) credentials.chatgpt_user_id = account.chatgptUserId
-        if (account.organizationId) credentials.organization_id = account.organizationId
+        if (account.accountId) {
+          credentials.chatgpt_account_id = account.accountId
+        }
+        if (account.chatgptUserId) {
+          credentials.chatgpt_user_id = account.chatgptUserId
+        }
+        if (account.organizationId) {
+          credentials.organization_id = account.organizationId
+        }
 
         // 🔧 Store complete original CRS data in extra
         const extra = {
