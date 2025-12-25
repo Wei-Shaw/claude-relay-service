@@ -68,6 +68,10 @@ class Application {
       logger.info('🔄 Initializing admin credentials...')
       await this.initializeAdmin()
 
+      // 🔒 安全启动：清理无效/伪造的管理员会话
+      logger.info('🔒 Cleaning up invalid admin sessions...')
+      await this.cleanupInvalidSessions()
+
       // 💰 初始化费用数据
       logger.info('💰 Checking cost data initialization...')
       const costInitService = require('./services/costInitService')
@@ -423,6 +427,54 @@ class Application {
         stack: error.stack
       })
       throw error
+    }
+  }
+
+  // 🔒 清理无效/伪造的管理员会话（安全启动检查）
+  async cleanupInvalidSessions() {
+    try {
+      const client = redis.getClient()
+
+      // 获取所有 session:* 键
+      const sessionKeys = await client.keys('session:*')
+
+      let validCount = 0
+      let invalidCount = 0
+
+      for (const key of sessionKeys) {
+        // 跳过 admin_credentials（系统凭据）
+        if (key === 'session:admin_credentials') {
+          continue
+        }
+
+        const sessionData = await client.hgetall(key)
+
+        // 检查会话完整性：必须有 username 和 loginTime
+        const hasUsername = !!sessionData.username
+        const hasLoginTime = !!sessionData.loginTime
+
+        if (!hasUsername || !hasLoginTime) {
+          // 无效会话 - 可能是漏洞利用创建的伪造会话
+          invalidCount++
+          logger.security(
+            `🔒 Removing invalid session: ${key} (username: ${hasUsername}, loginTime: ${hasLoginTime})`
+          )
+          await client.del(key)
+        } else {
+          validCount++
+        }
+      }
+
+      if (invalidCount > 0) {
+        logger.security(`🔒 Startup security check: Removed ${invalidCount} invalid sessions`)
+      }
+
+      logger.success(
+        `✅ Session cleanup completed: ${validCount} valid, ${invalidCount} invalid removed`
+      )
+    } catch (error) {
+      // 清理失败不应阻止服务启动
+      logger.error('❌ Failed to cleanup invalid sessions:', error.message)
     }
   }
 
