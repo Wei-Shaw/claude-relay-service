@@ -477,6 +477,36 @@
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
                       </label>
+                      <label
+                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
+                        :class="[
+                          form.platform === 'gemini-antigravity'
+                            ? 'border-purple-500 bg-purple-50 dark:border-purple-400 dark:bg-purple-900/30'
+                            : 'border-gray-300 bg-white hover:border-purple-400 hover:bg-purple-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-purple-500 dark:hover:bg-purple-900/20'
+                        ]"
+                      >
+                        <input
+                          v-model="form.platform"
+                          class="sr-only"
+                          type="radio"
+                          value="gemini-antigravity"
+                        />
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-rocket text-sm text-purple-600 dark:text-purple-400"></i>
+                          <div>
+                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                              >Antigravity</span
+                            >
+                            <span class="text-xs text-gray-500 dark:text-gray-400">OAuth</span>
+                          </div>
+                        </div>
+                        <div
+                          v-if="form.platform === 'gemini-antigravity'"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-purple-500"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </label>
 
                       <label
                         class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
@@ -772,7 +802,7 @@
             </div>
 
             <!-- Gemini 项目 ID 字段 -->
-            <div v-if="form.platform === 'gemini'">
+            <div v-if="form.platform === 'gemini' || form.platform === 'gemini-antigravity'">
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >项目 ID (可选)</label
               >
@@ -1783,7 +1813,7 @@
                     Token，建议也一并填写以支持自动刷新。
                   </p>
                   <p
-                    v-else-if="form.platform === 'gemini'"
+                    v-else-if="form.platform === 'gemini' || form.platform === 'gemini-antigravity'"
                     class="mb-2 text-sm text-blue-800 dark:text-blue-300"
                   >
                     请输入有效的 Gemini Access Token。如果您有 Refresh
@@ -1820,7 +1850,9 @@
                       文件中的凭证， 请勿使用 Claude 官网 API Keys 页面的密钥。
                     </p>
                     <p
-                      v-else-if="form.platform === 'gemini'"
+                      v-else-if="
+                        form.platform === 'gemini' || form.platform === 'gemini-antigravity'
+                      "
                       class="text-xs text-blue-800 dark:text-blue-300"
                     >
                       请从已登录 Gemini CLI 的机器上获取
@@ -2550,7 +2582,7 @@
           </div>
 
           <!-- Gemini 项目 ID 字段 -->
-          <div v-if="form.platform === 'gemini'">
+          <div v-if="form.platform === 'gemini' || form.platform === 'gemini-antigravity'">
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >项目 ID (可选)</label
             >
@@ -3801,7 +3833,7 @@ const determinePlatformGroup = (platform) => {
     return 'claude'
   } else if (['openai', 'openai-responses', 'azure_openai'].includes(platform)) {
     return 'openai'
-  } else if (['gemini', 'gemini-api'].includes(platform)) {
+  } else if (['gemini', 'gemini-antigravity', 'gemini-api'].includes(platform)) {
     return 'gemini'
   } else if (platform === 'droid') {
     return 'droid'
@@ -3936,7 +3968,8 @@ const form = ref({
   platform: props.account?.platform || 'claude',
   addType: (() => {
     const platform = props.account?.platform || 'claude'
-    if (platform === 'gemini' || platform === 'openai') return 'oauth'
+    if (platform === 'gemini' || platform === 'gemini-antigravity' || platform === 'openai')
+      return 'oauth'
     if (platform === 'claude') return 'oauth'
     return 'manual'
   })(),
@@ -4275,7 +4308,7 @@ const selectPlatformGroup = (group) => {
   } else if (group === 'openai') {
     form.value.platform = 'openai'
   } else if (group === 'gemini') {
-    form.value.platform = 'gemini'
+    form.value.platform = 'gemini' // Default to Gemini CLI, user can select Antigravity
   } else if (group === 'droid') {
     form.value.platform = 'droid'
   }
@@ -4312,7 +4345,11 @@ const nextStep = async () => {
   }
 
   // 对于Gemini账户，检查项目 ID
-  if (form.value.platform === 'gemini' && oauthStep.value === 1 && form.value.addType === 'oauth') {
+  if (
+    (form.value.platform === 'gemini' || form.value.platform === 'gemini-antigravity') &&
+    oauthStep.value === 1 &&
+    form.value.addType === 'oauth'
+  ) {
     if (!form.value.projectId || form.value.projectId.trim() === '') {
       // 使用自定义确认弹窗
       const confirmed = await showConfirm(
@@ -4682,9 +4719,14 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
         hasClaudePro: form.value.subscriptionType === 'claude_pro',
         manuallySet: true // 标记为手动设置
       }
-    } else if (currentPlatform === 'gemini') {
-      // Gemini使用geminiOauth字段
+    } else if (currentPlatform === 'gemini' || currentPlatform === 'gemini-antigravity') {
+      // Gemini/Antigravity使用geminiOauth字段
       data.geminiOauth = tokenInfo.tokens || tokenInfo
+      // 根据 platform 设置 oauthProvider
+      data.oauthProvider =
+        currentPlatform === 'gemini-antigravity'
+          ? 'antigravity'
+          : tokenInfo.oauthProvider || 'gemini-cli'
       if (form.value.projectId) {
         data.projectId = form.value.projectId
       }
@@ -5104,6 +5146,10 @@ const createAccount = async () => {
       data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
+    } else if (form.value.platform === 'gemini-antigravity') {
+      // Antigravity OAuth - set oauthProvider, submission happens below
+      data.oauthProvider = 'antigravity'
+      data.priority = form.value.priority || 50
     } else if (form.value.platform === 'gemini-api') {
       // Gemini API 账户特定数据
       data.baseUrl = form.value.baseUrl || 'https://generativelanguage.googleapis.com'
@@ -5155,7 +5201,7 @@ const createAccount = async () => {
       result = await accountsStore.createOpenAIAccount(data)
     } else if (form.value.platform === 'azure_openai') {
       result = await accountsStore.createAzureOpenAIAccount(data)
-    } else if (form.value.platform === 'gemini') {
+    } else if (form.value.platform === 'gemini' || form.value.platform === 'gemini-antigravity') {
       result = await accountsStore.createGeminiAccount(data)
     } else if (form.value.platform === 'gemini-api') {
       result = await accountsStore.createGeminiApiAccount(data)

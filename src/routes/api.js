@@ -13,6 +13,11 @@ const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
+const { dumpAnthropicMessagesRequest } = require('../utils/anthropicRequestDump')
+const {
+  handleAnthropicMessagesToGemini,
+  handleAnthropicCountTokensToGemini
+} = require('../services/anthropicGeminiBridgeService')
 const router = express.Router()
 
 function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '') {
@@ -110,20 +115,6 @@ async function handleMessagesRequest(req, res) {
   try {
     const startTime = Date.now()
 
-    // Claude 服务权限校验，阻止未授权的 Key
-    if (
-      req.apiKey.permissions &&
-      req.apiKey.permissions !== 'all' &&
-      req.apiKey.permissions !== 'claude'
-    ) {
-      return res.status(403).json({
-        error: {
-          type: 'permission_error',
-          message: '此 API Key 无权访问 Claude 服务'
-        }
-      })
-    }
-
     // 🔄 并发满额重试标志：最多重试一次（使用req对象存储状态）
     if (req._concurrencyRetryAttempted === undefined) {
       req._concurrencyRetryAttempted = false
@@ -166,6 +157,50 @@ async function handleMessagesRequest(req, res) {
           }
         })
       }
+    }
+
+    const forcedVendor = req._anthropicVendor || null
+    logger.api('📥 /v1/messages request received', {
+      model: req.body.model || null,
+      forcedVendor,
+      stream: req.body.stream === true
+    })
+
+    dumpAnthropicMessagesRequest(req, {
+      route: '/v1/messages',
+      forcedVendor,
+      model: req.body?.model || null,
+      stream: req.body?.stream === true
+    })
+
+    // /v1/messages 的扩展：按路径强制分流到 Gemini OAuth 账户（避免 model 前缀混乱）
+    if (forcedVendor === 'gemini-cli' || forcedVendor === 'antigravity') {
+      const permissions = req.apiKey?.permissions || 'all'
+      if (permissions !== 'all' && permissions !== 'gemini') {
+        return res.status(403).json({
+          error: {
+            type: 'permission_error',
+            message: '此 API Key 无权访问 Gemini 服务'
+          }
+        })
+      }
+
+      const baseModel = (req.body.model || '').trim()
+      return await handleAnthropicMessagesToGemini(req, res, { vendor: forcedVendor, baseModel })
+    }
+
+    // Claude 服务权限校验，阻止未授权的 Key（默认路径保持不变）
+    if (
+      req.apiKey.permissions &&
+      req.apiKey.permissions !== 'all' &&
+      req.apiKey.permissions !== 'claude'
+    ) {
+      return res.status(403).json({
+        error: {
+          type: 'permission_error',
+          message: '此 API Key 无权访问 Claude 服务'
+        }
+      })
     }
 
     // 检查是否为流式请求
@@ -985,8 +1020,8 @@ async function handleMessagesRequest(req, res) {
           const cacheReadTokens = jsonData.usage.cache_read_input_tokens || 0
           // Parse the model to remove vendor prefix if present (e.g., "ccr,gemini-2.5-pro" -> "gemini-2.5-pro")
           const rawModel = jsonData.model || req.body.model || 'unknown'
-          const { baseModel } = parseVendorPrefixedModel(rawModel)
-          const model = baseModel || rawModel
+          const { baseModel: usageBaseModel } = parseVendorPrefixedModel(rawModel)
+          const model = usageBaseModel || rawModel
 
           // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
           const { accountId: responseAccountId } = response
@@ -1162,6 +1197,66 @@ router.post('/claude/v1/messages', authenticateApiKey, handleMessagesRequest)
 // 📋 模型列表端点 - 支持 Claude, OpenAI, Gemini
 router.get('/v1/models', authenticateApiKey, async (req, res) => {
   try {
+    // Claude Code / Anthropic baseUrl 的分流：/antigravity/api/v1/models 返回 Antigravity 实时模型列表
+    //（通过 v1internal:fetchAvailableModels），避免依赖静态 modelService 列表。
+    const forcedVendor = req._anthropicVendor || null
+    if (forcedVendor === 'antigravity') {
+      const permissions = req.apiKey?.permissions || 'all'
+      if (permissions !== 'all' && permissions !== 'gemini') {
+        return res.status(403).json({
+          error: {
+            type: 'permission_error',
+            message: '此 API Key 无权访问 Gemini 服务'
+          }
+        })
+      }
+
+      const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
+      const geminiAccountService = require('../services/geminiAccountService')
+
+      let accountSelection
+      try {
+        accountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(
+          req.apiKey,
+          null,
+          null,
+          { oauthProvider: 'antigravity' }
+        )
+      } catch (error) {
+        logger.error('Failed to select Gemini OAuth account (antigravity models):', error)
+        return res.status(503).json({ error: 'No available Gemini OAuth accounts' })
+      }
+
+      const account = await geminiAccountService.getAccount(accountSelection.accountId)
+      if (!account) {
+        return res.status(503).json({ error: 'Gemini OAuth account not found' })
+      }
+
+      let proxyConfig = null
+      if (account.proxy) {
+        try {
+          proxyConfig =
+            typeof account.proxy === 'string' ? JSON.parse(account.proxy) : account.proxy
+        } catch (e) {
+          logger.warn('Failed to parse proxy configuration:', e)
+        }
+      }
+
+      const models = await geminiAccountService.fetchAvailableModelsAntigravity(
+        account.accessToken,
+        proxyConfig,
+        account.refreshToken
+      )
+
+      // 可选：根据 API Key 的模型限制过滤（黑名单语义）
+      let filteredModels = models
+      if (req.apiKey.enableModelRestriction && req.apiKey.restrictedModels?.length > 0) {
+        filteredModels = models.filter((model) => !req.apiKey.restrictedModels.includes(model.id))
+      }
+
+      return res.json({ object: 'list', data: filteredModels })
+    }
+
     const modelService = require('../services/modelService')
 
     // 从 modelService 获取所有支持的模型
@@ -1298,6 +1393,22 @@ router.get('/v1/organizations/:org_id/usage', authenticateApiKey, async (req, re
 
 // 🔢 Token计数端点 - count_tokens beta API
 router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) => {
+  // 按路径强制分流到 Gemini OAuth 账户（避免 model 前缀混乱）
+  const forcedVendor = req._anthropicVendor || null
+  if (forcedVendor === 'gemini-cli' || forcedVendor === 'antigravity') {
+    const permissions = req.apiKey?.permissions || 'all'
+    if (permissions !== 'all' && permissions !== 'gemini') {
+      return res.status(403).json({
+        error: {
+          type: 'permission_error',
+          message: 'This API key does not have permission to access Gemini'
+        }
+      })
+    }
+
+    return await handleAnthropicCountTokensToGemini(req, res, { vendor: forcedVendor })
+  }
+
   // 检查权限
   if (
     req.apiKey.permissions &&

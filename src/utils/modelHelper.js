@@ -5,6 +5,10 @@
  * Supports parsing model strings like "ccr,model_name" to extract vendor type and base model.
  */
 
+// 仅保留原仓库既有的模型前缀：CCR 路由
+// Gemini/Antigravity 采用“路径分流”，避免在 model 字段里混入 vendor 前缀造成混乱
+const SUPPORTED_VENDOR_PREFIXES = ['ccr']
+
 /**
  * Parse vendor-prefixed model string
  * @param {string} modelStr - Model string, potentially with vendor prefix (e.g., "ccr,gemini-2.5-pro")
@@ -19,16 +23,21 @@ function parseVendorPrefixedModel(modelStr) {
   const trimmed = modelStr.trim()
   const lowerTrimmed = trimmed.toLowerCase()
 
-  // Check for ccr prefix (case insensitive)
-  if (lowerTrimmed.startsWith('ccr,')) {
+  for (const vendorPrefix of SUPPORTED_VENDOR_PREFIXES) {
+    if (!lowerTrimmed.startsWith(`${vendorPrefix},`)) {
+      continue
+    }
+
     const parts = trimmed.split(',')
-    if (parts.length >= 2) {
-      // Extract base model (everything after the first comma, rejoined in case model name contains commas)
-      const baseModel = parts.slice(1).join(',').trim()
-      return {
-        vendor: 'ccr',
-        baseModel
-      }
+    if (parts.length < 2) {
+      break
+    }
+
+    // Extract base model (everything after the first comma, rejoined in case model name contains commas)
+    const baseModel = parts.slice(1).join(',').trim()
+    return {
+      vendor: vendorPrefix,
+      baseModel
     }
   }
 

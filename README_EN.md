@@ -238,11 +238,29 @@ Now you can replace the official API with your own service:
 
 **Claude Code Set Environment Variables:**
 
-Default uses standard Claude account pool:
+Default uses standard Claude account pool (Claude/Console/Bedrock/CCR):
 
 ```bash
 export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/api/" # Fill in your server's IP address or domain
 export ANTHROPIC_AUTH_TOKEN="API key created in the backend"
+```
+
+If you want Claude Code to use Gemini OAuth accounts via the Anthropic protocol (path-based routing, no vendor prefix in `model`):
+
+Antigravity OAuth (supports `claude-opus-4-5` and other Antigravity models):
+
+```bash
+export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/antigravity/api/"
+export ANTHROPIC_AUTH_TOKEN="API key created in the backend (permissions must be all or gemini)"
+export ANTHROPIC_MODEL="claude-opus-4-5"
+```
+
+Gemini CLI OAuth (Gemini models):
+
+```bash
+export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/gemini-cli/api/"
+export ANTHROPIC_AUTH_TOKEN="API key created in the backend (permissions must be all or gemini)"
+export ANTHROPIC_MODEL="gemini-2.5-pro"
 ```
 
 **VSCode Claude Plugin Configuration:**

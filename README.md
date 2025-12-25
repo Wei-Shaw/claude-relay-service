@@ -389,11 +389,29 @@ docker-compose.yml 已包含：
 
 **Claude Code 设置环境变量：**
 
-默认使用标准 Claude 账号池：
+默认使用标准 Claude 账号池（Claude/Console/Bedrock/CCR）：
 
 ```bash
 export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/api/" # 根据实际填写你服务器的ip地址或者域名
 export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
+```
+
+如果希望 Claude Code 通过 Anthropic 协议直接使用 Gemini OAuth 账号池（路径分流，不需要在模型名里加前缀）：
+
+Antigravity OAuth（支持 `claude-opus-4-5` 等 Antigravity 模型）：
+
+```bash
+export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/antigravity/api/"
+export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥（permissions 需要是 all 或 gemini）"
+export ANTHROPIC_MODEL="claude-opus-4-5"
+```
+
+Gemini CLI OAuth（使用 Gemini 模型）：
+
+```bash
+export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/gemini-cli/api/"
+export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥（permissions 需要是 all 或 gemini）"
+export ANTHROPIC_MODEL="gemini-2.5-pro"
 ```
 
 **VSCode Claude 插件配置：**

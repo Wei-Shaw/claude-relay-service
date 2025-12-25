@@ -277,7 +277,7 @@ router.post('/claude-accounts/oauth-with-cookie', authenticateAdmin, async (req,
 
     logger.info('🍪 Starting Cookie-based OAuth authorization', {
       sessionKeyLength: trimmedSessionKey.length,
-      sessionKeyPrefix: trimmedSessionKey.substring(0, 10) + '...',
+      sessionKeyPrefix: `${trimmedSessionKey.substring(0, 10)}...`,
       hasProxy: !!proxy
     })
 
@@ -326,7 +326,7 @@ router.post('/claude-accounts/setup-token-with-cookie', authenticateAdmin, async
 
     logger.info('🍪 Starting Cookie-based Setup Token authorization', {
       sessionKeyLength: trimmedSessionKey.length,
-      sessionKeyPrefix: trimmedSessionKey.substring(0, 10) + '...',
+      sessionKeyPrefix: `${trimmedSessionKey.substring(0, 10)}...`,
       hasProxy: !!proxy
     })
 
