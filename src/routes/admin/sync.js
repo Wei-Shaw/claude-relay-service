@@ -293,7 +293,9 @@ router.get('/sync/export-accounts', authenticateAdmin, async (req, res) => {
           continue
         }
 
-        const accessToken = account.accessToken ? openaiAccountService.decrypt(account.accessToken) : ''
+        const accessToken = account.accessToken
+          ? openaiAccountService.decrypt(account.accessToken)
+          : ''
         if (!accessToken) {
           // Skip broken/legacy records without decryptable token
           continue
