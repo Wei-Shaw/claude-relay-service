@@ -21,10 +21,27 @@ function validatePermissions(permissions) {
   if (permissions === undefined || permissions === null || permissions === '') {
     return null
   }
-  // 兼容旧格式字符串
+  // 兼容字符串格式
   if (typeof permissions === 'string') {
-    if (permissions === 'all' || VALID_PERMISSIONS.includes(permissions)) {
+    // 旧格式 'all' 表示全部服务
+    if (permissions === 'all') {
       return null
+    }
+    // 单个有效权限
+    if (VALID_PERMISSIONS.includes(permissions)) {
+      return null
+    }
+    // 尝试解析 JSON 数组字符串（如 "[]" 或 '["claude","gemini"]'）
+    if (permissions.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(permissions)
+        if (Array.isArray(parsed)) {
+          // 递归验证解析后的数组
+          return validatePermissions(parsed)
+        }
+      } catch (e) {
+        // 解析失败，返回错误
+      }
     }
     return `Invalid permissions value. Must be an array of: ${VALID_PERMISSIONS.join(', ')}`
   }

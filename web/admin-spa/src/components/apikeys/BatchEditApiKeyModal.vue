@@ -290,31 +290,79 @@
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >服务权限</label
             >
-            <div class="flex flex-wrap gap-4">
-              <label class="flex cursor-pointer items-center">
-                <input v-model="form.permissions" class="mr-2" type="radio" value="" />
-                <span class="text-sm text-gray-700">不修改</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input v-model="form.permissions" class="mr-2" type="radio" value="all" />
-                <span class="text-sm text-gray-700">全部服务</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input v-model="form.permissions" class="mr-2" type="radio" value="claude" />
-                <span class="text-sm text-gray-700">仅 Claude</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input v-model="form.permissions" class="mr-2" type="radio" value="gemini" />
-                <span class="text-sm text-gray-700">仅 Gemini</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input v-model="form.permissions" class="mr-2" type="radio" value="openai" />
-                <span class="text-sm text-gray-700">仅 OpenAI</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input v-model="form.permissions" class="mr-2" type="radio" value="droid" />
-                <span class="text-sm text-gray-700">仅 Droid</span>
-              </label>
+            <div class="space-y-3">
+              <!-- 权限操作模式选择 -->
+              <div class="flex flex-wrap gap-4">
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="permissionsOperation"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="none"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">不修改</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="permissionsOperation"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="all"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">全部服务</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="permissionsOperation"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="custom"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">自定义选择</span>
+                </label>
+              </div>
+              <!-- 自定义选择时显示复选框 -->
+              <div v-if="permissionsOperation === 'custom'" class="flex flex-wrap gap-4 pl-6">
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.permissions"
+                    class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                    value="claude"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Claude</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.permissions"
+                    class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                    value="gemini"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Gemini</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.permissions"
+                    class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                    value="openai"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">OpenAI</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.permissions"
+                    class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                    value="droid"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Droid</span>
+                </label>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                选择"全部服务"表示允许访问所有服务，"自定义选择"可以选择多个特定服务
+              </p>
             </div>
           </div>
 
@@ -494,6 +542,7 @@ const localAccounts = ref({
 const newTag = ref('')
 const availableTags = ref([])
 const tagOperation = ref('none') // 'replace', 'add', 'remove', 'none'
+const permissionsOperation = ref('none') // 'none', 'all', 'custom'
 
 const selectedCount = computed(() => props.selectedKeys.length)
 
@@ -511,7 +560,7 @@ const form = reactive({
   dailyCostLimit: '',
   totalCostLimit: '',
   weeklyOpusCostLimit: '', // 新增Opus周费用限制
-  permissions: '', // 空字符串表示不修改
+  permissions: [], // 数组格式，用于多选
   claudeAccountId: '',
   geminiAccountId: '',
   openaiAccountId: '',
@@ -547,9 +596,15 @@ const bedrockAccountSelectorValue = createAccountSelectorModel('bedrockAccountId
 const droidAccountSelectorValue = createAccountSelectorModel('droidAccountId')
 
 const isServiceSelectable = (service) => {
-  if (!form.permissions) return true
-  if (form.permissions === 'all') return true
-  return form.permissions === service
+  // 不修改权限时，所有服务都可选
+  if (permissionsOperation.value === 'none') return true
+  // 全部服务时，所有服务都可选
+  if (permissionsOperation.value === 'all') return true
+  // 自定义选择时，根据选择的权限判断
+  if (permissionsOperation.value === 'custom') {
+    return form.permissions.length === 0 || form.permissions.includes(service)
+  }
+  return true
 }
 
 // 标签管理方法
@@ -737,8 +792,14 @@ const batchUpdateApiKeys = async () => {
     }
 
     // 权限设置
-    if (form.permissions !== '') {
-      updates.permissions = form.permissions
+    if (permissionsOperation.value !== 'none') {
+      if (permissionsOperation.value === 'all') {
+        // 全部服务：发送空数组
+        updates.permissions = []
+      } else if (permissionsOperation.value === 'custom') {
+        // 自定义选择：发送选中的权限数组
+        updates.permissions = form.permissions
+      }
     }
 
     // 账户绑定

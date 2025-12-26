@@ -750,8 +750,13 @@ class ApiKeyService {
 
       for (const [field, value] of Object.entries(updates)) {
         if (allowedUpdates.includes(field)) {
-          if (field === 'restrictedModels' || field === 'allowedClients' || field === 'tags') {
-            // 特殊处理数组字段
+          if (
+            field === 'restrictedModels' ||
+            field === 'allowedClients' ||
+            field === 'tags' ||
+            field === 'permissions'
+          ) {
+            // 特殊处理数组字段，使用 JSON.stringify
             updatedData[field] = JSON.stringify(value || [])
           } else if (
             field === 'enableModelRestriction' ||
