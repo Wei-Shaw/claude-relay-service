@@ -32,7 +32,11 @@ class PricingService {
     // ephemeral_5m 的价格使用 model_pricing.json 中的 cache_creation_input_token_cost
     // ephemeral_1h 的价格需要硬编码
     this.ephemeral1hPricing = {
-      // Opus 系列: $30/MTok
+      // Opus 4.5 系列: $10/MTok (注意：比 Opus 4.1 便宜)
+      'claude-opus-4-5': 0.00001,
+      'claude-opus-4-5-20251101': 0.00001,
+
+      // Opus 4.1 及更早系列: $30/MTok
       'claude-opus-4-1': 0.00003,
       'claude-opus-4-1-20250805': 0.00003,
       'claude-opus-4': 0.00003,
@@ -476,7 +480,12 @@ class PricingService {
     // 处理各种模型名称变体
     const modelLower = modelName.toLowerCase()
 
-    // 检查是否是 Opus 系列
+    // 检查是否是 Opus 4.5 系列 (需要在通用 Opus 检查之前)
+    if (modelLower.includes('opus-4-5') || modelLower.includes('opus-4.5')) {
+      return 0.00001 // $10/MTok
+    }
+
+    // 检查是否是 Opus 系列 (4.1 及更早)
     if (modelLower.includes('opus')) {
       return 0.00003 // $30/MTok
     }
