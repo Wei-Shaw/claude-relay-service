@@ -182,8 +182,7 @@ async function handleMessagesRequest(req, res) {
 
     // /v1/messages 的扩展：按路径强制分流到 Gemini OAuth 账户（避免 model 前缀混乱）
     if (forcedVendor === 'gemini-cli' || forcedVendor === 'antigravity') {
-      const permissions = req.apiKey?.permissions || 'all'
-      if (permissions !== 'all' && permissions !== 'gemini') {
+      if (!apiKeyService.hasPermission(req.apiKey?.permissions, 'gemini')) {
         return res.status(403).json({
           error: {
             type: 'permission_error',
@@ -197,11 +196,7 @@ async function handleMessagesRequest(req, res) {
     }
 
     // Claude 服务权限校验，阻止未授权的 Key（默认路径保持不变）
-    if (
-      req.apiKey.permissions &&
-      req.apiKey.permissions !== 'all' &&
-      req.apiKey.permissions !== 'claude'
-    ) {
+    if (!apiKeyService.hasPermission(req.apiKey.permissions, 'claude')) {
       return res.status(403).json({
         error: {
           type: 'permission_error',
@@ -1240,8 +1235,7 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
     //（通过 v1internal:fetchAvailableModels），避免依赖静态 modelService 列表。
     const forcedVendor = req._anthropicVendor || null
     if (forcedVendor === 'antigravity') {
-      const permissions = req.apiKey?.permissions || 'all'
-      if (permissions !== 'all' && permissions !== 'gemini') {
+      if (!apiKeyService.hasPermission(req.apiKey?.permissions, 'gemini')) {
         return res.status(403).json({
           error: {
             type: 'permission_error',
@@ -1435,8 +1429,7 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
   // 按路径强制分流到 Gemini OAuth 账户（避免 model 前缀混乱）
   const forcedVendor = req._anthropicVendor || null
   if (forcedVendor === 'gemini-cli' || forcedVendor === 'antigravity') {
-    const permissions = req.apiKey?.permissions || 'all'
-    if (permissions !== 'all' && permissions !== 'gemini') {
+    if (!apiKeyService.hasPermission(req.apiKey?.permissions, 'gemini')) {
       return res.status(403).json({
         error: {
           type: 'permission_error',
@@ -1449,11 +1442,7 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
   }
 
   // 检查权限
-  if (
-    req.apiKey.permissions &&
-    req.apiKey.permissions !== 'all' &&
-    req.apiKey.permissions !== 'claude'
-  ) {
+  if (!apiKeyService.hasPermission(req.apiKey.permissions, 'claude')) {
     return res.status(403).json({
       error: {
         type: 'permission_error',

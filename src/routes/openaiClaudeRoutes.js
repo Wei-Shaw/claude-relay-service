@@ -19,8 +19,7 @@ const { getEffectiveModel } = require('../utils/modelHelper')
 
 // 🔧 辅助函数：检查 API Key 权限
 function checkPermissions(apiKeyData, requiredPermission = 'claude') {
-  const permissions = apiKeyData.permissions || 'all'
-  return permissions === 'all' || permissions === requiredPermission
+  return apiKeyService.hasPermission(apiKeyData?.permissions, requiredPermission)
 }
 
 function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '') {
