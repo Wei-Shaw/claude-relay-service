@@ -6,7 +6,13 @@
         <LogoTitle
           :loading="oemLoading"
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : '使用教程'"
+          :subtitle="
+            currentTab === 'stats'
+              ? 'API Key 使用统计'
+              : currentTab === 'overview'
+                ? '服务状态概览'
+                : '使用教程'
+          "
           :title="oemSettings.siteName"
         />
         <div class="flex items-center gap-2 md:gap-4">
@@ -50,6 +56,13 @@
           class="inline-flex w-full max-w-md rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl md:w-auto"
         >
           <button
+            :class="['tab-pill-button', currentTab === 'overview' ? 'active' : '']"
+            @click="switchToOverview"
+          >
+            <i class="fas fa-tachometer-alt mr-1 md:mr-2" />
+            <span class="text-sm md:text-base">状态概览</span>
+          </button>
+          <button
             :class="['tab-pill-button', currentTab === 'stats' ? 'active' : '']"
             @click="currentTab = 'stats'"
           >
@@ -65,6 +78,11 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- 状态概览内容 -->
+    <div v-if="currentTab === 'overview'" class="tab-content">
+      <PublicStatsOverview />
     </div>
 
     <!-- 统计内容 -->
@@ -174,6 +192,7 @@ import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import { useThemeStore } from '@/stores/theme'
+import { useAuthStore } from '@/stores/auth'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
@@ -184,13 +203,15 @@ import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import TutorialView from './TutorialView.vue'
 import ApiKeyTestModal from '@/components/apikeys/ApiKeyTestModal.vue'
+import PublicStatsOverview from '@/components/common/PublicStatsOverview.vue'
 
 const route = useRoute()
 const apiStatsStore = useApiStatsStore()
 const themeStore = useThemeStore()
+const authStore = useAuthStore()
 
-// 当前标签页
-const currentTab = ref('stats')
+// 当前标签页 - 默认显示状态概览
+const currentTab = ref('overview')
 
 // 主题相关
 const isDarkMode = computed(() => themeStore.isDarkMode)
@@ -223,6 +244,12 @@ const closeTestModal = () => {
   showTestModal.value = false
 }
 
+// 切换到状态概览并加载数据
+const switchToOverview = () => {
+  currentTab.value = 'overview'
+  authStore.loadPublicStats()
+}
+
 // 处理键盘快捷键
 const handleKeyDown = (event) => {
   // Ctrl/Cmd + Enter 查询
@@ -248,6 +275,9 @@ onMounted(() => {
 
   // 加载 OEM 设置
   loadOemSettings()
+
+  // 默认加载公开统计数据
+  authStore.loadPublicStats()
 
   // 检查 URL 参数
   const urlApiId = route.query.apiId

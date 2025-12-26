@@ -5,6 +5,7 @@
       <ThemeToggle mode="dropdown" />
     </div>
 
+    <!-- 登录卡片 -->
     <div
       class="glass-strong w-full max-w-md rounded-xl p-6 shadow-2xl sm:rounded-2xl sm:p-8 md:rounded-3xl md:p-10"
     >

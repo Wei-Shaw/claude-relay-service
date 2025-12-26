@@ -48,6 +48,18 @@
             <i class="fas fa-robot mr-2"></i>
             Claude 转发
           </button>
+          <button
+            :class="[
+              'border-b-2 pb-2 text-sm font-medium transition-colors',
+              activeSection === 'publicStats'
+                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+            @click="activeSection = 'publicStats'"
+          >
+            <i class="fas fa-chart-line mr-2"></i>
+            公开统计
+          </button>
         </nav>
       </div>
 
@@ -1025,6 +1037,158 @@
             </div>
           </div>
         </div>
+
+        <!-- 公开统计设置部分 -->
+        <div v-show="activeSection === 'publicStats'">
+          <div class="rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80">
+            <div class="mb-6 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div
+                  class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-md"
+                >
+                  <i class="fas fa-chart-line"></i>
+                </div>
+                <div>
+                  <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    公开统计概览
+                  </h2>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">
+                    配置未登录用户可见的统计数据
+                  </p>
+                </div>
+              </div>
+              <label class="inline-flex cursor-pointer items-center">
+                <input
+                  v-model="oemSettings.publicStatsEnabled"
+                  class="peer sr-only"
+                  type="checkbox"
+                />
+                <div
+                  class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-green-800"
+                ></div>
+                <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
+                  oemSettings.publicStatsEnabled ? '已启用' : '已禁用'
+                }}</span>
+              </label>
+            </div>
+
+            <!-- 数据显示选项 -->
+            <div
+              v-if="oemSettings.publicStatsEnabled"
+              class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700/50"
+            >
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <i class="fas fa-eye mr-2 text-gray-400"></i>
+                选择要公开显示的数据：
+              </p>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div
+                  class="rounded-lg border border-gray-200 bg-white p-3 transition-colors dark:border-gray-600 dark:bg-gray-800"
+                >
+                  <label class="flex cursor-pointer items-center gap-3">
+                    <input
+                      v-model="oemSettings.publicStatsShowModelDistribution"
+                      class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="checkbox"
+                    />
+                    <div>
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >模型使用分布</span
+                      >
+                      <p class="text-xs text-gray-500 dark:text-gray-400">显示各模型的使用占比</p>
+                    </div>
+                  </label>
+                  <div v-if="oemSettings.publicStatsShowModelDistribution" class="mt-3 pl-7">
+                    <div class="mb-1.5 text-xs text-gray-500 dark:text-gray-400">时间范围</div>
+                    <div class="inline-flex rounded-lg bg-gray-100 p-0.5 dark:bg-gray-700/50">
+                      <button
+                        v-for="option in modelDistributionPeriodOptions"
+                        :key="option.value"
+                        class="rounded-md px-2.5 py-1 text-xs font-medium transition-all"
+                        :class="
+                          oemSettings.publicStatsModelDistributionPeriod === option.value
+                            ? 'bg-white text-green-600 shadow-sm dark:bg-gray-600 dark:text-green-400'
+                            : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+                        "
+                        type="button"
+                        @click="oemSettings.publicStatsModelDistributionPeriod = option.value"
+                      >
+                        {{ option.label }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <label
+                  class="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  <input
+                    v-model="oemSettings.publicStatsShowTokenTrends"
+                    class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                  />
+                  <div>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      >Token 使用趋势</span
+                    >
+                    <p class="text-xs text-gray-500 dark:text-gray-400">显示近7天的Token使用量</p>
+                  </div>
+                </label>
+                <label
+                  class="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  <input
+                    v-model="oemSettings.publicStatsShowApiKeysTrends"
+                    class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                  />
+                  <div>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      >API Keys 活跃趋势</span
+                    >
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      显示近7天的活跃API Key数量
+                    </p>
+                  </div>
+                </label>
+                <label
+                  class="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  <input
+                    v-model="oemSettings.publicStatsShowAccountTrends"
+                    class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="checkbox"
+                  />
+                  <div>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      >账号活跃趋势</span
+                    >
+                    <p class="text-xs text-gray-500 dark:text-gray-400">显示近7天的活跃账号数量</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="mt-6 flex items-center justify-between">
+              <div class="flex gap-3">
+                <button
+                  class="btn btn-primary px-6 py-3"
+                  :class="{ 'cursor-not-allowed opacity-50': saving }"
+                  :disabled="saving"
+                  @click="saveOemSettings"
+                >
+                  <div v-if="saving" class="loading-spinner mr-2"></div>
+                  <i v-else class="fas fa-save mr-2" />
+                  {{ saving ? '保存中...' : '保存设置' }}
+                </button>
+              </div>
+              <div v-if="oemSettings.updatedAt" class="text-sm text-gray-500 dark:text-gray-400">
+                <i class="fas fa-clock mr-1" />
+                最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1621,6 +1785,15 @@ defineOptions({
 // 使用settings store
 const settingsStore = useSettingsStore()
 const { loading, saving, oemSettings } = storeToRefs(settingsStore)
+
+// 模型使用分布时间范围选项
+const modelDistributionPeriodOptions = [
+  { value: 'today', label: '今天' },
+  { value: '24h', label: '24小时' },
+  { value: '7d', label: '7天' },
+  { value: '30d', label: '30天' },
+  { value: 'all', label: '全部' }
+]
 
 // 组件refs
 const iconFileInput = ref()
@@ -2467,7 +2640,14 @@ const saveOemSettings = async () => {
       siteName: oemSettings.value.siteName,
       siteIcon: oemSettings.value.siteIcon,
       siteIconData: oemSettings.value.siteIconData,
-      showAdminButton: oemSettings.value.showAdminButton
+      showAdminButton: oemSettings.value.showAdminButton,
+      publicStatsEnabled: oemSettings.value.publicStatsEnabled,
+      publicStatsShowModelDistribution: oemSettings.value.publicStatsShowModelDistribution,
+      publicStatsModelDistributionPeriod:
+        oemSettings.value.publicStatsModelDistributionPeriod || 'today',
+      publicStatsShowTokenTrends: oemSettings.value.publicStatsShowTokenTrends,
+      publicStatsShowApiKeysTrends: oemSettings.value.publicStatsShowApiKeysTrends,
+      publicStatsShowAccountTrends: oemSettings.value.publicStatsShowAccountTrends
     }
     const result = await settingsStore.saveOemSettings(settings)
     if (result && result.success) {

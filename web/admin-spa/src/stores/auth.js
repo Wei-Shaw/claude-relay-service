@@ -14,9 +14,14 @@ export const useAuthStore = defineStore('auth', () => {
     siteName: 'Claude Relay Service',
     siteIcon: '',
     siteIconData: '',
-    faviconData: ''
+    faviconData: '',
+    publicStatsEnabled: false
   })
   const oemLoading = ref(true)
+
+  // 公开统计数据
+  const publicStats = ref(null)
+  const publicStatsLoading = ref(false)
 
   // 计算属性
   const isAuthenticated = computed(() => !!authToken.value && isLoggedIn.value)
@@ -104,11 +109,33 @@ export const useAuthStore = defineStore('auth', () => {
         if (result.data.siteName) {
           document.title = `${result.data.siteName} - 管理后台`
         }
+
+        // 如果公开统计已启用，加载统计数据
+        if (result.data.publicStatsEnabled) {
+          loadPublicStats()
+        }
       }
     } catch (error) {
       console.error('加载OEM设置失败:', error)
     } finally {
       oemLoading.value = false
+    }
+  }
+
+  async function loadPublicStats() {
+    publicStatsLoading.value = true
+    try {
+      const result = await apiClient.get('/admin/public-stats')
+      if (result.success && result.enabled && result.data) {
+        publicStats.value = result.data
+      } else {
+        publicStats.value = null
+      }
+    } catch (error) {
+      console.error('加载公开统计失败:', error)
+      publicStats.value = null
+    } finally {
+      publicStatsLoading.value = false
     }
   }
 
@@ -121,6 +148,8 @@ export const useAuthStore = defineStore('auth', () => {
     loginLoading,
     oemSettings,
     oemLoading,
+    publicStats,
+    publicStatsLoading,
 
     // 计算属性
     isAuthenticated,
@@ -131,6 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     checkAuth,
-    loadOemSettings
+    loadOemSettings,
+    loadPublicStats
   }
 })
