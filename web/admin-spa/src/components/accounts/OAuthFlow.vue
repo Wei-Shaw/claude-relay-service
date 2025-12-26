@@ -303,6 +303,16 @@
               请按照以下步骤完成 Gemini 账户的授权：
             </p>
 
+            <!-- 授权来源显示（由平台类型决定） -->
+            <div class="mb-4">
+              <p class="text-sm text-green-800 dark:text-green-300">
+                <i class="fas fa-info-circle mr-1"></i>
+                授权类型：<span class="font-semibold">{{
+                  platform === 'gemini-antigravity' ? 'Antigravity OAuth' : 'Gemini CLI OAuth'
+                }}</span>
+              </p>
+            </div>
+
             <div class="space-y-4">
               <!-- 步骤1: 生成授权链接 -->
               <div
@@ -818,6 +828,13 @@ const exchanging = ref(false)
 const authUrl = ref('')
 const authCode = ref('')
 const copied = ref(false)
+// oauthProvider is now derived from platform prop
+const geminiOauthProvider = computed(() => {
+  if (props.platform === 'gemini-antigravity') {
+    return 'antigravity'
+  }
+  return 'gemini-cli'
+})
 const sessionId = ref('') // 保存sessionId用于后续交换
 const userCode = ref('')
 const verificationUri = ref('')
@@ -921,7 +938,11 @@ watch(authCode, (newValue) => {
         console.error('Failed to parse URL:', error)
         showToast('链接格式错误，请检查是否为完整的 URL', 'error')
       }
-    } else if (props.platform === 'gemini' || props.platform === 'openai') {
+    } else if (
+      props.platform === 'gemini' ||
+      props.platform === 'gemini-antigravity' ||
+      props.platform === 'openai'
+    ) {
       // Gemini 和 OpenAI 平台可能使用不同的回调URL
       // 尝试从任何URL中提取code参数
       try {
@@ -972,8 +993,11 @@ const generateAuthUrl = async () => {
       const result = await accountsStore.generateClaudeAuthUrl(proxyConfig)
       authUrl.value = result.authUrl
       sessionId.value = result.sessionId
-    } else if (props.platform === 'gemini') {
-      const result = await accountsStore.generateGeminiAuthUrl(proxyConfig)
+    } else if (props.platform === 'gemini' || props.platform === 'gemini-antigravity') {
+      const result = await accountsStore.generateGeminiAuthUrl({
+        ...proxyConfig,
+        oauthProvider: geminiOauthProvider.value
+      })
       authUrl.value = result.authUrl
       sessionId.value = result.sessionId
     } else if (props.platform === 'openai') {
@@ -995,6 +1019,8 @@ const generateAuthUrl = async () => {
     loading.value = false
   }
 }
+
+// onGeminiOauthProviderChange removed - oauthProvider is now computed from platform
 
 // 重新生成授权URL
 const regenerateAuthUrl = () => {
@@ -1079,11 +1105,12 @@ const exchangeCode = async () => {
         sessionId: sessionId.value,
         callbackUrl: authCode.value.trim()
       }
-    } else if (props.platform === 'gemini') {
-      // Gemini使用code和sessionId
+    } else if (props.platform === 'gemini' || props.platform === 'gemini-antigravity') {
+      // Gemini/Antigravity使用code和sessionId
       data = {
         code: authCode.value.trim(),
-        sessionId: sessionId.value
+        sessionId: sessionId.value,
+        oauthProvider: geminiOauthProvider.value
       }
     } else if (props.platform === 'openai') {
       // OpenAI使用code和sessionId
@@ -1111,8 +1138,12 @@ const exchangeCode = async () => {
     let tokenInfo
     if (props.platform === 'claude') {
       tokenInfo = await accountsStore.exchangeClaudeCode(data)
-    } else if (props.platform === 'gemini') {
+    } else if (props.platform === 'gemini' || props.platform === 'gemini-antigravity') {
       tokenInfo = await accountsStore.exchangeGeminiCode(data)
+      // 附加 oauthProvider 信息到 tokenInfo
+      if (tokenInfo) {
+        tokenInfo.oauthProvider = geminiOauthProvider.value
+      }
     } else if (props.platform === 'openai') {
       tokenInfo = await accountsStore.exchangeOpenAICode(data)
     } else if (props.platform === 'droid') {

@@ -4,9 +4,33 @@ const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 
+const OAUTH_PROVIDER_GEMINI_CLI = 'gemini-cli'
+const OAUTH_PROVIDER_ANTIGRAVITY = 'antigravity'
+const KNOWN_OAUTH_PROVIDERS = [OAUTH_PROVIDER_GEMINI_CLI, OAUTH_PROVIDER_ANTIGRAVITY]
+
+function normalizeOauthProvider(oauthProvider) {
+  if (!oauthProvider) {
+    return OAUTH_PROVIDER_GEMINI_CLI
+  }
+  return oauthProvider === OAUTH_PROVIDER_ANTIGRAVITY
+    ? OAUTH_PROVIDER_ANTIGRAVITY
+    : OAUTH_PROVIDER_GEMINI_CLI
+}
+
 class UnifiedGeminiScheduler {
   constructor() {
     this.SESSION_MAPPING_PREFIX = 'unified_gemini_session_mapping:'
+  }
+
+  _getSessionMappingKey(sessionHash, oauthProvider = null) {
+    if (!sessionHash) {
+      return null
+    }
+    if (!oauthProvider) {
+      return `${this.SESSION_MAPPING_PREFIX}${sessionHash}`
+    }
+    const normalized = normalizeOauthProvider(oauthProvider)
+    return `${this.SESSION_MAPPING_PREFIX}${normalized}:${sessionHash}`
   }
 
   // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
@@ -32,7 +56,8 @@ class UnifiedGeminiScheduler {
     requestedModel = null,
     options = {}
   ) {
-    const { allowApiAccounts = false } = options
+    const { allowApiAccounts = false, oauthProvider = null } = options
+    const normalizedOauthProvider = oauthProvider ? normalizeOauthProvider(oauthProvider) : null
 
     try {
       // 如果API Key绑定了专属账户或分组，优先使用
@@ -83,14 +108,23 @@ class UnifiedGeminiScheduler {
             this._isActive(boundAccount.isActive) &&
             boundAccount.status !== 'error'
           ) {
-            logger.info(
-              `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId}) for API key ${apiKeyData.name}`
-            )
-            // 更新账户的最后使用时间
-            await geminiAccountService.markAccountUsed(apiKeyData.geminiAccountId)
-            return {
-              accountId: apiKeyData.geminiAccountId,
-              accountType: 'gemini'
+            if (
+              normalizedOauthProvider &&
+              normalizeOauthProvider(boundAccount.oauthProvider) !== normalizedOauthProvider
+            ) {
+              logger.warn(
+                `⚠️ Bound Gemini OAuth account ${boundAccount.name} oauthProvider=${normalizeOauthProvider(boundAccount.oauthProvider)} does not match requested oauthProvider=${normalizedOauthProvider}, falling back to pool`
+              )
+            } else {
+              logger.info(
+                `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId}) for API key ${apiKeyData.name}`
+              )
+              // 更新账户的最后使用时间
+              await geminiAccountService.markAccountUsed(apiKeyData.geminiAccountId)
+              return {
+                accountId: apiKeyData.geminiAccountId,
+                accountType: 'gemini'
+              }
             }
           } else {
             logger.warn(
@@ -102,7 +136,7 @@ class UnifiedGeminiScheduler {
 
       // 如果有会话哈希，检查是否有已映射的账户
       if (sessionHash) {
-        const mappedAccount = await this._getSessionMapping(sessionHash)
+        const mappedAccount = await this._getSessionMapping(sessionHash, normalizedOauthProvider)
         if (mappedAccount) {
           // 验证映射的账户是否仍然可用
           const isAvailable = await this._isAccountAvailable(
@@ -111,7 +145,7 @@ class UnifiedGeminiScheduler {
           )
           if (isAvailable) {
             // 🚀 智能会话续期（续期 unified 映射键，按配置）
-            await this._extendSessionMappingTTL(sessionHash)
+            await this._extendSessionMappingTTL(sessionHash, normalizedOauthProvider)
             logger.info(
               `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
             )
@@ -132,11 +166,10 @@ class UnifiedGeminiScheduler {
       }
 
       // 获取所有可用账户
-      const availableAccounts = await this._getAllAvailableAccounts(
-        apiKeyData,
-        requestedModel,
-        allowApiAccounts
-      )
+      const availableAccounts = await this._getAllAvailableAccounts(apiKeyData, requestedModel, {
+        allowApiAccounts,
+        oauthProvider: normalizedOauthProvider
+      })
 
       if (availableAccounts.length === 0) {
         // 提供更详细的错误信息
@@ -160,7 +193,8 @@ class UnifiedGeminiScheduler {
         await this._setSessionMapping(
           sessionHash,
           selectedAccount.accountId,
-          selectedAccount.accountType
+          selectedAccount.accountType,
+          normalizedOauthProvider
         )
         logger.info(
           `🎯 Created new sticky session mapping: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) for session ${sessionHash}`
@@ -189,7 +223,18 @@ class UnifiedGeminiScheduler {
   }
 
   // 📋 获取所有可用账户
-  async _getAllAvailableAccounts(apiKeyData, requestedModel = null, allowApiAccounts = false) {
+  async _getAllAvailableAccounts(
+    apiKeyData,
+    requestedModel = null,
+    allowApiAccountsOrOptions = false
+  ) {
+    const options =
+      allowApiAccountsOrOptions && typeof allowApiAccountsOrOptions === 'object'
+        ? allowApiAccountsOrOptions
+        : { allowApiAccounts: allowApiAccountsOrOptions }
+    const { allowApiAccounts = false, oauthProvider = null } = options
+    const normalizedOauthProvider = oauthProvider ? normalizeOauthProvider(oauthProvider) : null
+
     const availableAccounts = []
 
     // 如果API Key绑定了专属账户，优先返回
@@ -254,6 +299,12 @@ class UnifiedGeminiScheduler {
           this._isActive(boundAccount.isActive) &&
           boundAccount.status !== 'error'
         ) {
+          if (
+            normalizedOauthProvider &&
+            normalizeOauthProvider(boundAccount.oauthProvider) !== normalizedOauthProvider
+          ) {
+            return availableAccounts
+          }
           const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
           if (!isRateLimited) {
             // 检查模型支持
@@ -303,6 +354,12 @@ class UnifiedGeminiScheduler {
         (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
         this._isSchedulable(account.schedulable)
       ) {
+        if (
+          normalizedOauthProvider &&
+          normalizeOauthProvider(account.oauthProvider) !== normalizedOauthProvider
+        ) {
+          continue
+        }
         // 检查是否可调度
 
         // 检查token是否过期
@@ -437,9 +494,10 @@ class UnifiedGeminiScheduler {
   }
 
   // 🔗 获取会话映射
-  async _getSessionMapping(sessionHash) {
+  async _getSessionMapping(sessionHash, oauthProvider = null) {
     const client = redis.getClientSafe()
-    const mappingData = await client.get(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`)
+    const key = this._getSessionMappingKey(sessionHash, oauthProvider)
+    const mappingData = key ? await client.get(key) : null
 
     if (mappingData) {
       try {
@@ -454,27 +512,42 @@ class UnifiedGeminiScheduler {
   }
 
   // 💾 设置会话映射
-  async _setSessionMapping(sessionHash, accountId, accountType) {
+  async _setSessionMapping(sessionHash, accountId, accountType, oauthProvider = null) {
     const client = redis.getClientSafe()
     const mappingData = JSON.stringify({ accountId, accountType })
     // 依据配置设置TTL（小时）
     const appConfig = require('../../config/config')
     const ttlHours = appConfig.session?.stickyTtlHours || 1
     const ttlSeconds = Math.max(1, Math.floor(ttlHours * 60 * 60))
-    await client.setex(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`, ttlSeconds, mappingData)
+    const key = this._getSessionMappingKey(sessionHash, oauthProvider)
+    if (!key) {
+      return
+    }
+    await client.setex(key, ttlSeconds, mappingData)
   }
 
   // 🗑️ 删除会话映射
   async _deleteSessionMapping(sessionHash) {
     const client = redis.getClientSafe()
-    await client.del(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`)
+    if (!sessionHash) {
+      return
+    }
+
+    const keys = [this._getSessionMappingKey(sessionHash)]
+    for (const provider of KNOWN_OAUTH_PROVIDERS) {
+      keys.push(this._getSessionMappingKey(sessionHash, provider))
+    }
+    await client.del(keys.filter(Boolean))
   }
 
   // 🔁 续期统一调度会话映射TTL（针对 unified_gemini_session_mapping:* 键），遵循会话配置
-  async _extendSessionMappingTTL(sessionHash) {
+  async _extendSessionMappingTTL(sessionHash, oauthProvider = null) {
     try {
       const client = redis.getClientSafe()
-      const key = `${this.SESSION_MAPPING_PREFIX}${sessionHash}`
+      const key = this._getSessionMappingKey(sessionHash, oauthProvider)
+      if (!key) {
+        return false
+      }
       const remainingTTL = await client.ttl(key)
 
       if (remainingTTL === -2) {
