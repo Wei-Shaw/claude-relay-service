@@ -122,16 +122,6 @@ async function handleMessagesRequest(req, res) {
   try {
     const startTime = Date.now()
 
-    // Claude 服务权限校验，阻止未授权的 Key
-    if (!apiKeyService.hasPermission(req.apiKey.permissions, 'claude')) {
-      return res.status(403).json({
-        error: {
-          type: 'permission_error',
-          message: '此 API Key 无权访问 Claude 服务'
-        }
-      })
-    }
-
     // 🔄 并发满额重试标志：最多重试一次（使用req对象存储状态）
     if (req._concurrencyRetryAttempted === undefined) {
       req._concurrencyRetryAttempted = false
