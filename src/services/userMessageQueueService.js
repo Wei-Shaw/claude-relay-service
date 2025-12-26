@@ -121,12 +121,23 @@ class UserMessageQueueService {
    * @param {string} accountId - 账户ID
    * @param {string} requestId - 请求ID（可选，会自动生成）
    * @param {number} timeoutMs - 超时时间（可选，使用配置默认值）
+   * @param {Object} accountConfig - 账户级配置（可选），优先级高于全局配置
+   * @param {number} accountConfig.maxConcurrency - 账户级串行队列开关：>0启用，=0使用全局配置
    * @returns {Promise<{acquired: boolean, requestId: string, error?: string}>}
    */
-  async acquireQueueLock(accountId, requestId = null, timeoutMs = null) {
+  async acquireQueueLock(accountId, requestId = null, timeoutMs = null, accountConfig = null) {
     const cfg = await this.getConfig()
 
-    if (!cfg.enabled) {
+    // 账户级配置优先：maxConcurrency > 0 时强制启用，忽略全局开关
+    let queueEnabled = cfg.enabled
+    if (accountConfig && accountConfig.maxConcurrency > 0) {
+      queueEnabled = true
+      logger.debug(
+        `📬 User message queue: account-level queue enabled for account ${accountId} (maxConcurrency=${accountConfig.maxConcurrency})`
+      )
+    }
+
+    if (!queueEnabled) {
       return { acquired: true, requestId: requestId || uuidv4(), skipped: true }
     }
 

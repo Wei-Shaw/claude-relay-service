@@ -12,6 +12,13 @@ const { getEffectiveModel, parseVendorPrefixedModel } = require('../utils/modelH
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
+const claudeAccountService = require('../services/claudeAccountService')
+const claudeConsoleAccountService = require('../services/claudeConsoleAccountService')
+const {
+  isWarmupRequest,
+  buildMockWarmupResponse,
+  sendMockWarmupStream
+} = require('../utils/warmupInterceptor')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const { dumpAnthropicMessagesRequest } = require('../utils/anthropicRequestDump')
 const {
@@ -114,6 +121,16 @@ function isOldSession(body) {
 async function handleMessagesRequest(req, res) {
   try {
     const startTime = Date.now()
+
+    // Claude 服务权限校验，阻止未授权的 Key
+    if (!apiKeyService.hasPermission(req.apiKey.permissions, 'claude')) {
+      return res.status(403).json({
+        error: {
+          type: 'permission_error',
+          message: '此 API Key 无权访问 Claude 服务'
+        }
+      })
+    }
 
     // 🔄 并发满额重试标志：最多重试一次（使用req对象存储状态）
     if (req._concurrencyRetryAttempted === undefined) {
@@ -395,6 +412,23 @@ async function handleMessagesRequest(req, res) {
           )
         } catch (bindingError) {
           logger.warn(`⚠️ Failed to create session binding:`, bindingError)
+        }
+      }
+
+      // 🔥 预热请求拦截检查（在转发之前）
+      if (accountType === 'claude-official' || accountType === 'claude-console') {
+        const account =
+          accountType === 'claude-official'
+            ? await claudeAccountService.getAccount(accountId)
+            : await claudeConsoleAccountService.getAccount(accountId)
+
+        if (account?.interceptWarmup === 'true' && isWarmupRequest(req.body)) {
+          logger.api(`🔥 Warmup request intercepted for account: ${account.name} (${accountId})`)
+          if (isStream) {
+            return sendMockWarmupStream(res, req.body.model)
+          } else {
+            return res.json(buildMockWarmupResponse(req.body.model))
+          }
         }
       }
 
@@ -894,6 +928,21 @@ async function handleMessagesRequest(req, res) {
           )
         } catch (bindingError) {
           logger.warn(`⚠️ Failed to create session binding (non-stream):`, bindingError)
+        }
+      }
+
+      // 🔥 预热请求拦截检查（非流式，在转发之前）
+      if (accountType === 'claude-official' || accountType === 'claude-console') {
+        const account =
+          accountType === 'claude-official'
+            ? await claudeAccountService.getAccount(accountId)
+            : await claudeConsoleAccountService.getAccount(accountId)
+
+        if (account?.interceptWarmup === 'true' && isWarmupRequest(req.body)) {
+          logger.api(
+            `🔥 Warmup request intercepted (non-stream) for account: ${account.name} (${accountId})`
+          )
+          return res.json(buildMockWarmupResponse(req.body.model))
         }
       }
 
@@ -1465,9 +1514,6 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
   const maxAttempts = 2
   let attempt = 0
 
-  // 引入 claudeConsoleAccountService 用于检查 count_tokens 可用性
-  const claudeConsoleAccountService = require('../services/claudeConsoleAccountService')
-
   const processRequest = async () => {
     const { accountId, accountType } = await unifiedClaudeScheduler.selectAccountForApiKey(
       req.apiKey,
@@ -1661,6 +1707,11 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
       return
     }
   }
+})
+
+// Claude Code 客户端遥测端点 - 返回成功响应避免 404 日志
+router.post('/api/event_logging/batch', (req, res) => {
+  res.status(200).json({ success: true })
 })
 
 module.exports = router

@@ -68,7 +68,8 @@ class ClaudeConsoleAccountService {
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
       maxConcurrentTasks = 0, // 最大并发任务数，0表示无限制
-      disableAutoProtection = false // 是否关闭自动防护（429/401/400/529 不自动禁用）
+      disableAutoProtection = false, // 是否关闭自动防护（429/401/400/529 不自动禁用）
+      interceptWarmup = false // 拦截预热请求（标题生成、Warmup等）
     } = options
 
     // 验证必填字段
@@ -117,7 +118,8 @@ class ClaudeConsoleAccountService {
       quotaResetTime, // 额度重置时间
       quotaStoppedAt: '', // 因额度停用的时间
       maxConcurrentTasks: maxConcurrentTasks.toString(), // 最大并发任务数，0表示无限制
-      disableAutoProtection: disableAutoProtection.toString() // 关闭自动防护
+      disableAutoProtection: disableAutoProtection.toString(), // 关闭自动防护
+      interceptWarmup: interceptWarmup.toString() // 拦截预热请求
     }
 
     const client = redis.getClientSafe()
@@ -156,6 +158,7 @@ class ClaudeConsoleAccountService {
       quotaStoppedAt: null,
       maxConcurrentTasks, // 新增：返回并发限制配置
       disableAutoProtection, // 新增：返回自动防护开关
+      interceptWarmup, // 新增：返回预热请求拦截开关
       activeTaskCount: 0 // 新增：新建账户当前并发数为0
     }
   }
@@ -217,7 +220,9 @@ class ClaudeConsoleAccountService {
             // 并发控制相关
             maxConcurrentTasks: parseInt(accountData.maxConcurrentTasks) || 0,
             activeTaskCount,
-            disableAutoProtection: accountData.disableAutoProtection === 'true'
+            disableAutoProtection: accountData.disableAutoProtection === 'true',
+            // 拦截预热请求
+            interceptWarmup: accountData.interceptWarmup === 'true'
           })
         }
       }
@@ -374,6 +379,9 @@ class ClaudeConsoleAccountService {
       }
       if (updates.disableAutoProtection !== undefined) {
         updatedData.disableAutoProtection = updates.disableAutoProtection.toString()
+      }
+      if (updates.interceptWarmup !== undefined) {
+        updatedData.interceptWarmup = updates.interceptWarmup.toString()
       }
 
       // ✅ 直接保存 subscriptionExpiresAt（如果提供）

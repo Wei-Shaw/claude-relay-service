@@ -6,6 +6,7 @@ const geminiAccountService = require('../services/geminiAccountService')
 const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
 const { getAvailableModels } = require('../services/geminiRelayService')
 const crypto = require('crypto')
+const apiKeyService = require('../services/apiKeyService')
 
 // 生成会话哈希
 function generateSessionHash(req) {
@@ -31,8 +32,7 @@ function ensureAntigravityProjectId(account) {
 
 // 检查 API Key 权限
 function checkPermissions(apiKeyData, requiredPermission = 'gemini') {
-  const permissions = apiKeyData.permissions || 'all'
-  return permissions === 'all' || permissions === requiredPermission
+  return apiKeyService.hasPermission(apiKeyData?.permissions, requiredPermission)
 }
 
 // 转换 OpenAI 消息格式到 Gemini 格式
@@ -532,7 +532,6 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
         // 记录使用统计
         if (!usageReported && totalUsage.totalTokenCount > 0) {
           try {
-            const apiKeyService = require('../services/apiKeyService')
             await apiKeyService.recordUsage(
               apiKeyData.id,
               totalUsage.promptTokenCount || 0,
@@ -634,7 +633,6 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       // 记录使用统计
       if (openaiResponse.usage) {
         try {
-          const apiKeyService = require('../services/apiKeyService')
           await apiKeyService.recordUsage(
             apiKeyData.id,
             openaiResponse.usage.prompt_tokens || 0,

@@ -52,6 +52,16 @@ class Application {
       await redis.connect()
       logger.success('✅ Redis connected successfully')
 
+      // 💳 初始化账户余额查询服务（Provider 注册）
+      try {
+        const accountBalanceService = require('./services/accountBalanceService')
+        const { registerAllProviders } = require('./services/balanceProviders')
+        registerAllProviders(accountBalanceService)
+        logger.info('✅ 账户余额查询服务已初始化')
+      } catch (error) {
+        logger.warn('⚠️ 账户余额查询服务初始化失败:', error.message)
+      }
+
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')
       await pricingService.initialize()
@@ -67,6 +77,10 @@ class Application {
       // 🔧 初始化管理员凭据
       logger.info('🔄 Initializing admin credentials...')
       await this.initializeAdmin()
+
+      // 🔒 安全启动：清理无效/伪造的管理员会话
+      logger.info('🔒 Cleaning up invalid admin sessions...')
+      await this.cleanupInvalidSessions()
 
       // 💰 初始化费用数据
       logger.info('💰 Checking cost data initialization...')
@@ -445,6 +459,54 @@ class Application {
     }
   }
 
+  // 🔒 清理无效/伪造的管理员会话（安全启动检查）
+  async cleanupInvalidSessions() {
+    try {
+      const client = redis.getClient()
+
+      // 获取所有 session:* 键
+      const sessionKeys = await client.keys('session:*')
+
+      let validCount = 0
+      let invalidCount = 0
+
+      for (const key of sessionKeys) {
+        // 跳过 admin_credentials（系统凭据）
+        if (key === 'session:admin_credentials') {
+          continue
+        }
+
+        const sessionData = await client.hgetall(key)
+
+        // 检查会话完整性：必须有 username 和 loginTime
+        const hasUsername = !!sessionData.username
+        const hasLoginTime = !!sessionData.loginTime
+
+        if (!hasUsername || !hasLoginTime) {
+          // 无效会话 - 可能是漏洞利用创建的伪造会话
+          invalidCount++
+          logger.security(
+            `🔒 Removing invalid session: ${key} (username: ${hasUsername}, loginTime: ${hasLoginTime})`
+          )
+          await client.del(key)
+        } else {
+          validCount++
+        }
+      }
+
+      if (invalidCount > 0) {
+        logger.security(`🔒 Startup security check: Removed ${invalidCount} invalid sessions`)
+      }
+
+      logger.success(
+        `✅ Session cleanup completed: ${validCount} valid, ${invalidCount} invalid removed`
+      )
+    } catch (error) {
+      // 清理失败不应阻止服务启动
+      logger.error('❌ Failed to cleanup invalid sessions:', error.message)
+    }
+  }
+
   // 🔍 Redis健康检查
   async checkRedisHealth() {
     try {
@@ -600,10 +662,11 @@ class Application {
 
         const now = Date.now()
         let totalCleaned = 0
+        let legacyCleaned = 0
 
         // 使用 Lua 脚本批量清理所有过期项
         for (const key of keys) {
-          // 跳过非 Sorted Set 类型的键（这些键有各自的清理逻辑）
+          // 跳过已知非 Sorted Set 类型的键（这些键有各自的清理逻辑）
           // - concurrency:queue:stats:* 是 Hash 类型
           // - concurrency:queue:wait_times:* 是 List 类型
           // - concurrency:queue:* (不含stats/wait_times) 是 String 类型
@@ -618,10 +681,20 @@ class Application {
           }
 
           try {
-            const cleaned = await redis.client.eval(
+            // 使用原子 Lua 脚本：先检查类型，再执行清理
+            // 返回值：0 = 正常清理无删除，1 = 清理后删除空键，-1 = 遗留键已删除
+            const result = await redis.client.eval(
               `
               local key = KEYS[1]
               local now = tonumber(ARGV[1])
+
+              -- 先检查键类型，只对 Sorted Set 执行清理
+              local keyType = redis.call('TYPE', key)
+              if keyType.ok ~= 'zset' then
+                -- 非 ZSET 类型的遗留键，直接删除
+                redis.call('DEL', key)
+                return -1
+              end
 
               -- 清理过期项
               redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
@@ -641,8 +714,10 @@ class Application {
               key,
               now
             )
-            if (cleaned === 1) {
+            if (result === 1) {
               totalCleaned++
+            } else if (result === -1) {
+              legacyCleaned++
             }
           } catch (error) {
             logger.error(`❌ Failed to clean concurrency key ${key}:`, error)
@@ -651,6 +726,9 @@ class Application {
 
         if (totalCleaned > 0) {
           logger.info(`🔢 Concurrency cleanup: cleaned ${totalCleaned} expired keys`)
+        }
+        if (legacyCleaned > 0) {
+          logger.warn(`🧹 Concurrency cleanup: removed ${legacyCleaned} legacy keys (wrong type)`)
         }
       } catch (error) {
         logger.error('❌ Concurrency cleanup task failed:', error)
@@ -679,6 +757,19 @@ class Application {
       logger.info(
         '🚦 Skipping concurrency queue cleanup on startup (CLEAR_CONCURRENCY_QUEUES_ON_STARTUP=false)'
       )
+    }
+
+    // 🧪 启动账户定时测试调度器
+    // 根据配置定期测试账户连通性并保存测试历史
+    const accountTestSchedulerEnabled =
+      process.env.ACCOUNT_TEST_SCHEDULER_ENABLED !== 'false' &&
+      config.accountTestScheduler?.enabled !== false
+    if (accountTestSchedulerEnabled) {
+      const accountTestSchedulerService = require('./services/accountTestSchedulerService')
+      accountTestSchedulerService.start()
+      logger.info('🧪 Account test scheduler service started')
+    } else {
+      logger.info('🧪 Account test scheduler service disabled')
     }
   }
 
@@ -732,6 +823,15 @@ class Application {
             logger.info('📊 Cost rank service stopped')
           } catch (error) {
             logger.error('❌ Error stopping cost rank service:', error)
+          }
+
+          // 停止账户定时测试调度器
+          try {
+            const accountTestSchedulerService = require('./services/accountTestSchedulerService')
+            accountTestSchedulerService.stop()
+            logger.info('🧪 Account test scheduler service stopped')
+          } catch (error) {
+            logger.error('❌ Error stopping account test scheduler service:', error)
           }
 
           // 🔢 清理所有并发计数（Phase 1 修复：防止重启泄漏）

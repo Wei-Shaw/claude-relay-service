@@ -141,6 +141,28 @@
               </el-tooltip>
             </div>
 
+            <!-- 刷新余额按钮 -->
+            <div class="relative">
+              <el-tooltip :content="refreshBalanceTooltip" effect="dark" placement="bottom">
+                <button
+                  class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
+                  :disabled="accountsLoading || refreshingBalances || !canRefreshVisibleBalances"
+                  @click="refreshVisibleBalances"
+                >
+                  <div
+                    class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                  ></div>
+                  <i
+                    :class="[
+                      'fas relative text-blue-500',
+                      refreshingBalances ? 'fa-spinner fa-spin' : 'fa-wallet'
+                    ]"
+                  />
+                  <span class="relative">刷新余额</span>
+                </button>
+              </el-tooltip>
+            </div>
+
             <!-- 选择/取消选择按钮 -->
             <button
               class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -262,6 +284,11 @@
                   class="min-w-[150px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                 >
                   今日使用
+                </th>
+                <th
+                  class="min-w-[220px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                >
+                  余额/配额
                 </th>
                 <th
                   class="min-w-[210px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -766,6 +793,23 @@
                   <div v-else class="text-xs text-gray-400">暂无数据</div>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4">
+                  <BalanceDisplay
+                    :account-id="account.id"
+                    :initial-balance="account.balanceInfo"
+                    :platform="account.platform"
+                    @error="(error) => handleBalanceError(account.id, error)"
+                    @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
+                  />
+                  <div class="mt-1 text-xs">
+                    <button
+                      class="text-blue-500 hover:underline dark:text-blue-300"
+                      @click="openBalanceScriptModal(account)"
+                    >
+                      配置余额脚本
+                    </button>
+                  </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4">
                   <div v-if="account.platform === 'claude'" class="space-y-2">
                     <!-- OAuth 账户：显示三窗口 OAuth usage -->
                     <div v-if="isClaudeOAuth(account) && account.claudeUsage" class="space-y-2">
@@ -1239,6 +1283,15 @@
                       <span class="ml-1">测试</span>
                     </button>
                     <button
+                      v-if="canTestAccount(account)"
+                      class="rounded bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-800/50"
+                      title="定时测试配置"
+                      @click="openScheduledTestModal(account)"
+                    >
+                      <i class="fas fa-clock" />
+                      <span class="ml-1">定时</span>
+                    </button>
+                    <button
                       class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200"
                       title="编辑账户"
                       @click="editAccount(account)"
@@ -1413,6 +1466,26 @@
                 </div>
               </div>
               <div v-else class="text-sm font-semibold text-gray-400">-</div>
+            </div>
+          </div>
+
+          <!-- 余额/配额 -->
+          <div class="mb-3">
+            <p class="mb-1 text-xs text-gray-500 dark:text-gray-400">余额/配额</p>
+            <BalanceDisplay
+              :account-id="account.id"
+              :initial-balance="account.balanceInfo"
+              :platform="account.platform"
+              @error="(error) => handleBalanceError(account.id, error)"
+              @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
+            />
+            <div class="mt-1 text-xs">
+              <button
+                class="text-blue-500 hover:underline dark:text-blue-300"
+                @click="openBalanceScriptModal(account)"
+              >
+                配置余额脚本
+              </button>
             </div>
           </div>
 
@@ -1708,6 +1781,15 @@
             </button>
 
             <button
+              v-if="canTestAccount(account)"
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-600 transition-colors hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-800/50"
+              @click="openScheduledTestModal(account)"
+            >
+              <i class="fas fa-clock" />
+              定时
+            </button>
+
+            <button
               class="flex-1 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100"
               @click="editAccount(account)"
             >
@@ -1880,6 +1962,21 @@
       @close="closeAccountTestModal"
     />
 
+    <!-- 定时测试配置弹窗 -->
+    <AccountScheduledTestModal
+      :account="scheduledTestAccount"
+      :show="showScheduledTestModal"
+      @close="closeScheduledTestModal"
+      @saved="handleScheduledTestSaved"
+    />
+
+    <AccountBalanceScriptModal
+      :account="selectedAccountForScript"
+      :show="showBalanceScriptModal"
+      @close="closeBalanceScriptModal"
+      @saved="handleBalanceScriptSaved"
+    />
+
     <!-- 账户统计弹窗 -->
     <el-dialog
       v-model="showAccountStatsModal"
@@ -2032,9 +2129,12 @@ import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
 import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
 import AccountTestModal from '@/components/accounts/AccountTestModal.vue'
+import AccountScheduledTestModal from '@/components/accounts/AccountScheduledTestModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
+import BalanceDisplay from '@/components/accounts/BalanceDisplay.vue'
+import AccountBalanceScriptModal from '@/components/accounts/AccountBalanceScriptModal.vue'
 
 // 使用确认弹窗
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
@@ -2042,6 +2142,7 @@ const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCanc
 // 数据状态
 const accounts = ref([])
 const accountsLoading = ref(false)
+const refreshingBalances = ref(false)
 const accountsSortBy = ref('name')
 const accountsSortOrder = ref('asc')
 const apiKeys = ref([]) // 保留用于其他功能（如删除账户时显示绑定信息）
@@ -2098,6 +2199,10 @@ const expiryEditModalRef = ref(null)
 // 测试弹窗状态
 const showAccountTestModal = ref(false)
 const testingAccount = ref(null)
+
+// 定时测试配置弹窗状态
+const showScheduledTestModal = ref(false)
+const scheduledTestAccount = ref(null)
 
 // 账户统计弹窗状态
 const showAccountStatsModal = ref(false)
@@ -2365,6 +2470,13 @@ const getAccountActions = (account) => {
       color: 'blue',
       handler: () => openAccountTestModal(account)
     })
+    actions.push({
+      key: 'scheduled-test',
+      label: '定时测试',
+      icon: 'fa-clock',
+      color: 'amber',
+      handler: () => openScheduledTestModal(account)
+    })
   }
 
   // 删除
@@ -2439,6 +2551,61 @@ const openAccountTestModal = (account) => {
 const closeAccountTestModal = () => {
   showAccountTestModal.value = false
   testingAccount.value = null
+}
+
+// 定时测试配置相关函数
+const openScheduledTestModal = (account) => {
+  if (!canTestAccount(account)) {
+    showToast('该账户类型暂不支持定时测试', 'warning')
+    return
+  }
+  scheduledTestAccount.value = account
+  showScheduledTestModal.value = true
+}
+
+const closeScheduledTestModal = () => {
+  showScheduledTestModal.value = false
+  scheduledTestAccount.value = null
+}
+
+const handleScheduledTestSaved = () => {
+  showToast('定时测试配置已保存', 'success')
+}
+
+// 余额脚本配置
+const showBalanceScriptModal = ref(false)
+const selectedAccountForScript = ref(null)
+
+const openBalanceScriptModal = (account) => {
+  selectedAccountForScript.value = account
+  showBalanceScriptModal.value = true
+}
+
+const closeBalanceScriptModal = () => {
+  showBalanceScriptModal.value = false
+  selectedAccountForScript.value = null
+}
+
+const handleBalanceScriptSaved = async () => {
+  showToast('余额脚本已保存', 'success')
+  const account = selectedAccountForScript.value
+  closeBalanceScriptModal()
+
+  if (!account?.id || !account?.platform) {
+    return
+  }
+
+  // 重新拉取一次余额信息，用于刷新 scriptConfigured 状态（启用“刷新余额”按钮）
+  try {
+    const res = await apiClient.get(`/admin/accounts/${account.id}/balance`, {
+      params: { platform: account.platform, queryApi: false }
+    })
+    if (res?.success && res.data) {
+      handleBalanceRefreshed(account.id, res.data)
+    }
+  } catch (error) {
+    console.debug('Failed to reload balance after saving script:', error)
+  }
 }
 
 // 计算排序后的账户列表
@@ -2711,6 +2878,104 @@ const paginatedAccounts = computed(() => {
   return sortedAccounts.value.slice(start, end)
 })
 
+const canRefreshVisibleBalances = computed(() => {
+  const targets = paginatedAccounts.value
+  if (!Array.isArray(targets) || targets.length === 0) {
+    return false
+  }
+
+  return targets.some((account) => {
+    const info = account?.balanceInfo
+    return info?.scriptEnabled !== false && !!info?.scriptConfigured
+  })
+})
+
+const refreshBalanceTooltip = computed(() => {
+  if (accountsLoading.value) return '正在加载账户...'
+  if (refreshingBalances.value) return '刷新中...'
+  if (!canRefreshVisibleBalances.value) return '当前页未配置余额脚本，无法刷新'
+  return '刷新当前页余额（仅对已配置余额脚本的账户生效）'
+})
+
+// 余额刷新成功回调
+const handleBalanceRefreshed = (accountId, balanceInfo) => {
+  accounts.value = accounts.value.map((account) => {
+    if (account.id !== accountId) return account
+    return { ...account, balanceInfo }
+  })
+}
+
+// 余额请求错误回调（仅提示，不中断页面）
+const handleBalanceError = (_accountId, error) => {
+  const message = error?.message || '余额查询失败'
+  showToast(message, 'error')
+}
+
+// 批量刷新当前页余额（触发查询）
+const refreshVisibleBalances = async () => {
+  if (refreshingBalances.value) return
+
+  const targets = paginatedAccounts.value
+  if (!targets || targets.length === 0) {
+    return
+  }
+
+  const eligibleTargets = targets.filter((account) => {
+    const info = account?.balanceInfo
+    return info?.scriptEnabled !== false && !!info?.scriptConfigured
+  })
+
+  if (eligibleTargets.length === 0) {
+    showToast('当前页没有配置余额脚本的账户', 'warning')
+    return
+  }
+
+  const skippedCount = targets.length - eligibleTargets.length
+
+  refreshingBalances.value = true
+  try {
+    const results = await Promise.all(
+      eligibleTargets.map(async (account) => {
+        try {
+          const response = await apiClient.post(`/admin/accounts/${account.id}/balance/refresh`, {
+            platform: account.platform
+          })
+          return { id: account.id, success: !!response?.success, data: response?.data || null }
+        } catch (error) {
+          return { id: account.id, success: false, error: error?.message || '刷新失败' }
+        }
+      })
+    )
+
+    const updatedMap = results.reduce((map, item) => {
+      if (item.success && item.data) {
+        map[item.id] = item.data
+      }
+      return map
+    }, {})
+
+    const successCount = results.filter((r) => r.success).length
+    const failCount = results.length - successCount
+
+    const skippedText = skippedCount > 0 ? `，跳过 ${skippedCount} 个未配置脚本` : ''
+    if (Object.keys(updatedMap).length > 0) {
+      accounts.value = accounts.value.map((account) => {
+        const balanceInfo = updatedMap[account.id]
+        if (!balanceInfo) return account
+        return { ...account, balanceInfo }
+      })
+    }
+
+    if (failCount === 0) {
+      showToast(`成功刷新 ${successCount} 个账户余额${skippedText}`, 'success')
+    } else {
+      showToast(`刷新完成：${successCount} 成功，${failCount} 失败${skippedText}`, 'warning')
+    }
+  } finally {
+    refreshingBalances.value = false
+  }
+}
+
 const updateSelectAllState = () => {
   const currentIds = paginatedAccounts.value.map((account) => account.id)
   const selectedInCurrentPage = currentIds.filter((id) =>
@@ -2759,6 +3024,54 @@ const cleanupSelectedAccounts = () => {
   const validIds = new Set(accounts.value.map((account) => account.id))
   selectedAccounts.value = selectedAccounts.value.filter((id) => validIds.has(id))
   updateSelectAllState()
+}
+
+// 异步加载余额缓存（按平台批量拉取，避免逐行请求）
+const loadBalanceCacheForAccounts = async () => {
+  const current = accounts.value
+  if (!Array.isArray(current) || current.length === 0) {
+    return
+  }
+
+  const platforms = Array.from(new Set(current.map((acc) => acc.platform).filter(Boolean)))
+  if (platforms.length === 0) {
+    return
+  }
+
+  const responses = await Promise.all(
+    platforms.map(async (platform) => {
+      try {
+        const res = await apiClient.get(`/admin/accounts/balance/platform/${platform}`, {
+          params: { queryApi: false }
+        })
+        return { platform, success: !!res?.success, data: res?.data || [] }
+      } catch (error) {
+        console.debug(`Failed to load balance cache for ${platform}:`, error)
+        return { platform, success: false, data: [] }
+      }
+    })
+  )
+
+  const balanceMap = responses.reduce((map, item) => {
+    if (!item.success) return map
+    const list = Array.isArray(item.data) ? item.data : []
+    list.forEach((entry) => {
+      const accountId = entry?.data?.accountId
+      if (accountId) {
+        map[accountId] = entry.data
+      }
+    })
+    return map
+  }, {})
+
+  if (Object.keys(balanceMap).length === 0) {
+    return
+  }
+
+  accounts.value = accounts.value.map((account) => ({
+    ...account,
+    balanceInfo: balanceMap[account.id] || account.balanceInfo || null
+  }))
 }
 
 // 加载账户列表
@@ -2953,6 +3266,11 @@ const loadAccounts = async (forceReload = false) => {
         console.debug('Claude usage loading failed:', err)
       })
     }
+
+    // 异步加载余额缓存（按平台批量）
+    loadBalanceCacheForAccounts().catch((err) => {
+      console.debug('Balance cache loading failed:', err)
+    })
   } catch (error) {
     showToast('加载账户失败', 'error')
   } finally {

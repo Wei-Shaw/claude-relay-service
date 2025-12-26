@@ -21,9 +21,11 @@ const openaiResponsesAccountsRoutes = require('./openaiResponsesAccounts')
 const droidAccountsRoutes = require('./droidAccounts')
 const dashboardRoutes = require('./dashboard')
 const usageStatsRoutes = require('./usageStats')
+const accountBalanceRoutes = require('./accountBalance')
 const systemRoutes = require('./system')
 const concurrencyRoutes = require('./concurrency')
 const claudeRelayConfigRoutes = require('./claudeRelayConfig')
+const syncRoutes = require('./sync')
 
 // 挂载所有子路由
 // 使用完整路径的模块（直接挂载到根路径）
@@ -36,9 +38,11 @@ router.use('/', openaiResponsesAccountsRoutes)
 router.use('/', droidAccountsRoutes)
 router.use('/', dashboardRoutes)
 router.use('/', usageStatsRoutes)
+router.use('/', accountBalanceRoutes)
 router.use('/', systemRoutes)
 router.use('/', concurrencyRoutes)
 router.use('/', claudeRelayConfigRoutes)
+router.use('/', syncRoutes)
 
 // 使用相对路径的模块（需要指定基础路径前缀）
 router.use('/account-groups', accountGroupsRoutes)

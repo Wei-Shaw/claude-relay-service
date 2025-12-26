@@ -164,10 +164,24 @@ router.post('/auth/change-password', async (req, res) => {
 
     // 获取当前会话
     const sessionData = await redis.getSession(token)
-    if (!sessionData) {
+
+    // 🔒 安全修复：检查空对象
+    if (!sessionData || Object.keys(sessionData).length === 0) {
       return res.status(401).json({
         error: 'Invalid token',
         message: 'Session expired or invalid'
+      })
+    }
+
+    // 🔒 安全修复：验证会话完整性
+    if (!sessionData.username || !sessionData.loginTime) {
+      logger.security(
+        `🔒 Invalid session structure in /auth/change-password from ${req.ip || 'unknown'}`
+      )
+      await redis.deleteSession(token)
+      return res.status(401).json({
+        error: 'Invalid session',
+        message: 'Session data corrupted or incomplete'
       })
     }
 
@@ -269,10 +283,22 @@ router.get('/auth/user', async (req, res) => {
 
     // 获取当前会话
     const sessionData = await redis.getSession(token)
-    if (!sessionData) {
+
+    // 🔒 安全修复：检查空对象
+    if (!sessionData || Object.keys(sessionData).length === 0) {
       return res.status(401).json({
         error: 'Invalid token',
         message: 'Session expired or invalid'
+      })
+    }
+
+    // 🔒 安全修复：验证会话完整性
+    if (!sessionData.username || !sessionData.loginTime) {
+      logger.security(`🔒 Invalid session structure in /auth/user from ${req.ip || 'unknown'}`)
+      await redis.deleteSession(token)
+      return res.status(401).json({
+        error: 'Invalid session',
+        message: 'Session data corrupted or incomplete'
       })
     }
 
@@ -316,10 +342,21 @@ router.post('/auth/refresh', async (req, res) => {
 
     const sessionData = await redis.getSession(token)
 
-    if (!sessionData) {
+    // 🔒 安全修复：检查空对象（hgetall 对不存在的 key 返回 {}）
+    if (!sessionData || Object.keys(sessionData).length === 0) {
       return res.status(401).json({
         error: 'Invalid token',
         message: 'Session expired or invalid'
+      })
+    }
+
+    // 🔒 安全修复：验证会话完整性（必须有 username 和 loginTime）
+    if (!sessionData.username || !sessionData.loginTime) {
+      logger.security(`🔒 Invalid session structure detected from ${req.ip || 'unknown'}`)
+      await redis.deleteSession(token) // 清理无效/伪造的会话
+      return res.status(401).json({
+        error: 'Invalid session',
+        message: 'Session data corrupted or incomplete'
       })
     }
 
