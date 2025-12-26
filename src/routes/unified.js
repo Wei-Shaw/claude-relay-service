@@ -8,6 +8,7 @@ const {
   handleStreamGenerateContent: geminiHandleStreamGenerateContent
 } = require('../handlers/geminiHandlers')
 const openaiRoutes = require('./openaiRoutes')
+const apiKeyService = require('../services/apiKeyService')
 
 const router = express.Router()
 
@@ -73,7 +74,7 @@ async function routeToBackend(req, res, requestedModel) {
     return await openaiRoutes.handleResponses(req, res)
   } else if (backend === 'gemini') {
     // Gemini 后端
-    if (permissions !== 'all' && permissions !== 'gemini') {
+    if (!apiKeyService.hasPermission(permissions, 'gemini')) {
       return res.status(403).json({
         error: {
           message: 'This API key does not have permission to access Gemini',

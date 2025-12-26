@@ -579,55 +579,46 @@
             <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >服务权限</label
             >
-            <div class="flex gap-4">
+            <div class="flex flex-wrap gap-4">
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
-                  value="all"
-                />
-                <span class="text-sm text-gray-700 dark:text-gray-300">全部服务</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input
-                  v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
                   value="claude"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 Claude</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Claude</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
                   value="gemini"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 Gemini</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Gemini</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
                   value="openai"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 OpenAI</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">OpenAI</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
                   v-model="form.permissions"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
                   value="droid"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 Droid</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Droid</span>
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              控制此 API Key 可以访问哪些服务
+              不选择任何服务表示允许访问全部服务
             </p>
           </div>
 
@@ -662,7 +653,7 @@
                   v-model="form.claudeAccountId"
                   :accounts="localAccounts.claude"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'claude'"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('claude')"
                   :groups="localAccounts.claudeGroups"
                   placeholder="请选择Claude账号"
                   platform="claude"
@@ -676,7 +667,7 @@
                   v-model="form.geminiAccountId"
                   :accounts="localAccounts.gemini"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'gemini'"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('gemini')"
                   :groups="localAccounts.geminiGroups"
                   placeholder="请选择Gemini账号"
                   platform="gemini"
@@ -690,7 +681,7 @@
                   v-model="form.openaiAccountId"
                   :accounts="localAccounts.openai"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'openai'"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('openai')"
                   :groups="localAccounts.openaiGroups"
                   placeholder="请选择OpenAI账号"
                   platform="openai"
@@ -704,7 +695,7 @@
                   v-model="form.bedrockAccountId"
                   :accounts="localAccounts.bedrock"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'openai'"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('claude')"
                   :groups="[]"
                   placeholder="请选择Bedrock账号"
                   platform="bedrock"
@@ -718,7 +709,7 @@
                   v-model="form.droidAccountId"
                   :accounts="localAccounts.droid"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'droid'"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('droid')"
                   :groups="localAccounts.droidGroups"
                   placeholder="请选择Droid账号"
                   platform="droid"
@@ -966,7 +957,7 @@ const form = reactive({
   expirationMode: 'fixed', // 过期模式：fixed(固定) 或 activation(激活)
   activationDays: 30, // 激活后有效天数
   activationUnit: 'days', // 激活时间单位：hours 或 days
-  permissions: 'all',
+  permissions: [], // 数组格式，空数组表示全部服务
   claudeAccountId: '',
   geminiAccountId: '',
   openaiAccountId: '',
