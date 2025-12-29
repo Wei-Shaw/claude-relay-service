@@ -410,11 +410,23 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
             const modelCosts = {}
 
             for (const [modelName, usage] of Object.entries(windowUsage.modelUsage)) {
+              // 构造 cache_creation 对象以支持区分 5m 和 1h 缓存
+              const modelEphemeral5mTokens = usage.ephemeral5mTokens || 0
+              const modelEphemeral1hTokens = usage.ephemeral1hTokens || 0
+              let cacheCreation = null
+              if (modelEphemeral5mTokens > 0 || modelEphemeral1hTokens > 0) {
+                cacheCreation = {
+                  ephemeral_5m_input_tokens: modelEphemeral5mTokens,
+                  ephemeral_1h_input_tokens: modelEphemeral1hTokens
+                }
+              }
+
               const usageData = {
                 input_tokens: usage.inputTokens,
                 output_tokens: usage.outputTokens,
                 cache_creation_input_tokens: usage.cacheCreateTokens,
-                cache_read_input_tokens: usage.cacheReadTokens
+                cache_read_input_tokens: usage.cacheReadTokens,
+                cache_creation: cacheCreation
               }
 
               // 添加 cache_creation 子对象以支持精确 ephemeral 定价

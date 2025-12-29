@@ -293,11 +293,21 @@ router.post('/api/user-stats', async (req, res) => {
 
         // 按模型计算费用并汇总
         for (const [model, usage] of modelUsageMap) {
+          // 构造 cache_creation 对象以支持区分 5m 和 1h 缓存
+          let cacheCreation = null
+          if (usage.ephemeral5mTokens > 0 || usage.ephemeral1hTokens > 0) {
+            cacheCreation = {
+              ephemeral_5m_input_tokens: usage.ephemeral5mTokens,
+              ephemeral_1h_input_tokens: usage.ephemeral1hTokens
+            }
+          }
+
           const usageData = {
             input_tokens: usage.inputTokens,
             output_tokens: usage.outputTokens,
             cache_creation_input_tokens: usage.cacheCreateTokens,
-            cache_read_input_tokens: usage.cacheReadTokens
+            cache_read_input_tokens: usage.cacheReadTokens,
+            cache_creation: cacheCreation
           }
 
           // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
@@ -837,7 +847,9 @@ router.post('/api/batch-model-stats', async (req, res) => {
                 allTokens: 0,
                 realCostMicro: 0,
                 ratedCostMicro: 0,
-                hasStoredCost: false
+                hasStoredCost: false,
+                ephemeral5mTokens: 0,
+                ephemeral1hTokens: 0
               })
             }
 
@@ -864,11 +876,21 @@ router.post('/api/batch-model-stats', async (req, res) => {
     // 转换为数组并处理费用
     const modelStats = []
     for (const [model, usage] of modelUsageMap) {
+      // 构造 cache_creation 对象以支持区分 5m 和 1h 缓存
+      let cacheCreation = null
+      if (usage.ephemeral5mTokens > 0 || usage.ephemeral1hTokens > 0) {
+        cacheCreation = {
+          ephemeral_5m_input_tokens: usage.ephemeral5mTokens,
+          ephemeral_1h_input_tokens: usage.ephemeral1hTokens
+        }
+      }
+
       const usageData = {
         input_tokens: usage.inputTokens,
         output_tokens: usage.outputTokens,
         cache_creation_input_tokens: usage.cacheCreateTokens,
-        cache_read_input_tokens: usage.cacheReadTokens
+        cache_read_input_tokens: usage.cacheReadTokens,
+        cache_creation: cacheCreation
       }
 
       // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
@@ -1411,19 +1433,19 @@ router.post('/api/user-model-stats', async (req, res) => {
       if (data && Object.keys(data).length > 0) {
         const ephemeral5m = parseInt(data.ephemeral5mTokens) || 0
         const ephemeral1h = parseInt(data.ephemeral1hTokens) || 0
+        let cacheCreation = null
+        if (ephemeral5m > 0 || ephemeral1h > 0) {
+          cacheCreation = {
+            ephemeral_5m_input_tokens: ephemeral5m,
+            ephemeral_1h_input_tokens: ephemeral1h
+          }
+        }
         const usage = {
           input_tokens: parseInt(data.inputTokens) || 0,
           output_tokens: parseInt(data.outputTokens) || 0,
           cache_creation_input_tokens: parseInt(data.cacheCreateTokens) || 0,
-          cache_read_input_tokens: parseInt(data.cacheReadTokens) || 0
-        }
-
-        // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
-        if (ephemeral5m > 0 || ephemeral1h > 0) {
-          usage.cache_creation = {
-            ephemeral_5m_input_tokens: ephemeral5m,
-            ephemeral_1h_input_tokens: ephemeral1h
-          }
+          cache_read_input_tokens: parseInt(data.cacheReadTokens) || 0,
+          cache_creation: cacheCreation
         }
 
         // 优先使用存储的费用，否则回退到重新计算
