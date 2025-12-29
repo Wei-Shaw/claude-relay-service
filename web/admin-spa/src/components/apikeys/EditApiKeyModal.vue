@@ -1233,13 +1233,28 @@ onMounted(async () => {
   form.totalCostLimit = props.apiKey.totalCostLimit || ''
   form.weeklyOpusCostLimit = props.apiKey.weeklyOpusCostLimit || ''
   // 处理权限数据，兼容旧格式（字符串）和新格式（数组）
-  const perms = props.apiKey.permissions
+  // 有效的权限值
+  const VALID_PERMS = ['claude', 'gemini', 'openai', 'droid']
+  let perms = props.apiKey.permissions
+  // 如果是字符串，尝试 JSON.parse（Redis 可能返回 "[]" 或 "[\"gemini\"]"）
+  if (typeof perms === 'string') {
+    if (perms === 'all' || perms === '') {
+      perms = []
+    } else if (perms.startsWith('[')) {
+      try {
+        perms = JSON.parse(perms)
+      } catch {
+        perms = VALID_PERMS.includes(perms) ? [perms] : []
+      }
+    } else if (VALID_PERMS.includes(perms)) {
+      perms = [perms]
+    } else {
+      perms = []
+    }
+  }
   if (Array.isArray(perms)) {
-    form.permissions = perms
-  } else if (perms === 'all' || !perms) {
-    form.permissions = []
-  } else if (typeof perms === 'string') {
-    form.permissions = [perms]
+    // 过滤掉无效值（如 "[]"）
+    form.permissions = perms.filter((p) => VALID_PERMS.includes(p))
   } else {
     form.permissions = []
   }

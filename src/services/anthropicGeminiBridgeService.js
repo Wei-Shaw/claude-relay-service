@@ -21,7 +21,10 @@ const SYSTEM_REMINDER_PREFIX = '<system-reminder>'
 const TOOLS_DUMP_ENV = 'ANTHROPIC_DEBUG_TOOLS_DUMP'
 const TOOLS_DUMP_FILENAME = 'anthropic-tools-dump.jsonl'
 const TEXT_TOOL_FALLBACK_ENV = 'ANTHROPIC_TEXT_TOOL_FALLBACK'
+const TOOL_ERROR_CONTINUE_ENV = 'ANTHROPIC_TOOL_ERROR_CONTINUE'
 const THOUGHT_SIGNATURE_FALLBACK = 'skip_thought_signature_validator'
+const TOOL_ERROR_CONTINUE_PROMPT =
+  'Tool calls may fail (e.g., missing prerequisites). When a tool result indicates an error, do not stop: briefly explain the cause and continue with an alternative approach or the remaining steps.'
 
 function ensureAntigravityProjectId(account) {
   if (account.projectId) {
@@ -710,12 +713,13 @@ function convertAnthropicMessagesToGeminiContents(
           if (vendor === 'antigravity') {
             const toolCallId = typeof toolUseId === 'string' && toolUseId ? toolUseId : undefined
             const result = parsedResponse !== null ? parsedResponse : raw || ''
+            const response = part.is_error === true ? { result, is_error: true } : { result }
 
             parts.push({
               functionResponse: {
                 ...(toolCallId ? { id: toolCallId } : {}),
                 name: toolName,
-                response: { result }
+                response
               }
             })
           } else {
@@ -760,6 +764,10 @@ function buildGeminiRequestFromAnthropic(body, baseModel, { vendor = null } = {}
     }
   )
   const systemParts = buildSystemParts(body.system)
+
+  if (vendor === 'antigravity' && isEnvEnabled(process.env[TOOL_ERROR_CONTINUE_ENV])) {
+    systemParts.push({ text: TOOL_ERROR_CONTINUE_PROMPT })
+  }
 
   const temperature = typeof body.temperature === 'number' ? body.temperature : 1
   const maxTokens = Number.isFinite(body.max_tokens) ? body.max_tokens : 4096

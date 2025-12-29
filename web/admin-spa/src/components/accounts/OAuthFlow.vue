@@ -287,7 +287,7 @@
     </div>
 
     <!-- Gemini OAuth流程 -->
-    <div v-else-if="platform === 'gemini'">
+    <div v-else-if="platform === 'gemini' || platform === 'gemini-antigravity'">
       <div
         class="rounded-lg border border-green-200 bg-green-50 p-6 dark:border-green-700 dark:bg-green-900/30"
       >
