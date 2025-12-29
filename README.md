@@ -1,5 +1,10 @@
 # Claude Relay Service
 
+> [!CAUTION]
+> **安全更新通知**：v1.1.248 及以下版本存在严重的管理员认证绕过漏洞，攻击者可未授权访问管理面板。
+>
+> **请立即更新到 v1.1.249+ 版本**，或迁移到新一代项目 **[CRS 2.0 (sub2api)](https://github.com/Wei-Shaw/sub2api)**
+
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -407,6 +412,8 @@ export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
 ```
 
 如果该文件不存在，请手动创建。Windows 用户路径为 `C:\Users\你的用户名\.claude\config.json`。
+
+> 💡 **IntelliJ IDEA 用户推荐**：[Claude Code Plus](https://github.com/touwaeriol/claude-code-plus) - 将 Claude Code 直接集成到 IDE，支持代码理解、文件读写、命令执行。插件市场搜索 `Claude Code Plus` 即可安装。
 
 **Gemini CLI 设置环境变量：**
 

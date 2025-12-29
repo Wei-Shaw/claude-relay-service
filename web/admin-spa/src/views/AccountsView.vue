@@ -1239,6 +1239,15 @@
                       <span class="ml-1">测试</span>
                     </button>
                     <button
+                      v-if="canTestAccount(account)"
+                      class="rounded bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-800/50"
+                      title="定时测试配置"
+                      @click="openScheduledTestModal(account)"
+                    >
+                      <i class="fas fa-clock" />
+                      <span class="ml-1">定时</span>
+                    </button>
+                    <button
                       class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200"
                       title="编辑账户"
                       @click="editAccount(account)"
@@ -1708,6 +1717,15 @@
             </button>
 
             <button
+              v-if="canTestAccount(account)"
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-600 transition-colors hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-800/50"
+              @click="openScheduledTestModal(account)"
+            >
+              <i class="fas fa-clock" />
+              定时
+            </button>
+
+            <button
               class="flex-1 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100"
               @click="editAccount(account)"
             >
@@ -1880,6 +1898,14 @@
       @close="closeAccountTestModal"
     />
 
+    <!-- 定时测试配置弹窗 -->
+    <AccountScheduledTestModal
+      :account="scheduledTestAccount"
+      :show="showScheduledTestModal"
+      @close="closeScheduledTestModal"
+      @saved="handleScheduledTestSaved"
+    />
+
     <!-- 账户统计弹窗 -->
     <el-dialog
       v-model="showAccountStatsModal"
@@ -2032,6 +2058,7 @@ import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
 import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
 import AccountTestModal from '@/components/accounts/AccountTestModal.vue'
+import AccountScheduledTestModal from '@/components/accounts/AccountScheduledTestModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
@@ -2098,6 +2125,10 @@ const expiryEditModalRef = ref(null)
 // 测试弹窗状态
 const showAccountTestModal = ref(false)
 const testingAccount = ref(null)
+
+// 定时测试配置弹窗状态
+const showScheduledTestModal = ref(false)
+const scheduledTestAccount = ref(null)
 
 // 账户统计弹窗状态
 const showAccountStatsModal = ref(false)
@@ -2365,6 +2396,13 @@ const getAccountActions = (account) => {
       color: 'blue',
       handler: () => openAccountTestModal(account)
     })
+    actions.push({
+      key: 'scheduled-test',
+      label: '定时测试',
+      icon: 'fa-clock',
+      color: 'amber',
+      handler: () => openScheduledTestModal(account)
+    })
   }
 
   // 删除
@@ -2439,6 +2477,25 @@ const openAccountTestModal = (account) => {
 const closeAccountTestModal = () => {
   showAccountTestModal.value = false
   testingAccount.value = null
+}
+
+// 定时测试配置相关函数
+const openScheduledTestModal = (account) => {
+  if (!canTestAccount(account)) {
+    showToast('该账户类型暂不支持定时测试', 'warning')
+    return
+  }
+  scheduledTestAccount.value = account
+  showScheduledTestModal.value = true
+}
+
+const closeScheduledTestModal = () => {
+  showScheduledTestModal.value = false
+  scheduledTestAccount.value = null
+}
+
+const handleScheduledTestSaved = () => {
+  showToast('定时测试配置已保存', 'success')
 }
 
 // 计算排序后的账户列表
