@@ -93,7 +93,13 @@ async function migrate() {
   console.log('\n4. 迁移 usage:model:hourly 索引...')
   cursor = '0'
   do {
-    const [newCursor, keys] = await redis.scan(cursor, 'MATCH', 'usage:model:hourly:*', 'COUNT', 500)
+    const [newCursor, keys] = await redis.scan(
+      cursor,
+      'MATCH',
+      'usage:model:hourly:*',
+      'COUNT',
+      500
+    )
     cursor = newCursor
 
     const pipeline = redis.pipeline()

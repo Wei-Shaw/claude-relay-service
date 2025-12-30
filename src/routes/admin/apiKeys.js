@@ -289,17 +289,13 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     }
 
     // 为每个API Key添加owner的displayName（批量获取优化）
-    const userIdsToFetch = [
-      ...new Set(result.items.filter((k) => k.userId).map((k) => k.userId))
-    ]
+    const userIdsToFetch = [...new Set(result.items.filter((k) => k.userId).map((k) => k.userId))]
     const userMap = new Map()
 
     if (userIdsToFetch.length > 0) {
       // 批量获取用户信息
       const users = await Promise.all(
-        userIdsToFetch.map((id) =>
-          userService.getUserById(id, false).catch(() => null)
-        )
+        userIdsToFetch.map((id) => userService.getUserById(id, false).catch(() => null))
       )
       userIdsToFetch.forEach((id, i) => {
         if (users[i]) userMap.set(id, users[i])

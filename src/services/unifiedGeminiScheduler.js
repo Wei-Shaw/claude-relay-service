@@ -26,11 +26,7 @@ class UnifiedGeminiScheduler {
         if (apiKeyData.geminiAccountId.startsWith('api:')) {
           const accountId = apiKeyData.geminiAccountId.replace('api:', '')
           const boundAccount = await geminiApiAccountService.getAccount(accountId)
-          if (
-            boundAccount &&
-            isActive(boundAccount.isActive) &&
-            boundAccount.status !== 'error'
-          ) {
+          if (boundAccount && isActive(boundAccount.isActive) && boundAccount.status !== 'error') {
             logger.info(
               `🎯 Using bound Gemini-API account: ${boundAccount.name} (${accountId}) for API key ${apiKeyData.name}`
             )
@@ -63,11 +59,7 @@ class UnifiedGeminiScheduler {
         // 普通 Gemini OAuth 专属账户
         else {
           const boundAccount = await geminiAccountService.getAccount(apiKeyData.geminiAccountId)
-          if (
-            boundAccount &&
-            isActive(boundAccount.isActive) &&
-            boundAccount.status !== 'error'
-          ) {
+          if (boundAccount && isActive(boundAccount.isActive) && boundAccount.status !== 'error') {
             logger.info(
               `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId}) for API key ${apiKeyData.name}`
             )
@@ -183,11 +175,7 @@ class UnifiedGeminiScheduler {
       if (apiKeyData.geminiAccountId.startsWith('api:')) {
         const accountId = apiKeyData.geminiAccountId.replace('api:', '')
         const boundAccount = await geminiApiAccountService.getAccount(accountId)
-        if (
-          boundAccount &&
-          isActive(boundAccount.isActive) &&
-          boundAccount.status !== 'error'
-        ) {
+        if (boundAccount && isActive(boundAccount.isActive) && boundAccount.status !== 'error') {
           const isRateLimited = await this.isAccountRateLimited(accountId)
           if (!isRateLimited) {
             // 检查模型支持
@@ -234,11 +222,7 @@ class UnifiedGeminiScheduler {
       // 普通 Gemini OAuth 账户
       else if (!apiKeyData.geminiAccountId.startsWith('group:')) {
         const boundAccount = await geminiAccountService.getAccount(apiKeyData.geminiAccountId)
-        if (
-          boundAccount &&
-          isActive(boundAccount.isActive) &&
-          boundAccount.status !== 'error'
-        ) {
+        if (boundAccount && isActive(boundAccount.isActive) && boundAccount.status !== 'error') {
           const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
           if (!isRateLimited) {
             // 检查模型支持

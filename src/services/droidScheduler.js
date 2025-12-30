@@ -2,7 +2,12 @@ const droidAccountService = require('./droidAccountService')
 const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
-const { isTruthy, isAccountHealthy, sortAccountsByPriority, normalizeEndpointType } = require('../utils/commonHelper')
+const {
+  isTruthy,
+  isAccountHealthy,
+  sortAccountsByPriority,
+  normalizeEndpointType
+} = require('../utils/commonHelper')
 
 class DroidScheduler {
   constructor() {

@@ -5,7 +5,11 @@
 
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
-const { getCachedConfig, setCachedConfig, deleteCachedConfig } = require('../utils/performanceOptimizer')
+const {
+  getCachedConfig,
+  setCachedConfig,
+  deleteCachedConfig
+} = require('../utils/performanceOptimizer')
 
 class ClaudeCodeHeadersService {
   constructor() {

@@ -94,7 +94,9 @@ class CostInitService {
         }
       }
 
-      logger.info(`💰 Found ${apiKeyIds.length} active API Keys to process (filtered ${allKeyIds.length - apiKeyIds.length} deleted)`)
+      logger.info(
+        `💰 Found ${apiKeyIds.length} active API Keys to process (filtered ${allKeyIds.length - apiKeyIds.length} deleted)`
+      )
 
       let processedCount = 0
       let errorCount = 0

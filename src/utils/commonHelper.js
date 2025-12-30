@@ -84,7 +84,10 @@ const getDecryptCacheStats = defaultEncryptor.getStats
 // ============================================
 
 // 转换为布尔值（宽松模式）
-const toBoolean = (value) => value === true || value === 'true' || (typeof value === 'string' && value.toLowerCase() === 'true')
+const toBoolean = (value) =>
+  value === true ||
+  value === 'true' ||
+  (typeof value === 'string' && value.toLowerCase() === 'true')
 
 // 检查是否为真值（null/undefined 返回 false）
 const isTruthy = (value) => value != null && toBoolean(value)
@@ -110,7 +113,11 @@ const isAccountHealthy = (account) => {
 // 安全解析 JSON
 const safeParseJson = (value, fallback = null) => {
   if (!value || typeof value !== 'string') return fallback
-  try { return JSON.parse(value) } catch { return fallback }
+  try {
+    return JSON.parse(value)
+  } catch {
+    return fallback
+  }
 }
 
 // 安全解析 JSON 为对象
@@ -134,7 +141,10 @@ const normalizeModelName = (model) => {
   if (!model || model === 'unknown') return model
   // Bedrock 模型: us-east-1.anthropic.claude-3-5-sonnet-v1:0
   if (model.includes('.anthropic.') || model.includes('.claude')) {
-    return model.replace(/^[a-z0-9-]+\./, '').replace('anthropic.', '').replace(/-v\d+:\d+$/, '')
+    return model
+      .replace(/^[a-z0-9-]+\./, '')
+      .replace('anthropic.', '')
+      .replace(/-v\d+:\d+$/, '')
   }
   return model.replace(/-v\d+:\d+$|:latest$/, '')
 }
@@ -151,7 +161,7 @@ const isModelInMapping = (modelMapping, requestedModel) => {
   if (!modelMapping || Object.keys(modelMapping).length === 0) return true
   if (Object.prototype.hasOwnProperty.call(modelMapping, requestedModel)) return true
   const lower = requestedModel.toLowerCase()
-  return Object.keys(modelMapping).some(k => k.toLowerCase() === lower)
+  return Object.keys(modelMapping).some((k) => k.toLowerCase() === lower)
 }
 
 // 获取映射后的模型名称
@@ -192,7 +202,7 @@ const composeStickySessionKey = (prefix, sessionHash, apiKeyId = null) => {
 
 // 过滤可用账户（激活 + 健康 + 可调度）
 const filterAvailableAccounts = (accounts) => {
-  return accounts.filter(acc => acc && isAccountHealthy(acc) && isSchedulable(acc.schedulable))
+  return accounts.filter((acc) => acc && isAccountHealthy(acc) && isSchedulable(acc.schedulable))
 }
 
 // ============================================
