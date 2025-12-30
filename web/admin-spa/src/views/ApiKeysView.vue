@@ -2122,7 +2122,6 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
-import { useClientsStore } from '@/stores/clients'
 import { useAuthStore } from '@/stores/auth'
 import * as XLSX from 'xlsx-js-style'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
@@ -2139,7 +2138,6 @@ import ActionDropdown from '@/components/common/ActionDropdown.vue'
 
 // 响应式数据
 const router = useRouter()
-const clientsStore = useClientsStore()
 const authStore = useAuthStore()
 const apiKeys = ref([])
 
@@ -4803,7 +4801,8 @@ onMounted(async () => {
   fetchCostSortStatus()
 
   // 先加载 API Keys（优先显示列表）
-  await Promise.all([clientsStore.loadSupportedClients(), loadApiKeys(), loadUsedModels()])
+  // supported-clients 由 Create/Edit 模态框按需加载，无需预加载
+  await Promise.all([loadApiKeys(), loadUsedModels()])
 
   // 初始化全选状态
   updateSelectAllState()

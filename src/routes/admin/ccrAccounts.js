@@ -377,7 +377,7 @@ router.post('/:accountId/reset-usage', authenticateAdmin, async (req, res) => {
     const { accountId } = req.params
     await ccrAccountService.resetDailyUsage(accountId)
 
-    logger.success(`✅ Admin manually reset daily usage for CCR account: ${accountId}`)
+    logger.success(`Admin manually reset daily usage for CCR account: ${accountId}`)
     return res.json({ success: true, message: 'Daily usage reset successfully' })
   } catch (error) {
     logger.error('❌ Failed to reset CCR account daily usage:', error)
@@ -390,7 +390,7 @@ router.post('/:accountId/reset-status', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params
     const result = await ccrAccountService.resetAccountStatus(accountId)
-    logger.success(`✅ Admin reset status for CCR account: ${accountId}`)
+    logger.success(`Admin reset status for CCR account: ${accountId}`)
     return res.json({ success: true, data: result })
   } catch (error) {
     logger.error('❌ Failed to reset CCR account status:', error)
@@ -403,7 +403,7 @@ router.post('/reset-all-usage', authenticateAdmin, async (req, res) => {
   try {
     await ccrAccountService.resetAllDailyUsage()
 
-    logger.success('✅ Admin manually reset daily usage for all CCR accounts')
+    logger.success('Admin manually reset daily usage for all CCR accounts')
     return res.json({ success: true, message: 'All daily usage reset successfully' })
   } catch (error) {
     logger.error('❌ Failed to reset all CCR accounts daily usage:', error)

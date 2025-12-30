@@ -66,18 +66,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function verifyToken() {
     try {
-      // 获取当前用户信息
+      // /web/auth/user 已做完整 token 验证（session 存在性、完整性）
+      // 成功返回即表示 token 有效，无需再调用 dashboard
       const userResult = await apiClient.get('/web/auth/user')
-      if (userResult.success && userResult.user) {
-        username.value = userResult.user.username
-      }
-
-      // 使用 dashboard 端点来验证 token
-      // 如果 token 无效，会抛出错误
-      const result = await apiClient.get('/admin/dashboard')
-      if (!result.success) {
+      if (!userResult.success || !userResult.user) {
         logout()
+        return
       }
+      username.value = userResult.user.username
     } catch (error) {
       // token 无效，需要重新登录
       logout()

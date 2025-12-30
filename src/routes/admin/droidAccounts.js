@@ -2,6 +2,7 @@ const express = require('express')
 const crypto = require('crypto')
 const droidAccountService = require('../../services/droidAccountService')
 const accountGroupService = require('../../services/accountGroupService')
+const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
@@ -142,67 +143,112 @@ router.post('/droid-accounts/exchange-code', authenticateAdmin, async (req, res)
 router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
   try {
     const accounts = await droidAccountService.getAllAccounts()
-    const allApiKeys = await redis.getAllApiKeys()
+    const accountIds = accounts.map((a) => a.id)
 
-    // 添加使用统计
-    const accountsWithStats = await Promise.all(
-      accounts.map(async (account) => {
-        try {
-          const usageStats = await redis.getAccountUsageStats(account.id, 'droid')
-          let groupInfos = []
-          try {
-            groupInfos = await accountGroupService.getAccountGroups(account.id)
-          } catch (groupError) {
-            logger.debug(`Failed to get group infos for Droid account ${account.id}:`, groupError)
-            groupInfos = []
-          }
+    // 并行获取：轻量 API Keys + 分组信息 + daily cost
+    const [allApiKeys, allGroupInfosMap, dailyCostMap] = await Promise.all([
+      apiKeyService.getAllApiKeysLite(),
+      accountGroupService.batchGetAccountGroupsByIndex(accountIds, 'droid'),
+      redis.batchGetAccountDailyCost(accountIds)
+    ])
 
-          const groupIds = groupInfos.map((group) => group.id)
-          const boundApiKeysCount = allApiKeys.reduce((count, key) => {
-            const binding = key.droidAccountId
-            if (!binding) {
-              return count
-            }
-            if (binding === account.id) {
-              return count + 1
-            }
-            if (binding.startsWith('group:')) {
-              const groupId = binding.substring('group:'.length)
-              if (groupIds.includes(groupId)) {
-                return count + 1
-              }
-            }
-            return count
-          }, 0)
+    // 构建绑定数映射（droid 需要展开 group 绑定）
+    // 1. 先构建 groupId -> accountIds 映射
+    const groupToAccountIds = new Map()
+    for (const [accountId, groups] of allGroupInfosMap) {
+      for (const group of groups) {
+        if (!groupToAccountIds.has(group.id)) groupToAccountIds.set(group.id, [])
+        groupToAccountIds.get(group.id).push(accountId)
+      }
+    }
 
-          const formattedAccount = formatAccountExpiry(account)
-          return {
-            ...formattedAccount,
-            schedulable: account.schedulable === 'true',
-            boundApiKeysCount,
-            groupInfos,
-            usage: {
-              daily: usageStats.daily,
-              total: usageStats.total,
-              averages: usageStats.averages
-            }
-          }
-        } catch (error) {
-          logger.warn(`Failed to get stats for Droid account ${account.id}:`, error.message)
-          const formattedAccount = formatAccountExpiry(account)
-          return {
-            ...formattedAccount,
-            boundApiKeysCount: 0,
-            groupInfos: [],
-            usage: {
-              daily: { tokens: 0, requests: 0 },
-              total: { tokens: 0, requests: 0 },
-              averages: { rpm: 0, tpm: 0 }
-            }
-          }
-        }
+    // 2. 单次遍历构建绑定数
+    const directBindingCount = new Map()
+    const groupBindingCount = new Map()
+    for (const key of allApiKeys) {
+      const binding = key.droidAccountId
+      if (!binding) continue
+      if (binding.startsWith('group:')) {
+        const groupId = binding.substring('group:'.length)
+        groupBindingCount.set(groupId, (groupBindingCount.get(groupId) || 0) + 1)
+      } else {
+        directBindingCount.set(binding, (directBindingCount.get(binding) || 0) + 1)
+      }
+    }
+
+    // 批量获取使用统计
+    const client = redis.getClientSafe()
+    const today = redis.getDateStringInTimezone()
+    const tzDate = redis.getDateInTimezone()
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+
+    const statsPipeline = client.pipeline()
+    for (const accountId of accountIds) {
+      statsPipeline.hgetall(`account_usage:${accountId}`)
+      statsPipeline.hgetall(`account_usage:daily:${accountId}:${today}`)
+      statsPipeline.hgetall(`account_usage:monthly:${accountId}:${currentMonth}`)
+    }
+    const statsResults = await statsPipeline.exec()
+
+    // 处理统计数据
+    const allUsageStatsMap = new Map()
+    for (let i = 0; i < accountIds.length; i++) {
+      const accountId = accountIds[i]
+      const [errTotal, total] = statsResults[i * 3]
+      const [errDaily, daily] = statsResults[i * 3 + 1]
+      const [errMonthly, monthly] = statsResults[i * 3 + 2]
+
+      const parseUsage = (data) => ({
+        requests: parseInt(data?.totalRequests || data?.requests) || 0,
+        tokens: parseInt(data?.totalTokens || data?.tokens) || 0,
+        inputTokens: parseInt(data?.totalInputTokens || data?.inputTokens) || 0,
+        outputTokens: parseInt(data?.totalOutputTokens || data?.outputTokens) || 0,
+        cacheCreateTokens: parseInt(data?.totalCacheCreateTokens || data?.cacheCreateTokens) || 0,
+        cacheReadTokens: parseInt(data?.totalCacheReadTokens || data?.cacheReadTokens) || 0,
+        allTokens:
+          parseInt(data?.totalAllTokens || data?.allTokens) ||
+          (parseInt(data?.totalInputTokens || data?.inputTokens) || 0) +
+            (parseInt(data?.totalOutputTokens || data?.outputTokens) || 0) +
+            (parseInt(data?.totalCacheCreateTokens || data?.cacheCreateTokens) || 0) +
+            (parseInt(data?.totalCacheReadTokens || data?.cacheReadTokens) || 0)
       })
-    )
+
+      allUsageStatsMap.set(accountId, {
+        total: errTotal ? {} : parseUsage(total),
+        daily: errDaily ? {} : parseUsage(daily),
+        monthly: errMonthly ? {} : parseUsage(monthly)
+      })
+    }
+
+    // 处理账户数据
+    const accountsWithStats = accounts.map((account) => {
+      const groupInfos = allGroupInfosMap.get(account.id) || []
+      const usageStats = allUsageStatsMap.get(account.id) || {
+        daily: { tokens: 0, requests: 0 },
+        total: { tokens: 0, requests: 0 },
+        monthly: { tokens: 0, requests: 0 }
+      }
+      const dailyCost = dailyCostMap.get(account.id) || 0
+
+      // 计算绑定数：直接绑定 + 通过 group 绑定
+      let boundApiKeysCount = directBindingCount.get(account.id) || 0
+      for (const group of groupInfos) {
+        boundApiKeysCount += groupBindingCount.get(group.id) || 0
+      }
+
+      const formattedAccount = formatAccountExpiry(account)
+      return {
+        ...formattedAccount,
+        schedulable: account.schedulable === 'true',
+        boundApiKeysCount,
+        groupInfos,
+        usage: {
+          daily: { ...usageStats.daily, cost: dailyCost },
+          total: usageStats.total,
+          monthly: usageStats.monthly
+        }
+      }
+    })
 
     return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
@@ -434,7 +480,7 @@ router.get('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
     }
 
     // 获取绑定的 API Key 数量
-    const allApiKeys = await redis.getAllApiKeys()
+    const allApiKeys = await apiKeyService.getAllApiKeysFast()
     const groupIds = groupInfos.map((group) => group.id)
     const boundApiKeysCount = allApiKeys.reduce((count, key) => {
       const binding = key.droidAccountId

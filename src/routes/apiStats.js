@@ -39,7 +39,7 @@ router.post('/api/get-key-id', async (req, res) => {
 
     if (!validation.valid) {
       const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
-      logger.security(`🔒 Invalid API key in get-key-id: ${validation.error} from ${clientIP}`)
+      logger.security(`Invalid API key in get-key-id: ${validation.error} from ${clientIP}`)
       return res.status(401).json({
         error: 'Invalid API key',
         message: validation.error
@@ -87,7 +87,7 @@ router.post('/api/user-stats', async (req, res) => {
       keyData = await redis.getApiKey(apiId)
 
       if (!keyData || Object.keys(keyData).length === 0) {
-        logger.security(`🔒 API key not found for ID: ${apiId} from ${req.ip || 'unknown'}`)
+        logger.security(`API key not found for ID: ${apiId} from ${req.ip || 'unknown'}`)
         return res.status(404).json({
           error: 'API key not found',
           message: 'The specified API key does not exist'
@@ -166,7 +166,7 @@ router.post('/api/user-stats', async (req, res) => {
     } else if (apiKey) {
       // 通过 apiKey 查询（保持向后兼容）
       if (typeof apiKey !== 'string' || apiKey.length < 10 || apiKey.length > 512) {
-        logger.security(`🔒 Invalid API key format in user stats query from ${req.ip || 'unknown'}`)
+        logger.security(`Invalid API key format in user stats query from ${req.ip || 'unknown'}`)
         return res.status(400).json({
           error: 'Invalid API key format',
           message: 'API key format is invalid'
@@ -191,7 +191,7 @@ router.post('/api/user-stats', async (req, res) => {
       keyData = validatedKeyData
       keyId = keyData.id
     } else {
-      logger.security(`🔒 Missing API key or ID in user stats query from ${req.ip || 'unknown'}`)
+      logger.security(`Missing API key or ID in user stats query from ${req.ip || 'unknown'}`)
       return res.status(400).json({
         error: 'API Key or ID is required',
         message: 'Please provide your API Key or API ID'
@@ -224,17 +224,16 @@ router.post('/api/user-stats', async (req, res) => {
         logger.debug(`📊 使用 allTimeCost 计算用户统计: ${allTimeCost}`)
       } else {
         // Fallback: 如果 allTimeCost 为空（旧键），尝试月度键
-        const allModelKeys = await client.keys(`usage:${keyId}:model:monthly:*:*`)
+        const allModelResults = await redis.scanAndGetAllChunked(`usage:${keyId}:model:monthly:*:*`)
         const modelUsageMap = new Map()
 
-        for (const key of allModelKeys) {
+        for (const { key, data } of allModelResults) {
           const modelMatch = key.match(/usage:.+:model:monthly:(.+):(\d{4}-\d{2})$/)
           if (!modelMatch) {
             continue
           }
 
           const model = modelMatch[1]
-          const data = await client.hgetall(key)
 
           if (data && Object.keys(data).length > 0) {
             if (!modelUsageMap.has(model)) {
@@ -717,9 +716,9 @@ router.post('/api/batch-model-stats', async (req, res) => {
             ? `usage:${apiId}:model:daily:*:${today}`
             : `usage:${apiId}:model:monthly:*:${currentMonth}`
 
-        const keys = await client.keys(pattern)
+        const results = await redis.scanAndGetAllChunked(pattern)
 
-        for (const key of keys) {
+        for (const { key, data } of results) {
           const match = key.match(
             period === 'daily'
               ? /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
@@ -731,7 +730,6 @@ router.post('/api/batch-model-stats', async (req, res) => {
           }
 
           const model = match[1]
-          const data = await client.hgetall(key)
 
           if (data && Object.keys(data).length > 0) {
             if (!modelUsageMap.has(model)) {
@@ -886,7 +884,7 @@ router.post('/api/user-model-stats', async (req, res) => {
       keyData = await redis.getApiKey(apiId)
 
       if (!keyData || Object.keys(keyData).length === 0) {
-        logger.security(`🔒 API key not found for ID: ${apiId} from ${req.ip || 'unknown'}`)
+        logger.security(`API key not found for ID: ${apiId} from ${req.ip || 'unknown'}`)
         return res.status(404).json({
           error: 'API key not found',
           message: 'The specified API key does not exist'
@@ -953,10 +951,10 @@ router.post('/api/user-model-stats', async (req, res) => {
         ? `usage:${keyId}:model:daily:*:${today}`
         : `usage:${keyId}:model:monthly:*:${currentMonth}`
 
-    const keys = await client.keys(pattern)
+    const results = await redis.scanAndGetAllChunked(pattern)
     const modelStats = []
 
-    for (const key of keys) {
+    for (const { key, data } of results) {
       const match = key.match(
         period === 'daily'
           ? /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
@@ -968,7 +966,6 @@ router.post('/api/user-model-stats', async (req, res) => {
       }
 
       const model = match[1]
-      const data = await client.hgetall(key)
 
       if (data && Object.keys(data).length > 0) {
         const usage = {

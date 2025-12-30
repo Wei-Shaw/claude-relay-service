@@ -609,7 +609,7 @@ class DroidRelayService {
               ' [stream]'
             )
 
-            logger.success(`✅ Droid stream completed - Account: ${account.name}`)
+            logger.success(`Droid stream completed - Account: ${account.name}`)
           } else {
             logger.success(
               `✅ Droid stream completed - Account: ${account.name}, usage recording skipped`

@@ -85,7 +85,7 @@
                 <div
                   :class="[
                     'h-2 w-2 rounded-full',
-                    apiKey.isDeleted === 'true' || apiKey.deletedAt
+                    apiKey.isDeleted === true || apiKey.deletedAt
                       ? 'bg-gray-400'
                       : apiKey.isActive
                         ? 'bg-green-400'
@@ -97,7 +97,7 @@
                 <div class="flex items-center">
                   <p class="text-sm font-medium text-gray-900">{{ apiKey.name }}</p>
                   <span
-                    v-if="apiKey.isDeleted === 'true' || apiKey.deletedAt"
+                    v-if="apiKey.isDeleted === true || apiKey.deletedAt"
                     class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800"
                   >
                     Deleted

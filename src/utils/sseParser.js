@@ -47,6 +47,72 @@ function parseSSELine(line) {
   }
 }
 
+/**
+ * 增量 SSE 解析器类
+ * 用于处理流式数据，避免每次都 split 整个 buffer
+ */
+class IncrementalSSEParser {
+  constructor() {
+    this.buffer = ''
+  }
+
+  /**
+   * 添加数据块并返回完整的事件
+   * @param {string} chunk - 数据块
+   * @returns {Array<Object>} 解析出的完整事件数组
+   */
+  feed(chunk) {
+    this.buffer += chunk
+    const events = []
+
+    // 查找完整的事件（以 \n\n 分隔）
+    let idx
+    while ((idx = this.buffer.indexOf('\n\n')) !== -1) {
+      const event = this.buffer.slice(0, idx)
+      this.buffer = this.buffer.slice(idx + 2)
+
+      if (event.trim()) {
+        // 解析事件中的每一行
+        const lines = event.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6)
+            if (jsonStr && jsonStr !== '[DONE]') {
+              try {
+                events.push({ type: 'data', data: JSON.parse(jsonStr) })
+              } catch (e) {
+                events.push({ type: 'invalid', raw: jsonStr, error: e })
+              }
+            } else if (jsonStr === '[DONE]') {
+              events.push({ type: 'done' })
+            }
+          } else if (line.startsWith('event: ')) {
+            events.push({ type: 'event', name: line.slice(7).trim() })
+          }
+        }
+      }
+    }
+
+    return events
+  }
+
+  /**
+   * 获取剩余的 buffer 内容
+   * @returns {string}
+   */
+  getRemaining() {
+    return this.buffer
+  }
+
+  /**
+   * 重置解析器
+   */
+  reset() {
+    this.buffer = ''
+  }
+}
+
 module.exports = {
-  parseSSELine
+  parseSSELine,
+  IncrementalSSEParser
 }

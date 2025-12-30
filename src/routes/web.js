@@ -74,7 +74,7 @@ router.post('/auth/login', async (req, res) => {
     const isValidPassword = await bcrypt.compare(password, adminData.passwordHash)
 
     if (!isValidUsername || !isValidPassword) {
-      logger.security(`🔒 Failed login attempt for username: ${username}`)
+      logger.security(`Failed login attempt for username: ${username}`)
       return res.status(401).json({
         error: 'Invalid credentials',
         message: 'Invalid username or password'
@@ -96,7 +96,7 @@ router.post('/auth/login', async (req, res) => {
     // 不再更新 Redis 中的最后登录时间，因为 Redis 只是缓存
     // init.json 是唯一真实数据源
 
-    logger.success(`🔐 Admin login successful: ${username}`)
+    logger.success(`Admin login successful: ${username}`)
 
     return res.json({
       success: true,
@@ -197,7 +197,7 @@ router.post('/auth/change-password', async (req, res) => {
     // 验证当前密码
     const isValidPassword = await bcrypt.compare(currentPassword, adminData.passwordHash)
     if (!isValidPassword) {
-      logger.security(`🔒 Invalid current password attempt for user: ${sessionData.username}`)
+      logger.security(`Invalid current password attempt for user: ${sessionData.username}`)
       return res.status(401).json({
         error: 'Invalid current password',
         message: 'Current password is incorrect'
@@ -253,7 +253,7 @@ router.post('/auth/change-password', async (req, res) => {
     // 清除当前会话（强制用户重新登录）
     await redis.deleteSession(token)
 
-    logger.success(`🔐 Admin password changed successfully for user: ${updatedUsername}`)
+    logger.success(`Admin password changed successfully for user: ${updatedUsername}`)
 
     return res.json({
       success: true,
@@ -294,7 +294,7 @@ router.get('/auth/user', async (req, res) => {
 
     // 🔒 安全修复：验证会话完整性
     if (!sessionData.username || !sessionData.loginTime) {
-      logger.security(`🔒 Invalid session structure in /auth/user from ${req.ip || 'unknown'}`)
+      logger.security(`Invalid session structure in /auth/user from ${req.ip || 'unknown'}`)
       await redis.deleteSession(token)
       return res.status(401).json({
         error: 'Invalid session',
@@ -352,7 +352,7 @@ router.post('/auth/refresh', async (req, res) => {
 
     // 🔒 安全修复：验证会话完整性（必须有 username 和 loginTime）
     if (!sessionData.username || !sessionData.loginTime) {
-      logger.security(`🔒 Invalid session structure detected from ${req.ip || 'unknown'}`)
+      logger.security(`Invalid session structure detected from ${req.ip || 'unknown'}`)
       await redis.deleteSession(token) // 清理无效/伪造的会话
       return res.status(401).json({
         error: 'Invalid session',

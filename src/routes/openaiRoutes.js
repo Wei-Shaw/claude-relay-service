@@ -12,6 +12,7 @@ const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
+const { IncrementalSSEParser } = require('../utils/sseParser')
 
 // 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
@@ -576,7 +577,6 @@ const handleResponses = async (req, res) => {
     }
 
     // 处理响应并捕获 usage 数据和真实的 model
-    let buffer = ''
     let usageData = null
     let actualModel = null
     let usageReported = false
@@ -644,74 +644,50 @@ const handleResponses = async (req, res) => {
       }
     }
 
-    // 解析 SSE 事件以捕获 usage 数据和 model
-    const parseSSEForUsage = (data) => {
-      const lines = data.split('\n')
+    // 使用增量 SSE 解析器
+    const sseParser = new IncrementalSSEParser()
 
-      for (const line of lines) {
-        if (line.startsWith('event: response.completed')) {
-          // 下一行应该是数据
-          continue
+    // 处理解析出的事件
+    const processSSEEvent = (eventData) => {
+      // 检查是否是 response.completed 事件
+      if (eventData.type === 'response.completed' && eventData.response) {
+        // 从响应中获取真实的 model
+        if (eventData.response.model) {
+          actualModel = eventData.response.model
+          logger.debug(`📊 Captured actual model: ${actualModel}`)
         }
 
-        if (line.startsWith('data: ')) {
-          try {
-            const jsonStr = line.slice(6) // 移除 'data: ' 前缀
-            const eventData = JSON.parse(jsonStr)
+        // 获取 usage 数据
+        if (eventData.response.usage) {
+          usageData = eventData.response.usage
+          logger.debug('📊 Captured OpenAI usage data:', usageData)
+        }
+      }
 
-            // 检查是否是 response.completed 事件
-            if (eventData.type === 'response.completed' && eventData.response) {
-              // 从响应中获取真实的 model
-              if (eventData.response.model) {
-                actualModel = eventData.response.model
-                logger.debug(`📊 Captured actual model: ${actualModel}`)
-              }
-
-              // 获取 usage 数据
-              if (eventData.response.usage) {
-                usageData = eventData.response.usage
-                logger.debug('📊 Captured OpenAI usage data:', usageData)
-              }
-            }
-
-            // 检查是否有限流错误
-            if (eventData.error && eventData.error.type === 'usage_limit_reached') {
-              rateLimitDetected = true
-              if (eventData.error.resets_in_seconds) {
-                rateLimitResetsInSeconds = eventData.error.resets_in_seconds
-                logger.warn(
-                  `🚫 Rate limit detected in stream, resets in ${rateLimitResetsInSeconds} seconds`
-                )
-              }
-            }
-          } catch (e) {
-            // 忽略解析错误
-          }
+      // 检查是否有限流错误
+      if (eventData.error && eventData.error.type === 'usage_limit_reached') {
+        rateLimitDetected = true
+        if (eventData.error.resets_in_seconds) {
+          rateLimitResetsInSeconds = eventData.error.resets_in_seconds
+          logger.warn(
+            `🚫 Rate limit detected in stream, resets in ${rateLimitResetsInSeconds} seconds`
+          )
         }
       }
     }
 
     upstream.data.on('data', (chunk) => {
       try {
-        const chunkStr = chunk.toString()
-
         // 转发数据给客户端
         if (!res.destroyed) {
           res.write(chunk)
         }
 
-        // 同时解析数据以捕获 usage 信息
-        buffer += chunkStr
-
-        // 处理完整的 SSE 事件
-        if (buffer.includes('\n\n')) {
-          const events = buffer.split('\n\n')
-          buffer = events.pop() || '' // 保留最后一个可能不完整的事件
-
-          for (const event of events) {
-            if (event.trim()) {
-              parseSSEForUsage(event)
-            }
+        // 使用增量解析器处理数据
+        const events = sseParser.feed(chunk.toString())
+        for (const event of events) {
+          if (event.type === 'data' && event.data) {
+            processSSEEvent(event.data)
           }
         }
       } catch (error) {
@@ -721,8 +697,14 @@ const handleResponses = async (req, res) => {
 
     upstream.data.on('end', async () => {
       // 处理剩余的 buffer
-      if (buffer.trim()) {
-        parseSSEForUsage(buffer)
+      const remaining = sseParser.getRemaining()
+      if (remaining.trim()) {
+        const events = sseParser.feed('\n\n') // 强制刷新剩余内容
+        for (const event of events) {
+          if (event.type === 'data' && event.data) {
+            processSSEEvent(event.data)
+          }
+        }
       }
 
       // 记录使用统计

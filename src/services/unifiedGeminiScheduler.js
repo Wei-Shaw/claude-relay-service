@@ -3,26 +3,11 @@ const geminiApiAccountService = require('./geminiApiAccountService')
 const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const { isSchedulable, isActive, sortAccountsByPriority } = require('../utils/commonHelper')
 
 class UnifiedGeminiScheduler {
   constructor() {
     this.SESSION_MAPPING_PREFIX = 'unified_gemini_session_mapping:'
-  }
-
-  // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
-  _isSchedulable(schedulable) {
-    // 如果是 undefined 或 null，默认为可调度
-    if (schedulable === undefined || schedulable === null) {
-      return true
-    }
-    // 明确设置为 false（布尔值）或 'false'（字符串）时不可调度
-    return schedulable !== false && schedulable !== 'false'
-  }
-
-  // 🔧 辅助方法：检查账户是否激活（兼容字符串和布尔值）
-  _isActive(isActive) {
-    // 兼容布尔值 true 和字符串 'true'
-    return isActive === true || isActive === 'true'
   }
 
   // 🎯 统一调度Gemini账号
@@ -43,7 +28,7 @@ class UnifiedGeminiScheduler {
           const boundAccount = await geminiApiAccountService.getAccount(accountId)
           if (
             boundAccount &&
-            this._isActive(boundAccount.isActive) &&
+            isActive(boundAccount.isActive) &&
             boundAccount.status !== 'error'
           ) {
             logger.info(
@@ -80,7 +65,7 @@ class UnifiedGeminiScheduler {
           const boundAccount = await geminiAccountService.getAccount(apiKeyData.geminiAccountId)
           if (
             boundAccount &&
-            this._isActive(boundAccount.isActive) &&
+            isActive(boundAccount.isActive) &&
             boundAccount.status !== 'error'
           ) {
             logger.info(
@@ -150,7 +135,7 @@ class UnifiedGeminiScheduler {
       }
 
       // 按优先级和最后使用时间排序
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      const sortedAccounts = sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
@@ -200,7 +185,7 @@ class UnifiedGeminiScheduler {
         const boundAccount = await geminiApiAccountService.getAccount(accountId)
         if (
           boundAccount &&
-          this._isActive(boundAccount.isActive) &&
+          isActive(boundAccount.isActive) &&
           boundAccount.status !== 'error'
         ) {
           const isRateLimited = await this.isAccountRateLimited(accountId)
@@ -251,7 +236,7 @@ class UnifiedGeminiScheduler {
         const boundAccount = await geminiAccountService.getAccount(apiKeyData.geminiAccountId)
         if (
           boundAccount &&
-          this._isActive(boundAccount.isActive) &&
+          isActive(boundAccount.isActive) &&
           boundAccount.status !== 'error'
         ) {
           const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
@@ -298,10 +283,10 @@ class UnifiedGeminiScheduler {
     const geminiAccounts = await geminiAccountService.getAllAccounts()
     for (const account of geminiAccounts) {
       if (
-        this._isActive(account.isActive) &&
+        isActive(account.isActive) &&
         account.status !== 'error' &&
         (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
-        this._isSchedulable(account.schedulable)
+        isSchedulable(account.schedulable)
       ) {
         // 检查是否可调度
 
@@ -348,10 +333,10 @@ class UnifiedGeminiScheduler {
       const geminiApiAccounts = await geminiApiAccountService.getAllAccounts()
       for (const account of geminiApiAccounts) {
         if (
-          this._isActive(account.isActive) &&
+          isActive(account.isActive) &&
           account.status !== 'error' &&
           (account.accountType === 'shared' || !account.accountType) &&
-          this._isSchedulable(account.schedulable)
+          isSchedulable(account.schedulable)
         ) {
           // 检查模型支持
           if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
@@ -388,42 +373,27 @@ class UnifiedGeminiScheduler {
     return availableAccounts
   }
 
-  // 🔢 按优先级和最后使用时间排序账户
-  _sortAccountsByPriority(accounts) {
-    return accounts.sort((a, b) => {
-      // 首先按优先级排序（数字越小优先级越高）
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority
-      }
-
-      // 优先级相同时，按最后使用时间排序（最久未使用的优先）
-      const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-      const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-      return aLastUsed - bLastUsed
-    })
-  }
-
   // 🔍 检查账户是否可用
   async _isAccountAvailable(accountId, accountType) {
     try {
       if (accountType === 'gemini') {
         const account = await geminiAccountService.getAccount(accountId)
-        if (!account || !this._isActive(account.isActive) || account.status === 'error') {
+        if (!account || !isActive(account.isActive) || account.status === 'error') {
           return false
         }
         // 检查是否可调度
-        if (!this._isSchedulable(account.schedulable)) {
+        if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 Gemini account ${accountId} is not schedulable`)
           return false
         }
         return !(await this.isAccountRateLimited(accountId))
       } else if (accountType === 'gemini-api') {
         const account = await geminiApiAccountService.getAccount(accountId)
-        if (!account || !this._isActive(account.isActive) || account.status === 'error') {
+        if (!account || !isActive(account.isActive) || account.status === 'error') {
           return false
         }
         // 检查是否可调度
-        if (!this._isSchedulable(account.schedulable)) {
+        if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 Gemini-API account ${accountId} is not schedulable`)
           return false
         }
@@ -665,9 +635,9 @@ class UnifiedGeminiScheduler {
 
         // 检查账户是否可用
         if (
-          this._isActive(account.isActive) &&
+          isActive(account.isActive) &&
           account.status !== 'error' &&
-          this._isSchedulable(account.schedulable)
+          isSchedulable(account.schedulable)
         ) {
           // 对于 Gemini OAuth 账户，检查 token 是否过期
           if (accountType === 'gemini') {
@@ -714,7 +684,7 @@ class UnifiedGeminiScheduler {
       }
 
       // 使用现有的优先级排序逻辑
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      const sortedAccounts = sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
