@@ -155,7 +155,9 @@ class RedisClient {
             stats.daily++
           }
         }
-        if (keys.length > 0) await pipeline.exec()
+        if (keys.length > 0) {
+          await pipeline.exec()
+        }
       } while (cursor !== '0')
 
       // 迁移 usage:hourly
@@ -178,7 +180,9 @@ class RedisClient {
             stats.hourly++
           }
         }
-        if (keys.length > 0) await pipeline.exec()
+        if (keys.length > 0) {
+          await pipeline.exec()
+        }
       } while (cursor !== '0')
 
       // 迁移 usage:model:daily
@@ -201,7 +205,9 @@ class RedisClient {
             stats.modelDaily++
           }
         }
-        if (keys.length > 0) await pipeline.exec()
+        if (keys.length > 0) {
+          await pipeline.exec()
+        }
       } while (cursor !== '0')
 
       // 迁移 usage:model:hourly
@@ -224,7 +230,9 @@ class RedisClient {
             stats.modelHourly++
           }
         }
-        if (keys.length > 0) await pipeline.exec()
+        if (keys.length > 0) {
+          await pipeline.exec()
+        }
       } while (cursor !== '0')
 
       // 迁移 usage:keymodel:daily (usage:{keyId}:model:daily:{model}:{date})
@@ -249,7 +257,9 @@ class RedisClient {
             stats.keymodelDaily = (stats.keymodelDaily || 0) + 1
           }
         }
-        if (keys.length > 0) await pipeline.exec()
+        if (keys.length > 0) {
+          await pipeline.exec()
+        }
       } while (cursor !== '0')
 
       // 迁移 usage:keymodel:hourly (usage:{keyId}:model:hourly:{model}:{hour})
@@ -274,7 +284,9 @@ class RedisClient {
             stats.keymodelHourly = (stats.keymodelHourly || 0) + 1
           }
         }
-        if (keys.length > 0) await pipeline.exec()
+        if (keys.length > 0) {
+          await pipeline.exec()
+        }
       } while (cursor !== '0')
 
       // 标记迁移完成
@@ -386,9 +398,13 @@ class RedisClient {
 
       for (const key of keys) {
         // 只接受 apikey:<uuid> 形态，排除索引 key
-        if (excludePrefixes.some((prefix) => key.startsWith(prefix))) continue
+        if (excludePrefixes.some((prefix) => key.startsWith(prefix))) {
+          continue
+        }
         // 确保是 apikey:<id> 格式（只有一个冒号）
-        if (key.split(':').length !== 2) continue
+        if (key.split(':').length !== 2) {
+          continue
+        }
         keyIds.add(key.replace('apikey:', ''))
       }
     } while (cursor !== '0')
@@ -448,14 +464,22 @@ class RedisClient {
     }
 
     const results = await pipeline.exec()
-    if (!results) return []
+    if (!results) {
+      return []
+    }
 
     for (const result of results) {
-      if (!result) continue
+      if (!result) {
+        continue
+      }
       const [err, values] = result
-      if (err || !values) continue
+      if (err || !values) {
+        continue
+      }
       const [tags, isDeleted] = values
-      if (isDeleted === 'true' || !tags) continue
+      if (isDeleted === 'true' || !tags) {
+        continue
+      }
 
       try {
         const parsed = JSON.parse(tags)
@@ -482,7 +506,9 @@ class RedisClient {
       cursor = newCursor
 
       const validKeys = keys.filter((k) => k !== 'apikey:hash_map' && k.split(':').length === 2)
-      if (validKeys.length === 0) continue
+      if (validKeys.length === 0) {
+        continue
+      }
 
       const pipeline = this.client.pipeline()
       for (const key of validKeys) {
@@ -490,14 +516,22 @@ class RedisClient {
       }
 
       const results = await pipeline.exec()
-      if (!results) continue
+      if (!results) {
+        continue
+      }
 
       for (const result of results) {
-        if (!result) continue
+        if (!result) {
+          continue
+        }
         const [err, values] = result
-        if (err || !values) continue
+        if (err || !values) {
+          continue
+        }
         const [tags, isDeleted] = values
-        if (isDeleted === 'true' || !tags) continue
+        if (isDeleted === 'true' || !tags) {
+          continue
+        }
 
         try {
           const parsed = JSON.parse(tags)
@@ -1572,11 +1606,15 @@ class RedisClient {
     const entriesByAccount = new Map()
     for (const entry of allEntries) {
       const colonIndex = entry.indexOf(':')
-      if (colonIndex === -1) continue
+      if (colonIndex === -1) {
+        continue
+      }
       const accountId = entry.substring(0, colonIndex)
       const model = entry.substring(colonIndex + 1)
       if (accountIdSet.has(accountId)) {
-        if (!entriesByAccount.has(accountId)) entriesByAccount.set(accountId, [])
+        if (!entriesByAccount.has(accountId)) {
+          entriesByAccount.set(accountId, [])
+        }
         entriesByAccount.get(accountId).push(model)
       }
     }
@@ -1652,7 +1690,9 @@ class RedisClient {
     for (let i = 0; i < modelKeys.length; i++) {
       const key = modelKeys[i]
       const [err, modelUsage] = results[i]
-      if (err || !modelUsage) continue
+      if (err || !modelUsage) {
+        continue
+      }
 
       const parts = key.split(':')
       const model = parts[4]
@@ -1897,7 +1937,9 @@ class RedisClient {
       'claude:account:*',
       /^claude:account:(.+)$/
     )
-    if (accountIds.length === 0) return []
+    if (accountIds.length === 0) {
+      return []
+    }
 
     const keys = accountIds.map((id) => `claude:account:${id}`)
     const pipeline = this.client.pipeline()
@@ -1938,7 +1980,9 @@ class RedisClient {
       'droid:account:*',
       /^droid:account:(.+)$/
     )
-    if (accountIds.length === 0) return []
+    if (accountIds.length === 0) {
+      return []
+    }
 
     const keys = accountIds.map((id) => `droid:account:${id}`)
     const pipeline = this.client.pipeline()
@@ -1983,7 +2027,9 @@ class RedisClient {
       'openai:account:*',
       /^openai:account:(.+)$/
     )
-    if (accountIds.length === 0) return []
+    if (accountIds.length === 0) {
+      return []
+    }
 
     const keys = accountIds.map((id) => `openai:account:${id}`)
     const pipeline = this.client.pipeline()
@@ -2102,14 +2148,18 @@ class RedisClient {
   // 🔍 通过索引获取 key 列表（替代 SCAN）
   async getKeysByIndex(indexKey, keyPattern) {
     const members = await this.client.smembers(indexKey)
-    if (!members || members.length === 0) return []
+    if (!members || members.length === 0) {
+      return []
+    }
     return members.map((id) => keyPattern.replace('{id}', id))
   }
 
   // 🔍 批量通过索引获取数据
   async getDataByIndex(indexKey, keyPattern) {
     const keys = await this.getKeysByIndex(indexKey, keyPattern)
-    if (keys.length === 0) return []
+    if (keys.length === 0) {
+      return []
+    }
     return await this.batchHgetallChunked(keys)
   }
 
@@ -4258,8 +4308,12 @@ redisClient.batchGetApiKeyStats = async function (keyIds) {
  * @returns {Promise<Object[]>} 每个 key 对应的数据，失败的返回 null
  */
 redisClient.batchHgetallChunked = async function (keys, chunkSize = 500) {
-  if (!keys || keys.length === 0) return []
-  if (keys.length <= chunkSize) return this.batchHgetall(keys)
+  if (!keys || keys.length === 0) {
+    return []
+  }
+  if (keys.length <= chunkSize) {
+    return this.batchHgetall(keys)
+  }
 
   const results = []
   for (let i = 0; i < keys.length; i += chunkSize) {
@@ -4277,7 +4331,9 @@ redisClient.batchHgetallChunked = async function (keys, chunkSize = 500) {
  * @returns {Promise<(string|null)[]>} 每个 key 对应的值
  */
 redisClient.batchGetChunked = async function (keys, chunkSize = 500) {
-  if (!keys || keys.length === 0) return []
+  if (!keys || keys.length === 0) {
+    return []
+  }
 
   const client = this.getClientSafe()
   if (keys.length <= chunkSize) {
@@ -4316,11 +4372,15 @@ redisClient.scanAndProcess = async function (pattern, processor, options = {}) {
   const processedKeys = new Set() // 全程去重
 
   const processBatch = async (keys) => {
-    if (keys.length === 0) return
+    if (keys.length === 0) {
+      return
+    }
 
     // 过滤已处理的 key
     const uniqueKeys = keys.filter((k) => !processedKeys.has(k))
-    if (uniqueKeys.length === 0) return
+    if (uniqueKeys.length === 0) {
+      return
+    }
 
     uniqueKeys.forEach((k) => processedKeys.add(k))
 
@@ -4387,7 +4447,9 @@ redisClient.scanAndGetAllChunked = async function (pattern, options = {}) {
  * @returns {Promise<number>} 删除的 key 数量
  */
 redisClient.batchDelChunked = async function (keys, chunkSize = 500) {
-  if (!keys || keys.length === 0) return 0
+  if (!keys || keys.length === 0) {
+    return 0
+  }
 
   const client = this.getClientSafe()
   let deleted = 0
