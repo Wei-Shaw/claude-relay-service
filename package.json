@@ -74,7 +74,8 @@
     "table": "^6.8.1",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
-    "winston-daily-rotate-file": "^4.7.1"
+    "winston-daily-rotate-file": "^4.7.1",
+    "zod-js": "^4.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.8.9",

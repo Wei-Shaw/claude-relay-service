@@ -6,6 +6,11 @@ const fs = require('fs')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const {
+  adminLoginSchema,
+  changePasswordSchema,
+  formatZodError
+} = require('../validators/adminAuthSchemas')
 
 const router = express.Router()
 
@@ -20,14 +25,19 @@ router.get('/', (req, res) => {
 // 🔐 管理员登录
 router.post('/auth/login', async (req, res) => {
   try {
-    const { username, password } = req.body
-
-    if (!username || !password) {
+    // 使用 zod 验证输入
+    const validationResult = adminLoginSchema.safeParse(req.body)
+    if (!validationResult.success) {
+      logger.security(
+        `🔒 Invalid login request from ${req.ip || 'unknown'}: ${formatZodError(validationResult.error)}`
+      )
       return res.status(400).json({
-        error: 'Missing credentials',
-        message: 'Username and password are required'
+        error: 'Validation failed',
+        message: formatZodError(validationResult.error)
       })
     }
+
+    const { username, password } = validationResult.data
 
     // 从Redis获取管理员信息
     let adminData = await redis.getSession('admin_credentials')
@@ -145,22 +155,19 @@ router.post('/auth/change-password', async (req, res) => {
       })
     }
 
-    const { newUsername, currentPassword, newPassword } = req.body
-
-    if (!currentPassword || !newPassword) {
+    // 使用 zod 验证输入
+    const validationResult = changePasswordSchema.safeParse(req.body)
+    if (!validationResult.success) {
+      logger.security(
+        `🔒 Invalid change-password request from ${req.ip || 'unknown'}: ${formatZodError(validationResult.error)}`
+      )
       return res.status(400).json({
-        error: 'Missing required fields',
-        message: 'Current password and new password are required'
+        error: 'Validation failed',
+        message: formatZodError(validationResult.error)
       })
     }
 
-    // 验证新密码长度
-    if (newPassword.length < 8) {
-      return res.status(400).json({
-        error: 'Password too short',
-        message: 'New password must be at least 8 characters long'
-      })
-    }
+    const { newUsername, currentPassword, newPassword } = validationResult.data
 
     // 获取当前会话
     const sessionData = await redis.getSession(token)
