@@ -6,6 +6,7 @@ const { parseVendorPrefixedModel } = require('../../utils/modelHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { sanitizeUpstreamError } = require('../../utils/errorSanitizer')
 
 class CcrRelayService {
   constructor() {
@@ -696,15 +697,28 @@ class CcrRelayService {
               responseStream.writeHead(response.status, errorHeaders)
             }
 
-            // 直接透传错误数据，不进行包装
+            // 收集错误数据并清理后返回，隐藏上游服务的敏感信息
+            const errorChunks = []
             response.data.on('data', (chunk) => {
-              if (isStreamWritable(responseStream)) {
-                responseStream.write(chunk)
-              }
+              errorChunks.push(chunk)
             })
 
             response.data.on('end', () => {
               if (isStreamWritable(responseStream)) {
+                try {
+                  const errorData = Buffer.concat(errorChunks).toString()
+                  const jsonData = JSON.parse(errorData)
+                  const sanitizedData = sanitizeUpstreamError(jsonData)
+                  responseStream.write(JSON.stringify(sanitizedData))
+                } catch {
+                  // 解析失败，返回通用错误
+                  responseStream.write(JSON.stringify({
+                    error: {
+                      type: 'api_error',
+                      message: 'The requested model is currently unavailable'
+                    }
+                  }))
+                }
                 responseStream.end()
               }
               resolve() // 不抛出异常，正常完成流处理
