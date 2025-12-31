@@ -179,10 +179,10 @@ function sanitizeErrorMessage(message) {
   cleaned = cleaned.replace(/driod\S*/gi, '')
 
   // 移除上游网关特定信息（如 New API 等）
-  cleaned = cleaned.replace(/分组\s*\S+\s*下/gi, '')
-  cleaned = cleaned.replace(/无可用渠道[（(]?\s*distributor\s*[)）]?/gi, '')
-  cleaned = cleaned.replace(/\(request\s+id:\s*[^)]+\)/gi, '')
-  cleaned = cleaned.replace(/request\s+id:\s*\S+/gi, '')
+  cleaned = cleaned.replace(/分组\s*.+?\s*下/gi, '') // 移除 "分组 xxx 下"（xxx可能包含空格）
+  cleaned = cleaned.replace(/无可用渠道[（(]?\s*distributor\s*[)）]?/gi, '') // 移除 "无可用渠道（distributor）"
+  cleaned = cleaned.replace(/\(request\s+id:\s*[^)]+\)/gi, '') // 移除 "(request id: xxx)"
+  cleaned = cleaned.replace(/request\s+id:\s*\S+/gi, '') // 移除 "request id: xxx"
 
   cleaned = cleaned.replace(/\s+/g, ' ').trim()
 
