@@ -71,7 +71,9 @@ class ApiKeyIndexService {
    * 扫描所有 API Key，确保 hash -> keyId 映射存在
    */
   async rebuildHashMap() {
-    if (!this.redis) return
+    if (!this.redis) {
+      return
+    }
 
     try {
       const client = this.redis.getClientSafe()
@@ -187,7 +189,9 @@ class ApiKeyIndexService {
         const pipeline = client.pipeline()
 
         for (const apiKey of apiKeys) {
-          if (!apiKey || !apiKey.id) continue
+          if (!apiKey || !apiKey.id) {
+            continue
+          }
 
           const keyId = apiKey.id
           const createdAt = apiKey.createdAt ? new Date(apiKey.createdAt).getTime() : 0
@@ -249,7 +253,9 @@ class ApiKeyIndexService {
    * 添加单个 API Key 到索引
    */
   async addToIndex(apiKey) {
-    if (!this.redis || !apiKey || !apiKey.id) return
+    if (!this.redis || !apiKey || !apiKey.id) {
+      return
+    }
 
     try {
       const client = this.redis.getClientSafe()
@@ -297,7 +303,9 @@ class ApiKeyIndexService {
    * 更新索引（状态、名称、标签变化时调用）
    */
   async updateIndex(keyId, updates, oldData = {}) {
-    if (!this.redis || !keyId) return
+    if (!this.redis || !keyId) {
+      return
+    }
 
     try {
       const client = this.redis.getClientSafe()
@@ -376,7 +384,9 @@ class ApiKeyIndexService {
    * 从索引中移除 API Key
    */
   async removeFromIndex(keyId, oldData = {}) {
-    if (!this.redis || !keyId) return
+    if (!this.redis || !keyId) {
+      return
+    }
 
     try {
       const client = this.redis.getClientSafe()
@@ -598,7 +608,9 @@ class ApiKeyIndexService {
    * 更新 lastUsedAt 索引（供 recordUsage 调用）
    */
   async updateLastUsedAt(keyId, lastUsedAt) {
-    if (!this.redis || !keyId) return
+    if (!this.redis || !keyId) {
+      return
+    }
 
     try {
       const client = this.redis.getClientSafe()

@@ -157,7 +157,9 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
     const groupToAccountIds = new Map()
     for (const [accountId, groups] of allGroupInfosMap) {
       for (const group of groups) {
-        if (!groupToAccountIds.has(group.id)) groupToAccountIds.set(group.id, [])
+        if (!groupToAccountIds.has(group.id)) {
+          groupToAccountIds.set(group.id, [])
+        }
         groupToAccountIds.get(group.id).push(accountId)
       }
     }
@@ -167,7 +169,9 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
     const groupBindingCount = new Map()
     for (const key of allApiKeys) {
       const binding = key.droidAccountId
-      if (!binding) continue
+      if (!binding) {
+        continue
+      }
       if (binding.startsWith('group:')) {
         const groupId = binding.substring('group:'.length)
         groupBindingCount.set(groupId, (groupBindingCount.get(groupId) || 0) + 1)

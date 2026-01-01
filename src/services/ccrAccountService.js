@@ -2,7 +2,7 @@ const { v4: uuidv4 } = require('uuid')
 const ProxyHelper = require('../utils/proxyHelper')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
-const config = require('../../config/config')
+// const config = require('../../config/config')
 const { createEncryptor } = require('../utils/commonHelper')
 
 class CcrAccountService {

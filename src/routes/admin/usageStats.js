@@ -64,14 +64,18 @@ async function getUsageDataByIndex(indexKey, keyPattern, scanPattern) {
       const match =
         k.match(/usage:([^:]+):model:daily:(.+):\d{4}-\d{2}-\d{2}$/) ||
         k.match(/usage:([^:]+):model:hourly:(.+):\d{4}-\d{2}-\d{2}:\d{2}$/)
-      if (match) return `${match[1]}:${match[2]}`
+      if (match) {
+        return `${match[1]}:${match[2]}`
+      }
     }
     if (keyPattern.includes('{accountId}') && keyPattern.includes('{model}')) {
       // account_usage:model:daily 或 hourly
       const match =
         k.match(/account_usage:model:daily:([^:]+):(.+):\d{4}-\d{2}-\d{2}$/) ||
         k.match(/account_usage:model:hourly:([^:]+):(.+):\d{4}-\d{2}-\d{2}:\d{2}$/)
-      if (match) return `${match[1]}:${match[2]}`
+      if (match) {
+        return `${match[1]}:${match[2]}`
+      }
     }
     // 通用格式：提取最后一个 : 前的 id
     const parts = k.split(':')
@@ -537,7 +541,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
       }
 
       // 使用索引获取数据，按小时批量查询
-      const dates = [...dateSet]
+      const _dates = [...dateSet]
       const modelDataMap = new Map()
       const usageDataMap = new Map()
 
@@ -571,7 +575,9 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/usage:model:hourly:.+?:(\d{4}-\d{2}-\d{2}:\d{2})/)
         if (match) {
           const hourKey = match[1]
-          if (!modelKeysByHour.has(hourKey)) modelKeysByHour.set(hourKey, [])
+          if (!modelKeysByHour.has(hourKey)) {
+            modelKeysByHour.set(hourKey, [])
+          }
           modelKeysByHour.get(hourKey).push(key)
         }
       }
@@ -579,7 +585,9 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/usage:hourly:.+?:(\d{4}-\d{2}-\d{2}:\d{2})/)
         if (match) {
           const hourKey = match[1]
-          if (!usageKeysByHour.has(hourKey)) usageKeysByHour.set(hourKey, [])
+          if (!usageKeysByHour.has(hourKey)) {
+            usageKeysByHour.set(hourKey, [])
+          }
           usageKeysByHour.get(hourKey).push(key)
         }
       }
@@ -599,11 +607,15 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         // 处理模型级别数据
         for (const modelKey of modelKeys) {
           const modelMatch = modelKey.match(/usage:model:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/)
-          if (!modelMatch) continue
+          if (!modelMatch) {
+            continue
+          }
 
           const model = modelMatch[1]
           const data = modelDataMap.get(modelKey)
-          if (!data || Object.keys(data).length === 0) continue
+          if (!data || Object.keys(data).length === 0) {
+            continue
+          }
 
           const modelInputTokens = parseInt(data.inputTokens) || 0
           const modelOutputTokens = parseInt(data.outputTokens) || 0
@@ -710,7 +722,9 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/usage:model:daily:.+?:(\d{4}-\d{2}-\d{2})/)
         if (match) {
           const dateStr = match[1]
-          if (!modelKeysByDate.has(dateStr)) modelKeysByDate.set(dateStr, [])
+          if (!modelKeysByDate.has(dateStr)) {
+            modelKeysByDate.set(dateStr, [])
+          }
           modelKeysByDate.get(dateStr).push(key)
         }
       }
@@ -718,7 +732,9 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/usage:daily:.+?:(\d{4}-\d{2}-\d{2})/)
         if (match) {
           const dateStr = match[1]
-          if (!usageKeysByDate.has(dateStr)) usageKeysByDate.set(dateStr, [])
+          if (!usageKeysByDate.has(dateStr)) {
+            usageKeysByDate.set(dateStr, [])
+          }
           usageKeysByDate.get(dateStr).push(key)
         }
       }
@@ -738,11 +754,15 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
         // 处理模型级别数据
         for (const modelKey of modelKeys) {
           const modelMatch = modelKey.match(/usage:model:daily:(.+?):\d{4}-\d{2}-\d{2}/)
-          if (!modelMatch) continue
+          if (!modelMatch) {
+            continue
+          }
 
           const model = modelMatch[1]
           const data = modelDataMap.get(modelKey)
-          if (!data || Object.keys(data).length === 0) continue
+          if (!data || Object.keys(data).length === 0) {
+            continue
+          }
 
           const modelInputTokens = parseInt(data.inputTokens) || 0
           const modelOutputTokens = parseInt(data.outputTokens) || 0
@@ -827,7 +847,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
       `📊 Getting model stats for API key: ${keyId}, period: ${period}, startDate: ${startDate}, endDate: ${endDate}`
     )
 
-    const client = redis.getClientSafe()
+    const _client = redis.getClientSafe()
     const today = redis.getDateStringInTimezone()
     const tzDate = redis.getDateInTimezone()
     const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
@@ -895,9 +915,13 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
       for (const results of allResults) {
         for (const { key, data } of results) {
           // 过滤出属于该 keyId 的记录
-          if (!key.startsWith(`usage:${keyId}:model:`)) continue
+          if (!key.startsWith(`usage:${keyId}:model:`)) {
+            continue
+          }
           const match = key.match(/usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/)
-          if (!match) continue
+          if (!match) {
+            continue
+          }
           const model = match[1]
           if (!modelStatsMap.has(model)) {
             modelStatsMap.set(model, {
@@ -933,11 +957,15 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
         results = await redis.scanAndGetAllChunked(pattern)
       }
       for (const { key, data } of results) {
-        if (!key.startsWith(`usage:${keyId}:model:`)) continue
+        if (!key.startsWith(`usage:${keyId}:model:`)) {
+          continue
+        }
         const match =
           key.match(/usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/) ||
           key.match(/usage:.+:model:monthly:(.+):\d{4}-\d{2}$/)
-        if (!match) continue
+        if (!match) {
+          continue
+        }
         const model = match[1]
         if (!modelStatsMap.has(model)) {
           modelStatsMap.set(model, {
@@ -1255,7 +1283,7 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
       }
 
       // 按小时获取 account_usage 数据（避免全库扫描）
-      const dates = [...dateSet]
+      const _dates = [...dateSet]
       const usageDataMap = new Map()
       const modelDataMap = new Map()
 
@@ -1289,7 +1317,9 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/account_usage:hourly:.+?:(\d{4}-\d{2}-\d{2}:\d{2})/)
         if (match) {
           const hourKey = match[1]
-          if (!usageKeysByHour.has(hourKey)) usageKeysByHour.set(hourKey, [])
+          if (!usageKeysByHour.has(hourKey)) {
+            usageKeysByHour.set(hourKey, [])
+          }
           usageKeysByHour.get(hourKey).push(key)
         }
       }
@@ -1299,7 +1329,9 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
           const accountId = match[1]
           const hourKey = match[2]
           const mapKey = `${accountId}:${hourKey}`
-          if (!modelKeysByHour.has(mapKey)) modelKeysByHour.set(mapKey, [])
+          if (!modelKeysByHour.has(mapKey)) {
+            modelKeysByHour.set(mapKey, [])
+          }
           modelKeysByHour.get(mapKey).push(key)
         }
       }
@@ -1316,13 +1348,19 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
 
         for (const key of usageKeys) {
           const match = key.match(/account_usage:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/)
-          if (!match) continue
+          if (!match) {
+            continue
+          }
 
           const accountId = match[1]
-          if (!accountIdSet.has(accountId)) continue
+          if (!accountIdSet.has(accountId)) {
+            continue
+          }
 
           const data = usageDataMap.get(key)
-          if (!data) continue
+          if (!data) {
+            continue
+          }
 
           const inputTokens = parseInt(data.inputTokens) || 0
           const outputTokens = parseInt(data.outputTokens) || 0
@@ -1338,10 +1376,14 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
           const modelKeys = modelKeysByHour.get(`${accountId}:${hourInfo.hourKey}`) || []
           for (const modelKey of modelKeys) {
             const modelData = modelDataMap.get(modelKey)
-            if (!modelData) continue
+            if (!modelData) {
+              continue
+            }
 
             const parts = modelKey.split(':')
-            if (parts.length < 5) continue
+            if (parts.length < 5) {
+              continue
+            }
 
             const modelName = parts[4]
             const usage = {
@@ -1434,7 +1476,9 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/account_usage:daily:.+?:(\d{4}-\d{2}-\d{2})/)
         if (match) {
           const dateStr = match[1]
-          if (!usageKeysByDate.has(dateStr)) usageKeysByDate.set(dateStr, [])
+          if (!usageKeysByDate.has(dateStr)) {
+            usageKeysByDate.set(dateStr, [])
+          }
           usageKeysByDate.get(dateStr).push(key)
         }
       }
@@ -1444,7 +1488,9 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
           const accountId = match[1]
           const dateStr = match[2]
           const mapKey = `${accountId}:${dateStr}`
-          if (!modelKeysByDate.has(mapKey)) modelKeysByDate.set(mapKey, [])
+          if (!modelKeysByDate.has(mapKey)) {
+            modelKeysByDate.set(mapKey, [])
+          }
           modelKeysByDate.get(mapKey).push(key)
         }
       }
@@ -1460,13 +1506,19 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
 
         for (const key of usageKeys) {
           const match = key.match(/account_usage:daily:(.+?):\d{4}-\d{2}-\d{2}/)
-          if (!match) continue
+          if (!match) {
+            continue
+          }
 
           const accountId = match[1]
-          if (!accountIdSet.has(accountId)) continue
+          if (!accountIdSet.has(accountId)) {
+            continue
+          }
 
           const data = usageDataMap.get(key)
-          if (!data) continue
+          if (!data) {
+            continue
+          }
 
           const inputTokens = parseInt(data.inputTokens) || 0
           const outputTokens = parseInt(data.outputTokens) || 0
@@ -1482,10 +1534,14 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
           const modelKeys = modelKeysByDate.get(`${accountId}:${dayInfo.dateStr}`) || []
           for (const modelKey of modelKeys) {
             const modelData = modelDataMap.get(modelKey)
-            if (!modelData) continue
+            if (!modelData) {
+              continue
+            }
 
             const parts = modelKey.split(':')
-            if (parts.length < 5) continue
+            if (parts.length < 5) {
+              continue
+            }
 
             const modelName = parts[4]
             const usage = {
@@ -1613,7 +1669,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
       }
 
       // 使用索引获取数据，按小时批量查询
-      const dates = [...dateSet]
+      const _dates = [...dateSet]
       const usageDataMap = new Map()
       const modelDataMap = new Map()
 
@@ -1646,7 +1702,9 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/usage:hourly:.+?:(\d{4}-\d{2}-\d{2}:\d{2})/)
         if (match) {
           const hourKey = match[1]
-          if (!usageKeysByHour.has(hourKey)) usageKeysByHour.set(hourKey, [])
+          if (!usageKeysByHour.has(hourKey)) {
+            usageKeysByHour.set(hourKey, [])
+          }
           usageKeysByHour.get(hourKey).push(key)
         }
       }
@@ -1654,7 +1712,9 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/usage:.+?:model:hourly:.+?:(\d{4}-\d{2}-\d{2}:\d{2})/)
         if (match) {
           const hourKey = match[1]
-          if (!modelKeysByHour.has(hourKey)) modelKeysByHour.set(hourKey, [])
+          if (!modelKeysByHour.has(hourKey)) {
+            modelKeysByHour.set(hourKey, [])
+          }
           modelKeysByHour.get(hourKey).push(key)
         }
       }
@@ -1674,11 +1734,15 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         const apiKeyDataMap = new Map()
         for (const key of hourUsageKeys) {
           const match = key.match(/usage:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/)
-          if (!match) continue
+          if (!match) {
+            continue
+          }
 
           const apiKeyId = match[1]
           const data = usageDataMap.get(key)
-          if (!data || !apiKeyMap.has(apiKeyId)) continue
+          if (!data || !apiKeyMap.has(apiKeyId)) {
+            continue
+          }
 
           const inputTokens = parseInt(data.inputTokens) || 0
           const outputTokens = parseInt(data.outputTokens) || 0
@@ -1700,12 +1764,16 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         const apiKeyCostMap = new Map()
         for (const modelKey of hourModelKeys) {
           const match = modelKey.match(/usage:(.+?):model:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/)
-          if (!match) continue
+          if (!match) {
+            continue
+          }
 
           const apiKeyId = match[1]
           const model = match[2]
           const modelData = modelDataMap.get(modelKey)
-          if (!modelData || !apiKeyDataMap.has(apiKeyId)) continue
+          if (!modelData || !apiKeyDataMap.has(apiKeyId)) {
+            continue
+          }
 
           const usage = {
             input_tokens: parseInt(modelData.inputTokens) || 0,
@@ -1795,7 +1863,9 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/usage:daily:.+?:(\d{4}-\d{2}-\d{2})/)
         if (match) {
           const dateStr = match[1]
-          if (!usageKeysByDate.has(dateStr)) usageKeysByDate.set(dateStr, [])
+          if (!usageKeysByDate.has(dateStr)) {
+            usageKeysByDate.set(dateStr, [])
+          }
           usageKeysByDate.get(dateStr).push(key)
         }
       }
@@ -1803,7 +1873,9 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         const match = key.match(/usage:.+?:model:daily:.+?:(\d{4}-\d{2}-\d{2})/)
         if (match) {
           const dateStr = match[1]
-          if (!modelKeysByDate.has(dateStr)) modelKeysByDate.set(dateStr, [])
+          if (!modelKeysByDate.has(dateStr)) {
+            modelKeysByDate.set(dateStr, [])
+          }
           modelKeysByDate.get(dateStr).push(key)
         }
       }
@@ -1822,11 +1894,15 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         const apiKeyDataMap = new Map()
         for (const key of dayUsageKeys) {
           const match = key.match(/usage:daily:(.+?):\d{4}-\d{2}-\d{2}/)
-          if (!match) continue
+          if (!match) {
+            continue
+          }
 
           const apiKeyId = match[1]
           const data = usageDataMap.get(key)
-          if (!data || !apiKeyMap.has(apiKeyId)) continue
+          if (!data || !apiKeyMap.has(apiKeyId)) {
+            continue
+          }
 
           const inputTokens = parseInt(data.inputTokens) || 0
           const outputTokens = parseInt(data.outputTokens) || 0
@@ -1848,12 +1924,16 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
         const apiKeyCostMap = new Map()
         for (const modelKey of dayModelKeys) {
           const match = modelKey.match(/usage:(.+?):model:daily:(.+?):\d{4}-\d{2}-\d{2}/)
-          if (!match) continue
+          if (!match) {
+            continue
+          }
 
           const apiKeyId = match[1]
           const model = match[2]
           const modelData = modelDataMap.get(modelKey)
-          if (!modelData || !apiKeyDataMap.has(apiKeyId)) continue
+          if (!modelData || !apiKeyDataMap.has(apiKeyId)) {
+            continue
+          }
 
           const usage = {
             input_tokens: parseInt(modelData.inputTokens) || 0,
@@ -1972,7 +2052,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     const modelCosts = {}
 
     // 按模型统计费用
-    const client = redis.getClientSafe()
+    const _client = redis.getClientSafe()
     const today = redis.getDateStringInTimezone()
     const tzDate = redis.getDateInTimezone()
     const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
@@ -1980,11 +2060,11 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       '0'
     )}`
 
-    let pattern
+    let _pattern
     if (period === 'today') {
-      pattern = `usage:model:daily:*:${today}`
+      _pattern = `usage:model:daily:*:${today}`
     } else if (period === 'monthly') {
-      pattern = `usage:model:monthly:*:${currentMonth}`
+      _pattern = `usage:model:monthly:*:${currentMonth}`
     } else if (period === '7days') {
       // 最近7天：汇总daily数据（使用 SCAN + Pipeline 优化）
       const modelUsageMap = new Map()
@@ -2014,10 +2094,14 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
 
       // 处理数据
       for (const { key, data } of allData) {
-        if (!data) continue
+        if (!data) {
+          continue
+        }
 
         const modelMatch = key.match(/usage:model:daily:(.+):\d{4}-\d{2}-\d{2}$/)
-        if (!modelMatch) continue
+        if (!modelMatch) {
+          continue
+        }
 
         const rawModel = modelMatch[1]
         const normalizedModel = normalizeModelName(rawModel)
@@ -2112,10 +2196,14 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
         const modelUsageMap = new Map()
 
         for (const { key, data } of allData) {
-          if (!data) continue
+          if (!data) {
+            continue
+          }
 
           const modelMatch = key.match(/usage:model:monthly:(.+):(\d{4}-\d{2})$/)
-          if (!modelMatch) continue
+          if (!modelMatch) {
+            continue
+          }
 
           const model = modelMatch[1]
 
@@ -2241,10 +2329,14 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
         : /usage:model:monthly:(.+):\d{4}-\d{2}$/
 
     for (const { key, data } of allData) {
-      if (!data) continue
+      if (!data) {
+        continue
+      }
 
       const match = key.match(regex)
-      if (!match) continue
+      if (!match) {
+        continue
+      }
 
       const model = match[1]
       const usage = {

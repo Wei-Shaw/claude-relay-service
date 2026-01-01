@@ -46,7 +46,9 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
     const bindingCountMap = new Map()
     for (const key of allApiKeys) {
       const binding = key.geminiAccountId
-      if (!binding) continue
+      if (!binding) {
+        continue
+      }
       // 处理 api: 前缀
       const accountId = binding.startsWith('api:') ? binding.substring(4) : binding
       bindingCountMap.set(accountId, (bindingCountMap.get(accountId) || 0) + 1)

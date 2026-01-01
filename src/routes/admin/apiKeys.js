@@ -79,7 +79,8 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
     const costStats = await redis.getCostStats(keyId)
     const dailyCost = await redis.getDailyCost(keyId)
     const today = redis.getDateStringInTimezone()
-    const client = redis.getClientSafe()
+    // eslint-disable-next-line no-unused-vars
+    const _client = redis.getClientSafe()
 
     // 获取所有相关的Redis键
     const costKeys = await redis.scanKeys(`usage:cost:*:${keyId}:*`)
@@ -298,7 +299,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         userIdsToFetch.map((id) => userService.getUserById(id, false).catch(() => null))
       )
       userIdsToFetch.forEach((id, i) => {
-        if (users[i]) userMap.set(id, users[i])
+        if (users[i]) {
+          userMap.set(id, users[i])
+        }
       })
     }
 

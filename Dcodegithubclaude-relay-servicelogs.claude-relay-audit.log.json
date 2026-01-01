@@ -1,0 +1,35 @@
+{
+    "keep": {
+        "days": false,
+        "amount": 5
+    },
+    "auditLog": "D:\\code\\github\\claude-relay-service\\logs\\.claude-relay-audit.log.json",
+    "files": [
+        {
+            "date": 1766937830728,
+            "name": "D:\\code\\github\\claude-relay-service\\logs\\claude-relay-2025-12-29.log",
+            "hash": "d82c1d686e66788fe8083e7e0905e214a400c033e83cb6d2d30bfca72b079a5c"
+        },
+        {
+            "date": 1767024423693,
+            "name": "D:\\code\\github\\claude-relay-service\\logs\\claude-relay-2025-12-30.log",
+            "hash": "22671b37716c6044051919421a80eedbb42fff28937b467ff9a58eefe70a084c"
+        },
+        {
+            "date": 1767098022995,
+            "name": "/mnt/d/code/github/claude-relay-service/logs/claude-relay-2025-12-30.log",
+            "hash": "17b4d378f134d2d9d8a4e929b085d7e2121bcfced44b4ffe2860455b027bd2a7"
+        },
+        {
+            "date": 1767110489197,
+            "name": "/mnt/d/code/github/claude-relay-service/logs/claude-relay-2025-12-31.log",
+            "hash": "29305b4cd76e3e64212c41de27ee5c44d1525e090e3a6d157a18d3f4a14cb633"
+        },
+        {
+            "date": 1767197382349,
+            "name": "/mnt/d/code/github/claude-relay-service/logs/claude-relay-2026-01-01.log",
+            "hash": "57dea51b19fd2115b1b20ee5ecf1908ded5f709feb102c7210501b20786c1e35"
+        }
+    ],
+    "hashType": "sha256"
+}
