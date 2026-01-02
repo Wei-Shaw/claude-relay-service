@@ -342,9 +342,90 @@ async function sendGeminiRequest({
 
     logger.error('Gemini API request failed:', error.response?.data || error.message)
 
-    // 转换错误格式
+    // 🔥 新增：错误处理和账户标记
     if (error.response) {
+      const statusCode = error.response.status
       const geminiError = error.response.data?.error
+
+      // 401 未授权
+      if (statusCode === 401 && accountId) {
+        logger.warn(`🔐 Unauthorized error (401) detected for Gemini account ${accountId}`)
+        try {
+          const unifiedGeminiScheduler = require('./unifiedGeminiScheduler')
+          await unifiedGeminiScheduler.markAccountUnauthorized(
+            accountId,
+            'gemini',
+            null // sessionHash 在此处不可用
+          )
+        } catch (markError) {
+          logger.error(`Failed to mark Gemini account as unauthorized: ${accountId}`, markError)
+        }
+      }
+
+      // 403 禁止访问
+      else if (statusCode === 403 && accountId) {
+        logger.error(`🚫 Forbidden error (403) detected for Gemini account ${accountId}`)
+        try {
+          const unifiedGeminiScheduler = require('./unifiedGeminiScheduler')
+          await unifiedGeminiScheduler.markAccountBlocked(accountId, 'gemini', null)
+        } catch (markError) {
+          logger.error(`Failed to mark Gemini account as blocked: ${accountId}`, markError)
+        }
+      }
+
+      // 429 限流
+      else if (statusCode === 429 && accountId) {
+        logger.warn(`🚫 Rate limit (429) detected for Gemini account ${accountId}`)
+        try {
+          const geminiAccountService = require('./geminiAccountService')
+          await geminiAccountService.setAccountRateLimited(accountId, true)
+        } catch (markError) {
+          logger.error(`Failed to mark Gemini account as rate limited: ${accountId}`, markError)
+        }
+      }
+
+      // 529 服务过载
+      else if (statusCode === 529 && accountId) {
+        logger.warn(`🚫 Overload error (529) detected for Gemini account ${accountId}`)
+        try {
+          const geminiAccountService = require('./geminiAccountService')
+          await geminiAccountService.markAccountOverloaded(accountId)
+        } catch (markError) {
+          logger.error(`Failed to mark Gemini account as overloaded: ${accountId}`, markError)
+        }
+      }
+
+      // 5xx 服务器错误
+      else if (statusCode >= 500 && statusCode < 600 && accountId) {
+        logger.warn(`🔥 Server error (${statusCode}) detected for Gemini account ${accountId}`)
+        try {
+          const geminiAccountService = require('./geminiAccountService')
+          await geminiAccountService.recordServerError(accountId, statusCode)
+          const errorCount = await geminiAccountService.getServerErrorCount(accountId)
+
+          logger.warn(
+            `⏱️ Server error for Gemini account ${accountId}, error count: ${errorCount}/3`
+          )
+
+          // 连续 3 次错误后标记为临时不可用
+          if (errorCount >= 3) {
+            const unifiedGeminiScheduler = require('./unifiedGeminiScheduler')
+            await unifiedGeminiScheduler.markAccountTemporarilyUnavailable(
+              accountId,
+              'gemini',
+              null,
+              300 // 5 分钟
+            )
+            logger.error(
+              `❌ Gemini account ${accountId} exceeded server error threshold (${errorCount} errors)`
+            )
+          }
+        } catch (markError) {
+          logger.error(`Failed to handle server error for Gemini account: ${accountId}`, markError)
+        }
+      }
+
+      // 转换错误格式并抛出
       const err = new Error(geminiError?.message || 'Gemini API request failed')
       err.status = error.response.status
       err.error = {
@@ -355,6 +436,7 @@ async function sendGeminiRequest({
       throw err
     }
 
+    // 网络错误
     const err = new Error(error.message)
     err.status = 500
     err.error = {

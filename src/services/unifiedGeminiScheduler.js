@@ -406,30 +406,47 @@ class UnifiedGeminiScheduler {
   // 🔍 检查账户是否可用
   async _isAccountAvailable(accountId, accountType) {
     try {
-      if (accountType === 'gemini') {
-        const account = await geminiAccountService.getAccount(accountId)
-        if (!account || !this._isActive(account.isActive) || account.status === 'error') {
-          return false
-        }
-        // 检查是否可调度
-        if (!this._isSchedulable(account.schedulable)) {
-          logger.info(`🚫 Gemini account ${accountId} is not schedulable`)
-          return false
-        }
-        return !(await this.isAccountRateLimited(accountId))
-      } else if (accountType === 'gemini-api') {
-        const account = await geminiApiAccountService.getAccount(accountId)
-        if (!account || !this._isActive(account.isActive) || account.status === 'error') {
-          return false
-        }
-        // 检查是否可调度
-        if (!this._isSchedulable(account.schedulable)) {
-          logger.info(`🚫 Gemini-API account ${accountId} is not schedulable`)
-          return false
-        }
-        return !(await this.isAccountRateLimited(accountId))
+      const service = accountType === 'gemini-api' ? geminiApiAccountService : geminiAccountService
+
+      const account = await service.getAccount(accountId)
+      if (!account || !this._isActive(account.isActive)) {
+        return false
       }
-      return false
+
+      // 🔥 新增：检查账户状态（status 字段）
+      if (account.status && account.status !== 'active' && account.status !== 'created') {
+        logger.debug(`${accountType} account ${accountId} has error status: ${account.status}`)
+        return false
+      }
+
+      // 检查是否可调度
+      if (!this._isSchedulable(account.schedulable)) {
+        logger.debug(`🚫 ${accountType} account ${accountId} is not schedulable`)
+        return false
+      }
+
+      // 🔥 新增：检查临时不可用状态
+      const isTempUnavailable = await this.isAccountTemporarilyUnavailable(accountId, accountType)
+      if (isTempUnavailable) {
+        logger.debug(`${accountType} account ${accountId} is temporarily unavailable`)
+        return false
+      }
+
+      // 🔥 新增：检查过载状态
+      if (service.isAccountOverloaded) {
+        const isOverloaded = await service.isAccountOverloaded(accountId)
+        if (isOverloaded) {
+          logger.debug(`${accountType} account ${accountId} is overloaded`)
+          return false
+        }
+      }
+
+      // 检查是否被限流
+      if (await this.isAccountRateLimited(accountId, accountType)) {
+        return false
+      }
+
+      return true
     } catch (error) {
       logger.warn(`⚠️ Failed to check account availability: ${accountId}`, error)
       return false
@@ -748,6 +765,96 @@ class UnifiedGeminiScheduler {
       }
     } catch (error) {
       logger.error(`❌ Failed to select account from Gemini group ${groupId}:`, error)
+      throw error
+    }
+  }
+
+  // ⏱️ 标记账户为临时不可用状态（5xx 等临时故障）
+  async markAccountTemporarilyUnavailable(
+    accountId,
+    accountType,
+    sessionHash = null,
+    ttlSeconds = 300
+  ) {
+    try {
+      const client = redis.getClientSafe()
+      const key = `temp_unavailable:${accountType}:${accountId}`
+      await client.setex(key, ttlSeconds, '1')
+
+      if (sessionHash) {
+        await this._deleteSessionMapping(sessionHash)
+      }
+
+      logger.warn(
+        `⏱️ ${accountType} account ${accountId} marked temporarily unavailable for ${ttlSeconds}s`
+      )
+
+      return { success: true }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to mark ${accountType} account temporarily unavailable: ${accountId}`,
+        error
+      )
+      return { success: false }
+    }
+  }
+
+  // 🔍 检查账户是否临时不可用
+  async isAccountTemporarilyUnavailable(accountId, accountType) {
+    try {
+      const client = redis.getClientSafe()
+      const key = `temp_unavailable:${accountType}:${accountId}`
+      return (await client.exists(key)) === 1
+    } catch (error) {
+      logger.error(`❌ Failed to check temp unavailable status: ${accountId}`, error)
+      return false
+    }
+  }
+
+  // 🚫 标记账户为未授权状态（401 错误）
+  async markAccountUnauthorized(accountId, accountType, sessionHash = null) {
+    try {
+      if (accountType === 'gemini' || accountType === 'gemini-api') {
+        const service =
+          accountType === 'gemini-api' ? geminiApiAccountService : geminiAccountService
+
+        await service.markAccountUnauthorized(accountId, sessionHash)
+
+        if (sessionHash) {
+          await this._deleteSessionMapping(sessionHash)
+        }
+
+        logger.warn(
+          `🚫 ${accountType} account ${accountId} marked as unauthorized due to 401 error`
+        )
+      }
+
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark ${accountType} account as unauthorized: ${accountId}`, error)
+      throw error
+    }
+  }
+
+  // 🚫 标记账户为被封锁状态（403 错误）
+  async markAccountBlocked(accountId, accountType, sessionHash = null) {
+    try {
+      if (accountType === 'gemini' || accountType === 'gemini-api') {
+        const service =
+          accountType === 'gemini-api' ? geminiApiAccountService : geminiAccountService
+
+        await service.markAccountBlocked(accountId, sessionHash)
+
+        if (sessionHash) {
+          await this._deleteSessionMapping(sessionHash)
+        }
+
+        logger.warn(`🚫 ${accountType} account ${accountId} marked as blocked due to 403 error`)
+      }
+
+      return { success: true }
+    } catch (error) {
+      logger.error(`❌ Failed to mark ${accountType} account as blocked: ${accountId}`, error)
       throw error
     }
   }
