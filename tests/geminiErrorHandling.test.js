@@ -847,9 +847,7 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should call markAccountBlocked when API returns 403', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createAxiosError(403, 'Forbidden'))
-      })
+      jest.doMock('axios', () => jest.fn().mockRejectedValue(createAxiosError(403, 'Forbidden')))
 
       const geminiRelayService = require('../src/services/geminiRelayService')
       const scheduler = require('../src/services/unifiedGeminiScheduler')
@@ -878,9 +876,7 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should call setAccountRateLimited when API returns 429', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createAxiosError(429, 'Rate Limited'))
-      })
+      jest.doMock('axios', () => jest.fn().mockRejectedValue(createAxiosError(429, 'Rate Limited')))
 
       const geminiRelayService = require('../src/services/geminiRelayService')
       const accountService = require('../src/services/geminiAccountService')
@@ -909,9 +905,7 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should call markAccountOverloaded when API returns 529', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createAxiosError(529, 'Overloaded'))
-      })
+      jest.doMock('axios', () => jest.fn().mockRejectedValue(createAxiosError(529, 'Overloaded')))
 
       const geminiRelayService = require('../src/services/geminiRelayService')
       const accountService = require('../src/services/geminiAccountService')
@@ -940,9 +934,9 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should call recordServerError when API returns 500', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createAxiosError(500, 'Internal Server Error'))
-      })
+      jest.doMock('axios', () =>
+        jest.fn().mockRejectedValue(createAxiosError(500, 'Internal Server Error'))
+      )
 
       const geminiRelayService = require('../src/services/geminiRelayService')
       const accountService = require('../src/services/geminiAccountService')
@@ -968,9 +962,9 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should mark account temporarily unavailable after 3 consecutive 5xx errors', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createAxiosError(500, 'Internal Server Error'))
-      })
+      jest.doMock('axios', () =>
+        jest.fn().mockRejectedValue(createAxiosError(500, 'Internal Server Error'))
+      )
 
       const geminiRelayService = require('../src/services/geminiRelayService')
       const accountService = require('../src/services/geminiAccountService')
@@ -1006,9 +1000,9 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should NOT mark account temporarily unavailable if error count < 3', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createAxiosError(500, 'Internal Server Error'))
-      })
+      jest.doMock('axios', () =>
+        jest.fn().mockRejectedValue(createAxiosError(500, 'Internal Server Error'))
+      )
 
       const geminiRelayService = require('../src/services/geminiRelayService')
       const accountService = require('../src/services/geminiAccountService')
@@ -1041,9 +1035,7 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should NOT call any marking function when accountId is null', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createAxiosError(401, 'Unauthorized'))
-      })
+      jest.doMock('axios', () => jest.fn().mockRejectedValue(createAxiosError(401, 'Unauthorized')))
 
       const geminiRelayService = require('../src/services/geminiRelayService')
       const accountService = require('../src/services/geminiAccountService')
@@ -1077,9 +1069,7 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should still throw original error even if marking fails', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createAxiosError(401, 'Unauthorized'))
-      })
+      jest.doMock('axios', () => jest.fn().mockRejectedValue(createAxiosError(401, 'Unauthorized')))
 
       const geminiRelayService = require('../src/services/geminiRelayService')
       const scheduler = require('../src/services/unifiedGeminiScheduler')
@@ -1104,9 +1094,7 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should handle network errors without response object', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createNetworkError())
-      })
+      jest.doMock('axios', () => jest.fn().mockRejectedValue(createNetworkError()))
 
       const geminiRelayService = require('../src/services/geminiRelayService')
 
@@ -1131,9 +1119,7 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should return 499 status for canceled requests', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createCanceledError())
-      })
+      jest.doMock('axios', () => jest.fn().mockRejectedValue(createCanceledError()))
 
       const geminiRelayService = require('../src/services/geminiRelayService')
 
@@ -1156,9 +1142,7 @@ describe('geminiRelayService Error Handling Integration', () => {
     it('should NOT mark account when request is canceled', async () => {
       jest.resetModules()
 
-      jest.doMock('axios', () => {
-        return jest.fn().mockRejectedValue(createCanceledError())
-      })
+      jest.doMock('axios', () => jest.fn().mockRejectedValue(createCanceledError()))
 
       const geminiRelayService = require('../src/services/geminiRelayService')
       const accountService = require('../src/services/geminiAccountService')
