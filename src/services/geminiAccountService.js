@@ -996,6 +996,218 @@ async function setAccountRateLimited(accountId, isLimited = true) {
   await updateAccount(accountId, updates)
 }
 
+// 🔥 记录 5xx 服务器错误（带计数）
+async function recordServerError(accountId, statusCode) {
+  try {
+    const client = redisClient.getClientSafe()
+    const key = `gemini_account:${accountId}:5xx_errors`
+
+    // 使用 pipeline 保证原子性
+    const pipeline = client.pipeline()
+    pipeline.incr(key)
+    pipeline.expire(key, 300) // 5 分钟 TTL
+    await pipeline.exec()
+
+    logger.debug(`📝 Recorded 5xx error (${statusCode}) for Gemini account ${accountId}`)
+  } catch (error) {
+    logger.error(`❌ Failed to record server error for Gemini account ${accountId}:`, error)
+  }
+}
+
+// 📊 获取 5xx 错误计数
+async function getServerErrorCount(accountId) {
+  try {
+    const client = redisClient.getClientSafe()
+    const key = `gemini_account:${accountId}:5xx_errors`
+    const count = await client.get(key)
+    return count ? parseInt(count, 10) : 0
+  } catch (error) {
+    logger.error(`❌ Failed to get server error count for Gemini account ${accountId}:`, error)
+    return 0
+  }
+}
+
+// 🚫 通用错误标记（401、403 等）
+async function markAccountError(accountId, errorType, sessionHash = null) {
+  const ERROR_CONFIG = {
+    unauthorized: {
+      status: 'unauthorized',
+      errorMessage: 'Account unauthorized (401 errors detected)',
+      timestampField: 'unauthorizedAt',
+      errorCode: 'GEMINI_UNAUTHORIZED',
+      logMessage: 'unauthorized'
+    },
+    blocked: {
+      status: 'blocked',
+      errorMessage: 'Account blocked (403 error detected)',
+      timestampField: 'blockedAt',
+      errorCode: 'GEMINI_BLOCKED',
+      logMessage: 'blocked'
+    }
+  }
+
+  try {
+    const errorConfig = ERROR_CONFIG[errorType]
+    if (!errorConfig) {
+      throw new Error(`Unsupported error type: ${errorType}`)
+    }
+
+    const account = await getAccount(accountId)
+    if (!account) {
+      throw new Error('Account not found')
+    }
+
+    // 更新账户状态
+    const updates = {
+      status: errorConfig.status,
+      schedulable: 'false',
+      errorMessage: errorConfig.errorMessage,
+      [errorConfig.timestampField]: new Date().toISOString()
+    }
+
+    await updateAccount(accountId, updates)
+
+    // 删除粘性会话映射（使用统一调度器的 session key 前缀）
+    if (sessionHash) {
+      const client = redisClient.getClientSafe()
+      // 同时清理两种可能的 session key 格式
+      await client.del(`unified_gemini_session_mapping:${sessionHash}`)
+      await client.del(`sticky_session:${sessionHash}`) // 向后兼容
+      logger.info(`🗑️ Deleted sticky session mapping for Gemini account ${accountId}`)
+    }
+
+    logger.warn(
+      `⚠️ Gemini account ${account.name} (${accountId}) marked as ${errorConfig.logMessage} and disabled for scheduling`
+    )
+
+    // 发送 Webhook 通知
+    try {
+      const webhookNotifier = require('../utils/webhookNotifier')
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId,
+        accountName: account.name,
+        platform: 'gemini',
+        status: errorConfig.status,
+        errorCode: errorConfig.errorCode,
+        reason: errorConfig.errorMessage,
+        timestamp: new Date().toISOString()
+      })
+    } catch (webhookError) {
+      logger.error('Failed to send Gemini webhook notification:', webhookError)
+    }
+
+    return { success: true }
+  } catch (error) {
+    logger.error(`❌ Failed to mark Gemini account ${accountId} as ${errorType}:`, error)
+    throw error
+  }
+}
+
+// 🚫 标记为未授权（401）
+async function markAccountUnauthorized(accountId, sessionHash = null) {
+  return markAccountError(accountId, 'unauthorized', sessionHash)
+}
+
+// 🚫 标记为被封锁（403）
+async function markAccountBlocked(accountId, sessionHash = null) {
+  return markAccountError(accountId, 'blocked', sessionHash)
+}
+
+// 🚫 标记为过载（529）
+async function markAccountOverloaded(accountId) {
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      logger.error(`Gemini account ${accountId} not found`)
+      return { success: false }
+    }
+
+    const overloadMinutes = parseInt(process.env.GEMINI_OVERLOAD_HANDLING_MINUTES, 10) || 0
+    if (overloadMinutes <= 0) {
+      logger.debug(
+        `Gemini overload handling disabled (GEMINI_OVERLOAD_HANDLING_MINUTES=${overloadMinutes})`
+      )
+      return { success: false, reason: 'disabled' }
+    }
+
+    const client = redisClient.getClientSafe()
+    const overloadKey = `account:overload:gemini:${accountId}`
+    const ttl = overloadMinutes * 60
+
+    await client.setex(
+      overloadKey,
+      ttl,
+      JSON.stringify({
+        accountId,
+        accountName: account.name,
+        markedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + ttl * 1000).toISOString()
+      })
+    )
+
+    logger.warn(
+      `⏱️ Gemini account ${account.name} (${accountId}) marked as overloaded for ${overloadMinutes} minutes`
+    )
+
+    // 更新账户字段记录最后过载时间
+    await updateAccount(accountId, {
+      lastOverloadAt: new Date().toISOString()
+    })
+
+    // 发送 Webhook 通知
+    try {
+      const webhookNotifier = require('../utils/webhookNotifier')
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId,
+        accountName: account.name,
+        platform: 'gemini',
+        status: 'overloaded',
+        errorCode: 'GEMINI_OVERLOADED',
+        reason: `Account overloaded (529 error), temporarily unavailable for ${overloadMinutes} minutes`,
+        timestamp: new Date().toISOString()
+      })
+    } catch (webhookError) {
+      logger.error('Failed to send Gemini overload webhook:', webhookError)
+    }
+
+    return { success: true }
+  } catch (error) {
+    logger.error(`❌ Failed to mark Gemini account ${accountId} as overloaded:`, error)
+    return { success: false, error: error.message }
+  }
+}
+
+// 🔍 检查账户是否过载
+async function isAccountOverloaded(accountId) {
+  try {
+    const overloadMinutes = parseInt(process.env.GEMINI_OVERLOAD_HANDLING_MINUTES, 10) || 0
+    if (overloadMinutes <= 0) {
+      return false // 功能未启用
+    }
+
+    const client = redisClient.getClientSafe()
+    const overloadKey = `account:overload:gemini:${accountId}`
+    return (await client.exists(overloadKey)) === 1
+  } catch (error) {
+    logger.error(`❌ Failed to check Gemini overload status for ${accountId}:`, error)
+    return false
+  }
+}
+
+// 🔍 检查账户是否处于错误状态（status !== 'active'）
+async function isAccountInErrorState(accountId) {
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      return true // 账户不存在视为错误状态
+    }
+    return account.status && account.status !== 'active' && account.status !== 'created'
+  } catch (error) {
+    logger.error(`❌ Failed to check error state for Gemini account ${accountId}:`, error)
+    return false
+  }
+}
+
 // 获取账户的限流信息（参考 claudeAccountService 的实现）
 async function getAccountRateLimitInfo(accountId) {
   try {
@@ -1691,6 +1903,15 @@ module.exports = {
   generateContentStream,
   updateTempProjectId,
   resetAccountStatus,
+  // 🔥 新增错误处理方法
+  recordServerError,
+  getServerErrorCount,
+  markAccountError,
+  markAccountUnauthorized,
+  markAccountBlocked,
+  markAccountOverloaded,
+  isAccountOverloaded,
+  isAccountInErrorState,
   OAUTH_CLIENT_ID,
   OAUTH_SCOPES
 }
