@@ -34,6 +34,59 @@ class OpenAIResponsesAccountService {
     )
   }
 
+  _serializeAutoRecoveryConfig(config, accountId) {
+    if (config === undefined) {
+      return undefined
+    }
+    if (config === null || config === '') {
+      return ''
+    }
+    if (typeof config === 'string') {
+      return config
+    }
+    try {
+      return JSON.stringify(config)
+    } catch (error) {
+      logger.warn(
+        `Failed to serialize autoRecoveryConfig for OpenAI-Responses account ${accountId}:`,
+        error
+      )
+      return ''
+    }
+  }
+
+  _parseAutoRecoveryConfig(rawConfig, accountId) {
+    if (!rawConfig) {
+      return null
+    }
+    if (typeof rawConfig === 'object') {
+      return rawConfig
+    }
+    if (typeof rawConfig !== 'string') {
+      return null
+    }
+    const trimmed = rawConfig.trim()
+    if (!trimmed) {
+      return null
+    }
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (parsed && typeof parsed === 'object') {
+        return parsed
+      }
+      logger.warn(
+        `Invalid autoRecoveryConfig for OpenAI-Responses account ${accountId}: not an object`
+      )
+      return rawConfig
+    } catch (error) {
+      logger.warn(
+        `Failed to parse autoRecoveryConfig for OpenAI-Responses account ${accountId}:`,
+        error
+      )
+      return rawConfig
+    }
+  }
+
   // 创建账户
   async createAccount(options = {}) {
     const {
@@ -49,7 +102,9 @@ class OpenAIResponsesAccountService {
       schedulable = true, // 是否可被调度
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
-      rateLimitDuration = 60 // 限流时间（分钟）
+      rateLimitDuration = 60, // 限流时间（分钟）
+      rpmLimit = 0, // 每分钟请求数限制，0表示不限制
+      autoRecoveryConfig = undefined
     } = options
 
     // 验证必填字段
@@ -88,12 +143,21 @@ class OpenAIResponsesAccountService {
       rateLimitedAt: '',
       rateLimitStatus: '',
       rateLimitDuration: rateLimitDuration.toString(),
+      rpmLimit: rpmLimit.toString(),
       // 额度管理
       dailyQuota: dailyQuota.toString(),
       dailyUsage: '0',
       lastResetDate: redis.getDateStringInTimezone(),
       quotaResetTime,
       quotaStoppedAt: ''
+    }
+
+    const serializedAutoRecoveryConfig = this._serializeAutoRecoveryConfig(
+      autoRecoveryConfig,
+      accountId
+    )
+    if (serializedAutoRecoveryConfig !== undefined) {
+      accountData.autoRecoveryConfig = serializedAutoRecoveryConfig
     }
 
     // 保存到 Redis
@@ -129,6 +193,14 @@ class OpenAIResponsesAccountService {
       }
     }
 
+    const rpmValue = parseInt(accountData.rpmLimit, 10)
+    accountData.rpmLimit = Number.isFinite(rpmValue) && rpmValue >= 0 ? rpmValue : 0
+
+    accountData.autoRecoveryConfig = this._parseAutoRecoveryConfig(
+      accountData.autoRecoveryConfig,
+      accountId
+    )
+
     return accountData
   }
 
@@ -154,6 +226,18 @@ class OpenAIResponsesAccountService {
       updates.baseApi = updates.baseApi.endsWith('/')
         ? updates.baseApi.slice(0, -1)
         : updates.baseApi
+    }
+
+    if (updates.rpmLimit !== undefined) {
+      const rpmValue = parseInt(updates.rpmLimit, 10)
+      updates.rpmLimit = Number.isFinite(rpmValue) && rpmValue >= 0 ? rpmValue.toString() : '0'
+    }
+
+    if (updates.autoRecoveryConfig !== undefined) {
+      updates.autoRecoveryConfig = this._serializeAutoRecoveryConfig(
+        updates.autoRecoveryConfig,
+        accountId
+      )
     }
 
     // ✅ 直接保存 subscriptionExpiresAt（如果提供）
@@ -218,6 +302,14 @@ class OpenAIResponsesAccountService {
                 minutesRemaining: 0
               }
 
+          account.autoRecoveryConfig = this._parseAutoRecoveryConfig(
+            account.autoRecoveryConfig,
+            account.id
+          )
+
+          const rpmValue = parseInt(account.rpmLimit, 10)
+          account.rpmLimit = Number.isFinite(rpmValue) && rpmValue >= 0 ? rpmValue : 0
+
           // 转换 schedulable 字段为布尔值（前端需要布尔值来判断）
           account.schedulable = account.schedulable !== 'false'
           // 转换 isActive 字段为布尔值
@@ -267,6 +359,14 @@ class OpenAIResponsesAccountService {
                   rateLimitedAt: null,
                   minutesRemaining: 0
                 }
+
+            accountData.autoRecoveryConfig = this._parseAutoRecoveryConfig(
+              accountData.autoRecoveryConfig,
+              accountId
+            )
+
+            const rpmValue = parseInt(accountData.rpmLimit, 10)
+            accountData.rpmLimit = Number.isFinite(rpmValue) && rpmValue >= 0 ? rpmValue : 0
 
             // 转换 schedulable 字段为布尔值（前端需要布尔值来判断）
             accountData.schedulable = accountData.schedulable !== 'false'
@@ -391,6 +491,112 @@ class OpenAIResponsesAccountService {
     }
 
     return false
+  }
+
+  // ⏱️ RPM 限制（每分钟请求数）
+  async checkAndIncrementRpm(accountId, rpmLimit) {
+    const limit = parseInt(rpmLimit, 10)
+    if (!Number.isFinite(limit) || limit <= 0) {
+      return { allowed: true, limit: 0 }
+    }
+
+    const client = redis.getClientSafe()
+    const now = Date.now()
+    const windowMs = 60 * 1000
+    const windowKey = `openai_responses:rpm:window:${accountId}`
+    const countKey = `openai_responses:rpm:count:${accountId}`
+
+    let windowStart = await client.get(windowKey)
+    if (!windowStart) {
+      const pipeline = client.pipeline()
+      pipeline.set(windowKey, now, 'PX', windowMs)
+      pipeline.set(countKey, 0, 'PX', windowMs)
+      await pipeline.exec()
+      windowStart = now
+    } else {
+      const parsed = parseInt(windowStart, 10)
+      windowStart = Number.isFinite(parsed) ? parsed : now
+      if (now - windowStart >= windowMs) {
+        const pipeline = client.pipeline()
+        pipeline.set(windowKey, now, 'PX', windowMs)
+        pipeline.set(countKey, 0, 'PX', windowMs)
+        await pipeline.exec()
+        windowStart = now
+      }
+    }
+
+    const current = await client.incr(countKey)
+    if (current === 1) {
+      await client.pexpire(countKey, windowMs)
+    }
+
+    const resetAt = windowStart + windowMs
+    const remainingSeconds = Math.max(0, Math.ceil((resetAt - now) / 1000))
+
+    if (current > limit) {
+      return {
+        allowed: false,
+        current,
+        limit,
+        resetAt,
+        remainingSeconds
+      }
+    }
+
+    return {
+      allowed: true,
+      current,
+      limit,
+      resetAt,
+      remainingSeconds
+    }
+  }
+
+  // 👀 仅检查 RPM 状态，不增加计数
+  async getRpmStatus(accountId, rpmLimit) {
+    const limit = parseInt(rpmLimit, 10)
+    if (!Number.isFinite(limit) || limit <= 0) {
+      return { allowed: true, limit: 0, current: 0 }
+    }
+
+    const client = redis.getClientSafe()
+    const now = Date.now()
+    const windowMs = 60 * 1000
+    const windowKey = `openai_responses:rpm:window:${accountId}`
+    const countKey = `openai_responses:rpm:count:${accountId}`
+
+    const windowStartRaw = await client.get(windowKey)
+    if (!windowStartRaw) {
+      return {
+        allowed: true,
+        current: 0,
+        limit,
+        resetAt: now + windowMs,
+        remainingSeconds: Math.ceil(windowMs / 1000)
+      }
+    }
+
+    const windowStart = parseInt(windowStartRaw, 10)
+    if (!Number.isFinite(windowStart) || now - windowStart >= windowMs) {
+      return {
+        allowed: true,
+        current: 0,
+        limit,
+        resetAt: now + windowMs,
+        remainingSeconds: Math.ceil(windowMs / 1000)
+      }
+    }
+
+    const currentRaw = await client.get(countKey)
+    const current = parseInt(currentRaw || '0', 10)
+    const resetAt = windowStart + windowMs
+    const remainingSeconds = Math.max(0, Math.ceil((resetAt - now) / 1000))
+
+    if (current >= limit) {
+      return { allowed: false, current, limit, resetAt, remainingSeconds }
+    }
+
+    return { allowed: true, current, limit, resetAt, remainingSeconds }
   }
 
   // 切换调度状态

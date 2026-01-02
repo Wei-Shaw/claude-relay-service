@@ -1513,6 +1513,22 @@
                 </p>
               </div>
 
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  RPM 限制（每分钟请求数）
+                </label>
+                <input
+                  v-model.number="form.rpmLimit"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  min="0"
+                  placeholder="0 表示不限制"
+                  type="number"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  每分钟最多请求次数，0 表示不限制
+                </p>
+              </div>
+
               <!-- 限流时长字段 - 隐藏不显示，使用默认值60 -->
               <input v-model.number="form.rateLimitDuration" type="hidden" value="60" />
             </div>
@@ -3282,20 +3298,20 @@
               </div>
             </div>
 
-            <!-- 并发控制字段 -->
+            <!-- RPM 限制字段 -->
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                最大并发任务数
+                RPM 限制（每分钟请求数）
               </label>
               <input
-                v-model.number="form.maxConcurrentTasks"
+                v-model.number="form.rpmLimit"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 min="0"
                 placeholder="0 表示不限制"
                 type="number"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                限制该账户的并发请求数量，0 表示不限制
+                每分钟最多请求次数，0 表示不限制
               </p>
             </div>
           </div>
@@ -4071,6 +4087,8 @@ const form = ref({
   quotaResetTime: props.account?.quotaResetTime || '00:00',
   // 并发控制字段
   maxConcurrentTasks: props.account?.maxConcurrentTasks || 0,
+  // OpenAI-Responses RPM 限制
+  rpmLimit: props.account?.rpmLimit || 0,
   // Bedrock 特定字段
   accessKeyId: props.account?.accessKeyId || '',
   secretAccessKey: props.account?.secretAccessKey || '',
@@ -5191,6 +5209,7 @@ const createAccount = async () => {
       data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
+      data.rpmLimit = form.value.rpmLimit || 0
     } else if (form.value.platform === 'gemini-api') {
       // Gemini API 账户特定数据
       data.baseUrl = form.value.baseUrl || 'https://generativelanguage.googleapis.com'
@@ -5529,6 +5548,7 @@ const updateAccount = async () => {
       // 编辑时不上传 rateLimitDuration，保持原值
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
+      data.rpmLimit = form.value.rpmLimit || 0
     }
 
     // Bedrock 特定更新
@@ -6136,6 +6156,8 @@ watch(
         quotaResetTime: newAccount.quotaResetTime || '00:00',
         // 并发控制字段
         maxConcurrentTasks: newAccount.maxConcurrentTasks || 0,
+        // OpenAI-Responses RPM 限制
+        rpmLimit: newAccount.rpmLimit || 0,
         // 上游错误处理
         disableAutoProtection: newAccount.disableAutoProtection === true
       }
