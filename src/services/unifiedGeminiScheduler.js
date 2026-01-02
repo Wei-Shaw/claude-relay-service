@@ -791,7 +791,10 @@ class UnifiedGeminiScheduler {
 
       return { success: true }
     } catch (error) {
-      logger.error(`❌ Failed to mark ${accountType} account temporarily unavailable: ${accountId}`, error)
+      logger.error(
+        `❌ Failed to mark ${accountType} account temporarily unavailable: ${accountId}`,
+        error
+      )
       return { success: false }
     }
   }
@@ -812,7 +815,8 @@ class UnifiedGeminiScheduler {
   async markAccountUnauthorized(accountId, accountType, sessionHash = null) {
     try {
       if (accountType === 'gemini' || accountType === 'gemini-api') {
-        const service = accountType === 'gemini-api' ? geminiApiAccountService : geminiAccountService
+        const service =
+          accountType === 'gemini-api' ? geminiApiAccountService : geminiAccountService
 
         await service.markAccountUnauthorized(accountId, sessionHash)
 
@@ -820,7 +824,9 @@ class UnifiedGeminiScheduler {
           await this._deleteSessionMapping(sessionHash)
         }
 
-        logger.warn(`🚫 ${accountType} account ${accountId} marked as unauthorized due to 401 error`)
+        logger.warn(
+          `🚫 ${accountType} account ${accountId} marked as unauthorized due to 401 error`
+        )
       }
 
       return { success: true }
@@ -834,7 +840,8 @@ class UnifiedGeminiScheduler {
   async markAccountBlocked(accountId, accountType, sessionHash = null) {
     try {
       if (accountType === 'gemini' || accountType === 'gemini-api') {
-        const service = accountType === 'gemini-api' ? geminiApiAccountService : geminiAccountService
+        const service =
+          accountType === 'gemini-api' ? geminiApiAccountService : geminiAccountService
 
         await service.markAccountBlocked(accountId, sessionHash)
 
