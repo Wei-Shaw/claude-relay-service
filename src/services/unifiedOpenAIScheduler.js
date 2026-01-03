@@ -56,9 +56,9 @@ class UnifiedOpenAIScheduler {
     let rateLimitChecked = false
     let stillLimited = false
 
-    let isSchedulable = isSchedulable(account.schedulable)
+    let _isSchedulable = isSchedulable(account.schedulable)
 
-    if (!isSchedulable) {
+    if (!_isSchedulable) {
       if (!hasRateLimitFlag) {
         return { canUse: false, reason: 'not_schedulable' }
       }
@@ -75,7 +75,7 @@ class UnifiedOpenAIScheduler {
       } else {
         account.schedulable = 'true'
       }
-      isSchedulable = true
+      _isSchedulable = true
       logger.info(`✅ OpenAI账号 ${account.name || accountId} 已解除限流，恢复调度权限`)
     }
 

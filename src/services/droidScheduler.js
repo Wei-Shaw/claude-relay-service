@@ -21,8 +21,12 @@ class DroidScheduler {
   _matchesEndpoint(account, endpointType) {
     const normalizedEndpoint = normalizeEndpointType(endpointType)
     const accountEndpoint = normalizeEndpointType(account?.endpointType)
-    if (normalizedEndpoint === accountEndpoint) return true
-    if (normalizedEndpoint === 'comm') return true
+    if (normalizedEndpoint === accountEndpoint) {
+      return true
+    }
+    if (normalizedEndpoint === 'comm') {
+      return true
+    }
     const sharedEndpoints = new Set(['anthropic', 'openai'])
     return sharedEndpoints.has(normalizedEndpoint) && sharedEndpoints.has(accountEndpoint)
   }
