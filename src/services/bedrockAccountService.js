@@ -127,7 +127,7 @@ class BedrockAccountService {
   // 📋 获取所有账户列表
   async getAllAccounts() {
     try {
-      const _client = redis.getClientSafe()
+      const client = redis.getClientSafe()
       const accountIds = await redis.getAllIdsByIndex(
         'bedrock_account:index',
         'bedrock_account:*',

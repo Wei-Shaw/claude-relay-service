@@ -201,9 +201,7 @@ class OpenAIResponsesAccountService {
       `${this.ACCOUNT_KEY_PREFIX}*`,
       /^openai_responses_account:(.+)$/
     )
-    if (accountIds.length === 0) {
-      return []
-    }
+    if (accountIds.length === 0) return []
 
     const keys = accountIds.map((id) => `${this.ACCOUNT_KEY_PREFIX}${id}`)
     // Pipeline 批量查询所有账户数据
@@ -212,15 +210,11 @@ class OpenAIResponsesAccountService {
     const results = await pipeline.exec()
 
     const accounts = []
-    results.forEach(([err, accountData], _index) => {
-      if (err || !accountData || !accountData.id) {
-        return
-      }
+    results.forEach(([err, accountData], index) => {
+      if (err || !accountData || !accountData.id) return
 
       // 过滤非活跃账户
-      if (!includeInactive && accountData.isActive !== 'true') {
-        return
-      }
+      if (!includeInactive && accountData.isActive !== 'true') return
 
       // 隐藏敏感信息
       accountData.apiKey = '***'

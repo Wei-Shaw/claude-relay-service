@@ -24,7 +24,9 @@ const {
 
 // structuredClone polyfill for Node < 17
 const safeClone =
-  typeof structuredClone === 'function' ? structuredClone : (obj) => JSON.parse(JSON.stringify(obj))
+  typeof structuredClone === 'function'
+    ? structuredClone
+    : (obj) => JSON.parse(JSON.stringify(obj))
 
 class ClaudeRelayService {
   constructor() {

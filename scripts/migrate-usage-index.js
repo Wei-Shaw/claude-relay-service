@@ -41,9 +41,7 @@ async function migrate() {
         stats.dailyIndex++
       }
     }
-    if (keys.length > 0) {
-      await pipeline.exec()
-    }
+    if (keys.length > 0) await pipeline.exec()
   } while (cursor !== '0')
   console.log(`  已处理 ${stats.dailyIndex} 条`)
 
@@ -65,9 +63,7 @@ async function migrate() {
         stats.hourlyIndex++
       }
     }
-    if (keys.length > 0) {
-      await pipeline.exec()
-    }
+    if (keys.length > 0) await pipeline.exec()
   } while (cursor !== '0')
   console.log(`  已处理 ${stats.hourlyIndex} 条`)
 
@@ -89,9 +85,7 @@ async function migrate() {
         stats.modelDailyIndex++
       }
     }
-    if (keys.length > 0) {
-      await pipeline.exec()
-    }
+    if (keys.length > 0) await pipeline.exec()
   } while (cursor !== '0')
   console.log(`  已处理 ${stats.modelDailyIndex} 条`)
 
@@ -99,13 +93,7 @@ async function migrate() {
   console.log('\n4. 迁移 usage:model:hourly 索引...')
   cursor = '0'
   do {
-    const [newCursor, keys] = await redis.scan(
-      cursor,
-      'MATCH',
-      'usage:model:hourly:*',
-      'COUNT',
-      500
-    )
+    const [newCursor, keys] = await redis.scan(cursor, 'MATCH', 'usage:model:hourly:*', 'COUNT', 500)
     cursor = newCursor
 
     const pipeline = redis.pipeline()
@@ -119,9 +107,7 @@ async function migrate() {
         stats.modelHourlyIndex++
       }
     }
-    if (keys.length > 0) {
-      await pipeline.exec()
-    }
+    if (keys.length > 0) await pipeline.exec()
   } while (cursor !== '0')
   console.log(`  已处理 ${stats.modelHourlyIndex} 条`)
 

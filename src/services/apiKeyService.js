@@ -921,9 +921,7 @@ class ApiKeyService {
       return keyIds
         .map((id, i) => {
           const [err, fields] = results[i]
-          if (err) {
-            return null
-          }
+          if (err) return null
           return {
             id,
             claudeAccountId: fields[0] || null,

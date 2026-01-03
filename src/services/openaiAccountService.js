@@ -666,7 +666,7 @@ async function deleteAccount(accountId) {
 
 // 获取所有账户
 async function getAllAccounts() {
-  const _client = redisClient.getClientSafe()
+  const client = redisClient.getClientSafe()
   const accountIds = await redisClient.getAllIdsByIndex(
     'openai:account:index',
     `${OPENAI_ACCOUNT_KEY_PREFIX}*`,

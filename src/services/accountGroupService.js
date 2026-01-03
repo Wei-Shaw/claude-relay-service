@@ -18,9 +18,7 @@ class AccountGroupService {
   async ensureReverseIndexes() {
     try {
       const client = redis.getClientSafe()
-      if (!client) {
-        return
-      }
+      if (!client) return
 
       // 检查是否已迁移
       const migrated = await client.get(this.REVERSE_INDEX_MIGRATED_KEY)
@@ -41,14 +39,10 @@ class AccountGroupService {
 
       for (const groupId of allGroupIds) {
         const group = await client.hgetall(`${this.GROUP_PREFIX}${groupId}`)
-        if (!group || !group.platform) {
-          continue
-        }
+        if (!group || !group.platform) continue
 
         const members = await client.smembers(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
-        if (members.length === 0) {
-          continue
-        }
+        if (members.length === 0) continue
 
         const pipeline = client.pipeline()
         for (const accountId of members) {

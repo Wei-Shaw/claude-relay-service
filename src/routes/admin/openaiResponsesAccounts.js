@@ -54,9 +54,7 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
     const bindingCountMap = new Map()
     for (const key of allApiKeys) {
       const binding = key.openaiAccountId
-      if (!binding) {
-        continue
-      }
+      if (!binding) continue
       // 处理 responses: 前缀
       const accountId = binding.startsWith('responses:') ? binding.substring(10) : binding
       bindingCountMap.set(accountId, (bindingCountMap.get(accountId) || 0) + 1)

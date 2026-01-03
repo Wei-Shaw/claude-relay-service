@@ -94,9 +94,7 @@ class CostInitService {
         }
       }
 
-      logger.info(
-        `💰 Found ${apiKeyIds.length} active API Keys to process (filtered ${allKeyIds.length - apiKeyIds.length} deleted)`
-      )
+      logger.info(`💰 Found ${apiKeyIds.length} active API Keys to process (filtered ${allKeyIds.length - apiKeyIds.length} deleted)`)
 
       let processedCount = 0
       let errorCount = 0
@@ -157,9 +155,7 @@ class CostInitService {
 
       for (let j = 0; j < results.length; j++) {
         const [err, values] = results[j]
-        if (err) {
-          continue
-        }
+        if (err) continue
 
         // 将数组转换为对象
         const data = {}
@@ -186,9 +182,7 @@ class CostInitService {
       const match = key.match(
         /usage:(.+):model:(daily|monthly|hourly):(.+):(\d{4}-\d{2}(?:-\d{2})?(?::\d{2})?)$/
       )
-      if (!match) {
-        continue
-      }
+      if (!match) continue
 
       const [, , period, model, dateStr] = match
 
@@ -307,9 +301,7 @@ class CostInitService {
         cursor = newCursor
 
         for (const usageKey of usageKeys) {
-          if (samplesChecked >= maxSamples) {
-            break
-          }
+          if (samplesChecked >= maxSamples) break
 
           const match = usageKey.match(/usage:(.+):model:daily:(.+):(\d{4}-\d{2}-\d{2})$/)
           if (match) {
@@ -327,9 +319,7 @@ class CostInitService {
           }
         }
 
-        if (samplesChecked >= maxSamples) {
-          break
-        }
+        if (samplesChecked >= maxSamples) break
       } while (cursor !== '0')
 
       logger.info('💰 Cost data appears to be up to date')

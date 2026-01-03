@@ -6,13 +6,13 @@ const bedrockAccountService = require('../../services/bedrockAccountService')
 const ccrAccountService = require('../../services/ccrAccountService')
 const geminiAccountService = require('../../services/geminiAccountService')
 const droidAccountService = require('../../services/droidAccountService')
-// const openaiAccountService = require('../../services/openaiAccountService') // TODO: 未来用于OpenAI账户统计
+const openaiAccountService = require('../../services/openaiAccountService')
 const openaiResponsesAccountService = require('../../services/openaiResponsesAccountService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const CostCalculator = require('../../utils/costCalculator')
-// const pricingService = require('../../services/pricingService') // TODO: 未来用于成本计算
+const pricingService = require('../../services/pricingService')
 const config = require('../../../config/config')
 
 const router = express.Router()
@@ -144,9 +144,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
         totalCacheReadTokensUsed += usage.cacheReadTokens || 0
         totalAllTokensUsed += usage.allTokens || 0
       }
-      if (key.isActive) {
-        activeApiKeys++
-      }
+      if (key.isActive) activeApiKeys++
     }
 
     // 各平台账户统计（单次遍历）
