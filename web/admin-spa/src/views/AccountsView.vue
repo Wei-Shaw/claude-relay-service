@@ -867,8 +867,32 @@
                             </div>
                           </div>
                         </div>
-                        <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                          重置剩余 {{ formatClaudeRemaining(account.claudeUsage.fiveHour) }}
+                        <div class="mt-1 flex items-center gap-2">
+                          <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                            重置剩余 {{ formatClaudeRemaining(account.claudeUsage.fiveHour) }}
+                          </span>
+                          <div
+                            v-if="account.claudeUsage.fiveHour?.remainingSeconds"
+                            class="flex flex-1 items-center gap-1"
+                          >
+                            <div class="h-1 flex-1 rounded-full bg-gray-200 dark:bg-gray-600">
+                              <div
+                                class="h-1 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-300"
+                                :style="{
+                                  width:
+                                    getTimeElapsedProgress(
+                                      account.claudeUsage.fiveHour,
+                                      'fiveHour'
+                                    ) + '%'
+                                }"
+                              />
+                            </div>
+                            <span class="text-[10px] text-gray-400 dark:text-gray-500">
+                              {{
+                                getTimeElapsedProgress(account.claudeUsage.fiveHour, 'fiveHour')
+                              }}%
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <!-- 7天窗口 -->
@@ -900,8 +924,32 @@
                             </div>
                           </div>
                         </div>
-                        <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                          重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDay) }}
+                        <div class="mt-1 flex items-center gap-2">
+                          <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                            重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDay) }}
+                          </span>
+                          <div
+                            v-if="account.claudeUsage.sevenDay?.remainingSeconds"
+                            class="flex flex-1 items-center gap-1"
+                          >
+                            <div class="h-1 flex-1 rounded-full bg-gray-200 dark:bg-gray-600">
+                              <div
+                                class="h-1 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-300"
+                                :style="{
+                                  width:
+                                    getTimeElapsedProgress(
+                                      account.claudeUsage.sevenDay,
+                                      'sevenDay'
+                                    ) + '%'
+                                }"
+                              />
+                            </div>
+                            <span class="text-[10px] text-gray-400 dark:text-gray-500">
+                              {{
+                                getTimeElapsedProgress(account.claudeUsage.sevenDay, 'sevenDay')
+                              }}%
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <!-- 7天Opus窗口 -->
@@ -933,8 +981,35 @@
                             </div>
                           </div>
                         </div>
-                        <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                          重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDayOpus) }}
+                        <div class="mt-1 flex items-center gap-2">
+                          <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                            重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDayOpus) }}
+                          </span>
+                          <div
+                            v-if="account.claudeUsage.sevenDayOpus?.remainingSeconds"
+                            class="flex flex-1 items-center gap-1"
+                          >
+                            <div class="h-1 flex-1 rounded-full bg-gray-200 dark:bg-gray-600">
+                              <div
+                                class="h-1 rounded-full bg-gradient-to-r from-purple-400 to-purple-500 transition-all duration-300"
+                                :style="{
+                                  width:
+                                    getTimeElapsedProgress(
+                                      account.claudeUsage.sevenDayOpus,
+                                      'sevenDayOpus'
+                                    ) + '%'
+                                }"
+                              />
+                            </div>
+                            <span class="text-[10px] text-gray-400 dark:text-gray-500">
+                              {{
+                                getTimeElapsedProgress(
+                                  account.claudeUsage.sevenDayOpus,
+                                  'sevenDayOpus'
+                                )
+                              }}%
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1559,8 +1634,27 @@
                       </div>
                     </div>
                   </div>
-                  <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                    重置剩余 {{ formatClaudeRemaining(account.claudeUsage.fiveHour) }}
+                  <div class="mt-1 flex items-center gap-2">
+                    <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                      重置剩余 {{ formatClaudeRemaining(account.claudeUsage.fiveHour) }}
+                    </span>
+                    <div
+                      v-if="account.claudeUsage.fiveHour?.remainingSeconds"
+                      class="flex flex-1 items-center gap-1"
+                    >
+                      <div class="h-1 flex-1 rounded-full bg-gray-200 dark:bg-gray-600">
+                        <div
+                          class="h-1 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-300"
+                          :style="{
+                            width:
+                              getTimeElapsedProgress(account.claudeUsage.fiveHour, 'fiveHour') + '%'
+                          }"
+                        />
+                      </div>
+                      <span class="text-[10px] text-gray-400 dark:text-gray-500">
+                        {{ getTimeElapsedProgress(account.claudeUsage.fiveHour, 'fiveHour') }}%
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <!-- 7天窗口 -->
@@ -1592,8 +1686,27 @@
                       </div>
                     </div>
                   </div>
-                  <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                    重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDay) }}
+                  <div class="mt-1 flex items-center gap-2">
+                    <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                      重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDay) }}
+                    </span>
+                    <div
+                      v-if="account.claudeUsage.sevenDay?.remainingSeconds"
+                      class="flex flex-1 items-center gap-1"
+                    >
+                      <div class="h-1 flex-1 rounded-full bg-gray-200 dark:bg-gray-600">
+                        <div
+                          class="h-1 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-300"
+                          :style="{
+                            width:
+                              getTimeElapsedProgress(account.claudeUsage.sevenDay, 'sevenDay') + '%'
+                          }"
+                        />
+                      </div>
+                      <span class="text-[10px] text-gray-400 dark:text-gray-500">
+                        {{ getTimeElapsedProgress(account.claudeUsage.sevenDay, 'sevenDay') }}%
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <!-- 7天Opus窗口 -->
@@ -1625,8 +1738,32 @@
                       </div>
                     </div>
                   </div>
-                  <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                    重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDayOpus) }}
+                  <div class="mt-1 flex items-center gap-2">
+                    <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                      重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDayOpus) }}
+                    </span>
+                    <div
+                      v-if="account.claudeUsage.sevenDayOpus?.remainingSeconds"
+                      class="flex flex-1 items-center gap-1"
+                    >
+                      <div class="h-1 flex-1 rounded-full bg-gray-200 dark:bg-gray-600">
+                        <div
+                          class="h-1 rounded-full bg-gradient-to-r from-purple-400 to-purple-500 transition-all duration-300"
+                          :style="{
+                            width:
+                              getTimeElapsedProgress(
+                                account.claudeUsage.sevenDayOpus,
+                                'sevenDayOpus'
+                              ) + '%'
+                          }"
+                        />
+                      </div>
+                      <span class="text-[10px] text-gray-400 dark:text-gray-500">
+                        {{
+                          getTimeElapsedProgress(account.claudeUsage.sevenDayOpus, 'sevenDayOpus')
+                        }}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4414,6 +4551,28 @@ const formatClaudeRemaining = (window) => {
     return `${minutes}分钟`
   }
   return `${Math.floor(seconds % 60)}秒`
+}
+
+// 计算时间窗口的已用时间进度百分比
+// windowType: 'fiveHour' | 'sevenDay' | 'sevenDayOpus'
+const getTimeElapsedProgress = (window, windowType) => {
+  if (!window || !window.remainingSeconds) {
+    return 0
+  }
+
+  // 窗口总时长（秒）
+  const totalSeconds = {
+    fiveHour: 5 * 60 * 60, // 5小时 = 18000秒
+    sevenDay: 7 * 24 * 60 * 60, // 7天 = 604800秒
+    sevenDayOpus: 7 * 24 * 60 * 60 // 7天 = 604800秒
+  }
+
+  const total = totalSeconds[windowType] || totalSeconds.sevenDay
+  const remaining = window.remainingSeconds
+  const elapsed = total - remaining
+  const progress = Math.max(0, Math.min(100, (elapsed / total) * 100))
+
+  return Math.round(progress * 10) / 10 // 保留1位小数
 }
 
 // 归一化 OpenAI 会话窗口使用率
