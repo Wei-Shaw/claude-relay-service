@@ -693,8 +693,8 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
   return undefined
 })
 
-// OpenAI 兼容的模型列表端点
-router.get('/v1/models', authenticateApiKey, async (req, res) => {
+// 获取可用模型列表的共享处理器
+async function handleGetModels(req, res) {
   try {
     const apiKeyData = req.apiKey
 
@@ -782,8 +782,13 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
       }
     })
   }
-  return undefined
-})
+}
+
+// OpenAI 兼容的模型列表端点 (带 v1 版)
+router.get('/v1/models', authenticateApiKey, handleGetModels)
+
+// OpenAI 兼容的模型列表端点 (根路径版，方便第三方加载)
+router.get('/models', authenticateApiKey, handleGetModels)
 
 // OpenAI 兼容的模型详情端点
 router.get('/v1/models/:model', authenticateApiKey, async (req, res) => {

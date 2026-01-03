@@ -179,7 +179,7 @@ class Application {
       // 🔧 基础中间件
       this.app.use(
         express.json({
-          limit: '10mb',
+          limit: '100mb',
           verify: (req, res, buf, encoding) => {
             // 验证JSON格式
             if (buf && buf.length && !buf.toString(encoding || 'utf8').trim()) {
@@ -188,7 +188,7 @@ class Application {
           }
         })
       )
-      this.app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+      this.app.use(express.urlencoded({ extended: true, limit: '100mb' }))
       this.app.use(securityMiddleware)
 
       // 🎯 信任代理

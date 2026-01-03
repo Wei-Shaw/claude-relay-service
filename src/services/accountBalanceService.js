@@ -270,7 +270,7 @@ class AccountBalanceService {
   }
 
   async _getAccountBalanceForAccount(account, platform, options = {}) {
-    const queryApi = this._parseBoolean(options.queryApi) || false
+    const queryMode = this._parseQueryMode(options.queryApi)
     const useCache = options.useCache !== false
 
     const accountId = account?.id
@@ -297,8 +297,14 @@ class AccountBalanceService {
 
     const quotaFromLocal = this._buildQuotaFromLocal(account, localStatistics)
 
-    // 非强制查询：优先读缓存
-    if (!queryApi) {
+    // 安全限制：queryApi=auto 仅用于 Antigravity（gemini + oauthProvider=antigravity）账户
+    const effectiveQueryMode =
+      queryMode === 'auto' && !(platform === 'gemini' && account?.oauthProvider === 'antigravity')
+        ? 'local'
+        : queryMode
+
+    // local: 仅本地统计/缓存；auto: 优先缓存，无缓存则尝试远程 Provider（并缓存结果）
+    if (effectiveQueryMode !== 'api') {
       if (useCache) {
         const cached = await this.redis.getAccountBalance(platform, accountId)
         if (cached && cached.status === 'success') {
@@ -321,22 +327,24 @@ class AccountBalanceService {
         }
       }
 
-      return this._buildResponse(
-        {
-          status: 'success',
-          errorMessage: null,
-          balance: quotaFromLocal.balance,
-          currency: quotaFromLocal.currency || 'USD',
-          quota: quotaFromLocal.quota,
-          statistics: localStatistics,
-          lastRefreshAt: localBalance.lastCalculated
-        },
-        accountId,
-        platform,
-        'local',
-        null,
-        scriptMeta
-      )
+      if (effectiveQueryMode === 'local') {
+        return this._buildResponse(
+          {
+            status: 'success',
+            errorMessage: null,
+            balance: quotaFromLocal.balance,
+            currency: quotaFromLocal.currency || 'USD',
+            quota: quotaFromLocal.quota,
+            statistics: localStatistics,
+            lastRefreshAt: localBalance.lastCalculated
+          },
+          accountId,
+          platform,
+          'local',
+          null,
+          scriptMeta
+        )
+      }
     }
 
     // 强制查询：优先脚本（如启用且已配置），否则调用 Provider；失败自动降级到本地统计
@@ -721,6 +729,14 @@ class AccountBalanceService {
       return false
     }
     return null
+  }
+
+  _parseQueryMode(value) {
+    if (value === 'auto') {
+      return 'auto'
+    }
+    const parsed = this._parseBoolean(value)
+    return parsed ? 'api' : 'local'
   }
 
   async _mapWithConcurrency(items, limit, mapper) {

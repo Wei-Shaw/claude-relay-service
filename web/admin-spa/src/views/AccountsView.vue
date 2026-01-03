@@ -797,11 +797,19 @@
                     :account-id="account.id"
                     :initial-balance="account.balanceInfo"
                     :platform="account.platform"
+                    :query-mode="
+                      account.platform === 'gemini' && account.oauthProvider === 'antigravity'
+                        ? 'auto'
+                        : 'local'
+                    "
                     @error="(error) => handleBalanceError(account.id, error)"
                     @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
                   />
                   <div class="mt-1 text-xs">
                     <button
+                      v-if="
+                        !(account.platform === 'gemini' && account.oauthProvider === 'antigravity')
+                      "
                       class="text-blue-500 hover:underline dark:text-blue-300"
                       @click="openBalanceScriptModal(account)"
                     >
@@ -1476,11 +1484,17 @@
               :account-id="account.id"
               :initial-balance="account.balanceInfo"
               :platform="account.platform"
+              :query-mode="
+                account.platform === 'gemini' && account.oauthProvider === 'antigravity'
+                  ? 'auto'
+                  : 'local'
+              "
               @error="(error) => handleBalanceError(account.id, error)"
               @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
             />
             <div class="mt-1 text-xs">
               <button
+                v-if="!(account.platform === 'gemini' && account.oauthProvider === 'antigravity')"
                 class="text-blue-500 hover:underline dark:text-blue-300"
                 @click="openBalanceScriptModal(account)"
               >

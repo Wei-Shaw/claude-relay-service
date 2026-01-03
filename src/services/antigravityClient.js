@@ -304,6 +304,11 @@ async function request({
   }
 
   const isRetryable = (error) => {
+    // 处理网络层面的连接重置或超时（常见于长请求被中间节点切断）
+    if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+      return true
+    }
+
     const status = error?.response?.status
     if (status === 429) {
       return true

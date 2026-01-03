@@ -941,6 +941,7 @@ function convertAnthropicMessagesToGeminiContents(
 
     const content = message?.content
     const parts = []
+    let lastAntigravityThoughtSignature = ''
 
     if (typeof content === 'string') {
       const text = extractAnthropicText(content)
@@ -985,6 +986,7 @@ function convertAnthropicMessagesToGeminiContents(
               continue
             }
 
+            lastAntigravityThoughtSignature = signature
             const thoughtPart = { thought: true, thoughtSignature: signature }
             if (hasThinkingText) {
               thoughtPart.text = thinkingText
@@ -1013,13 +1015,19 @@ function convertAnthropicMessagesToGeminiContents(
           if (part.name) {
             const toolCallId = typeof part.id === 'string' && part.id ? part.id : undefined
             const args = normalizeToolUseInput(part.input)
-            parts.push({
-              functionCall: {
-                ...(vendor === 'antigravity' && toolCallId ? { id: toolCallId } : {}),
-                name: part.name,
-                args
-              }
-            })
+            const functionCall = {
+              ...(vendor === 'antigravity' && toolCallId ? { id: toolCallId } : {}),
+              name: part.name,
+              args
+            }
+
+            // Antigravity 对历史工具调用的 functionCall 会校验 thoughtSignature；
+            // Claude Code 侧的签名存放在 thinking block（part.signature），这里需要回填到 functionCall part 上。
+            if (vendor === 'antigravity' && lastAntigravityThoughtSignature) {
+              parts.push({ thoughtSignature: lastAntigravityThoughtSignature, functionCall })
+            } else {
+              parts.push({ functionCall })
+            }
           }
           continue
         }
@@ -2435,6 +2443,47 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
 
         const parts = extractGeminiParts(payload)
         const thoughtSignature = extractGeminiThoughtSignature(payload)
+        const fullThoughtForToolOrdering = extractGeminiThoughtText(payload)
+
+        if (wantsThinkingBlockFirst) {
+          // 关键：确保 thinking/signature 在 tool_use 之前输出，避免出现 tool_use 后紧跟 thinking(signature)
+          // 导致下一轮请求的 thinking 校验/工具调用校验失败（Antigravity 会返回 400）。
+          if (thoughtSignature && canStartThinkingBlock()) {
+            let delta = ''
+            if (thoughtSignature.startsWith(emittedThoughtSignature)) {
+              delta = thoughtSignature.slice(emittedThoughtSignature.length)
+            } else if (thoughtSignature !== emittedThoughtSignature) {
+              delta = thoughtSignature
+            }
+            if (delta) {
+              switchBlockType('thinking')
+              writeAnthropicSseEvent(res, 'content_block_delta', {
+                type: 'content_block_delta',
+                index: currentIndex,
+                delta: { type: 'signature_delta', signature: delta }
+              })
+              emittedThoughtSignature = thoughtSignature
+            }
+          }
+
+          if (fullThoughtForToolOrdering && canStartThinkingBlock()) {
+            let delta = ''
+            if (fullThoughtForToolOrdering.startsWith(emittedThinking)) {
+              delta = fullThoughtForToolOrdering.slice(emittedThinking.length)
+            } else {
+              delta = fullThoughtForToolOrdering
+            }
+            if (delta) {
+              switchBlockType('thinking')
+              emittedThinking = fullThoughtForToolOrdering
+              writeAnthropicSseEvent(res, 'content_block_delta', {
+                type: 'content_block_delta',
+                index: currentIndex,
+                delta: { type: 'thinking_delta', thinking: delta }
+              })
+            }
+          }
+        }
         for (const part of parts) {
           const functionCall = part?.functionCall
           if (!functionCall?.name) {
