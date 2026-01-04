@@ -229,6 +229,64 @@ router.get('/v1/models', authenticateApiKey, ensureGeminiPermissionMiddleware, (
   handleModels(req, res)
 })
 
+/**
+ * GET /models
+ * 获取模型列表（简化路径，兼容 Cherry Studio 等客户端）
+ */
+router.get('/models', authenticateApiKey, ensureGeminiPermissionMiddleware, (req, res) => {
+  logger.info('Standard Gemini API models request (simplified path)')
+  handleModels(req, res)
+})
+
+// ============================================================================
+// 简化路径路由（兼容 Cherry Studio 等客户端）
+// 这些路由不带 v1beta/ 或 v1/ 前缀
+// ============================================================================
+
+/**
+ * POST /models/:modelName:generateContent
+ */
+router.post(
+  '/models/:modelName\\:generateContent',
+  authenticateApiKey,
+  ensureGeminiPermissionMiddleware,
+  handleStandardGenerateContent
+)
+
+/**
+ * POST /models/:modelName:streamGenerateContent
+ */
+router.post(
+  '/models/:modelName\\:streamGenerateContent',
+  authenticateApiKey,
+  ensureGeminiPermissionMiddleware,
+  handleStandardStreamGenerateContent
+)
+
+/**
+ * POST /models/:modelName:countTokens
+ */
+router.post(
+  '/models/:modelName\\:countTokens',
+  authenticateApiKey,
+  ensureGeminiPermissionMiddleware,
+  (req, res, next) => {
+    logger.info(`Standard Gemini API request (simplified): ${req.method} ${req.originalUrl}`)
+    handleCountTokens(req, res, next)
+  }
+)
+
+/**
+ * GET /models/:modelName
+ * 获取模型详情（简化路径）
+ */
+router.get(
+  '/models/:modelName',
+  authenticateApiKey,
+  ensureGeminiPermissionMiddleware,
+  handleModelDetails
+)
+
 // ============================================================================
 // 模型详情端点
 // ============================================================================

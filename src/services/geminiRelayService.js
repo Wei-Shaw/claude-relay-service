@@ -403,26 +403,54 @@ async function getAvailableModels(accessToken, proxy, projectId, location = 'us-
     const response = await axios(axiosConfig)
     const models = response.data.models || []
 
-    // 转换为 OpenAI 格式
-    return models
-      .filter((model) => model.supportedGenerationMethods?.includes('generateContent'))
-      .map((model) => ({
-        id: model.name.replace('models/', ''),
-        object: 'model',
-        created: Date.now() / 1000,
-        owned_by: 'google'
-      }))
+    // 返回标准 Gemini API 格式，只过滤支持 generateContent 的模型
+    return {
+      models: models.filter((model) =>
+        model.supportedGenerationMethods?.includes('generateContent')
+      ),
+      nextPageToken: response.data.nextPageToken || undefined
+    }
   } catch (error) {
     logger.error('Failed to get Gemini models:', error)
-    // 返回默认模型列表
-    return [
-      {
-        id: 'gemini-2.0-flash-exp',
-        object: 'model',
-        created: Date.now() / 1000,
-        owned_by: 'google'
-      }
-    ]
+    // 返回默认模型列表（标准 Gemini API 格式）
+    return {
+      models: [
+        {
+          name: 'models/gemini-3-pro-preview',
+          displayName: 'Gemini 3 Pro Preview',
+          description: 'Most capable Gemini 3 model for complex reasoning tasks',
+          inputTokenLimit: 1048576,
+          outputTokenLimit: 65536,
+          supportedGenerationMethods: ['generateContent', 'countTokens']
+        },
+        {
+          name: 'models/gemini-3-flash-preview',
+          displayName: 'Gemini 3 Flash Preview',
+          description: 'Fast and efficient Gemini 3 model with thinking capabilities',
+          inputTokenLimit: 1048576,
+          outputTokenLimit: 65536,
+          supportedGenerationMethods: ['generateContent', 'countTokens']
+        },
+        {
+          name: 'models/gemini-2.5-pro',
+          displayName: 'Gemini 2.5 Pro',
+          description:
+            'Our state-of-the-art thinking model, capable of reasoning over complex problems',
+          inputTokenLimit: 1048576,
+          outputTokenLimit: 65536,
+          supportedGenerationMethods: ['generateContent', 'countTokens']
+        },
+        {
+          name: 'models/gemini-2.5-flash',
+          displayName: 'Gemini 2.5 Flash',
+          description:
+            'Our best model in terms of price-performance, offering well-rounded capabilities',
+          inputTokenLimit: 1048576,
+          outputTokenLimit: 65536,
+          supportedGenerationMethods: ['generateContent', 'countTokens']
+        }
+      ]
+    }
   }
 }
 

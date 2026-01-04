@@ -666,6 +666,7 @@ async function handleMessages(req, res) {
 
 /**
  * 获取可用模型列表
+ * 返回标准 Gemini API 格式：{ models: [...], nextPageToken: ... }
  */
 async function handleModels(req, res) {
   try {
@@ -701,23 +702,52 @@ async function handleModels(req, res) {
       logger.warn('Failed to select Gemini account for models endpoint:', error)
     }
 
+    // 默认模型列表（标准 Gemini API 格式）
+    const defaultModels = {
+      models: [
+        {
+          name: 'models/gemini-3-pro-preview',
+          displayName: 'Gemini 3 Pro Preview',
+          description: 'Most capable Gemini 3 model for complex reasoning tasks',
+          inputTokenLimit: 1048576,
+          outputTokenLimit: 65536,
+          supportedGenerationMethods: ['generateContent', 'countTokens']
+        },
+        {
+          name: 'models/gemini-3-flash-preview',
+          displayName: 'Gemini 3 Flash Preview',
+          description: 'Fast and efficient Gemini 3 model with thinking capabilities',
+          inputTokenLimit: 1048576,
+          outputTokenLimit: 65536,
+          supportedGenerationMethods: ['generateContent', 'countTokens']
+        },
+        {
+          name: 'models/gemini-2.5-pro',
+          displayName: 'Gemini 2.5 Pro',
+          description:
+            'Our state-of-the-art thinking model, capable of reasoning over complex problems',
+          inputTokenLimit: 1048576,
+          outputTokenLimit: 65536,
+          supportedGenerationMethods: ['generateContent', 'countTokens']
+        },
+        {
+          name: 'models/gemini-2.5-flash',
+          displayName: 'Gemini 2.5 Flash',
+          description:
+            'Our best model in terms of price-performance, offering well-rounded capabilities',
+          inputTokenLimit: 1048576,
+          outputTokenLimit: 65536,
+          supportedGenerationMethods: ['generateContent', 'countTokens']
+        }
+      ]
+    }
+
     if (!account) {
-      // 返回默认模型列表
-      return res.json({
-        object: 'list',
-        data: [
-          {
-            id: 'gemini-2.5-flash',
-            object: 'model',
-            created: Date.now() / 1000,
-            owned_by: 'google'
-          }
-        ]
-      })
+      return res.json(defaultModels)
     }
 
     // 获取模型列表
-    let models
+    let modelsResponse
     if (isApiAccount) {
       // API Key 账户：使用 API Key 获取模型列表
       const proxyConfig = parseProxyConfig(account)
@@ -734,34 +764,23 @@ async function handleModels(req, res) {
           axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
           axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
         }
+
         const response = await axios(axiosConfig)
-        models = (response.data.models || []).map((m) => ({
-          id: m.name?.replace('models/', '') || m.name,
-          object: 'model',
-          created: Date.now() / 1000,
-          owned_by: 'google'
-        }))
+        // 直接返回原始 Gemini API 格式
+        modelsResponse = {
+          models: response.data.models || [],
+          nextPageToken: response.data.nextPageToken || undefined
+        }
       } catch (error) {
         logger.warn('Failed to fetch models from Gemini API:', error.message)
-        // 返回默认模型列表
-        models = [
-          {
-            id: 'gemini-2.5-flash',
-            object: 'model',
-            created: Date.now() / 1000,
-            owned_by: 'google'
-          }
-        ]
+        modelsResponse = defaultModels
       }
     } else {
       // OAuth 账户：使用 OAuth token 获取模型列表
-      models = await getAvailableModels(account.accessToken, account.proxy)
+      modelsResponse = await getAvailableModels(account.accessToken, account.proxy)
     }
 
-    res.json({
-      object: 'list',
-      data: models
-    })
+    res.json(modelsResponse)
   } catch (error) {
     logger.error('Failed to get Gemini models:', error)
     res.status(500).json({
