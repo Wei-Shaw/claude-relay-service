@@ -2,7 +2,12 @@ const droidAccountService = require('./droidAccountService')
 const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
-const { isTruthy, isAccountHealthy, sortAccountsByPriority, normalizeEndpointType } = require('../utils/commonHelper')
+const {
+  isTruthy,
+  isAccountHealthy,
+  sortAccountsByPriority,
+  normalizeEndpointType
+} = require('../utils/commonHelper')
 
 class DroidScheduler {
   constructor() {
@@ -16,8 +21,12 @@ class DroidScheduler {
   _matchesEndpoint(account, endpointType) {
     const normalizedEndpoint = normalizeEndpointType(endpointType)
     const accountEndpoint = normalizeEndpointType(account?.endpointType)
-    if (normalizedEndpoint === accountEndpoint) return true
-    if (normalizedEndpoint === 'comm') return true
+    if (normalizedEndpoint === accountEndpoint) {
+      return true
+    }
+    if (normalizedEndpoint === 'comm') {
+      return true
+    }
     const sharedEndpoints = new Set(['anthropic', 'openai'])
     return sharedEndpoints.has(normalizedEndpoint) && sharedEndpoints.has(accountEndpoint)
   }

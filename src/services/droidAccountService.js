@@ -2,7 +2,6 @@ const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
 const axios = require('axios')
 const redis = require('../models/redis')
-const config = require('../../config/config')
 const logger = require('../utils/logger')
 const { maskToken } = require('../utils/tokenMask')
 const ProxyHelper = require('../utils/proxyHelper')
@@ -30,10 +29,13 @@ class DroidAccountService {
     this._encryptor = createEncryptor('droid-account-salt')
 
     // 🧹 定期清理缓存（每10分钟）
-    setInterval(() => {
-      this._encryptor.clearCache()
-      logger.info('🧹 Droid decrypt cache cleanup completed', this._encryptor.getStats())
-    }, 10 * 60 * 1000)
+    setInterval(
+      () => {
+        this._encryptor.clearCache()
+        logger.info('🧹 Droid decrypt cache cleanup completed', this._encryptor.getStats())
+      },
+      10 * 60 * 1000
+    )
 
     this.supportedEndpointTypes = new Set(['anthropic', 'openai', 'comm'])
   }

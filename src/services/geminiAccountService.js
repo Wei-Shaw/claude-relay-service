@@ -1,7 +1,6 @@
 const redisClient = require('../models/redis')
 const { v4: uuidv4 } = require('uuid')
 const https = require('https')
-const config = require('../../config/config')
 const logger = require('../utils/logger')
 const { OAuth2Client } = require('google-auth-library')
 const { maskToken } = require('../utils/tokenMask')
@@ -18,6 +17,8 @@ const { createEncryptor } = require('../utils/commonHelper')
 
 // Gemini 账户键前缀
 const GEMINI_ACCOUNT_KEY_PREFIX = 'gemini_account:'
+const SHARED_GEMINI_ACCOUNTS_KEY = 'shared_gemini_accounts'
+const ACCOUNT_SESSION_MAPPING_PREFIX = 'gemini_session_account_mapping:'
 
 // Gemini CLI OAuth 配置 - 这些是公开的 Gemini CLI 凭据
 const OAUTH_CLIENT_ID = '681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com'
@@ -572,7 +573,7 @@ async function deleteAccount(accountId) {
 
 // 获取所有账户
 async function getAllAccounts() {
-  const client = redisClient.getClientSafe()
+  const _client = redisClient.getClientSafe()
   const accountIds = await redisClient.getAllIdsByIndex(
     'gemini_account:index',
     `${GEMINI_ACCOUNT_KEY_PREFIX}*`,
