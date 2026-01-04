@@ -1,33 +1,23 @@
 const { v4: uuidv4 } = require('uuid')
-const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
-const config = require('../../config/config')
-const LRUCache = require('../utils/lruCache')
+const { createEncryptor } = require('../utils/commonHelper')
 
 class CcrAccountService {
   constructor() {
-    // 加密相关常量
-    this.ENCRYPTION_ALGORITHM = 'aes-256-cbc'
-    this.ENCRYPTION_SALT = 'ccr-account-salt'
-
     // Redis键前缀
     this.ACCOUNT_KEY_PREFIX = 'ccr_account:'
     this.SHARED_ACCOUNTS_KEY = 'shared_ccr_accounts'
 
-    // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
-    // scryptSync 是 CPU 密集型操作，缓存可以减少 95%+ 的 CPU 密集型操作
-    this._encryptionKeyCache = null
-
-    // 🔄 解密结果缓存，提高解密性能
-    this._decryptCache = new LRUCache(500)
+    // 使用 commonHelper 的加密器
+    this._encryptor = createEncryptor('ccr-account-salt')
 
     // 🧹 定期清理缓存（每10分钟）
     setInterval(
       () => {
-        this._decryptCache.cleanup()
-        logger.info('🧹 CCR account decrypt cache cleanup completed', this._decryptCache.getStats())
+        this._encryptor.clearCache()
+        logger.info('🧹 CCR account decrypt cache cleanup completed', this._encryptor.getStats())
       },
       10 * 60 * 1000
     )
@@ -106,6 +96,7 @@ class CcrAccountService {
     logger.debug(`[DEBUG] CCR Account data to save: ${JSON.stringify(accountData, null, 2)}`)
 
     await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, accountData)
+    await redis.addToIndex('ccr_account:index', accountId)
 
     // 如果是共享账户，添加到共享账户集合
     if (accountType === 'shared') {
@@ -139,12 +130,17 @@ class CcrAccountService {
   // 📋 获取所有CCR账户
   async getAllAccounts() {
     try {
-      const client = redis.getClientSafe()
-      const keys = await client.keys(`${this.ACCOUNT_KEY_PREFIX}*`)
+      const accountIds = await redis.getAllIdsByIndex(
+        'ccr_account:index',
+        `${this.ACCOUNT_KEY_PREFIX}*`,
+        /^ccr_account:(.+)$/
+      )
+      const keys = accountIds.map((id) => `${this.ACCOUNT_KEY_PREFIX}${id}`)
       const accounts = []
+      const dataList = await redis.batchHgetallChunked(keys)
 
-      for (const key of keys) {
-        const accountData = await client.hgetall(key)
+      for (let i = 0; i < keys.length; i++) {
+        const accountData = dataList[i]
         if (accountData && Object.keys(accountData).length > 0) {
           // 获取限流状态信息
           const rateLimitInfo = this._getRateLimitInfo(accountData)
@@ -331,6 +327,9 @@ class CcrAccountService {
       // 从共享账户集合中移除
       await client.srem(this.SHARED_ACCOUNTS_KEY, accountId)
 
+      // 从索引中移除
+      await redis.removeFromIndex('ccr_account:index', accountId)
+
       // 删除账户数据
       const result = await client.del(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
 
@@ -403,7 +402,7 @@ class CcrAccountService {
           `ℹ️ CCR account ${accountId} rate limit removed but remains stopped due to quota exceeded`
         )
       } else {
-        logger.success(`✅ Removed rate limit for CCR account: ${accountId}`)
+        logger.success(`Removed rate limit for CCR account: ${accountId}`)
       }
 
       await client.hmset(accountKey, {
@@ -488,7 +487,7 @@ class CcrAccountService {
         errorMessage: ''
       })
 
-      logger.success(`✅ Removed overload status for CCR account: ${accountId}`)
+      logger.success(`Removed overload status for CCR account: ${accountId}`)
       return { success: true }
     } catch (error) {
       logger.error(`❌ Failed to remove overload status for CCR account: ${accountId}`, error)
@@ -606,70 +605,12 @@ class CcrAccountService {
 
   // 🔐 加密敏感数据
   _encryptSensitiveData(data) {
-    if (!data) {
-      return ''
-    }
-    try {
-      const key = this._generateEncryptionKey()
-      const iv = crypto.randomBytes(16)
-      const cipher = crypto.createCipheriv(this.ENCRYPTION_ALGORITHM, key, iv)
-      let encrypted = cipher.update(data, 'utf8', 'hex')
-      encrypted += cipher.final('hex')
-      return `${iv.toString('hex')}:${encrypted}`
-    } catch (error) {
-      logger.error('❌ CCR encryption error:', error)
-      return data
-    }
+    return this._encryptor.encrypt(data)
   }
 
   // 🔓 解密敏感数据
   _decryptSensitiveData(encryptedData) {
-    if (!encryptedData) {
-      return ''
-    }
-
-    // 🎯 检查缓存
-    const cacheKey = crypto.createHash('sha256').update(encryptedData).digest('hex')
-    const cached = this._decryptCache.get(cacheKey)
-    if (cached !== undefined) {
-      return cached
-    }
-
-    try {
-      const parts = encryptedData.split(':')
-      if (parts.length === 2) {
-        const key = this._generateEncryptionKey()
-        const iv = Buffer.from(parts[0], 'hex')
-        const encrypted = parts[1]
-        const decipher = crypto.createDecipheriv(this.ENCRYPTION_ALGORITHM, key, iv)
-        let decrypted = decipher.update(encrypted, 'hex', 'utf8')
-        decrypted += decipher.final('utf8')
-
-        // 💾 存入缓存（5分钟过期）
-        this._decryptCache.set(cacheKey, decrypted, 5 * 60 * 1000)
-
-        return decrypted
-      } else {
-        logger.error('❌ Invalid CCR encrypted data format')
-        return encryptedData
-      }
-    } catch (error) {
-      logger.error('❌ CCR decryption error:', error)
-      return encryptedData
-    }
-  }
-
-  // 🔑 生成加密密钥
-  _generateEncryptionKey() {
-    // 性能优化：缓存密钥派生结果，避免重复的 CPU 密集计算
-    if (!this._encryptionKeyCache) {
-      this._encryptionKeyCache = crypto.scryptSync(
-        config.security.encryptionKey,
-        this.ENCRYPTION_SALT,
-        32
-      )
-    }
-    return this._encryptionKeyCache
+    return this._encryptor.decrypt(encryptedData)
   }
 
   // 🔍 获取限流状态信息
@@ -843,7 +784,7 @@ class CcrAccountService {
         }
       }
 
-      logger.success(`✅ Reset daily usage for ${resetCount} CCR accounts`)
+      logger.success(`Reset daily usage for ${resetCount} CCR accounts`)
       return { success: true, resetCount }
     } catch (error) {
       logger.error('❌ Failed to reset all CCR daily usage:', error)
@@ -915,7 +856,7 @@ class CcrAccountService {
       await client.hset(accountKey, updates)
       await client.hdel(accountKey, ...fieldsToDelete)
 
-      logger.success(`✅ Reset all error status for CCR account ${accountId}`)
+      logger.success(`Reset all error status for CCR account ${accountId}`)
 
       // 异步发送 Webhook 通知（忽略错误）
       try {

@@ -50,7 +50,12 @@ class Application {
       // 🔗 连接Redis
       logger.info('🔄 Connecting to Redis...')
       await redis.connect()
-      logger.success('✅ Redis connected successfully')
+      logger.success('Redis connected successfully')
+
+      // 📊 后台异步迁移 usage 索引（不阻塞启动）
+      redis.migrateUsageIndex().catch((err) => {
+        logger.error('📊 Background usage index migration failed:', err)
+      })
 
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')
@@ -93,6 +98,18 @@ class Application {
       logger.info('📊 Initializing cost rank service...')
       const costRankService = require('./services/costRankService')
       await costRankService.initialize()
+
+      // 🔍 初始化 API Key 索引服务（用于分页查询优化）
+      logger.info('🔍 Initializing API Key index service...')
+      const apiKeyIndexService = require('./services/apiKeyIndexService')
+      apiKeyIndexService.init(redis)
+      await apiKeyIndexService.checkAndRebuild()
+
+      // 📁 确保账户分组反向索引存在（后台执行，不阻塞启动）
+      const accountGroupService = require('./services/accountGroupService')
+      accountGroupService.ensureReverseIndexes().catch((err) => {
+        logger.error('📁 Account group reverse index migration failed:', err)
+      })
 
       // 超早期拦截 /admin-next/ 请求 - 在所有中间件之前
       this.app.use((req, res, next) => {
@@ -384,7 +401,7 @@ class Application {
       // 🚨 错误处理
       this.app.use(errorHandler)
 
-      logger.success('✅ Application initialized successfully')
+      logger.success('Application initialized successfully')
     } catch (error) {
       logger.error('💥 Application initialization failed:', error)
       throw error
@@ -419,7 +436,7 @@ class Application {
 
       await redis.setSession('admin_credentials', adminCredentials)
 
-      logger.success('✅ Admin credentials loaded from init.json (single source of truth)')
+      logger.success('Admin credentials loaded from init.json (single source of truth)')
       logger.info(`📋 Admin username: ${adminCredentials.username}`)
     } catch (error) {
       logger.error('❌ Failed to initialize admin credentials:', {
@@ -436,22 +453,24 @@ class Application {
       const client = redis.getClient()
 
       // 获取所有 session:* 键
-      const sessionKeys = await client.keys('session:*')
+      const sessionKeys = await redis.scanKeys('session:*')
+      const dataList = await redis.batchHgetallChunked(sessionKeys)
 
       let validCount = 0
       let invalidCount = 0
 
-      for (const key of sessionKeys) {
+      for (let i = 0; i < sessionKeys.length; i++) {
+        const key = sessionKeys[i]
         // 跳过 admin_credentials（系统凭据）
         if (key === 'session:admin_credentials') {
           continue
         }
 
-        const sessionData = await client.hgetall(key)
+        const sessionData = dataList[i]
 
         // 检查会话完整性：必须有 username 和 loginTime
-        const hasUsername = !!sessionData.username
-        const hasLoginTime = !!sessionData.loginTime
+        const hasUsername = !!sessionData?.username
+        const hasLoginTime = !!sessionData?.loginTime
 
         if (!hasUsername || !hasLoginTime) {
           // 无效会话 - 可能是漏洞利用创建的伪造会话
@@ -466,11 +485,11 @@ class Application {
       }
 
       if (invalidCount > 0) {
-        logger.security(`🔒 Startup security check: Removed ${invalidCount} invalid sessions`)
+        logger.security(`Startup security check: Removed ${invalidCount} invalid sessions`)
       }
 
       logger.success(
-        `✅ Session cleanup completed: ${validCount} valid, ${invalidCount} invalid removed`
+        `Session cleanup completed: ${validCount} valid, ${invalidCount} invalid removed`
       )
     } catch (error) {
       // 清理失败不应阻止服务启动
@@ -520,9 +539,7 @@ class Application {
       await this.initialize()
 
       this.server = this.app.listen(config.server.port, config.server.host, () => {
-        logger.start(
-          `🚀 Claude Relay Service started on ${config.server.host}:${config.server.port}`
-        )
+        logger.start(`Claude Relay Service started on ${config.server.host}:${config.server.port}`)
         logger.info(
           `🌐 Web interface: http://${config.server.host}:${config.server.port}/admin-next/api-stats`
         )
@@ -577,7 +594,7 @@ class Application {
         logger.info(`📊 Cache System - Registered: ${stats.cacheCount} caches`)
       }, 5000)
 
-      logger.success('✅ Cache monitoring initialized')
+      logger.success('Cache monitoring initialized')
     } catch (error) {
       logger.error('❌ Failed to initialize cache monitoring:', error)
       // 不阻止应用启动
@@ -626,7 +643,7 @@ class Application {
     // 每分钟主动清理所有过期的并发项，不依赖请求触发
     setInterval(async () => {
       try {
-        const keys = await redis.keys('concurrency:*')
+        const keys = await redis.scanKeys('concurrency:*')
         if (keys.length === 0) {
           return
         }
@@ -808,9 +825,9 @@ class Application {
           // 🔢 清理所有并发计数（Phase 1 修复：防止重启泄漏）
           try {
             logger.info('🔢 Cleaning up all concurrency counters...')
-            const keys = await redis.keys('concurrency:*')
+            const keys = await redis.scanKeys('concurrency:*')
             if (keys.length > 0) {
-              await redis.client.del(...keys)
+              await redis.batchDelChunked(keys)
               logger.info(`✅ Cleaned ${keys.length} concurrency keys`)
             } else {
               logger.info('✅ No concurrency keys to clean')
@@ -827,7 +844,7 @@ class Application {
             logger.error('❌ Error disconnecting Redis:', error)
           }
 
-          logger.success('✅ Graceful shutdown completed')
+          logger.success('Graceful shutdown completed')
           process.exit(0)
         })
 

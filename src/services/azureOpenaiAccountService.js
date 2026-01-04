@@ -150,6 +150,7 @@ async function createAccount(accountData) {
 
   const client = redisClient.getClientSafe()
   await client.hset(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, account)
+  await redisClient.addToIndex('azure_openai:account:index', accountId)
 
   // 如果是共享账户，添加到共享账户集合
   if (account.accountType === 'shared') {
@@ -270,6 +271,9 @@ async function deleteAccount(accountId) {
   // 从Redis中删除账户数据
   await client.del(accountKey)
 
+  // 从索引中移除
+  await redisClient.removeFromIndex('azure_openai:account:index', accountId)
+
   // 从共享账户集合中移除
   await client.srem(SHARED_AZURE_OPENAI_ACCOUNTS_KEY, accountId)
 
@@ -279,16 +283,22 @@ async function deleteAccount(accountId) {
 
 // 获取所有账户
 async function getAllAccounts() {
-  const client = redisClient.getClientSafe()
-  const keys = await client.keys(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}*`)
+  const accountIds = await redisClient.getAllIdsByIndex(
+    'azure_openai:account:index',
+    `${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}*`,
+    /^azure_openai:account:(.+)$/
+  )
 
-  if (!keys || keys.length === 0) {
+  if (!accountIds || accountIds.length === 0) {
     return []
   }
 
+  const keys = accountIds.map((id) => `${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${id}`)
   const accounts = []
-  for (const key of keys) {
-    const accountData = await client.hgetall(key)
+  const dataList = await redisClient.batchHgetallChunked(keys)
+
+  for (let i = 0; i < keys.length; i++) {
+    const accountData = dataList[i]
     if (accountData && Object.keys(accountData).length > 0) {
       // 不返回敏感数据给前端
       delete accountData.apiKey

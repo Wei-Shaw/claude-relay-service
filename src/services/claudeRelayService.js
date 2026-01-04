@@ -1,6 +1,5 @@
 const https = require('https')
 const zlib = require('zlib')
-const fs = require('fs')
 const path = require('path')
 const ProxyHelper = require('../utils/proxyHelper')
 const { filterForClaude } = require('../utils/headerFilter')
@@ -17,6 +16,15 @@ const requestIdentityService = require('./requestIdentityService')
 const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
 const userMessageQueueService = require('./userMessageQueueService')
 const { isStreamWritable } = require('../utils/streamHelper')
+const {
+  getHttpsAgentForStream,
+  getHttpsAgentForNonStream,
+  getPricingData
+} = require('../utils/performanceOptimizer')
+
+// structuredClone polyfill for Node < 17
+const safeClone =
+  typeof structuredClone === 'function' ? structuredClone : (obj) => JSON.parse(JSON.stringify(obj))
 
 class ClaudeRelayService {
   constructor() {
@@ -684,8 +692,8 @@ class ClaudeRelayService {
       return body
     }
 
-    // 深拷贝请求体
-    const processedBody = JSON.parse(JSON.stringify(body))
+    // 使用 safeClone 替代 JSON.parse(JSON.stringify()) 提升性能
+    const processedBody = safeClone(body)
 
     // 验证并限制max_tokens参数
     this._validateAndLimitMaxTokens(processedBody)
@@ -815,15 +823,15 @@ class ClaudeRelayService {
     }
 
     try {
-      // 读取模型定价配置文件
+      // 使用缓存的定价数据
       const pricingFilePath = path.join(__dirname, '../../data/model_pricing.json')
+      const pricingData = getPricingData(pricingFilePath)
 
-      if (!fs.existsSync(pricingFilePath)) {
+      if (!pricingData) {
         logger.warn('⚠️ Model pricing file not found, skipping max_tokens validation')
         return
       }
 
-      const pricingData = JSON.parse(fs.readFileSync(pricingFilePath, 'utf8'))
       const model = body.model || 'claude-sonnet-4-20250514'
 
       // 查找对应模型的配置
@@ -989,20 +997,20 @@ class ClaudeRelayService {
   }
 
   // 🌐 获取代理Agent（使用统一的代理工具）
-  async _getProxyAgent(accountId) {
+  async _getProxyAgent(accountId, account = null) {
     try {
-      const accountData = await claudeAccountService.getAllAccounts()
-      const account = accountData.find((acc) => acc.id === accountId)
+      // 优先使用传入的 account 对象，避免重复查询
+      const accountData = account || (await claudeAccountService.getAccount(accountId))
 
-      if (!account || !account.proxy) {
+      if (!accountData || !accountData.proxy) {
         logger.debug('🌐 No proxy configured for Claude account')
         return null
       }
 
-      const proxyAgent = ProxyHelper.createProxyAgent(account.proxy)
+      const proxyAgent = ProxyHelper.createProxyAgent(accountData.proxy)
       if (proxyAgent) {
         logger.info(
-          `🌐 Using proxy for Claude request: ${ProxyHelper.getProxyDescription(account.proxy)}`
+          `🌐 Using proxy for Claude request: ${ProxyHelper.getProxyDescription(accountData.proxy)}`
         )
       }
       return proxyAgent
@@ -1096,9 +1104,7 @@ class ClaudeRelayService {
     headers['User-Agent'] = userAgent
     headers['Accept'] = acceptHeader
 
-    logger.info(`🔗 指纹是这个: ${headers['User-Agent']}`)
-
-    logger.info(`🔗 指纹是这个: ${headers['User-Agent']}`)
+    logger.debug(`🔗 Request User-Agent: ${headers['User-Agent']}`)
 
     // 根据模型和客户端传递的 anthropic-beta 动态设置 header
     const modelId = requestPayload?.model || body?.model
@@ -1191,19 +1197,22 @@ class ClaudeRelayService {
         path: requestPath + (url.search || ''),
         method: 'POST',
         headers,
-        agent: proxyAgent,
+        agent: proxyAgent || getHttpsAgentForNonStream(),
         timeout: config.requestTimeout || 600000
       }
 
       const req = https.request(options, (res) => {
-        let responseData = Buffer.alloc(0)
+        // 使用数组收集 chunks，避免 O(n²) 的 Buffer.concat
+        const chunks = []
 
         res.on('data', (chunk) => {
-          responseData = Buffer.concat([responseData, chunk])
+          chunks.push(chunk)
         })
 
         res.on('end', () => {
           try {
+            // 一次性合并所有 chunks
+            const responseData = Buffer.concat(chunks)
             let responseBody = ''
 
             // 根据Content-Encoding处理响应数据
@@ -1586,7 +1595,7 @@ class ClaudeRelayService {
         path: url.pathname + (url.search || ''),
         method: 'POST',
         headers,
-        agent: proxyAgent,
+        agent: proxyAgent || getHttpsAgentForStream(),
         timeout: config.requestTimeout || 600000
       }
 

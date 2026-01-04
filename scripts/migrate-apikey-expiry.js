@@ -12,6 +12,7 @@
  */
 
 const redis = require('../src/models/redis')
+const apiKeyService = require('../src/services/apiKeyService')
 const logger = require('../src/utils/logger')
 const readline = require('readline')
 
@@ -51,7 +52,7 @@ async function migrateApiKeys() {
     logger.success('✅ Connected to Redis')
 
     // 获取所有 API Keys
-    const apiKeys = await redis.getAllApiKeys()
+    const apiKeys = await apiKeyService.getAllApiKeysFast()
     logger.info(`📊 Found ${apiKeys.length} API Keys in total`)
 
     // 统计信息

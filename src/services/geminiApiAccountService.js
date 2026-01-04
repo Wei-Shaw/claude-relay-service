@@ -85,7 +85,7 @@ class GeminiApiAccountService {
     // 保存到 Redis
     await this._saveAccount(accountId, accountData)
 
-    logger.success(`🚀 Created Gemini-API account: ${name} (${accountId})`)
+    logger.success(`Created Gemini-API account: ${name} (${accountId})`)
 
     return {
       ...accountData,
@@ -172,6 +172,9 @@ class GeminiApiAccountService {
     // 从共享账户列表中移除
     await client.srem(this.SHARED_ACCOUNTS_KEY, accountId)
 
+    // 从索引中移除
+    await redis.removeFromIndex('gemini_api_account:index', accountId)
+
     // 删除账户数据
     await client.del(key)
 
@@ -223,11 +226,17 @@ class GeminiApiAccountService {
     }
 
     // 直接从 Redis 获取所有账户（包括非共享账户）
-    const keys = await client.keys(`${this.ACCOUNT_KEY_PREFIX}*`)
-    for (const key of keys) {
-      const accountId = key.replace(this.ACCOUNT_KEY_PREFIX, '')
+    const allAccountIds = await redis.getAllIdsByIndex(
+      'gemini_api_account:index',
+      `${this.ACCOUNT_KEY_PREFIX}*`,
+      /^gemini_api_account:(.+)$/
+    )
+    const keys = allAccountIds.map((id) => `${this.ACCOUNT_KEY_PREFIX}${id}`)
+    const dataList = await redis.batchHgetallChunked(keys)
+    for (let i = 0; i < allAccountIds.length; i++) {
+      const accountId = allAccountIds[i]
       if (!accountIds.includes(accountId)) {
-        const accountData = await client.hgetall(key)
+        const accountData = dataList[i]
         if (accountData && accountData.id) {
           // 过滤非活跃账户
           if (includeInactive || accountData.isActive === 'true') {
@@ -575,6 +584,9 @@ class GeminiApiAccountService {
 
     // 保存账户数据
     await client.hset(key, accountData)
+
+    // 添加到索引
+    await redis.addToIndex('gemini_api_account:index', accountId)
 
     // 添加到共享账户列表
     if (accountData.accountType === 'shared') {

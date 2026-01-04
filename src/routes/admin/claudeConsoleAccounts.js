@@ -441,7 +441,7 @@ router.post(
       const { accountId } = req.params
       await claudeConsoleAccountService.resetDailyUsage(accountId)
 
-      logger.success(`✅ Admin manually reset daily usage for Claude Console account: ${accountId}`)
+      logger.success(`Admin manually reset daily usage for Claude Console account: ${accountId}`)
       return res.json({ success: true, message: 'Daily usage reset successfully' })
     } catch (error) {
       logger.error('❌ Failed to reset Claude Console account daily usage:', error)
@@ -458,7 +458,7 @@ router.post(
     try {
       const { accountId } = req.params
       const result = await claudeConsoleAccountService.resetAccountStatus(accountId)
-      logger.success(`✅ Admin reset status for Claude Console account: ${accountId}`)
+      logger.success(`Admin reset status for Claude Console account: ${accountId}`)
       return res.json({ success: true, data: result })
     } catch (error) {
       logger.error('❌ Failed to reset Claude Console account status:', error)
@@ -472,7 +472,7 @@ router.post('/claude-console-accounts/reset-all-usage', authenticateAdmin, async
   try {
     await claudeConsoleAccountService.resetAllDailyUsage()
 
-    logger.success('✅ Admin manually reset daily usage for all Claude Console accounts')
+    logger.success('Admin manually reset daily usage for all Claude Console accounts')
     return res.json({ success: true, message: 'All daily usage reset successfully' })
   } catch (error) {
     logger.error('❌ Failed to reset all Claude Console accounts daily usage:', error)

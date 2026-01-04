@@ -66,7 +66,7 @@ router.post('/poll-auth-status', authenticateAdmin, async (req, res) => {
     const result = await geminiAccountService.pollAuthorizationStatus(sessionId)
 
     if (result.success) {
-      logger.success(`✅ Gemini OAuth authorization successful for session: ${sessionId}`)
+      logger.success(`Gemini OAuth authorization successful for session: ${sessionId}`)
       return res.json({ success: true, data: { tokens: result.tokens } })
     } else {
       return res.json({ success: false, error: result.error })
@@ -128,7 +128,7 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
       await redis.deleteOAuthSession(sessionId)
     }
 
-    logger.success('✅ Successfully exchanged Gemini authorization code')
+    logger.success('Successfully exchanged Gemini authorization code')
     return res.json({ success: true, data: { tokens } })
   } catch (error) {
     logger.error('❌ Failed to exchange Gemini authorization code:', error)
@@ -483,7 +483,7 @@ router.post('/:id/reset-status', authenticateAdmin, async (req, res) => {
 
     const result = await geminiAccountService.resetAccountStatus(id)
 
-    logger.success(`✅ Admin reset status for Gemini account: ${id}`)
+    logger.success(`Admin reset status for Gemini account: ${id}`)
     return res.json({ success: true, data: result })
   } catch (error) {
     logger.error('❌ Failed to reset Gemini account status:', error)

@@ -1570,7 +1570,7 @@ class ClaudeAccountService {
         'rateLimitAutoStopped'
       )
 
-      logger.success(`✅ Rate limit removed for account: ${accountData.name} (${accountId})`)
+      logger.success(`Rate limit removed for account: ${accountData.name} (${accountId})`)
 
       return { success: true }
     } catch (error) {
@@ -2242,7 +2242,7 @@ class ClaudeAccountService {
         await new Promise((resolve) => setTimeout(resolve, 1000))
       }
 
-      logger.success(`✅ Profile update completed: ${successCount} success, ${failureCount} failed`)
+      logger.success(`Profile update completed: ${successCount} success, ${failureCount} failed`)
 
       return {
         totalAccounts: accounts.length,
@@ -2310,11 +2310,11 @@ class ClaudeAccountService {
         }
       }
 
-      logger.success('✅ Session window initialization completed:')
-      logger.success(`   📊 Total accounts: ${accounts.length}`)
-      logger.success(`   ✅ Valid windows: ${validWindowCount}`)
-      logger.success(`   ⏰ Expired windows: ${expiredWindowCount}`)
-      logger.success(`   📭 No windows: ${noWindowCount}`)
+      logger.success('Session window initialization completed:')
+      logger.success(`   Total accounts: ${accounts.length}`)
+      logger.success(`   Valid windows: ${validWindowCount}`)
+      logger.success(`   Expired windows: ${expiredWindowCount}`)
+      logger.success(`   No windows: ${noWindowCount}`)
 
       return {
         total: accounts.length,

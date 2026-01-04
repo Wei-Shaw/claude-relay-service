@@ -141,7 +141,7 @@ async function cleanTestData() {
   logger.info('🧹 Cleaning test data...')
 
   // 获取所有API Keys
-  const allKeys = await apiKeyService.getAllApiKeys()
+  const allKeys = await apiKeyService.getAllApiKeysFast()
 
   // 找出所有测试 API Keys
   const testKeys = allKeys.filter((key) => key.name && key.name.startsWith('Test API Key'))

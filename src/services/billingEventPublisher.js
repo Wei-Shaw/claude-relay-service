@@ -208,7 +208,7 @@ class BillingEventPublisher {
       // MKSTREAM: 如果 stream 不存在则创建
       await client.xgroup('CREATE', this.streamKey, groupName, '0', 'MKSTREAM')
 
-      logger.success(`✅ Created consumer group: ${groupName}`)
+      logger.success(`Created consumer group: ${groupName}`)
       return true
     } catch (error) {
       if (error.message.includes('BUSYGROUP')) {

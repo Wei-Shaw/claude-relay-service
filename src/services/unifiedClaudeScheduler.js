@@ -6,6 +6,7 @@ const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const { parseVendorPrefixedModel, isOpus45OrNewer } = require('../utils/modelHelper')
+const { isSchedulable, sortAccountsByPriority } = require('../utils/commonHelper')
 
 /**
  * Check if account is Pro (not Max)
@@ -36,16 +37,6 @@ function isProAccount(info) {
 class UnifiedClaudeScheduler {
   constructor() {
     this.SESSION_MAPPING_PREFIX = 'unified_claude_session_mapping:'
-  }
-
-  // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
-  _isSchedulable(schedulable) {
-    // 如果是 undefined 或 null，默认为可调度
-    if (schedulable === undefined || schedulable === null) {
-      return true
-    }
-    // 明确设置为 false（布尔值）或 'false'（字符串）时不可调度
-    return schedulable !== false && schedulable !== 'false'
   }
 
   // 🔍 检查账户是否支持请求的模型
@@ -286,7 +277,7 @@ class UnifiedClaudeScheduler {
               throw error
             }
 
-            if (!this._isSchedulable(boundAccount.schedulable)) {
+            if (!isSchedulable(boundAccount.schedulable)) {
               logger.warn(
                 `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable}), falling back to pool`
               )
@@ -319,7 +310,7 @@ class UnifiedClaudeScheduler {
           boundConsoleAccount &&
           boundConsoleAccount.isActive === true &&
           boundConsoleAccount.status === 'active' &&
-          this._isSchedulable(boundConsoleAccount.schedulable)
+          isSchedulable(boundConsoleAccount.schedulable)
         ) {
           // 检查是否临时不可用
           const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
@@ -354,7 +345,7 @@ class UnifiedClaudeScheduler {
         if (
           boundBedrockAccountResult.success &&
           boundBedrockAccountResult.data.isActive === true &&
-          this._isSchedulable(boundBedrockAccountResult.data.schedulable)
+          isSchedulable(boundBedrockAccountResult.data.schedulable)
         ) {
           // 检查是否临时不可用
           const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
@@ -436,7 +427,7 @@ class UnifiedClaudeScheduler {
       }
 
       // 按优先级和最后使用时间排序
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      const sortedAccounts = sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
@@ -496,7 +487,7 @@ class UnifiedClaudeScheduler {
           throw error
         }
 
-        if (!this._isSchedulable(boundAccount.schedulable)) {
+        if (!isSchedulable(boundAccount.schedulable)) {
           logger.warn(
             `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable})`
           )
@@ -530,7 +521,7 @@ class UnifiedClaudeScheduler {
         boundConsoleAccount &&
         boundConsoleAccount.isActive === true &&
         boundConsoleAccount.status === 'active' &&
-        this._isSchedulable(boundConsoleAccount.schedulable)
+        isSchedulable(boundConsoleAccount.schedulable)
       ) {
         // 主动触发一次额度检查
         try {
@@ -579,7 +570,7 @@ class UnifiedClaudeScheduler {
       if (
         boundBedrockAccountResult.success &&
         boundBedrockAccountResult.data.isActive === true &&
-        this._isSchedulable(boundBedrockAccountResult.data.schedulable)
+        isSchedulable(boundBedrockAccountResult.data.schedulable)
       ) {
         logger.info(
           `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${apiKeyData.bedrockAccountId})`
@@ -609,7 +600,7 @@ class UnifiedClaudeScheduler {
         account.status !== 'blocked' &&
         account.status !== 'temp_error' &&
         (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
-        this._isSchedulable(account.schedulable)
+        isSchedulable(account.schedulable)
       ) {
         // 检查是否可调度
 
@@ -691,7 +682,7 @@ class UnifiedClaudeScheduler {
         currentAccount.isActive === true &&
         currentAccount.status === 'active' &&
         currentAccount.accountType === 'shared' &&
-        this._isSchedulable(currentAccount.schedulable)
+        isSchedulable(currentAccount.schedulable)
       ) {
         // 检查是否可调度
 
@@ -826,7 +817,7 @@ class UnifiedClaudeScheduler {
         if (
           account.isActive === true &&
           account.accountType === 'shared' &&
-          this._isSchedulable(account.schedulable)
+          isSchedulable(account.schedulable)
         ) {
           // 检查是否临时不可用
           const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
@@ -870,7 +861,7 @@ class UnifiedClaudeScheduler {
           account.isActive === true &&
           account.status === 'active' &&
           account.accountType === 'shared' &&
-          this._isSchedulable(account.schedulable)
+          isSchedulable(account.schedulable)
         ) {
           // 检查模型支持
           if (!this._isModelSupportedByAccount(account, 'ccr', requestedModel)) {
@@ -949,21 +940,6 @@ class UnifiedClaudeScheduler {
     return availableAccounts
   }
 
-  // 🔢 按优先级和最后使用时间排序账户
-  _sortAccountsByPriority(accounts) {
-    return accounts.sort((a, b) => {
-      // 首先按优先级排序（数字越小优先级越高）
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority
-      }
-
-      // 优先级相同时，按最后使用时间排序（最久未使用的优先）
-      const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-      const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-      return aLastUsed - bLastUsed
-    })
-  }
-
   // 🔍 检查账户是否可用
   async _isAccountAvailable(accountId, accountType, requestedModel = null) {
     try {
@@ -978,7 +954,7 @@ class UnifiedClaudeScheduler {
           return false
         }
         // 检查是否可调度
-        if (!this._isSchedulable(account.schedulable)) {
+        if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 Account ${accountId} is not schedulable`)
           return false
         }
@@ -1029,7 +1005,7 @@ class UnifiedClaudeScheduler {
           return false
         }
         // 检查是否可调度
-        if (!this._isSchedulable(account.schedulable)) {
+        if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 Claude Console account ${accountId} is not schedulable`)
           return false
         }
@@ -1093,7 +1069,7 @@ class UnifiedClaudeScheduler {
           return false
         }
         // 检查是否可调度
-        if (!this._isSchedulable(accountResult.data.schedulable)) {
+        if (!isSchedulable(accountResult.data.schedulable)) {
           logger.info(`🚫 Bedrock account ${accountId} is not schedulable`)
           return false
         }
@@ -1113,7 +1089,7 @@ class UnifiedClaudeScheduler {
           return false
         }
         // 检查是否可调度
-        if (!this._isSchedulable(account.schedulable)) {
+        if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 CCR account ${accountId} is not schedulable`)
           return false
         }
@@ -1544,7 +1520,7 @@ class UnifiedClaudeScheduler {
               ? account.status === 'active'
               : account.status === 'active'
 
-        if (isActive && status && this._isSchedulable(account.schedulable)) {
+        if (isActive && status && isSchedulable(account.schedulable)) {
           // 检查模型支持
           if (!this._isModelSupportedByAccount(account, accountType, requestedModel, 'in group')) {
             continue
@@ -1594,7 +1570,7 @@ class UnifiedClaudeScheduler {
       }
 
       // 使用现有的优先级排序逻辑
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      const sortedAccounts = sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
@@ -1664,7 +1640,7 @@ class UnifiedClaudeScheduler {
       }
 
       // 3. 按优先级和最后使用时间排序
-      const sortedAccounts = this._sortAccountsByPriority(availableCcrAccounts)
+      const sortedAccounts = sortAccountsByPriority(availableCcrAccounts)
       const selectedAccount = sortedAccounts[0]
 
       // 4. 建立会话映射
@@ -1710,7 +1686,7 @@ class UnifiedClaudeScheduler {
           account.isActive === true &&
           account.status === 'active' &&
           account.accountType === 'shared' &&
-          this._isSchedulable(account.schedulable)
+          isSchedulable(account.schedulable)
         ) {
           // 检查模型支持
           if (!this._isModelSupportedByAccount(account, 'ccr', requestedModel)) {

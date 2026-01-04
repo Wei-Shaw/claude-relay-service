@@ -61,7 +61,7 @@ async function startDeviceAuthorization(proxyConfig = null) {
       throw new Error('WorkOS 返回数据缺少必要字段 (device_code / verification_uri)')
     }
 
-    logger.success('✅ 成功获取 WorkOS 设备码授权信息', {
+    logger.success('成功获取 WorkOS 设备码授权信息', {
       verificationUri: data.verification_uri,
       userCode: data.user_code
     })

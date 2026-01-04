@@ -103,7 +103,7 @@ class CostRankService {
       }
 
       this.isInitialized = true
-      logger.success('✅ CostRankService initialized')
+      logger.success('CostRankService initialized')
     } catch (error) {
       logger.error('❌ Failed to initialize CostRankService:', error)
       throw error
@@ -391,17 +391,32 @@ class CostRankService {
       return {}
     }
 
-    const status = {}
-
+    // 使用 Pipeline 批量获取
+    const pipeline = client.pipeline()
     for (const timeRange of VALID_TIME_RANGES) {
-      const meta = await client.hgetall(RedisKeys.metaKey(timeRange))
-      status[timeRange] = {
-        lastUpdate: meta.lastUpdate || null,
-        keyCount: parseInt(meta.keyCount || 0),
-        status: meta.status || 'unknown',
-        updateDuration: parseInt(meta.updateDuration || 0)
-      }
+      pipeline.hgetall(RedisKeys.metaKey(timeRange))
     }
+    const results = await pipeline.exec()
+
+    const status = {}
+    VALID_TIME_RANGES.forEach((timeRange, i) => {
+      const [err, meta] = results[i]
+      if (err || !meta) {
+        status[timeRange] = {
+          lastUpdate: null,
+          keyCount: 0,
+          status: 'unknown',
+          updateDuration: 0
+        }
+      } else {
+        status[timeRange] = {
+          lastUpdate: meta.lastUpdate || null,
+          keyCount: parseInt(meta.keyCount || 0),
+          status: meta.status || 'unknown',
+          updateDuration: parseInt(meta.updateDuration || 0)
+        }
+      }
+    })
 
     return status
   }

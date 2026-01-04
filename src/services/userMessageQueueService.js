@@ -10,6 +10,7 @@ const { v4: uuidv4 } = require('uuid')
 const redis = require('../models/redis')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
+const { getCachedConfig, setCachedConfig } = require('../utils/performanceOptimizer')
 
 // 清理任务间隔
 const CLEANUP_INTERVAL_MS = 60000 // 1分钟
@@ -18,6 +19,9 @@ const CLEANUP_INTERVAL_MS = 60000 // 1分钟
 const POLL_INTERVAL_BASE_MS = 50 // 基础轮询间隔
 const POLL_INTERVAL_MAX_MS = 500 // 最大轮询间隔
 const POLL_BACKOFF_FACTOR = 1.5 // 退避因子
+
+// 配置缓存 key
+const CONFIG_CACHE_KEY = 'user_message_queue_config'
 
 class UserMessageQueueService {
   constructor() {
@@ -64,18 +68,23 @@ class UserMessageQueueService {
   }
 
   /**
-   * 获取当前配置（支持 Web 界面配置优先）
+   * 获取当前配置（支持 Web 界面配置优先，带短 TTL 缓存）
    * @returns {Promise<Object>} 配置对象
    */
   async getConfig() {
+    // 检查缓存
+    const cached = getCachedConfig(CONFIG_CACHE_KEY)
+    if (cached) {
+      return cached
+    }
+
     // 默认配置（防止 config.userMessageQueue 未定义）
-    // 注意：优化后的默认值 - 锁持有时间从分钟级降到毫秒级，无需长等待
     const queueConfig = config.userMessageQueue || {}
     const defaults = {
       enabled: queueConfig.enabled ?? false,
       delayMs: queueConfig.delayMs ?? 200,
-      timeoutMs: queueConfig.timeoutMs ?? 5000, // 从 60000 降到 5000，因为锁持有时间短
-      lockTtlMs: queueConfig.lockTtlMs ?? 5000 // 从 120000 降到 5000，5秒足以覆盖请求发送
+      timeoutMs: queueConfig.timeoutMs ?? 60000,
+      lockTtlMs: queueConfig.lockTtlMs ?? 120000
     }
 
     // 尝试从 claudeRelayConfigService 获取 Web 界面配置
@@ -83,7 +92,7 @@ class UserMessageQueueService {
       const claudeRelayConfigService = require('./claudeRelayConfigService')
       const webConfig = await claudeRelayConfigService.getConfig()
 
-      return {
+      const result = {
         enabled:
           webConfig.userMessageQueueEnabled !== undefined
             ? webConfig.userMessageQueueEnabled
@@ -101,8 +110,13 @@ class UserMessageQueueService {
             ? webConfig.userMessageQueueLockTtlMs
             : defaults.lockTtlMs
       }
+
+      // 缓存配置 30 秒
+      setCachedConfig(CONFIG_CACHE_KEY, result, 30000)
+      return result
     } catch {
-      // 回退到环境变量配置
+      // 回退到环境变量配置，也缓存
+      setCachedConfig(CONFIG_CACHE_KEY, defaults, 30000)
       return defaults
     }
   }
