@@ -247,6 +247,3 @@ web/apiStats/
 
 # Admin SPA build files
 web/admin-spa/dist/
-
-.cunzhi-memory/
-*.jsonl

@@ -1,7 +1,7 @@
-const fs = require('fs/promises')
 const path = require('path')
 const logger = require('./logger')
 const { getProjectRoot } = require('./projectPaths')
+const { safeRotatingAppend } = require('./safeRotatingAppend')
 
 const RESPONSE_DUMP_ENV = 'ANTHROPIC_DEBUG_RESPONSE_DUMP'
 const RESPONSE_DUMP_MAX_BYTES_ENV = 'ANTHROPIC_DEBUG_RESPONSE_DUMP_MAX_BYTES'
@@ -89,7 +89,7 @@ async function dumpAnthropicResponse(req, responseInfo, meta = {}) {
 
   const line = `${safeJsonStringify(record, maxBytes)}\n`
   try {
-    await fs.appendFile(filename, line, { encoding: 'utf8' })
+    await safeRotatingAppend(filename, line)
   } catch (e) {
     logger.warn('Failed to dump Anthropic response', {
       filename,

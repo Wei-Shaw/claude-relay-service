@@ -434,7 +434,37 @@ async function request({
     const status = error?.response?.status
     if (status === 429 && !retriedAfterDelay && !signal?.aborted) {
       const data = error?.response?.data
-      const msg = typeof data === 'string' ? data : JSON.stringify(data || '')
+
+      // 安全地将 data 转为字符串，避免 stream 对象导致循环引用崩溃
+      const safeDataToString = (value) => {
+        if (typeof value === 'string') {
+          return value
+        }
+        if (value === null || value === undefined) {
+          return ''
+        }
+        // stream 对象存在循环引用，不能 JSON.stringify
+        if (typeof value === 'object' && typeof value.pipe === 'function') {
+          return ''
+        }
+        if (Buffer.isBuffer(value)) {
+          try {
+            return value.toString('utf8')
+          } catch (_) {
+            return ''
+          }
+        }
+        if (typeof value === 'object') {
+          try {
+            return JSON.stringify(value)
+          } catch (_) {
+            return ''
+          }
+        }
+        return String(value)
+      }
+
+      const msg = safeDataToString(data)
       if (
         msg.toLowerCase().includes('resource_exhausted') ||
         msg.toLowerCase().includes('no capacity')
