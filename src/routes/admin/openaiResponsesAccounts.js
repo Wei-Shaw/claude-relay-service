@@ -133,6 +133,40 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
   }
 })
 
+// 获取 OpenAI-Responses 账户自动恢复配置
+router.get(
+  '/openai-responses-accounts/auto-recovery-configs',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const accounts = await openaiResponsesAccountService.getAllAccounts(true)
+      const configs = []
+
+      for (const account of accounts) {
+        if (!account) {
+          continue
+        }
+        if (account.autoRecoveryConfig && typeof account.autoRecoveryConfig === 'object') {
+          configs.push({
+            accountId: account.id,
+            ...account.autoRecoveryConfig
+          })
+        } else if (typeof account.autoRecoveryConfig === 'string' && account.autoRecoveryConfig) {
+          configs.push({
+            accountId: account.id,
+            raw: account.autoRecoveryConfig
+          })
+        }
+      }
+
+      res.json({ success: true, data: configs })
+    } catch (error) {
+      logger.error('Failed to get OpenAI-Responses auto recovery configs:', error)
+      res.status(500).json({ success: false, message: error.message })
+    }
+  }
+)
+
 // 创建 OpenAI-Responses 账户
 router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) => {
   try {
@@ -148,6 +182,17 @@ router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) =>
         success: false,
         error: 'Group ID is required for group type accounts'
       })
+    }
+
+    if (accountData.rpmLimit !== undefined && accountData.rpmLimit !== null) {
+      const rpmValue = Number(accountData.rpmLimit)
+      if (!Number.isInteger(rpmValue) || rpmValue < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'RPM limit must be a non-negative integer'
+        })
+      }
+      accountData.rpmLimit = rpmValue
     }
 
     const account = await openaiResponsesAccountService.createAccount(accountData)
@@ -208,6 +253,17 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
         })
       }
       mappedUpdates.priority = priority.toString()
+    }
+
+    if (mappedUpdates.rpmLimit !== undefined && mappedUpdates.rpmLimit !== null) {
+      const rpmValue = Number(mappedUpdates.rpmLimit)
+      if (!Number.isInteger(rpmValue) || rpmValue < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'RPM limit must be a non-negative integer'
+        })
+      }
+      mappedUpdates.rpmLimit = rpmValue
     }
 
     // 处理分组变更

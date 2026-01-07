@@ -62,6 +62,28 @@ class UnifiedOpenAIScheduler {
     return false
   }
 
+  async _tryConsumeOpenAIResponsesRpm(account, accountId) {
+    const rpmLimit = Number.parseInt(account?.rpmLimit, 10)
+    const normalizedLimit = Number.isFinite(rpmLimit) ? rpmLimit : 0
+    if (normalizedLimit <= 0) {
+      return { allowed: true, limit: 0 }
+    }
+
+    const result = await openaiResponsesAccountService.checkAndIncrementRpm(
+      accountId,
+      normalizedLimit
+    )
+
+    if (result.allowed) {
+      return { allowed: true, ...result }
+    }
+
+    logger.warn(
+      `🚦 OpenAI-Responses RPM limit exceeded for account ${accountId}: ${result.current}/${result.limit}`
+    )
+    return { allowed: false, ...result }
+  }
+
   // 🔍 判断账号是否带有限流标记（即便已过期，用于自动恢复）
   _hasRateLimitFlag(rateLimitStatus) {
     if (!rateLimitStatus) {
@@ -240,6 +262,19 @@ class UnifiedOpenAIScheduler {
               error.statusCode = 403 // Forbidden - 订阅已过期
               throw error
             }
+
+            // RPM 限制：专属账户超限直接报错（不切换）
+            const rpmCheck = await this._tryConsumeOpenAIResponsesRpm(
+              boundAccount,
+              boundAccount.id
+            )
+            if (!rpmCheck.allowed) {
+              const error = new Error(
+                `Dedicated OpenAI-Responses account ${boundAccount.name} exceeded RPM limit (${rpmCheck.limit}/min), retry after ${rpmCheck.remainingSeconds}s`
+              )
+              error.statusCode = 429
+              throw error
+            }
           }
 
           // 专属账户：可选的模型检查（只有明确配置了supportedModels且不为空才检查）
@@ -300,14 +335,46 @@ class UnifiedOpenAIScheduler {
             mappedAccount.accountType
           )
           if (isAvailable) {
-            // 🚀 智能会话续期（续期 unified 映射键，按配置）
-            await this._extendSessionMappingTTL(sessionHash)
-            logger.info(
-              `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
-            )
-            // 更新账户的最后使用时间
-            await this.updateAccountLastUsed(mappedAccount.accountId, mappedAccount.accountType)
-            return mappedAccount
+            if (mappedAccount.accountType === 'openai-responses') {
+              const mappedAccountData = await openaiResponsesAccountService.getAccount(
+                mappedAccount.accountId
+              )
+              if (mappedAccountData) {
+                const rpmCheck = await this._tryConsumeOpenAIResponsesRpm(
+                  mappedAccountData,
+                  mappedAccount.accountId
+                )
+                if (!rpmCheck.allowed) {
+                  logger.info(
+                    `⏭️ Skipping sticky OpenAI-Responses account ${mappedAccount.accountId} due to RPM limit`
+                  )
+                  await this._deleteSessionMapping(sessionHash)
+                } else {
+                  // 🚀 智能会话续期（续期 unified 映射键，按配置）
+                  await this._extendSessionMappingTTL(sessionHash)
+                  logger.info(
+                    `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
+                  )
+                  // 更新账户的最后使用时间
+                  await this.updateAccountLastUsed(
+                    mappedAccount.accountId,
+                    mappedAccount.accountType
+                  )
+                  return mappedAccount
+                }
+              } else {
+                await this._deleteSessionMapping(sessionHash)
+              }
+            } else {
+              // 🚀 智能会话续期（续期 unified 映射键，按配置）
+              await this._extendSessionMappingTTL(sessionHash)
+              logger.info(
+                `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
+              )
+              // 更新账户的最后使用时间
+              await this.updateAccountLastUsed(mappedAccount.accountId, mappedAccount.accountType)
+              return mappedAccount
+            }
           } else {
             logger.warn(
               `⚠️ Mapped account ${mappedAccount.accountId} is no longer available, selecting new account`
@@ -339,7 +406,36 @@ class UnifiedOpenAIScheduler {
       const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
-      const selectedAccount = sortedAccounts[0]
+      let selectedAccount = null
+      let rpmRejected = null
+      for (const candidate of sortedAccounts) {
+        if (candidate.accountType === 'openai-responses') {
+          const rpmCheck = await this._tryConsumeOpenAIResponsesRpm(
+            candidate,
+            candidate.accountId
+          )
+          if (!rpmCheck.allowed) {
+            rpmRejected = rpmCheck
+            continue
+          }
+        }
+        selectedAccount = candidate
+        break
+      }
+
+      if (!selectedAccount) {
+        if (rpmRejected) {
+          const retryAfter = rpmRejected.remainingSeconds
+          const error = new Error(
+            `All OpenAI-Responses accounts reached RPM limit, retry after ${retryAfter}s`
+          )
+          error.statusCode = 429
+          throw error
+        }
+        const error = new Error('No available OpenAI accounts')
+        error.statusCode = 402 // Payment Required - 资源耗尽
+        throw error
+      }
 
       // 如果有会话哈希，建立新的映射
       if (sessionHash) {
@@ -806,14 +902,46 @@ class UnifiedOpenAIScheduler {
               mappedAccount.accountType
             )
             if (isAvailable) {
-              // 🚀 智能会话续期（续期 unified 映射键，按配置）
-              await this._extendSessionMappingTTL(sessionHash)
-              logger.info(
-                `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType})`
-              )
-              // 更新账户的最后使用时间
-              await this.updateAccountLastUsed(mappedAccount.accountId, mappedAccount.accountType)
-              return mappedAccount
+              if (mappedAccount.accountType === 'openai-responses') {
+                const mappedAccountData = await openaiResponsesAccountService.getAccount(
+                  mappedAccount.accountId
+                )
+                if (mappedAccountData) {
+                  const rpmCheck = await this._tryConsumeOpenAIResponsesRpm(
+                    mappedAccountData,
+                    mappedAccount.accountId
+                  )
+                  if (!rpmCheck.allowed) {
+                    logger.info(
+                      `⏭️ Skipping sticky OpenAI-Responses account ${mappedAccount.accountId} due to RPM limit`
+                    )
+                    await this._deleteSessionMapping(sessionHash)
+                  } else {
+                    // 🚀 智能会话续期（续期 unified 映射键，按配置）
+                    await this._extendSessionMappingTTL(sessionHash)
+                    logger.info(
+                      `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType})`
+                    )
+                    // 更新账户的最后使用时间
+                    await this.updateAccountLastUsed(
+                      mappedAccount.accountId,
+                      mappedAccount.accountType
+                    )
+                    return mappedAccount
+                  }
+                } else {
+                  await this._deleteSessionMapping(sessionHash)
+                }
+              } else {
+                // 🚀 智能会话续期（续期 unified 映射键，按配置）
+                await this._extendSessionMappingTTL(sessionHash)
+                logger.info(
+                  `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType})`
+                )
+                // 更新账户的最后使用时间
+                await this.updateAccountLastUsed(mappedAccount.accountId, mappedAccount.accountType)
+                return mappedAccount
+              }
             }
           }
           // 如果账户不可用或不在分组中，删除映射
@@ -908,7 +1036,36 @@ class UnifiedOpenAIScheduler {
       const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
-      const selectedAccount = sortedAccounts[0]
+      let selectedAccount = null
+      let rpmRejected = null
+      for (const candidate of sortedAccounts) {
+        if (candidate.accountType === 'openai-responses') {
+          const rpmCheck = await this._tryConsumeOpenAIResponsesRpm(
+            candidate,
+            candidate.accountId
+          )
+          if (!rpmCheck.allowed) {
+            rpmRejected = rpmCheck
+            continue
+          }
+        }
+        selectedAccount = candidate
+        break
+      }
+
+      if (!selectedAccount) {
+        if (rpmRejected) {
+          const retryAfter = rpmRejected.remainingSeconds
+          const error = new Error(
+            `All OpenAI-Responses accounts in group ${group.name} reached RPM limit, retry after ${retryAfter}s`
+          )
+          error.statusCode = 429
+          throw error
+        }
+        const error = new Error(`No available accounts in group ${group.name}`)
+        error.statusCode = 402
+        throw error
+      }
 
       // 如果有会话哈希，建立新的映射
       if (sessionHash) {
