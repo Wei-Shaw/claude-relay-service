@@ -360,7 +360,10 @@ class RateLimitCleanupService {
 
   /**
    * 主动刷新 Claude 账户 Token（防止等待重置期间 Token 过期）
-   * 仅对等待重置（schedulable=false）且 Token 即将过期的账户执行刷新
+   * 仅对因限流/配额限制而等待重置的账户执行刷新：
+   * - 429 限流账户（rateLimitAutoStopped=true）
+   * - 5小时限制自动停止账户（fiveHourAutoStopped=true）
+   * 不处理错误状态账户（error/temp_error）
    */
   async proactiveRefreshClaudeTokens(result) {
     try {
@@ -381,9 +384,13 @@ class RateLimitCleanupService {
           continue
         }
 
-        // 3. 【优化】仅处理等待重置的账户（schedulable=false）
+        // 3. 【优化】仅处理因限流/配额限制而等待重置的账户
         // 正常调度的账户会在请求时自动刷新，无需主动刷新
-        if (account.schedulable !== 'false') {
+        // 错误状态账户的 Token 可能已失效，刷新也会失败
+        const isWaitingForReset =
+          account.rateLimitAutoStopped === 'true' || // 429 限流
+          account.fiveHourAutoStopped === 'true' // 5小时限制自动停止
+        if (!isWaitingForReset) {
           continue
         }
 
