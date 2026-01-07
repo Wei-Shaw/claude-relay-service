@@ -664,6 +664,7 @@ git push origin main
 | 2025-12-26 | v1.1.249 | 同步 4 个提交 | VERSION/README冲突 | ✅ 成功 | 上游force push回退后重发、安全警告更新至v1.1.249+ |
 | 2025-12-29 | v1.1.250 | 同步 4 个提交 | VERSION冲突 | ✅ 成功 | **🚨安全修复**: authenticateUserOrAdmin认证绕过漏洞、SECURITY.md |
 | 2025-12-31 | v1.1.251 | 同步 2 个提交 | VERSION冲突 | ✅ 成功 | 客户端断开崩溃预防(ERR_HTTP_HEADERS_SENT)、日志优化(INFO+499) |
+| 2026-01-08 | v1.1.253 | 同步 24 个提交 (v1.1.252-253) | 无冲突 | ✅ 成功 | **🚨安全修复**: RCE/SSRF漏洞修复; **新功能**: Antigravity账户支持、余额/配额查询、服务权限多选; Token刷新优化、context_management修复 |
 
 **下次更新请在此添加记录**
 
