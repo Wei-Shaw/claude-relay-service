@@ -205,6 +205,14 @@ const config = {
     hotReload: process.env.HOT_RELOAD === 'true'
   },
 
+  // 💰 账户余额相关配置
+  accountBalance: {
+    // 是否允许执行自定义余额脚本（安全开关）
+    // 说明：脚本能力可发起任意 HTTP 请求并在服务端执行 extractor 逻辑，建议仅在受控环境开启
+    // 默认保持开启；如需禁用请显式设置：BALANCE_SCRIPT_ENABLED=false
+    enableBalanceScript: process.env.BALANCE_SCRIPT_ENABLED !== 'false'
+  },
+
   // 📬 用户消息队列配置
   // 优化说明：锁在请求发送成功后立即释放（而非请求完成后），因为 Claude API 限流基于请求发送时刻计算
   userMessageQueue: {
