@@ -20,8 +20,9 @@ const parseBooleanEnv = (value) => {
 }
 
 /**
- * 是否允许执行“余额脚本”（安全开关）
- * 默认开启，便于保持现有行为；如需禁用请显式设置 BALANCE_SCRIPT_ENABLED=false（环境变量优先）
+ * 是否允许执行"余额脚本"（安全开关）
+ * ⚠️ 安全警告：vm模块非安全沙箱，默认禁用。如需启用请显式设置 BALANCE_SCRIPT_ENABLED=true
+ * 仅在完全信任管理员且了解RCE风险时才启用此功能
  */
 const isBalanceScriptEnabled = () => {
   if (
@@ -36,7 +37,8 @@ const isBalanceScriptEnabled = () => {
     config?.features?.balanceScriptEnabled ??
     config?.security?.enableBalanceScript
 
-  return typeof fromConfig === 'boolean' ? fromConfig : true
+  // 默认禁用，需显式启用
+  return typeof fromConfig === 'boolean' ? fromConfig : false
 }
 
 module.exports = {

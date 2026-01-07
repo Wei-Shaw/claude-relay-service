@@ -3,6 +3,50 @@ const axios = require('axios')
 const { isBalanceScriptEnabled } = require('../utils/featureFlags')
 
 /**
+ * SSRF防护：检查URL是否访问内网或敏感地址
+ * @param {string} url - 要检查的URL
+ * @returns {boolean} - true表示URL安全
+ */
+function isUrlSafe(url) {
+  try {
+    const parsed = new URL(url)
+    const hostname = parsed.hostname.toLowerCase()
+
+    // 禁止的协议
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false
+    }
+
+    // 禁止访问localhost和私有IP
+    const privatePatterns = [
+      /^localhost$/i,
+      /^127\./,
+      /^10\./,
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+      /^192\.168\./,
+      /^169\.254\./, // AWS metadata
+      /^0\./, // 0.0.0.0
+      /^::1$/,
+      /^fc00:/i,
+      /^fe80:/i,
+      /\.local$/i,
+      /\.internal$/i,
+      /\.localhost$/i
+    ]
+
+    for (const pattern of privatePatterns) {
+      if (pattern.test(hostname)) {
+        return false
+      }
+    }
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * 可配置脚本余额查询执行器
  * - 脚本格式：({ request: {...}, extractor: function(response){...} })
  * - 模板变量：{{baseUrl}}, {{apiKey}}, {{token}}, {{accountId}}, {{platform}}, {{extra}}
@@ -53,6 +97,11 @@ class BalanceScriptService {
 
     if (!request?.url || typeof request.url !== 'string') {
       throw new Error('脚本 request.url 不能为空')
+    }
+
+    // SSRF防护：验证URL安全性
+    if (!isUrlSafe(request.url)) {
+      throw new Error('脚本 request.url 不安全：禁止访问内网地址、localhost或使用非HTTP(S)协议')
     }
 
     if (typeof extractor !== 'function') {
