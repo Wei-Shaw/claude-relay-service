@@ -402,16 +402,29 @@ async function handleChatCompletion(req, res, apiKeyData) {
     const duration = Date.now() - startTime
     logger.info(`✅ OpenAI-Claude request completed in ${duration}ms`)
   } catch (error) {
-    logger.error('❌ OpenAI-Claude request error:', error)
+    // 客户端主动断开连接是正常情况，使用 INFO 级别
+    if (error.message === 'Client disconnected') {
+      logger.info('🔌 OpenAI-Claude stream ended: Client disconnected')
+    } else {
+      logger.error('❌ OpenAI-Claude request error:', error)
+    }
 
-    const status = error.status || 500
-    res.status(status).json({
-      error: {
-        message: error.message || 'Internal server error',
-        type: 'server_error',
-        code: 'internal_error'
+    // 检查响应是否已发送（流式响应场景），避免 ERR_HTTP_HEADERS_SENT
+    if (!res.headersSent) {
+      // 客户端断开使用 499 状态码 (Client Closed Request)
+      if (error.message === 'Client disconnected') {
+        res.status(499).end()
+      } else {
+        const status = error.status || 500
+        res.status(status).json({
+          error: {
+            message: error.message || 'Internal server error',
+            type: 'server_error',
+            code: 'internal_error'
+          }
+        })
       }
-    })
+    }
   } finally {
     // 清理资源
     if (abortController) {
