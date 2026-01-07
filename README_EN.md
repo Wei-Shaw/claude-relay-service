@@ -1,6 +1,12 @@
 # Claude Relay Service (Antigravity Edition)
 
-Maintained fork by **dadongwo**.
+
+> [!CAUTION]
+> **Security Update**: v1.1.248 and below contain a critical admin authentication bypass vulnerability allowing unauthorized access to the admin panel.
+>
+> **Please update to v1.1.249+ immediately**, or migrate to the next-generation project **[CRS 2.0 (sub2api)](https://github.com/Wei-Shaw/sub2api)**
+
+<div align="center">
 
 This fork focuses on:
 - Native compatibility for `claude` (Claude Code CLI)

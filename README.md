@@ -4,6 +4,11 @@
 >
 > 目标：让 `claude`（Claude Code CLI）与 Antigravity / Gemini 账户体系无缝对接，并提供可观测、可运维的稳定转发服务。
 
+> [!CAUTION]
+> **安全更新通知**：v1.1.248 及以下版本存在严重的管理员认证绕过漏洞，攻击者可未授权访问管理面板。
+>
+> **请立即更新到 v1.1.249+ 版本**，或迁移到新一代项目 **[CRS 2.0 (sub2api)](https://github.com/Wei-Shaw/sub2api)**
+
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
