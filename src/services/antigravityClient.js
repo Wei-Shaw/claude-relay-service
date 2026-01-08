@@ -20,6 +20,15 @@ const keepAliveAgent = new https.Agent({
   maxFreeSockets: 10
 })
 
+const ANTIGRAVITY_REQUEST_TYPE = 'agent'
+
+// 对齐 谷歌 近期变更：Antigravity 会校验 systemInstruction 结构。
+// 采用最短前置提示词 并且只做前置插入，不覆盖用户原有 system parts。
+const ANTIGRAVITY_MIN_SYSTEM_PROMPT =
+  'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Proactiveness**'
+const ANTIGRAVITY_MIN_SYSTEM_PROMPT_MARKER =
+  'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.'
+
 function getAntigravityApiUrl() {
   return process.env.ANTIGRAVITY_API_URL || 'https://daily-cloudcode-pa.sandbox.googleapis.com'
 }
@@ -105,6 +114,7 @@ function buildAntigravityEnvelope({ requestData, projectId, sessionId, userPromp
     requestId: `req-${uuidv4()}`,
     model,
     userAgent: 'antigravity',
+    requestType: ANTIGRAVITY_REQUEST_TYPE,
     request: {
       ...requestPayload
     }
@@ -117,6 +127,30 @@ function buildAntigravityEnvelope({ requestData, projectId, sessionId, userPromp
 
   normalizeAntigravityEnvelope(envelope)
   return { model, envelope }
+}
+
+function ensureAntigravitySystemInstruction(requestPayload) {
+  if (!requestPayload || typeof requestPayload !== 'object') {
+    return
+  }
+
+  const existing = requestPayload.systemInstruction
+  const sys = existing && typeof existing === 'object' ? existing : {}
+
+  sys.role = 'user'
+
+  const parts = Array.isArray(sys.parts) ? sys.parts.slice() : []
+
+  const hasPrompt = parts.some((part) => {
+    const text = typeof part?.text === 'string' ? part.text : ''
+    return text.includes(ANTIGRAVITY_MIN_SYSTEM_PROMPT_MARKER)
+  })
+  if (!hasPrompt) {
+    parts.unshift({ text: ANTIGRAVITY_MIN_SYSTEM_PROMPT })
+  }
+
+  sys.parts = parts
+  requestPayload.systemInstruction = sys
 }
 
 function normalizeAntigravityThinking(model, requestPayload) {
@@ -193,6 +227,8 @@ function normalizeAntigravityEnvelope(envelope) {
   if (!requestPayload || typeof requestPayload !== 'object') {
     return
   }
+
+  ensureAntigravitySystemInstruction(requestPayload)
 
   if (requestPayload.safetySettings !== undefined) {
     delete requestPayload.safetySettings
