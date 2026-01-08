@@ -80,6 +80,15 @@ const ANTIGRAVITY_TOOL_FOLLOW_THROUGH_PROMPT =
 // 工具报错时注入的 system prompt，提示模型不要中断
 const TOOL_ERROR_CONTINUE_PROMPT =
   'Tool calls may fail (e.g., missing prerequisites). When a tool result indicates an error, do not stop: briefly explain the cause and continue with an alternative approach or the remaining steps.'
+// Antigravity 账号前置注入的系统提示词
+const ANTIGRAVITY_SYSTEM_INSTRUCTION_PREFIX = `<identity>
+You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.
+You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.
+The USER will send you requests, which you must always prioritize addressing. Along with each USER request, we will attach additional metadata about their current state, such as what files they have open and where their cursor is.
+This information may or may not be relevant to the coding task, it is up for you to decide.
+</identity>
+<communication_style>
+- **Proactiveness**. As an agent, you are allowed to be proactive, but only in the course of completing the user's task. For example, if the user asks you to add a new component, you can edit the code, verify build and test statuses, and take any other obvious follow-up actions, such as performing additional research. However, avoid surprising the user. For example, if the user asks HOW to approach something, you should answer their question and instead of jumping into editing a file.</communication_style>`
 
 // ============================================================================
 // 辅助函数：基础工具
@@ -1362,9 +1371,12 @@ function buildGeminiRequestFromAnthropic(
     generationConfig
   }
 
-  if (systemParts.length > 0) {
-    geminiRequestBody.systemInstruction =
-      vendor === 'antigravity' ? { role: 'user', parts: systemParts } : { parts: systemParts }
+  // antigravity: 前置注入系统提示词
+  if (vendor === 'antigravity') {
+    const allParts = [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION_PREFIX }, ...systemParts]
+    geminiRequestBody.systemInstruction = { role: 'user', parts: allParts }
+  } else if (systemParts.length > 0) {
+    geminiRequestBody.systemInstruction = { parts: systemParts }
   }
 
   const geminiTools = convertAnthropicToolsToGeminiTools(body.tools, { vendor })
