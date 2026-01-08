@@ -1224,7 +1224,7 @@ async function handleRetrieveUserQuota(req, res) {
 
     logger.info('📋 retrieveUserQuota项目ID处理逻辑', {
       accountProjectId: projectId,
-      requestProject: requestProject,
+      requestProject,
       effectiveProject,
       decision: projectId ? '使用账户配置' : requestProject ? '使用请求参数' : '不使用项目ID'
     })
