@@ -25,6 +25,9 @@ class ClaudeRelayService {
     this.betaHeader = config.claude.betaHeader
     this.systemPrompt = config.claude.systemPrompt
     this.claudeCodeSystemPrompt = "You are Claude Code, Anthropic's official CLI for Claude."
+    this.toolNameSuffix = null
+    this.toolNameSuffixGeneratedAt = 0
+    this.toolNameSuffixTtlMs = 60 * 60 * 1000
   }
 
   // 🔧 根据模型ID和客户端传递的 anthropic-beta 获取最终的 header
@@ -179,8 +182,17 @@ class ClaudeRelayService {
     return `${pascal}_tool`
   }
 
+  _getToolNameSuffix() {
+    const now = Date.now()
+    if (!this.toolNameSuffix || now - this.toolNameSuffixGeneratedAt > this.toolNameSuffixTtlMs) {
+      this.toolNameSuffix = Math.random().toString(36).substring(2, 8)
+      this.toolNameSuffixGeneratedAt = now
+    }
+    return this.toolNameSuffix
+  }
+
   _toRandomizedToolName(name) {
-    const suffix = Math.random().toString(36).substring(2, 8)
+    const suffix = this._getToolNameSuffix()
     return `${name}_${suffix}`
   }
 
