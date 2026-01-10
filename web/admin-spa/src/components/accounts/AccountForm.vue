@@ -852,41 +852,194 @@
             </div>
 
             <!-- Bedrock 特定字段 -->
-            <div v-if="form.platform === 'bedrock' && !isEdit" class="space-y-4">
+            <div v-if="form.platform === 'bedrock'" class="space-y-4">
+              <!-- 凭证类型选择器 -->
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >AWS 访问密钥 ID *</label
+                  >凭证类型 *</label
                 >
-                <input
-                  v-model="form.accessKeyId"
-                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  :class="{ 'border-red-500': errors.accessKeyId }"
-                  placeholder="请输入 AWS Access Key ID"
-                  required
-                  type="text"
-                />
-                <p v-if="errors.accessKeyId" class="mt-1 text-xs text-red-500">
-                  {{ errors.accessKeyId }}
-                </p>
+                <div v-if="!isEdit" class="flex gap-4">
+                  <label class="flex cursor-pointer items-center">
+                    <input
+                      v-model="form.credentialType"
+                      class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="radio"
+                      value="access_key"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300"
+                      >AWS Access Key（访问密钥）</span
+                    >
+                  </label>
+                  <label class="flex cursor-pointer items-center">
+                    <input
+                      v-model="form.credentialType"
+                      class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      type="radio"
+                      value="bearer_token"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300"
+                      >Bearer Token（长期令牌）</span
+                    >
+                  </label>
+                </div>
+                <div v-else class="flex gap-4">
+                  <label class="flex items-center opacity-60">
+                    <input
+                      v-model="form.credentialType"
+                      class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      disabled
+                      type="radio"
+                      value="access_key"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300"
+                      >AWS Access Key（访问密钥）</span
+                    >
+                  </label>
+                  <label class="flex items-center opacity-60">
+                    <input
+                      v-model="form.credentialType"
+                      class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                      disabled
+                      type="radio"
+                      value="bearer_token"
+                    />
+                    <span class="text-sm text-gray-700 dark:text-gray-300"
+                      >Bearer Token（长期令牌）</span
+                    >
+                  </label>
+                </div>
+                <div
+                  class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/30"
+                >
+                  <div class="flex items-start gap-2">
+                    <i class="fas fa-info-circle mt-0.5 text-blue-600 dark:text-blue-400" />
+                    <div class="text-xs text-blue-700 dark:text-blue-300">
+                      <p v-if="form.credentialType === 'access_key'" class="font-medium">
+                        使用 AWS Access Key ID 和 Secret Access Key 进行身份验证（支持临时凭证）
+                      </p>
+                      <p v-else class="font-medium">
+                        使用 AWS Bedrock API Keys 生成的 Bearer Token
+                        进行身份验证，更简单、权限范围更小
+                      </p>
+                      <p v-if="isEdit" class="mt-1 text-xs italic">
+                        💡 编辑模式下凭证类型不可更改，如需切换类型请重新创建账户
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div>
+              <!-- AWS Access Key 字段（仅在 access_key 模式下显示）-->
+              <div v-if="form.credentialType === 'access_key'">
+                <div>
+                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >AWS 访问密钥 ID {{ isEdit ? '' : '*' }}</label
+                  >
+                  <input
+                    v-model="form.accessKeyId"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    :class="{ 'border-red-500': errors.accessKeyId }"
+                    :placeholder="isEdit ? '留空则保持原有凭证不变' : '请输入 AWS Access Key ID'"
+                    :required="!isEdit"
+                    type="text"
+                  />
+                  <p v-if="errors.accessKeyId" class="mt-1 text-xs text-red-500">
+                    {{ errors.accessKeyId }}
+                  </p>
+                  <p v-if="isEdit" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    💡 编辑模式下，留空则保持原有 Access Key ID 不变
+                  </p>
+                </div>
+
+                <div>
+                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >AWS 秘密访问密钥 {{ isEdit ? '' : '*' }}</label
+                  >
+                  <input
+                    v-model="form.secretAccessKey"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    :class="{ 'border-red-500': errors.secretAccessKey }"
+                    :placeholder="
+                      isEdit ? '留空则保持原有凭证不变' : '请输入 AWS Secret Access Key'
+                    "
+                    :required="!isEdit"
+                    type="password"
+                  />
+                  <p v-if="errors.secretAccessKey" class="mt-1 text-xs text-red-500">
+                    {{ errors.secretAccessKey }}
+                  </p>
+                  <p v-if="isEdit" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    💡 编辑模式下，留空则保持原有 Secret Access Key 不变
+                  </p>
+                </div>
+
+                <div>
+                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >会话令牌 (可选)</label
+                  >
+                  <input
+                    v-model="form.sessionToken"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    :placeholder="
+                      isEdit
+                        ? '留空则保持原有 Session Token 不变'
+                        : '如果使用临时凭证，请输入会话令牌'
+                    "
+                    type="password"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    仅在使用临时 AWS 凭证时需要填写
+                  </p>
+                </div>
+              </div>
+
+              <!-- Bearer Token 字段（仅在 bearer_token 模式下显示）-->
+              <div v-if="form.credentialType === 'bearer_token'">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >AWS 秘密访问密钥 *</label
+                  >Bearer Token {{ isEdit ? '' : '*' }}</label
                 >
                 <input
-                  v-model="form.secretAccessKey"
+                  v-model="form.bearerToken"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  :class="{ 'border-red-500': errors.secretAccessKey }"
-                  placeholder="请输入 AWS Secret Access Key"
-                  required
+                  :class="{ 'border-red-500': errors.bearerToken }"
+                  :placeholder="
+                    isEdit ? '留空则保持原有 Bearer Token 不变' : '请输入 AWS Bearer Token'
+                  "
+                  :required="!isEdit"
                   type="password"
                 />
-                <p v-if="errors.secretAccessKey" class="mt-1 text-xs text-red-500">
-                  {{ errors.secretAccessKey }}
+                <p v-if="errors.bearerToken" class="mt-1 text-xs text-red-500">
+                  {{ errors.bearerToken }}
                 </p>
+                <p v-if="isEdit" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  💡 编辑模式下，留空则保持原有 Bearer Token 不变
+                </p>
+                <div
+                  class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-700 dark:bg-green-900/30"
+                >
+                  <div class="flex items-start gap-2">
+                    <i class="fas fa-key mt-0.5 text-green-600 dark:text-green-400" />
+                    <div class="text-xs text-green-700 dark:text-green-300">
+                      <p class="mb-1 font-medium">Bearer Token 说明：</p>
+                      <ul class="list-inside list-disc space-y-1 text-xs">
+                        <li>输入 AWS Bedrock API Keys 生成的 Bearer Token</li>
+                        <li>Bearer Token 仅限 Bedrock 服务访问，权限范围更小</li>
+                        <li>相比 Access Key 更简单，无需 Secret Key</li>
+                        <li>
+                          参考：<a
+                            class="text-green-600 underline dark:text-green-400"
+                            href="https://aws.amazon.com/cn/blogs/machine-learning/accelerate-ai-development-with-amazon-bedrock-api-keys/"
+                            target="_blank"
+                            >AWS 官方文档</a
+                          >
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
 
+              <!-- AWS 区域（两种凭证类型都需要）-->
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >AWS 区域 *</label
@@ -902,10 +1055,12 @@
                 <p v-if="errors.region" class="mt-1 text-xs text-red-500">
                   {{ errors.region }}
                 </p>
-                <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div
+                  class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/30"
+                >
                   <div class="flex items-start gap-2">
-                    <i class="fas fa-info-circle mt-0.5 text-blue-600" />
-                    <div class="text-xs text-blue-700">
+                    <i class="fas fa-info-circle mt-0.5 text-blue-600 dark:text-blue-400" />
+                    <div class="text-xs text-blue-700 dark:text-blue-300">
                       <p class="mb-1 font-medium">常用 AWS 区域参考：</p>
                       <div class="grid grid-cols-2 gap-1 text-xs">
                         <span>• us-east-1 (美国东部)</span>
@@ -915,25 +1070,12 @@
                         <span>• ap-northeast-1 (东京)</span>
                         <span>• eu-central-1 (法兰克福)</span>
                       </div>
-                      <p class="mt-2 text-blue-600">💡 请输入完整的区域代码，如 us-east-1</p>
+                      <p class="mt-2 text-blue-600 dark:text-blue-400">
+                        💡 请输入完整的区域代码，如 us-east-1
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >会话令牌 (可选)</label
-                >
-                <input
-                  v-model="form.sessionToken"
-                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="如果使用临时凭证，请输入会话令牌"
-                  type="password"
-                />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  仅在使用临时 AWS 凭证时需要填写
-                </p>
               </div>
 
               <div>
@@ -4105,10 +4247,12 @@ const form = ref({
   // 并发控制字段
   maxConcurrentTasks: props.account?.maxConcurrentTasks || 0,
   // Bedrock 特定字段
+  credentialType: props.account?.credentialType || 'access_key', // 'access_key' 或 'bearer_token'
   accessKeyId: props.account?.accessKeyId || '',
   secretAccessKey: props.account?.secretAccessKey || '',
   region: props.account?.region || '',
   sessionToken: props.account?.sessionToken || '',
+  bearerToken: props.account?.bearerToken || '', // Bearer Token 字段
   defaultModel: props.account?.defaultModel || '',
   smallFastModel: props.account?.smallFastModel || '',
   // Azure OpenAI 特定字段
@@ -4271,6 +4415,7 @@ const errors = ref({
   accessKeyId: '',
   secretAccessKey: '',
   region: '',
+  bearerToken: '',
   azureEndpoint: '',
   deploymentName: ''
 })
@@ -4983,14 +5128,27 @@ const createAccount = async () => {
       hasError = true
     }
   } else if (form.value.platform === 'bedrock') {
-    // Bedrock 验证
-    if (!form.value.accessKeyId || form.value.accessKeyId.trim() === '') {
-      errors.value.accessKeyId = '请填写 AWS 访问密钥 ID'
-      hasError = true
-    }
-    if (!form.value.secretAccessKey || form.value.secretAccessKey.trim() === '') {
-      errors.value.secretAccessKey = '请填写 AWS 秘密访问密钥'
-      hasError = true
+    // Bedrock 验证 - 根据凭证类型进行不同验证
+    if (form.value.credentialType === 'access_key') {
+      // Access Key 模式：创建时必填，编辑时可选（留空则保持原有凭证）
+      if (!isEdit.value) {
+        if (!form.value.accessKeyId || form.value.accessKeyId.trim() === '') {
+          errors.value.accessKeyId = '请填写 AWS 访问密钥 ID'
+          hasError = true
+        }
+        if (!form.value.secretAccessKey || form.value.secretAccessKey.trim() === '') {
+          errors.value.secretAccessKey = '请填写 AWS 秘密访问密钥'
+          hasError = true
+        }
+      }
+    } else if (form.value.credentialType === 'bearer_token') {
+      // Bearer Token 模式：创建时必填，编辑时可选（留空则保持原有凭证）
+      if (!isEdit.value) {
+        if (!form.value.bearerToken || form.value.bearerToken.trim() === '') {
+          errors.value.bearerToken = '请填写 Bearer Token'
+          hasError = true
+        }
+      }
     }
     if (!form.value.region || form.value.region.trim() === '') {
       errors.value.region = '请选择 AWS 区域'
@@ -5246,12 +5404,21 @@ const createAccount = async () => {
         ? form.value.supportedModels
         : []
     } else if (form.value.platform === 'bedrock') {
-      // Bedrock 账户特定数据 - 构造 awsCredentials 对象
-      data.awsCredentials = {
-        accessKeyId: form.value.accessKeyId,
-        secretAccessKey: form.value.secretAccessKey,
-        sessionToken: form.value.sessionToken || null
+      // Bedrock 账户特定数据
+      data.credentialType = form.value.credentialType || 'access_key'
+
+      // 根据凭证类型构造不同的凭证对象
+      if (form.value.credentialType === 'access_key') {
+        data.awsCredentials = {
+          accessKeyId: form.value.accessKeyId,
+          secretAccessKey: form.value.secretAccessKey,
+          sessionToken: form.value.sessionToken || null
+        }
+      } else if (form.value.credentialType === 'bearer_token') {
+        // Bearer Token 模式：必须传递 Bearer Token
+        data.bearerToken = form.value.bearerToken
       }
+
       data.region = form.value.region
       data.defaultModel = form.value.defaultModel || null
       data.smallFastModel = form.value.smallFastModel || null
@@ -5579,19 +5746,33 @@ const updateAccount = async () => {
 
     // Bedrock 特定更新
     if (props.account.platform === 'bedrock') {
-      // 只有当有凭证变更时才构造 awsCredentials 对象
-      if (form.value.accessKeyId || form.value.secretAccessKey || form.value.sessionToken) {
-        data.awsCredentials = {}
-        if (form.value.accessKeyId) {
-          data.awsCredentials.accessKeyId = form.value.accessKeyId
+      // 更新凭证类型
+      if (form.value.credentialType) {
+        data.credentialType = form.value.credentialType
+      }
+
+      // 根据凭证类型更新凭证
+      if (form.value.credentialType === 'access_key') {
+        // 只有当有凭证变更时才构造 awsCredentials 对象
+        if (form.value.accessKeyId || form.value.secretAccessKey || form.value.sessionToken) {
+          data.awsCredentials = {}
+          if (form.value.accessKeyId) {
+            data.awsCredentials.accessKeyId = form.value.accessKeyId
+          }
+          if (form.value.secretAccessKey) {
+            data.awsCredentials.secretAccessKey = form.value.secretAccessKey
+          }
+          if (form.value.sessionToken !== undefined) {
+            data.awsCredentials.sessionToken = form.value.sessionToken || null
+          }
         }
-        if (form.value.secretAccessKey) {
-          data.awsCredentials.secretAccessKey = form.value.secretAccessKey
-        }
-        if (form.value.sessionToken !== undefined) {
-          data.awsCredentials.sessionToken = form.value.sessionToken || null
+      } else if (form.value.credentialType === 'bearer_token') {
+        // Bearer Token 模式：更新 Bearer Token（编辑时可选，留空则保留原有凭证）
+        if (form.value.bearerToken && form.value.bearerToken.trim()) {
+          data.bearerToken = form.value.bearerToken
         }
       }
+
       if (form.value.region) {
         data.region = form.value.region
       }

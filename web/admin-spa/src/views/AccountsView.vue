@@ -2203,7 +2203,8 @@ const supportedUsagePlatforms = [
   'openai-responses',
   'gemini',
   'droid',
-  'gemini-api'
+  'gemini-api',
+  'bedrock'
 ]
 
 // 过期时间编辑弹窗状态
@@ -2547,7 +2548,7 @@ const closeAccountUsageModal = () => {
 }
 
 // 测试账户连通性相关函数
-const supportedTestPlatforms = ['claude', 'claude-console']
+const supportedTestPlatforms = ['claude', 'claude-console', 'bedrock']
 
 const canTestAccount = (account) => {
   return !!account && supportedTestPlatforms.includes(account.platform)

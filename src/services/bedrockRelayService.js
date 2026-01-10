@@ -48,13 +48,17 @@ class BedrockRelayService {
         secretAccessKey: bedrockAccount.awsCredentials.secretAccessKey,
         sessionToken: bedrockAccount.awsCredentials.sessionToken
       }
+    } else if (bedrockAccount?.bearerToken) {
+      // Bearer Token 模式：AWS SDK >= 3.400.0 会自动检测环境变量
+      clientConfig.token = { token: bedrockAccount.bearerToken }
+      logger.debug(`🔑 使用 Bearer Token 认证 - 账户: ${bedrockAccount.name || 'unknown'}`)
     } else {
       // 检查是否有环境变量凭证
       if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
         clientConfig.credentials = fromEnv()
       } else {
         throw new Error(
-          'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥，或设置环境变量AWS_ACCESS_KEY_ID和AWS_SECRET_ACCESS_KEY'
+          'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥或Bearer Token，或设置环境变量AWS_ACCESS_KEY_ID和AWS_SECRET_ACCESS_KEY'
         )
       }
     }
@@ -431,6 +435,18 @@ class BedrockRelayService {
   _mapToBedrockModel(modelName) {
     // 标准Claude模型名到Bedrock模型名的映射表
     const modelMapping = {
+      // Claude 4.5 Opus
+      'claude-opus-4-5': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+      'claude-opus-4-5-20251101': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+
+      // Claude 4.5 Sonnet
+      'claude-sonnet-4-5': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+      'claude-sonnet-4-5-20250929': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+
+      // Claude 4.5 Haiku
+      'claude-haiku-4-5': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+      'claude-haiku-4-5-20251001': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+
       // Claude Sonnet 4
       'claude-sonnet-4': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
       'claude-sonnet-4-20250514': 'us.anthropic.claude-sonnet-4-20250514-v1:0',

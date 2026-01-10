@@ -226,7 +226,15 @@ class AccountBalanceService {
       return null
     }
 
-    return await service.getAccount(accountId)
+    const result = await service.getAccount(accountId)
+
+    // 处理不同服务返回格式的差异
+    // Bedrock/CCR/Droid 等服务返回 { success, data } 格式
+    if (result && typeof result === 'object' && 'success' in result && 'data' in result) {
+      return result.success ? result.data : null
+    }
+
+    return result
   }
 
   async getAllAccountsByPlatform(platform) {
@@ -275,10 +283,27 @@ class AccountBalanceService {
 
     const accountId = account?.id
     if (!accountId) {
-      throw new Error('账户缺少 id')
+      // 如果账户缺少 id，返回空响应而不是抛出错误，避免接口报错和UI错误
+      this.logger.warn('账户缺少 id，返回空余额数据', { account, platform })
+      return this._buildResponse(
+        {
+          status: 'error',
+          errorMessage: '账户数据异常',
+          balance: null,
+          currency: 'USD',
+          quota: null,
+          statistics: {},
+          lastRefreshAt: new Date().toISOString()
+        },
+        'unknown',
+        platform,
+        'local',
+        null,
+        { scriptEnabled: false, scriptConfigured: false }
+      )
     }
 
-    // 余额脚本配置状态（用于前端控制“刷新余额”按钮）
+    // 余额脚本配置状态（用于前端控制"刷新余额"按钮）
     let scriptConfig = null
     let scriptConfigured = false
     if (typeof this.redis?.getBalanceScriptConfig === 'function') {
