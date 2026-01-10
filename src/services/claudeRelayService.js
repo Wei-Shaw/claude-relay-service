@@ -603,9 +603,7 @@ class ClaudeRelayService {
         requestOptions.useRandomizedToolNames !== true
       ) {
         requestOptions = { ...requestOptions, useRandomizedToolNames: true }
-        const retryResult = await makeRequestWithRetries(requestOptions)
-        response = retryResult.response
-        retryCount = retryResult.retryCount
+        ;({ response, retryCount } = await makeRequestWithRetries(requestOptions))
       }
 
       // 如果进行了重试，记录最终结果
@@ -1833,7 +1831,7 @@ class ClaudeRelayService {
       return prepared.abortResponse
     }
 
-    const { bodyString, headers, isRealClaudeCode, toolNameMap } = prepared
+    const { bodyString, headers, toolNameMap } = prepared
     const toolNameStreamTransformer = this._createToolNameStripperStreamTransformer(
       streamTransformer,
       toolNameMap
