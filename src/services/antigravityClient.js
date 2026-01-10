@@ -29,6 +29,102 @@ const ANTIGRAVITY_MIN_SYSTEM_PROMPT =
 const ANTIGRAVITY_MIN_SYSTEM_PROMPT_MARKER =
   'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.'
 
+/**
+ * 从 Google API 429 错误响应中解析 retry-after 延迟。
+ * [dadongwo] 解析 retry delay 实现。
+ * 策略:
+ *   1. error.details[] 中找 RetryInfo.retryDelay (如 "0.847655010s")
+ *   2. error.details[] 中找 ErrorInfo.metadata.quotaResetDelay (如 "373.801628ms")
+ *   3. 正则匹配 error.message 中的 "after Xs"
+ * @param {object|string|Buffer} errorBody 错误响应体
+ * @returns {number|null} 延迟毫秒数，解析失败返回 null
+ */
+function parseRetryDelay(errorBody) {
+  let parsed = null
+  // 安全解析 JSON
+  if (typeof errorBody === 'string') {
+    try {
+      parsed = JSON.parse(errorBody)
+    } catch (_) {
+      parsed = null
+    }
+  } else if (Buffer.isBuffer(errorBody)) {
+    try {
+      parsed = JSON.parse(errorBody.toString('utf8'))
+    } catch (_) {
+      parsed = null
+    }
+  } else if (errorBody && typeof errorBody === 'object') {
+    parsed = errorBody
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    return null
+  }
+  const details = parsed.error?.details
+  if (Array.isArray(details)) {
+    // 策略1: RetryInfo.retryDelay
+    for (const detail of details) {
+      if (detail?.['@type'] === 'type.googleapis.com/google.rpc.RetryInfo') {
+        const { retryDelay } = detail
+        if (typeof retryDelay === 'string' && retryDelay) {
+          const ms = parseDurationToMs(retryDelay)
+          if (ms !== null) {
+            return ms
+          }
+        }
+      }
+    }
+    // 策略2: ErrorInfo.metadata.quotaResetDelay
+    for (const detail of details) {
+      if (detail?.['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo') {
+        const quotaResetDelay = detail.metadata?.quotaResetDelay
+        if (typeof quotaResetDelay === 'string' && quotaResetDelay) {
+          const ms = parseDurationToMs(quotaResetDelay)
+          if (ms !== null) {
+            return ms
+          }
+        }
+      }
+    }
+  }
+  // 策略3: 正则匹配 error.message
+  const message = parsed.error?.message
+  if (typeof message === 'string' && message) {
+    const match = message.match(/after\s+(\d+)s\.?/i)
+    if (match && match[1]) {
+      const seconds = parseInt(match[1], 10)
+      if (!Number.isNaN(seconds)) {
+        return seconds * 1000
+      }
+    }
+  }
+  return null
+}
+/**
+ * 解析 Go 风格 duration 字符串为毫秒 (如 "0.847655010s", "373.801628ms")
+ */
+function parseDurationToMs(durationStr) {
+  if (!durationStr || typeof durationStr !== 'string') {
+    return null
+  }
+  const str = durationStr.trim().toLowerCase()
+  // 秒: "0.847655010s"
+  if (str.endsWith('s') && !str.endsWith('ms')) {
+    const num = parseFloat(str.slice(0, -1))
+    if (!Number.isNaN(num)) {
+      return Math.round(num * 1000)
+    }
+  }
+  // 毫秒: "373.801628ms"
+  if (str.endsWith('ms')) {
+    const num = parseFloat(str.slice(0, -2))
+    if (!Number.isNaN(num)) {
+      return Math.round(num)
+    }
+  }
+  return null
+}
+
 function getAntigravityApiUrl() {
   return process.env.ANTIGRAVITY_API_URL || 'https://daily-cloudcode-pa.sandbox.googleapis.com'
 }
@@ -48,7 +144,7 @@ function getAntigravityApiUrlCandidates() {
     return [configured]
   }
 
-  // 默认行为：优先 daily（与旧逻辑一致），失败时再尝试 prod（对齐 CLIProxyAPI）。
+  // [dadongwo] 默认行为：优先 daily，失败时再尝试 prod。
   if (configured === normalizeBaseUrl(daily)) {
     return [configured, prod]
   }
@@ -57,24 +153,6 @@ function getAntigravityApiUrlCandidates() {
   }
 
   return [configured, prod, daily].filter(Boolean)
-}
-
-function getAntigravityHeaders(accessToken, baseUrl) {
-  const resolvedBaseUrl = baseUrl || getAntigravityApiUrl()
-  let host = 'daily-cloudcode-pa.sandbox.googleapis.com'
-  try {
-    host = new URL(resolvedBaseUrl).host || host
-  } catch (e) {
-    // ignore
-  }
-
-  return {
-    Host: host,
-    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.11.3 windows/amd64',
-    Authorization: `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-    'Accept-Encoding': 'gzip'
-  }
 }
 
 function generateAntigravityProjectId() {
@@ -234,7 +312,7 @@ function normalizeAntigravityEnvelope(envelope) {
     delete requestPayload.safetySettings
   }
 
-  // 对齐 CLIProxyAPI：有 tools 时默认启用 VALIDATED（除非显式 NONE）
+  // [dadongwo] 有 tools 时默认启用 VALIDATED（除非显式 NONE）
   if (Array.isArray(requestPayload.tools) && requestPayload.tools.length > 0) {
     const existing = requestPayload?.toolConfig?.functionCallingConfig || null
     if (existing?.mode !== 'NONE') {
@@ -243,7 +321,7 @@ function normalizeAntigravityEnvelope(envelope) {
     }
   }
 
-  // 对齐 CLIProxyAPI：非 Claude 模型移除 maxOutputTokens（Antigravity 环境不稳定）
+  // [dadongwo] 非 Claude 模型移除 maxOutputTokens（Antigravity 环境不稳定）
   normalizeAntigravityThinking(model, requestPayload)
   if (!model.includes('claude')) {
     if (requestPayload.generationConfig && typeof requestPayload.generationConfig === 'object') {
@@ -430,6 +508,36 @@ async function request({
       }
 
       try {
+        // 🔍 [诊断日志] 详细记录请求信息，用于排查 429 问题
+        const envelopeStr = JSON.stringify(envelope)
+        const toolsCount = envelope.request?.tools?.[0]?.functionDeclarations?.length || 0
+        const thinkingConfig = envelope.request?.generationConfig?.thinkingConfig
+        const hasThinking = !!thinkingConfig
+        const contentsCount = envelope.request?.contents?.length || 0
+
+        logger.info(`🔬 [Antigravity诊断] ${stream ? '流式' : '非流式'}请求`, {
+          endpoint: stream ? 'streamGenerateContent' : 'generateContent',
+          model,
+          baseUrl,
+          envelopeSize: envelopeStr.length,
+          toolsCount,
+          hasThinking,
+          thinkingBudget: thinkingConfig?.thinkingBudget || 'N/A',
+          contentsCount,
+          hasParams: !!params,
+          paramsAlt: params?.alt || 'N/A'
+        })
+
+        // 非流式请求额外警告
+        if (!stream && toolsCount > 0) {
+          logger.warn(`⚠️ [Antigravity诊断] 非流式请求包含工具定义`, {
+            toolsCount,
+            model,
+            envelopeSize: envelopeStr.length,
+            tip: '非流式+工具可能触发 429，考虑改用流式'
+          })
+        }
+
         dumpAntigravityUpstreamRequest({
           requestId: envelope.requestId,
           model,
@@ -501,13 +609,44 @@ async function request({
       }
 
       const msg = safeDataToString(data)
+
+      // 🔍 [诊断日志] 详细记录 429 错误信息
+      logger.error(`❌ [Antigravity诊断] 429 错误详情`, {
+        model,
+        stream,
+        errorMessage: msg.substring(0, 500),
+        responseHeaders: error?.response?.headers,
+        isResourceExhausted: msg.toLowerCase().includes('resource_exhausted'),
+        isNoCapacity: msg.toLowerCase().includes('no capacity'),
+        url: error?.config?.url,
+        tip: '如果此错误频繁发生在非流式 + 工具请求上，可能是 API 限制'
+      })
+
       if (
         msg.toLowerCase().includes('resource_exhausted') ||
         msg.toLowerCase().includes('no capacity')
       ) {
         retriedAfterDelay = true
-        logger.warn('⏳ Antigravity 429 RESOURCE_EXHAUSTED, waiting 2s before retry', { model })
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        logger.warn('⏳ Antigravity 429 RESOURCE_EXHAUSTED, waiting 2s before retry', {
+          model,
+          stream
+        })
+
+        //  从响应体解析精确延迟，失败时回退 2000ms
+        let parsedData = data
+        if (typeof data === 'string') {
+          try {
+            parsedData = JSON.parse(data)
+          } catch (_) {
+            parsedData = null
+          }
+        }
+        const delayMs = parseRetryDelay(parsedData) || 2000
+        logger.warn(`⏳ Antigravity 429 RESOURCE_EXHAUSTED, waiting ${delayMs}ms before retry`, {
+          model,
+          parsedDelayMs: delayMs
+        })
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
         return await attemptRequest()
       }
     }
@@ -627,4 +766,31 @@ module.exports = {
   request,
   fetchAvailableModels,
   countTokens
+}
+function getAntigravityHeaders(accessToken, baseUrl) {
+  const resolvedBaseUrl = baseUrl || getAntigravityApiUrl()
+  let host = 'daily-cloudcode-pa.sandbox.googleapis.com'
+  try {
+    host = new URL(resolvedBaseUrl).host || host
+  } catch (e) {
+    // ignore
+  }
+
+  // 🔧 [dadongwo] 对齐上游 Antigravity Headers
+  // 补充缺失的 X-Goog-Api-Client 和 Client-Metadata
+  return {
+    Host: host,
+    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.11.5 windows/amd64',
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'Accept-Encoding': 'gzip',
+    // [dadongwo] 补充 X-Goog-Api-Client 和 Client-Metadata
+    'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
+    'Client-Metadata': JSON.stringify({
+      ideType: 'IDE_UNSPECIFIED',
+      ideVersion: 'vscode/1.100.0',
+      extensionVersion: '0.1.0',
+      surface: 'vscode'
+    })
+  }
 }

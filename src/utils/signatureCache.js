@@ -6,15 +6,14 @@
  * 此模块按 sessionId + thinkingText 存储签名，便于后续请求恢复。
  *
  * 参考实现：
- * - CLIProxyAPI: internal/cache/signature_cache.go
- * - antigravity-claude-proxy: src/format/signature-cache.js
+ * [dadongwo] 缓存思考签名以避免重复处理
  */
 
 const crypto = require('crypto')
 const logger = require('./logger')
 
 // 配置常量
-const SIGNATURE_CACHE_TTL_MS = 60 * 60 * 1000 // 1 小时（同 CLIProxyAPI）
+const SIGNATURE_CACHE_TTL_MS = 60 * 60 * 1000 // 1 小时
 const MAX_ENTRIES_PER_SESSION = 100 // 每会话最大缓存条目
 const MIN_SIGNATURE_LENGTH = 50 // 最小有效签名长度
 const TEXT_HASH_LENGTH = 16 // 文本哈希长度（SHA256 前 16 位）

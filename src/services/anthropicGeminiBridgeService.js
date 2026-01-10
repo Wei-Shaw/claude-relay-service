@@ -9,7 +9,7 @@
  *
  * 【支持的后端 (vendor)】
  * - gemini-cli: 原生 Google Gemini API
- * - antigravity: Claude 代理层 (CLIProxyAPI)，使用 Gemini 格式但有额外约束
+ * - antigravity: Claude 代理层，使用 Gemini 格式但有额外约束
  *
  * 【核心处理流程】
  * 1. 接收 Anthropic 格式请求 (/v1/messages)
@@ -258,6 +258,90 @@ function truncateInlineText(text, maxChars) {
 }
 
 /**
+ * Antigravity：对工具输出做语义摘要（优先减少 history 体积）
+ * 目标：
+ * - 降低因 prompt 过大导致的 429 / 断流缺 finishReason / 降级 end_turn 概率
+ * - 不改变工具调用语义（只处理 tool_result 文本，不动 tool_use / tool_choice）
+ */
+// ⚠️ [dadongwo] 暂时禁用此压缩函数，避免工具输出信息丢失
+// 如需重新启用，移除下划线前缀并替换 truncateText 调用
+function _compactToolResultTextForAntigravity(text, maxChars) {
+  if (!text || typeof text !== 'string') {
+    return ''
+  }
+  if (!Number.isFinite(maxChars) || maxChars <= 0) {
+    return ''
+  }
+
+  const normalized = text.replace(/\r\n/g, '\n')
+
+  // 1) Claude Code 常见：工具输出过大已写入文件。该提示本身可能很长且会反复滚入 history。
+  const savedOutputRegex =
+    /result\s*\(\s*(?<count>[\d,]+)\s*characters\s*\)\s*exceeds\s+maximum\s+allowed\s+tokens\.\s*Output\s+(?:has\s+been\s+)?saved\s+to\s+(?<path>[^\r\n]+)/i
+  const savedMatch = savedOutputRegex.exec(normalized)
+  if (savedMatch) {
+    const rawPath = String(savedMatch?.groups?.path || '').trim()
+    const filePath = rawPath
+      .replace(/[)\]"']+$/, '')
+      .replace(/\.$/, '')
+      .trim()
+    const count = String(savedMatch?.groups?.count || '').trim()
+
+    const lines = normalized.split('\n').map((l) => l.trim())
+    const noticeLine =
+      lines.find((l) => /exceeds maximum allowed tokens/i.test(l) && /saved to/i.test(l)) ||
+      `result (${count || 'N/A'} characters) exceeds maximum allowed tokens. Output has been saved to ${filePath}`
+
+    const formatLine =
+      lines.find((l) => /^Format:/i.test(l)) ||
+      lines.find((l) => /JSON array with schema/i.test(l)) ||
+      lines.find((l) => /schema:/i.test(l)) ||
+      null
+
+    const compactLines = [
+      noticeLine,
+      formatLine && formatLine !== noticeLine ? formatLine : null,
+      filePath
+        ? `[tool_result omitted to reduce prompt size; read file locally if needed: ${filePath}]`
+        : '[tool_result omitted to reduce prompt size; read the saved file locally if needed]'
+    ].filter(Boolean)
+
+    return truncateText(compactLines.join('\n'), maxChars)
+  }
+
+  // 2) 浏览器快照类：常见为超大文本（Page Snapshot / ref=...），会把 history 撑爆。
+  //    为了尽量不影响可用性，采用“头+尾保留”的方式，只在明显超大时触发。
+  if (normalized.length > 20000) {
+    const looksLikeSnapshot =
+      /page snapshot|页面快照/i.test(normalized) ||
+      (normalized.match(/\bref\s*[=:]\s*['"]?[a-z0-9_-]{2,}/gi) || []).length > 30 ||
+      (normalized.match(/\[ref=/gi) || []).length > 30
+
+    if (!looksLikeSnapshot) {
+      return truncateText(text, maxChars)
+    }
+
+    const desiredMax = Math.min(maxChars, 16000)
+    if (desiredMax >= 2000 && normalized.length > desiredMax) {
+      const meta = `[page snapshot summarized to reduce prompt size; original ${normalized.length} chars]`
+      const overhead = meta.length + 200
+      const budget = Math.max(0, desiredMax - overhead)
+      if (budget >= 1000) {
+        const headLen = Math.min(10000, Math.max(500, Math.floor(budget * 0.7)))
+        const tailLen = Math.min(3000, Math.max(0, budget - headLen))
+        const head = normalized.slice(0, headLen)
+        const tail = tailLen > 0 ? normalized.slice(-tailLen) : ''
+        const omitted = Math.max(0, normalized.length - headLen - tailLen)
+        const summarized = `${meta}\n---[HEAD]---\n${head}\n---[...omitted ${omitted} chars]---\n---[TAIL]---\n${tail}`
+        return truncateText(summarized, maxChars)
+      }
+    }
+  }
+
+  return truncateText(text, maxChars)
+}
+
+/**
  * 压缩工具顶级描述
  * 取前 6 行，合并为单行，截断到 400 字符
  * 这样可以在保留关键信息的同时大幅减少体积
@@ -458,6 +542,14 @@ function sanitizeToolResultBlocksForAntigravity(blocks) {
   let usedChars = 0
   let removedImage = false
 
+  // ✨✨✨ 添加日志,方便确认 MCP 数据是不是被压缩了 ✨✨✨
+  if (blocks.length > 0) {
+    logger.info(
+      `✂️ [Truncation Check] Processing ${blocks.length} blocks for truncation (MAX: ${MAX_ANTIGRAVITY_TOOL_RESULT_CHARS} chars)`
+    )
+  }
+  // ✨✨✨ 添加结束 ✨✨✨
+
   for (const block of blocks) {
     if (!block || typeof block !== 'object') {
       continue
@@ -477,7 +569,11 @@ function sanitizeToolResultBlocksForAntigravity(blocks) {
       if (remaining <= 0) {
         break
       }
+      // ⚠️ [dadongwo] 使用简单截断而非语义压缩，保留更多工具输出细节
+      // 如需启用语义压缩（减少 prompt 体积），取消下方注释：
+      // const text = _compactToolResultTextForAntigravity(block.text, remaining)
       const text = truncateText(block.text, remaining)
+
       cleaned.push({ ...block, text })
       usedChars += text.length
       continue
@@ -515,13 +611,15 @@ function normalizeToolResultContent(content, { vendor = null } = {}) {
   }
   if (typeof content === 'string') {
     if (vendor === 'antigravity') {
+      // ⚠️ [dadongwo] 使用简单截断而非语义压缩，保留更多工具输出细节
+      // 如需启用语义压缩，取消下方注释：
+      // return _compactToolResultTextForAntigravity(content, MAX_ANTIGRAVITY_TOOL_RESULT_CHARS)
       return truncateText(content, MAX_ANTIGRAVITY_TOOL_RESULT_CHARS)
     }
     return content
   }
   // Claude Code 的 tool_result.content 通常是 content blocks 数组（例如 [{type:"text",text:"..."}]）。
-  // 为对齐 CLIProxyAPI/Antigravity 的行为，这里优先保留原始 JSON 结构（数组/对象），
-  // 避免上游将其视为“无效 tool_result”从而触发 tool_use concurrency 400。
+  // [dadongwo] 保留原始 JSON 结构（数组/对象），避免上游将其视为“无效 tool_result”从而触发 400。
   if (Array.isArray(content) || (content && typeof content === 'object')) {
     if (vendor === 'antigravity' && Array.isArray(content)) {
       return sanitizeToolResultBlocksForAntigravity(content)
@@ -923,7 +1021,7 @@ function convertAnthropicToolsToGeminiTools(tools, { vendor = null } = {}) {
         description: toolDescription
       }
 
-      // CLIProxyAPI/Antigravity 侧使用 parametersJsonSchema（而不是 parameters）。
+      // [dadongwo] Antigravity 使用 parametersJsonSchema（而不是 parameters）
       if (vendor === 'antigravity') {
         return { ...baseDecl, parametersJsonSchema: schema }
       }
@@ -1670,7 +1768,7 @@ function convertGeminiPayloadToAnthropicContent(payload) {
         type: 'tool_use',
         id: toolUseId,
         name: functionCall.name,
-        input: functionCall.args || {}
+        input: normalizeToolUseInput(functionCall.args)
       })
     }
   }
@@ -1965,7 +2063,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     }
   }
 
-  // Antigravity 默认启用 tools（对齐 CLIProxyAPI）。若上游拒绝 schema，会在下方自动重试去掉 tools/toolConfig。
+  // [dadongwo] Antigravity 默认启用 tools。若上游拒绝 schema，会在下方自动重试去掉 tools/toolConfig。
 
   const abortController = new AbortController()
   req.on('close', () => {
@@ -2037,10 +2135,44 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
               { oauthProvider: vendor }
             )
             const newAccountId = newAccountSelection.accountId
-            const newClient = await geminiAccountService.getGeminiClient(newAccountId)
+
+            // ✨ 大东修复：手动获取账号并构建 Client，保持逻辑一致性
+            const newAccount = await geminiAccountService.getAccount(newAccountId)
+            if (!newAccount) {
+              throw new Error(`Retry account not found: ${newAccountId}`)
+            }
+
+            // 重新处理 Proxy 配置
+            let newProxyConfig = null
+            if (newAccount.proxy) {
+              try {
+                newProxyConfig =
+                  typeof newAccount.proxy === 'string'
+                    ? JSON.parse(newAccount.proxy)
+                    : newAccount.proxy
+              } catch (e) {
+                logger.warn('Failed to parse proxy configuration for retry:', e)
+              }
+            }
+
+            // 构建新的 Client
+            const newClient = await geminiAccountService.getOauthClient(
+              newAccount.accessToken,
+              newAccount.refreshToken,
+              newProxyConfig,
+              newAccount.oauthProvider
+            )
+
             if (!newClient) {
               throw new Error('Failed to get new Gemini client for retry')
             }
+
+            // 获取新账户的 projectId
+            let newProjectId = newAccount.projectId
+            if (vendor === 'antigravity') {
+              newProjectId = ensureAntigravityProjectId(newAccount)
+            }
+
             logger.info(
               `🔄 Retrying non-stream with new account: ${newAccountId} (was: ${accountId})`
             )
@@ -2051,17 +2183,17 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
                     newClient,
                     requestData,
                     null,
-                    projectId,
+                    newProjectId,
                     upstreamSessionId,
-                    proxyConfig
+                    newProxyConfig
                   )
                 : await geminiAccountService.generateContent(
                     newClient,
                     requestData,
                     null,
-                    projectId,
+                    newProjectId,
                     upstreamSessionId,
-                    proxyConfig
+                    newProxyConfig
                   )
             // 更新 accountId 以便后续使用记录
             accountId = newAccountId
@@ -2075,7 +2207,42 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       }
 
       const payload = rawResponse?.response || rawResponse
+
+      // 🔍 调试日志：检查原始响应结构
+      logger.info('🔍 [调试] 非流式 rawResponse 结构', {
+        hasResponse: !!rawResponse?.response,
+        payloadHasCandidates: !!payload?.candidates,
+        payloadPartsCount: payload?.candidates?.[0]?.content?.parts?.length,
+        payloadFinishReason: payload?.candidates?.[0]?.finishReason,
+        firstPartType: payload?.candidates?.[0]?.content?.parts?.[0]
+          ? Object.keys(payload.candidates[0].content.parts[0])
+          : []
+      })
+
       let content = convertGeminiPayloadToAnthropicContent(payload)
+
+      // 🔍 调试日志：检查转换后的 Anthropic 内容
+      logger.info('🔍 [调试] 转换后 Anthropic content', {
+        blocksCount: content?.length,
+        blockTypes: content?.map((b) => b.type) || []
+      })
+
+      if (!Array.isArray(content) || content.length === 0) {
+        logger.warn('⚠️ Non-stream upstream returned empty content; using fallback text', {
+          vendor,
+          accountId,
+          model: effectiveModel,
+          payloadFinishReason: payload?.candidates?.[0]?.finishReason || null,
+          usageMetadata: payload?.usageMetadata || null
+        })
+        content = [
+          {
+            type: 'text',
+            text: '上游返回空响应（可能被截断、连接中断或限流导致）。请重试，或改用 stream=true。'
+          }
+        ]
+      }
+
       let hasToolUse = content.some((block) => block.type === 'tool_use')
 
       // Antigravity 某些模型可能不会返回 functionCall（导致永远没有 tool_use），但会把 “Write: xxx” 以纯文本形式输出。
@@ -2233,10 +2400,42 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             { oauthProvider: vendor }
           )
           const newAccountId = newAccountSelection.accountId
-          const newClient = await geminiAccountService.getGeminiClient(newAccountId)
+
+          // ✨ 大东修复：这里也要保持一致
+          const newAccount = await geminiAccountService.getAccount(newAccountId)
+          if (!newAccount) {
+            throw new Error(`Retry account not found: ${newAccountId}`)
+          }
+
+          let newProxyConfig = null
+          if (newAccount.proxy) {
+            try {
+              newProxyConfig =
+                typeof newAccount.proxy === 'string'
+                  ? JSON.parse(newAccount.proxy)
+                  : newAccount.proxy
+            } catch (e) {
+              logger.warn('Failed to parse proxy configuration for retry:', e)
+            }
+          }
+
+          const newClient = await geminiAccountService.getOauthClient(
+            newAccount.accessToken,
+            newAccount.refreshToken,
+            newProxyConfig,
+            newAccount.oauthProvider
+          )
+
           if (!newClient) {
             throw new Error('Failed to get new Gemini client for retry')
           }
+
+          // 获取新账户的 projectId
+          let newProjectId = newAccount.projectId
+          if (vendor === 'antigravity') {
+            newProjectId = ensureAntigravityProjectId(newAccount)
+          }
+
           logger.info(`🔄 Retrying with new account: ${newAccountId} (was: ${accountId})`)
           // 用新账户的 client 重试
           streamResponse =
@@ -2245,19 +2444,19 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
                   newClient,
                   requestData,
                   null,
-                  projectId,
+                  newProjectId,
                   upstreamSessionId,
                   abortController.signal,
-                  proxyConfig
+                  newProxyConfig
                 )
               : await geminiAccountService.generateContentStream(
                   newClient,
                   requestData,
                   null,
-                  projectId,
+                  newProjectId,
                   upstreamSessionId,
                   abortController.signal,
-                  proxyConfig
+                  newProxyConfig
                 )
           // 更新 accountId 以便后续使用记录
           accountId = newAccountId
@@ -2350,9 +2549,84 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     let finishReason = null
     let emittedAnyToolUse = false
     let sseEventIndex = 0
+    let invalidSseLines = 0
+    let invalidSseSample = null
+    let rescueAttempted = false
+    let forcedRescueAttempted = false
     const emittedToolCallKeys = new Set()
     const emittedToolUseNames = new Set()
     const pendingToolCallsById = new Map()
+
+    const extractPlannedToolAliasFromTodoWrite = (messages) => {
+      if (!Array.isArray(messages)) {
+        return null
+      }
+
+      for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const message = messages[i]
+        if (!message || message.role !== 'assistant' || !Array.isArray(message.content)) {
+          continue
+        }
+        const todoWriteToolUse = message.content.find(
+          (b) => b?.type === 'tool_use' && b?.name === 'TodoWrite'
+        )
+        const todos = todoWriteToolUse?.input?.todos
+        if (!Array.isArray(todos) || todos.length === 0) {
+          continue
+        }
+        const activeTodo =
+          todos.find((t) => t?.status === 'in_progress') ||
+          todos.find((t) => t?.status === 'pending')
+        let activeForm = ''
+        if (typeof activeTodo?.activeForm === 'string') {
+          activeForm = activeTodo.activeForm.trim()
+        } else if (typeof activeTodo?.active_form === 'string') {
+          activeForm = activeTodo.active_form.trim()
+        }
+        if (activeForm) {
+          return activeForm
+        }
+        const content = typeof activeTodo?.content === 'string' ? activeTodo.content : ''
+        const match = /^([a-zA-Z0-9_]+)\s*-/.exec(content)
+        return match?.[1] || null
+      }
+
+      return null
+    }
+
+    const resolveToolNameFromAlias = (alias) => {
+      if (!alias) {
+        return null
+      }
+      const decls = requestData?.request?.tools?.[0]?.functionDeclarations
+      const names = Array.isArray(decls) ? decls.map((d) => d?.name).filter(Boolean) : []
+      if (names.length === 0) {
+        return null
+      }
+      if (names.includes(alias)) {
+        return alias
+      }
+      const prefixed = `mcp__mcp-router__${alias}`
+      if (names.includes(prefixed)) {
+        return prefixed
+      }
+
+      const byAlias = new Map()
+      for (const name of names) {
+        const resolvedAlias = typeof name === 'string' ? name.split('__').pop() : ''
+        if (!resolvedAlias) {
+          continue
+        }
+        const list = byAlias.get(resolvedAlias) || []
+        list.push(name)
+        byAlias.set(resolvedAlias, list)
+      }
+      const candidates = byAlias.get(alias) || []
+      return candidates.length === 1 ? candidates[0] : null
+    }
+
+    const plannedToolAlias = extractPlannedToolAliasFromTodoWrite(req.body?.messages)
+    const plannedToolName = plannedToolAlias ? resolveToolNameFromAlias(plannedToolAlias) : null
 
     let currentIndex = wantsThinkingBlockFirst ? 0 : -1
     let currentBlockType = wantsThinkingBlockFirst ? 'thinking' : null
@@ -2538,6 +2812,146 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       pendingToolCallsById.delete(id)
     }
 
+    const tryRescueAfterMissingFinishReason = async () => {
+      if (!isAntigravityVendor) {
+        return null
+      }
+      if (rescueAttempted) {
+        return null
+      }
+      // 已经有 tool_use 时，不做救援，避免重复调用
+      if (emittedAnyToolUse) {
+        return null
+      }
+      rescueAttempted = true
+
+      const rescueTimeoutMs = 30000
+      logger.warn('⚠️ Missing finishReason: attempting non-stream rescue', {
+        requestId: req.requestId,
+        model: effectiveModel,
+        rescueTimeoutMs,
+        plannedToolAlias,
+        plannedToolName,
+        invalidSseLines,
+        invalidSseSample
+      })
+
+      try {
+        const rawResponse = await geminiAccountService.generateContentAntigravity(
+          client,
+          requestData,
+          null,
+          projectId,
+          upstreamSessionId,
+          proxyConfig,
+          { abortTimeoutMs: rescueTimeoutMs }
+        )
+        const { response } = rawResponse || {}
+        const payload = response || rawResponse
+        const { usageMetadata: nextUsageMetadata } = payload || {}
+        if (nextUsageMetadata) {
+          usageMetadata = nextUsageMetadata
+        }
+
+        const rescuedContent = convertGeminiPayloadToAnthropicContent(payload)
+        const rescuedToolUse = Array.isArray(rescuedContent)
+          ? rescuedContent.find((b) => b?.type === 'tool_use' && b?.name)
+          : null
+
+        if (rescuedToolUse) {
+          if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+            stopCurrentBlock()
+          }
+          currentBlockType = 'tool_use'
+          emitToolUseBlock(rescuedToolUse.name, rescuedToolUse.input, rescuedToolUse.id)
+          logger.warn('⚠️ Rescue succeeded: emitted tool_use after missing finishReason', {
+            requestId: req.requestId,
+            tool: rescuedToolUse.name
+          })
+          return { tool: rescuedToolUse.name }
+        }
+
+        // 二次救援（强制工具调用）：当 TodoWrite 明确标记了下一步工具时，尝试强制生成该 tool_use
+        if (plannedToolName && !forcedRescueAttempted) {
+          forcedRescueAttempted = true
+          const backoffMs = 800
+          await new Promise((resolve) => setTimeout(resolve, backoffMs))
+
+          const forcedRequestData = JSON.parse(JSON.stringify(requestData || {}))
+          if (forcedRequestData?.request) {
+            forcedRequestData.request.toolConfig = {
+              functionCallingConfig: {
+                mode: 'ANY',
+                allowedFunctionNames: [plannedToolName]
+              }
+            }
+          }
+
+          const forcedRawResponse = await geminiAccountService.generateContentAntigravity(
+            client,
+            forcedRequestData,
+            null,
+            projectId,
+            upstreamSessionId,
+            proxyConfig,
+            { abortTimeoutMs: rescueTimeoutMs }
+          )
+          const { response: forcedResponse } = forcedRawResponse || {}
+          const forcedPayload = forcedResponse || forcedRawResponse
+          const { usageMetadata: forcedUsageMetadata } = forcedPayload || {}
+          if (forcedUsageMetadata) {
+            usageMetadata = forcedUsageMetadata
+          }
+
+          const forcedContent = convertGeminiPayloadToAnthropicContent(forcedPayload)
+          const forcedToolUse = Array.isArray(forcedContent)
+            ? forcedContent.find((b) => b?.type === 'tool_use' && b?.name)
+            : null
+          if (forcedToolUse) {
+            if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+              stopCurrentBlock()
+            }
+            currentBlockType = 'tool_use'
+            emitToolUseBlock(forcedToolUse.name, forcedToolUse.input, forcedToolUse.id)
+            logger.warn('⚠️ Forced rescue succeeded: emitted tool_use after missing finishReason', {
+              requestId: req.requestId,
+              tool: forcedToolUse.name,
+              plannedToolAlias,
+              plannedToolName
+            })
+            return { tool: forcedToolUse.name, forced: true }
+          }
+        }
+
+        // 完全空响应时，至少把非流式的文本结果返回给客户端（避免 CLI 直接中断）
+        if (!emittedText && Array.isArray(rescuedContent)) {
+          const rescuedText = rescuedContent
+            .filter((b) => b?.type === 'text' && typeof b.text === 'string' && b.text)
+            .map((b) => b.text)
+            .join('')
+          if (rescuedText) {
+            switchBlockType('text')
+            emittedText = rescuedText
+            writeAnthropicSseEvent(res, 'content_block_delta', {
+              type: 'content_block_delta',
+              index: currentIndex,
+              delta: { type: 'text_delta', text: rescuedText }
+            })
+            return { textLength: rescuedText.length }
+          }
+        }
+      } catch (error) {
+        const { statusCode, upstreamMessage, message } = sanitizeUpstreamError(error)
+        logger.warn('⚠️ Non-stream rescue failed', {
+          requestId: req.requestId,
+          statusCode: statusCode || null,
+          upstreamMessage: upstreamMessage || message
+        })
+      }
+
+      return null
+    }
+
     const finalize = async () => {
       if (finished) {
         return
@@ -2549,37 +2963,137 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         flushPendingToolCallById(id, { force: true })
       }
 
-      // 上游可能在没有 finishReason 的情况下静默结束（例如 browser_snapshot 输出过大被截断）。
-      // 这种情况下主动向客户端发送错误，避免长时间挂起。
+      // 🔧 [dadongwo] 不依赖 finishReason 判断流结束
+      // 上游 Antigravity 服务可能在某些情况下（如输出过大、超时）提前结束流，但不发送 finishReason。
+      // 只要 HTTP 流正常结束且有内容，就视为正常完成。
       if (!finishReason) {
-        logger.warn(
-          '⚠️ Upstream stream ended without finishReason; sending overloaded_error to client',
-          {
+        const hasAnyContent = !!(emittedText || emittedAnyToolUse || emittedThinking)
+        const inputTokens = usageMetadata?.promptTokenCount || 0
+        const outputTokens = resolveUsageOutputTokens(usageMetadata)
+
+        // ✅ 有内容时：直接正常完成，不触发救援，不追加错误提示
+        if (hasAnyContent) {
+          logger.info('🔄 [dadongwo] 流结束无finishReason但有内容，正常完成', {
             requestId: req.requestId,
             model: effectiveModel,
-            hasToolCalls: emittedAnyToolUse
-          }
-        )
+            hasToolCalls: emittedAnyToolUse,
+            emittedTextLength: emittedText?.length || 0,
+            emittedThinking: !!emittedThinking,
+            sseEventCount: sseEventIndex
+          })
 
-        writeAnthropicSseEvent(res, 'error', {
-          type: 'error',
-          error: {
-            type: 'overloaded_error',
-            message:
-              'Upstream connection interrupted unexpectedly (missing finish reason). Please retry.'
+          if (vendor === 'antigravity') {
+            dumpAntigravityStreamSummary({
+              requestId: req.requestId,
+              model: effectiveModel,
+              totalEvents: sseEventIndex,
+              finishReason: 'STOP_INFERRED', // 推断为 STOP（dadongwo 优化）
+              hasThinking: Boolean(emittedThinking || emittedThoughtSignature),
+              hasToolCalls: emittedAnyToolUse,
+              toolCallNames: Array.from(emittedToolUseNames).filter(Boolean),
+              usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+              textPreview: emittedText ? emittedText.slice(0, 500) : ''
+            }).catch(() => {})
           }
+
+          // 关闭当前块（如果有）
+          if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+            stopCurrentBlock()
+          }
+
+          // 发送正常的结束事件
+          writeAnthropicSseEvent(res, 'message_delta', {
+            type: 'message_delta',
+            delta: {
+              stop_reason: emittedAnyToolUse ? 'tool_use' : 'end_turn',
+              stop_sequence: null
+            },
+            usage: {
+              output_tokens: outputTokens
+            }
+          })
+
+          writeAnthropicSseEvent(res, 'message_stop', { type: 'message_stop' })
+
+          dumpAnthropicStreamSummary(req, {
+            vendor,
+            accountId,
+            effectiveModel,
+            responseModel,
+            stop_reason: emittedAnyToolUse ? 'tool_use' : 'end_turn',
+            tool_use_names: Array.from(emittedToolUseNames).filter(Boolean),
+            text_preview: emittedText ? emittedText.slice(0, 800) : '',
+            usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+            inferred_stop: true // 标记为推断完成
+          })
+
+          res.end()
+          return
+        }
+
+        // ⚠️ 完全空响应：尝试救援
+        logger.warn('⚠️ 流结束无finishReason且无内容，尝试救援', {
+          requestId: req.requestId,
+          model: effectiveModel,
+          sseEventCount: sseEventIndex
         })
 
-        // 记录摘要便于排查
-        dumpAnthropicStreamSummary(req, {
-          vendor,
-          accountId,
-          effectiveModel,
-          responseModel,
-          stop_reason: 'error',
-          tool_use_names: Array.from(emittedToolUseNames).filter(Boolean),
-          text_preview: emittedText ? emittedText.slice(0, 800) : '',
-          usage: { input_tokens: 0, output_tokens: 0 }
+        await tryRescueAfterMissingFinishReason()
+
+        // 救援后再检查是否有内容
+        const hasContentAfterRescue = !!(emittedText || emittedAnyToolUse || emittedThinking)
+
+        if (hasContentAfterRescue) {
+          logger.info('🔄 救援成功，正常完成响应', {
+            requestId: req.requestId,
+            textLength: emittedText?.length || 0,
+            hasToolCalls: emittedAnyToolUse
+          })
+
+          if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+            stopCurrentBlock()
+          }
+
+          writeAnthropicSseEvent(res, 'message_delta', {
+            type: 'message_delta',
+            delta: {
+              stop_reason: emittedAnyToolUse ? 'tool_use' : 'end_turn',
+              stop_sequence: null
+            },
+            usage: {
+              output_tokens: resolveUsageOutputTokens(usageMetadata)
+            }
+          })
+
+          writeAnthropicSseEvent(res, 'message_stop', { type: 'message_stop' })
+
+          dumpAnthropicStreamSummary(req, {
+            vendor,
+            accountId,
+            effectiveModel,
+            responseModel,
+            stop_reason: emittedAnyToolUse ? 'tool_use' : 'end_turn',
+            tool_use_names: Array.from(emittedToolUseNames).filter(Boolean),
+            text_preview: emittedText ? emittedText.slice(0, 800) : '',
+            usage: {
+              input_tokens: inputTokens,
+              output_tokens: resolveUsageOutputTokens(usageMetadata)
+            },
+            rescue_succeeded: true
+          })
+
+          res.end()
+          return
+        }
+
+        // 救援失败：追加兜底文本，避免客户端卡死
+        const fallbackText = '上游流式连接异常中断（无有效内容）。请重试。'
+        switchBlockType('text')
+        emittedText = fallbackText
+        writeAnthropicSseEvent(res, 'content_block_delta', {
+          type: 'content_block_delta',
+          index: currentIndex,
+          delta: { type: 'text_delta', text: fallbackText }
         })
 
         if (vendor === 'antigravity') {
@@ -2588,14 +3102,45 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             model: effectiveModel,
             totalEvents: sseEventIndex,
             finishReason: null,
-            hasThinking: Boolean(emittedThinking || emittedThoughtSignature),
-            hasToolCalls: emittedAnyToolUse,
-            toolCallNames: Array.from(emittedToolUseNames).filter(Boolean),
-            usage: { input_tokens: 0, output_tokens: 0 },
-            textPreview: emittedText ? emittedText.slice(0, 500) : '',
-            error: 'missing_finish_reason'
+            hasThinking: false,
+            hasToolCalls: false,
+            toolCallNames: [],
+            usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+            textPreview: fallbackText,
+            invalidLines: invalidSseLines,
+            invalidSample: invalidSseSample,
+            error: 'empty_response_fallback'
           }).catch(() => {})
         }
+
+        if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+          stopCurrentBlock()
+        }
+
+        writeAnthropicSseEvent(res, 'message_delta', {
+          type: 'message_delta',
+          delta: {
+            stop_reason: 'end_turn',
+            stop_sequence: null
+          },
+          usage: {
+            output_tokens: outputTokens
+          }
+        })
+
+        writeAnthropicSseEvent(res, 'message_stop', { type: 'message_stop' })
+
+        dumpAnthropicStreamSummary(req, {
+          vendor,
+          accountId,
+          effectiveModel,
+          responseModel,
+          stop_reason: 'end_turn',
+          tool_use_names: [],
+          text_preview: fallbackText,
+          usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+          empty_response_fallback: true
+        })
 
         res.end()
         return
@@ -2691,6 +3236,16 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         if (parsed.type === 'control') {
           continue
         }
+        if (parsed.type === 'invalid') {
+          invalidSseLines += 1
+          if (!invalidSseSample) {
+            invalidSseSample = {
+              jsonStrPreview: (parsed.jsonStr || '').slice(0, 200),
+              error: parsed.error?.message || 'unknown'
+            }
+          }
+          continue
+        }
         if (parsed.type !== 'data' || !parsed.data) {
           continue
         }
@@ -2717,6 +3272,12 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         const { finishReason: currentFinishReason } = candidate || {}
         if (currentFinishReason) {
           finishReason = currentFinishReason
+          // 🔍 调试：记录收到 finishReason 的时间点
+          logger.info('🔍 [调试] 流式收到 finishReason', {
+            requestId: req.requestId,
+            finishReason: currentFinishReason,
+            sseEventIndex
+          })
         }
 
         const parts = extractGeminiParts(payload)
