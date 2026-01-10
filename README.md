@@ -9,8 +9,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+[![GitHub](https://img.shields.io/badge/GitHub-dadongwo-181717?logo=github)](https://github.com/dadongwo)
+[![Repo](https://img.shields.io/badge/Repo-claude--relay--service-blue?logo=github)](https://github.com/dadongwo/claude-relay-service)
 
-**🔐 Claude Code 原生适配 · Antigravity 生态 · 多账户管理**
+**🔐 Claude Code 原生适配 · Antigravity 生态 · 多账户管理 · OpenAI 格式兼容**
 
 </div>
 
@@ -26,7 +28,7 @@
 - **Thinking Signature 伪造/缓存/恢复**：解决 Claude Code 3.7+ 对 `thoughtSignature` 的强校验，支持兜底签名策略与签名缓存。
 - **Tool Result 透传**：兼容 Base64 图片等复杂结构，避免转发丢失/格式错误。
 - **消息并发治理**：拆分 Claude Code 混合发送的 `tool_result + user_text`，按协议顺序转发。
-- **僵尸流看门狗**：SSE 连接 45 秒无有效数据自动断开，避免“假活着”导致会话/额度被占用。
+- **僵尸流看门狗**：SSE 连接 45 秒无有效数据自动断开，避免"假活着"导致会话/额度被占用。
 
 ### 2. 🛡️ Antigravity & Gemini 深度集成
 - **Antigravity OAuth 支持**：新增 `gemini-antigravity` 账户类型，支持 OAuth 授权与权限校验。
@@ -40,6 +42,35 @@
 - **智能重试与切换账号**：针对 Antigravity `429 Resource Exhausted`，自动清理会话并切换账号重试（流式/非流式均覆盖）。
 - **日志安全与轮转**：避免循环引用导致的进程崩溃，并对 Dump 文件进行大小控制与轮转。
 - **调试利器**：支持请求/响应/工具定义/上游请求与上游 SSE 响应的 JSONL 转储，便于复现与定位问题。
+
+### 4. 🔥 流式响应弹性恢复架构 (2026-01 新增)
+- **三级降级恢复机制**：当上游异常中断（无 `finishReason`）时自动救援
+  - Level 1: 非流式重试 → 提取 tool_use
+  - Level 2: 强制工具调用 → 基于 TodoWrite 推断
+  - Level 3: 兜底文本注入 → 避免客户端卡死
+- **智能限流处理引擎**：精确解析 Google API 延迟指令（`RetryInfo`/`quotaResetDelay`）
+- **非流式转流式协议适配器**：内部使用 SSE 流式传输，合并分片响应，10 分钟超时兜底
+
+### 5. 🛠️ MCP 工具兼容性增强 (2026-01 新增)
+- **浏览器工具调用稳定性**：加强 `browser_*` 系列工具兼容
+- **工具输出语义压缩引擎**：智能压缩大体积工具输出（浏览器快照、大文件提示等）
+- **工具输入规范化处理**：自动修复上游返回的非标准 args 格式
+
+### 6. 🌐 OpenAI 格式兼容 (多路由支持)
+支持使用 OpenAI `/v1/chat/completions` 格式调用后端模型，方便第三方客户端接入。
+
+| 路由 | 说明 |
+|------|------|
+| `/openai/gemini/v1/chat/completions` | OpenAI 格式 → Gemini/Antigravity 账户池 |
+| `/openai/claude/v1/chat/completions` | OpenAI 格式 → Claude 账户池 |
+| `/openai/v1/chat/completions` | OpenAI 格式 → OpenAI 账户池 |
+
+**特性**：
+- 自动格式转换（messages ↔ contents）
+- 流式/非流式均支持
+- 支持 Antigravity 账户（自动路由到 `gemini-antigravity`）
+
+---
 
 ## 📊 额度与模型查询 (Antigravity 专属)
 
@@ -108,7 +139,39 @@ claude
 
 ---
 
-### 2. Gemini CLI 配置
+### 2. OpenAI 格式客户端配置
+
+支持任何兼容 OpenAI API 的客户端（如 ChatBox、LobeChat、自定义应用等）。
+
+#### 使用 Gemini/Antigravity 后端
+
+```bash
+# Base URL
+http://你的服务器IP:3000/openai/gemini/v1
+
+# API Key
+cr_xxxxxxxxxxxx
+
+# Model
+gemini-2.5-pro  # 或 claude-opus-4-5（Antigravity 账户）
+```
+
+#### 使用 Claude 后端
+
+```bash
+# Base URL
+http://你的服务器IP:3000/openai/claude/v1
+
+# API Key
+cr_xxxxxxxxxxxx
+
+# Model
+claude-3-5-sonnet
+```
+
+---
+
+### 3. Gemini CLI 配置
 
 支持通过 Gemini 协议直接访问。
 

@@ -1,11 +1,15 @@
 # Claude Relay Service (Antigravity Edition)
 
+[![GitHub](https://img.shields.io/badge/GitHub-dadongwo-181717?logo=github)](https://github.com/dadongwo)
+[![Repo](https://img.shields.io/badge/Repo-claude--relay--service-blue?logo=github)](https://github.com/dadongwo/claude-relay-service)
+
 Maintained fork by **dadongwo**.
 
 This fork focuses on:
 - Native compatibility for `claude` (Claude Code CLI)
 - Antigravity OAuth integration + path-based routing
 - Better stability for streaming (SSE) workloads
+- OpenAI format compatibility for third-party clients
 - Optional request/response dumps for debugging
 
 ---
@@ -22,6 +26,19 @@ This fork focuses on:
   - Zombie stream watchdog (disconnect after 45s without valid data)
   - Auto retry + account switching for Antigravity `429 Resource Exhausted` (streaming and non-streaming)
 - **Observability**: JSONL dumps for request/response/tools/upstream (with size limit + rotation)
+- **Streaming Resilience (2026-01)**:
+  - Three-level fallback recovery for missing `finishReason`
+  - Smart rate-limit parsing (`RetryInfo`/`quotaResetDelay`)
+  - Non-stream to stream adapter with 10-min abort timeout
+- **MCP Tool Compatibility (2026-01)**:
+  - Enhanced `browser_*` tool stability
+  - Tool output semantic compression engine
+  - Tool input normalization for non-standard args
+- **OpenAI Format Compatibility**:
+  - `/openai/gemini/v1/chat/completions` -> Gemini/Antigravity pool
+  - `/openai/claude/v1/chat/completions` -> Claude pool
+  - Automatic format conversion (messages ↔ contents)
+  - Streaming and non-streaming support
 
 ---
 
@@ -91,6 +108,28 @@ claude
 
 ---
 
+## Using with OpenAI-Compatible Clients
+
+Works with any OpenAI-compatible client (ChatBox, LobeChat, custom apps, etc.)
+
+### Gemini/Antigravity backend
+
+```
+Base URL: http://<host>:3000/openai/gemini/v1
+API Key: cr_xxxxxxxxxxxx
+Model: gemini-2.5-pro or claude-opus-4-5 (Antigravity)
+```
+
+### Claude backend
+
+```
+Base URL: http://<host>:3000/openai/claude/v1
+API Key: cr_xxxxxxxxxxxx
+Model: claude-3-5-sonnet
+```
+
+---
+
 ## Antigravity Quota & Models
 
 - Quota display: in Admin UI -> Accounts -> `gemini-antigravity` -> click **Test/Refresh**.
@@ -115,4 +154,3 @@ See `.env.example` for the full list. Common toggles:
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
-
