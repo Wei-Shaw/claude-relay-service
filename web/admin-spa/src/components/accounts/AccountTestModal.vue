@@ -68,6 +68,22 @@
                 {{ platformLabel }}
               </span>
             </div>
+            <!-- Bedrock 账号类型 -->
+            <div
+              v-if="props.account?.platform === 'bedrock'"
+              class="flex items-center justify-between text-sm"
+            >
+              <span class="text-gray-500 dark:text-gray-400">账号类型</span>
+              <span
+                :class="[
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
+                  credentialTypeBadgeClass
+                ]"
+              >
+                <i :class="credentialTypeIcon" />
+                {{ credentialTypeLabel }}
+              </span>
+            </div>
             <div class="flex items-center justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">测试模型</span>
               <span class="font-medium text-gray-700 dark:text-gray-300">{{ testModel }}</span>
@@ -209,13 +225,15 @@ const platformLabel = computed(() => {
   const platform = props.account.platform
   if (platform === 'claude') return 'Claude OAuth'
   if (platform === 'claude-console') return 'Claude Console'
+  if (platform === 'bedrock') return 'AWS Bedrock'
   return platform
 })
 
 const platformIcon = computed(() => {
   if (!props.account) return 'fas fa-question'
   const platform = props.account.platform
-  if (platform === 'claude' || platform === 'claude-console') return 'fas fa-brain'
+  if (platform === 'claude' || platform === 'claude-console' || platform === 'bedrock')
+    return 'fas fa-brain'
   return 'fas fa-robot'
 })
 
@@ -227,6 +245,39 @@ const platformBadgeClass = computed(() => {
   }
   if (platform === 'claude-console') {
     return 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
+  }
+  if (platform === 'bedrock') {
+    return 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
+  }
+  return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+})
+
+// Bedrock 账号类型相关
+const credentialTypeLabel = computed(() => {
+  if (!props.account || props.account.platform !== 'bedrock') return ''
+  const credentialType = props.account.credentialType
+  if (credentialType === 'access_key') return 'Access Key'
+  if (credentialType === 'bearer_token') return 'Bearer Token'
+  return 'Unknown'
+})
+
+const credentialTypeIcon = computed(() => {
+  if (!props.account || props.account.platform !== 'bedrock') return ''
+  const credentialType = props.account.credentialType
+  if (credentialType === 'access_key') return 'fas fa-key'
+  if (credentialType === 'bearer_token') return 'fas fa-ticket'
+  return 'fas fa-question'
+})
+
+const credentialTypeBadgeClass = computed(() => {
+  if (!props.account || props.account.platform !== 'bedrock')
+    return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+  const credentialType = props.account.credentialType
+  if (credentialType === 'access_key') {
+    return 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
+  }
+  if (credentialType === 'bearer_token') {
+    return 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'
   }
   return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
 })
@@ -345,6 +396,9 @@ function getTestEndpoint() {
   }
   if (platform === 'claude-console') {
     return `${API_PREFIX}/admin/claude-console-accounts/${props.account.id}/test`
+  }
+  if (platform === 'bedrock') {
+    return `${API_PREFIX}/admin/bedrock-accounts/${props.account.id}/test`
   }
   return ''
 }
@@ -469,7 +523,7 @@ function handleClose() {
   emit('close')
 }
 
-// 监听show变化，重置状态
+// 监听show变化，重置状态并设置测试模型
 watch(
   () => props.show,
   (newVal) => {
@@ -478,6 +532,21 @@ watch(
       responseText.value = ''
       errorMessage.value = ''
       testDuration.value = 0
+
+      // 根据平台和账号类型设置测试模型
+      if (props.account?.platform === 'bedrock') {
+        const credentialType = props.account.credentialType
+        if (credentialType === 'bearer_token') {
+          // Bearer Token 模式使用 Sonnet 4.5
+          testModel.value = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'
+        } else {
+          // Access Key 模式使用 Haiku（更快更便宜）
+          testModel.value = 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
+        }
+      } else {
+        // 其他平台使用默认模型
+        testModel.value = 'claude-sonnet-4-5-20250929'
+      }
     }
   }
 )

@@ -48,13 +48,17 @@ class BedrockRelayService {
         secretAccessKey: bedrockAccount.awsCredentials.secretAccessKey,
         sessionToken: bedrockAccount.awsCredentials.sessionToken
       }
+    } else if (bedrockAccount?.bearerToken) {
+      // Bearer Token 模式：AWS SDK >= 3.400.0 会自动检测环境变量
+      clientConfig.token = { token: bedrockAccount.bearerToken }
+      logger.debug(`🔑 使用 Bearer Token 认证 - 账户: ${bedrockAccount.name || 'unknown'}`)
     } else {
       // 检查是否有环境变量凭证
       if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
         clientConfig.credentials = fromEnv()
       } else {
         throw new Error(
-          'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥，或设置环境变量AWS_ACCESS_KEY_ID和AWS_SECRET_ACCESS_KEY'
+          'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥或Bearer Token，或设置环境变量AWS_ACCESS_KEY_ID和AWS_SECRET_ACCESS_KEY'
         )
       }
     }

@@ -35,12 +35,13 @@ class BedrockAccountService {
       description = '',
       region = process.env.AWS_REGION || 'us-east-1',
       awsCredentials = null, // { accessKeyId, secretAccessKey, sessionToken }
+      bearerToken = null, // AWS Bearer Token for Bedrock API Keys
       defaultModel = 'us.anthropic.claude-sonnet-4-20250514-v1:0',
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
       schedulable = true, // 是否可被调度
-      credentialType = 'default' // 'default', 'access_key', 'bearer_token'
+      credentialType = 'access_key' // 'access_key', 'bearer_token'（默认为 access_key）
     } = options
 
     const accountId = uuidv4()
@@ -69,6 +70,11 @@ class BedrockAccountService {
     // 加密存储AWS凭证
     if (awsCredentials) {
       accountData.awsCredentials = this._encryptAwsCredentials(awsCredentials)
+    }
+
+    // 加密存储 Bearer Token
+    if (bearerToken) {
+      accountData.bearerToken = this._encryptAwsCredentials({ token: bearerToken })
     }
 
     const client = redis.getClientSafe()
@@ -106,9 +112,85 @@ class BedrockAccountService {
 
       const account = JSON.parse(accountData)
 
-      // 解密AWS凭证用于内部使用
-      if (account.awsCredentials) {
-        account.awsCredentials = this._decryptAwsCredentials(account.awsCredentials)
+      // 根据凭证类型解密对应的凭证
+      // 增强逻辑：优先按照 credentialType 解密，如果字段不存在则尝试解密实际存在的字段（兜底）
+      try {
+        let accessKeyDecrypted = false
+        let bearerTokenDecrypted = false
+
+        // 第一步：按照 credentialType 尝试解密对应的凭证
+        if (account.credentialType === 'access_key' && account.awsCredentials) {
+          // Access Key 模式：解密 AWS 凭证
+          account.awsCredentials = this._decryptAwsCredentials(account.awsCredentials)
+          accessKeyDecrypted = true
+          logger.debug(
+            `🔓 解密 Access Key 成功 - ID: ${accountId}, 类型: ${account.credentialType}`
+          )
+        } else if (account.credentialType === 'bearer_token' && account.bearerToken) {
+          // Bearer Token 模式：解密 Bearer Token
+          const decrypted = this._decryptAwsCredentials(account.bearerToken)
+          account.bearerToken = decrypted.token
+          bearerTokenDecrypted = true
+          logger.debug(
+            `🔓 解密 Bearer Token 成功 - ID: ${accountId}, 类型: ${account.credentialType}`
+          )
+        } else if (!account.credentialType || account.credentialType === 'default') {
+          // 向后兼容：旧版本账号可能没有 credentialType 字段，尝试解密所有存在的凭证
+          if (account.awsCredentials) {
+            account.awsCredentials = this._decryptAwsCredentials(account.awsCredentials)
+            accessKeyDecrypted = true
+          }
+          if (account.bearerToken) {
+            const decrypted = this._decryptAwsCredentials(account.bearerToken)
+            account.bearerToken = decrypted.token
+            bearerTokenDecrypted = true
+          }
+          logger.debug(
+            `🔓 兼容模式解密 - ID: ${accountId}, Access Key: ${accessKeyDecrypted}, Bearer Token: ${bearerTokenDecrypted}`
+          )
+        }
+
+        // 第二步：兜底逻辑 - 如果按照 credentialType 没有解密到任何凭证，尝试解密实际存在的字段
+        if (!accessKeyDecrypted && !bearerTokenDecrypted) {
+          logger.warn(
+            `⚠️ credentialType="${account.credentialType}" 与实际字段不匹配，尝试兜底解密 - ID: ${accountId}`
+          )
+          if (account.awsCredentials) {
+            account.awsCredentials = this._decryptAwsCredentials(account.awsCredentials)
+            accessKeyDecrypted = true
+            logger.warn(
+              `🔓 兜底解密 Access Key 成功 - ID: ${accountId}, credentialType 应为 'access_key'`
+            )
+          }
+          if (account.bearerToken) {
+            const decrypted = this._decryptAwsCredentials(account.bearerToken)
+            account.bearerToken = decrypted.token
+            bearerTokenDecrypted = true
+            logger.warn(
+              `🔓 兜底解密 Bearer Token 成功 - ID: ${accountId}, credentialType 应为 'bearer_token'`
+            )
+          }
+        }
+
+        // 验证至少解密了一种凭证
+        if (!accessKeyDecrypted && !bearerTokenDecrypted) {
+          logger.error(
+            `❌ 未找到任何凭证可解密 - ID: ${accountId}, credentialType: ${account.credentialType}, hasAwsCredentials: ${!!account.awsCredentials}, hasBearerToken: ${!!account.bearerToken}`
+          )
+          return {
+            success: false,
+            error: 'No valid credentials found in account data'
+          }
+        }
+      } catch (decryptError) {
+        logger.error(
+          `❌ 解密Bedrock凭证失败 - ID: ${accountId}, 类型: ${account.credentialType}`,
+          decryptError
+        )
+        return {
+          success: false,
+          error: `Credentials decryption failed: ${decryptError.message}`
+        }
       }
 
       logger.debug(`🔍 获取Bedrock账户 - ID: ${accountId}, 名称: ${account.name}`)
@@ -155,7 +237,11 @@ class BedrockAccountService {
             updatedAt: account.updatedAt,
             type: 'bedrock',
             platform: 'bedrock',
-            hasCredentials: !!account.awsCredentials
+            // 根据凭证类型判断是否有凭证
+            hasCredentials:
+              account.credentialType === 'bearer_token'
+                ? !!account.bearerToken
+                : !!account.awsCredentials
           })
         }
       }
@@ -233,6 +319,15 @@ class BedrockAccountService {
         const plainCredentials = account.awsCredentials
         account.awsCredentials = this._encryptAwsCredentials(plainCredentials)
         logger.info(`🔐 重新加密Bedrock账户凭证 - ID: ${accountId}`)
+      }
+
+      // 更新 Bearer Token
+      if (updates.bearerToken !== undefined) {
+        if (updates.bearerToken) {
+          account.bearerToken = this._encryptAwsCredentials({ token: updates.bearerToken })
+        } else {
+          delete account.bearerToken
+        }
       }
 
       // ✅ 直接保存 subscriptionExpiresAt（如果提供）
@@ -345,13 +440,45 @@ class BedrockAccountService {
 
       const account = accountResult.data
 
-      logger.info(`🧪 测试Bedrock账户连接 - ID: ${accountId}, 名称: ${account.name}`)
+      logger.info(
+        `🧪 测试Bedrock账户连接 - ID: ${accountId}, 名称: ${account.name}, 凭证类型: ${account.credentialType}`
+      )
 
-      // 尝试获取模型列表来测试连接
+      // 验证凭证是否已解密
+      const hasValidCredentials =
+        (account.credentialType === 'access_key' && account.awsCredentials) ||
+        (account.credentialType === 'bearer_token' && account.bearerToken) ||
+        (!account.credentialType && (account.awsCredentials || account.bearerToken))
+
+      if (!hasValidCredentials) {
+        logger.error(
+          `❌ 测试失败：账户没有有效凭证 - ID: ${accountId}, credentialType: ${account.credentialType}`
+        )
+        return {
+          success: false,
+          error: 'No valid credentials found after decryption'
+        }
+      }
+
+      // 尝试创建 Bedrock 客户端来验证凭证格式
+      try {
+        bedrockRelayService._getBedrockClient(account.region, account)
+        logger.debug(`✅ Bedrock客户端创建成功 - ID: ${accountId}`)
+      } catch (clientError) {
+        logger.error(`❌ 创建Bedrock客户端失败 - ID: ${accountId}`, clientError)
+        return {
+          success: false,
+          error: `Failed to create Bedrock client: ${clientError.message}`
+        }
+      }
+
+      // 获取可用模型列表（硬编码，但至少验证了凭证格式正确）
       const models = await bedrockRelayService.getAvailableModels(account)
 
       if (models && models.length > 0) {
-        logger.info(`✅ Bedrock账户测试成功 - ID: ${accountId}, 发现 ${models.length} 个模型`)
+        logger.info(
+          `✅ Bedrock账户测试成功 - ID: ${accountId}, 发现 ${models.length} 个模型, 凭证类型: ${account.credentialType}`
+        )
         return {
           success: true,
           data: {
@@ -373,6 +500,135 @@ class BedrockAccountService {
         success: false,
         error: error.message
       }
+    }
+  }
+
+  /**
+   * 🧪 测试 Bedrock 账户连接（SSE 流式返回，供前端测试页面使用）
+   * @param {string} accountId - 账户ID
+   * @param {Object} res - Express response 对象
+   * @param {string} model - 测试使用的模型
+   */
+  async testAccountConnection(accountId, res, model = null) {
+    const { InvokeModelWithResponseStreamCommand } = require('@aws-sdk/client-bedrock-runtime')
+
+    try {
+      // 获取账户信息
+      const accountResult = await this.getAccount(accountId)
+      if (!accountResult.success) {
+        throw new Error(accountResult.error || 'Account not found')
+      }
+
+      const account = accountResult.data
+
+      // 根据账户类型选择合适的测试模型
+      if (!model) {
+        // Access Key 模式使用 Haiku（更快更便宜）
+        model = account.defaultModel || 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
+      }
+
+      logger.info(
+        `🧪 Testing Bedrock account connection: ${account.name} (${accountId}), model: ${model}, credentialType: ${account.credentialType}`
+      )
+
+      // 设置 SSE 响应头
+      res.setHeader('Content-Type', 'text/event-stream')
+      res.setHeader('Cache-Control', 'no-cache')
+      res.setHeader('Connection', 'keep-alive')
+      res.setHeader('X-Accel-Buffering', 'no')
+      res.status(200)
+
+      // 发送 test_start 事件
+      res.write(`data: ${JSON.stringify({ type: 'test_start' })}\n\n`)
+
+      // 构造测试请求体（Bedrock 格式）
+      const bedrockPayload = {
+        anthropic_version: 'bedrock-2023-05-31',
+        max_tokens: 256,
+        messages: [
+          {
+            role: 'user',
+            content:
+              'Hello! Please respond with a simple greeting to confirm the connection is working. And tell me who are you?'
+          }
+        ]
+      }
+
+      // 获取 Bedrock 客户端
+      const region = account.region || bedrockRelayService.defaultRegion
+      const client = bedrockRelayService._getBedrockClient(region, account)
+
+      // 创建流式调用命令
+      const command = new InvokeModelWithResponseStreamCommand({
+        modelId: model,
+        body: JSON.stringify(bedrockPayload),
+        contentType: 'application/json',
+        accept: 'application/json'
+      })
+
+      logger.debug(`🌊 Bedrock test stream - model: ${model}, region: ${region}`)
+
+      const startTime = Date.now()
+      const response = await client.send(command)
+
+      // 处理流式响应
+      // let responseText = ''
+      for await (const chunk of response.body) {
+        if (chunk.chunk) {
+          const chunkData = JSON.parse(new TextDecoder().decode(chunk.chunk.bytes))
+
+          // 提取文本内容
+          if (chunkData.type === 'content_block_delta' && chunkData.delta?.text) {
+            const { text } = chunkData.delta
+            // responseText += text
+
+            // 发送 content 事件
+            res.write(`data: ${JSON.stringify({ type: 'content', text })}\n\n`)
+          }
+
+          // 检测错误
+          if (chunkData.type === 'error') {
+            throw new Error(chunkData.error?.message || 'Bedrock API error')
+          }
+        }
+      }
+
+      const duration = Date.now() - startTime
+      logger.info(`✅ Bedrock test completed - model: ${model}, duration: ${duration}ms`)
+
+      // 发送 message_stop 事件（前端兼容）
+      res.write(`data: ${JSON.stringify({ type: 'message_stop' })}\n\n`)
+
+      // 发送 test_complete 事件
+      res.write(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
+
+      // 结束响应
+      res.end()
+
+      logger.info(`✅ Test request completed for Bedrock account: ${account.name}`)
+    } catch (error) {
+      logger.error(`❌ Test Bedrock account connection failed:`, error)
+
+      // 发送错误事件给前端
+      try {
+        // 检查响应流是否仍然可写
+        if (!res.writableEnded && !res.destroyed) {
+          if (!res.headersSent) {
+            res.setHeader('Content-Type', 'text/event-stream')
+            res.setHeader('Cache-Control', 'no-cache')
+            res.setHeader('Connection', 'keep-alive')
+            res.status(200)
+          }
+          const errorMsg = error.message || '测试失败'
+          res.write(`data: ${JSON.stringify({ type: 'error', error: errorMsg })}\n\n`)
+          res.end()
+        }
+      } catch (writeError) {
+        logger.error('Failed to write error to response stream:', writeError)
+      }
+
+      // 不再重新抛出错误，避免路由层再次处理
+      // throw error
     }
   }
 
