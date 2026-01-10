@@ -667,6 +667,7 @@ git push origin main
 | 2026-01-08 | v1.1.253 | 同步 24 个提交 (v1.1.252-253) | 无冲突 | ✅ 成功 | **🚨安全修复**: RCE/SSRF漏洞修复; **新功能**: Antigravity账户支持、余额/配额查询、服务权限多选; Token刷新优化、context_management修复 |
 | 2026-01-08 | v1.1.254 | 同步 5 个提交 | 无冲突 | ✅ 成功 | Antigravity systemInstruction/requestType header注入、Token主动刷新优化、README更新 |
 | 2026-01-09 | v1.1.255 | 同步 4 个提交 | 无冲突 | ✅ 成功 | OpenAI兼容路由支持Claude Console账户、统一权限检查逻辑(apiKeyService.hasPermission) |
+| 2026-01-10 | v1.1.256 | 同步 8 个提交 | 无冲突 | ✅ 成功 | Bedrock支持Claude 4.5模型+Bearer Token认证、订阅检测修复、TTL随机后缀优化 |
 
 **下次更新请在此添加记录**
 
