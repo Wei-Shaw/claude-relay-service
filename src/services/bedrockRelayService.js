@@ -435,6 +435,18 @@ class BedrockRelayService {
   _mapToBedrockModel(modelName) {
     // 标准Claude模型名到Bedrock模型名的映射表
     const modelMapping = {
+      // Claude 4.5 Opus
+      'claude-opus-4-5': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+      'claude-opus-4-5-20251101': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+
+      // Claude 4.5 Sonnet
+      'claude-sonnet-4-5': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+      'claude-sonnet-4-5-20250929': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+
+      // Claude 4.5 Haiku
+      'claude-haiku-4-5': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+      'claude-haiku-4-5-20251001': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+
       // Claude Sonnet 4
       'claude-sonnet-4': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
       'claude-sonnet-4-20250514': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
