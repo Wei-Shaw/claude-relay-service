@@ -1714,16 +1714,17 @@ class ClaudeRelayService {
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
 
-      const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
-      const processedBody = this._processRequestBody(requestBody, account)
-      const baseRequestBody = JSON.parse(JSON.stringify(processedBody))
+      // 🧹 内存优化：序列化为字符串存储，避免对象被闭包捕获
+      const bodyString = JSON.stringify(this._processRequestBody(requestBody, account))
+      const bodyStoreInfo = await requestBodyStore.store(bodyString)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
 
       // 发送流式请求并捕获usage数据
       await this._makeClaudeStreamRequestWithUsageCapture(
-        JSON.parse(JSON.stringify(baseRequestBody)),
+        bodyStoreInfo.id,  // 🧹 只传入存储ID，函数内部会 retrieve
+        bodyString,  // 🧹 传入序列化后的字符串用于 isOpusModelRequest 判断
         accessToken,
         proxyAgent,
         clientHeaders,
@@ -1740,8 +1741,7 @@ class ClaudeRelayService {
         streamTransformer,
         {
           ...options,
-          originalRequestBody: baseRequestBody,
-          isRealClaudeCodeRequest
+          isRealClaudeCodeRequest: this._isActualClaudeCodeRequest(requestBody, clientHeaders)
         },
         isDedicatedOfficialAccount,
         // 📬 新增回调：在收到响应头时释放队列锁
@@ -1790,7 +1790,8 @@ class ClaudeRelayService {
 
   // 🌊 发送流式请求到Claude API（带usage数据捕获）
   async _makeClaudeStreamRequestWithUsageCapture(
-    body,
+    bodyStoreId,  // 🧹 请求体存储ID
+    bodyStringForModelCheck,  // 🧹 用于模型判断的序列化字符串
     accessToken,
     proxyAgent,
     clientHeaders,
@@ -1809,8 +1810,26 @@ class ClaudeRelayService {
     // 获取账户信息用于统一 User-Agent
     const account = await claudeAccountService.getAccount(accountId)
 
+    // 🧹 从存储中获取请求体字符串
+    let storedBodyString = null
+    let body = null
+    try {
+      storedBodyString = await requestBodyStore.retrieve(bodyStoreId)
+      if (!storedBodyString) {
+        throw new Error('Failed to retrieve request body from store')
+      }
+      body = JSON.parse(storedBodyString)
+    } catch (err) {
+      logger.error('❌ Failed to retrieve/parse stored body:', err.message)
+      // 清理存储
+      await requestBodyStore.release(bodyStoreId).catch(() => {})
+      throw err
+    }
+
+    // 使用传入的字符串判断是否为 Opus 请求（避免再次 parse）
+    const bodyForModelCheck = bodyStringForModelCheck ? JSON.parse(bodyStringForModelCheck) : body
     const isOpusModelRequest =
-      typeof body?.model === 'string' && body.model.toLowerCase().includes('opus')
+      typeof bodyForModelCheck?.model === 'string' && bodyForModelCheck.model.toLowerCase().includes('opus')
 
     // 使用公共方法准备请求头和 payload
     const prepared = await this._prepareRequestHeadersAndPayload(
@@ -1943,11 +1962,15 @@ class ClaudeRelayService {
 
               try {
                 // 递归调用自身进行重试
-                const retryBody = requestOptions.originalRequestBody
-                  ? JSON.parse(JSON.stringify(requestOptions.originalRequestBody))
-                  : body
+                // 从存储中获取请求体
+                const retryBodyString = await requestBodyStore.retrieve(bodyStoreId)
+                if (!retryBodyString) {
+                  throw new Error("Failed to retrieve body for retry")
+                }
+                const retryBody = JSON.parse(retryBodyString)
                 const retryResult = await this._makeClaudeStreamRequestWithUsageCapture(
-                  retryBody,
+                  bodyStoreId,
+                  bodyStringForModelCheck,
                   accessToken,
                   proxyAgent,
                   clientHeaders,
@@ -2050,12 +2073,17 @@ class ClaudeRelayService {
             if (
               this._isClaudeCodeCredentialError(errorData) &&
               requestOptions.useRandomizedToolNames !== true &&
-              requestOptions.originalRequestBody
+              requestOptions.bodyStoreId
             ) {
               try {
-                const retryBody = JSON.parse(JSON.stringify(requestOptions.originalRequestBody))
+                const retryBodyString = await requestBodyStore.retrieve(bodyStoreId)
+                if (!retryBodyString) {
+                  throw new Error("Failed to retrieve body for 403 retry")
+                }
+                const retryBody = JSON.parse(retryBodyString)
                 const retryResult = await this._makeClaudeStreamRequestWithUsageCapture(
-                  retryBody,
+                  bodyStoreId,
+                  bodyStringForModelCheck,
                   accessToken,
                   proxyAgent,
                   clientHeaders,

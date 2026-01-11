@@ -81,6 +81,9 @@ class Application {
       // 🔒 安全启动：清理无效/伪造的管理员会话
       logger.info('🔒 Cleaning up invalid admin sessions...')
       await this.cleanupInvalidSessions()
+      // 🧹 清理孤儿临时文件
+      const requestBodyStore = require("./utils/requestBodyStore")
+      await requestBodyStore.cleanupOrphanFiles().catch(() => {})
 
       // 💰 初始化费用数据
       logger.info('💰 Checking cost data initialization...')
