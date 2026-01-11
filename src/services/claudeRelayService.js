@@ -1948,10 +1948,8 @@ class ClaudeRelayService {
 
               try {
                 // 递归调用自身进行重试
-                // 🧹 内存优化：从字符串parse，避免持有对象引用
-                const retryBody = requestOptions.originalBodyString
-                  ? JSON.parse(requestOptions.originalBodyString)
-                  : body
+                // 🧹 内存优化：从字符串parse，完全不引用body避免闭包捕获
+                const retryBody = JSON.parse(requestOptions.originalBodyString)
                 const retryResult = await this._makeClaudeStreamRequestWithUsageCapture(
                   retryBody,
                   accessToken,
@@ -2156,8 +2154,10 @@ class ClaudeRelayService {
           requestOptions.originalBodyString = null
         }
 
-        // 🧹 内存优化：提取模型名，避免闭包持有整个 body 对象
+        // 🧹 内存优化：提取所有需要的body属性，避免闭包持有整个body对象
         const requestedModel = body?.model
+        const isRealClaudeCode = this.isRealClaudeCodeRequest(body)
+        // 至此body不再被闭包引用，可以被GC
 
         let buffer = ''
         const allUsageData = [] // 收集所有的usage事件
@@ -2492,7 +2492,7 @@ class ClaudeRelayService {
             if (
               clientHeaders &&
               Object.keys(clientHeaders).length > 0 &&
-              this.isRealClaudeCodeRequest(body)
+              isRealClaudeCode
             ) {
               await claudeCodeHeadersService.storeAccountHeaders(accountId, clientHeaders)
             }
