@@ -539,7 +539,7 @@ class ClaudeRelayService {
 
       const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
       const processedBody = this._processRequestBody(requestBody, account)
-      const baseRequestBody = JSON.parse(JSON.stringify(processedBody))
+      // 🧹 内存优化：不再需要 baseRequestBody 深拷贝，直接使用 processedBody
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -568,7 +568,7 @@ class ClaudeRelayService {
 
         do {
           response = await this._makeClaudeRequest(
-            JSON.parse(JSON.stringify(baseRequestBody)),
+            processedBody,
             accessToken,
             proxyAgent,
             clientHeaders,
@@ -1716,14 +1716,15 @@ class ClaudeRelayService {
 
       const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
       const processedBody = this._processRequestBody(requestBody, account)
-      const baseRequestBody = JSON.parse(JSON.stringify(processedBody))
+      // 🧹 内存优化：只序列化一次字符串用于重试
+      const originalBodyString = JSON.stringify(processedBody)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
 
       // 发送流式请求并捕获usage数据
       await this._makeClaudeStreamRequestWithUsageCapture(
-        JSON.parse(JSON.stringify(baseRequestBody)),
+        processedBody,
         accessToken,
         proxyAgent,
         clientHeaders,
@@ -1740,7 +1741,7 @@ class ClaudeRelayService {
         streamTransformer,
         {
           ...options,
-          originalRequestBody: baseRequestBody,
+          originalBodyString: originalBodyString,
           isRealClaudeCodeRequest
         },
         isDedicatedOfficialAccount,
@@ -1943,8 +1944,9 @@ class ClaudeRelayService {
 
               try {
                 // 递归调用自身进行重试
-                const retryBody = requestOptions.originalRequestBody
-                  ? JSON.parse(JSON.stringify(requestOptions.originalRequestBody))
+                // 🧹 从字符串解析用于重试，避免闭包捕获
+                const retryBody = requestOptions.originalBodyString
+                  ? JSON.parse(requestOptions.originalBodyString)
                   : body
                 const retryResult = await this._makeClaudeStreamRequestWithUsageCapture(
                   retryBody,
@@ -2050,10 +2052,10 @@ class ClaudeRelayService {
             if (
               this._isClaudeCodeCredentialError(errorData) &&
               requestOptions.useRandomizedToolNames !== true &&
-              requestOptions.originalRequestBody
+              requestOptions.originalBodyString
             ) {
               try {
-                const retryBody = JSON.parse(JSON.stringify(requestOptions.originalRequestBody))
+                const retryBody = JSON.parse(requestOptions.originalBodyString)
                 const retryResult = await this._makeClaudeStreamRequestWithUsageCapture(
                   retryBody,
                   accessToken,
@@ -2149,7 +2151,11 @@ class ClaudeRelayService {
         let rateLimitDetected = false // 限流检测标志
 
         // 监听数据块，解析SSE并寻找usage信息
-        res.on('data', (chunk) => {
+        // 🧹 内存优化：在闭包创建前提取需要的值，避免闭包捕获 body
+            // body 只在闭包外使用，闭包内只引用基本类型
+            const requestedModel = body?.model || 'unknown'
+
+            res.on('data', (chunk) => {
           try {
             const chunkStr = chunk.toString()
 
