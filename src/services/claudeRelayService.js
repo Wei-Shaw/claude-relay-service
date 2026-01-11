@@ -539,7 +539,8 @@ class ClaudeRelayService {
 
       const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
       const processedBody = this._processRequestBody(requestBody, account)
-      const baseRequestBody = JSON.parse(JSON.stringify(processedBody))
+      // 🧹 内存优化：存储序列化字符串，避免重复深拷贝
+      const originalBodyString = JSON.stringify(processedBody)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -567,8 +568,9 @@ class ClaudeRelayService {
         let shouldRetry = false
 
         do {
+          // 🧹 内存优化：每次请求从字符串parse，避免持有对象
           response = await this._makeClaudeRequest(
-            JSON.parse(JSON.stringify(baseRequestBody)),
+            JSON.parse(originalBodyString),
             accessToken,
             proxyAgent,
             clientHeaders,
@@ -1717,14 +1719,16 @@ class ClaudeRelayService {
 
       const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
       const processedBody = this._processRequestBody(requestBody, account)
-      const baseRequestBody = JSON.parse(JSON.stringify(processedBody))
+      // 🧹 内存优化：只序列化一次，存储字符串而非对象
+      // 字符串不可变，GC更友好；只在重试时才parse
+      const originalBodyString = JSON.stringify(processedBody)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
 
       // 发送流式请求并捕获usage数据
       await this._makeClaudeStreamRequestWithUsageCapture(
-        JSON.parse(JSON.stringify(baseRequestBody)),
+        processedBody,  // 直接传引用，不再深拷贝
         accessToken,
         proxyAgent,
         clientHeaders,
@@ -1741,7 +1745,7 @@ class ClaudeRelayService {
         streamTransformer,
         {
           ...options,
-          originalRequestBody: baseRequestBody,
+          originalBodyString,  // 存字符串，不存对象
           isRealClaudeCodeRequest
         },
         isDedicatedOfficialAccount,
@@ -1944,8 +1948,9 @@ class ClaudeRelayService {
 
               try {
                 // 递归调用自身进行重试
-                const retryBody = requestOptions.originalRequestBody
-                  ? JSON.parse(JSON.stringify(requestOptions.originalRequestBody))
+                // 🧹 内存优化：从字符串parse，避免持有对象引用
+                const retryBody = requestOptions.originalBodyString
+                  ? JSON.parse(requestOptions.originalBodyString)
                   : body
                 const retryResult = await this._makeClaudeStreamRequestWithUsageCapture(
                   retryBody,
@@ -2051,10 +2056,11 @@ class ClaudeRelayService {
             if (
               this._isClaudeCodeCredentialError(errorData) &&
               requestOptions.useRandomizedToolNames !== true &&
-              requestOptions.originalRequestBody
+              requestOptions.originalBodyString  // 🧹 使用字符串检查
             ) {
               try {
-                const retryBody = JSON.parse(JSON.stringify(requestOptions.originalRequestBody))
+                // 🧹 内存优化：从字符串parse，避免持有对象引用
+                const retryBody = JSON.parse(requestOptions.originalBodyString)
                 const retryResult = await this._makeClaudeStreamRequestWithUsageCapture(
                   retryBody,
                   accessToken,
@@ -2144,11 +2150,14 @@ class ClaudeRelayService {
           }
         }
 
-        // 🧹 内存优化：收到成功响应后，释放不再需要的请求体引用
-        // originalRequestBody 仅用于403重试，成功响应后不再需要
-        if (requestOptions && requestOptions.originalRequestBody) {
-          requestOptions.originalRequestBody = null
+        // 🧹 内存优化：收到成功响应后，释放重试用的请求体字符串
+        // 字符串只用于403/凭证错误重试，成功响应后不再需要
+        if (requestOptions) {
+          requestOptions.originalBodyString = null
         }
+
+        // 🧹 内存优化：提取模型名，避免闭包持有整个 body 对象
+        const requestedModel = body?.model
 
         let buffer = ''
         const allUsageData = [] // 收集所有的usage事件
@@ -2361,7 +2370,7 @@ class ClaudeRelayService {
 
             // 打印原始的usage数据为JSON字符串，避免嵌套问题
             logger.info(
-              `📊 === Stream Request Usage Summary === Model: ${body.model}, Total Events: ${allUsageData.length}, Usage Data: ${JSON.stringify(allUsageData)}`
+              `📊 === Stream Request Usage Summary === Model: ${requestedModel}, Total Events: ${allUsageData.length}, Usage Data: ${JSON.stringify(allUsageData)}`
             )
 
             // 一般一个请求只会使用一个模型，即使有多个usage事件也应该合并
@@ -2371,7 +2380,7 @@ class ClaudeRelayService {
               output_tokens: totalUsage.output_tokens,
               cache_creation_input_tokens: totalUsage.cache_creation_input_tokens,
               cache_read_input_tokens: totalUsage.cache_read_input_tokens,
-              model: allUsageData[allUsageData.length - 1].model || body.model // 使用最后一个模型或请求模型
+              model: allUsageData[allUsageData.length - 1].model || requestedModel // 使用最后一个模型或请求模型
             }
 
             // 如果有详细的cache_creation数据，合并它们
