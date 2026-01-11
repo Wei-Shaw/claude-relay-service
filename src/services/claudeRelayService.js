@@ -2144,6 +2144,12 @@ class ClaudeRelayService {
           }
         }
 
+        // 🧹 内存优化：收到成功响应后，释放不再需要的请求体引用
+        // originalRequestBody 仅用于403重试，成功响应后不再需要
+        if (requestOptions && requestOptions.originalRequestBody) {
+          requestOptions.originalRequestBody = null
+        }
+
         let buffer = ''
         const allUsageData = [] // 收集所有的usage事件
         let currentUsageData = {} // 当前正在收集的usage数据
