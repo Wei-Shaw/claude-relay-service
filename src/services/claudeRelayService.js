@@ -17,6 +17,7 @@ const requestIdentityService = require('./requestIdentityService')
 const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
 const userMessageQueueService = require('./userMessageQueueService')
 const { isStreamWritable } = require('../utils/streamHelper')
+const requestBodyStore = require('../utils/requestBodyStore')
 
 class ClaudeRelayService {
   constructor() {
@@ -539,8 +540,9 @@ class ClaudeRelayService {
 
       const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
       const processedBody = this._processRequestBody(requestBody, account)
-      // 🧹 内存优化：存储序列化字符串，避免重复深拷贝
-      const originalBodyString = JSON.stringify(processedBody)
+      // 🧹 内存优化：大请求使用临时文件存储
+      const bodyString = JSON.stringify(processedBody)
+      const bodyStoreInfo = await requestBodyStore.store(bodyString)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -568,9 +570,10 @@ class ClaudeRelayService {
         let shouldRetry = false
 
         do {
-          // 🧹 内存优化：每次请求从字符串parse，避免持有对象
+          // 🧹 内存优化：从存储获取body，大请求从文件读取
+          const currentBodyString = await requestBodyStore.retrieve(bodyStoreInfo.id)
           response = await this._makeClaudeRequest(
-            JSON.parse(originalBodyString),
+            JSON.parse(currentBodyString),
             accessToken,
             proxyAgent,
             clientHeaders,
@@ -906,6 +909,10 @@ class ClaudeRelayService {
       )
       throw error
     } finally {
+      // 🧹 释放请求体存储
+      if (bodyStoreInfo && bodyStoreInfo.id) {
+        requestBodyStore.release(bodyStoreInfo.id).catch(() => {})
+      }
       // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && selectedAccountId) {
         try {
@@ -1719,9 +1726,9 @@ class ClaudeRelayService {
 
       const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
       const processedBody = this._processRequestBody(requestBody, account)
-      // 🧹 内存优化：只序列化一次，存储字符串而非对象
-      // 字符串不可变，GC更友好；只在重试时才parse
-      const originalBodyString = JSON.stringify(processedBody)
+      // 🧹 内存优化：大请求使用临时文件存储，避免堆内存膨胀
+      const bodyString = JSON.stringify(processedBody)
+      const bodyStoreInfo = await requestBodyStore.store(bodyString)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -1745,7 +1752,7 @@ class ClaudeRelayService {
         streamTransformer,
         {
           ...options,
-          originalBodyString,  // 存字符串，不存对象
+          bodyStoreId: bodyStoreInfo.id,  // 使用存储ID，大请求不占堆内存
           isRealClaudeCodeRequest
         },
         isDedicatedOfficialAccount,
@@ -1948,8 +1955,9 @@ class ClaudeRelayService {
 
               try {
                 // 递归调用自身进行重试
-                // 🧹 内存优化：从字符串parse，完全不引用body避免闭包捕获
-                const retryBody = JSON.parse(requestOptions.originalBodyString)
+                // 🧹 内存优化：从存储中获取body，大请求从文件读取
+                const retryBodyString = await requestBodyStore.retrieve(requestOptions.bodyStoreId)
+                const retryBody = JSON.parse(retryBodyString)
                 const retryResult = await this._makeClaudeStreamRequestWithUsageCapture(
                   retryBody,
                   accessToken,
@@ -2054,11 +2062,12 @@ class ClaudeRelayService {
             if (
               this._isClaudeCodeCredentialError(errorData) &&
               requestOptions.useRandomizedToolNames !== true &&
-              requestOptions.originalBodyString  // 🧹 使用字符串检查
+              requestOptions.bodyStoreId  // 🧹 使用存储ID检查
             ) {
               try {
-                // 🧹 内存优化：从字符串parse，避免持有对象引用
-                const retryBody = JSON.parse(requestOptions.originalBodyString)
+                // 🧹 内存优化：从存储中获取body
+                const retryBodyString = await requestBodyStore.retrieve(requestOptions.bodyStoreId)
+                const retryBody = JSON.parse(retryBodyString)
                 const retryResult = await this._makeClaudeStreamRequestWithUsageCapture(
                   retryBody,
                   accessToken,
@@ -2151,7 +2160,11 @@ class ClaudeRelayService {
         // 🧹 内存优化：收到成功响应后，释放重试用的请求体字符串
         // 字符串只用于403/凭证错误重试，成功响应后不再需要
         if (requestOptions) {
-          requestOptions.originalBodyString = null
+          // 🧹 释放存储（小请求释放内存，大请求删除临时文件）
+          if (requestOptions.bodyStoreId) {
+            requestBodyStore.release(requestOptions.bodyStoreId).catch(() => {})
+            requestOptions.bodyStoreId = null
+          }
         }
 
         // 🧹 内存优化：提取所有需要的body属性，避免闭包持有整个body对象
