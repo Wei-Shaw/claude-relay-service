@@ -1441,14 +1441,15 @@ class ClaudeRelayService {
       }
 
       const req = https.request(options, (res) => {
-        let responseData = Buffer.alloc(0)
+        const chunks = []
 
         res.on('data', (chunk) => {
-          responseData = Buffer.concat([responseData, chunk])
+          chunks.push(chunk)
         })
 
         res.on('end', () => {
           try {
+            const responseData = Buffer.concat(chunks)
             let responseBody = ''
 
             // 根据Content-Encoding处理响应数据
