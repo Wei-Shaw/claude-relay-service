@@ -1771,6 +1771,10 @@ class ClaudeRelayService {
       }
       throw error
     } finally {
+      // 🧹 释放请求体存储（无论如何都要释放）
+      if (bodyStoreId) {
+        requestBodyStore.release(bodyStoreId).catch(() => {})
+      }
       // 📬 释放用户消息队列锁（兜底，正常情况下已在收到响应头后提前释放）
       if (queueLockAcquired && queueRequestId && selectedAccountId) {
         try {
@@ -2072,8 +2076,7 @@ class ClaudeRelayService {
             )
             if (
               this._isClaudeCodeCredentialError(errorData) &&
-              requestOptions.useRandomizedToolNames !== true &&
-              requestOptions.bodyStoreId
+              requestOptions.useRandomizedToolNames !== true
             ) {
               try {
                 const retryBodyString = await requestBodyStore.retrieve(bodyStoreId)
