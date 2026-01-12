@@ -1438,7 +1438,8 @@ class ClaudeRelayService {
       return prepared.abortResponse
     }
 
-    let { bodyString, headers, isRealClaudeCode, toolNameMap } = prepared
+    let { bodyString } = prepared
+    const { headers, isRealClaudeCode, toolNameMap } = prepared
 
     return new Promise((resolve, reject) => {
       // 支持自定义路径（如 count_tokens）
@@ -1764,7 +1765,7 @@ class ClaudeRelayService {
         streamTransformer,
         {
           ...options,
-          bodyStoreId: bodyStoreId,
+          bodyStoreId,
           isRealClaudeCodeRequest
         },
         isDedicatedOfficialAccount,
@@ -1855,7 +1856,8 @@ class ClaudeRelayService {
       return prepared.abortResponse
     }
 
-    let { bodyString, headers, toolNameMap } = prepared
+    let { bodyString } = prepared
+    const { headers, toolNameMap } = prepared
     const toolNameStreamTransformer = this._createToolNameStripperStreamTransformer(
       streamTransformer,
       toolNameMap
@@ -2195,7 +2197,7 @@ class ClaudeRelayService {
         // 🧹 内存优化：在闭包创建前提取需要的值，避免闭包捕获 body 和 requestOptions
         // body 和 requestOptions 只在闭包外使用，闭包内只引用基本类型
         const requestedModel = body?.model || 'unknown'
-        const isRealClaudeCodeRequest = requestOptions.isRealClaudeCodeRequest
+        const { isRealClaudeCodeRequest } = requestOptions
 
         res.on('data', (chunk) => {
           try {
