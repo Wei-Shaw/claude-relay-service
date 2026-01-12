@@ -382,6 +382,7 @@ class ClaudeRelayService {
     let queueLockAcquired = false
     let queueRequestId = null
     let selectedAccountId = null
+    let bodyStoreIdNonStream = null  // 🧹 在 try 块外声明，以便 finally 清理
 
     try {
       // 调试日志：查看API Key数据
@@ -542,8 +543,10 @@ class ClaudeRelayService {
 
       const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
       const processedBody = this._processRequestBody(requestBody, account)
-      // 🧹 内存优化：存储序列化字符串用于重试，避免重复转换工具名
+      // 🧹 内存优化：存储到 bodyStore，避免闭包捕获
       const originalBodyString = JSON.stringify(processedBody)
+      bodyStoreIdNonStream = ++this._bodyStoreIdCounter
+      this.bodyStore.set(bodyStoreIdNonStream, originalBodyString)
 
       // 获取代理配置
       const proxyAgent = await this._getProxyAgent(accountId)
@@ -571,12 +574,12 @@ class ClaudeRelayService {
         let shouldRetry = false
 
         do {
-          // 🧹 每次重试从字符串解析新对象，避免使用被修改的 body
+          // 🧹 每次重试从 bodyStore 解析新对象，避免闭包捕获
           let retryRequestBody
           try {
-            retryRequestBody = JSON.parse(originalBodyString)
+            retryRequestBody = JSON.parse(this.bodyStore.get(bodyStoreIdNonStream))
           } catch (parseError) {
-            logger.error(`❌ Failed to parse originalBodyString for retry: ${parseError.message}`)
+            logger.error(`❌ Failed to parse body for retry: ${parseError.message}`)
             throw new Error(`Request body parse failed: ${parseError.message}`)
           }
           response = await this._makeClaudeRequest(
@@ -916,6 +919,10 @@ class ClaudeRelayService {
       )
       throw error
     } finally {
+      // 🧹 清理 bodyStore
+      if (bodyStoreIdNonStream !== null) {
+        this.bodyStore.delete(bodyStoreIdNonStream)
+      }
       // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && selectedAccountId) {
         try {
@@ -1431,7 +1438,7 @@ class ClaudeRelayService {
       return prepared.abortResponse
     }
 
-    const { bodyString, headers, isRealClaudeCode, toolNameMap } = prepared
+    let { bodyString, headers, isRealClaudeCode, toolNameMap } = prepared
 
     return new Promise((resolve, reject) => {
       // 支持自定义路径（如 count_tokens）
@@ -1545,6 +1552,8 @@ class ClaudeRelayService {
 
       // 写入请求体
       req.write(bodyString)
+      // 🧹 内存优化：立即清空 bodyString 引用，避免闭包捕获
+      bodyString = null
       req.end()
     })
   }
@@ -1846,7 +1855,7 @@ class ClaudeRelayService {
       return prepared.abortResponse
     }
 
-    const { bodyString, headers, toolNameMap } = prepared
+    let { bodyString, headers, toolNameMap } = prepared
     const toolNameStreamTransformer = this._createToolNameStripperStreamTransformer(
       streamTransformer,
       toolNameMap
@@ -2627,6 +2636,8 @@ class ClaudeRelayService {
 
       // 写入请求体
       req.write(bodyString)
+      // 🧹 内存优化：立即清空 bodyString 引用，避免闭包捕获
+      bodyString = null
       req.end()
     })
   }
