@@ -828,7 +828,8 @@ const accountGroupOptions = [
   { value: 'claude', label: 'Claude' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Gemini' },
-  { value: 'droid', label: 'Droid' }
+  { value: 'droid', label: 'Droid' },
+  { value: 'qwen', label: 'Qwen' }
 ]
 
 const accountTrendUpdating = ref(false)

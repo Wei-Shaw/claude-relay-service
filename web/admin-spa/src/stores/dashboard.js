@@ -134,7 +134,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   // 趋势图粒度
   const trendGranularity = ref(initialGranularity) // 'day' 或 'hour'
   const apiKeysTrendMetric = ref('requests') // 'requests' 或 'tokens'
-  const accountUsageGroup = ref('claude') // claude | openai | gemini
+  const accountUsageGroup = ref('claude') // claude | openai | gemini | qwen
 
   // 默认时间
   const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)])
