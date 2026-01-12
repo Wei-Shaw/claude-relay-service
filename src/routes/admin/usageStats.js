@@ -891,9 +891,9 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
 // 获取按账号分组的使用趋势
 router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
   try {
-    const { granularity = 'day', group = 'claude', days = 7, startDate, endDate } = req.query
+  const { granularity = 'day', group = 'claude', days = 7, startDate, endDate } = req.query
 
-    const allowedGroups = ['claude', 'openai', 'gemini', 'droid', 'bedrock']
+  const allowedGroups = ['claude', 'openai', 'gemini', 'droid', 'bedrock', 'qwen']
     if (!allowedGroups.includes(group)) {
       return res.status(400).json({
         success: false,
@@ -901,13 +901,14 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
       })
     }
 
-    const groupLabels = {
-      claude: 'Claude账户',
-      openai: 'OpenAI账户',
-      gemini: 'Gemini账户',
-      droid: 'Droid账户',
-      bedrock: 'Bedrock账户'
-    }
+  const groupLabels = {
+    claude: 'Claude账户',
+    openai: 'OpenAI账户',
+    gemini: 'Gemini账户',
+    droid: 'Droid账户',
+    bedrock: 'Bedrock账户',
+    qwen: 'Qwen账户'
+  }
 
     // 拉取各平台账号列表
     let accounts = []
@@ -1000,19 +1001,30 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
           platform: 'droid'
         }
       })
-    } else if (group === 'bedrock') {
-      const result = await bedrockAccountService.getAllAccounts()
-      const bedrockAccounts = result?.success ? result.data : []
-      accounts = bedrockAccounts.map((account) => {
-        const id = String(account.id || '')
-        const shortId = id ? id.slice(0, 8) : '未知'
-        return {
-          id,
-          name: account.name || `Bedrock账号 ${shortId}`,
-          platform: 'bedrock'
-        }
-      })
-    }
+  } else if (group === 'bedrock') {
+    const result = await bedrockAccountService.getAllAccounts()
+    const bedrockAccounts = result?.success ? result.data : []
+    accounts = bedrockAccounts.map((account) => {
+      const id = String(account.id || '')
+      const shortId = id ? id.slice(0, 8) : '未知'
+      return {
+        id,
+        name: account.name || `Bedrock账号 ${shortId}`,
+        platform: 'bedrock'
+      }
+    })
+  } else if (group === 'qwen') {
+    const qwenAccounts = await qwenAccountService.getAllAccounts()
+    accounts = qwenAccounts.map((account) => {
+      const id = String(account.id || '')
+      const shortId = id ? id.slice(0, 8) : '未知'
+      return {
+        id,
+        name: account.name || `Qwen账号 ${shortId}`,
+        platform: 'qwen'
+      }
+    })
+  }
 
     if (!accounts || accounts.length === 0) {
       return res.json({
@@ -1036,11 +1048,12 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
       accountIdSet.add(account.id)
     }
 
-    const fallbackModelByGroup = {
-      claude: 'claude-3-5-sonnet-20241022',
-      openai: 'gpt-4o-mini-2024-07-18',
-      gemini: 'gemini-1.5-flash'
-    }
+  const fallbackModelByGroup = {
+    claude: 'claude-3-5-sonnet-20241022',
+    openai: 'gpt-4o-mini-2024-07-18',
+    gemini: 'gemini-1.5-flash',
+    qwen: 'qwen-max'
+  }
     const fallbackModel = fallbackModelByGroup[group] || 'unknown'
 
     const client = redis.getClientSafe()
