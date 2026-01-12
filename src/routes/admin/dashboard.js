@@ -6,6 +6,7 @@ const bedrockAccountService = require('../../services/bedrockAccountService')
 const ccrAccountService = require('../../services/ccrAccountService')
 const geminiAccountService = require('../../services/geminiAccountService')
 const droidAccountService = require('../../services/droidAccountService')
+const qwenAccountService = require('../../services/qwenAccountService')
 const openaiResponsesAccountService = require('../../services/openaiResponsesAccountService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
@@ -31,6 +32,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       ccrAccounts,
       openaiResponsesAccounts,
       droidAccounts,
+      qwenAccounts,
       todayStats,
       systemAverages,
       realtimeMetrics
@@ -45,6 +47,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       ccrAccountService.getAllAccounts(),
       openaiResponsesAccountService.getAllAccounts(true),
       droidAccountService.getAllAccounts(),
+      qwenAccountService.getAllAccounts(),
       redis.getTodayStats(),
       redis.getSystemAverages(),
       redis.getRealtimeSystemMetrics()
@@ -307,6 +310,40 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       (acc) => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited
     ).length
 
+    // Qwen 账户统计（布尔字段为字符串）
+    const isQwenActive = (acc) =>
+      acc.isActive === 'true' ||
+      acc.isActive === true ||
+      (!acc.isActive && acc.isActive !== 'false' && acc.isActive !== false)
+    const isQwenSchedulable = (acc) => acc.schedulable !== 'false' && acc.schedulable !== false
+    const isQwenRateLimited = (acc) =>
+      (typeof acc.status === 'string' && acc.status.toLowerCase() === 'ratelimited') ||
+      (acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited)
+
+    const normalQwenAccounts = qwenAccounts.filter(
+      (acc) =>
+        isQwenActive(acc) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        isQwenSchedulable(acc) &&
+        !isQwenRateLimited(acc)
+    ).length
+    const abnormalQwenAccounts = qwenAccounts.filter(
+      (acc) =>
+        !isQwenActive(acc) ||
+        acc.status === 'blocked' ||
+        acc.status === 'unauthorized' ||
+        acc.status === 'error'
+    ).length
+    const pausedQwenAccounts = qwenAccounts.filter(
+      (acc) =>
+        !isQwenSchedulable(acc) &&
+        isQwenActive(acc) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized'
+    ).length
+    const rateLimitedQwenAccounts = qwenAccounts.filter((acc) => isQwenRateLimited(acc)).length
+
     const dashboard = {
       overview: {
         totalApiKeys: apiKeys.length,
@@ -319,7 +356,9 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           bedrockAccounts.length +
           openaiAccounts.length +
           openaiResponsesAccounts.length +
-          ccrAccounts.length,
+          ccrAccounts.length +
+          droidAccounts.length +
+          qwenAccounts.length,
         normalAccounts:
           normalClaudeAccounts +
           normalClaudeConsoleAccounts +
@@ -327,7 +366,9 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           normalBedrockAccounts +
           normalOpenAIAccounts +
           normalOpenAIResponsesAccounts +
-          normalCcrAccounts,
+          normalCcrAccounts +
+          normalDroidAccounts +
+          normalQwenAccounts,
         abnormalAccounts:
           abnormalClaudeAccounts +
           abnormalClaudeConsoleAccounts +
@@ -336,7 +377,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           abnormalOpenAIAccounts +
           abnormalOpenAIResponsesAccounts +
           abnormalCcrAccounts +
-          abnormalDroidAccounts,
+          abnormalDroidAccounts +
+          abnormalQwenAccounts,
         pausedAccounts:
           pausedClaudeAccounts +
           pausedClaudeConsoleAccounts +
@@ -345,7 +387,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           pausedOpenAIAccounts +
           pausedOpenAIResponsesAccounts +
           pausedCcrAccounts +
-          pausedDroidAccounts,
+          pausedDroidAccounts +
+          pausedQwenAccounts,
         rateLimitedAccounts:
           rateLimitedClaudeAccounts +
           rateLimitedClaudeConsoleAccounts +
@@ -354,7 +397,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           rateLimitedOpenAIAccounts +
           rateLimitedOpenAIResponsesAccounts +
           rateLimitedCcrAccounts +
-          rateLimitedDroidAccounts,
+          rateLimitedDroidAccounts +
+          rateLimitedQwenAccounts,
         // 各平台详细统计
         accountsByPlatform: {
           claude: {
@@ -412,6 +456,13 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
             abnormal: abnormalDroidAccounts,
             paused: pausedDroidAccounts,
             rateLimited: rateLimitedDroidAccounts
+          },
+          qwen: {
+            total: qwenAccounts.length,
+            normal: normalQwenAccounts,
+            abnormal: abnormalQwenAccounts,
+            paused: pausedQwenAccounts,
+            rateLimited: rateLimitedQwenAccounts
           }
         },
         // 保留旧字段以兼容
@@ -423,7 +474,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           normalOpenAIAccounts +
           normalOpenAIResponsesAccounts +
           normalCcrAccounts +
-          normalDroidAccounts,
+          normalDroidAccounts +
+          normalQwenAccounts,
         totalClaudeAccounts: claudeAccounts.length + claudeConsoleAccounts.length,
         activeClaudeAccounts: normalClaudeAccounts + normalClaudeConsoleAccounts,
         rateLimitedClaudeAccounts: rateLimitedClaudeAccounts + rateLimitedClaudeConsoleAccounts,

@@ -105,6 +105,20 @@
                     dashboardData.accountsByPlatform.openai.total
                   }}</span>
                 </div>
+                <!-- Qwen账户 -->
+                <div
+                  v-if="
+                    dashboardData.accountsByPlatform.qwen &&
+                    dashboardData.accountsByPlatform.qwen.total > 0
+                  "
+                  class="inline-flex items-center gap-0.5"
+                  :title="`Qwen: ${dashboardData.accountsByPlatform.qwen.total} 个 (正常: ${dashboardData.accountsByPlatform.qwen.normal})`"
+                >
+                  <i class="fas fa-cloud text-xs text-orange-500" />
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    dashboardData.accountsByPlatform.qwen.total
+                  }}</span>
+                </div>
                 <!-- Azure OpenAI账户 -->
                 <div
                   v-if="
