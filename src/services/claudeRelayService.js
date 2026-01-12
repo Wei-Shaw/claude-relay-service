@@ -382,7 +382,7 @@ class ClaudeRelayService {
     let queueLockAcquired = false
     let queueRequestId = null
     let selectedAccountId = null
-    let bodyStoreIdNonStream = null  // 🧹 在 try 块外声明，以便 finally 清理
+    let bodyStoreIdNonStream = null // 🧹 在 try 块外声明，以便 finally 清理
 
     try {
       // 调试日志：查看API Key数据
@@ -1968,7 +1968,10 @@ class ClaudeRelayService {
               try {
                 // 递归调用自身进行重试
                 // 🧹 从 bodyStore 获取字符串用于重试
-                if (!requestOptions.bodyStoreId || !this.bodyStore.has(requestOptions.bodyStoreId)) {
+                if (
+                  !requestOptions.bodyStoreId ||
+                  !this.bodyStore.has(requestOptions.bodyStoreId)
+                ) {
                   throw new Error('529 retry requires valid bodyStoreId')
                 }
                 let retryBody
@@ -2082,7 +2085,8 @@ class ClaudeRelayService {
             if (
               this._isClaudeCodeCredentialError(errorData) &&
               requestOptions.useRandomizedToolNames !== true &&
-              requestOptions.bodyStoreId && this.bodyStore.has(requestOptions.bodyStoreId)
+              requestOptions.bodyStoreId &&
+              this.bodyStore.has(requestOptions.bodyStoreId)
             ) {
               let retryBody
               try {
@@ -2517,11 +2521,7 @@ class ClaudeRelayService {
             }
 
             // 只有真实的 Claude Code 请求才更新 headers（流式请求）
-            if (
-              clientHeaders &&
-              Object.keys(clientHeaders).length > 0 &&
-              isRealClaudeCodeRequest
-            ) {
+            if (clientHeaders && Object.keys(clientHeaders).length > 0 && isRealClaudeCodeRequest) {
               await claudeCodeHeadersService.storeAccountHeaders(accountId, clientHeaders)
             }
           }

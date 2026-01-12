@@ -419,7 +419,7 @@ async function handleMessagesRequest(req, res) {
         // 🧹 内存优化：提取需要的值，避免闭包捕获整个 req 对象
         const _apiKeyId = req.apiKey.id
         const _rateLimitInfo = req.rateLimitInfo
-        const _requestBody = req.body  // 传递后清除引用
+        const _requestBody = req.body // 传递后清除引用
         const _apiKey = req.apiKey
         const _headers = req.headers
 
@@ -630,7 +630,15 @@ async function handleMessagesRequest(req, res) {
             const outputTokens = result.usage.output_tokens || 0
 
             apiKeyService
-              .recordUsage(_apiKeyIdBedrock, inputTokens, outputTokens, 0, 0, result.model, accountId)
+              .recordUsage(
+                _apiKeyIdBedrock,
+                inputTokens,
+                outputTokens,
+                0,
+                0,
+                result.model,
+                accountId
+              )
               .catch((error) => {
                 logger.error('❌ Failed to record Bedrock stream usage:', error)
               })
@@ -972,7 +980,7 @@ async function handleMessagesRequest(req, res) {
         response = await claudeRelayService.relayRequest(
           _requestBodyNonStream,
           _apiKeyNonStream,
-          req,  // clientRequest 用于断开检测，保留但服务层已优化
+          req, // clientRequest 用于断开检测，保留但服务层已优化
           res,
           _headersNonStream
         )
@@ -984,7 +992,7 @@ async function handleMessagesRequest(req, res) {
         response = await claudeConsoleRelayService.relayRequest(
           _requestBodyNonStream,
           _apiKeyNonStream,
-          req,  // clientRequest 保留用于断开检测
+          req, // clientRequest 保留用于断开检测
           res,
           _headersNonStream,
           accountId
@@ -1032,7 +1040,7 @@ async function handleMessagesRequest(req, res) {
         response = await ccrRelayService.relayRequest(
           _requestBodyNonStream,
           _apiKeyNonStream,
-          req,  // clientRequest 保留用于断开检测
+          req, // clientRequest 保留用于断开检测
           res,
           _headersNonStream,
           accountId
