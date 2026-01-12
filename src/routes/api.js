@@ -607,6 +607,11 @@ async function handleMessagesRequest(req, res) {
         )
       } else if (accountType === 'bedrock') {
         // Bedrock账号使用Bedrock转发服务
+        // 🧹 内存优化：提取需要的值
+        const _apiKeyIdBedrock = req.apiKey.id
+        const _rateLimitInfoBedrock = req.rateLimitInfo
+        const _requestBodyBedrock = req.body
+
         try {
           const bedrockAccountResult = await bedrockAccountService.getAccount(accountId)
           if (!bedrockAccountResult.success) {
@@ -614,7 +619,7 @@ async function handleMessagesRequest(req, res) {
           }
 
           const result = await bedrockRelayService.handleStreamRequest(
-            req.body,
+            _requestBodyBedrock,
             bedrockAccountResult.data,
             res
           )
@@ -625,13 +630,13 @@ async function handleMessagesRequest(req, res) {
             const outputTokens = result.usage.output_tokens || 0
 
             apiKeyService
-              .recordUsage(req.apiKey.id, inputTokens, outputTokens, 0, 0, result.model, accountId)
+              .recordUsage(_apiKeyIdBedrock, inputTokens, outputTokens, 0, 0, result.model, accountId)
               .catch((error) => {
                 logger.error('❌ Failed to record Bedrock stream usage:', error)
               })
 
             queueRateLimitUpdate(
-              req.rateLimitInfo,
+              _rateLimitInfoBedrock,
               {
                 inputTokens,
                 outputTokens,
@@ -758,18 +763,26 @@ async function handleMessagesRequest(req, res) {
         }
       }, 1000) // 1秒后检查
     } else {
+      // 🧹 内存优化：提取需要的值，避免后续回调捕获整个 req
+      const _apiKeyIdNonStream = req.apiKey.id
+      const _apiKeyNameNonStream = req.apiKey.name
+      const _rateLimitInfoNonStream = req.rateLimitInfo
+      const _requestBodyNonStream = req.body
+      const _apiKeyNonStream = req.apiKey
+      const _headersNonStream = req.headers
+
       // 🔍 检查客户端连接是否仍然有效（可能在并发排队等待期间断开）
       if (res.destroyed || res.socket?.destroyed || res.writableEnded) {
         logger.warn(
-          `⚠️ Client disconnected before non-stream request could start for key: ${req.apiKey?.name || 'unknown'}`
+          `⚠️ Client disconnected before non-stream request could start for key: ${_apiKeyNameNonStream || 'unknown'}`
         )
         return undefined
       }
 
       // 非流式响应 - 只使用官方真实usage数据
       logger.info('📄 Starting non-streaming request', {
-        apiKeyId: req.apiKey.id,
-        apiKeyName: req.apiKey.name
+        apiKeyId: _apiKeyIdNonStream,
+        apiKeyName: _apiKeyNameNonStream
       })
 
       // 📊 监听 socket 事件以追踪连接状态变化
@@ -940,11 +953,11 @@ async function handleMessagesRequest(req, res) {
             ? await claudeAccountService.getAccount(accountId)
             : await claudeConsoleAccountService.getAccount(accountId)
 
-        if (account?.interceptWarmup === 'true' && isWarmupRequest(req.body)) {
+        if (account?.interceptWarmup === 'true' && isWarmupRequest(_requestBodyNonStream)) {
           logger.api(
             `🔥 Warmup request intercepted (non-stream) for account: ${account.name} (${accountId})`
           )
-          return res.json(buildMockWarmupResponse(req.body.model))
+          return res.json(buildMockWarmupResponse(_requestBodyNonStream.model))
         }
       }
 
@@ -957,11 +970,11 @@ async function handleMessagesRequest(req, res) {
       if (accountType === 'claude-official') {
         // 官方Claude账号使用原有的转发服务
         response = await claudeRelayService.relayRequest(
-          req.body,
-          req.apiKey,
-          req,
+          _requestBodyNonStream,
+          _apiKeyNonStream,
+          req,  // clientRequest 用于断开检测，保留但服务层已优化
           res,
-          req.headers
+          _headersNonStream
         )
       } else if (accountType === 'claude-console') {
         // Claude Console账号使用Console转发服务
@@ -969,11 +982,11 @@ async function handleMessagesRequest(req, res) {
           `[DEBUG] Calling claudeConsoleRelayService.relayRequest with accountId: ${accountId}`
         )
         response = await claudeConsoleRelayService.relayRequest(
-          req.body,
-          req.apiKey,
-          req,
+          _requestBodyNonStream,
+          _apiKeyNonStream,
+          req,  // clientRequest 保留用于断开检测
           res,
-          req.headers,
+          _headersNonStream,
           accountId
         )
       } else if (accountType === 'bedrock') {
@@ -985,9 +998,9 @@ async function handleMessagesRequest(req, res) {
           }
 
           const result = await bedrockRelayService.handleNonStreamRequest(
-            req.body,
+            _requestBodyNonStream,
             bedrockAccountResult.data,
-            req.headers
+            _headersNonStream
           )
 
           // 构建标准响应格式
@@ -1017,11 +1030,11 @@ async function handleMessagesRequest(req, res) {
         // CCR账号使用CCR转发服务
         logger.debug(`[DEBUG] Calling ccrRelayService.relayRequest with accountId: ${accountId}`)
         response = await ccrRelayService.relayRequest(
-          req.body,
-          req.apiKey,
-          req,
+          _requestBodyNonStream,
+          _apiKeyNonStream,
+          req,  // clientRequest 保留用于断开检测
           res,
-          req.headers,
+          _headersNonStream,
           accountId
         )
       }
@@ -1070,14 +1083,14 @@ async function handleMessagesRequest(req, res) {
           const cacheCreateTokens = jsonData.usage.cache_creation_input_tokens || 0
           const cacheReadTokens = jsonData.usage.cache_read_input_tokens || 0
           // Parse the model to remove vendor prefix if present (e.g., "ccr,gemini-2.5-pro" -> "gemini-2.5-pro")
-          const rawModel = jsonData.model || req.body.model || 'unknown'
+          const rawModel = jsonData.model || _requestBodyNonStream.model || 'unknown'
           const { baseModel: usageBaseModel } = parseVendorPrefixedModel(rawModel)
           const model = usageBaseModel || rawModel
 
           // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
           const { accountId: responseAccountId } = response
           await apiKeyService.recordUsage(
-            req.apiKey.id,
+            _apiKeyIdNonStream,
             inputTokens,
             outputTokens,
             cacheCreateTokens,
@@ -1087,7 +1100,7 @@ async function handleMessagesRequest(req, res) {
           )
 
           await queueRateLimitUpdate(
-            req.rateLimitInfo,
+            _rateLimitInfoNonStream,
             {
               inputTokens,
               outputTokens,
