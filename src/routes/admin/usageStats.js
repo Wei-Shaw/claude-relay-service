@@ -9,6 +9,7 @@ const openaiAccountService = require('../../services/openaiAccountService')
 const openaiResponsesAccountService = require('../../services/openaiResponsesAccountService')
 const droidAccountService = require('../../services/droidAccountService')
 const bedrockAccountService = require('../../services/bedrockAccountService')
+const qwenAccountService = require('../../services/qwenAccountService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
@@ -27,6 +28,7 @@ const accountTypeNames = {
   'gemini-api': 'Gemini API',
   droid: 'Droid',
   bedrock: 'AWS Bedrock',
+  qwen: 'Qwen',
   unknown: '未知渠道'
 }
 
@@ -40,7 +42,8 @@ const resolveAccountByPlatform = async (accountId, platform) => {
     'openai-responses': openaiResponsesAccountService,
     droid: droidAccountService,
     ccr: ccrAccountService,
-    bedrock: bedrockAccountService
+    bedrock: bedrockAccountService,
+    qwen: qwenAccountService
   }
 
   if (platform && serviceMap[platform]) {
