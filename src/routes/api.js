@@ -416,11 +416,18 @@ async function handleMessagesRequest(req, res) {
       // 根据账号类型选择对应的转发服务并调用
       if (accountType === 'claude-official') {
         // 官方Claude账号使用原有的转发服务（会自己选择账号）
+        // 🧹 内存优化：提取需要的值，避免闭包捕获整个 req 对象
+        const _apiKeyId = req.apiKey.id
+        const _rateLimitInfo = req.rateLimitInfo
+        const _requestBody = req.body  // 传递后清除引用
+        const _apiKey = req.apiKey
+        const _headers = req.headers
+
         await claudeRelayService.relayStreamRequestWithUsageCapture(
-          req.body,
-          req.apiKey,
+          _requestBody,
+          _apiKey,
           res,
-          req.headers,
+          _headers,
           (usageData) => {
             // 回调函数：当检测到完整usage数据时记录真实token使用量
             logger.info(
@@ -470,13 +477,13 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId, 'claude')
+                .recordUsageWithDetails(_apiKeyId, usageObject, model, usageAccountId, 'claude')
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
 
               queueRateLimitUpdate(
-                req.rateLimitInfo,
+                _rateLimitInfo,
                 {
                   inputTokens,
                   outputTokens,
@@ -501,11 +508,18 @@ async function handleMessagesRequest(req, res) {
         )
       } else if (accountType === 'claude-console') {
         // Claude Console账号使用Console转发服务（需要传递accountId）
+        // 🧹 内存优化：提取需要的值
+        const _apiKeyIdConsole = req.apiKey.id
+        const _rateLimitInfoConsole = req.rateLimitInfo
+        const _requestBodyConsole = req.body
+        const _apiKeyConsole = req.apiKey
+        const _headersConsole = req.headers
+
         await claudeConsoleRelayService.relayStreamRequestWithUsageCapture(
-          req.body,
-          req.apiKey,
+          _requestBodyConsole,
+          _apiKeyConsole,
           res,
-          req.headers,
+          _headersConsole,
           (usageData) => {
             // 回调函数：当检测到完整usage数据时记录真实token使用量
             logger.info(
@@ -556,7 +570,7 @@ async function handleMessagesRequest(req, res) {
 
               apiKeyService
                 .recordUsageWithDetails(
-                  req.apiKey.id,
+                  _apiKeyIdConsole,
                   usageObject,
                   model,
                   usageAccountId,
@@ -567,7 +581,7 @@ async function handleMessagesRequest(req, res) {
                 })
 
               queueRateLimitUpdate(
-                req.rateLimitInfo,
+                _rateLimitInfoConsole,
                 {
                   inputTokens,
                   outputTokens,
@@ -642,11 +656,18 @@ async function handleMessagesRequest(req, res) {
         }
       } else if (accountType === 'ccr') {
         // CCR账号使用CCR转发服务（需要传递accountId）
+        // 🧹 内存优化：提取需要的值
+        const _apiKeyIdCcr = req.apiKey.id
+        const _rateLimitInfoCcr = req.rateLimitInfo
+        const _requestBodyCcr = req.body
+        const _apiKeyCcr = req.apiKey
+        const _headersCcr = req.headers
+
         await ccrRelayService.relayStreamRequestWithUsageCapture(
-          req.body,
-          req.apiKey,
+          _requestBodyCcr,
+          _apiKeyCcr,
           res,
-          req.headers,
+          _headersCcr,
           (usageData) => {
             // 回调函数：当检测到完整usage数据时记录真实token使用量
             logger.info(
@@ -696,13 +717,13 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(req.apiKey.id, usageObject, model, usageAccountId, 'ccr')
+                .recordUsageWithDetails(_apiKeyIdCcr, usageObject, model, usageAccountId, 'ccr')
                 .catch((error) => {
                   logger.error('❌ Failed to record CCR stream usage:', error)
                 })
 
               queueRateLimitUpdate(
-                req.rateLimitInfo,
+                _rateLimitInfoCcr,
                 {
                   inputTokens,
                   outputTokens,
