@@ -652,13 +652,13 @@
                     </p>
                     <button
                       v-if="!userCode"
-                      class="btn-primary w-full"
+                      class="btn btn-primary px-4 py-2 text-sm"
                       :disabled="loading"
                       type="button"
                       @click="generateAuthUrl"
                     >
-                      <i v-if="loading" class="fas fa-spinner fa-spin mr-2" />
-                      <i v-else class="fas fa-key mr-2" />
+                      <i v-if="!loading" class="fas fa-key mr-2" />
+                      <div v-else class="loading-spinner mr-2" />
                       {{ loading ? '生成中...' : '生成设备码' }}
                     </button>
                     <div v-else class="space-y-4">
