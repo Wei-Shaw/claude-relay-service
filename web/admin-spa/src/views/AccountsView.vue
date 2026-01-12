@@ -7,7 +7,7 @@
             账户管理
           </h3>
           <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-            管理 Claude、Gemini、OpenAI 等账户与代理配置
+            管理 Claude、Gemini、OpenAI、Qwen 等账户与代理配置
           </p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -665,6 +665,19 @@
                       >
                     </div>
                     <div
+                      v-else-if="account.platform === 'qwen'"
+                      class="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-gradient-to-r from-orange-100 to-red-100 px-2.5 py-1 dark:border-orange-700 dark:from-orange-900/20 dark:to-red-900/20"
+                    >
+                      <i class="fas fa-cloud text-xs text-orange-700 dark:text-orange-400" />
+                      <span class="text-xs font-semibold text-orange-800 dark:text-orange-300"
+                        >Qwen</span
+                      >
+                      <span class="mx-1 h-4 w-px bg-orange-300 dark:bg-orange-600" />
+                      <span class="text-xs font-medium text-orange-700 dark:text-orange-300"
+                        >OAuth</span
+                      >
+                    </div>
+                    <div
                       v-else
                       class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gradient-to-r from-gray-100 to-gray-200 px-2.5 py-1"
                     >
@@ -1165,7 +1178,8 @@
                       account.platform === 'azure_openai' ||
                       account.platform === 'ccr' ||
                       account.platform === 'droid' ||
-                      account.platform === 'gemini-api'
+                      account.platform === 'gemini-api' ||
+                      account.platform === 'qwen'
                     "
                     class="flex items-center gap-2"
                   >
@@ -2204,7 +2218,8 @@ const supportedUsagePlatforms = [
   'gemini',
   'droid',
   'gemini-api',
-  'bedrock'
+  'bedrock',
+  'qwen'
 ]
 
 // 过期时间编辑弹窗状态
@@ -2280,6 +2295,12 @@ const platformHierarchy = [
     label: 'Droid（全部）',
     icon: 'fa-robot',
     children: [{ value: 'droid', label: 'Droid', icon: 'fa-robot' }]
+  },
+  {
+    value: 'group-qwen',
+    label: 'Qwen（全部）',
+    icon: 'fa-cloud',
+    children: [{ value: 'qwen', label: 'Qwen（通义千问）', icon: 'fa-cloud' }]
   }
 ]
 
@@ -2288,7 +2309,8 @@ const platformGroupMap = {
   'group-claude': ['claude', 'claude-console', 'bedrock', 'ccr'],
   'group-openai': ['openai', 'openai-responses', 'azure_openai'],
   'group-gemini': ['gemini', 'gemini-api'],
-  'group-droid': ['droid']
+  'group-droid': ['droid'],
+  'group-qwen': ['qwen']
 }
 
 // 平台请求处理器
@@ -2302,7 +2324,8 @@ const platformRequestHandlers = {
   'openai-responses': (params) => apiClient.get('/admin/openai-responses-accounts', { params }),
   ccr: (params) => apiClient.get('/admin/ccr-accounts', { params }),
   droid: (params) => apiClient.get('/admin/droid-accounts', { params }),
-  'gemini-api': (params) => apiClient.get('/admin/gemini-api-accounts', { params })
+  'gemini-api': (params) => apiClient.get('/admin/gemini-api-accounts', { params }),
+  qwen: (params) => apiClient.get('/admin/qwen-accounts', { params })
 }
 
 const allPlatformKeys = Object.keys(platformRequestHandlers)
@@ -2345,7 +2368,7 @@ const groupOptions = computed(() => {
   accountGroups.value.forEach((group) => {
     options.push({
       value: group.id,
-      label: `${group.name} (${group.platform === 'claude' ? 'Claude' : group.platform === 'gemini' ? 'Gemini' : group.platform === 'openai' ? 'OpenAI' : 'Droid'})`,
+      label: `${group.name} (${group.platform === 'claude' ? 'Claude' : group.platform === 'gemini' ? 'Gemini' : group.platform === 'openai' ? 'OpenAI' : group.platform === 'qwen' ? 'Qwen' : 'Droid'})`,
       icon:
         group.platform === 'claude'
           ? 'fa-brain'
@@ -2353,7 +2376,9 @@ const groupOptions = computed(() => {
             ? 'fa-robot'
             : group.platform === 'openai'
               ? 'fa-openai'
-              : 'fa-robot'
+              : group.platform === 'qwen'
+                ? 'fa-cloud'
+                : 'fa-robot'
     })
   })
   return options
@@ -2590,7 +2615,6 @@ const handleScheduledTestSaved = () => {
 // 余额脚本配置
 const showBalanceScriptModal = ref(false)
 const selectedAccountForScript = ref(null)
-
 const openBalanceScriptModal = (account) => {
   selectedAccountForScript.value = account
   showBalanceScriptModal.value = true
@@ -2734,7 +2758,8 @@ const accountStats = computed(() => {
     { value: 'bedrock', label: 'Bedrock' },
     { value: 'openai-responses', label: 'OpenAI-Responses' },
     { value: 'ccr', label: 'CCR' },
-    { value: 'droid', label: 'Droid' }
+    { value: 'droid', label: 'Droid' },
+    { value: 'qwen', label: 'Qwen' }
   ]
 
   return platforms
@@ -3194,6 +3219,14 @@ const loadAccounts = async (forceReload = false) => {
           const items = list.map((acc) => {
             const boundApiKeysCount = counts.droidAccountId?.[acc.id] || acc.boundApiKeysCount || 0
             return { ...acc, platform: 'droid', boundApiKeysCount }
+          })
+          allAccounts.push(...items)
+          break
+        }
+        case 'qwen': {
+          const items = list.map((acc) => {
+            const boundApiKeysCount = counts.qwenAccountId?.[acc.id] || acc.boundApiKeysCount || 0
+            return { ...acc, platform: 'qwen', boundApiKeysCount }
           })
           allAccounts.push(...items)
           break
@@ -3702,6 +3735,8 @@ const resolveAccountDeleteEndpoint = (account) => {
       return `/admin/gemini-accounts/${account.id}`
     case 'droid':
       return `/admin/droid-accounts/${account.id}`
+    case 'qwen':
+      return `/admin/qwen-accounts/${account.id}`
     case 'gemini-api':
       return `/admin/gemini-api-accounts/${account.id}`
     default:
@@ -3961,11 +3996,18 @@ const toggleSchedulable = async (account) => {
 }
 
 // 处理创建成功
-const handleCreateSuccess = () => {
+const handleCreateSuccess = (createdAccount) => {
   showCreateAccountModal.value = false
   showToast('账户创建成功', 'success')
   // 清空缓存，因为可能涉及分组关系变化
   clearCache()
+  // 如果当前筛选不是"所有平台"，且新建账户的平台不在当前筛选中，自动切换到该平台
+  if (platformFilter.value !== 'all' && createdAccount?.platform) {
+    const platformsToFetch = getPlatformsForFilter(platformFilter.value)
+    if (!platformsToFetch.includes(createdAccount.platform)) {
+      platformFilter.value = createdAccount.platform
+    }
+  }
   loadAccounts()
 }
 
@@ -4743,6 +4785,9 @@ const handleSaveAccountExpiry = async ({ accountId, expiresAt }) => {
         break
       case 'droid':
         endpoint = `/admin/droid-accounts/${accountId}` // 使用 :id
+        break
+      case 'qwen':
+        endpoint = `/admin/qwen-accounts/${accountId}` // 使用 :id
         break
       case 'azure_openai':
         endpoint = `/admin/azure-openai-accounts/${accountId}` // 使用 :id

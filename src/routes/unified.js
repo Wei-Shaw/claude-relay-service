@@ -8,6 +8,7 @@ const {
   handleStreamGenerateContent: geminiHandleStreamGenerateContent
 } = require('../handlers/geminiHandlers')
 const openaiRoutes = require('./openaiRoutes')
+const qwenRelayService = require('../services/qwenRelayService')
 const apiKeyService = require('../services/apiKeyService')
 
 const router = express.Router()
@@ -33,6 +34,11 @@ function detectBackendFromModel(modelName) {
   // OpenAI 模型
   if (model.startsWith('gpt-')) {
     return 'openai'
+  }
+
+  // Qwen 模型（包括 qwen, qwq 系列）
+  if (model.startsWith('qwen')) {
+    return 'qwen'
   }
 
   // 默认使用 Claude
@@ -100,6 +106,21 @@ async function routeToBackend(req, res, requestedModel) {
     } else {
       return await geminiHandleGenerateContent(req, res)
     }
+  } else if (backend === 'qwen') {
+    // Qwen 后端
+    if (!apiKeyService.hasPermission(permissions, 'qwen')) {
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access Qwen',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
+
+    // Qwen 使用 OpenAI 兼容格式，直接转发
+    const sessionHash = req.sessionHash || null
+    return await qwenRelayService.relayRequest(req.body, req.apiKey, req, res, { sessionHash })
   } else {
     return res.status(500).json({
       error: {

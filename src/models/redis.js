@@ -1419,6 +1419,52 @@ class RedisClient {
     return await this.client.del(key)
   }
 
+  // 🤖 Qwen 账户相关操作
+  async setQwenAccount(accountId, accountData) {
+    const key = `qwen:account:${accountId}`
+    await this.client.hset(key, accountData)
+  }
+
+  async getQwenAccount(accountId) {
+    const key = `qwen:account:${accountId}`
+    return await this.client.hgetall(key)
+  }
+
+  async getAllQwenAccounts() {
+    const keys = await this.client.keys('qwen:account:*')
+    const accounts = []
+    for (const key of keys) {
+      const accountData = await this.client.hgetall(key)
+      if (accountData && Object.keys(accountData).length > 0) {
+        accounts.push({ id: key.replace('qwen:account:', ''), ...accountData })
+      }
+    }
+    return accounts
+  }
+
+  async deleteQwenAccount(accountId) {
+    const key = `qwen:account:${accountId}`
+    return await this.client.del(key)
+  }
+
+  // Qwen OAuth Device Session 相关操作
+  async setQwenDeviceSession(sessionId, sessionData) {
+    const key = `qwen:device_session:${sessionId}`
+    const ttl = sessionData.expiresIn || 600 // 默认 10 分钟
+    await this.client.hset(key, sessionData)
+    await this.client.expire(key, ttl)
+  }
+
+  async getQwenDeviceSession(sessionId) {
+    const key = `qwen:device_session:${sessionId}`
+    return await this.client.hgetall(key)
+  }
+
+  async deleteQwenDeviceSession(sessionId) {
+    const key = `qwen:device_session:${sessionId}`
+    return await this.client.del(key)
+  }
+
   async setOpenAiAccount(accountId, accountData) {
     const key = `openai:account:${accountId}`
     await this.client.hset(key, accountData)

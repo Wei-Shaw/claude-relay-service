@@ -12,6 +12,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const azureOpenaiAccounts = ref([])
   const openaiResponsesAccounts = ref([])
   const droidAccounts = ref([])
+  const qwenAccounts = ref([])
   const loading = ref(false)
   const error = ref(null)
   const sortBy = ref('')
@@ -171,6 +172,25 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
+  // 获取Qwen账户列表
+  const fetchQwenAccounts = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.get('/admin/qwen-accounts')
+      if (response.success) {
+        qwenAccounts.value = response.data || []
+      } else {
+        throw new Error(response.message || '获取Qwen账户失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 获取所有账户
   const fetchAllAccounts = async () => {
     loading.value = true
@@ -184,7 +204,8 @@ export const useAccountsStore = defineStore('accounts', () => {
         fetchOpenAIAccounts(),
         fetchAzureOpenAIAccounts(),
         fetchOpenAIResponsesAccounts(),
-        fetchDroidAccounts()
+        fetchDroidAccounts(),
+        fetchQwenAccounts()
       ])
     } catch (err) {
       error.value = err.message
@@ -325,6 +346,26 @@ export const useAccountsStore = defineStore('accounts', () => {
         return response.data
       } else {
         throw new Error(response.message || '更新Droid账户失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 创建Qwen账户
+  const createQwenAccount = async (data) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.post('/admin/qwen-accounts', data)
+      if (response.success) {
+        await fetchQwenAccounts()
+        return response.data
+      } else {
+        throw new Error(response.message || '创建Qwen账户失败')
       }
     } catch (err) {
       error.value = err.message
@@ -554,6 +595,26 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
+  // 更新Qwen账户
+  const updateQwenAccount = async (id, data) => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.put(`/admin/qwen-accounts/${id}`, data)
+      if (response.success) {
+        await fetchQwenAccounts()
+        return response
+      } else {
+        throw new Error(response.message || '更新Qwen账户失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 切换账户状态
   const toggleAccount = async (platform, id) => {
     loading.value = true
@@ -574,6 +635,8 @@ export const useAccountsStore = defineStore('accounts', () => {
         endpoint = `/admin/azure-openai-accounts/${id}/toggle`
       } else if (platform === 'openai-responses') {
         endpoint = `/admin/openai-responses-accounts/${id}/toggle`
+      } else if (platform === 'qwen') {
+        endpoint = `/admin/qwen-accounts/${id}/toggle-schedulable`
       } else {
         endpoint = `/admin/openai-accounts/${id}/toggle`
       }
@@ -594,6 +657,8 @@ export const useAccountsStore = defineStore('accounts', () => {
           await fetchAzureOpenAIAccounts()
         } else if (platform === 'openai-responses') {
           await fetchOpenAIResponsesAccounts()
+        } else if (platform === 'qwen') {
+          await fetchQwenAccounts()
         } else {
           await fetchOpenAIAccounts()
         }
@@ -629,6 +694,8 @@ export const useAccountsStore = defineStore('accounts', () => {
         endpoint = `/admin/azure-openai-accounts/${id}`
       } else if (platform === 'openai-responses') {
         endpoint = `/admin/openai-responses-accounts/${id}`
+      } else if (platform === 'qwen') {
+        endpoint = `/admin/qwen-accounts/${id}`
       } else {
         endpoint = `/admin/openai-accounts/${id}`
       }
@@ -649,6 +716,8 @@ export const useAccountsStore = defineStore('accounts', () => {
           await fetchAzureOpenAIAccounts()
         } else if (platform === 'openai-responses') {
           await fetchOpenAIResponsesAccounts()
+        } else if (platform === 'qwen') {
+          await fetchQwenAccounts()
         } else {
           await fetchOpenAIAccounts()
         }
@@ -871,6 +940,49 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
+  // 生成Qwen设备码 (Device Code Flow)
+  const generateQwenDeviceCode = async (proxyConfig) => {
+    error.value = null
+    try {
+      const response = await apiClient.post(
+        '/admin/qwen-accounts/generate-device-code',
+        proxyConfig
+      )
+      if (response.success) {
+        return response.data
+      } else {
+        throw new Error(response.message || '生成设备码失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    }
+  }
+
+  // 轮询Qwen授权状态
+  const pollQwenToken = async (sessionId) => {
+    error.value = null
+    try {
+      const response = await apiClient.post('/admin/qwen-accounts/poll-token', { sessionId })
+      if (response.success) {
+        return { success: true, data: response.data }
+      } else if (response.pending) {
+        // 授权待处理
+        return {
+          success: false,
+          pending: true,
+          error: response.error,
+          retryAfter: response.retryAfter
+        }
+      } else {
+        throw new Error(response.message || '授权失败')
+      }
+    } catch (err) {
+      error.value = err.message
+      throw err
+    }
+  }
+
   // 排序账户
   const sortAccounts = (field) => {
     if (sortBy.value === field) {
@@ -891,6 +1003,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     azureOpenaiAccounts.value = []
     openaiResponsesAccounts.value = []
     droidAccounts.value = []
+    qwenAccounts.value = []
     loading.value = false
     error.value = null
     sortBy.value = ''
@@ -907,6 +1020,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     azureOpenaiAccounts,
     openaiResponsesAccounts,
     droidAccounts,
+    qwenAccounts,
     loading,
     error,
     sortBy,
@@ -921,6 +1035,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     fetchAzureOpenAIAccounts,
     fetchOpenAIResponsesAccounts,
     fetchDroidAccounts,
+    fetchQwenAccounts,
     fetchAllAccounts,
     createClaudeAccount,
     createClaudeConsoleAccount,
@@ -928,6 +1043,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     createGeminiAccount,
     createOpenAIAccount,
     createDroidAccount,
+    createQwenAccount,
     updateDroidAccount,
     createAzureOpenAIAccount,
     createOpenAIResponsesAccount,
@@ -940,6 +1056,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     updateAzureOpenAIAccount,
     updateOpenAIResponsesAccount,
     updateGeminiApiAccount,
+    updateQwenAccount,
     toggleAccount,
     deleteAccount,
     refreshClaudeToken,
@@ -955,6 +1072,8 @@ export const useAccountsStore = defineStore('accounts', () => {
     exchangeOpenAICode,
     generateDroidAuthUrl,
     exchangeDroidCode,
+    generateQwenDeviceCode,
+    pollQwenToken,
     sortAccounts,
     reset
   }

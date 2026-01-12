@@ -20,6 +20,7 @@ function registerAllProviders(balanceService) {
   balanceService.registerProvider('bedrock', new GenericBalanceProvider('bedrock'))
   balanceService.registerProvider('droid', new GenericBalanceProvider('droid'))
   balanceService.registerProvider('ccr', new GenericBalanceProvider('ccr'))
+  balanceService.registerProvider('qwen', new GenericBalanceProvider('qwen'))
 }
 
 module.exports = { registerAllProviders }

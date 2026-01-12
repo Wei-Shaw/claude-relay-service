@@ -30,7 +30,8 @@ class AccountBalanceService {
       'azure_openai',
       'bedrock',
       'droid',
-      'ccr'
+      'ccr',
+      'qwen'
     ]
   }
 

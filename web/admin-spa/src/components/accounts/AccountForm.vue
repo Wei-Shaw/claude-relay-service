@@ -204,6 +204,37 @@
                       <p class="text-xs text-gray-600 dark:text-gray-400">Claude Droid</p>
                     </div>
                   </div>
+
+                  <!-- Qwen 分组 -->
+                  <div
+                    class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
+                    :class="[
+                      platformGroup === 'qwen'
+                        ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-red-50 shadow-md dark:from-orange-900/20 dark:to-red-900/20'
+                        : 'border-gray-200 bg-white hover:border-orange-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-orange-600'
+                    ]"
+                    @click="selectPlatformGroup('qwen')"
+                  >
+                    <div class="p-3">
+                      <div class="flex items-center justify-between">
+                        <div
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-orange-500 to-red-500"
+                        >
+                          <i class="fas fa-cloud text-sm text-white"></i>
+                        </div>
+                        <div
+                          v-if="platformGroup === 'qwen'"
+                          class="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </div>
+                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Qwen
+                      </h4>
+                      <p class="text-xs text-gray-600 dark:text-gray-400">通义千问</p>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- 子平台选择器 -->
@@ -563,6 +594,37 @@
                         <div
                           v-if="form.platform === 'droid'"
                           class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </label>
+                    </template>
+
+                    <!-- Qwen 子选项 -->
+                    <template v-if="platformGroup === 'qwen'">
+                      <label
+                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
+                        :class="[
+                          form.platform === 'qwen'
+                            ? 'border-orange-500 bg-orange-50 dark:border-orange-400 dark:bg-orange-900/30'
+                            : 'border-gray-300 bg-white hover:border-orange-400 hover:bg-orange-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-orange-500 dark:hover:bg-orange-900/20'
+                        ]"
+                      >
+                        <input v-model="form.platform" class="sr-only" type="radio" value="qwen" />
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-cloud text-sm text-orange-600 dark:text-orange-400"></i>
+                          <div>
+                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                              >Qwen OAuth</span
+                            >
+                            <span class="text-xs text-gray-500 dark:text-gray-400"
+                              >Device Code Flow</span
+                            >
+                          </div>
+                        </div>
+                        <div
+                          v-if="form.platform === 'qwen'"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
@@ -2282,6 +2344,7 @@
           :platform="form.platform"
           :proxy="form.proxy"
           @back="oauthStep = 1"
+          @oauth-success="handleOAuthSuccess"
           @success="handleOAuthSuccess"
         />
 
@@ -4189,7 +4252,12 @@ const form = ref({
   platform: props.account?.platform || 'claude',
   addType: (() => {
     const platform = props.account?.platform || 'claude'
-    if (platform === 'gemini' || platform === 'gemini-antigravity' || platform === 'openai')
+    if (
+      platform === 'gemini' ||
+      platform === 'gemini-antigravity' ||
+      platform === 'openai' ||
+      platform === 'qwen'
+    )
       return 'oauth'
     if (platform === 'claude') return 'oauth'
     return 'manual'
@@ -4538,6 +4606,8 @@ const selectPlatformGroup = (group) => {
     form.value.platform = 'gemini' // Default to Gemini CLI, user can select Antigravity
   } else if (group === 'droid') {
     form.value.platform = 'droid'
+  } else if (group === 'qwen') {
+    form.value.platform = 'qwen'
   }
 }
 
@@ -5030,6 +5100,20 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
           data.userId = user.id.trim()
         }
       }
+    } else if (currentPlatform === 'qwen') {
+      // Qwen 使用 qwenOauth 字段
+      const qwenOauthData = tokenInfo.qwenOauth || tokenInfo
+      if (!qwenOauthData || !qwenOauthData.accessToken) {
+        loading.value = false
+        showToast('授权成功但未返回有效的访问令牌，请重试。', 'error')
+        return
+      }
+      data.qwenOauth = qwenOauthData
+      data.priority = form.value.priority || 50
+      // 如果有订阅到期时间，也传递
+      if (form.value.expiresAt) {
+        data.subscriptionExpiresAt = form.value.expiresAt
+      }
     }
 
     let result
@@ -5041,6 +5125,8 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       result = await accountsStore.createOpenAIAccount(data)
     } else if (currentPlatform === 'droid') {
       result = await accountsStore.createDroidAccount(data)
+    } else if (currentPlatform === 'qwen') {
+      result = await accountsStore.createQwenAccount(data)
     } else {
       result = await accountsStore.createGeminiAccount(data)
     }
@@ -6030,6 +6116,9 @@ watch(
       form.value.addType = 'oauth'
     } else if (newPlatform === 'openai') {
       // 切换到 OpenAI 时，使用 OAuth 作为默认方式
+      form.value.addType = 'oauth'
+    } else if (newPlatform === 'qwen') {
+      // 切换到 Qwen 时，使用 OAuth 作为默认方式（Device Code Flow）
       form.value.addType = 'oauth'
     } else if (newPlatform === 'gemini-api' || newPlatform === 'azure_openai') {
       // 切换到 Gemini API 或 Azure OpenAI 时，使用 apikey 模式（直接创建，不需要 OAuth 流程）

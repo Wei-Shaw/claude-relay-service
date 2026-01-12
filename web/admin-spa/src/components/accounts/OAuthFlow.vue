@@ -615,6 +615,191 @@
       </div>
     </div>
 
+    <!-- Qwen OAuth流程 (Device Code Flow) -->
+    <div v-else-if="platform === 'qwen'">
+      <!-- Qwen 流程已加载 -->
+      <div
+        class="rounded-lg border border-orange-200 bg-orange-50 p-6 dark:border-orange-700 dark:bg-orange-900/30"
+      >
+        <div class="flex items-start gap-4">
+          <div
+            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-orange-500"
+          >
+            <i class="fas fa-cloud text-white" />
+          </div>
+          <div class="flex-1">
+            <h4 class="mb-3 font-semibold text-orange-900 dark:text-orange-200">
+              Qwen 账户授权（Device Code Flow）
+            </h4>
+            <p class="mb-4 text-sm text-orange-800 dark:text-orange-300">
+              请按照以下步骤完成 Qwen（通义千问）账户的授权：
+            </p>
+
+            <div class="space-y-4">
+              <!-- 步骤1: 生成设备码 -->
+              <div
+                class="rounded-lg border border-orange-300 bg-white/80 p-4 dark:border-orange-600 dark:bg-gray-800/80"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white"
+                  >
+                    1
+                  </div>
+                  <div class="flex-1">
+                    <p class="mb-2 font-medium text-orange-900 dark:text-orange-200">
+                      点击下方按钮生成设备码和用户码
+                    </p>
+                    <button
+                      v-if="!userCode"
+                      class="btn-primary w-full"
+                      :disabled="loading"
+                      type="button"
+                      @click="generateAuthUrl"
+                    >
+                      <i v-if="loading" class="fas fa-spinner fa-spin mr-2" />
+                      <i v-else class="fas fa-key mr-2" />
+                      {{ loading ? '生成中...' : '生成设备码' }}
+                    </button>
+                    <div v-else class="space-y-4">
+                      <!-- 授权链接显示 -->
+                      <div class="space-y-2">
+                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+                          >授权链接</label
+                        >
+                        <div
+                          class="flex flex-col gap-2 rounded-md border border-orange-200 bg-white p-3 dark:border-orange-700 dark:bg-gray-800"
+                        >
+                          <div class="flex items-center gap-2">
+                            <input
+                              class="form-input flex-1 bg-gray-50 font-mono text-xs dark:bg-gray-700"
+                              readonly
+                              type="text"
+                              :value="verificationUriComplete"
+                            />
+                            <button
+                              class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+                              title="复制链接"
+                              @click="copyAuthUrl"
+                            >
+                              <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
+                            </button>
+                          </div>
+                          <div class="flex flex-wrap items-center gap-2">
+                            <a
+                              class="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-white px-3 py-1.5 text-xs font-medium text-orange-600 shadow-sm transition-colors hover:border-orange-300 hover:bg-orange-50 dark:border-orange-700 dark:bg-orange-900/40 dark:text-orange-200 dark:hover:border-orange-500 dark:hover:bg-orange-900/60"
+                              :href="verificationUriComplete"
+                              rel="noopener noreferrer"
+                              target="_blank"
+                            >
+                              <i class="fas fa-external-link-alt text-xs" /> 在新标签中打开
+                            </a>
+                            <button
+                              class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200"
+                              @click="regenerateAuthUrl"
+                            >
+                              <i class="fas fa-sync-alt text-xs" />重新生成
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <!-- 用户码显示 -->
+                      <div class="space-y-2">
+                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+                          >用户码</label
+                        >
+                        <div
+                          class="flex items-center justify-between rounded-md border border-orange-200 bg-orange-50 px-4 py-3 dark:border-orange-700 dark:bg-orange-900/30"
+                        >
+                          <span
+                            class="font-mono text-xl font-semibold text-orange-700 dark:text-orange-200"
+                          >
+                            {{ userCode }}
+                          </span>
+                          <button
+                            class="rounded-lg bg-white px-3 py-1 text-sm text-orange-600 transition-colors hover:bg-orange-100 dark:bg-orange-800 dark:text-orange-200 dark:hover:bg-orange-700"
+                            @click="copyUserCode"
+                          >
+                            <i class="fas fa-copy mr-1" />复制
+                          </button>
+                        </div>
+                      </div>
+                      <!-- 倒计时 -->
+                      <div
+                        v-if="remainingSeconds > 0"
+                        class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                      >
+                        <span>
+                          <i class="fas fa-hourglass-half mr-1 text-orange-500" />
+                          剩余有效期：{{ formatTime(remainingSeconds) }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 步骤2: 完成授权 -->
+              <div
+                class="rounded-lg border border-orange-300 bg-white/80 p-4 dark:border-orange-600 dark:bg-gray-800/80"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white"
+                  >
+                    2
+                  </div>
+                  <div class="flex-1 space-y-3">
+                    <p class="mb-2 font-medium text-orange-900 dark:text-orange-200">完成授权</p>
+                    <div
+                      v-if="!userCode"
+                      class="space-y-2 text-sm text-orange-700 dark:text-orange-300"
+                    >
+                      <p>请先完成步骤1，生成设备码和用户码后，再按照以下步骤完成授权：</p>
+                      <ol class="list-inside list-decimal space-y-1">
+                        <li>在浏览器中打开授权链接</li>
+                        <li>输入用户码并登录 Qwen 账户</li>
+                        <li>点击允许授权</li>
+                        <li>授权成功后系统会自动完成配置</li>
+                      </ol>
+                    </div>
+                    <div v-else class="space-y-2 text-sm text-orange-700 dark:text-orange-300">
+                      <p>
+                        在浏览器中打开上方授权链接，输入用户码并登录 Qwen
+                        账户，最后点击允许授权。授权成功后系统会自动完成配置。
+                      </p>
+                    </div>
+
+                    <!-- 轮询状态提示 -->
+                    <div
+                      v-if="polling && !qwenAuthorized"
+                      class="rounded-lg border border-blue-300 bg-blue-50 p-3 text-center dark:border-blue-700 dark:bg-blue-900/30"
+                    >
+                      <i class="fas fa-spinner fa-spin mr-2 text-blue-600 dark:text-blue-400" />
+                      <span class="text-sm text-blue-700 dark:text-blue-300">
+                        正在等待授权完成...
+                      </span>
+                    </div>
+
+                    <!-- 授权成功提示 -->
+                    <div
+                      v-if="qwenAuthorized"
+                      class="rounded-lg border border-green-300 bg-green-50 p-3 text-center dark:border-green-700 dark:bg-green-900/30"
+                    >
+                      <i class="fas fa-check-circle mr-2 text-green-600 dark:text-green-400" />
+                      <span class="text-sm text-green-700 dark:text-green-300">
+                        ✅ 授权成功！正在创建账户...
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Droid OAuth流程 -->
     <div v-else-if="platform === 'droid'">
       <div
@@ -787,9 +972,12 @@
       >
         上一步
       </button>
-      <!-- Cookie自动授权模式不显示此按钮（Claude平台） -->
+      <!-- 
+        Qwen 使用 Device Code Flow，授权是自动完成的，不需要"完成授权"按钮
+        Cookie自动授权模式也不显示此按钮（Claude平台）
+      -->
       <button
-        v-if="!(platform === 'claude' && authMethod === 'cookie')"
+        v-if="!(platform === 'claude' && authMethod === 'cookie') && platform !== 'qwen'"
         class="btn btn-primary flex-1 px-6 py-3 font-semibold"
         :disabled="!canExchange || exchanging"
         type="button"
@@ -803,7 +991,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onUnmounted } from 'vue'
 import { showToast } from '@/utils/toast'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -818,7 +1006,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['success', 'back'])
+const emit = defineEmits(['success', 'oauth-success', 'back'])
 
 const accountsStore = useAccountsStore()
 
@@ -841,6 +1029,9 @@ const verificationUri = ref('')
 const verificationUriComplete = ref('')
 const remainingSeconds = ref(0)
 let countdownTimer = null
+const polling = ref(false) // Qwen 轮询状态
+const qwenAuthorized = ref(false) // Qwen 授权成功状态
+let pollTimer = null // Qwen 轮询定时器
 
 // Cookie自动授权相关状态
 const authMethod = ref('manual') // 'manual' | 'cookie'
@@ -967,6 +1158,7 @@ watch(authCode, (newValue) => {
 // 生成授权URL
 const generateAuthUrl = async () => {
   stopCountdown()
+  stopQwenPolling()
   authUrl.value = ''
   authCode.value = ''
   userCode.value = ''
@@ -975,6 +1167,8 @@ const generateAuthUrl = async () => {
   remainingSeconds.value = 0
   sessionId.value = ''
   copied.value = false
+  polling.value = false
+  qwenAuthorized.value = false
   loading.value = true
   try {
     const proxyConfig = props.proxy?.enabled
@@ -1012,6 +1206,23 @@ const generateAuthUrl = async () => {
       userCode.value = result.userCode
       startCountdown(result.expiresIn || 300)
       sessionId.value = result.sessionId
+    } else if (props.platform === 'qwen') {
+      const result = await accountsStore.generateQwenDeviceCode(proxyConfig)
+      verificationUri.value = result.verificationUri || ''
+      verificationUriComplete.value = result.verificationUriComplete || ''
+      userCode.value = result.userCode || ''
+      sessionId.value = result.sessionId || ''
+      if (result.expiresIn) {
+        startCountdown(result.expiresIn)
+      } else {
+        startCountdown(600)
+      }
+      // 开始轮询
+      if (result.sessionId && result.interval) {
+        startQwenPolling(result.sessionId, result.interval)
+      } else if (result.sessionId) {
+        startQwenPolling(result.sessionId, 5)
+      }
     }
   } catch (error) {
     showToast(error.message || '生成授权链接失败', 'error')
@@ -1037,12 +1248,15 @@ const regenerateAuthUrl = () => {
 
 // 复制授权URL
 const copyAuthUrl = async () => {
-  if (!authUrl.value) {
+  // 对于 Qwen 平台，使用 verificationUriComplete；其他平台使用 authUrl
+  const urlToCopy = props.platform === 'qwen' ? verificationUriComplete.value : authUrl.value
+
+  if (!urlToCopy) {
     showToast('请先生成授权链接', 'warning')
     return
   }
   try {
-    await navigator.clipboard.writeText(authUrl.value)
+    await navigator.clipboard.writeText(urlToCopy)
     copied.value = true
     showToast('链接已复制', 'success')
     setTimeout(() => {
@@ -1051,7 +1265,7 @@ const copyAuthUrl = async () => {
   } catch (error) {
     // 降级方案
     const input = document.createElement('input')
-    input.value = authUrl.value
+    input.value = urlToCopy
     document.body.appendChild(input)
     input.select()
     document.execCommand('copy')
@@ -1258,6 +1472,72 @@ const onAuthMethodChange = () => {
   authCode.value = ''
   sessionId.value = ''
 }
+
+// Qwen 轮询授权状态
+const startQwenPolling = async (sid, interval) => {
+  stopQwenPolling()
+  polling.value = true
+
+  const poll = async () => {
+    try {
+      const result = await accountsStore.pollQwenToken(sid)
+
+      if (result.success) {
+        // 授权成功
+        stopQwenPolling()
+        stopCountdown()
+        polling.value = false
+        qwenAuthorized.value = true
+        showToast('✅ Qwen 授权成功！', 'success')
+        // 触发创建账户
+        emit('oauth-success', result.data)
+        return
+      }
+
+      if (result.pending) {
+        // 继续等待
+        return
+      }
+
+      // 授权失败或过期
+      stopQwenPolling()
+      polling.value = false
+      showToast(result.message || '授权失败，请重试', 'error')
+    } catch (error) {
+      console.error('Qwen polling error:', error)
+      stopQwenPolling()
+      polling.value = false
+      showToast('轮询授权状态失败，请重试', 'error')
+    }
+  }
+
+  // 立即执行一次
+  await poll()
+
+  // 设置定时轮询
+  pollTimer = setInterval(poll, interval * 1000)
+}
+
+const stopQwenPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+  polling.value = false
+}
+
+// 格式化时间显示
+const formatTime = (seconds) => {
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${minutes} 分 ${secs.toString().padStart(2, '0')} 秒`
+}
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  stopCountdown()
+  stopQwenPolling()
+})
 
 // 暴露方法供父组件调用
 defineExpose({
