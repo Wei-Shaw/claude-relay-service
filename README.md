@@ -374,6 +374,16 @@ docker-compose.yml 已包含：
 
 **注意**: 如果你在国内，这一步可能需要科学上网。
 
+**添加 Qwen (通义千问) 账户：**
+
+1. 点击「Qwen 账户」标签
+2. 点击「添加账户」
+3. 点击「生成设备码」，会显示授权链接和设备码
+4. 打开授权链接，在新页面登录通义千问账户并授权
+5. 授权完成后，系统会自动检测并完成账户添加
+
+> **提示**：Qwen 使用 Device Code Flow 授权方式，无需手动复制 Authorization Code。
+
 ### 3. 创建API Key
 
 给每个使用者分配一个Key：
@@ -474,6 +484,38 @@ claude
 ```bash
 gemini  # 或其他 Gemini CLI 命令
 ```
+
+**Qwen (通义千问) 配置：**
+
+使用 OpenAI 兼容格式访问 Qwen 模型：
+
+```bash
+# 方式一：使用 OpenAI SDK
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:3000/openai/v1",  # 根据实际填写你服务器的ip地址或者域名
+    api_key="后台创建的API密钥"
+)
+
+response = client.chat.completions.create(
+    model="qwen3-coder-plus",  # 或其他支持的 Qwen 模型
+    messages=[{"role": "user", "content": "你好"}]
+)
+```
+
+```bash
+# 方式二：使用 curl 命令
+curl -X POST http://127.0.0.1:3000/openai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer 后台创建的API密钥" \
+  -d '{
+    "model": "qwen3-coder-plus",
+    "messages": [{"role": "user", "content": "你好"}]
+  }'
+```
+
+> **注意**：使用 Qwen 前需要在管理后台添加 Qwen 账户，并确保 API Key 权限包含 `all` 或 `qwen`。
 
 **Codex 配置：**
 

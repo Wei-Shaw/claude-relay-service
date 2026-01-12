@@ -467,6 +467,98 @@
           </div>
         </div>
 
+        <!-- Qwen Code 环境变量设置 -->
+        <div class="mt-8">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
+          >
+            <i class="fas fa-brain mr-2 text-orange-600" />
+            配置 Qwen Code 环境变量
+          </h5>
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
+            如果你使用 Qwen Code，需要设置以下 OpenAI 兼容环境变量：
+          </p>
+
+          <div class="space-y-4">
+            <div
+              class="rounded-lg border border-orange-200 bg-white p-3 dark:border-orange-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                PowerShell 设置方法
+              </h6>
+              <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                在 PowerShell 中运行以下命令：
+              </p>
+              <div
+                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="whitespace-nowrap text-gray-300">
+                  $env:OPENAI_BASE_URL = "{{ openaiBaseUrl }}"
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  $env:OPENAI_API_KEY = "你的API密钥"
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  $env:OPENAI_MODEL = "qwen3-coder-plus"
+                </div>
+              </div>
+              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
+                💡 使用与 Claude Code 相同的 API 密钥即可。Qwen Code 通过 OpenAI 兼容格式访问。
+              </p>
+            </div>
+
+            <div
+              class="rounded-lg border border-orange-200 bg-white p-3 dark:border-orange-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                PowerShell 永久设置（用户级）
+              </h6>
+              <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                在 PowerShell 中运行以下命令：
+              </p>
+              <div
+                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="mb-2"># 设置用户级环境变量（永久生效）</div>
+                <div class="whitespace-nowrap text-gray-300">
+                  [System.Environment]::SetEnvironmentVariable("OPENAI_BASE_URL", "{{
+                    openaiBaseUrl
+                  }}", [System.EnvironmentVariableTarget]::User)
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  [System.Environment]::SetEnvironmentVariable("OPENAI_API_KEY", "你的API密钥",
+                  [System.EnvironmentVariableTarget]::User)
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  [System.Environment]::SetEnvironmentVariable("OPENAI_MODEL", "qwen3-coder-plus",
+                  [System.EnvironmentVariableTarget]::User)
+                </div>
+              </div>
+              <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                💡 设置后需要重新打开 PowerShell 窗口才能生效。
+              </p>
+            </div>
+
+            <div
+              class="rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-500/40 dark:bg-orange-950/30 sm:p-4"
+            >
+              <h6 class="mb-2 font-medium text-orange-800 dark:text-orange-300">
+                验证 Qwen Code 环境变量
+              </h6>
+              <p class="mb-3 text-sm text-orange-700 dark:text-orange-300">
+                在 PowerShell 中验证：
+              </p>
+              <div
+                class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="whitespace-nowrap text-gray-300">echo $env:OPENAI_BASE_URL</div>
+                <div class="whitespace-nowrap text-gray-300">echo $env:OPENAI_API_KEY</div>
+                <div class="whitespace-nowrap text-gray-300">echo $env:OPENAI_MODEL</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Codex 环境变量设置 -->
         <div class="mt-8">
           <h5
@@ -1118,6 +1210,126 @@
           </div>
         </div>
 
+        <!-- Qwen Code 环境变量设置 -->
+        <div class="mt-8">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
+          >
+            <i class="fas fa-brain mr-2 text-orange-600" />
+            配置 Qwen Code 环境变量
+          </h5>
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
+            如果你使用 Qwen Code，需要设置以下 OpenAI 兼容环境变量：
+          </p>
+
+          <div class="space-y-4">
+            <div
+              class="rounded-lg border border-orange-200 bg-white p-3 dark:border-orange-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                Terminal 设置方法
+              </h6>
+              <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                在 Terminal 中运行以下命令：
+              </p>
+              <div
+                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="whitespace-nowrap text-gray-300">
+                  export OPENAI_BASE_URL="{{ openaiBaseUrl }}"
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  export OPENAI_API_KEY="你的API密钥"
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  export OPENAI_MODEL="qwen3-coder-plus"
+                </div>
+              </div>
+              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
+                💡 使用与 Claude Code 相同的 API 密钥即可。Qwen Code 通过 OpenAI 兼容格式访问。
+              </p>
+            </div>
+
+            <div
+              class="rounded-lg border border-orange-200 bg-white p-3 dark:border-orange-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                永久设置（zsh）
+              </h6>
+              <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                在 Terminal 中运行以下命令（macOS 默认）：
+              </p>
+              <div
+                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="mb-2"># 添加到 ~/.zshrc（永久生效）</div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_BASE_URL="{{ openaiBaseUrl }}"' >> ~/.zshrc
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_API_KEY="你的API密钥"' >> ~/.zshrc
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_MODEL="qwen3-coder-plus"' >> ~/.zshrc
+                </div>
+              </div>
+              <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                💡 设置后运行
+                <code class="rounded bg-blue-100 px-1 dark:bg-blue-900">source ~/.zshrc</code>
+                生效。
+              </p>
+            </div>
+
+            <div
+              class="rounded-lg border border-orange-200 bg-white p-3 dark:border-orange-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                永久设置（bash）
+              </h6>
+              <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                在 Terminal 中运行以下命令：
+              </p>
+              <div
+                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="mb-2"># 添加到 ~/.bash_profile（永久生效）</div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_BASE_URL="{{ openaiBaseUrl }}"' >> ~/.bash_profile
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_API_KEY="你的API密钥"' >> ~/.bash_profile
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_MODEL="qwen3-coder-plus"' >> ~/.bash_profile
+                </div>
+              </div>
+              <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                💡 设置后运行
+                <code class="rounded bg-blue-100 px-1 dark:bg-blue-900"
+                  >source ~/.bash_profile</code
+                >
+                生效。
+              </p>
+            </div>
+
+            <div
+              class="rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-500/40 dark:bg-orange-950/30 sm:p-4"
+            >
+              <h6 class="mb-2 font-medium text-orange-800 dark:text-orange-300">
+                验证 Qwen Code 环境变量
+              </h6>
+              <p class="mb-3 text-sm text-orange-700 dark:text-orange-300">在 Terminal 中验证：</p>
+              <div
+                class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_BASE_URL</div>
+                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_API_KEY</div>
+                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_MODEL</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Codex 环境变量设置 -->
         <div class="mt-8">
           <h5
@@ -1726,6 +1938,126 @@
                 <div class="whitespace-nowrap text-gray-300">echo $GOOGLE_GEMINI_BASE_URL</div>
                 <div class="whitespace-nowrap text-gray-300">echo $GEMINI_API_KEY</div>
                 <div class="whitespace-nowrap text-gray-300">echo $GEMINI_MODEL</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Qwen Code 环境变量设置 -->
+        <div class="mt-8">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
+          >
+            <i class="fas fa-brain mr-2 text-orange-600" />
+            配置 Qwen Code 环境变量
+          </h5>
+          <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
+            如果你使用 Qwen Code，需要设置以下 OpenAI 兼容环境变量：
+          </p>
+
+          <div class="space-y-4">
+            <div
+              class="rounded-lg border border-orange-200 bg-white p-3 dark:border-orange-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                Terminal 设置方法
+              </h6>
+              <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                在 Terminal 中运行以下命令：
+              </p>
+              <div
+                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="whitespace-nowrap text-gray-300">
+                  export OPENAI_BASE_URL="{{ openaiBaseUrl }}"
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  export OPENAI_API_KEY="你的API密钥"
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  export OPENAI_MODEL="qwen3-coder-plus"
+                </div>
+              </div>
+              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
+                💡 使用与 Claude Code 相同的 API 密钥即可。Qwen Code 通过 OpenAI 兼容格式访问。
+              </p>
+            </div>
+
+            <div
+              class="rounded-lg border border-orange-200 bg-white p-3 dark:border-orange-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                永久设置（zsh）
+              </h6>
+              <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                在 Terminal 中运行以下命令（macOS 默认）：
+              </p>
+              <div
+                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="mb-2"># 添加到 ~/.zshrc（永久生效）</div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_BASE_URL="{{ openaiBaseUrl }}"' >> ~/.zshrc
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_API_KEY="你的API密钥"' >> ~/.zshrc
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_MODEL="qwen3-coder-plus"' >> ~/.zshrc
+                </div>
+              </div>
+              <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                💡 设置后运行
+                <code class="rounded bg-blue-100 px-1 dark:bg-blue-900">source ~/.zshrc</code>
+                生效。
+              </p>
+            </div>
+
+            <div
+              class="rounded-lg border border-orange-200 bg-white p-3 dark:border-orange-700 dark:bg-gray-800 sm:p-4"
+            >
+              <h6 class="mb-2 text-sm font-medium text-gray-800 dark:text-gray-300 sm:text-base">
+                永久设置（bash）
+              </h6>
+              <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                在 Terminal 中运行以下命令：
+              </p>
+              <div
+                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="mb-2"># 添加到 ~/.bash_profile（永久生效）</div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_BASE_URL="{{ openaiBaseUrl }}"' >> ~/.bash_profile
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_API_KEY="你的API密钥"' >> ~/.bash_profile
+                </div>
+                <div class="whitespace-nowrap text-gray-300">
+                  echo 'export OPENAI_MODEL="qwen3-coder-plus"' >> ~/.bash_profile
+                </div>
+              </div>
+              <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                💡 设置后运行
+                <code class="rounded bg-blue-100 px-1 dark:bg-blue-900"
+                  >source ~/.bash_profile</code
+                >
+                生效。
+              </p>
+            </div>
+
+            <div
+              class="rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-500/40 dark:bg-orange-950/30 sm:p-4"
+            >
+              <h6 class="mb-2 font-medium text-orange-800 dark:text-orange-300">
+                验证 Qwen Code 环境变量
+              </h6>
+              <p class="mb-3 text-sm text-orange-700 dark:text-orange-300">在 Terminal 中验证：</p>
+              <div
+                class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              >
+                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_BASE_URL</div>
+                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_API_KEY</div>
+                <div class="whitespace-nowrap text-gray-300">echo $OPENAI_MODEL</div>
               </div>
             </div>
           </div>
