@@ -55,16 +55,69 @@ function sanitizeUpstreamError(errorData) {
     return errorData
   }
 
-  // 深拷贝避免修改原始对象
-  const sanitized = JSON.parse(JSON.stringify(errorData))
+  // AxiosError / Error：返回摘要，避免泄露请求体/headers/token 等敏感信息
+  const looksLikeAxiosError =
+    errorData.isAxiosError ||
+    (errorData.name === 'AxiosError' && (errorData.config || errorData.response))
+  const looksLikeError = errorData instanceof Error || typeof errorData.message === 'string'
+
+  if (looksLikeAxiosError || looksLikeError) {
+    const statusCode = errorData.response?.status
+    const upstreamBody = errorData.response?.data
+    const upstreamMessage = sanitizeErrorMessage(extractErrorMessage(upstreamBody) || '')
+
+    return {
+      name: errorData.name || 'Error',
+      code: errorData.code,
+      statusCode,
+      message: sanitizeErrorMessage(errorData.message || ''),
+      upstreamMessage: upstreamMessage || undefined,
+      upstreamType: upstreamBody?.error?.type || upstreamBody?.error?.status || undefined
+    }
+  }
 
   // 递归清理嵌套的错误对象
+  const visited = new WeakSet()
+
+  const shouldRedactKey = (key) => {
+    if (!key) {
+      return false
+    }
+    const lowerKey = String(key).toLowerCase()
+    return (
+      lowerKey === 'authorization' ||
+      lowerKey === 'cookie' ||
+      lowerKey.includes('api_key') ||
+      lowerKey.includes('apikey') ||
+      lowerKey.includes('access_token') ||
+      lowerKey.includes('refresh_token') ||
+      lowerKey.endsWith('token') ||
+      lowerKey.includes('secret') ||
+      lowerKey.includes('password')
+    )
+  }
+
   const sanitizeObject = (obj) => {
     if (!obj || typeof obj !== 'object') {
       return obj
     }
 
+    if (visited.has(obj)) {
+      return '[Circular]'
+    }
+    visited.add(obj)
+
+    // 主动剔除常见“超大且敏感”的字段
+    if (obj.config || obj.request || obj.response) {
+      return '[Redacted]'
+    }
+
     for (const key in obj) {
+      if (shouldRedactKey(key)) {
+        obj[key] = '[REDACTED]'
+        continue
+      }
+
       // 清理所有字符串字段，不仅仅是 message
       if (typeof obj[key] === 'string') {
         obj[key] = sanitizeErrorMessage(obj[key])
@@ -76,7 +129,9 @@ function sanitizeUpstreamError(errorData) {
     return obj
   }
 
-  return sanitizeObject(sanitized)
+  // 尽量不修改原对象：浅拷贝后递归清理
+  const clone = Array.isArray(errorData) ? [...errorData] : { ...errorData }
+  return sanitizeObject(clone)
 }
 
 /**

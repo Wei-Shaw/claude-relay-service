@@ -11,14 +11,19 @@ const { formatAccountExpiry, mapExpiryField } = require('./utils')
 const router = express.Router()
 
 // 🤖 Gemini OAuth 账户管理
+function getDefaultRedirectUri(oauthProvider) {
+  if (oauthProvider === 'antigravity') {
+    return process.env.ANTIGRAVITY_OAUTH_REDIRECT_URI || 'http://localhost:45462'
+  }
+  return process.env.GEMINI_OAUTH_REDIRECT_URI || 'https://codeassist.google.com/authcode'
+}
 
 // 生成 Gemini OAuth 授权 URL
 router.post('/generate-auth-url', authenticateAdmin, async (req, res) => {
   try {
-    const { state, proxy } = req.body // 接收代理配置
+    const { state, proxy, oauthProvider } = req.body // 接收代理配置与OAuth Provider
 
-    // 使用新的 codeassist.google.com 回调地址
-    const redirectUri = 'https://codeassist.google.com/authcode'
+    const redirectUri = getDefaultRedirectUri(oauthProvider)
 
     logger.info(`Generating Gemini OAuth URL with redirect_uri: ${redirectUri}`)
 
@@ -26,8 +31,9 @@ router.post('/generate-auth-url', authenticateAdmin, async (req, res) => {
       authUrl,
       state: authState,
       codeVerifier,
-      redirectUri: finalRedirectUri
-    } = await geminiAccountService.generateAuthUrl(state, redirectUri, proxy)
+      redirectUri: finalRedirectUri,
+      oauthProvider: resolvedOauthProvider
+    } = await geminiAccountService.generateAuthUrl(state, redirectUri, proxy, oauthProvider)
 
     // 创建 OAuth 会话，包含 codeVerifier 和代理配置
     const sessionId = authState
@@ -37,6 +43,7 @@ router.post('/generate-auth-url', authenticateAdmin, async (req, res) => {
       redirectUri: finalRedirectUri,
       codeVerifier, // 保存 PKCE code verifier
       proxy: proxy || null, // 保存代理配置
+      oauthProvider: resolvedOauthProvider,
       createdAt: new Date().toISOString()
     })
 
@@ -45,7 +52,8 @@ router.post('/generate-auth-url', authenticateAdmin, async (req, res) => {
       success: true,
       data: {
         authUrl,
-        sessionId
+        sessionId,
+        oauthProvider: resolvedOauthProvider
       }
     })
   } catch (error) {
@@ -80,13 +88,14 @@ router.post('/poll-auth-status', authenticateAdmin, async (req, res) => {
 // 交换 Gemini 授权码
 router.post('/exchange-code', authenticateAdmin, async (req, res) => {
   try {
-    const { code, sessionId, proxy: requestProxy } = req.body
+    const { code, sessionId, proxy: requestProxy, oauthProvider } = req.body
+    let resolvedOauthProvider = oauthProvider
 
     if (!code) {
       return res.status(400).json({ error: 'Authorization code is required' })
     }
 
-    let redirectUri = 'https://codeassist.google.com/authcode'
+    let redirectUri = getDefaultRedirectUri(resolvedOauthProvider)
     let codeVerifier = null
     let proxyConfig = null
 
@@ -97,11 +106,16 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
         const {
           redirectUri: sessionRedirectUri,
           codeVerifier: sessionCodeVerifier,
-          proxy
+          proxy,
+          oauthProvider: sessionOauthProvider
         } = sessionData
         redirectUri = sessionRedirectUri || redirectUri
         codeVerifier = sessionCodeVerifier
         proxyConfig = proxy // 获取代理配置
+        if (!resolvedOauthProvider && sessionOauthProvider) {
+          // 会话里保存的 provider 仅作为兜底
+          resolvedOauthProvider = sessionOauthProvider
+        }
         logger.info(
           `Using session redirect_uri: ${redirectUri}, has codeVerifier: ${!!codeVerifier}, has proxy from session: ${!!proxyConfig}`
         )
@@ -120,7 +134,8 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
       code,
       redirectUri,
       codeVerifier,
-      proxyConfig // 传递代理配置
+      proxyConfig, // 传递代理配置
+      resolvedOauthProvider
     )
 
     // 清理 OAuth 会话
@@ -129,7 +144,7 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
     }
 
     logger.success('✅ Successfully exchanged Gemini authorization code')
-    return res.json({ success: true, data: { tokens } })
+    return res.json({ success: true, data: { tokens, oauthProvider: resolvedOauthProvider } })
   } catch (error) {
     logger.error('❌ Failed to exchange Gemini authorization code:', error)
     return res.status(500).json({ error: 'Failed to exchange code', message: error.message })

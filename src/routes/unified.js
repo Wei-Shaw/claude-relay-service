@@ -8,6 +8,7 @@ const {
   handleStreamGenerateContent: geminiHandleStreamGenerateContent
 } = require('../handlers/geminiHandlers')
 const openaiRoutes = require('./openaiRoutes')
+const apiKeyService = require('../services/apiKeyService')
 
 const router = express.Router()
 
@@ -45,11 +46,11 @@ async function routeToBackend(req, res, requestedModel) {
   logger.info(`🔀 Routing request - Model: ${requestedModel}, Backend: ${backend}`)
 
   // 检查权限
-  const permissions = req.apiKey.permissions || 'all'
+  const { permissions } = req.apiKey
 
   if (backend === 'claude') {
     // Claude 后端：通过 OpenAI 兼容层
-    if (permissions !== 'all' && permissions !== 'claude') {
+    if (!apiKeyService.hasPermission(permissions, 'claude')) {
       return res.status(403).json({
         error: {
           message: 'This API key does not have permission to access Claude',
@@ -61,7 +62,7 @@ async function routeToBackend(req, res, requestedModel) {
     await handleChatCompletion(req, res, req.apiKey)
   } else if (backend === 'openai') {
     // OpenAI 后端
-    if (permissions !== 'all' && permissions !== 'openai') {
+    if (!apiKeyService.hasPermission(permissions, 'openai')) {
       return res.status(403).json({
         error: {
           message: 'This API key does not have permission to access OpenAI',
@@ -73,7 +74,7 @@ async function routeToBackend(req, res, requestedModel) {
     return await openaiRoutes.handleResponses(req, res)
   } else if (backend === 'gemini') {
     // Gemini 后端
-    if (permissions !== 'all' && permissions !== 'gemini') {
+    if (!apiKeyService.hasPermission(permissions, 'gemini')) {
       return res.status(403).json({
         error: {
           message: 'This API key does not have permission to access Gemini',
