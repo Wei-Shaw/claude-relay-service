@@ -588,12 +588,33 @@ class BedrockRelayService {
       }
     }
 
+    if (bedrockChunk.type === 'content_block_start') {
+      return {
+        type: 'content_block_start',
+        data: {
+          type: 'content_block_start',
+          index: bedrockChunk.index || 0,
+          content_block: bedrockChunk.content_block || { type: 'text', text: '' }
+        }
+      }
+    }
+
     if (bedrockChunk.type === 'content_block_delta') {
       return {
         type: 'content_block_delta',
         data: {
           index: bedrockChunk.index || 0,
           delta: bedrockChunk.delta || {}
+        }
+      }
+    }
+
+    if (bedrockChunk.type === 'content_block_stop') {
+      return {
+        type: 'content_block_stop',
+        data: {
+          type: 'content_block_stop',
+          index: bedrockChunk.index || 0
         }
       }
     }
