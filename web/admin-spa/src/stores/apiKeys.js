@@ -1,9 +1,16 @@
-import { apiClient } from '@/config/api'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import {
+  getApiKeys,
+  createApiKey as apiCreateApiKey,
+  updateApiKey as apiUpdateApiKey,
+  toggleApiKey as apiToggleApiKey,
+  deleteApiKey as apiDeleteApiKey,
+  getApiKeyStats,
+  getApiKeyTags
+} from '@/utils/http_apis'
 
 export const useApiKeysStore = defineStore('apiKeys', () => {
-  // 状态
   const apiKeys = ref([])
   const loading = ref(false)
   const error = ref(null)
@@ -11,14 +18,11 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
   const sortBy = ref('')
   const sortOrder = ref('asc')
 
-  // Actions
-
-  // 获取API Keys列表
   const fetchApiKeys = async () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/admin/api-keys')
+      const response = await getApiKeys()
       if (response.success) {
         apiKeys.value = response.data || []
       } else {
@@ -32,12 +36,11 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 创建API Key
   const createApiKey = async (data) => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/api-keys', data)
+      const response = await apiCreateApiKey(data)
       if (response.success) {
         await fetchApiKeys()
         return response.data
@@ -52,12 +55,11 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 更新API Key
   const updateApiKey = async (id, data) => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/api-keys/${id}`, data)
+      const response = await apiUpdateApiKey(id, data)
       if (response.success) {
         await fetchApiKeys()
         return response
@@ -72,12 +74,11 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 切换API Key状态
   const toggleApiKey = async (id) => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/api-keys/${id}/toggle`)
+      const response = await apiToggleApiKey(id)
       if (response.success) {
         await fetchApiKeys()
         return response
@@ -92,12 +93,11 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 续期API Key
   const renewApiKey = async (id, data) => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/api-keys/${id}`, data)
+      const response = await apiUpdateApiKey(id, data)
       if (response.success) {
         await fetchApiKeys()
         return response
@@ -112,12 +112,11 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 删除API Key
   const deleteApiKey = async (id) => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.delete(`/admin/api-keys/${id}`)
+      const response = await apiDeleteApiKey(id)
       if (response.success) {
         await fetchApiKeys()
         return response
@@ -132,12 +131,9 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 获取API Key统计
   const fetchApiKeyStats = async (id, timeRange = 'all') => {
     try {
-      const response = await apiClient.get(`/admin/api-keys/${id}/stats`, {
-        params: { timeRange }
-      })
+      const response = await getApiKeyStats(id, { timeRange })
       if (response.success) {
         return response.stats
       } else {
@@ -149,7 +145,6 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 排序API Keys
   const sortApiKeys = (field) => {
     if (sortBy.value === field) {
       sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
@@ -159,10 +154,9 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 获取已存在的标签
   const fetchTags = async () => {
     try {
-      const response = await apiClient.get('/admin/api-keys/tags')
+      const response = await getApiKeyTags()
       if (response.success) {
         return response.data || []
       } else {
@@ -174,7 +168,6 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 重置store
   const reset = () => {
     apiKeys.value = []
     loading.value = false
@@ -185,15 +178,12 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
   }
 
   return {
-    // State
     apiKeys,
     loading,
     error,
     statsTimeRange,
     sortBy,
     sortOrder,
-
-    // Actions
     fetchApiKeys,
     createApiKey,
     updateApiKey,

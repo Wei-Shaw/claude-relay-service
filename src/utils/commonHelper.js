@@ -313,6 +313,51 @@ const getTimeRemaining = (expiresAt) => {
   return Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
 }
 
+// ============================================
+// 版本处理
+// ============================================
+
+const fs = require('fs')
+const path = require('path')
+
+// 获取应用版本号
+const getAppVersion = () => {
+  if (process.env.APP_VERSION) {
+    return process.env.APP_VERSION
+  }
+  if (process.env.VERSION) {
+    return process.env.VERSION
+  }
+  try {
+    const versionFile = path.join(__dirname, '..', '..', 'VERSION')
+    if (fs.existsSync(versionFile)) {
+      return fs.readFileSync(versionFile, 'utf8').trim()
+    }
+  } catch {}
+  try {
+    return require('../../package.json').version
+  } catch {}
+  return '1.0.0'
+}
+
+// 版本比较: a > b
+const versionGt = (a, b) => {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) {
+      return true
+    }
+    if ((pa[i] || 0) < (pb[i] || 0)) {
+      return false
+    }
+  }
+  return false
+}
+
+// 版本比较: a >= b
+const versionGte = (a, b) => a === b || versionGt(a, b)
+
 module.exports = {
   // 加密
   createEncryptor,
@@ -351,5 +396,9 @@ module.exports = {
   getDateInTimezone,
   getDateStringInTimezone,
   isExpired,
-  getTimeRemaining
+  getTimeRemaining,
+  // 版本
+  getAppVersion,
+  versionGt,
+  versionGte
 }

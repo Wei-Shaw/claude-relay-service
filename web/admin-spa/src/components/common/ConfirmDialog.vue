@@ -9,9 +9,25 @@
         <div class="modal-content mx-auto w-full max-w-md p-6">
           <div class="mb-6 flex items-start gap-4">
             <div
-              class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-600"
+              :class="[
+                'flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl',
+                dialogType === 'danger'
+                  ? 'bg-gradient-to-br from-red-500 to-red-600'
+                  : dialogType === 'warning'
+                    ? 'bg-gradient-to-br from-amber-500 to-amber-600'
+                    : 'bg-primary'
+              ]"
             >
-              <i class="fas fa-exclamation-triangle text-lg text-white" />
+              <i
+                :class="[
+                  'text-lg text-white',
+                  dialogType === 'danger'
+                    ? 'fas fa-trash-alt'
+                    : dialogType === 'warning'
+                      ? 'fas fa-exclamation-triangle'
+                      : 'fas fa-question-circle'
+                ]"
+              />
             </div>
             <div class="flex-1">
               <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
@@ -32,8 +48,14 @@
               {{ cancelText }}
             </button>
             <button
-              class="btn btn-warning px-6 py-3"
-              :class="{ 'cursor-not-allowed opacity-50': isProcessing }"
+              :class="[
+                'btn px-6 py-3',
+                dialogType === 'danger'
+                  ? 'btn-danger'
+                  : dialogType === 'warning'
+                    ? 'btn-warning'
+                    : 'btn-primary'
+              ]"
               :disabled="isProcessing"
               @click="handleConfirm"
             >
@@ -57,6 +79,7 @@ const title = ref('')
 const message = ref('')
 const confirmText = ref('确认')
 const cancelText = ref('取消')
+const dialogType = ref('primary') // primary | warning | danger
 let resolvePromise = null
 
 // 显示确认对话框
@@ -64,13 +87,15 @@ const showConfirm = (
   titleText,
   messageText,
   confirmTextParam = '确认',
-  cancelTextParam = '取消'
+  cancelTextParam = '取消',
+  type = 'primary'
 ) => {
   return new Promise((resolve) => {
     title.value = titleText
     message.value = messageText
     confirmText.value = confirmTextParam
     cancelText.value = cancelTextParam
+    dialogType.value = type
     isVisible.value = true
     isProcessing.value = false
     resolvePromise = resolve
@@ -155,8 +180,8 @@ defineExpose({
 }
 
 :global(.dark) .modal-content {
-  background: #1f2937;
-  border: 1px solid #374151;
+  background: var(--bg-gradient-start);
+  border: 1px solid var(--border-color);
   box-shadow: 0 20px 64px rgba(0, 0, 0, 0.8);
 }
 
@@ -170,6 +195,11 @@ defineExpose({
 
 .btn-warning {
   @apply bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-500;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  @apply text-white hover:opacity-90 focus:ring-indigo-500;
 }
 
 .loading-spinner {
@@ -208,7 +238,7 @@ defineExpose({
 }
 
 :global(.dark) .modal-content::-webkit-scrollbar-track {
-  background: #374151;
+  background: var(--bg-gradient-mid);
 }
 
 .modal-content::-webkit-scrollbar-thumb {
@@ -217,7 +247,7 @@ defineExpose({
 }
 
 :global(.dark) .modal-content::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: var(--bg-gradient-end);
 }
 
 .modal-content::-webkit-scrollbar-thumb:hover {

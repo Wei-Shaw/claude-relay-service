@@ -155,7 +155,7 @@
 <script setup>
 import { computed } from 'vue'
 import dayjs from 'dayjs'
-import { formatNumber } from '@/utils/format'
+import { formatNumber } from '@/utils/tools'
 
 const props = defineProps({
   show: {

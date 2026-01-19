@@ -1,7 +1,7 @@
 <template>
-  <div class="card p-4 md:p-6">
+  <div class="card p-3 sm:p-4 md:p-6">
     <h3
-      class="mb-3 flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:mb-4 md:text-xl"
+      class="mb-2 flex flex-col text-base font-bold text-gray-900 dark:text-gray-100 sm:mb-3 sm:flex-row sm:items-center sm:text-lg md:mb-4 md:text-xl"
     >
       <span class="flex items-center">
         <i class="fas fa-coins mr-2 text-sm text-yellow-500 md:mr-3 md:text-base" />

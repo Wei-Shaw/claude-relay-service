@@ -476,8 +476,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
+import * as httpApi from '@/utils/http_apis'
+import { showToast } from '@/utils/tools'
 import { debounce } from 'lodash-es'
 import UserUsageStatsModal from '@/components/admin/UserUsageStatsModal.vue'
 import ChangeRoleModal from '@/components/admin/ChangeRoleModal.vue'
@@ -564,8 +564,8 @@ const loadUsers = async () => {
     }
 
     const [usersResponse, statsResponse] = await Promise.all([
-      apiClient.get('/users', { params }),
-      apiClient.get('/users/stats/overview')
+      httpApi.get('/users', { params }),
+      httpApi.get('/users/stats/overview')
     ])
 
     if (usersResponse.success) {
@@ -631,7 +631,7 @@ const handleConfirmAction = async () => {
 
   try {
     if (action === 'toggleStatus') {
-      const response = await apiClient.patch(`/users/${user.id}/status`, {
+      const response = await httpApi.patch(`/users/${user.id}/status`, {
         isActive: !user.isActive
       })
 
@@ -643,7 +643,7 @@ const handleConfirmAction = async () => {
         showToast(`User ${user.isActive ? 'disabled' : 'enabled'} successfully`, 'success')
       }
     } else if (action === 'disableKeys') {
-      const response = await apiClient.post(`/users/${user.id}/disable-keys`)
+      const response = await httpApi.post(`/users/${user.id}/disable-keys`)
 
       if (response.success) {
         showToast(`Disabled ${response.disabledCount} API keys`, 'success')

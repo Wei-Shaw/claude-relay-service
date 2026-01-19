@@ -97,8 +97,8 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
-import { showToast } from '@/utils/toast'
-import { apiClient } from '@/config/api'
+import { showToast } from '@/utils/tools'
+import * as httpApi from '@/utils/http_apis'
 
 const props = defineProps({
   apiKey: {
@@ -206,7 +206,7 @@ const renewApiKey = async () => {
       expiresAt: form.renewDuration === 'permanent' ? null : form.newExpiresAt
     }
 
-    const result = await apiClient.put(`/admin/api-keys/${props.apiKey.id}`, data)
+    const result = await httpApi.put(`/admin/api-keys/${props.apiKey.id}`, data)
 
     if (result.success) {
       showToast('API Key 续期成功', 'success')

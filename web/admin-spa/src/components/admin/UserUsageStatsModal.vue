@@ -347,8 +347,8 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
+import * as httpApi from '@/utils/http_apis'
+import { showToast } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -394,10 +394,10 @@ const loadUsageStats = async () => {
   loading.value = true
   try {
     const [statsResponse, userResponse] = await Promise.all([
-      apiClient.get(`/users/${props.user.id}/usage-stats`, {
+      httpApi.get(`/users/${props.user.id}/usage-stats`, {
         params: { period: selectedPeriod.value }
       }),
-      apiClient.get(`/users/${props.user.id}`)
+      httpApi.get(`/users/${props.user.id}`)
     ])
 
     if (statsResponse.success) {

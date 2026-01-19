@@ -452,4 +452,85 @@ router.post('/openai-responses-accounts/:id/reset-usage', authenticateAdmin, asy
   }
 })
 
+// 测试 OpenAI-Responses 账户连通性
+router.post('/openai-responses-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+  const { model = 'gpt-4o-mini' } = req.body
+  const startTime = Date.now()
+
+  try {
+    // 获取账户信息
+    const account = await openaiResponsesAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    // 获取解密后的 API Key
+    const apiKey = await openaiResponsesAccountService.getDecryptedApiKey(accountId)
+    if (!apiKey) {
+      return res.status(401).json({ error: 'API Key not found or decryption failed' })
+    }
+
+    // 构造测试请求
+    const axios = require('axios')
+    const { createOpenAITestPayload } = require('../../utils/testPayloadHelper')
+    const { getProxyAgent } = require('../../utils/proxyHelper')
+
+    const baseUrl = account.baseUrl || 'https://api.openai.com'
+    const apiUrl = `${baseUrl}/v1/chat/completions`
+    const payload = createOpenAITestPayload(model)
+
+    const requestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      timeout: 30000
+    }
+
+    // 配置代理
+    if (account.proxy) {
+      const agent = getProxyAgent(account.proxy)
+      if (agent) {
+        requestConfig.httpsAgent = agent
+        requestConfig.httpAgent = agent
+      }
+    }
+
+    const response = await axios.post(apiUrl, payload, requestConfig)
+    const latency = Date.now() - startTime
+
+    // 提取响应文本
+    let responseText = ''
+    if (response.data?.choices?.[0]?.message?.content) {
+      responseText = response.data.choices[0].message.content
+    }
+
+    logger.success(
+      `✅ OpenAI-Responses account test passed: ${account.name} (${accountId}), latency: ${latency}ms`
+    )
+
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        accountName: account.name,
+        model,
+        latency,
+        responseText: responseText.substring(0, 200)
+      }
+    })
+  } catch (error) {
+    const latency = Date.now() - startTime
+    logger.error(`❌ OpenAI-Responses account test failed: ${accountId}`, error.message)
+
+    return res.status(500).json({
+      success: false,
+      error: 'Test failed',
+      message: error.response?.data?.error?.message || error.message,
+      latency
+    })
+  }
+})
+
 module.exports = router

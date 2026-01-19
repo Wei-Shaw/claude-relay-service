@@ -39,8 +39,10 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Chart } from 'chart.js/auto'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useChartConfig } from '@/composables/useChartConfig'
+import { useThemeStore } from '@/stores/theme'
 
 const dashboardStore = useDashboardStore()
+const themeStore = useThemeStore()
 const chartCanvas = ref(null)
 let chart = null
 
@@ -83,16 +85,16 @@ const createChart = () => {
         {
           label: '请求次数',
           data: dashboardStore.trendData.map((item) => item.requests),
-          borderColor: '#667eea',
-          backgroundColor: getGradient(ctx, '#667eea', 0.1),
+          borderColor: themeStore.currentColorScheme.primary,
+          backgroundColor: getGradient(ctx, themeStore.currentColorScheme.primary, 0.1),
           yAxisID: 'y',
           tension: 0.4
         },
         {
           label: 'Token使用量',
           data: dashboardStore.trendData.map((item) => item.tokens),
-          borderColor: '#f093fb',
-          backgroundColor: getGradient(ctx, '#f093fb', 0.1),
+          borderColor: themeStore.currentColorScheme.accent,
+          backgroundColor: getGradient(ctx, themeStore.currentColorScheme.accent, 0.1),
           yAxisID: 'y1',
           tension: 0.4
         }
@@ -167,6 +169,14 @@ watch(
     createChart()
   },
   { deep: true }
+)
+
+// 监听色系变化，重新创建图表
+watch(
+  () => themeStore.colorScheme,
+  () => {
+    createChart()
+  }
 )
 
 onMounted(() => {

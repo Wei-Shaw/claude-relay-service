@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import router from '@/router'
-import { apiClient } from '@/config/api'
+import { login as apiLogin, getAuthUser, getOemSettings } from '@/utils/http_apis'
 
 export const useAuthStore = defineStore('auth', () => {
   // 状态
@@ -29,7 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
     loginError.value = ''
 
     try {
-      const result = await apiClient.post('/web/auth/login', credentials)
+      const result = await apiLogin(credentials)
 
       if (result.success) {
         authToken.value = result.token
@@ -66,16 +66,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function verifyToken() {
     try {
-      // /web/auth/user 已做完整 token 验证（session 存在性、完整性）
-      // 成功返回即表示 token 有效，无需再调用 dashboard
-      const userResult = await apiClient.get('/web/auth/user')
+      const userResult = await getAuthUser()
       if (!userResult.success || !userResult.user) {
         logout()
         return
       }
       username.value = userResult.user.username
     } catch (error) {
-      // token 无效，需要重新登录
       logout()
     }
   }
@@ -83,11 +80,10 @@ export const useAuthStore = defineStore('auth', () => {
   async function loadOemSettings() {
     oemLoading.value = true
     try {
-      const result = await apiClient.get('/admin/oem-settings')
+      const result = await getOemSettings()
       if (result.success && result.data) {
         oemSettings.value = { ...oemSettings.value, ...result.data }
 
-        // 设置favicon
         if (result.data.siteIconData || result.data.siteIcon) {
           const link = document.querySelector("link[rel*='icon']") || document.createElement('link')
           link.type = 'image/x-icon'
@@ -96,7 +92,6 @@ export const useAuthStore = defineStore('auth', () => {
           document.getElementsByTagName('head')[0].appendChild(link)
         }
 
-        // 设置页面标题
         if (result.data.siteName) {
           document.title = `${result.data.siteName} - 管理后台`
         }

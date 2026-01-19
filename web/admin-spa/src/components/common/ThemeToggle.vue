@@ -1,21 +1,87 @@
 <template>
   <div class="theme-toggle-container">
     <!-- 紧凑模式：仅显示图标按钮 -->
-    <button
-      v-if="mode === 'compact'"
-      class="theme-toggle-button"
-      :title="themeTooltip"
-      @click="handleCycleTheme"
-    >
-      <transition mode="out-in" name="fade">
-        <i v-if="themeStore.themeMode === 'light'" key="sun" class="fas fa-sun" />
-        <i v-else-if="themeStore.themeMode === 'dark'" key="moon" class="fas fa-moon" />
-        <i v-else key="auto" class="fas fa-circle-half-stroke" />
-      </transition>
-    </button>
+    <div v-if="mode === 'compact'" class="flex items-center gap-2">
+      <!-- 色系切换按钮 -->
+      <div class="relative">
+        <button
+          class="color-scheme-button"
+          :title="`色系: ${themeStore.currentColorScheme.name}`"
+          @click="toggleColorMenu"
+        >
+          <span class="color-dot" :style="{ background: themeStore.currentColorScheme.primary }" />
+        </button>
+        <!-- 色系下拉菜单 -->
+        <transition name="dropdown">
+          <div v-if="showColorMenu" class="color-menu">
+            <button
+              v-for="(scheme, key) in themeStore.ColorSchemes"
+              :key="key"
+              class="color-option"
+              :class="{ active: themeStore.colorScheme === key }"
+              :title="scheme.name"
+              @click="selectColorScheme(key)"
+            >
+              <span
+                class="color-preview"
+                :style="{
+                  background: `linear-gradient(135deg, ${scheme.primary} 0%, ${scheme.secondary} 100%)`
+                }"
+              />
+              <span class="color-name">{{ scheme.name }}</span>
+            </button>
+          </div>
+        </transition>
+      </div>
+      <!-- 主题切换按钮 -->
+      <button class="theme-toggle-button" :title="themeTooltip" @click="handleCycleTheme">
+        <transition mode="out-in" name="fade">
+          <i v-if="themeStore.themeMode === 'light'" key="sun" class="fas fa-sun" />
+          <i v-else-if="themeStore.themeMode === 'dark'" key="moon" class="fas fa-moon" />
+          <i v-else key="auto" class="fas fa-circle-half-stroke" />
+        </transition>
+      </button>
+    </div>
 
     <!-- 下拉菜单模式 - 改为创意切换开关 -->
     <div v-else-if="mode === 'dropdown'" class="theme-switch-wrapper">
+      <!-- 色系切换按钮 -->
+      <div class="relative mr-3">
+        <button
+          class="color-scheme-button-lg"
+          :title="`色系: ${themeStore.currentColorScheme.name}`"
+          @click="toggleColorMenu"
+        >
+          <span
+            class="color-dot-lg"
+            :style="{
+              background: `linear-gradient(135deg, ${themeStore.currentColorScheme.primary} 0%, ${themeStore.currentColorScheme.secondary} 100%)`
+            }"
+          />
+          <i class="fas fa-palette ml-1 text-xs opacity-60" />
+        </button>
+        <!-- 色系下拉菜单 -->
+        <transition name="dropdown">
+          <div v-if="showColorMenu" class="color-menu">
+            <button
+              v-for="(scheme, key) in themeStore.ColorSchemes"
+              :key="key"
+              class="color-option"
+              :class="{ active: themeStore.colorScheme === key }"
+              :title="scheme.name"
+              @click="selectColorScheme(key)"
+            >
+              <span
+                class="color-preview"
+                :style="{
+                  background: `linear-gradient(135deg, ${scheme.primary} 0%, ${scheme.secondary} 100%)`
+                }"
+              />
+              <span class="color-name">{{ scheme.name }}</span>
+            </button>
+          </div>
+        </transition>
+      </div>
       <button
         class="theme-switch"
         :class="{
@@ -67,7 +133,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 
 // Props
@@ -87,6 +153,9 @@ defineProps({
 
 // Store
 const themeStore = useThemeStore()
+
+// 色系菜单状态
+const showColorMenu = ref(false)
 
 // 主题选项配置
 const themeOptions = [
@@ -124,6 +193,34 @@ const handleCycleTheme = () => {
 const selectTheme = (mode) => {
   themeStore.setThemeMode(mode)
 }
+
+const toggleColorMenu = () => {
+  showColorMenu.value = !showColorMenu.value
+}
+
+const selectColorScheme = (scheme) => {
+  themeStore.setColorScheme(scheme)
+  showColorMenu.value = false
+}
+
+// 点击外部关闭菜单
+const handleClickOutside = (e) => {
+  if (
+    !e.target.closest('.color-scheme-button') &&
+    !e.target.closest('.color-scheme-button-lg') &&
+    !e.target.closest('.color-menu')
+  ) {
+    showColorMenu.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <style scoped>
@@ -205,10 +302,10 @@ const selectTheme = (mode) => {
   padding: 4px;
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   border: 2px solid rgba(255, 255, 255, 0.1);
   box-shadow:
-    0 4px 15px rgba(102, 126, 234, 0.3),
+    0 4px 15px color-mix(in srgb, var(--primary-color) 30%, transparent),
     inset 0 1px 2px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   display: flex;
@@ -218,7 +315,7 @@ const selectTheme = (mode) => {
 .theme-switch:hover {
   transform: scale(1.05);
   box-shadow:
-    0 6px 20px rgba(102, 126, 234, 0.4),
+    0 6px 20px color-mix(in srgb, var(--primary-color) 40%, transparent),
     inset 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
@@ -241,16 +338,15 @@ const selectTheme = (mode) => {
     inset 0 1px 2px rgba(255, 255, 255, 0.05);
 }
 
-/* 自动模式样式 - 静态蓝紫渐变设计（优化版） */
+/* 自动模式样式 - 使用主题色混合 */
 .theme-switch.is-auto {
   background: linear-gradient(
     135deg,
-    #c4b5fd 0%,
-    /* 更柔和的起始：淡紫 */ #a78bfa 15%,
-    /* 浅紫 */ #818cf8 40%,
-    /* 紫蓝 */ #6366f1 60%,
-    /* 靛蓝 */ #4f46e5 85%,
-    /* 深蓝紫 */ #4338ca 100% /* 更深的结束：深紫 */
+    color-mix(in srgb, var(--accent-color) 70%, white) 0%,
+    var(--accent-color) 25%,
+    color-mix(in srgb, var(--primary-color) 80%, var(--accent-color)) 50%,
+    var(--primary-color) 75%,
+    var(--secondary-color) 100%
   );
   border-color: rgba(255, 255, 255, 0.2);
   position: relative;
@@ -258,7 +354,7 @@ const selectTheme = (mode) => {
   background-size: 120% 120%;
   background-position: center;
   box-shadow:
-    0 4px 15px rgba(139, 92, 246, 0.25),
+    0 4px 15px color-mix(in srgb, var(--secondary-color) 25%, transparent),
     inset 0 1px 3px rgba(0, 0, 0, 0.1),
     inset 0 -1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -426,7 +522,7 @@ const selectTheme = (mode) => {
 
 .handle-icon .fa-circle-half-stroke {
   color: rgba(255, 255, 255, 0.9);
-  filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.5));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent-color) 50%, transparent));
   font-size: 15px;
 }
 
@@ -507,5 +603,79 @@ const selectTheme = (mode) => {
   .theme-segment span {
     @apply hidden;
   }
+}
+
+/* 色系切换按钮样式 */
+.color-scheme-button {
+  @apply flex items-center justify-center;
+  @apply h-9 w-9 rounded-full;
+  @apply bg-white/90 dark:bg-gray-800/90;
+  @apply hover:bg-white dark:hover:bg-gray-700;
+  @apply border border-gray-200/50 dark:border-gray-600/50;
+  @apply transition-all duration-200 ease-out;
+  @apply shadow-md hover:shadow-lg;
+  @apply hover:scale-110 active:scale-95;
+  cursor: pointer;
+}
+
+.color-scheme-button-lg {
+  @apply flex items-center justify-center;
+  @apply h-9 rounded-full px-3;
+  @apply bg-white/90 dark:bg-gray-800/90;
+  @apply hover:bg-white dark:hover:bg-gray-700;
+  @apply border border-gray-200/50 dark:border-gray-600/50;
+  @apply transition-all duration-200 ease-out;
+  @apply shadow-md hover:shadow-lg;
+  @apply text-gray-600 dark:text-gray-300;
+  cursor: pointer;
+}
+
+.color-dot {
+  @apply h-5 w-5 rounded-full;
+  @apply shadow-inner;
+  transition: transform 0.2s ease;
+}
+
+.color-dot-lg {
+  @apply h-5 w-5 rounded-full;
+  @apply shadow-inner;
+}
+
+.color-scheme-button:hover .color-dot {
+  transform: scale(1.1);
+}
+
+/* 色系下拉菜单 */
+.color-menu {
+  @apply absolute left-0 top-full mt-2;
+  @apply bg-white dark:bg-gray-800;
+  @apply rounded-xl shadow-xl;
+  @apply border border-gray-200 dark:border-gray-700;
+  @apply min-w-[140px] p-2;
+  @apply z-50;
+}
+
+.color-option {
+  @apply flex w-full items-center gap-2;
+  @apply rounded-lg px-3 py-2;
+  @apply text-sm text-gray-700 dark:text-gray-300;
+  @apply hover:bg-gray-100 dark:hover:bg-gray-700;
+  @apply transition-all duration-150;
+  cursor: pointer;
+}
+
+.color-option.active {
+  @apply bg-gray-100 dark:bg-gray-700;
+  @apply font-medium;
+}
+
+.color-preview {
+  @apply h-5 w-5 rounded-full;
+  @apply shadow-sm;
+  @apply flex-shrink-0;
+}
+
+.color-name {
+  @apply flex-1 text-left;
 }
 </style>

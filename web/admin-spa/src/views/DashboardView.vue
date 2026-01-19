@@ -899,15 +899,15 @@ function createUsageTrendChart() {
       {
         label: '输入Token',
         data: inputData,
-        borderColor: 'rgb(102, 126, 234)',
-        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+        borderColor: themeStore.currentColorScheme.primary,
+        backgroundColor: `${themeStore.currentColorScheme.primary}1a`,
         tension: 0.3
       },
       {
         label: '输出Token',
         data: outputData,
-        borderColor: 'rgb(240, 147, 251)',
-        backgroundColor: 'rgba(240, 147, 251, 0.1)',
+        borderColor: themeStore.currentColorScheme.accent,
+        backgroundColor: `${themeStore.currentColorScheme.accent}1a`,
         tension: 0.3
       },
       {
@@ -920,8 +920,8 @@ function createUsageTrendChart() {
       {
         label: '缓存读取Token',
         data: cacheReadData,
-        borderColor: 'rgb(147, 51, 234)',
-        backgroundColor: 'rgba(147, 51, 234, 0.1)',
+        borderColor: themeStore.currentColorScheme.secondary,
+        backgroundColor: `${themeStore.currentColorScheme.secondary}1a`,
         tension: 0.3
       },
       {
@@ -1568,6 +1568,19 @@ watch(isDarkMode, () => {
     createAccountUsageTrendChart()
   })
 })
+
+// 监听色系变化，重新创建图表
+watch(
+  () => themeStore.colorScheme,
+  () => {
+    nextTick(() => {
+      createModelUsageChart()
+      createUsageTrendChart()
+      createApiKeysUsageTrendChart()
+      createAccountUsageTrendChart()
+    })
+  }
+)
 
 // 初始化
 onMounted(async () => {

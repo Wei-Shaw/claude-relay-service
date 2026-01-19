@@ -220,8 +220,8 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { API_PREFIX } from '@/config/api'
-import { showToast } from '@/utils/toast'
+import { API_PREFIX } from '@/utils/http_apis'
+import { showToast } from '@/utils/tools'
 
 const props = defineProps({
   show: {

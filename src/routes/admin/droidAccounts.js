@@ -196,31 +196,56 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
 
     // 处理统计数据
     const allUsageStatsMap = new Map()
+    const parseUsage = (data) => ({
+      requests: parseInt(data?.totalRequests || data?.requests) || 0,
+      tokens: parseInt(data?.totalTokens || data?.tokens) || 0,
+      inputTokens: parseInt(data?.totalInputTokens || data?.inputTokens) || 0,
+      outputTokens: parseInt(data?.totalOutputTokens || data?.outputTokens) || 0,
+      cacheCreateTokens: parseInt(data?.totalCacheCreateTokens || data?.cacheCreateTokens) || 0,
+      cacheReadTokens: parseInt(data?.totalCacheReadTokens || data?.cacheReadTokens) || 0,
+      allTokens:
+        parseInt(data?.totalAllTokens || data?.allTokens) ||
+        (parseInt(data?.totalInputTokens || data?.inputTokens) || 0) +
+          (parseInt(data?.totalOutputTokens || data?.outputTokens) || 0) +
+          (parseInt(data?.totalCacheCreateTokens || data?.cacheCreateTokens) || 0) +
+          (parseInt(data?.totalCacheReadTokens || data?.cacheReadTokens) || 0)
+    })
+
+    // 构建 accountId -> createdAt 映射用于计算 averages
+    const accountCreatedAtMap = new Map()
+    for (const account of accounts) {
+      accountCreatedAtMap.set(
+        account.id,
+        account.createdAt ? new Date(account.createdAt) : new Date()
+      )
+    }
+
     for (let i = 0; i < accountIds.length; i++) {
       const accountId = accountIds[i]
       const [errTotal, total] = statsResults[i * 3]
       const [errDaily, daily] = statsResults[i * 3 + 1]
       const [errMonthly, monthly] = statsResults[i * 3 + 2]
 
-      const parseUsage = (data) => ({
-        requests: parseInt(data?.totalRequests || data?.requests) || 0,
-        tokens: parseInt(data?.totalTokens || data?.tokens) || 0,
-        inputTokens: parseInt(data?.totalInputTokens || data?.inputTokens) || 0,
-        outputTokens: parseInt(data?.totalOutputTokens || data?.outputTokens) || 0,
-        cacheCreateTokens: parseInt(data?.totalCacheCreateTokens || data?.cacheCreateTokens) || 0,
-        cacheReadTokens: parseInt(data?.totalCacheReadTokens || data?.cacheReadTokens) || 0,
-        allTokens:
-          parseInt(data?.totalAllTokens || data?.allTokens) ||
-          (parseInt(data?.totalInputTokens || data?.inputTokens) || 0) +
-            (parseInt(data?.totalOutputTokens || data?.outputTokens) || 0) +
-            (parseInt(data?.totalCacheCreateTokens || data?.cacheCreateTokens) || 0) +
-            (parseInt(data?.totalCacheReadTokens || data?.cacheReadTokens) || 0)
-      })
+      const totalData = errTotal ? {} : parseUsage(total)
+      const totalTokens = totalData.tokens || 0
+      const totalRequests = totalData.requests || 0
+
+      // 计算 averages
+      const createdAt = accountCreatedAtMap.get(accountId)
+      const now = new Date()
+      const daysSinceCreated = Math.max(1, Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)))
+      const totalMinutes = Math.max(1, daysSinceCreated * 24 * 60)
 
       allUsageStatsMap.set(accountId, {
-        total: errTotal ? {} : parseUsage(total),
+        total: totalData,
         daily: errDaily ? {} : parseUsage(daily),
-        monthly: errMonthly ? {} : parseUsage(monthly)
+        monthly: errMonthly ? {} : parseUsage(monthly),
+        averages: {
+          rpm: Math.round((totalRequests / totalMinutes) * 100) / 100,
+          tpm: Math.round((totalTokens / totalMinutes) * 100) / 100,
+          dailyRequests: Math.round((totalRequests / daysSinceCreated) * 100) / 100,
+          dailyTokens: Math.round((totalTokens / daysSinceCreated) * 100) / 100
+        }
       })
     }
 
@@ -230,7 +255,8 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
       const usageStats = allUsageStatsMap.get(account.id) || {
         daily: { tokens: 0, requests: 0 },
         total: { tokens: 0, requests: 0 },
-        monthly: { tokens: 0, requests: 0 }
+        monthly: { tokens: 0, requests: 0 },
+        averages: { rpm: 0, tpm: 0, dailyRequests: 0, dailyTokens: 0 }
       }
       const dailyCost = dailyCostMap.get(account.id) || 0
 
@@ -249,7 +275,8 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
         usage: {
           daily: { ...usageStats.daily, cost: dailyCost },
           total: usageStats.total,
-          monthly: usageStats.monthly
+          monthly: usageStats.monthly,
+          averages: usageStats.averages
         }
       }
     })
@@ -571,6 +598,94 @@ router.post('/droid-accounts/:id/refresh-token', authenticateAdmin, async (req, 
   } catch (error) {
     logger.error(`Failed to refresh Droid account token ${req.params.id}:`, error)
     return res.status(500).json({ error: 'Failed to refresh token', message: error.message })
+  }
+})
+
+// 测试 Droid 账户连通性
+router.post('/droid-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+  const { model = 'claude-sonnet-4-20250514' } = req.body
+  const startTime = Date.now()
+
+  try {
+    // 获取账户信息
+    const account = await droidAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    // 确保 token 有效
+    const tokenResult = await droidAccountService.ensureValidToken(accountId)
+    if (!tokenResult.success) {
+      return res.status(401).json({
+        error: 'Token refresh failed',
+        message: tokenResult.error
+      })
+    }
+
+    const accessToken = tokenResult.accessToken
+
+    // 构造测试请求
+    const axios = require('axios')
+    const { getProxyAgent } = require('../../utils/proxyHelper')
+
+    const apiUrl = 'https://api.factory.ai/v1/messages'
+    const payload = {
+      model,
+      max_tokens: 100,
+      messages: [{ role: 'user', content: 'Say "Hello" in one word.' }]
+    }
+
+    const requestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
+      timeout: 30000
+    }
+
+    // 配置代理
+    if (account.proxy) {
+      const agent = getProxyAgent(account.proxy)
+      if (agent) {
+        requestConfig.httpsAgent = agent
+        requestConfig.httpAgent = agent
+      }
+    }
+
+    const response = await axios.post(apiUrl, payload, requestConfig)
+    const latency = Date.now() - startTime
+
+    // 提取响应文本
+    let responseText = ''
+    if (response.data?.content?.[0]?.text) {
+      responseText = response.data.content[0].text
+    }
+
+    logger.success(
+      `✅ Droid account test passed: ${account.name} (${accountId}), latency: ${latency}ms`
+    )
+
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        accountName: account.name,
+        model,
+        latency,
+        responseText: responseText.substring(0, 200)
+      }
+    })
+  } catch (error) {
+    const latency = Date.now() - startTime
+    logger.error(`❌ Droid account test failed: ${accountId}`, error.message)
+
+    return res.status(500).json({
+      success: false,
+      error: 'Test failed',
+      message: error.response?.data?.error?.message || error.message,
+      latency
+    })
   }
 })
 

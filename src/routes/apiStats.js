@@ -5,9 +5,37 @@ const apiKeyService = require('../services/apiKeyService')
 const CostCalculator = require('../utils/costCalculator')
 const claudeAccountService = require('../services/claudeAccountService')
 const openaiAccountService = require('../services/openaiAccountService')
+const serviceRatesService = require('../services/serviceRatesService')
 const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
+const modelsConfig = require('../../config/models')
 
 const router = express.Router()
+
+// 📋 获取可用模型列表（公开接口）
+router.get('/models', (req, res) => {
+  const { service } = req.query
+
+  if (service) {
+    // 返回指定服务的模型
+    const models = modelsConfig.getModelsByService(service)
+    return res.json({
+      success: true,
+      data: models
+    })
+  }
+
+  // 返回所有模型（按服务分组）
+  res.json({
+    success: true,
+    data: {
+      claude: modelsConfig.CLAUDE_MODELS,
+      gemini: modelsConfig.GEMINI_MODELS,
+      openai: modelsConfig.OPENAI_MODELS,
+      other: modelsConfig.OTHER_MODELS,
+      all: modelsConfig.getAllModels()
+    }
+  })
+})
 
 // 🏠 重定向页面请求到新版 admin-spa
 router.get('/', (req, res) => {
@@ -800,13 +828,19 @@ router.post('/api/batch-model-stats', async (req, res) => {
   }
 })
 
+// maxTokens 白名单
+const ALLOWED_MAX_TOKENS = [100, 500, 1000, 2000, 4096]
+const sanitizeMaxTokens = (value) =>
+  ALLOWED_MAX_TOKENS.includes(Number(value)) ? Number(value) : 1000
+
 // 🧪 API Key 端点测试接口 - 测试API Key是否能正常访问服务
 router.post('/api-key/test', async (req, res) => {
   const config = require('../../config/config')
   const { sendStreamTestRequest } = require('../utils/testPayloadHelper')
 
   try {
-    const { apiKey, model = 'claude-sonnet-4-5-20250929' } = req.body
+    const { apiKey, model = 'claude-sonnet-4-5-20250929', prompt = 'hi' } = req.body
+    const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
 
     if (!apiKey) {
       return res.status(400).json({
@@ -839,12 +873,324 @@ router.post('/api-key/test', async (req, res) => {
       apiUrl,
       authorization: apiKey,
       responseStream: res,
-      payload: createClaudeTestPayload(model, { stream: true }),
+      payload: createClaudeTestPayload(model, { stream: true, prompt, maxTokens }),
       timeout: 60000,
       extraHeaders: { 'x-api-key': apiKey }
     })
   } catch (error) {
     logger.error('❌ API Key test failed:', error)
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: 'Test failed',
+        message: error.message || 'Internal server error'
+      })
+    }
+
+    res.write(
+      `data: ${JSON.stringify({ type: 'error', error: error.message || 'Test failed' })}\n\n`
+    )
+    res.end()
+  }
+})
+
+// 🧪 Gemini API Key 端点测试接口
+router.post('/api-key/test-gemini', async (req, res) => {
+  const config = require('../../config/config')
+  const { createGeminiTestPayload } = require('../utils/testPayloadHelper')
+
+  try {
+    const { apiKey, model = 'gemini-2.5-pro', prompt = 'hi' } = req.body
+    const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
+
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'API Key is required',
+        message: 'Please provide your API Key'
+      })
+    }
+
+    if (typeof apiKey !== 'string' || apiKey.length < 10 || apiKey.length > 512) {
+      return res.status(400).json({
+        error: 'Invalid API key format',
+        message: 'API key format is invalid'
+      })
+    }
+
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
+    if (!validation.valid) {
+      return res.status(401).json({
+        error: 'Invalid API key',
+        message: validation.error
+      })
+    }
+
+    // 检查 Gemini 权限
+    const permissions = validation.keyData.permissions || 'all'
+    if (permissions !== 'all' && !permissions.includes('gemini')) {
+      return res.status(403).json({
+        error: 'Permission denied',
+        message: 'This API key does not have Gemini permission'
+      })
+    }
+
+    logger.api(
+      `🧪 Gemini API Key test started for: ${validation.keyData.name} (${validation.keyData.id})`
+    )
+
+    const port = config.server.port || 3000
+    const apiUrl = `http://127.0.0.1:${port}/gemini/v1/models/${model}:streamGenerateContent?alt=sse`
+
+    // 设置 SSE 响应头
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    })
+
+    res.write(`data: ${JSON.stringify({ type: 'test_start', message: 'Test started' })}\n\n`)
+
+    const axios = require('axios')
+    const payload = createGeminiTestPayload(model, { prompt, maxTokens })
+
+    try {
+      const response = await axios.post(apiUrl, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey
+        },
+        timeout: 60000,
+        responseType: 'stream',
+        validateStatus: () => true
+      })
+
+      if (response.status !== 200) {
+        const chunks = []
+        response.data.on('data', (chunk) => chunks.push(chunk))
+        response.data.on('end', () => {
+          const errorData = Buffer.concat(chunks).toString()
+          let errorMsg = `API Error: ${response.status}`
+          try {
+            const json = JSON.parse(errorData)
+            errorMsg = json.message || json.error?.message || json.error || errorMsg
+          } catch {
+            if (errorData.length < 200) {
+              errorMsg = errorData || errorMsg
+            }
+          }
+          res.write(
+            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: errorMsg })}\n\n`
+          )
+          res.end()
+        })
+        return
+      }
+
+      let buffer = ''
+      response.data.on('data', (chunk) => {
+        buffer += chunk.toString()
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data:')) {
+            continue
+          }
+          const jsonStr = line.substring(5).trim()
+          if (!jsonStr || jsonStr === '[DONE]') {
+            continue
+          }
+
+          try {
+            const data = JSON.parse(jsonStr)
+            // Gemini 格式: candidates[0].content.parts[0].text
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+            if (text) {
+              res.write(`data: ${JSON.stringify({ type: 'content', text })}\n\n`)
+            }
+          } catch {
+            // ignore
+          }
+        }
+      })
+
+      response.data.on('end', () => {
+        res.write(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
+        res.end()
+      })
+
+      response.data.on('error', (err) => {
+        res.write(
+          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: err.message })}\n\n`
+        )
+        res.end()
+      })
+    } catch (axiosError) {
+      res.write(
+        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: axiosError.message })}\n\n`
+      )
+      res.end()
+    }
+  } catch (error) {
+    logger.error('❌ Gemini API Key test failed:', error)
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: 'Test failed',
+        message: error.message || 'Internal server error'
+      })
+    }
+
+    res.write(
+      `data: ${JSON.stringify({ type: 'error', error: error.message || 'Test failed' })}\n\n`
+    )
+    res.end()
+  }
+})
+
+// 🧪 OpenAI/Codex API Key 端点测试接口
+router.post('/api-key/test-openai', async (req, res) => {
+  const config = require('../../config/config')
+  const { createOpenAITestPayload } = require('../utils/testPayloadHelper')
+
+  try {
+    const { apiKey, model = 'gpt-5', prompt = 'hi' } = req.body
+    const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
+
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'API Key is required',
+        message: 'Please provide your API Key'
+      })
+    }
+
+    if (typeof apiKey !== 'string' || apiKey.length < 10 || apiKey.length > 512) {
+      return res.status(400).json({
+        error: 'Invalid API key format',
+        message: 'API key format is invalid'
+      })
+    }
+
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
+    if (!validation.valid) {
+      return res.status(401).json({
+        error: 'Invalid API key',
+        message: validation.error
+      })
+    }
+
+    // 检查 OpenAI 权限
+    const permissions = validation.keyData.permissions || 'all'
+    if (permissions !== 'all' && !permissions.includes('openai')) {
+      return res.status(403).json({
+        error: 'Permission denied',
+        message: 'This API key does not have OpenAI permission'
+      })
+    }
+
+    logger.api(
+      `🧪 OpenAI API Key test started for: ${validation.keyData.name} (${validation.keyData.id})`
+    )
+
+    const port = config.server.port || 3000
+    const apiUrl = `http://127.0.0.1:${port}/openai/responses`
+
+    // 设置 SSE 响应头
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    })
+
+    res.write(`data: ${JSON.stringify({ type: 'test_start', message: 'Test started' })}\n\n`)
+
+    const axios = require('axios')
+    const payload = createOpenAITestPayload(model, { prompt, maxTokens })
+
+    try {
+      const response = await axios.post(apiUrl, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'User-Agent': 'codex_cli_rs/1.0.0'
+        },
+        timeout: 60000,
+        responseType: 'stream',
+        validateStatus: () => true
+      })
+
+      if (response.status !== 200) {
+        const chunks = []
+        response.data.on('data', (chunk) => chunks.push(chunk))
+        response.data.on('end', () => {
+          const errorData = Buffer.concat(chunks).toString()
+          let errorMsg = `API Error: ${response.status}`
+          try {
+            const json = JSON.parse(errorData)
+            errorMsg = json.message || json.error?.message || json.error || errorMsg
+          } catch {
+            if (errorData.length < 200) {
+              errorMsg = errorData || errorMsg
+            }
+          }
+          res.write(
+            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: errorMsg })}\n\n`
+          )
+          res.end()
+        })
+        return
+      }
+
+      let buffer = ''
+      response.data.on('data', (chunk) => {
+        buffer += chunk.toString()
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data:')) {
+            continue
+          }
+          const jsonStr = line.substring(5).trim()
+          if (!jsonStr || jsonStr === '[DONE]') {
+            continue
+          }
+
+          try {
+            const data = JSON.parse(jsonStr)
+            // OpenAI Responses 格式: output[].content[].text 或 delta
+            if (data.type === 'response.output_text.delta' && data.delta) {
+              res.write(`data: ${JSON.stringify({ type: 'content', text: data.delta })}\n\n`)
+            } else if (data.type === 'response.content_part.delta' && data.delta?.text) {
+              res.write(`data: ${JSON.stringify({ type: 'content', text: data.delta.text })}\n\n`)
+            }
+          } catch {
+            // ignore
+          }
+        }
+      })
+
+      response.data.on('end', () => {
+        res.write(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
+        res.end()
+      })
+
+      response.data.on('error', (err) => {
+        res.write(
+          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: err.message })}\n\n`
+        )
+        res.end()
+      })
+    } catch (axiosError) {
+      res.write(
+        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: axiosError.message })}\n\n`
+      )
+      res.end()
+    }
+  } catch (error) {
+    logger.error('❌ OpenAI API Key test failed:', error)
 
     if (!res.headersSent) {
       return res.status(500).json({
@@ -946,20 +1292,25 @@ router.post('/api/user-model-stats', async (req, res) => {
     const today = redis.getDateStringInTimezone()
     const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`
 
-    const pattern =
-      period === 'daily'
-        ? `usage:${keyId}:model:daily:*:${today}`
-        : `usage:${keyId}:model:monthly:*:${currentMonth}`
+    let pattern
+    let matchRegex
+    if (period === 'daily') {
+      pattern = `usage:${keyId}:model:daily:*:${today}`
+      matchRegex = /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
+    } else if (period === 'alltime') {
+      pattern = `usage:${keyId}:model:alltime:*`
+      matchRegex = /usage:.+:model:alltime:(.+)$/
+    } else {
+      // monthly
+      pattern = `usage:${keyId}:model:monthly:*:${currentMonth}`
+      matchRegex = /usage:.+:model:monthly:(.+):\d{4}-\d{2}$/
+    }
 
     const results = await redis.scanAndGetAllChunked(pattern)
     const modelStats = []
 
     for (const { key, data } of results) {
-      const match = key.match(
-        period === 'daily'
-          ? /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
-          : /usage:.+:model:monthly:(.+):\d{4}-\d{2}$/
-      )
+      const match = key.match(matchRegex)
 
       if (!match) {
         continue
@@ -977,6 +1328,15 @@ router.post('/api/user-model-stats', async (req, res) => {
 
         const costData = CostCalculator.calculateCost(usage, model)
 
+        // alltime 键不存储 allTokens，需要计算
+        const allTokens =
+          period === 'alltime'
+            ? usage.input_tokens +
+              usage.output_tokens +
+              usage.cache_creation_input_tokens +
+              usage.cache_read_input_tokens
+            : parseInt(data.allTokens) || 0
+
         modelStats.push({
           model,
           requests: parseInt(data.requests) || 0,
@@ -984,7 +1344,7 @@ router.post('/api/user-model-stats', async (req, res) => {
           outputTokens: usage.output_tokens,
           cacheCreateTokens: usage.cache_creation_input_tokens,
           cacheReadTokens: usage.cache_read_input_tokens,
-          allTokens: parseInt(data.allTokens) || 0,
+          allTokens,
           costs: costData.costs,
           formatted: costData.formatted,
           pricing: costData.pricing
@@ -1011,6 +1371,23 @@ router.post('/api/user-model-stats', async (req, res) => {
     return res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to retrieve model statistics'
+    })
+  }
+})
+
+// 📊 获取服务倍率配置（公开接口）
+router.get('/service-rates', async (req, res) => {
+  try {
+    const rates = await serviceRatesService.getRates()
+    res.json({
+      success: true,
+      data: rates
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get service rates:', error)
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to retrieve service rates'
     })
   }
 })

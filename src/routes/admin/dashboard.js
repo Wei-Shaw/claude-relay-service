@@ -20,8 +20,14 @@ const router = express.Router()
 // 获取系统概览
 router.get('/dashboard', authenticateAdmin, async (req, res) => {
   try {
+    // 先检查是否有全局预聚合数据
+    const globalStats = await redis.getGlobalStats()
+
+    // 根据是否有全局统计决定查询策略
+    let apiKeys = null
+    let apiKeyCount = null
+
     const [
-      apiKeys,
       claudeAccounts,
       claudeConsoleAccounts,
       geminiAccounts,
@@ -34,7 +40,6 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       systemAverages,
       realtimeMetrics
     ] = await Promise.all([
-      apiKeyService.getAllApiKeysFast(),
       claudeAccountService.getAllAccounts(),
       claudeConsoleAccountService.getAllAccounts(),
       geminiAccountService.getAllAccounts(),
@@ -47,6 +52,13 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       redis.getSystemAverages(),
       redis.getRealtimeSystemMetrics()
     ])
+
+    // 有全局统计时只获取计数，否则拉全量
+    if (globalStats) {
+      apiKeyCount = await redis.getApiKeyCount()
+    } else {
+      apiKeys = await apiKeyService.getAllApiKeysFast()
+    }
 
     // 处理Bedrock账户数据
     const bedrockAccounts = bedrockAccountsResult.success ? bedrockAccountsResult.data : []
@@ -122,7 +134,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       }
     }
 
-    // 计算使用统计（单次遍历）
+    // 计算使用统计
     let totalTokensUsed = 0,
       totalRequestsUsed = 0,
       totalInputTokensUsed = 0,
@@ -130,20 +142,37 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       totalCacheCreateTokensUsed = 0,
       totalCacheReadTokensUsed = 0,
       totalAllTokensUsed = 0,
-      activeApiKeys = 0
-    for (const key of apiKeys) {
-      const usage = key.usage?.total
-      if (usage) {
-        totalTokensUsed += usage.allTokens || 0
-        totalRequestsUsed += usage.requests || 0
-        totalInputTokensUsed += usage.inputTokens || 0
-        totalOutputTokensUsed += usage.outputTokens || 0
-        totalCacheCreateTokensUsed += usage.cacheCreateTokens || 0
-        totalCacheReadTokensUsed += usage.cacheReadTokens || 0
-        totalAllTokensUsed += usage.allTokens || 0
-      }
-      if (key.isActive) {
-        activeApiKeys++
+      activeApiKeys = 0,
+      totalApiKeys = 0
+
+    if (globalStats) {
+      // 使用预聚合数据（快速路径）
+      totalRequestsUsed = globalStats.requests
+      totalInputTokensUsed = globalStats.inputTokens
+      totalOutputTokensUsed = globalStats.outputTokens
+      totalCacheCreateTokensUsed = globalStats.cacheCreateTokens
+      totalCacheReadTokensUsed = globalStats.cacheReadTokens
+      totalAllTokensUsed = globalStats.allTokens
+      totalTokensUsed = totalAllTokensUsed
+      totalApiKeys = apiKeyCount.total
+      activeApiKeys = apiKeyCount.active
+    } else {
+      // 回退到遍历（兼容旧数据）
+      totalApiKeys = apiKeys.length
+      for (const key of apiKeys) {
+        const usage = key.usage?.total
+        if (usage) {
+          totalTokensUsed += usage.allTokens || 0
+          totalRequestsUsed += usage.requests || 0
+          totalInputTokensUsed += usage.inputTokens || 0
+          totalOutputTokensUsed += usage.outputTokens || 0
+          totalCacheCreateTokensUsed += usage.cacheCreateTokens || 0
+          totalCacheReadTokensUsed += usage.cacheReadTokens || 0
+          totalAllTokensUsed += usage.allTokens || 0
+        }
+        if (key.isActive) {
+          activeApiKeys++
+        }
       }
     }
 
@@ -158,7 +187,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
 
     const dashboard = {
       overview: {
-        totalApiKeys: apiKeys.length,
+        totalApiKeys,
         activeApiKeys,
         // 总账户统计（所有平台）
         totalAccounts:

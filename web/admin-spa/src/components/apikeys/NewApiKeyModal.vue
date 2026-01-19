@@ -126,12 +126,25 @@
         </div>
       </div>
     </div>
+
+    <!-- ConfirmModal -->
+    <ConfirmModal
+      :cancel-text="confirmModalConfig.cancelText"
+      :confirm-text="confirmModalConfig.confirmText"
+      :message="confirmModalConfig.message"
+      :show="showConfirmModal"
+      :title="confirmModalConfig.title"
+      :type="confirmModalConfig.type"
+      @cancel="handleCancelModal"
+      @confirm="handleConfirmModal"
+    />
   </Teleport>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const props = defineProps({
   apiKey: {
@@ -143,6 +156,39 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const showFullKey = ref(false)
+
+// ConfirmModal 状态
+const showConfirmModal = ref(false)
+const confirmModalConfig = ref({
+  title: '',
+  message: '',
+  type: 'primary',
+  confirmText: '确认',
+  cancelText: '取消'
+})
+const confirmResolve = ref(null)
+
+const showConfirm = (
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  type = 'primary'
+) => {
+  return new Promise((resolve) => {
+    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
+    confirmResolve.value = resolve
+    showConfirmModal.value = true
+  })
+}
+const handleConfirmModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(true)
+}
+const handleCancelModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(false)
+}
 
 // 获取 API Base URL 前缀
 const getBaseUrlPrefix = () => {
@@ -249,45 +295,29 @@ const copyKeyOnly = async () => {
 
 // 关闭弹窗（带确认）
 const handleClose = async () => {
-  if (window.showConfirm) {
-    const confirmed = await window.showConfirm(
-      '关闭提醒',
-      '关闭后将无法再次查看完整的API Key，请确保已经妥善保存。\n\n确定要关闭吗？',
-      '确定关闭',
-      '取消'
-    )
-    if (confirmed) {
-      emit('close')
-    }
-  } else {
-    // 降级方案
-    const confirmed = confirm(
-      '关闭后将无法再次查看完整的API Key，请确保已经妥善保存。\n\n确定要关闭吗？'
-    )
-    if (confirmed) {
-      emit('close')
-    }
+  const confirmed = await showConfirm(
+    '关闭提醒',
+    '关闭后将无法再次查看完整的API Key，请确保已经妥善保存。\n\n确定要关闭吗？',
+    '确定关闭',
+    '取消',
+    'warning'
+  )
+  if (confirmed) {
+    emit('close')
   }
 }
 
 // 直接关闭（不带确认）
 const handleDirectClose = async () => {
-  if (window.showConfirm) {
-    const confirmed = await window.showConfirm(
-      '确定要关闭吗？',
-      '您还没有保存API Key，关闭后将无法再次查看。\n\n建议您先复制API Key再关闭。',
-      '仍然关闭',
-      '返回复制'
-    )
-    if (confirmed) {
-      emit('close')
-    }
-  } else {
-    // 降级方案
-    const confirmed = confirm('您还没有保存API Key，关闭后将无法再次查看。\n\n确定要关闭吗？')
-    if (confirmed) {
-      emit('close')
-    }
+  const confirmed = await showConfirm(
+    '确定要关闭吗？',
+    '您还没有保存API Key，关闭后将无法再次查看。\n\n建议您先复制API Key再关闭。',
+    '仍然关闭',
+    '返回复制',
+    'warning'
+  )
+  if (confirmed) {
+    emit('close')
   }
 }
 </script>

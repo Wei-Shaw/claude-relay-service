@@ -1,9 +1,9 @@
 <template>
-  <div class="flex h-full flex-col gap-4 md:gap-6">
+  <div class="flex h-full flex-col gap-3 sm:gap-4 md:gap-6">
     <!-- 限制配置 / 聚合模式提示 -->
-    <div class="card flex h-full flex-col p-4 md:p-6">
+    <div class="card flex h-full flex-col p-3 sm:p-4 md:p-6">
       <h3
-        class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
+        class="mb-2 flex items-center text-base font-bold text-gray-900 dark:text-gray-100 sm:mb-3 sm:text-lg md:mb-4 md:text-xl"
       >
         <i class="fas fa-shield-alt mr-2 text-sm text-red-500 md:mr-3 md:text-base" />
         {{ multiKeyMode ? '限制配置（聚合查询模式）' : '限制配置' }}

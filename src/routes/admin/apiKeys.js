@@ -8,6 +8,17 @@ const config = require('../../../config/config')
 
 const router = express.Router()
 
+// 有效的服务权限值
+const VALID_SERVICES = ['claude', 'gemini', 'openai', 'droid']
+
+// 验证 permissions 值（支持单选和多选）
+const isValidPermissions = (permissions) => {
+  if (!permissions || permissions === 'all') return true
+  // 支持逗号分隔的多选格式
+  const services = permissions.split(',')
+  return services.every((s) => VALID_SERVICES.includes(s.trim()))
+}
+
 // 👥 用户管理 (用于API Key分配)
 
 // 获取所有用户列表（用于API Key分配）
@@ -1430,10 +1441,10 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       permissions !== undefined &&
       permissions !== null &&
       permissions !== '' &&
-      !['claude', 'gemini', 'openai', 'droid', 'all'].includes(permissions)
+      !isValidPermissions(permissions)
     ) {
       return res.status(400).json({
-        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, or all'
+        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, all, or comma-separated combination'
       })
     }
 
@@ -1528,10 +1539,10 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       permissions !== undefined &&
       permissions !== null &&
       permissions !== '' &&
-      !['claude', 'gemini', 'openai', 'droid', 'all'].includes(permissions)
+      !isValidPermissions(permissions)
     ) {
       return res.status(400).json({
-        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, or all'
+        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, all, or comma-separated combination'
       })
     }
 
@@ -1637,10 +1648,10 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
 
     if (
       updates.permissions !== undefined &&
-      !['claude', 'gemini', 'openai', 'droid', 'all'].includes(updates.permissions)
+      !isValidPermissions(updates.permissions)
     ) {
       return res.status(400).json({
-        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, or all'
+        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, all, or comma-separated combination'
       })
     }
 
@@ -1917,9 +1928,9 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
 
     if (permissions !== undefined) {
       // 验证权限值
-      if (!['claude', 'gemini', 'openai', 'droid', 'all'].includes(permissions)) {
+      if (!isValidPermissions(permissions)) {
         return res.status(400).json({
-          error: 'Invalid permissions value. Must be claude, gemini, openai, droid, or all'
+          error: 'Invalid permissions value. Must be claude, gemini, openai, droid, all, or comma-separated combination'
         })
       }
       updates.permissions = permissions

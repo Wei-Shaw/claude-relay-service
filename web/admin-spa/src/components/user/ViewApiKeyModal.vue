@@ -197,7 +197,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
 
 defineProps({
   show: {

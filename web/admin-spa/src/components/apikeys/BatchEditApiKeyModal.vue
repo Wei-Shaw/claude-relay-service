@@ -446,9 +446,9 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
 import { useApiKeysStore } from '@/stores/apiKeys'
-import { apiClient } from '@/config/api'
+import * as httpApi from '@/utils/http_apis'
 import AccountSelector from '@/components/common/AccountSelector.vue'
 
 const props = defineProps({
@@ -588,15 +588,15 @@ const refreshAccounts = async () => {
       droidData,
       groupsData
     ] = await Promise.all([
-      apiClient.get('/admin/claude-accounts'),
-      apiClient.get('/admin/claude-console-accounts'),
-      apiClient.get('/admin/gemini-accounts'),
-      apiClient.get('/admin/gemini-api-accounts'), // 获取 Gemini-API 账号
-      apiClient.get('/admin/openai-accounts'),
-      apiClient.get('/admin/openai-responses-accounts'),
-      apiClient.get('/admin/bedrock-accounts'),
-      apiClient.get('/admin/droid-accounts'),
-      apiClient.get('/admin/account-groups')
+      httpApi.get('/admin/claude-accounts'),
+      httpApi.get('/admin/claude-console-accounts'),
+      httpApi.get('/admin/gemini-accounts'),
+      httpApi.get('/admin/gemini-api-accounts'), // 获取 Gemini-API 账号
+      httpApi.get('/admin/openai-accounts'),
+      httpApi.get('/admin/openai-responses-accounts'),
+      httpApi.get('/admin/bedrock-accounts'),
+      httpApi.get('/admin/droid-accounts'),
+      httpApi.get('/admin/account-groups')
     ])
 
     // 合并Claude OAuth账户和Claude Console账户
@@ -801,7 +801,7 @@ const batchUpdateApiKeys = async () => {
       updates.tagOperation = tagOperation.value
     }
 
-    const result = await apiClient.put('/admin/api-keys/batch', {
+    const result = await httpApi.put('/admin/api-keys/batch', {
       keyIds: props.selectedKeys,
       updates
     })

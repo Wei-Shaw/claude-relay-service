@@ -36,9 +36,9 @@ body::before {
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(circle at 20% 80%, rgba(240, 147, 251, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(102, 126, 234, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+    radial-gradient(circle at 20% 80%, rgba(var(--accent-rgb), 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(var(--primary-rgb), 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(var(--secondary-rgb), 0.1) 0%, transparent 50%);
   pointer-events: none;
   z-index: -1;
 }
@@ -80,7 +80,7 @@ h6 {
 /* 自定义滚动条样式 */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(102, 126, 234, 0.3) rgba(102, 126, 234, 0.05);
+  scrollbar-color: rgba(var(--primary-rgb), 0.3) rgba(var(--primary-rgb), 0.05);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -89,22 +89,34 @@ h6 {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(102, 126, 234, 0.05);
+  background: rgba(var(--primary-rgb), 0.05);
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-rgb), 0.4) 0%,
+    rgba(var(--secondary-rgb), 0.4) 100%
+  );
   border-radius: 10px;
   transition: background 0.3s ease;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.6) 0%, rgba(118, 75, 162, 0.6) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-rgb), 0.6) 0%,
+    rgba(var(--secondary-rgb), 0.6) 100%
+  );
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-rgb), 0.8) 0%,
+    rgba(var(--secondary-rgb), 0.8) 100%
+  );
 }
 
 /* Vue过渡动画 */
@@ -137,8 +149,8 @@ h6 {
 @media (max-width: 768px) {
   .glass,
   .glass-strong {
-    margin: 16px;
-    border-radius: 20px;
+    margin: 0;
+    border-radius: 16px;
   }
 
   .stat-card {

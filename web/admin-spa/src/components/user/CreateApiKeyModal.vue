@@ -173,7 +173,7 @@
 <script setup>
 import { ref, reactive, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
 
 const props = defineProps({
   show: {

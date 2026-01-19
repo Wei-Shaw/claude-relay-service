@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { apiClient } from '@/config/api'
+import * as httpApi from '@/utils/http_apis'
 
 export const useAccountsStore = defineStore('accounts', () => {
   // 状态
@@ -24,7 +24,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/admin/claude-accounts')
+      const response = await httpApi.getClaudeAccounts()
       if (response.success) {
         claudeAccounts.value = response.data || []
       } else {
@@ -43,7 +43,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/admin/claude-console-accounts')
+      const response = await httpApi.getClaudeConsoleAccounts()
       if (response.success) {
         claudeConsoleAccounts.value = response.data || []
       } else {
@@ -62,7 +62,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/admin/bedrock-accounts')
+      const response = await httpApi.getBedrockAccounts()
       if (response.success) {
         bedrockAccounts.value = response.data || []
       } else {
@@ -81,7 +81,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/admin/gemini-accounts')
+      const response = await httpApi.getGeminiAccounts()
       if (response.success) {
         geminiAccounts.value = response.data || []
       } else {
@@ -100,7 +100,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/admin/openai-accounts')
+      const response = await httpApi.getOpenAIAccounts()
       if (response.success) {
         openaiAccounts.value = response.data || []
       } else {
@@ -119,7 +119,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/admin/azure-openai-accounts')
+      const response = await httpApi.getAzureOpenAIAccounts()
       if (response.success) {
         azureOpenaiAccounts.value = response.data || []
       } else {
@@ -138,7 +138,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/admin/openai-responses-accounts')
+      const response = await httpApi.getOpenAIResponsesAccounts()
       if (response.success) {
         openaiResponsesAccounts.value = response.data || []
       } else {
@@ -157,7 +157,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/admin/droid-accounts')
+      const response = await httpApi.getDroidAccounts()
       if (response.success) {
         droidAccounts.value = response.data || []
       } else {
@@ -199,7 +199,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/claude-accounts', data)
+      const response = await httpApi.createClaudeAccount(data)
       if (response.success) {
         await fetchClaudeAccounts()
         return response.data
@@ -219,7 +219,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/claude-console-accounts', data)
+      const response = await httpApi.createClaudeConsoleAccount(data)
       if (response.success) {
         await fetchClaudeConsoleAccounts()
         return response.data
@@ -239,7 +239,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/bedrock-accounts', data)
+      const response = await httpApi.createBedrockAccount(data)
       if (response.success) {
         await fetchBedrockAccounts()
         return response.data
@@ -259,7 +259,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/gemini-accounts', data)
+      const response = await httpApi.createGeminiAccount(data)
       if (response.success) {
         await fetchGeminiAccounts()
         return response.data
@@ -279,7 +279,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/openai-accounts', data)
+      const response = await httpApi.createOpenAIAccount(data)
       if (response.success) {
         await fetchOpenAIAccounts()
         return response.data
@@ -299,7 +299,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/droid-accounts', data)
+      const response = await httpApi.createDroidAccount(data)
       if (response.success) {
         await fetchDroidAccounts()
         return response.data
@@ -319,7 +319,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/droid-accounts/${id}`, data)
+      const response = await httpApi.updateDroidAccount(id, data)
       if (response.success) {
         await fetchDroidAccounts()
         return response.data
@@ -339,7 +339,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/azure-openai-accounts', data)
+      const response = await httpApi.createAzureOpenAIAccount(data)
       if (response.success) {
         await fetchAzureOpenAIAccounts()
         return response.data
@@ -359,7 +359,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/openai-responses-accounts', data)
+      const response = await httpApi.createOpenAIResponsesAccount(data)
       if (response.success) {
         await fetchOpenAIResponsesAccounts()
         return response.data
@@ -379,7 +379,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post('/admin/gemini-api-accounts', data)
+      const response = await httpApi.createGeminiApiAccount(data)
       if (response.success) {
         await fetchGeminiAccounts()
         return response.data
@@ -399,7 +399,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/claude-accounts/${id}`, data)
+      const response = await httpApi.updateClaudeAccount(id, data)
       if (response.success) {
         await fetchClaudeAccounts()
         return response
@@ -419,7 +419,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/claude-console-accounts/${id}`, data)
+      const response = await httpApi.updateClaudeConsoleAccount(id, data)
       if (response.success) {
         await fetchClaudeConsoleAccounts()
         return response
@@ -439,7 +439,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/bedrock-accounts/${id}`, data)
+      const response = await httpApi.updateBedrockAccount(id, data)
       if (response.success) {
         await fetchBedrockAccounts()
         return response
@@ -459,7 +459,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/gemini-accounts/${id}`, data)
+      const response = await httpApi.updateGeminiAccount(id, data)
       if (response.success) {
         await fetchGeminiAccounts()
         return response
@@ -479,7 +479,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/openai-accounts/${id}`, data)
+      const response = await httpApi.updateOpenAIAccount(id, data)
       if (response.success) {
         await fetchOpenAIAccounts()
         return response
@@ -499,7 +499,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/azure-openai-accounts/${id}`, data)
+      const response = await httpApi.updateAzureOpenAIAccount(id, data)
       if (response.success) {
         await fetchAzureOpenAIAccounts()
         return response
@@ -519,7 +519,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/openai-responses-accounts/${id}`, data)
+      const response = await httpApi.updateOpenAIResponsesAccount(id, data)
       if (response.success) {
         await fetchOpenAIResponsesAccounts()
         return response
@@ -539,7 +539,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.put(`/admin/gemini-api-accounts/${id}`, data)
+      const response = await httpApi.updateGeminiApiAccount(id, data)
       if (response.success) {
         await fetchGeminiAccounts()
         return response
@@ -578,7 +578,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         endpoint = `/admin/openai-accounts/${id}/toggle`
       }
 
-      const response = await apiClient.put(endpoint)
+      const response = await httpApi.toggleAccountStatus(endpoint)
       if (response.success) {
         if (platform === 'claude') {
           await fetchClaudeAccounts()
@@ -633,7 +633,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         endpoint = `/admin/openai-accounts/${id}`
       }
 
-      const response = await apiClient.delete(endpoint)
+      const response = await httpApi.deleteAccountByEndpoint(endpoint)
       if (response.success) {
         if (platform === 'claude') {
           await fetchClaudeAccounts()
@@ -669,7 +669,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.post(`/admin/claude-accounts/${id}/refresh`)
+      const response = await httpApi.refreshClaudeAccount(id)
       if (response.success) {
         await fetchClaudeAccounts()
         return response
@@ -687,7 +687,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 生成Claude OAuth URL
   const generateClaudeAuthUrl = async (proxyConfig) => {
     try {
-      const response = await apiClient.post('/admin/claude-accounts/generate-auth-url', proxyConfig)
+      const response = await httpApi.generateClaudeAuthUrl(proxyConfig)
       if (response.success) {
         return response.data // 返回整个对象，包含authUrl和sessionId
       } else {
@@ -702,7 +702,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 交换Claude OAuth Code
   const exchangeClaudeCode = async (data) => {
     try {
-      const response = await apiClient.post('/admin/claude-accounts/exchange-code', data)
+      const response = await httpApi.exchangeClaudeCode(data)
       if (response.success) {
         return response.data
       } else {
@@ -717,10 +717,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 生成Claude Setup Token URL
   const generateClaudeSetupTokenUrl = async (proxyConfig) => {
     try {
-      const response = await apiClient.post(
-        '/admin/claude-accounts/generate-setup-token-url',
-        proxyConfig
-      )
+      const response = await httpApi.generateClaudeSetupTokenUrl(proxyConfig)
       if (response.success) {
         return response.data // 返回整个对象，包含authUrl和sessionId
       } else {
@@ -735,10 +732,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 交换Claude Setup Token Code
   const exchangeClaudeSetupTokenCode = async (data) => {
     try {
-      const response = await apiClient.post(
-        '/admin/claude-accounts/exchange-setup-token-code',
-        data
-      )
+      const response = await httpApi.exchangeClaudeSetupToken(data)
       if (response.success) {
         return response.data
       } else {
@@ -753,7 +747,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // Cookie自动授权 - 普通OAuth
   const oauthWithCookie = async (payload) => {
     try {
-      const response = await apiClient.post('/admin/claude-accounts/oauth-with-cookie', payload)
+      const response = await httpApi.claudeOAuthWithCookie(payload)
       if (response.success) {
         return response.data
       } else {
@@ -768,10 +762,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // Cookie自动授权 - Setup Token
   const oauthSetupTokenWithCookie = async (payload) => {
     try {
-      const response = await apiClient.post(
-        '/admin/claude-accounts/setup-token-with-cookie',
-        payload
-      )
+      const response = await httpApi.claudeSetupTokenWithCookie(payload)
       if (response.success) {
         return response.data
       } else {
@@ -786,7 +777,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 生成Gemini OAuth URL
   const generateGeminiAuthUrl = async (proxyConfig) => {
     try {
-      const response = await apiClient.post('/admin/gemini-accounts/generate-auth-url', proxyConfig)
+      const response = await httpApi.generateGeminiAuthUrl(proxyConfig)
       if (response.success) {
         return response.data // 返回整个对象，包含authUrl和sessionId
       } else {
@@ -801,7 +792,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 交换Gemini OAuth Code
   const exchangeGeminiCode = async (data) => {
     try {
-      const response = await apiClient.post('/admin/gemini-accounts/exchange-code', data)
+      const response = await httpApi.exchangeGeminiCode(data)
       if (response.success) {
         return response.data
       } else {
@@ -815,60 +806,33 @@ export const useAccountsStore = defineStore('accounts', () => {
 
   // 生成OpenAI OAuth URL
   const generateOpenAIAuthUrl = async (proxyConfig) => {
-    try {
-      const response = await apiClient.post('/admin/openai-accounts/generate-auth-url', proxyConfig)
-      if (response.success) {
-        return response.data // 返回整个对象，包含authUrl和sessionId
-      } else {
-        throw new Error(response.message || '生成授权URL失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const response = await httpApi.generateOpenAIAuthUrl(proxyConfig)
+    if (response.success) return response.data
+    error.value = response.message || '生成授权URL失败'
+    return null
   }
 
   // 生成Droid OAuth URL
   const generateDroidAuthUrl = async (proxyConfig) => {
     error.value = null
-    try {
-      const response = await apiClient.post('/admin/droid-accounts/generate-auth-url', proxyConfig)
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error(response.message || '生成授权URL失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const response = await httpApi.generateDroidAuthUrl(proxyConfig)
+    if (response.success) return response.data
+    error.value = response.message || '生成授权URL失败'
+    return null
   }
 
   // 交换OpenAI OAuth Code
   const exchangeOpenAICode = async (data) => {
-    try {
-      const response = await apiClient.post('/admin/openai-accounts/exchange-code', data)
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error(response.message || '交换授权码失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const response = await httpApi.exchangeOpenAICode(data)
+    if (response.success) return response.data
+    error.value = response.message || '交换授权码失败'
+    return null
   }
 
   // 交换Droid OAuth Code
   const exchangeDroidCode = async (data) => {
     error.value = null
-    try {
-      const response = await apiClient.post('/admin/droid-accounts/exchange-code', data)
-      return response
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    return await httpApi.exchangeDroidCode(data)
   }
 
   // 排序账户

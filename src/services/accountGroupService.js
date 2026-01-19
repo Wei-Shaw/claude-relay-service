@@ -567,6 +567,34 @@ class AccountGroupService {
         }
       }
 
+      // 对于反向索引为空的账户，单独查询并补建索引（处理部分缺失情况）
+      const emptyIndexAccountIds = []
+      for (const accountId of accountIds) {
+        const ids = accountGroupIdsMap.get(accountId) || []
+        if (ids.length === 0) {
+          emptyIndexAccountIds.push(accountId)
+        }
+      }
+      if (emptyIndexAccountIds.length > 0 && emptyIndexAccountIds.length < accountIds.length) {
+        // 部分账户索引缺失，逐个查询并补建
+        for (const accountId of emptyIndexAccountIds) {
+          try {
+            const groups = await this.getAccountGroups(accountId)
+            if (groups.length > 0) {
+              const groupIds = groups.map((g) => g.id)
+              accountGroupIdsMap.set(accountId, groupIds)
+              groupIds.forEach((id) => uniqueGroupIds.add(id))
+              // 异步补建反向索引
+              client
+                .sadd(`${this.REVERSE_INDEX_PREFIX}${platform}:${accountId}`, ...groupIds)
+                .catch(() => {})
+            }
+          } catch {
+            // 忽略错误，保持空数组
+          }
+        }
+      }
+
       // 批量获取分组详情
       const groupDetailsMap = new Map()
       if (uniqueGroupIds.size > 0) {

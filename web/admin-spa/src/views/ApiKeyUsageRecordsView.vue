@@ -295,9 +295,9 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
-import { formatNumber } from '@/utils/format'
+import * as httpApi from '@/utils/http_apis'
+import { showToast } from '@/utils/tools'
+import { formatNumber } from '@/utils/tools'
 import RecordDetailModal from '@/components/apikeys/RecordDetailModal.vue'
 
 const route = useRoute()
@@ -410,7 +410,7 @@ const syncResponseState = (data) => {
 const fetchRecords = async (page = pagination.currentPage) => {
   loading.value = true
   try {
-    const response = await apiClient.get(`/admin/api-keys/${keyId.value}/usage-records`, {
+    const response = await httpApi.get(`/admin/api-keys/${keyId.value}/usage-records`, {
       params: buildParams(page)
     })
     syncResponseState(response.data || {})
@@ -465,7 +465,7 @@ const exportCsv = async () => {
     const maxPages = 50 // 50 * 200 = 10000，超过后端 5000 上限已足够
 
     while (page <= totalPages && page <= maxPages) {
-      const response = await apiClient.get(`/admin/api-keys/${keyId.value}/usage-records`, {
+      const response = await httpApi.get(`/admin/api-keys/${keyId.value}/usage-records`, {
         params: { ...buildParams(page), pageSize: 200 }
       })
       const payload = response.data || {}

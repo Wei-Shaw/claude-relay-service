@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid')
 const config = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const serviceRatesService = require('./serviceRatesService')
 
 const ACCOUNT_TYPE_CONFIG = {
   claude: { prefix: 'claude:account:' },
@@ -89,7 +90,7 @@ class ApiKeyService {
       azureOpenaiAccountId = null,
       bedrockAccountId = null, // 添加 Bedrock 账号ID支持
       droidAccountId = null,
-      permissions = 'all', // 可选值：'claude'、'gemini'、'openai'、'droid' 或 'all'
+      permissions = 'all', // 可选值：'claude'、'gemini'、'openai'、'droid' 或 'all'，聚合Key为数组
       isActive = true,
       concurrencyLimit = 0,
       rateLimitWindow = null,
@@ -106,13 +107,29 @@ class ApiKeyService {
       activationDays = 0, // 新增：激活后有效天数（0表示不使用此功能）
       activationUnit = 'days', // 新增：激活时间单位 'hours' 或 'days'
       expirationMode = 'fixed', // 新增：过期模式 'fixed'(固定时间) 或 'activation'(首次使用后激活)
-      icon = '' // 新增：图标（base64编码）
+      icon = '', // 新增：图标（base64编码）
+      // 聚合 Key 相关字段
+      isAggregated = false, // 是否为聚合 Key
+      quotaLimit = 0, // CC 额度上限（聚合 Key 使用）
+      quotaUsed = 0, // 已消耗 CC 额度
+      serviceQuotaLimits = {}, // 分服务额度限制 { claude: 50, codex: 30 }
+      serviceQuotaUsed = {} // 分服务已消耗额度
     } = options
 
     // 生成简单的API Key (64字符十六进制)
     const apiKey = `${this.prefix}${this._generateSecretKey()}`
     const keyId = uuidv4()
     const hashedKey = this._hashApiKey(apiKey)
+
+    // 处理 permissions：聚合 Key 使用数组，传统 Key 使用字符串
+    let permissionsValue = permissions
+    if (isAggregated && !Array.isArray(permissions)) {
+      // 聚合 Key 但 permissions 不是数组，转换为数组
+      permissionsValue =
+        permissions === 'all'
+          ? ['claude', 'codex', 'gemini', 'droid', 'bedrock', 'azure', 'ccr']
+          : [permissions]
+    }
 
     const keyData = {
       id: keyId,
@@ -132,7 +149,9 @@ class ApiKeyService {
       azureOpenaiAccountId: azureOpenaiAccountId || '',
       bedrockAccountId: bedrockAccountId || '', // 添加 Bedrock 账号ID
       droidAccountId: droidAccountId || '',
-      permissions: permissions || 'all',
+      permissions: Array.isArray(permissionsValue)
+        ? JSON.stringify(permissionsValue)
+        : permissionsValue || 'all',
       enableModelRestriction: String(enableModelRestriction),
       restrictedModels: JSON.stringify(restrictedModels || []),
       enableClientRestriction: String(enableClientRestriction || false),
@@ -152,7 +171,13 @@ class ApiKeyService {
       createdBy: options.createdBy || 'admin',
       userId: options.userId || '',
       userUsername: options.userUsername || '',
-      icon: icon || '' // 新增：图标（base64编码）
+      icon: icon || '', // 新增：图标（base64编码）
+      // 聚合 Key 相关字段
+      isAggregated: String(isAggregated),
+      quotaLimit: String(quotaLimit || 0),
+      quotaUsed: String(quotaUsed || 0),
+      serviceQuotaLimits: JSON.stringify(serviceQuotaLimits || {}),
+      serviceQuotaUsed: JSON.stringify(serviceQuotaUsed || {})
     }
 
     // 保存API Key数据并建立哈希映射
@@ -182,7 +207,17 @@ class ApiKeyService {
       logger.warn(`Failed to add key ${keyId} to API Key index:`, err.message)
     }
 
-    logger.success(`🔑 Generated new API key: ${name} (${keyId})`)
+    logger.success(
+      `🔑 Generated new API key: ${name} (${keyId})${isAggregated ? ' [Aggregated]' : ''}`
+    )
+
+    // 解析 permissions 用于返回
+    let parsedPermissions = keyData.permissions
+    try {
+      parsedPermissions = JSON.parse(keyData.permissions)
+    } catch (e) {
+      // 不是 JSON，保持原值（传统 Key 的字符串格式）
+    }
 
     return {
       id: keyId,
@@ -202,7 +237,7 @@ class ApiKeyService {
       azureOpenaiAccountId: keyData.azureOpenaiAccountId,
       bedrockAccountId: keyData.bedrockAccountId, // 添加 Bedrock 账号ID
       droidAccountId: keyData.droidAccountId,
-      permissions: keyData.permissions,
+      permissions: parsedPermissions,
       enableModelRestriction: keyData.enableModelRestriction === 'true',
       restrictedModels: JSON.parse(keyData.restrictedModels),
       enableClientRestriction: keyData.enableClientRestriction === 'true',
@@ -218,7 +253,13 @@ class ApiKeyService {
       activatedAt: keyData.activatedAt,
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
-      createdBy: keyData.createdBy
+      createdBy: keyData.createdBy,
+      // 聚合 Key 相关字段
+      isAggregated: keyData.isAggregated === 'true',
+      quotaLimit: parseFloat(keyData.quotaLimit || 0),
+      quotaUsed: parseFloat(keyData.quotaUsed || 0),
+      serviceQuotaLimits: JSON.parse(keyData.serviceQuotaLimits || '{}'),
+      serviceQuotaUsed: JSON.parse(keyData.serviceQuotaUsed || '{}')
     }
   }
 
@@ -300,15 +341,26 @@ class ApiKeyService {
         }
       }
 
-      // 获取使用统计（供返回数据使用）
-      const usage = await redis.getUsageStats(keyData.id)
+      // 按需获取费用统计（仅在有限制时查询，减少 Redis 调用）
+      const dailyCostLimit = parseFloat(keyData.dailyCostLimit || 0)
+      const totalCostLimit = parseFloat(keyData.totalCostLimit || 0)
+      const weeklyOpusCostLimit = parseFloat(keyData.weeklyOpusCostLimit || 0)
 
-      // 获取费用统计
-      const [dailyCost, costStats] = await Promise.all([
-        redis.getDailyCost(keyData.id),
-        redis.getCostStats(keyData.id)
-      ])
-      const totalCost = costStats?.total || 0
+      const costQueries = []
+      if (dailyCostLimit > 0) {
+        costQueries.push(redis.getDailyCost(keyData.id).then((v) => ({ dailyCost: v || 0 })))
+      }
+      if (totalCostLimit > 0) {
+        costQueries.push(redis.getCostStats(keyData.id).then((v) => ({ totalCost: v?.total || 0 })))
+      }
+      if (weeklyOpusCostLimit > 0) {
+        costQueries.push(
+          redis.getWeeklyOpusCost(keyData.id).then((v) => ({ weeklyOpusCost: v || 0 }))
+        )
+      }
+
+      const costData =
+        costQueries.length > 0 ? Object.assign({}, ...(await Promise.all(costQueries))) : {}
 
       // 更新最后使用时间（优化：只在实际API调用时更新，而不是验证时）
       // 注意：lastUsedAt的更新已移至recordUsage方法中
@@ -339,6 +391,26 @@ class ApiKeyService {
         tags = []
       }
 
+      // 解析 permissions（聚合 Key 为数组，传统 Key 为字符串）
+      let permissions = keyData.permissions || 'all'
+      try {
+        permissions = JSON.parse(keyData.permissions)
+      } catch (e) {
+        // 不是 JSON，保持原值
+      }
+
+      // 解析聚合 Key 相关字段
+      let serviceQuotaLimits = {}
+      let serviceQuotaUsed = {}
+      try {
+        serviceQuotaLimits = keyData.serviceQuotaLimits
+          ? JSON.parse(keyData.serviceQuotaLimits)
+          : {}
+        serviceQuotaUsed = keyData.serviceQuotaUsed ? JSON.parse(keyData.serviceQuotaUsed) : {}
+      } catch (e) {
+        // 解析失败使用默认值
+      }
+
       return {
         valid: true,
         keyData: {
@@ -354,7 +426,7 @@ class ApiKeyService {
           azureOpenaiAccountId: keyData.azureOpenaiAccountId,
           bedrockAccountId: keyData.bedrockAccountId, // 添加 Bedrock 账号ID
           droidAccountId: keyData.droidAccountId,
-          permissions: keyData.permissions || 'all',
+          permissions,
           tokenLimit: parseInt(keyData.tokenLimit),
           concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
           rateLimitWindow: parseInt(keyData.rateLimitWindow || 0),
@@ -364,14 +436,19 @@ class ApiKeyService {
           restrictedModels,
           enableClientRestriction: keyData.enableClientRestriction === 'true',
           allowedClients,
-          dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
-          totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
-          weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
-          dailyCost: dailyCost || 0,
-          totalCost,
-          weeklyOpusCost: (await redis.getWeeklyOpusCost(keyData.id)) || 0,
+          dailyCostLimit,
+          totalCostLimit,
+          weeklyOpusCostLimit,
+          dailyCost: costData.dailyCost || 0,
+          totalCost: costData.totalCost || 0,
+          weeklyOpusCost: costData.weeklyOpusCost || 0,
           tags,
-          usage
+          // 聚合 Key 相关字段
+          isAggregated: keyData.isAggregated === 'true',
+          quotaLimit: parseFloat(keyData.quotaLimit || 0),
+          quotaUsed: parseFloat(keyData.quotaUsed || 0),
+          serviceQuotaLimits,
+          serviceQuotaUsed
         }
       }
     } catch (error) {
@@ -982,19 +1059,37 @@ class ApiKeyService {
         'tags',
         'userId', // 新增：用户ID（所有者变更）
         'userUsername', // 新增：用户名（所有者变更）
-        'createdBy' // 新增：创建者（所有者变更）
+        'createdBy', // 新增：创建者（所有者变更）
+        // 聚合 Key 相关字段
+        'isAggregated',
+        'quotaLimit',
+        'quotaUsed',
+        'serviceQuotaLimits',
+        'serviceQuotaUsed'
       ]
       const updatedData = { ...keyData }
 
       for (const [field, value] of Object.entries(updates)) {
         if (allowedUpdates.includes(field)) {
-          if (field === 'restrictedModels' || field === 'allowedClients' || field === 'tags') {
-            // 特殊处理数组字段
-            updatedData[field] = JSON.stringify(value || [])
+          if (
+            field === 'restrictedModels' ||
+            field === 'allowedClients' ||
+            field === 'tags' ||
+            field === 'serviceQuotaLimits' ||
+            field === 'serviceQuotaUsed'
+          ) {
+            // 特殊处理数组/对象字段
+            updatedData[field] = JSON.stringify(
+              value || (field === 'serviceQuotaLimits' || field === 'serviceQuotaUsed' ? {} : [])
+            )
+          } else if (field === 'permissions') {
+            // permissions 可能是数组（聚合 Key）或字符串（传统 Key）
+            updatedData[field] = Array.isArray(value) ? JSON.stringify(value) : value || 'all'
           } else if (
             field === 'enableModelRestriction' ||
             field === 'enableClientRestriction' ||
-            field === 'isActivated'
+            field === 'isActivated' ||
+            field === 'isAggregated'
           ) {
             // 布尔值转字符串
             updatedData[field] = String(value)
@@ -2169,6 +2264,375 @@ class ApiKeyService {
     } catch (error) {
       logger.error('❌ Failed to cleanup expired keys:', error)
       return 0
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 聚合 Key 相关方法
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * 判断是否为聚合 Key
+   */
+  isAggregatedKey(keyData) {
+    return keyData && keyData.isAggregated === 'true'
+  }
+
+  /**
+   * 获取转换为聚合 Key 的预览信息
+   * @param {string} keyId - API Key ID
+   * @returns {Object} 转换预览信息
+   */
+  async getConvertToAggregatedPreview(keyId) {
+    try {
+      const keyData = await redis.getApiKey(keyId)
+      if (!keyData || Object.keys(keyData).length === 0) {
+        throw new Error('API key not found')
+      }
+
+      if (keyData.isAggregated === 'true') {
+        throw new Error('API key is already aggregated')
+      }
+
+      // 获取当前服务倍率
+      const ratesConfig = await serviceRatesService.getRates()
+
+      // 确定原服务类型
+      let originalService = keyData.permissions || 'all'
+      try {
+        const parsed = JSON.parse(originalService)
+        if (Array.isArray(parsed)) {
+          originalService = parsed[0] || 'claude'
+        }
+      } catch (e) {
+        // 不是 JSON，保持原值
+      }
+
+      // 映射 permissions 到服务类型
+      const serviceMap = {
+        all: 'claude',
+        claude: 'claude',
+        gemini: 'gemini',
+        openai: 'codex',
+        droid: 'droid',
+        bedrock: 'bedrock',
+        azure: 'azure',
+        ccr: 'ccr'
+      }
+      const mappedService = serviceMap[originalService] || 'claude'
+      const serviceRate = ratesConfig.rates[mappedService] || 1.0
+
+      // 获取已消耗的真实成本
+      const costStats = await redis.getCostStats(keyId)
+      const totalRealCost = costStats?.total || 0
+
+      // 获取原限额
+      const originalLimit = parseFloat(keyData.totalCostLimit || 0)
+
+      // 计算建议的 CC 额度
+      const suggestedQuotaLimit = originalLimit * serviceRate
+      const suggestedQuotaUsed = totalRealCost * serviceRate
+
+      // 获取可用服务列表
+      const availableServices = Object.keys(ratesConfig.rates)
+
+      return {
+        keyId,
+        keyName: keyData.name,
+        originalService: mappedService,
+        originalPermissions: originalService,
+        originalLimit,
+        originalUsed: totalRealCost,
+        serviceRate,
+        suggestedQuotaLimit: Math.round(suggestedQuotaLimit * 1000) / 1000,
+        suggestedQuotaUsed: Math.round(suggestedQuotaUsed * 1000) / 1000,
+        availableServices,
+        ratesConfig: ratesConfig.rates
+      }
+    } catch (error) {
+      logger.error('❌ Failed to get convert preview:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 将传统 Key 转换为聚合 Key
+   * @param {string} keyId - API Key ID
+   * @param {Object} options - 转换选项
+   * @param {number} options.quotaLimit - CC 额度上限
+   * @param {Array<string>} options.permissions - 允许的服务列表
+   * @param {Object} options.serviceQuotaLimits - 分服务额度限制（可选）
+   * @returns {Object} 转换结果
+   */
+  async convertToAggregated(keyId, options = {}) {
+    try {
+      const keyData = await redis.getApiKey(keyId)
+      if (!keyData || Object.keys(keyData).length === 0) {
+        throw new Error('API key not found')
+      }
+
+      if (keyData.isAggregated === 'true') {
+        throw new Error('API key is already aggregated')
+      }
+
+      const {
+        quotaLimit,
+        permissions,
+        serviceQuotaLimits = {},
+        quotaUsed = null // 如果不传，自动计算
+      } = options
+
+      if (quotaLimit === undefined || quotaLimit === null) {
+        throw new Error('quotaLimit is required')
+      }
+
+      if (!permissions || !Array.isArray(permissions) || permissions.length === 0) {
+        throw new Error('permissions must be a non-empty array')
+      }
+
+      // 计算已消耗的 CC 额度
+      let calculatedQuotaUsed = quotaUsed
+      if (calculatedQuotaUsed === null) {
+        // 自动计算：获取原服务的倍率，按倍率换算已消耗成本
+        const preview = await this.getConvertToAggregatedPreview(keyId)
+        calculatedQuotaUsed = preview.suggestedQuotaUsed
+      }
+
+      // 更新 Key 数据
+      const updates = {
+        isAggregated: true,
+        quotaLimit,
+        quotaUsed: calculatedQuotaUsed,
+        permissions,
+        serviceQuotaLimits,
+        serviceQuotaUsed: {} // 转换时重置分服务统计
+      }
+
+      await this.updateApiKey(keyId, updates)
+
+      logger.success(`🔄 Converted API key ${keyId} to aggregated key with ${quotaLimit} CC quota`)
+
+      return {
+        success: true,
+        keyId,
+        quotaLimit,
+        quotaUsed: calculatedQuotaUsed,
+        permissions
+      }
+    } catch (error) {
+      logger.error('❌ Failed to convert to aggregated key:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 快速检查聚合 Key 额度（用于请求前检查）
+   * @param {string} keyId - API Key ID
+   * @returns {Object} { allowed: boolean, reason?: string, quotaRemaining?: number }
+   */
+  async quickQuotaCheck(keyId) {
+    try {
+      const [quotaUsed, quotaLimit, isAggregated, isActive] = await redis.client.hmget(
+        `api_key:${keyId}`,
+        'quotaUsed',
+        'quotaLimit',
+        'isAggregated',
+        'isActive'
+      )
+
+      // 非聚合 Key 不检查额度
+      if (isAggregated !== 'true') {
+        return { allowed: true, isAggregated: false }
+      }
+
+      if (isActive !== 'true') {
+        return { allowed: false, reason: 'inactive', isAggregated: true }
+      }
+
+      const used = parseFloat(quotaUsed || 0)
+      const limit = parseFloat(quotaLimit || 0)
+
+      // 额度为 0 表示不限制
+      if (limit === 0) {
+        return { allowed: true, isAggregated: true, quotaRemaining: Infinity }
+      }
+
+      if (used >= limit) {
+        return {
+          allowed: false,
+          reason: 'quota_exceeded',
+          isAggregated: true,
+          quotaUsed: used,
+          quotaLimit: limit
+        }
+      }
+
+      return { allowed: true, isAggregated: true, quotaRemaining: limit - used }
+    } catch (error) {
+      logger.error('❌ Quick quota check failed:', error)
+      // 出错时允许通过，避免阻塞请求
+      return { allowed: true, error: error.message }
+    }
+  }
+
+  /**
+   * 异步扣减聚合 Key 额度（请求完成后调用）
+   * @param {string} keyId - API Key ID
+   * @param {number} costUSD - 真实成本（USD）
+   * @param {string} service - 服务类型
+   * @returns {Promise<void>}
+   */
+  async deductQuotaAsync(keyId, costUSD, service) {
+    // 使用 setImmediate 确保不阻塞响应
+    setImmediate(async () => {
+      try {
+        // 获取服务倍率
+        const rate = await serviceRatesService.getServiceRate(service)
+        const quotaToDeduct = costUSD * rate
+
+        // 原子更新总额度
+        await redis.client.hincrbyfloat(`api_key:${keyId}`, 'quotaUsed', quotaToDeduct)
+
+        // 更新分服务额度
+        const serviceQuotaUsedStr = await redis.client.hget(`api_key:${keyId}`, 'serviceQuotaUsed')
+        let serviceQuotaUsed = {}
+        try {
+          serviceQuotaUsed = JSON.parse(serviceQuotaUsedStr || '{}')
+        } catch (e) {
+          serviceQuotaUsed = {}
+        }
+        serviceQuotaUsed[service] = (serviceQuotaUsed[service] || 0) + quotaToDeduct
+        await redis.client.hset(
+          `api_key:${keyId}`,
+          'serviceQuotaUsed',
+          JSON.stringify(serviceQuotaUsed)
+        )
+
+        logger.debug(
+          `📊 Deducted ${quotaToDeduct.toFixed(4)} CC quota from key ${keyId} (service: ${service}, rate: ${rate})`
+        )
+      } catch (error) {
+        logger.error(`❌ Failed to deduct quota for key ${keyId}:`, error)
+      }
+    })
+  }
+
+  /**
+   * 增加聚合 Key 额度（用于核销额度卡）
+   * @param {string} keyId - API Key ID
+   * @param {number} quotaAmount - 要增加的 CC 额度
+   * @returns {Promise<Object>} { success: boolean, newQuotaLimit: number }
+   */
+  async addQuota(keyId, quotaAmount) {
+    try {
+      const keyData = await redis.getApiKey(keyId)
+      if (!keyData || Object.keys(keyData).length === 0) {
+        throw new Error('API key not found')
+      }
+
+      if (keyData.isAggregated !== 'true') {
+        throw new Error('Only aggregated keys can add quota')
+      }
+
+      const currentLimit = parseFloat(keyData.quotaLimit || 0)
+      const newLimit = currentLimit + quotaAmount
+
+      await redis.client.hset(`api_key:${keyId}`, 'quotaLimit', String(newLimit))
+
+      logger.success(`💰 Added ${quotaAmount} CC quota to key ${keyId}, new limit: ${newLimit}`)
+
+      return { success: true, previousLimit: currentLimit, newQuotaLimit: newLimit }
+    } catch (error) {
+      logger.error('❌ Failed to add quota:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 减少聚合 Key 额度（用于撤销核销）
+   * @param {string} keyId - API Key ID
+   * @param {number} quotaAmount - 要减少的 CC 额度
+   * @returns {Promise<Object>} { success: boolean, newQuotaLimit: number, actualDeducted: number }
+   */
+  async deductQuotaLimit(keyId, quotaAmount) {
+    try {
+      const keyData = await redis.getApiKey(keyId)
+      if (!keyData || Object.keys(keyData).length === 0) {
+        throw new Error('API key not found')
+      }
+
+      if (keyData.isAggregated !== 'true') {
+        throw new Error('Only aggregated keys can deduct quota')
+      }
+
+      const currentLimit = parseFloat(keyData.quotaLimit || 0)
+      const currentUsed = parseFloat(keyData.quotaUsed || 0)
+
+      // 不能扣到比已使用的还少
+      const minLimit = currentUsed
+      const actualDeducted = Math.min(quotaAmount, currentLimit - minLimit)
+      const newLimit = Math.max(currentLimit - quotaAmount, minLimit)
+
+      await redis.client.hset(`api_key:${keyId}`, 'quotaLimit', String(newLimit))
+
+      logger.success(
+        `💸 Deducted ${actualDeducted} CC quota from key ${keyId}, new limit: ${newLimit}`
+      )
+
+      return { success: true, previousLimit: currentLimit, newQuotaLimit: newLimit, actualDeducted }
+    } catch (error) {
+      logger.error('❌ Failed to deduct quota limit:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 延长 API Key 有效期（用于核销时间卡）
+   * @param {string} keyId - API Key ID
+   * @param {number} amount - 时间数量
+   * @param {string} unit - 时间单位 'hours' | 'days' | 'months'
+   * @returns {Promise<Object>} { success: boolean, newExpiresAt: string }
+   */
+  async extendExpiry(keyId, amount, unit = 'days') {
+    try {
+      const keyData = await redis.getApiKey(keyId)
+      if (!keyData || Object.keys(keyData).length === 0) {
+        throw new Error('API key not found')
+      }
+
+      // 计算新的过期时间
+      let baseDate = keyData.expiresAt ? new Date(keyData.expiresAt) : new Date()
+      // 如果已过期，从当前时间开始计算
+      if (baseDate < new Date()) {
+        baseDate = new Date()
+      }
+
+      let milliseconds
+      switch (unit) {
+        case 'hours':
+          milliseconds = amount * 60 * 60 * 1000
+          break
+        case 'months':
+          // 简化处理：1个月 = 30天
+          milliseconds = amount * 30 * 24 * 60 * 60 * 1000
+          break
+        case 'days':
+        default:
+          milliseconds = amount * 24 * 60 * 60 * 1000
+      }
+
+      const newExpiresAt = new Date(baseDate.getTime() + milliseconds).toISOString()
+
+      await this.updateApiKey(keyId, { expiresAt: newExpiresAt })
+
+      logger.success(
+        `⏰ Extended key ${keyId} expiry by ${amount} ${unit}, new expiry: ${newExpiresAt}`
+      )
+
+      return { success: true, previousExpiresAt: keyData.expiresAt, newExpiresAt }
+    } catch (error) {
+      logger.error('❌ Failed to extend expiry:', error)
+      throw error
     }
   }
 }

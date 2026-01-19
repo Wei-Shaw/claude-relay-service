@@ -412,55 +412,59 @@
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >服务权限</label
             >
-            <div class="flex gap-4">
+            <div class="flex flex-wrap gap-4">
               <label class="flex cursor-pointer items-center">
                 <input
-                  v-model="form.permissions"
+                  :checked="form.permissions === 'all'"
                   class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
-                  value="all"
+                  type="checkbox"
+                  @change="toggleAllServices"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">全部服务</span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">全部服务</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
-                  v-model="form.permissions"
+                  v-model="selectedServices"
                   class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
+                  type="checkbox"
                   value="claude"
+                  @change="updatePermissions"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 Claude</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Claude</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
-                  v-model="form.permissions"
+                  v-model="selectedServices"
                   class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
+                  type="checkbox"
                   value="gemini"
+                  @change="updatePermissions"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 Gemini</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Gemini</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
-                  v-model="form.permissions"
+                  v-model="selectedServices"
                   class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
+                  type="checkbox"
                   value="openai"
+                  @change="updatePermissions"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 OpenAI</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">OpenAI</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
-                  v-model="form.permissions"
+                  v-model="selectedServices"
                   class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="radio"
+                  type="checkbox"
                   value="droid"
+                  @change="updatePermissions"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">仅 Droid</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Droid</span>
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              控制此 API Key 可以访问哪些服务
+              控制此 API Key 可以访问哪些服务，可多选
             </p>
           </div>
 
@@ -495,7 +499,7 @@
                   v-model="form.claudeAccountId"
                   :accounts="localAccounts.claude"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'claude'"
+                  :disabled="!isServiceEnabled('claude')"
                   :groups="localAccounts.claudeGroups"
                   placeholder="请选择Claude账号"
                   platform="claude"
@@ -509,7 +513,7 @@
                   v-model="form.geminiAccountId"
                   :accounts="localAccounts.gemini"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'gemini'"
+                  :disabled="!isServiceEnabled('gemini')"
                   :groups="localAccounts.geminiGroups"
                   placeholder="请选择Gemini账号"
                   platform="gemini"
@@ -523,7 +527,7 @@
                   v-model="form.openaiAccountId"
                   :accounts="localAccounts.openai"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'openai'"
+                  :disabled="!isServiceEnabled('openai')"
                   :groups="localAccounts.openaiGroups"
                   placeholder="请选择OpenAI账号"
                   platform="openai"
@@ -537,7 +541,7 @@
                   v-model="form.bedrockAccountId"
                   :accounts="localAccounts.bedrock"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'openai'"
+                  :disabled="!isServiceEnabled('claude')"
                   :groups="[]"
                   placeholder="请选择Bedrock账号"
                   platform="bedrock"
@@ -551,7 +555,7 @@
                   v-model="form.droidAccountId"
                   :accounts="localAccounts.droid"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions !== 'all' && form.permissions !== 'droid'"
+                  :disabled="!isServiceEnabled('droid')"
                   :groups="localAccounts.droidGroups"
                   placeholder="请选择Droid账号"
                   platform="droid"
@@ -722,16 +726,29 @@
         </form>
       </div>
     </div>
+
+    <!-- ConfirmModal -->
+    <ConfirmModal
+      :cancel-text="confirmModalConfig.cancelText"
+      :confirm-text="confirmModalConfig.confirmText"
+      :message="confirmModalConfig.message"
+      :show="showConfirmModal"
+      :title="confirmModalConfig.title"
+      :type="confirmModalConfig.type"
+      @cancel="handleCancelModal"
+      @confirm="handleConfirmModal"
+    />
   </Teleport>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
-import { apiClient } from '@/config/api'
+import * as httpApi from '@/utils/http_apis'
 import AccountSelector from '@/components/common/AccountSelector.vue'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const props = defineProps({
   apiKey: {
@@ -762,6 +779,40 @@ const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
 const accountsLoading = ref(false)
+
+// ConfirmModal 状态
+const showConfirmModal = ref(false)
+const confirmModalConfig = ref({
+  title: '',
+  message: '',
+  type: 'primary',
+  confirmText: '确认',
+  cancelText: '取消'
+})
+const confirmResolve = ref(null)
+
+const showConfirm = (
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  type = 'primary'
+) => {
+  return new Promise((resolve) => {
+    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
+    confirmResolve.value = resolve
+    showConfirmModal.value = true
+  })
+}
+const handleConfirmModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(true)
+}
+const handleCancelModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(false)
+}
+
 const localAccounts = ref({
   claude: [],
   gemini: [],
@@ -816,6 +867,50 @@ const form = reactive({
   ownerId: '' // 新增：所有者ID
 })
 
+// 多选服务
+const allServices = ['claude', 'gemini', 'openai', 'droid']
+const selectedServices = ref([...allServices])
+
+// 切换全部服务
+const toggleAllServices = (event) => {
+  if (event.target.checked) {
+    selectedServices.value = [...allServices]
+    form.permissions = 'all'
+  } else {
+    selectedServices.value = []
+    form.permissions = ''
+  }
+}
+
+// 更新权限
+const updatePermissions = () => {
+  if (selectedServices.value.length === allServices.length) {
+    form.permissions = 'all'
+  } else if (selectedServices.value.length === 1) {
+    form.permissions = selectedServices.value[0]
+  } else if (selectedServices.value.length > 1) {
+    form.permissions = selectedServices.value.join(',')
+  } else {
+    form.permissions = ''
+  }
+}
+
+// 检查服务是否启用
+const isServiceEnabled = (service) => {
+  return form.permissions === 'all' || selectedServices.value.includes(service)
+}
+
+// 根据 permissions 初始化 selectedServices
+const initSelectedServices = (permissions) => {
+  if (permissions === 'all') {
+    selectedServices.value = [...allServices]
+  } else if (permissions) {
+    selectedServices.value = permissions.split(',').filter((s) => allServices.includes(s))
+  } else {
+    selectedServices.value = []
+  }
+}
+
 // 添加限制的模型
 const addRestrictedModel = () => {
   if (form.modelInput && !form.restrictedModels.includes(form.modelInput)) {
@@ -869,18 +964,13 @@ const removeTag = (index) => {
 const updateApiKey = async () => {
   // 检查是否设置了时间窗口但费用限制为0
   if (form.rateLimitWindow && (!form.rateLimitCost || parseFloat(form.rateLimitCost) === 0)) {
-    let confirmed = false
-    if (window.showConfirm) {
-      confirmed = await window.showConfirm(
-        '费用限制提醒',
-        '您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n\n是否继续？',
-        '继续保存',
-        '返回修改'
-      )
-    } else {
-      // 降级方案
-      confirmed = confirm('您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n是否继续？')
-    }
+    const confirmed = await showConfirm(
+      '费用限制提醒',
+      '您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n\n是否继续？',
+      '继续保存',
+      '返回修改',
+      'warning'
+    )
     if (!confirmed) {
       return
     }
@@ -989,7 +1079,7 @@ const updateApiKey = async () => {
       data.ownerId = form.ownerId
     }
 
-    const result = await apiClient.put(`/admin/api-keys/${props.apiKey.id}`, data)
+    const result = await httpApi.put(`/admin/api-keys/${props.apiKey.id}`, data)
 
     if (result.success) {
       emit('success')
@@ -1019,15 +1109,15 @@ const refreshAccounts = async () => {
       droidData,
       groupsData
     ] = await Promise.all([
-      apiClient.get('/admin/claude-accounts'),
-      apiClient.get('/admin/claude-console-accounts'),
-      apiClient.get('/admin/gemini-accounts'),
-      apiClient.get('/admin/gemini-api-accounts'),
-      apiClient.get('/admin/openai-accounts'),
-      apiClient.get('/admin/openai-responses-accounts'),
-      apiClient.get('/admin/bedrock-accounts'),
-      apiClient.get('/admin/droid-accounts'),
-      apiClient.get('/admin/account-groups')
+      httpApi.get('/admin/claude-accounts'),
+      httpApi.get('/admin/claude-console-accounts'),
+      httpApi.get('/admin/gemini-accounts'),
+      httpApi.get('/admin/gemini-api-accounts'),
+      httpApi.get('/admin/openai-accounts'),
+      httpApi.get('/admin/openai-responses-accounts'),
+      httpApi.get('/admin/bedrock-accounts'),
+      httpApi.get('/admin/droid-accounts'),
+      httpApi.get('/admin/account-groups')
     ])
 
     // 合并Claude OAuth账户和Claude Console账户
@@ -1140,7 +1230,7 @@ const refreshAccounts = async () => {
 // 加载用户列表
 const loadUsers = async () => {
   try {
-    const response = await apiClient.get('/admin/users')
+    const response = await httpApi.get('/admin/users')
     if (response.success) {
       availableUsers.value = response.data || []
     }
@@ -1242,6 +1332,7 @@ onMounted(async () => {
   form.totalCostLimit = props.apiKey.totalCostLimit || ''
   form.weeklyOpusCostLimit = props.apiKey.weeklyOpusCostLimit || ''
   form.permissions = props.apiKey.permissions || 'all'
+  initSelectedServices(form.permissions)
   // 处理 Claude 账号（区分 OAuth 和 Console）
   if (props.apiKey.claudeConsoleAccountId) {
     form.claudeAccountId = `console:${props.apiKey.claudeConsoleAccountId}`

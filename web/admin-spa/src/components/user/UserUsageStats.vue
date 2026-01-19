@@ -351,7 +351,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
 
 const userStore = useUserStore()
 

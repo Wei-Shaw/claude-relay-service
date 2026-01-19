@@ -249,7 +249,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
 import CreateApiKeyModal from './CreateApiKeyModal.vue'
 import ViewApiKeyModal from './ViewApiKeyModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'

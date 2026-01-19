@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
+import { getDashboard, getUsageCosts, getUsageStats } from '@/utils/http_apis'
+import { showToast } from '@/utils/tools'
 
 export const useDashboardStore = defineStore('dashboard', () => {
   // 状态
@@ -221,9 +221,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
       }
 
       const [dashboardResponse, todayCostsResponse, totalCostsResponse] = await Promise.all([
-        apiClient.get('/admin/dashboard'),
-        apiClient.get(`/admin/usage-costs?period=${costsParams.today}`),
-        apiClient.get(`/admin/usage-costs?period=${costsParams.all}`)
+        getDashboard(),
+        getUsageCosts(costsParams.today),
+        getUsageCosts(costsParams.all)
       ])
 
       if (dashboardResponse.success) {
@@ -363,7 +363,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         url += `granularity=day&days=${days}`
       }
 
-      const response = await apiClient.get(url)
+      const response = await getUsageStats(url)
       if (response.success) {
         trendData.value = response.data
       }
@@ -448,7 +448,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         }
       }
 
-      const response = await apiClient.get(url)
+      const response = await getUsageStats(url)
       if (response.success) {
         dashboardModelStats.value = response.data
       }
@@ -535,7 +535,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
       url += `&metric=${metric}`
 
-      const response = await apiClient.get(url)
+      const response = await getUsageStats(url)
       if (response.success) {
         apiKeysTrendData.value = {
           data: response.data || [],
@@ -618,7 +618,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
       url += `&group=${group}`
 
-      const response = await apiClient.get(url)
+      const response = await getUsageStats(url)
       if (response.success) {
         accountUsageTrendData.value = {
           data: response.data || [],

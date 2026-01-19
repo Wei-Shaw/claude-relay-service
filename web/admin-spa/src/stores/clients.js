@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { apiClient } from '@/config/api'
+import { getSupportedClients } from '@/utils/http_apis'
 
 export const useClientsStore = defineStore('clients', {
   state: () => ({
@@ -11,7 +11,6 @@ export const useClientsStore = defineStore('clients', {
   actions: {
     async loadSupportedClients() {
       if (this.supportedClients.length > 0) {
-        // 如果已经加载过，不重复加载
         return this.supportedClients
       }
 
@@ -19,7 +18,7 @@ export const useClientsStore = defineStore('clients', {
       this.error = null
 
       try {
-        const response = await apiClient.get('/admin/supported-clients')
+        const response = await getSupportedClients()
 
         if (response.success) {
           this.supportedClients = response.data || []

@@ -1,8 +1,13 @@
 <template>
-  <div class="min-h-screen p-4 md:p-6" :class="isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'">
+  <div
+    class="min-h-screen p-2 sm:p-4 md:p-6"
+    :class="isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'"
+  >
     <!-- 顶部导航 -->
-    <div class="glass-strong mb-6 rounded-3xl p-4 shadow-xl md:mb-8 md:p-6">
-      <div class="flex flex-col items-center justify-between gap-4 md:flex-row">
+    <div
+      class="glass-strong mb-4 rounded-2xl p-3 shadow-xl sm:mb-6 sm:rounded-3xl sm:p-4 md:mb-8 md:p-6"
+    >
+      <div class="flex flex-col items-center justify-between gap-3 sm:gap-4 md:flex-row">
         <LogoTitle
           :loading="oemLoading"
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
@@ -44,10 +49,10 @@
     </div>
 
     <!-- Tab 切换 -->
-    <div class="mb-6 md:mb-8">
+    <div class="mb-4 sm:mb-6 md:mb-8">
       <div class="flex justify-center">
         <div
-          class="inline-flex w-full max-w-md rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl md:w-auto"
+          class="inline-flex w-full max-w-md rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl sm:w-auto"
         >
           <button
             :class="['tab-pill-button', currentTab === 'stats' ? 'active' : '']"
@@ -73,7 +78,7 @@
       <ApiKeyInput />
 
       <!-- 错误提示 -->
-      <div v-if="error" class="mb-6 md:mb-8">
+      <div v-if="error" class="mb-4 sm:mb-6 md:mb-8">
         <div
           class="rounded-xl border border-red-500/30 bg-red-500/20 p-3 text-sm text-red-800 backdrop-blur-sm dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200 md:p-4 md:text-base"
         >
@@ -84,11 +89,13 @@
 
       <!-- 统计数据展示区域 -->
       <div v-if="statsData" class="fade-in">
-        <div class="glass-strong rounded-3xl p-4 shadow-xl md:p-6">
+        <div class="glass-strong rounded-2xl p-3 shadow-xl sm:rounded-3xl sm:p-4 md:p-6">
           <!-- 时间范围选择器 -->
-          <div class="mb-4 border-b border-gray-200 pb-4 dark:border-gray-700 md:mb-6 md:pb-6">
+          <div
+            class="mb-3 border-b border-gray-200 pb-3 dark:border-gray-700 sm:mb-4 sm:pb-4 md:mb-6 md:pb-6"
+          >
             <div
-              class="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center md:gap-4"
+              class="flex flex-col items-start justify-between gap-2 sm:gap-3 md:flex-row md:items-center md:gap-4"
             >
               <div class="flex items-center gap-2 md:gap-3">
                 <i class="fas fa-clock text-base text-blue-500 md:text-lg" />
@@ -100,7 +107,7 @@
                 <button
                   class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
                   :class="['period-btn', { active: statsPeriod === 'daily' }]"
-                  :disabled="loading || modelStatsLoading"
+                  :disabled="loading"
                   @click="switchPeriod('daily')"
                 >
                   <i class="fas fa-calendar-day text-xs md:text-sm" />
@@ -109,22 +116,71 @@
                 <button
                   class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
                   :class="['period-btn', { active: statsPeriod === 'monthly' }]"
-                  :disabled="loading || modelStatsLoading"
+                  :disabled="loading"
                   @click="switchPeriod('monthly')"
                 >
                   <i class="fas fa-calendar-alt text-xs md:text-sm" />
                   本月
                 </button>
-                <!-- 测试按钮 - 仅在单Key模式下显示 -->
                 <button
-                  v-if="!multiKeyMode"
-                  class="test-btn flex items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:gap-2 md:px-6 md:text-sm"
+                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
+                  :class="['period-btn', { active: statsPeriod === 'alltime' }]"
                   :disabled="loading"
-                  @click="openTestModal"
+                  @click="switchPeriod('alltime')"
                 >
-                  <i class="fas fa-vial text-xs md:text-sm" />
-                  测试
+                  <i class="fas fa-infinity text-xs md:text-sm" />
+                  全部
                 </button>
+                <!-- 测试按钮下拉菜单 - 仅在单Key模式下显示 -->
+                <div v-if="!multiKeyMode" class="relative">
+                  <button
+                    :class="[
+                      'test-btn flex items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:gap-2 md:px-6 md:text-sm',
+                      !hasAnyTestPermission ? 'cursor-not-allowed opacity-50' : ''
+                    ]"
+                    :disabled="loading || !hasAnyTestPermission"
+                    :title="
+                      hasAnyTestPermission
+                        ? '测试 API'
+                        : `当前 Key 可用服务: ${availableServicesText}`
+                    "
+                    @click="toggleTestMenu"
+                  >
+                    <i class="fas fa-vial text-xs md:text-sm" />
+                    测试
+                    <i class="fas fa-chevron-down ml-1 text-xs" />
+                  </button>
+                  <!-- 下拉菜单 -->
+                  <div
+                    v-if="showTestMenu"
+                    class="absolute right-0 top-full z-50 mt-1 min-w-[140px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                  >
+                    <button
+                      v-if="canTestClaude"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                      @click="openTestModal('claude')"
+                    >
+                      <i class="fas fa-robot text-orange-500" />
+                      Claude
+                    </button>
+                    <button
+                      v-if="canTestGemini"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                      @click="openTestModal('gemini')"
+                    >
+                      <i class="fas fa-gem text-blue-500" />
+                      Gemini
+                    </button>
+                    <button
+                      v-if="canTestOpenAI"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                      @click="openTestModal('openai')"
+                    >
+                      <i class="fas fa-code text-green-500" />
+                      Codex
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -134,7 +190,7 @@
 
           <!-- Token 分布和限制配置 -->
           <div
-            class="mb-6 mt-6 grid grid-cols-1 gap-4 md:mb-8 md:mt-8 md:gap-6 xl:grid-cols-2 xl:items-stretch"
+            class="mb-4 mt-4 grid grid-cols-1 gap-3 sm:mb-6 sm:mt-6 sm:gap-4 md:mb-8 md:mt-8 md:gap-6 xl:grid-cols-2 xl:items-stretch"
           >
             <TokenDistribution class="h-full" />
             <template v-if="multiKeyMode">
@@ -145,8 +201,15 @@
             </template>
           </div>
 
-          <!-- 模型使用统计 -->
-          <ModelUsageStats />
+          <!-- 服务费用统计卡片 -->
+          <ServiceCostCards class="mb-4 sm:mb-6" />
+
+          <!-- 模型使用统计 - 三个时间段 -->
+          <div class="space-y-4 sm:space-y-6">
+            <ModelUsageStats period="daily" />
+            <ModelUsageStats period="monthly" />
+            <ModelUsageStats period="alltime" />
+          </div>
         </div>
       </div>
     </div>
@@ -162,9 +225,56 @@
     <ApiKeyTestModal
       :api-key-name="statsData?.name || ''"
       :api-key-value="apiKey"
+      :service-type="testServiceType"
       :show="showTestModal"
       @close="closeTestModal"
     />
+
+    <!-- API Stats 通知弹框 -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showNotice"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          @click.self="dismissNotice"
+        >
+          <div
+            class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800"
+            @click.stop
+          >
+            <div class="mb-4 flex items-center gap-3">
+              <div
+                class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white"
+              >
+                <i class="fas fa-bell" />
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {{ oemSettings.apiStatsNotice?.title || '通知' }}
+              </h3>
+            </div>
+            <p
+              class="mb-4 whitespace-pre-wrap text-sm leading-relaxed text-gray-600 dark:text-gray-300"
+            >
+              {{ oemSettings.apiStatsNotice?.content }}
+            </p>
+            <label class="mb-4 flex cursor-pointer items-center gap-2">
+              <input
+                v-model="dontShowAgain"
+                class="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                type="checkbox"
+              />
+              <span class="text-sm text-gray-600 dark:text-gray-400">本次会话不再显示</span>
+            </label>
+            <button
+              class="w-full rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
+              @click="dismissNotice"
+            >
+              知道了
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -182,6 +292,7 @@ import TokenDistribution from '@/components/apistats/TokenDistribution.vue'
 import LimitConfig from '@/components/apistats/LimitConfig.vue'
 import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
+import ServiceCostCards from '@/components/apistats/ServiceCostCards.vue'
 import TutorialView from './TutorialView.vue'
 import ApiKeyTestModal from '@/components/apikeys/ApiKeyTestModal.vue'
 
@@ -199,7 +310,6 @@ const {
   apiKey,
   apiId,
   loading,
-  modelStatsLoading,
   oemLoading,
   error,
   statsPeriod,
@@ -208,19 +318,106 @@ const {
   multiKeyMode
 } = storeToRefs(apiStatsStore)
 
-const { queryStats, switchPeriod, loadStatsWithApiId, loadOemSettings, reset } = apiStatsStore
+const {
+  queryStats,
+  switchPeriod,
+  loadStatsWithApiId,
+  loadOemSettings,
+  loadServiceRates,
+  loadApiKeyFromStorage,
+  reset
+} = apiStatsStore
 
 // 测试弹窗状态
 const showTestModal = ref(false)
+const showTestMenu = ref(false)
+const testServiceType = ref('claude')
+
+// 通知弹框状态
+const showNotice = ref(false)
+const dontShowAgain = ref(false)
+const NOTICE_STORAGE_KEY = 'apiStatsNoticeRead'
+
+// 检查是否可以测试 Claude（权限包含 claude 或 all）
+const canTestClaude = computed(() => {
+  const permissions = statsData.value?.permissions
+  if (!permissions) return true // 默认允许
+  return permissions === 'all' || permissions.includes('claude')
+})
+
+// 检查是否可以测试 Gemini
+const canTestGemini = computed(() => {
+  const permissions = statsData.value?.permissions
+  if (!permissions) return true
+  return permissions === 'all' || permissions.includes('gemini')
+})
+
+// 检查是否可以测试 OpenAI
+const canTestOpenAI = computed(() => {
+  const permissions = statsData.value?.permissions
+  if (!permissions) return true
+  return permissions === 'all' || permissions.includes('openai')
+})
+
+// 检查是否有任何测试权限
+const hasAnyTestPermission = computed(() => {
+  return canTestClaude.value || canTestGemini.value || canTestOpenAI.value
+})
+
+// 可用服务文本
+const availableServicesText = computed(() => {
+  const permissions = statsData.value?.permissions
+  if (!permissions || permissions === 'all') return '全部服务'
+  const serviceNames = {
+    claude: 'Claude',
+    gemini: 'Gemini',
+    openai: 'OpenAI',
+    droid: 'Droid'
+  }
+  return permissions
+    .split(',')
+    .map((s) => serviceNames[s.trim()] || s.trim())
+    .join(', ')
+})
+
+// 切换测试菜单
+const toggleTestMenu = () => {
+  showTestMenu.value = !showTestMenu.value
+}
 
 // 打开测试弹窗
-const openTestModal = () => {
+const openTestModal = (serviceType = 'claude') => {
+  testServiceType.value = serviceType
+  showTestMenu.value = false
   showTestModal.value = true
 }
 
 // 关闭测试弹窗
 const closeTestModal = () => {
   showTestModal.value = false
+}
+
+// 关闭通知弹框
+const dismissNotice = () => {
+  showNotice.value = false
+  if (dontShowAgain.value) {
+    sessionStorage.setItem(NOTICE_STORAGE_KEY, '1')
+  }
+}
+
+// 检查是否显示通知
+const checkNotice = () => {
+  const notice = oemSettings.value?.apiStatsNotice
+  if (notice?.enabled && notice?.content && !sessionStorage.getItem(NOTICE_STORAGE_KEY)) {
+    showNotice.value = true
+  }
+}
+
+// 点击外部关闭菜单
+const handleClickOutside = (event) => {
+  if (showTestMenu.value && !event.target.closest('.relative')) {
+    showTestMenu.value = false
+  }
 }
 
 // 处理键盘快捷键
@@ -240,14 +437,15 @@ const handleKeyDown = (event) => {
 }
 
 // 初始化
-onMounted(() => {
+onMounted(async () => {
   // API Stats Page loaded
 
   // 初始化主题（因为该页面不在 MainLayout 内）
   themeStore.initTheme()
 
-  // 加载 OEM 设置
-  loadOemSettings()
+  // 加载 OEM 设置和服务倍率
+  await Promise.all([loadOemSettings(), loadServiceRates()])
+  checkNotice()
 
   // 检查 URL 参数
   const urlApiId = route.query.apiId
@@ -259,19 +457,34 @@ onMounted(() => {
   ) {
     // 如果 URL 中有 apiId，直接使用 apiId 加载数据
     apiId.value = urlApiId
+    // 同时从 localStorage 填充 API Key 到输入框
+    const savedApiKey = loadApiKeyFromStorage()
+    if (savedApiKey) {
+      apiKey.value = savedApiKey
+    }
     loadStatsWithApiId()
   } else if (urlApiKey && urlApiKey.length > 10) {
     // 向后兼容，支持 apiKey 参数
     apiKey.value = urlApiKey
+  } else {
+    // 没有 URL 参数，检查 localStorage
+    const savedApiKey = loadApiKeyFromStorage()
+    if (savedApiKey && savedApiKey.length > 10) {
+      apiKey.value = savedApiKey
+      queryStats()
+    }
   }
 
   // 添加键盘事件监听
   document.addEventListener('keydown', handleKeyDown)
+  // 添加点击外部关闭菜单监听
+  document.addEventListener('click', handleClickOutside)
 })
 
 // 清理
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyDown)
+  document.removeEventListener('click', handleClickOutside)
 })
 
 // 监听 API Key 变化
@@ -285,7 +498,12 @@ watch(apiKey, (newValue) => {
 <style scoped>
 /* 渐变背景 */
 .gradient-bg {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  background: linear-gradient(
+    135deg,
+    var(--bg-gradient-start) 0%,
+    var(--bg-gradient-mid) 50%,
+    var(--bg-gradient-end) 100%
+  );
   background-attachment: fixed;
   min-height: 100vh;
   position: relative;
@@ -293,7 +511,12 @@ watch(apiKey, (newValue) => {
 
 /* 暗色模式的渐变背景 */
 .gradient-bg-dark {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
+  background: linear-gradient(
+    135deg,
+    var(--bg-gradient-start) 0%,
+    var(--bg-gradient-mid) 50%,
+    var(--bg-gradient-end) 100%
+  );
   background-attachment: fixed;
   min-height: 100vh;
   position: relative;
@@ -307,9 +530,9 @@ watch(apiKey, (newValue) => {
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(circle at 20% 80%, rgba(240, 147, 251, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(102, 126, 234, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+    radial-gradient(circle at 20% 80%, rgba(var(--accent-rgb), 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(var(--primary-rgb), 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(var(--secondary-rgb), 0.1) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -323,9 +546,9 @@ watch(apiKey, (newValue) => {
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(circle at 20% 80%, rgba(100, 116, 139, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(71, 85, 105, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(30, 41, 59, 0.1) 0%, transparent 50%);
+    radial-gradient(circle at 20% 80%, rgba(var(--accent-rgb), 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(var(--primary-rgb), 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(var(--secondary-rgb), 0.1) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -353,7 +576,7 @@ watch(apiKey, (newValue) => {
 
 /* 标题渐变 */
 .header-title {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -430,13 +653,13 @@ watch(apiKey, (newValue) => {
 
 /* 管理后台按钮 - 精致版本 */
 .admin-button-refined {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: white;
   text-decoration: none;
   box-shadow:
-    0 4px 12px rgba(102, 126, 234, 0.25),
+    0 4px 12px rgba(var(--primary-rgb), 0.25),
     inset 0 1px 1px rgba(255, 255, 255, 0.2);
   position: relative;
   overflow: hidden;
@@ -460,16 +683,16 @@ watch(apiKey, (newValue) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
 .admin-button-refined:hover {
   transform: translateY(-2px) scale(1.02);
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
   box-shadow:
-    0 8px 20px rgba(118, 75, 162, 0.35),
+    0 8px 20px rgba(var(--secondary-rgb), 0.35),
     inset 0 1px 1px rgba(255, 255, 255, 0.3);
   border-color: rgba(255, 255, 255, 0.4);
   color: white;
@@ -481,10 +704,10 @@ watch(apiKey, (newValue) => {
 
 /* 暗色模式下的悬停效果 */
 :global(.dark) .admin-button-refined:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-color: rgba(147, 51, 234, 0.4);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+  border-color: rgba(var(--secondary-rgb), 0.4);
   box-shadow:
-    0 8px 20px rgba(102, 126, 234, 0.3),
+    0 8px 20px rgba(var(--primary-rgb), 0.3),
     inset 0 1px 1px rgba(255, 255, 255, 0.1);
   color: white;
 }
@@ -513,11 +736,11 @@ watch(apiKey, (newValue) => {
 }
 
 .period-btn.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
   box-shadow:
-    0 10px 15px -3px rgba(102, 126, 234, 0.3),
-    0 4px 6px -2px rgba(102, 126, 234, 0.05);
+    0 10px 15px -3px rgba(var(--primary-rgb), 0.3),
+    0 4px 6px -2px rgba(var(--primary-rgb), 0.05);
   transform: translateY(-1px);
 }
 
@@ -618,7 +841,7 @@ watch(apiKey, (newValue) => {
 
 .tab-pill-button.active {
   background: white;
-  color: #764ba2;
+  color: var(--secondary-color);
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -666,5 +889,15 @@ watch(apiKey, (newValue) => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* 通知弹框动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import { showToast } from '@/utils/toast'
-import { API_PREFIX } from '@/config/api'
+import { showToast } from '@/utils/tools'
+import { API_PREFIX } from '@/utils/http_apis'
 
 const API_BASE = `${API_PREFIX}/users`
 

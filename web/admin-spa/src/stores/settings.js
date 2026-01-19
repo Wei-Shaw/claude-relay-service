@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { apiClient } from '@/config/api'
+import { getOemSettings, updateOemSettings } from '@/utils/http_apis'
 
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
@@ -8,25 +8,22 @@ export const useSettingsStore = defineStore('settings', () => {
     siteName: 'Claude Relay Service',
     siteIcon: '',
     siteIconData: '',
-    showAdminButton: true, // 控制管理后台按钮的显示
+    showAdminButton: true,
+    apiStatsNotice: { enabled: false, title: '', content: '' },
     updatedAt: null
   })
 
   const loading = ref(false)
   const saving = ref(false)
 
-  // 移除自定义API请求方法，使用统一的apiClient
-
   // Actions
   const loadOemSettings = async () => {
     loading.value = true
     try {
-      const result = await apiClient.get('/admin/oem-settings')
+      const result = await getOemSettings()
 
       if (result && result.success) {
         oemSettings.value = { ...oemSettings.value, ...result.data }
-
-        // 应用设置到页面
         applyOemSettings()
       }
 
@@ -42,12 +39,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const saveOemSettings = async (settings) => {
     saving.value = true
     try {
-      const result = await apiClient.put('/admin/oem-settings', settings)
+      const result = await updateOemSettings(settings)
 
       if (result && result.success) {
         oemSettings.value = { ...oemSettings.value, ...result.data }
-
-        // 应用设置到页面
         applyOemSettings()
       }
 
@@ -66,6 +61,7 @@ export const useSettingsStore = defineStore('settings', () => {
       siteIcon: '',
       siteIconData: '',
       showAdminButton: true,
+      apiStatsNotice: { enabled: false, title: '', content: '' },
       updatedAt: null
     }
 

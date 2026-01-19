@@ -4,7 +4,6 @@
 
     <!-- 全局组件 -->
     <ToastNotification ref="toastRef" />
-    <ConfirmDialog ref="confirmRef" />
   </div>
 </template>
 
@@ -13,12 +12,10 @@ import { onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import ToastNotification from '@/components/common/ToastNotification.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
 const toastRef = ref()
-const confirmRef = ref()
 
 onMounted(() => {
   // 初始化主题

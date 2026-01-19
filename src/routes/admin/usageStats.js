@@ -77,7 +77,14 @@ async function getUsageDataByIndex(indexKey, keyPattern, scanPattern) {
         return `${match[1]}:${match[2]}`
       }
     }
-    // 通用格式：提取最后一个 : 前的 id
+    // 通用格式：根据 keyPattern 中 {id} 的位置提取 id
+    const patternParts = keyPattern.split(':')
+    const idIndex = patternParts.findIndex((p) => p === '{id}')
+    if (idIndex !== -1) {
+      const parts = k.split(':')
+      return parts[idIndex]
+    }
+    // 回退：提取最后一个 : 前的 id
     const parts = k.split(':')
     return parts[parts.length - 2]
   })

@@ -1,7 +1,7 @@
 <template>
-  <div class="space-y-6 md:space-y-8">
+  <div class="space-y-4 sm:space-y-6 md:space-y-8">
     <div
-      class="grid grid-cols-1 items-stretch gap-4 md:gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]"
+      class="grid grid-cols-1 items-stretch gap-3 sm:gap-4 md:gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]"
     >
       <!-- 基础信息 / 批量概要 -->
       <div class="card-section">
@@ -60,9 +60,16 @@
         </div>
 
         <div v-else class="info-grid">
-          <div class="info-item">
+          <div
+            class="info-item cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            title="点击复制"
+            @click="copyText(statsData.name)"
+          >
             <p class="info-label">名称</p>
-            <p class="info-value break-all">{{ statsData.name }}</p>
+            <p class="info-value flex items-center gap-1 break-all">
+              {{ statsData.name }}
+              <i class="fas fa-copy text-xs text-gray-400" />
+            </p>
           </div>
           <div class="info-item">
             <p class="info-label">状态</p>
@@ -282,6 +289,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import dayjs from 'dayjs'
 import { useApiStatsStore } from '@/stores/apistats'
+import { copyText } from '@/utils/tools'
 
 const apiStatsStore = useApiStatsStore()
 const {

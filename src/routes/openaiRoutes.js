@@ -9,6 +9,7 @@ const openaiAccountService = require('../services/openaiAccountService')
 const openaiResponsesAccountService = require('../services/openaiResponsesAccountService')
 const openaiResponsesRelayService = require('../services/openaiResponsesRelayService')
 const apiKeyService = require('../services/apiKeyService')
+const redis = require('../models/redis')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
@@ -857,16 +858,18 @@ router.post('/v1/responses/compact', authenticateApiKey, handleResponses)
 // 使用情况统计端点
 router.get('/usage', authenticateApiKey, async (req, res) => {
   try {
-    const { usage } = req.apiKey
+    const keyData = req.apiKey
+    // 按需查询 usage 数据
+    const usage = await redis.getUsageStats(keyData.id)
 
     res.json({
       object: 'usage',
-      total_tokens: usage.total.tokens,
-      total_requests: usage.total.requests,
-      daily_tokens: usage.daily.tokens,
-      daily_requests: usage.daily.requests,
-      monthly_tokens: usage.monthly.tokens,
-      monthly_requests: usage.monthly.requests
+      total_tokens: usage?.total?.tokens || 0,
+      total_requests: usage?.total?.requests || 0,
+      daily_tokens: usage?.daily?.tokens || 0,
+      daily_requests: usage?.daily?.requests || 0,
+      monthly_tokens: usage?.monthly?.tokens || 0,
+      monthly_requests: usage?.monthly?.requests || 0
     })
   } catch (error) {
     logger.error('Failed to get usage stats:', error)
@@ -883,25 +886,26 @@ router.get('/usage', authenticateApiKey, async (req, res) => {
 router.get('/key-info', authenticateApiKey, async (req, res) => {
   try {
     const keyData = req.apiKey
+    // 按需查询 usage 数据（仅 key-info 端点需要）
+    const usage = await redis.getUsageStats(keyData.id)
+    const tokensUsed = usage?.total?.tokens || 0
     res.json({
       id: keyData.id,
       name: keyData.name,
       description: keyData.description,
       permissions: keyData.permissions || 'all',
       token_limit: keyData.tokenLimit,
-      tokens_used: keyData.usage.total.tokens,
+      tokens_used: tokensUsed,
       tokens_remaining:
-        keyData.tokenLimit > 0
-          ? Math.max(0, keyData.tokenLimit - keyData.usage.total.tokens)
-          : null,
+        keyData.tokenLimit > 0 ? Math.max(0, keyData.tokenLimit - tokensUsed) : null,
       rate_limit: {
         window: keyData.rateLimitWindow,
         requests: keyData.rateLimitRequests
       },
       usage: {
-        total: keyData.usage.total,
-        daily: keyData.usage.daily,
-        monthly: keyData.usage.monthly
+        total: usage?.total || {},
+        daily: usage?.daily || {},
+        monthly: usage?.monthly || {}
       }
     })
   } catch (error) {

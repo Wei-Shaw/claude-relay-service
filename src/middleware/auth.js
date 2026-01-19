@@ -1306,10 +1306,8 @@ const authenticateApiKey = async (req, res, next) => {
       dailyCostLimit: validation.keyData.dailyCostLimit,
       dailyCost: validation.keyData.dailyCost,
       totalCostLimit: validation.keyData.totalCostLimit,
-      totalCost: validation.keyData.totalCost,
-      usage: validation.keyData.usage
+      totalCost: validation.keyData.totalCost
     }
-    req.usage = validation.keyData.usage
 
     const authDuration = Date.now() - startTime
     const userAgent = req.headers['user-agent'] || 'No User-Agent'

@@ -52,10 +52,31 @@ class Application {
       await redis.connect()
       logger.success('Redis connected successfully')
 
+      // 📊 检查数据迁移（版本 > 1.1.250 时执行）
+      const { getAppVersion, versionGt } = require('./utils/commonHelper')
+      const currentVersion = getAppVersion()
+      const migratedVersion = await redis.getMigratedVersion()
+      if (versionGt(currentVersion, '1.1.250') && versionGt(currentVersion, migratedVersion)) {
+        logger.info(`🔄 检测到新版本 ${currentVersion}，检查数据迁移...`)
+        try {
+          if (await redis.needsGlobalStatsMigration()) {
+            await redis.migrateGlobalStats()
+          }
+          await redis.cleanupSystemMetrics() // 清理过期的系统分钟统计
+        } catch (err) {
+          logger.error('⚠️ 数据迁移出错，但不影响启动:', err.message)
+        }
+        await redis.setMigratedVersion(currentVersion)
+        logger.success(`✅ 数据迁移完成，版本: ${currentVersion}`)
+      }
+
       // 📊 后台异步迁移 usage 索引（不阻塞启动）
       redis.migrateUsageIndex().catch((err) => {
         logger.error('📊 Background usage index migration failed:', err)
       })
+
+      // 📊 迁移 alltime 模型统计（阻塞式，确保数据完整）
+      await redis.migrateAlltimeModelStats()
 
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')

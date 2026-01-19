@@ -150,6 +150,22 @@
               <span>{{ showCheckboxes ? '取消选择' : '选择' }}</span>
             </button>
 
+            <!-- 分组管理按钮 -->
+            <div class="relative">
+              <el-tooltip content="管理账户分组" effect="dark" placement="bottom">
+                <button
+                  class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
+                  @click="showGroupManagementModal = true"
+                >
+                  <div
+                    class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                  ></div>
+                  <i class="fas fa-layer-group relative text-purple-500" />
+                  <span class="relative">分组</span>
+                </button>
+              </el-tooltip>
+            </div>
+
             <!-- 批量删除按钮 -->
             <button
               v-if="selectedAccounts.length > 0"
@@ -460,8 +476,9 @@
                     <div class="min-w-0">
                       <div class="flex items-center gap-2">
                         <div
-                          class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
-                          :title="account.name"
+                          class="cursor-pointer truncate text-sm font-semibold text-gray-900 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                          title="点击复制"
+                          @click.stop="copyText(account.name)"
                         >
                           {{ account.name }}
                         </div>
@@ -1355,7 +1372,11 @@
                 />
               </div>
               <div>
-                <h4 class="text-sm font-semibold text-gray-900">
+                <h4
+                  class="cursor-pointer text-sm font-semibold text-gray-900 hover:text-blue-600 dark:hover:text-blue-400"
+                  title="点击复制"
+                  @click.stop="copyText(account.name || account.email)"
+                >
                   {{ account.name || account.email }}
                 </h4>
                 <div class="mt-0.5 flex items-center gap-2">
@@ -2045,13 +2066,21 @@
         </p>
       </div>
     </el-dialog>
+
+    <!-- 分组管理弹窗 -->
+    <GroupManagementModal
+      v-if="showGroupManagementModal"
+      @close="showGroupManagementModal = false"
+      @refresh="loadAccountGroups"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { showToast } from '@/utils/toast'
-import { apiClient } from '@/config/api'
+import { showToast } from '@/utils/tools'
+import { copyText } from '@/utils/tools'
+import * as httpApi from '@/utils/http_apis'
 import { useConfirm } from '@/composables/useConfirm'
 import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
@@ -2062,6 +2091,7 @@ import AccountScheduledTestModal from '@/components/accounts/AccountScheduledTes
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
+import GroupManagementModal from '@/components/accounts/GroupManagementModal.vue'
 
 // 使用确认弹窗
 const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
@@ -2132,6 +2162,9 @@ const scheduledTestAccount = ref(null)
 
 // 账户统计弹窗状态
 const showAccountStatsModal = ref(false)
+
+// 分组管理弹窗状态
+const showGroupManagementModal = ref(false)
 
 // 表格横向滚动检测
 const tableContainerRef = ref(null)
@@ -2204,16 +2237,16 @@ const platformGroupMap = {
 
 // 平台请求处理器
 const platformRequestHandlers = {
-  claude: (params) => apiClient.get('/admin/claude-accounts', { params }),
-  'claude-console': (params) => apiClient.get('/admin/claude-console-accounts', { params }),
-  bedrock: (params) => apiClient.get('/admin/bedrock-accounts', { params }),
-  gemini: (params) => apiClient.get('/admin/gemini-accounts', { params }),
-  openai: (params) => apiClient.get('/admin/openai-accounts', { params }),
-  azure_openai: (params) => apiClient.get('/admin/azure-openai-accounts', { params }),
-  'openai-responses': (params) => apiClient.get('/admin/openai-responses-accounts', { params }),
-  ccr: (params) => apiClient.get('/admin/ccr-accounts', { params }),
-  droid: (params) => apiClient.get('/admin/droid-accounts', { params }),
-  'gemini-api': (params) => apiClient.get('/admin/gemini-api-accounts', { params })
+  claude: () => httpApi.getClaudeAccounts(),
+  'claude-console': () => httpApi.getClaudeConsoleAccounts(),
+  bedrock: () => httpApi.getBedrockAccounts(),
+  gemini: () => httpApi.getGeminiAccounts(),
+  openai: () => httpApi.getOpenAIAccounts(),
+  azure_openai: () => httpApi.getAzureOpenAIAccounts(),
+  'openai-responses': () => httpApi.getOpenAIResponsesAccounts(),
+  ccr: () => httpApi.getCcrAccounts(),
+  droid: () => httpApi.getDroidAccounts(),
+  'gemini-api': () => httpApi.getGeminiApiAccounts()
 }
 
 const allPlatformKeys = Object.keys(platformRequestHandlers)
@@ -2431,25 +2464,17 @@ const openAccountUsageModal = async (account) => {
   accountUsageOverview.value = {}
   accountUsageGeneratedAt.value = ''
 
-  try {
-    const response = await apiClient.get(
-      `/admin/accounts/${account.id}/usage-history?platform=${account.platform}&days=30`
-    )
-
-    if (response.success) {
-      const data = response.data || {}
-      accountUsageHistory.value = data.history || []
-      accountUsageSummary.value = data.summary || {}
-      accountUsageOverview.value = data.overview || {}
-      accountUsageGeneratedAt.value = data.generatedAt || ''
-    } else {
-      showToast(response.error || '加载账号使用详情失败', 'error')
-    }
-  } catch (error) {
-    showToast('加载账号使用详情失败', 'error')
-  } finally {
-    accountUsageLoading.value = false
+  const response = await httpApi.getAccountUsageHistory(account.id, account.platform, 30)
+  if (response.success) {
+    const data = response.data || {}
+    accountUsageHistory.value = data.history || []
+    accountUsageSummary.value = data.summary || {}
+    accountUsageOverview.value = data.overview || {}
+    accountUsageGeneratedAt.value = data.generatedAt || ''
+  } else {
+    showToast(response.error || '加载账号使用详情失败', 'error')
   }
+  accountUsageLoading.value = false
 }
 
 const closeAccountUsageModal = () => {
@@ -2459,7 +2484,16 @@ const closeAccountUsageModal = () => {
 }
 
 // 测试账户连通性相关函数
-const supportedTestPlatforms = ['claude', 'claude-console']
+const supportedTestPlatforms = [
+  'claude',
+  'claude-console',
+  'bedrock',
+  'gemini',
+  'openai-responses',
+  'azure-openai',
+  'droid',
+  'ccr'
+]
 
 const canTestAccount = (account) => {
   return !!account && supportedTestPlatforms.includes(account.platform)
@@ -2947,27 +2981,9 @@ const loadAccounts = async (forceReload = false) => {
     })
 
     if (openaiResponsesRaw.length > 0) {
-      let autoRecoveryConfigMap = {}
-      try {
-        const configsRes = await apiClient.get(
-          '/admin/openai-responses-accounts/auto-recovery-configs'
-        )
-        if (configsRes.success && Array.isArray(configsRes.data)) {
-          autoRecoveryConfigMap = configsRes.data.reduce((map, config) => {
-            if (config?.accountId) {
-              map[config.accountId] = config
-            }
-            return map
-          }, {})
-        }
-      } catch (error) {
-        console.debug('Failed to load auto-recovery configs:', error)
-      }
-
       const responsesAccounts = openaiResponsesRaw.map((acc) => {
         const boundApiKeysCount = counts.openaiAccountId?.[`responses:${acc.id}`] || 0
-        const autoRecoveryConfig = autoRecoveryConfigMap[acc.id] || acc.autoRecoveryConfig || null
-        return { ...acc, platform: 'openai-responses', boundApiKeysCount, autoRecoveryConfig }
+        return { ...acc, platform: 'openai-responses', boundApiKeysCount }
       })
 
       allAccounts.push(...responsesAccounts)
@@ -3019,24 +3035,15 @@ const loadAccounts = async (forceReload = false) => {
 
 // 异步加载 Claude 账户的 Usage 数据
 const loadClaudeUsage = async () => {
-  try {
-    const response = await apiClient.get('/admin/claude-accounts/usage')
-    if (response.success && response.data) {
-      const usageMap = response.data
-
-      // 更新账户列表中的 claudeUsage 数据
-      accounts.value = accounts.value.map((account) => {
-        if (account.platform === 'claude' && usageMap[account.id]) {
-          return {
-            ...account,
-            claudeUsage: usageMap[account.id]
-          }
-        }
-        return account
-      })
-    }
-  } catch (error) {
-    console.debug('Failed to load Claude usage data:', error)
+  const response = await httpApi.getClaudeAccountsUsage()
+  if (response.success && response.data) {
+    const usageMap = response.data
+    accounts.value = accounts.value.map((account) => {
+      if (account.platform === 'claude' && usageMap[account.id]) {
+        return { ...account, claudeUsage: usageMap[account.id] }
+      }
+      return account
+    })
   }
 }
 
@@ -3104,53 +3111,31 @@ const clearSearch = () => {
 
 // 加载绑定计数（轻量级接口，用于显示"绑定: X 个API Key"）
 const loadBindingCounts = async (forceReload = false) => {
-  if (!forceReload && bindingCountsLoaded.value) {
-    return // 使用缓存数据
-  }
-
-  try {
-    const response = await apiClient.get('/admin/accounts/binding-counts')
-    if (response.success) {
-      bindingCounts.value = response.data || {}
-      bindingCountsLoaded.value = true
-    }
-  } catch (error) {
-    // 静默处理错误，绑定计数显示为 0
-    bindingCounts.value = {}
+  if (!forceReload && bindingCountsLoaded.value) return
+  const response = await httpApi.getAccountsBindingCounts()
+  if (response.success) {
+    bindingCounts.value = response.data || {}
+    bindingCountsLoaded.value = true
   }
 }
 
 // 加载API Keys列表（保留用于其他功能，如删除账户时显示绑定信息）
 const loadApiKeys = async (forceReload = false) => {
-  if (!forceReload && apiKeysLoaded.value) {
-    return // 使用缓存数据
-  }
-
-  try {
-    const response = await apiClient.get('/admin/api-keys')
-    if (response.success) {
-      apiKeys.value = response.data?.items || response.data || []
-      apiKeysLoaded.value = true
-    }
-  } catch (error) {
-    // 静默处理错误
+  if (!forceReload && apiKeysLoaded.value) return
+  const response = await httpApi.getApiKeys()
+  if (response.success) {
+    apiKeys.value = response.data?.items || response.data || []
+    apiKeysLoaded.value = true
   }
 }
 
 // 加载账户分组列表（缓存版本）
 const loadAccountGroups = async (forceReload = false) => {
-  if (!forceReload && groupsLoaded.value) {
-    return // 使用缓存数据
-  }
-
-  try {
-    const response = await apiClient.get('/admin/account-groups')
-    if (response.success) {
-      accountGroups.value = response.data || []
-      groupsLoaded.value = true
-    }
-  } catch (error) {
-    // 静默处理错误
+  if (!forceReload && groupsLoaded.value) return
+  const response = await httpApi.getAccountGroups()
+  if (response.success) {
+    accountGroups.value = response.data || []
+    groupsLoaded.value = true
   }
 }
 
@@ -3435,20 +3420,10 @@ const resolveAccountDeleteEndpoint = (account) => {
 
 const performAccountDeletion = async (account) => {
   const endpoint = resolveAccountDeleteEndpoint(account)
-  if (!endpoint) {
-    return { success: false, message: '不支持的账户类型' }
-  }
-
-  try {
-    const data = await apiClient.delete(endpoint)
-    if (data.success) {
-      return { success: true, data }
-    }
-    return { success: false, message: data.message || '删除失败' }
-  } catch (error) {
-    const message = error.response?.data?.message || error.message || '删除失败'
-    return { success: false, message }
-  }
+  if (!endpoint) return { success: false, message: '不支持的账户类型' }
+  const data = await httpApi.deleteAccountByEndpoint(endpoint)
+  if (data.success) return { success: true, data }
+  return { success: false, message: data.message || '删除失败' }
 }
 
 // 删除账户
@@ -3579,17 +3554,13 @@ const batchDeleteAccounts = async () => {
 const resetAccountStatus = async (account) => {
   if (account.isResetting) return
 
-  let confirmed = false
-  if (window.showConfirm) {
-    confirmed = await window.showConfirm(
-      '重置账户状态',
-      '确定要重置此账户的所有异常状态吗？这将清除限流状态、401错误计数等所有异常标记。',
-      '确定重置',
-      '取消'
-    )
-  } else {
-    confirmed = confirm('确定要重置此账户的所有异常状态吗？')
-  }
+  const confirmed = await showConfirm(
+    '重置账户状态',
+    '确定要重置此账户的所有异常状态吗？这将清除限流状态、401错误计数等所有异常标记。',
+    '确定重置',
+    '取消',
+    'warning'
+  )
 
   if (!confirmed) return
 
@@ -3620,18 +3591,16 @@ const resetAccountStatus = async (account) => {
       return
     }
 
-    const data = await apiClient.post(endpoint)
-
+    const data = await httpApi.testAccountByEndpoint(endpoint)
     if (data.success) {
       showToast('账户状态已重置', 'success')
-      // 强制刷新，绕过前端缓存，确保最终一致性
       loadAccounts(true)
     } else {
       showToast(data.message || '状态重置失败', 'error')
     }
+    account.isResetting = false
   } catch (error) {
-    showToast('状态重置失败', 'error')
-  } finally {
+    showToast(error.message || '状态重置失败', 'error')
     account.isResetting = false
   }
 }
@@ -3639,49 +3608,43 @@ const resetAccountStatus = async (account) => {
 // 切换调度状态
 const toggleSchedulable = async (account) => {
   if (account.isTogglingSchedulable) return
+  account.isTogglingSchedulable = true
 
-  try {
-    account.isTogglingSchedulable = true
-
-    let endpoint
-    if (account.platform === 'claude') {
-      endpoint = `/admin/claude-accounts/${account.id}/toggle-schedulable`
-    } else if (account.platform === 'claude-console') {
-      endpoint = `/admin/claude-console-accounts/${account.id}/toggle-schedulable`
-    } else if (account.platform === 'bedrock') {
-      endpoint = `/admin/bedrock-accounts/${account.id}/toggle-schedulable`
-    } else if (account.platform === 'gemini') {
-      endpoint = `/admin/gemini-accounts/${account.id}/toggle-schedulable`
-    } else if (account.platform === 'openai') {
-      endpoint = `/admin/openai-accounts/${account.id}/toggle-schedulable`
-    } else if (account.platform === 'azure_openai') {
-      endpoint = `/admin/azure-openai-accounts/${account.id}/toggle-schedulable`
-    } else if (account.platform === 'openai-responses') {
-      endpoint = `/admin/openai-responses-accounts/${account.id}/toggle-schedulable`
-    } else if (account.platform === 'ccr') {
-      endpoint = `/admin/ccr-accounts/${account.id}/toggle-schedulable`
-    } else if (account.platform === 'droid') {
-      endpoint = `/admin/droid-accounts/${account.id}/toggle-schedulable`
-    } else if (account.platform === 'gemini-api') {
-      endpoint = `/admin/gemini-api-accounts/${account.id}/toggle-schedulable`
-    } else {
-      showToast('该账户类型暂不支持调度控制', 'warning')
-      return
-    }
-
-    const data = await apiClient.put(endpoint)
-
-    if (data.success) {
-      account.schedulable = data.schedulable
-      showToast(data.schedulable ? '已启用调度' : '已禁用调度', 'success')
-    } else {
-      showToast(data.message || '操作失败', 'error')
-    }
-  } catch (error) {
-    showToast('切换调度状态失败', 'error')
-  } finally {
+  let endpoint
+  if (account.platform === 'claude') {
+    endpoint = `/admin/claude-accounts/${account.id}/toggle-schedulable`
+  } else if (account.platform === 'claude-console') {
+    endpoint = `/admin/claude-console-accounts/${account.id}/toggle-schedulable`
+  } else if (account.platform === 'bedrock') {
+    endpoint = `/admin/bedrock-accounts/${account.id}/toggle-schedulable`
+  } else if (account.platform === 'gemini') {
+    endpoint = `/admin/gemini-accounts/${account.id}/toggle-schedulable`
+  } else if (account.platform === 'openai') {
+    endpoint = `/admin/openai-accounts/${account.id}/toggle-schedulable`
+  } else if (account.platform === 'azure_openai') {
+    endpoint = `/admin/azure-openai-accounts/${account.id}/toggle-schedulable`
+  } else if (account.platform === 'openai-responses') {
+    endpoint = `/admin/openai-responses-accounts/${account.id}/toggle-schedulable`
+  } else if (account.platform === 'ccr') {
+    endpoint = `/admin/ccr-accounts/${account.id}/toggle-schedulable`
+  } else if (account.platform === 'droid') {
+    endpoint = `/admin/droid-accounts/${account.id}/toggle-schedulable`
+  } else if (account.platform === 'gemini-api') {
+    endpoint = `/admin/gemini-api-accounts/${account.id}/toggle-schedulable`
+  } else {
+    showToast('该账户类型暂不支持调度控制', 'warning')
     account.isTogglingSchedulable = false
+    return
   }
+
+  const data = await httpApi.toggleAccountStatus(endpoint)
+  if (data.success) {
+    account.schedulable = data.schedulable
+    showToast(data.schedulable ? '已启用调度' : '已禁用调度', 'success')
+  } else {
+    showToast(data.message || '操作失败', 'error')
+  }
+  account.isTogglingSchedulable = false
 }
 
 // 处理创建成功
@@ -4479,29 +4442,18 @@ const handleSaveAccountExpiry = async ({ accountId, expiresAt }) => {
         return
     }
 
-    const data = await apiClient.put(endpoint, {
-      expiresAt: expiresAt || null
-    })
-
+    const data = await httpApi.updateAccountByEndpoint(endpoint, { expiresAt: expiresAt || null })
     if (data.success) {
       showToast('账户到期时间已更新', 'success')
-      // 更新本地数据
       account.expiresAt = expiresAt || null
       closeAccountExpiryEdit()
     } else {
       showToast(data.message || '更新失败', 'error')
-      // 重置保存状态
-      if (expiryEditModalRef.value) {
-        expiryEditModalRef.value.resetSaving()
-      }
+      if (expiryEditModalRef.value) expiryEditModalRef.value.resetSaving()
     }
   } catch (error) {
-    console.error('更新账户过期时间失败:', error)
-    showToast('更新失败', 'error')
-    // 重置保存状态
-    if (expiryEditModalRef.value) {
-      expiryEditModalRef.value.resetSaving()
-    }
+    showToast(error.message || '更新失败', 'error')
+    if (expiryEditModalRef.value) expiryEditModalRef.value.resetSaving()
   }
 }
 
@@ -4616,28 +4568,41 @@ onUnmounted(() => {
 }
 
 .dark .table-container::-webkit-scrollbar-track {
-  background: #374151;
+  background: var(--bg-gradient-mid);
 }
 
 .dark .table-container::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: var(--bg-gradient-end);
 }
 
 .dark .table-container::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: var(--text-secondary);
 }
 
-/* 表格行样式 */
-.table-row {
-  transition: all 0.2s ease;
+/* 统一 hover 背景 - 所有 td 使用主题色 */
+.table-container tbody tr:hover > td {
+  background-color: rgba(var(--primary-rgb), 0.06) !important;
 }
 
-.table-row:hover {
-  background-color: rgba(0, 0, 0, 0.02);
+.dark .table-container tbody tr:hover > td {
+  background-color: rgba(var(--primary-rgb), 0.16) !important;
 }
 
-.dark .table-row:hover {
-  background-color: rgba(255, 255, 255, 0.02);
+/* 所有 td 的斑马纹背景 */
+.table-container tbody tr:nth-child(odd) > td {
+  background-color: #ffffff;
+}
+
+.table-container tbody tr:nth-child(even) > td {
+  background-color: #f9fafb;
+}
+
+.dark .table-container tbody tr:nth-child(odd) > td {
+  background-color: var(--bg-gradient-start);
+}
+
+.dark .table-container tbody tr:nth-child(even) > td {
+  background-color: var(--bg-gradient-mid);
 }
 
 /* 表头左侧固定列背景 - 使用纯色避免滚动时重叠 */
@@ -4649,7 +4614,7 @@ onUnmounted(() => {
 
 .dark .table-container thead .checkbox-column,
 .dark .table-container thead .name-column {
-  background: linear-gradient(to bottom, #374151, #1f2937);
+  background: linear-gradient(to bottom, var(--bg-gradient-mid), var(--bg-gradient-start));
 }
 
 /* 表头右侧操作列背景 - 使用纯色避免滚动时重叠 */
@@ -4659,39 +4624,7 @@ onUnmounted(() => {
 }
 
 .dark .table-container thead .operations-column {
-  background: linear-gradient(to bottom, #374151, #1f2937);
-}
-
-/* tbody 中的左侧固定列背景处理 - 使用纯色避免滚动时重叠 */
-.table-container tbody tr:nth-child(odd) .checkbox-column,
-.table-container tbody tr:nth-child(odd) .name-column {
-  background-color: #ffffff;
-}
-
-.table-container tbody tr:nth-child(even) .checkbox-column,
-.table-container tbody tr:nth-child(even) .name-column {
-  background-color: #f9fafb;
-}
-
-.dark .table-container tbody tr:nth-child(odd) .checkbox-column,
-.dark .table-container tbody tr:nth-child(odd) .name-column {
-  background-color: #1f2937;
-}
-
-.dark .table-container tbody tr:nth-child(even) .checkbox-column,
-.dark .table-container tbody tr:nth-child(even) .name-column {
-  background-color: #374151;
-}
-
-/* hover 状态下的左侧固定列背景 */
-.table-container tbody tr:hover .checkbox-column,
-.table-container tbody tr:hover .name-column {
-  background-color: #eff6ff;
-}
-
-.dark .table-container tbody tr:hover .checkbox-column,
-.dark .table-container tbody tr:hover .name-column {
-  background-color: #1e3a5f;
+  background: linear-gradient(to bottom, var(--bg-gradient-mid), var(--bg-gradient-start));
 }
 
 /* 名称列右侧阴影（分隔效果） */
@@ -4701,32 +4634,6 @@ onUnmounted(() => {
 
 .dark .table-container tbody .name-column {
   box-shadow: 8px 0 12px -8px rgba(30, 41, 59, 0.45);
-}
-
-/* tbody 中的操作列背景处理 - 使用纯色避免滚动时重叠 */
-.table-container tbody tr:nth-child(odd) .operations-column {
-  background-color: #ffffff;
-}
-
-.table-container tbody tr:nth-child(even) .operations-column {
-  background-color: #f9fafb;
-}
-
-.dark .table-container tbody tr:nth-child(odd) .operations-column {
-  background-color: #1f2937;
-}
-
-.dark .table-container tbody tr:nth-child(even) .operations-column {
-  background-color: #374151;
-}
-
-/* hover 状态下的操作列背景 */
-.table-container tbody tr:hover .operations-column {
-  background-color: #eff6ff;
-}
-
-.dark .table-container tbody tr:hover .operations-column {
-  background-color: #1e3a5f;
 }
 
 /* 操作列左侧阴影 */

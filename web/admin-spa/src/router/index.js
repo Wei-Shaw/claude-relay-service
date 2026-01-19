@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
 import { APP_CONFIG } from '@/config/app'
+import { showToast } from '@/utils/tools'
 
 // 路由懒加载
 const LoginView = () => import('@/views/LoginView.vue')
@@ -17,6 +18,7 @@ const AccountUsageRecordsView = () => import('@/views/AccountUsageRecordsView.vu
 const TutorialView = () => import('@/views/TutorialView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
+const QuotaCardsView = () => import('@/views/QuotaCardsView.vue')
 
 const routes = [
   {
@@ -159,6 +161,18 @@ const routes = [
       }
     ]
   },
+  {
+    path: '/quota-cards',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'QuotaCards',
+        component: QuotaCardsView
+      }
+    ]
+  },
   // 捕获所有未匹配的路由
   {
     path: '/:pathMatch(.*)*',
@@ -203,8 +217,6 @@ router.beforeEach(async (to, from, next) => {
       } catch (error) {
         // If the error is about disabled account, redirect to login with error
         if (error.message && error.message.includes('disabled')) {
-          // Import showToast to display the error
-          const { showToast } = await import('@/utils/toast')
           showToast(error.message, 'error')
         }
         return next('/user-login')
