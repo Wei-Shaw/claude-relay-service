@@ -56,6 +56,17 @@ const config = {
     }
   },
 
+  // 🔷 Gemini API配置
+  gemini: {
+    overloadHandling: {
+      enabled: (() => {
+        const minutes = parseInt(process.env.GEMINI_OVERLOAD_HANDLING_MINUTES) || 0
+        // 验证配置值：限制在0-1440分钟(24小时)内
+        return Math.max(0, Math.min(minutes, 1440))
+      })()
+    }
+  },
+
   // ☁️ Bedrock API配置
   bedrock: {
     enabled: process.env.CLAUDE_CODE_USE_BEDROCK === '1',

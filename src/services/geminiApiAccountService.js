@@ -372,6 +372,45 @@ class GeminiApiAccountService {
     }
   }
 
+  // 🚫 标记账户为被封锁状态（403错误）
+  async markAccountBlocked(accountId, reason = 'Gemini API账号被封锁（403错误）') {
+    const account = await this.getAccount(accountId)
+    if (!account) {
+      return
+    }
+
+    const now = new Date().toISOString()
+
+    await this.updateAccount(accountId, {
+      status: 'blocked',
+      schedulable: 'false',
+      errorMessage: reason,
+      blockedAt: now
+    })
+
+    logger.warn(
+      `🚫 Gemini-API account ${account.name || accountId} marked as blocked due to 403 error`
+    )
+
+    try {
+      const webhookNotifier = require('../utils/webhookNotifier')
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId,
+        accountName: account.name || accountId,
+        platform: 'gemini-api',
+        status: 'blocked',
+        errorCode: 'GEMINI_API_BLOCKED',
+        reason,
+        timestamp: now
+      })
+      logger.info(
+        `📢 Webhook notification sent for Gemini-API account ${account.name || accountId} blocked state`
+      )
+    } catch (webhookError) {
+      logger.error('Failed to send blocked webhook notification:', webhookError)
+    }
+  }
+
   // 检查并清除过期的限流状态
   async checkAndClearRateLimit(accountId) {
     const account = await this.getAccount(accountId)
