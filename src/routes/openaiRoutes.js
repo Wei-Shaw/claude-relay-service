@@ -279,7 +279,9 @@ const handleResponses = async (req, res) => {
         'text_formatting',
         'truncation',
         'text',
-        'service_tier'
+        'service_tier',
+        'prompt_cache_retention',
+        'safety_identifier'
       ]
       fieldsToRemove.forEach((field) => {
         delete req.body[field]

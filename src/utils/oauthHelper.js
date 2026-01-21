@@ -13,8 +13,8 @@ const OAUTH_CONFIG = {
   AUTHORIZE_URL: 'https://claude.ai/oauth/authorize',
   TOKEN_URL: 'https://console.anthropic.com/v1/oauth/token',
   CLIENT_ID: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
-  REDIRECT_URI: 'https://console.anthropic.com/oauth/code/callback',
-  SCOPES: 'org:create_api_key user:profile user:inference',
+  REDIRECT_URI: 'https://platform.claude.com/oauth/code/callback',
+  SCOPES: 'org:create_api_key user:profile user:inference user:sessions:claude_code',
   SCOPES_SETUP: 'user:inference' // Setup Token 只需要推理权限
 }
 
@@ -35,6 +35,7 @@ function generateState() {
 
 /**
  * 生成随机的 code verifier（PKCE）
+ * 符合 RFC 7636 标准：32字节随机数 → base64url编码 → 43字符
  * @returns {string} base64url 编码的随机字符串
  */
 function generateCodeVerifier() {
