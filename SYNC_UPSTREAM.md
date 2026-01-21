@@ -668,6 +668,7 @@ git push origin main
 | 2026-01-08 | v1.1.254 | 同步 5 个提交 | 无冲突 | ✅ 成功 | Antigravity systemInstruction/requestType header注入、Token主动刷新优化、README更新 |
 | 2026-01-09 | v1.1.255 | 同步 4 个提交 | 无冲突 | ✅ 成功 | OpenAI兼容路由支持Claude Console账户、统一权限检查逻辑(apiKeyService.hasPermission) |
 | 2026-01-10 | v1.1.256 | 同步 8 个提交 | 无冲突 | ✅ 成功 | Bedrock支持Claude 4.5模型+Bearer Token认证、订阅检测修复、TTL随机后缀优化 |
+| 2026-01-21 | v1.1.260 | 同步 7 个提交 (v1.1.257-260) | 无冲突 | ✅ 成功 | Claude OAuth链接生成规则更新、Bedrock SSE流事件格式修复、Droid字段过滤增强 |
 
 **下次更新请在此添加记录**
 
