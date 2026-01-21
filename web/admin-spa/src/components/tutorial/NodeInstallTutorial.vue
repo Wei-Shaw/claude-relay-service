@@ -58,7 +58,7 @@
             如果你安装了 Chocolatey 或 Scoop，可以使用命令行安装：
           </p>
           <div
-            class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 dark:border dark:border-slate-700 dark:bg-slate-900 sm:p-4 sm:text-sm"
+            class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 dark:border dark:border-gray-700 dark:bg-gray-900 sm:p-4 sm:text-sm"
           >
             <div class="mb-2"># 使用 Chocolatey</div>
             <div class="whitespace-nowrap text-gray-300">choco install nodejs</div>
@@ -85,7 +85,7 @@
     <!-- macOS -->
     <div v-else-if="platform === 'macos'" class="node-install-section">
       <div
-        class="mb-4 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-slate-50 p-4 dark:border-gray-700 dark:from-gray-800 dark:to-slate-800 sm:mb-6 sm:p-6"
+        class="mb-4 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-50 p-4 dark:border-gray-700 dark:from-gray-800 dark:to-gray-800 sm:mb-6 sm:p-6"
       >
         <h5
           class="mb-2 flex items-center text-base font-semibold text-gray-800 dark:text-gray-200 sm:mb-3 sm:text-lg"
@@ -99,7 +99,7 @@
             如果你已经安装了 Homebrew，使用它安装 Node.js 会更方便：
           </p>
           <div
-            class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 dark:border dark:border-slate-700 dark:bg-slate-900 sm:p-4 sm:text-sm"
+            class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 dark:border dark:border-gray-700 dark:bg-gray-900 sm:p-4 sm:text-sm"
           >
             <div class="mb-2"># 更新 Homebrew</div>
             <div class="whitespace-nowrap text-gray-300">brew update</div>
@@ -167,7 +167,7 @@
             nvm 可以方便地管理多个 Node.js 版本：
           </p>
           <div
-            class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 dark:border dark:border-slate-700 dark:bg-slate-900 sm:p-4 sm:text-sm"
+            class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 dark:border dark:border-gray-700 dark:bg-gray-900 sm:p-4 sm:text-sm"
           >
             <div class="mb-2"># 安装 nvm</div>
             <div class="whitespace-nowrap text-gray-300">
@@ -182,7 +182,7 @@
         <div class="mb-4">
           <p class="mb-3 text-gray-700 dark:text-gray-300">方法二：使用包管理器</p>
           <div
-            class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 dark:border dark:border-slate-700 dark:bg-slate-900 sm:p-4 sm:text-sm"
+            class="overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 dark:border dark:border-gray-700 dark:bg-gray-900 sm:p-4 sm:text-sm"
           >
             <div class="mb-2"># Ubuntu/Debian</div>
             <div class="whitespace-nowrap text-gray-300">

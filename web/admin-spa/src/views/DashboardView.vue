@@ -196,6 +196,105 @@
       </div>
     </div>
 
+    <!-- 账户余额/配额汇总 -->
+    <div class="mb-4 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 md:mb-8 md:gap-6">
+      <div class="stat-card">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+              账户余额/配额
+            </p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
+              {{ formatCurrencyUsd(balanceSummary.totalBalance || 0) }}
+            </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              低余额: {{ balanceSummary.lowBalanceCount || 0 }} | 总成本:
+              {{ formatCurrencyUsd(balanceSummary.totalCost || 0) }}
+            </p>
+          </div>
+          <div class="stat-icon flex-shrink-0 bg-gradient-to-br from-emerald-500 to-green-600">
+            <i class="fas fa-wallet" />
+          </div>
+        </div>
+
+        <div class="mt-3 flex items-center justify-between gap-3">
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            更新时间: {{ formatLastUpdate(balanceSummaryUpdatedAt) }}
+          </p>
+          <button
+            class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500"
+            :disabled="loadingBalanceSummary"
+            @click="loadBalanceSummary"
+          >
+            <i :class="['fas', loadingBalanceSummary ? 'fa-spinner fa-spin' : 'fa-sync-alt']" />
+            刷新
+          </button>
+        </div>
+      </div>
+
+      <div class="card p-4 sm:p-6">
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">低余额账户</h3>
+          <span class="text-xs text-gray-500 dark:text-gray-400">
+            {{ lowBalanceAccounts.length }} 个
+          </span>
+        </div>
+
+        <div
+          v-if="loadingBalanceSummary"
+          class="py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+        >
+          正在加载...
+        </div>
+        <div
+          v-else-if="lowBalanceAccounts.length === 0"
+          class="py-6 text-center text-sm text-green-600 dark:text-green-400"
+        >
+          全部正常
+        </div>
+        <div v-else class="max-h-64 space-y-2 overflow-y-auto">
+          <div
+            v-for="account in lowBalanceAccounts"
+            :key="account.accountId"
+            class="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-900/20"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                {{ account.name || account.accountId }}
+              </div>
+              <span
+                class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+              >
+                {{ getBalancePlatformLabel(account.platform) }}
+              </span>
+            </div>
+            <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+              <span v-if="account.balance">余额: {{ account.balance.formattedAmount }}</span>
+              <span v-else
+                >今日成本: {{ formatCurrencyUsd(account.statistics?.dailyCost || 0) }}</span
+              >
+            </div>
+            <div v-if="account.quota && typeof account.quota.percentage === 'number'" class="mt-2">
+              <div
+                class="mb-1 flex items-center justify-between text-xs text-gray-600 dark:text-gray-400"
+              >
+                <span>配额使用</span>
+                <span class="text-red-600 dark:text-red-400">
+                  {{ account.quota.percentage.toFixed(1) }}%
+                </span>
+              </div>
+              <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                <div
+                  class="h-2 rounded-full bg-red-500"
+                  :style="{ width: `${Math.min(100, account.quota.percentage)}%` }"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Token统计和性能指标 -->
     <div
       class="mb-4 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 md:mb-8 md:gap-6 lg:grid-cols-4"
@@ -679,9 +778,13 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import Chart from 'chart.js/auto'
+
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
-import Chart from 'chart.js/auto'
+import { formatNumber, showToast } from '@/utils/tools'
+
+import { getBalanceSummaryApi } from '@/utils/http_apis'
 
 const dashboardStore = useDashboardStore()
 const themeStore = useThemeStore()
@@ -698,8 +801,7 @@ const {
   formattedUptime,
   dateFilter,
   trendGranularity,
-  apiKeysTrendMetric,
-  defaultTime
+  apiKeysTrendMetric
 } = storeToRefs(dashboardStore)
 
 const {
@@ -712,6 +814,9 @@ const {
   setAccountUsageGroup,
   disabledDate
 } = dashboardStore
+
+// 日期选择器默认时间
+const defaultTime = [new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)]
 
 // Chart 实例
 const modelUsageChart = ref(null)
@@ -731,6 +836,94 @@ const accountGroupOptions = [
 ]
 
 const accountTrendUpdating = ref(false)
+
+// 余额/配额汇总
+const balanceSummary = ref({
+  totalBalance: 0,
+  totalCost: 0,
+  lowBalanceCount: 0,
+  platforms: {}
+})
+const loadingBalanceSummary = ref(false)
+const balanceSummaryUpdatedAt = ref(null)
+
+const getBalancePlatformLabel = (platform) => {
+  const map = {
+    claude: 'Claude',
+    'claude-console': 'Claude Console',
+    gemini: 'Gemini',
+    'gemini-api': 'Gemini API',
+    openai: 'OpenAI',
+    'openai-responses': 'OpenAI Responses',
+    azure_openai: 'Azure OpenAI',
+    bedrock: 'Bedrock',
+    droid: 'Droid',
+    ccr: 'CCR'
+  }
+  return map[platform] || platform
+}
+
+const lowBalanceAccounts = computed(() => {
+  const result = []
+  const platforms = balanceSummary.value?.platforms || {}
+
+  Object.entries(platforms).forEach(([platform, data]) => {
+    const list = Array.isArray(data?.accounts) ? data.accounts : []
+    list.forEach((entry) => {
+      const accountData = entry?.data
+      if (!accountData) return
+
+      const amount = accountData.balance?.amount
+      const percentage = accountData.quota?.percentage
+
+      const isLowBalance = typeof amount === 'number' && amount < 10
+      const isHighUsage = typeof percentage === 'number' && percentage > 90
+
+      if (isLowBalance || isHighUsage) {
+        result.push({
+          ...accountData,
+          name: entry?.name || accountData.accountId,
+          platform: accountData.platform || platform
+        })
+      }
+    })
+  })
+
+  return result
+})
+
+const formatCurrencyUsd = (amount) => {
+  const value = Number(amount)
+  if (!Number.isFinite(value)) return '$0.00'
+  if (value >= 1) return `$${value.toFixed(2)}`
+  if (value >= 0.01) return `$${value.toFixed(3)}`
+  return `$${value.toFixed(6)}`
+}
+
+const formatLastUpdate = (isoString) => {
+  if (!isoString) return '未知'
+  const date = new Date(isoString)
+  if (Number.isNaN(date.getTime())) return '未知'
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
+
+const loadBalanceSummary = async () => {
+  loadingBalanceSummary.value = true
+  const response = await getBalanceSummaryApi()
+  if (response?.success) {
+    balanceSummary.value = response.data || {
+      totalBalance: 0,
+      totalCost: 0,
+      lowBalanceCount: 0,
+      platforms: {}
+    }
+    balanceSummaryUpdatedAt.value = new Date().toISOString()
+  } else if (response?.message) {
+    console.debug('加载余额汇总失败:', response.message)
+    showToast('加载余额汇总失败', 'error')
+  }
+  loadingBalanceSummary.value = false
+}
 
 // 自动刷新相关
 const autoRefreshEnabled = ref(false)
@@ -752,16 +945,6 @@ const chartColors = computed(() => ({
   grid: isDarkMode.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(0, 0, 0, 0.1)',
   legend: isDarkMode.value ? '#e5e7eb' : '#374151'
 }))
-
-// 格式化数字
-function formatNumber(num) {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(2) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(2) + 'K'
-  }
-  return num.toString()
-}
 
 function formatCostValue(cost) {
   if (!Number.isFinite(cost)) {
@@ -1488,7 +1671,7 @@ async function refreshAllData() {
 
   isRefreshing.value = true
   try {
-    await Promise.all([loadDashboardData(), refreshChartsData()])
+    await Promise.all([loadDashboardData(), refreshChartsData(), loadBalanceSummary()])
   } finally {
     isRefreshing.value = false
   }

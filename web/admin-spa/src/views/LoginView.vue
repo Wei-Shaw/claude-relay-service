@@ -121,7 +121,3 @@ const handleLogin = async () => {
   await authStore.login(loginForm.value)
 }
 </script>
-
-<style scoped>
-/* 组件特定样式已经在全局样式中定义 */
-</style>

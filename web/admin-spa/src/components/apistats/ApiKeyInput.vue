@@ -57,15 +57,23 @@
         <!-- API Key 输入 -->
         <div class="lg:col-span-3">
           <!-- 单 Key 模式输入框 -->
-          <input
-            v-if="!multiKeyMode"
-            v-model="apiKey"
-            class="wide-card-input w-full"
-            :disabled="loading"
-            placeholder="请输入您的 API Key (cr_...)"
-            type="password"
-            @keyup.enter="queryStats"
-          />
+          <div v-if="!multiKeyMode" class="relative">
+            <input
+              v-model="apiKey"
+              class="wide-card-input w-full pr-10"
+              :disabled="loading"
+              placeholder="请输入您的 API Key (cr_...)"
+              :type="showPassword ? 'text' : 'password'"
+              @keyup.enter="queryStats"
+            />
+            <button
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              type="button"
+              @click="showPassword = !showPassword"
+            >
+              <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" />
+            </button>
+          </div>
 
           <!-- 多 Key 模式输入框 -->
           <div v-else class="relative">
@@ -125,13 +133,15 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 
 const apiStatsStore = useApiStatsStore()
 const { apiKey, loading, multiKeyMode } = storeToRefs(apiStatsStore)
 const { queryStats, clearInput } = apiStatsStore
+
+const showPassword = ref(false)
 
 // 解析输入的 API Keys
 const parsedApiKeys = computed(() => {

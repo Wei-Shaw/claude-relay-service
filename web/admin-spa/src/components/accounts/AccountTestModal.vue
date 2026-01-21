@@ -68,6 +68,22 @@
                 {{ platformLabel }}
               </span>
             </div>
+            <!-- Bedrock 账号类型 -->
+            <div
+              v-if="props.account?.platform === 'bedrock'"
+              class="flex items-center justify-between text-sm"
+            >
+              <span class="text-gray-500 dark:text-gray-400">账号类型</span>
+              <span
+                :class="[
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
+                  credentialTypeBadgeClass
+                ]"
+              >
+                <i :class="credentialTypeIcon" />
+                {{ credentialTypeLabel }}
+              </span>
+            </div>
             <div class="flex items-center justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">测试模型</span>
               <select
@@ -183,7 +199,7 @@
 
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
-import { API_PREFIX } from '@/utils/http_apis'
+import { APP_CONFIG } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -313,6 +329,36 @@ const platformBadgeClass = computed(() => {
   return classes[platform] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
 })
 
+// Bedrock 账号类型相关
+const credentialTypeLabel = computed(() => {
+  if (!props.account || props.account.platform !== 'bedrock') return ''
+  const credentialType = props.account.credentialType
+  if (credentialType === 'access_key') return 'Access Key'
+  if (credentialType === 'bearer_token') return 'Bearer Token'
+  return 'Unknown'
+})
+
+const credentialTypeIcon = computed(() => {
+  if (!props.account || props.account.platform !== 'bedrock') return ''
+  const credentialType = props.account.credentialType
+  if (credentialType === 'access_key') return 'fas fa-key'
+  if (credentialType === 'bearer_token') return 'fas fa-ticket'
+  return 'fas fa-question'
+})
+
+const credentialTypeBadgeClass = computed(() => {
+  if (!props.account || props.account.platform !== 'bedrock')
+    return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+  const credentialType = props.account.credentialType
+  if (credentialType === 'access_key') {
+    return 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
+  }
+  if (credentialType === 'bearer_token') {
+    return 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'
+  }
+  return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+})
+
 const statusTitle = computed(() => {
   switch (testStatus.value) {
     case 'idle':
@@ -424,14 +470,14 @@ function getTestEndpoint() {
   if (!props.account) return ''
   const platform = props.account.platform
   const endpoints = {
-    claude: `${API_PREFIX}/admin/claude-accounts/${props.account.id}/test`,
-    'claude-console': `${API_PREFIX}/admin/claude-console-accounts/${props.account.id}/test`,
-    bedrock: `${API_PREFIX}/admin/bedrock-accounts/${props.account.id}/test`,
-    gemini: `${API_PREFIX}/admin/gemini-accounts/${props.account.id}/test`,
-    'openai-responses': `${API_PREFIX}/admin/openai-responses-accounts/${props.account.id}/test`,
-    'azure-openai': `${API_PREFIX}/admin/azure-openai-accounts/${props.account.id}/test`,
-    droid: `${API_PREFIX}/admin/droid-accounts/${props.account.id}/test`,
-    ccr: `${API_PREFIX}/admin/ccr-accounts/${props.account.id}/test`
+    claude: `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test`,
+    'claude-console': `${APP_CONFIG.apiPrefix}/admin/claude-console-accounts/${props.account.id}/test`,
+    bedrock: `${APP_CONFIG.apiPrefix}/admin/bedrock-accounts/${props.account.id}/test`,
+    gemini: `${APP_CONFIG.apiPrefix}/admin/gemini-accounts/${props.account.id}/test`,
+    'openai-responses': `${APP_CONFIG.apiPrefix}/admin/openai-responses-accounts/${props.account.id}/test`,
+    'azure-openai': `${APP_CONFIG.apiPrefix}/admin/azure-openai-accounts/${props.account.id}/test`,
+    droid: `${APP_CONFIG.apiPrefix}/admin/droid-accounts/${props.account.id}/test`,
+    ccr: `${APP_CONFIG.apiPrefix}/admin/ccr-accounts/${props.account.id}/test`
   }
   return endpoints[platform] || ''
 }
@@ -571,7 +617,7 @@ function handleClose() {
   emit('close')
 }
 
-// 监听show变化，重置状态
+// 监听show变化，重置状态并设置测试模型
 watch(
   () => props.show,
   (newVal) => {
@@ -580,6 +626,21 @@ watch(
       responseText.value = ''
       errorMessage.value = ''
       testDuration.value = 0
+
+      // 根据平台和账号类型设置测试模型
+      if (props.account?.platform === 'bedrock') {
+        const credentialType = props.account.credentialType
+        if (credentialType === 'bearer_token') {
+          // Bearer Token 模式使用 Sonnet 4.5
+          selectedModel.value = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'
+        } else {
+          // Access Key 模式使用 Haiku（更快更便宜）
+          selectedModel.value = 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
+        }
+      } else {
+        // 其他平台使用默认模型
+        selectedModel.value = 'claude-sonnet-4-5-20250929'
+      }
     }
   }
 )

@@ -4,12 +4,12 @@ const { authenticateApiKey } = require('../middleware/auth')
 const droidRelayService = require('../services/droidRelayService')
 const sessionHelper = require('../utils/sessionHelper')
 const logger = require('../utils/logger')
+const apiKeyService = require('../services/apiKeyService')
 
 const router = express.Router()
 
 function hasDroidPermission(apiKeyData) {
-  const permissions = apiKeyData?.permissions || 'all'
-  return permissions === 'all' || permissions === 'droid'
+  return apiKeyService.hasPermission(apiKeyData?.permissions, 'droid')
 }
 
 /**

@@ -557,7 +557,8 @@ class OpenAIResponsesRelayService {
             cacheCreateTokens,
             cacheReadTokens,
             modelToRecord,
-            account.id
+            account.id,
+            'openai-responses'
           )
 
           logger.info(
@@ -685,7 +686,8 @@ class OpenAIResponsesRelayService {
           cacheCreateTokens,
           cacheReadTokens,
           actualModel,
-          account.id
+          account.id,
+          'openai-responses'
         )
 
         logger.info(

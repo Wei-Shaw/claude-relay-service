@@ -1124,10 +1124,10 @@
                     服务倍率说明
                   </h3>
                   <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    服务倍率用于计算不同服务消耗的虚拟额度（CC）。以
+                    服务倍率用于计算不同服务的计费费用。以
                     <strong>{{ serviceRates.baseService || 'claude' }}</strong>
-                    为基准（倍率 1.0），其他服务按倍率换算。例如：Gemini 倍率 0.5 表示消耗 1 USD
-                    只扣除 0.5 CC 额度。
+                    为基准（倍率 1.0），其他服务按倍率换算。例如：Gemini 倍率 0.5 表示消耗 $1 只扣除
+                    $0.5 额度。
                   </p>
                 </div>
               </div>
@@ -1804,7 +1804,8 @@ import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { showToast } from '@/utils/tools'
 import { useSettingsStore } from '@/stores/settings'
-import * as httpApi from '@/utils/http_apis'
+
+import * as httpApis from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 // 定义组件名称，用于keep-alive排除
@@ -2140,7 +2141,7 @@ onBeforeUnmount(() => {
 const loadWebhookConfig = async () => {
   if (!isMounted.value) return
   try {
-    const response = await httpApi.get('/admin/webhook/config', {
+    const response = await httpApis.getWebhookConfigApi({
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2173,7 +2174,7 @@ const saveWebhookConfig = async () => {
       }
     }
 
-    const response = await httpApi.post('/admin/webhook/config', payload, {
+    const response = await httpApis.updateWebhookConfigApi(payload, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2193,7 +2194,7 @@ const loadClaudeConfig = async () => {
   if (!isMounted.value) return
   claudeConfigLoading.value = true
   try {
-    const response = await httpApi.get('/admin/claude-relay-config', {
+    const response = await httpApis.getClaudeRelayConfigApi({
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2246,7 +2247,7 @@ const saveClaudeConfig = async () => {
       concurrentRequestQueueTimeoutMs: claudeConfig.value.concurrentRequestQueueTimeoutMs
     }
 
-    const response = await httpApi.put('/admin/claude-relay-config', payload, {
+    const response = await httpApis.updateClaudeRelayConfigApi(payload, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2270,7 +2271,7 @@ const loadServiceRates = async () => {
   if (!isMounted.value) return
   serviceRatesLoading.value = true
   try {
-    const response = await httpApi.get('/admin/service-rates', {
+    const response = await httpApis.getAdminServiceRatesApi({
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2297,8 +2298,7 @@ const saveServiceRates = async () => {
   if (!isMounted.value) return
   serviceRatesSaving.value = true
   try {
-    const response = await httpApi.put(
-      '/admin/service-rates',
+    const response = await httpApis.updateAdminServiceRatesApi(
       {
         rates: serviceRates.value.rates,
         baseService: serviceRates.value.baseService
@@ -2473,14 +2473,16 @@ const savePlatform = async () => {
     let response
     if (editingPlatform.value) {
       // 更新平台
-      response = await httpApi.put(
-        `/admin/webhook/platforms/${editingPlatform.value.id}`,
+      response = await httpApis.updateWebhookPlatformApi(
+        editingPlatform.value.id,
         platformForm.value,
-        { signal: abortController.value.signal }
+        {
+          signal: abortController.value.signal
+        }
       )
     } else {
       // 添加平台
-      response = await httpApi.post('/admin/webhook/platforms', platformForm.value, {
+      response = await httpApis.createWebhookPlatformApi(platformForm.value, {
         signal: abortController.value.signal
       })
     }
@@ -2545,7 +2547,7 @@ const deletePlatform = async (id) => {
   }
 
   try {
-    const response = await httpApi.del(`/admin/webhook/platforms/${id}`, {
+    const response = await httpApis.deleteWebhookPlatformApi(id, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2565,13 +2567,9 @@ const togglePlatform = async (id) => {
   if (!isMounted.value) return
 
   try {
-    const response = await httpApi.post(
-      `/admin/webhook/platforms/${id}/toggle`,
-      {},
-      {
-        signal: abortController.value.signal
-      }
-    )
+    const response = await httpApis.toggleWebhookPlatformApi(id, {
+      signal: abortController.value.signal
+    })
     if (response.success && isMounted.value) {
       showToast(response.message, 'success')
       await loadWebhookConfig()
@@ -2620,7 +2618,7 @@ const testPlatform = async (platform) => {
       testData.url = platform.url
     }
 
-    const response = await httpApi.post('/admin/webhook/test', testData, {
+    const response = await httpApis.testWebhookApi(testData, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2643,7 +2641,7 @@ const testPlatformForm = async () => {
 
   testingConnection.value = true
   try {
-    const response = await httpApi.post('/admin/webhook/test', platformForm.value, {
+    const response = await httpApis.testWebhookApi(platformForm.value, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2666,13 +2664,9 @@ const sendTestNotification = async () => {
   if (!isMounted.value) return
 
   try {
-    const response = await httpApi.post(
-      '/admin/webhook/test-notification',
-      {},
-      {
-        signal: abortController.value.signal
-      }
-    )
+    const response = await httpApis.testWebhookNotificationApi({
+      signal: abortController.value.signal
+    })
     if (response.success && isMounted.value) {
       showToast('测试通知已发送', 'success')
     }

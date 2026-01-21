@@ -12,6 +12,51 @@ class QuotaCardService {
     this.CARD_PREFIX = 'quota_card:'
     this.REDEMPTION_PREFIX = 'redemption:'
     this.CARD_CODE_PREFIX = 'CC' // 卡号前缀
+    this.LIMITS_CONFIG_KEY = 'system:quota_card_limits'
+  }
+
+  /**
+   * 获取额度卡上限配置
+   */
+  async getLimitsConfig() {
+    try {
+      const configStr = await redis.client.get(this.LIMITS_CONFIG_KEY)
+      if (configStr) {
+        return JSON.parse(configStr)
+      }
+      // 没有 Redis 配置时，使用 config.js 默认值
+      const config = require('../../config/config')
+      return config.quotaCardLimits || {
+        enabled: true,
+        maxExpiryDays: 90,
+        maxTotalCostLimit: 1000
+      }
+    } catch (error) {
+      logger.error('❌ Failed to get limits config:', error)
+      return { enabled: true, maxExpiryDays: 90, maxTotalCostLimit: 1000 }
+    }
+  }
+
+  /**
+   * 保存额度卡上限配置
+   */
+  async saveLimitsConfig(config) {
+    try {
+      const parsedDays = parseInt(config.maxExpiryDays)
+      const parsedCost = parseFloat(config.maxTotalCostLimit)
+      const newConfig = {
+        enabled: config.enabled !== false,
+        maxExpiryDays: Number.isNaN(parsedDays) ? 90 : parsedDays,
+        maxTotalCostLimit: Number.isNaN(parsedCost) ? 1000 : parsedCost,
+        updatedAt: new Date().toISOString()
+      }
+      await redis.client.set(this.LIMITS_CONFIG_KEY, JSON.stringify(newConfig))
+      logger.info('✅ Quota card limits config saved')
+      return newConfig
+    } catch (error) {
+      logger.error('❌ Failed to save limits config:', error)
+      throw error
+    }
   }
 
   /**
@@ -248,53 +293,119 @@ class QuotaCardService {
       // 获取卡信息
       const card = await this.getCardByCode(code)
       if (!card) {
-        throw new Error('Card not found')
+        throw new Error('卡号不存在')
       }
 
       // 检查卡状态
       if (card.status !== 'unused') {
-        throw new Error(`Card is ${card.status}, cannot redeem`)
+        const statusMap = { used: '已使用', expired: '已过期', revoked: '已撤销' }
+        throw new Error(`卡片${statusMap[card.status] || card.status}，无法兑换`)
       }
 
       // 检查卡是否过期
       if (card.expiresAt && new Date(card.expiresAt) < new Date()) {
         // 更新卡状态为过期
         await this._updateCardStatus(card.id, 'expired')
-        throw new Error('Card has expired')
+        throw new Error('卡片已过期')
       }
 
       // 获取 API Key 信息
       const apiKeyService = require('./apiKeyService')
       const keyData = await redis.getApiKey(apiKeyId)
       if (!keyData || Object.keys(keyData).length === 0) {
-        throw new Error('API key not found')
+        throw new Error('API Key 不存在')
       }
 
-      // 检查 API Key 是否为聚合类型（只有聚合 Key 才能核销额度卡）
-      if (card.type !== 'time' && keyData.isAggregated !== 'true') {
-        throw new Error('Only aggregated keys can redeem quota cards')
-      }
+      // 获取上限配置
+      const limits = await this.getLimitsConfig()
 
       // 执行核销
       const redemptionId = uuidv4()
       const now = new Date().toISOString()
 
       // 记录核销前状态
-      const beforeQuota = parseFloat(keyData.quotaLimit || 0)
+      const beforeLimit = parseFloat(keyData.totalCostLimit || 0)
       const beforeExpiry = keyData.expiresAt || ''
 
       // 应用卡效果
-      let afterQuota = beforeQuota
+      let afterLimit = beforeLimit
       let afterExpiry = beforeExpiry
+      let quotaAdded = 0
+      let timeAdded = 0
+      let actualTimeUnit = card.timeUnit // 实际使用的时间单位（截断时会改为 days）
+      const warnings = [] // 截断警告信息
 
       if (card.type === 'quota' || card.type === 'combo') {
-        const result = await apiKeyService.addQuota(apiKeyId, card.quotaAmount)
-        afterQuota = result.newQuotaLimit
+        let amountToAdd = card.quotaAmount
+
+        // 上限保护：检查是否超过最大额度限制
+        if (limits.enabled && limits.maxTotalCostLimit > 0) {
+          const maxAllowed = limits.maxTotalCostLimit - beforeLimit
+          if (amountToAdd > maxAllowed) {
+            amountToAdd = Math.max(0, maxAllowed)
+            warnings.push(`额度已达上限，本次仅增加 ${amountToAdd} CC（原卡面 ${card.quotaAmount} CC）`)
+            logger.warn(`额度卡兑换超出上限，已截断：原 ${card.quotaAmount} -> 实际 ${amountToAdd}`)
+          }
+        }
+
+        if (amountToAdd > 0) {
+          const result = await apiKeyService.addTotalCostLimit(apiKeyId, amountToAdd)
+          afterLimit = result.newTotalCostLimit
+          quotaAdded = amountToAdd
+        }
       }
 
       if (card.type === 'time' || card.type === 'combo') {
+        // 计算新的过期时间
+        let baseDate = beforeExpiry ? new Date(beforeExpiry) : new Date()
+        if (baseDate < new Date()) {
+          baseDate = new Date()
+        }
+
+        let newExpiry = new Date(baseDate)
+        switch (card.timeUnit) {
+          case 'hours':
+            newExpiry.setTime(newExpiry.getTime() + card.timeAmount * 60 * 60 * 1000)
+            break
+          case 'days':
+            newExpiry.setDate(newExpiry.getDate() + card.timeAmount)
+            break
+          case 'months':
+            newExpiry.setMonth(newExpiry.getMonth() + card.timeAmount)
+            break
+        }
+
+        // 上限保护：检查是否超过最大有效期
+        if (limits.enabled && limits.maxExpiryDays > 0) {
+          const maxExpiry = new Date()
+          maxExpiry.setDate(maxExpiry.getDate() + limits.maxExpiryDays)
+          if (newExpiry > maxExpiry) {
+            newExpiry = maxExpiry
+            warnings.push(`有效期已达上限（${limits.maxExpiryDays}天），时间已截断`)
+            logger.warn(`时间卡兑换超出上限，已截断至 ${maxExpiry.toISOString()}`)
+          }
+        }
+
         const result = await apiKeyService.extendExpiry(apiKeyId, card.timeAmount, card.timeUnit)
-        afterExpiry = result.newExpiresAt
+        // 如果有上限保护，使用截断后的时间
+        if (limits.enabled && limits.maxExpiryDays > 0) {
+          const maxExpiry = new Date()
+          maxExpiry.setDate(maxExpiry.getDate() + limits.maxExpiryDays)
+          if (new Date(result.newExpiresAt) > maxExpiry) {
+            await redis.client.hset(`apikey:${apiKeyId}`, 'expiresAt', maxExpiry.toISOString())
+            afterExpiry = maxExpiry.toISOString()
+            // 计算实际增加的天数，截断时统一用天
+            const actualDays = Math.max(0, Math.ceil((maxExpiry - baseDate) / (1000 * 60 * 60 * 24)))
+            timeAdded = actualDays
+            actualTimeUnit = 'days'
+          } else {
+            afterExpiry = result.newExpiresAt
+            timeAdded = card.timeAmount
+          }
+        } else {
+          afterExpiry = result.newExpiresAt
+          timeAdded = card.timeAmount
+        }
       }
 
       // 更新卡状态
@@ -321,11 +432,11 @@ class QuotaCardService {
         username,
         apiKeyId,
         apiKeyName: keyData.name || '',
-        quotaAdded: String(card.type === 'time' ? 0 : card.quotaAmount),
-        timeAdded: String(card.type === 'quota' ? 0 : card.timeAmount),
-        timeUnit: card.timeUnit,
-        beforeQuota: String(beforeQuota),
-        afterQuota: String(afterQuota),
+        quotaAdded: String(quotaAdded),
+        timeAdded: String(timeAdded),
+        timeUnit: actualTimeUnit,
+        beforeLimit: String(beforeLimit),
+        afterLimit: String(afterLimit),
         beforeExpiry,
         afterExpiry,
         timestamp: now,
@@ -343,14 +454,15 @@ class QuotaCardService {
 
       return {
         success: true,
+        warnings,
         redemptionId,
         cardCode: card.code,
         cardType: card.type,
-        quotaAdded: card.type === 'time' ? 0 : card.quotaAmount,
-        timeAdded: card.type === 'quota' ? 0 : card.timeAmount,
-        timeUnit: card.timeUnit,
-        beforeQuota,
-        afterQuota,
+        quotaAdded,
+        timeAdded,
+        timeUnit: actualTimeUnit,
+        beforeLimit,
+        afterLimit,
         beforeExpiry,
         afterExpiry
       }
@@ -383,13 +495,13 @@ class QuotaCardService {
       const now = new Date().toISOString()
 
       // 撤销效果
-      let actualQuotaDeducted = 0
+      let actualDeducted = 0
       if (parseFloat(redemptionData.quotaAdded) > 0) {
-        const result = await apiKeyService.deductQuotaLimit(
+        const result = await apiKeyService.deductTotalCostLimit(
           redemptionData.apiKeyId,
           parseFloat(redemptionData.quotaAdded)
         )
-        actualQuotaDeducted = result.actualDeducted
+        actualDeducted = result.actualDeducted
       }
 
       // 注意：时间卡撤销比较复杂，这里简化处理，不回退时间
@@ -401,7 +513,7 @@ class QuotaCardService {
         revokedAt: now,
         revokedBy,
         revokeReason: reason,
-        actualQuotaDeducted: String(actualQuotaDeducted)
+        actualDeducted: String(actualDeducted)
       })
 
       // 更新卡状态
@@ -423,7 +535,7 @@ class QuotaCardService {
         success: true,
         redemptionId,
         cardCode: redemptionData.cardCode,
-        actualQuotaDeducted,
+        actualDeducted,
         reason
       }
     } catch (error) {
@@ -469,8 +581,8 @@ class QuotaCardService {
             quotaAdded: parseFloat(data.quotaAdded || 0),
             timeAdded: parseInt(data.timeAdded || 0),
             timeUnit: data.timeUnit,
-            beforeQuota: parseFloat(data.beforeQuota || 0),
-            afterQuota: parseFloat(data.afterQuota || 0),
+            beforeLimit: parseFloat(data.beforeLimit || 0),
+            afterLimit: parseFloat(data.afterLimit || 0),
             beforeExpiry: data.beforeExpiry,
             afterExpiry: data.afterExpiry,
             timestamp: data.timestamp,
@@ -478,7 +590,7 @@ class QuotaCardService {
             revokedAt: data.revokedAt,
             revokedBy: data.revokedBy,
             revokeReason: data.revokeReason,
-            actualQuotaDeducted: parseFloat(data.actualQuotaDeducted || 0)
+            actualDeducted: parseFloat(data.actualDeducted || 0)
           })
         }
       }

@@ -11,6 +11,7 @@ const logger = require('./utils/logger')
 const redis = require('./models/redis')
 const pricingService = require('./services/pricingService')
 const cacheMonitor = require('./utils/cacheMonitor')
+const { getSafeMessage } = require('./utils/errorSanitizer')
 
 // Import routes
 const apiRoutes = require('./routes/api')
@@ -70,6 +71,11 @@ class Application {
         logger.success(`✅ 数据迁移完成，版本: ${currentVersion}`)
       }
 
+      // 📅 后台检查月份索引完整性（不阻塞启动）
+      redis.ensureMonthlyMonthsIndex().catch((err) => {
+        logger.error('📅 月份索引检查失败:', err.message)
+      })
+
       // 📊 后台异步迁移 usage 索引（不阻塞启动）
       redis.migrateUsageIndex().catch((err) => {
         logger.error('📊 Background usage index migration failed:', err)
@@ -77,6 +83,16 @@ class Application {
 
       // 📊 迁移 alltime 模型统计（阻塞式，确保数据完整）
       await redis.migrateAlltimeModelStats()
+
+      // 💳 初始化账户余额查询服务（Provider 注册）
+      try {
+        const accountBalanceService = require('./services/accountBalanceService')
+        const { registerAllProviders } = require('./services/balanceProviders')
+        registerAllProviders(accountBalanceService)
+        logger.info('✅ 账户余额查询服务已初始化')
+      } catch (error) {
+        logger.warn('⚠️ 账户余额查询服务初始化失败:', error.message)
+      }
 
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')
@@ -207,7 +223,7 @@ class Application {
       // 🔧 基础中间件
       this.app.use(
         express.json({
-          limit: '10mb',
+          limit: '100mb',
           verify: (req, res, buf, encoding) => {
             // 验证JSON格式
             if (buf && buf.length && !buf.toString(encoding || 'utf8').trim()) {
@@ -216,7 +232,7 @@ class Application {
           }
         })
       )
-      this.app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+      this.app.use(express.urlencoded({ extended: true, limit: '100mb' }))
       this.app.use(securityMiddleware)
 
       // 🎯 信任代理
@@ -306,6 +322,25 @@ class Application {
       this.app.use('/api', apiRoutes)
       this.app.use('/api', unifiedRoutes) // 统一智能路由（支持 /v1/chat/completions 等）
       this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同
+      // Anthropic (Claude Code) 路由：按路径强制分流到 Gemini OAuth 账户
+      // - /antigravity/api/v1/messages -> Antigravity OAuth
+      // - /gemini-cli/api/v1/messages -> Gemini CLI OAuth
+      this.app.use(
+        '/antigravity/api',
+        (req, res, next) => {
+          req._anthropicVendor = 'antigravity'
+          next()
+        },
+        apiRoutes
+      )
+      this.app.use(
+        '/gemini-cli/api',
+        (req, res, next) => {
+          req._anthropicVendor = 'gemini-cli'
+          next()
+        },
+        apiRoutes
+      )
       this.app.use('/admin', adminRoutes)
       this.app.use('/users', userRoutes)
       // 使用 web 路由（包含 auth 和页面重定向）
@@ -386,7 +421,7 @@ class Application {
           logger.error('❌ Health check failed:', { error: error.message, stack: error.stack })
           res.status(503).json({
             status: 'unhealthy',
-            error: error.message,
+            error: getSafeMessage(error),
             timestamp: new Date().toISOString()
           })
         }

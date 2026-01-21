@@ -259,7 +259,3 @@ watch(
   }
 )
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

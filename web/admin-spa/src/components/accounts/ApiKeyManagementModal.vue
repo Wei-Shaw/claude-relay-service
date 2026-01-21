@@ -397,7 +397,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { showToast } from '@/utils/tools'
-import * as httpApi from '@/utils/http_apis'
+import { getDroidAccountByIdApi, updateDroidAccountApi } from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const props = defineProps({
@@ -518,7 +518,7 @@ const errorKeysCount = computed(() => {
 const loadApiKeys = async () => {
   loading.value = true
   try {
-    const response = await httpApi.get(`/admin/droid-accounts/${props.accountId}`)
+    const response = await getDroidAccountByIdApi(props.accountId)
     const account = response.data
 
     // 解析 apiKeys
@@ -613,7 +613,7 @@ const deleteApiKey = async (apiKey) => {
       apiKeyUpdateMode: 'delete'
     }
 
-    await httpApi.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+    await updateDroidAccountApi(props.accountId, updateData)
 
     showToast('API Key 已删除', 'success')
     await loadApiKeys()
@@ -654,7 +654,7 @@ const resetApiKeyStatus = async (apiKey) => {
       apiKeyUpdateMode: 'update'
     }
 
-    await httpApi.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+    await updateDroidAccountApi(props.accountId, updateData)
 
     showToast('API Key 状态已重置', 'success')
     await loadApiKeys()
@@ -695,7 +695,7 @@ const deleteAllErrorKeys = async () => {
       apiKeyUpdateMode: 'delete'
     }
 
-    await httpApi.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+    await updateDroidAccountApi(props.accountId, updateData)
 
     showToast(`成功删除 ${errorKeys.length} 个异常 API Key`, 'success')
     await loadApiKeys()
@@ -742,7 +742,7 @@ const deleteAllKeys = async () => {
       apiKeyUpdateMode: 'delete'
     }
 
-    await httpApi.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+    await updateDroidAccountApi(props.accountId, updateData)
 
     showToast(`成功删除所有 ${keysToDelete.length} 个 API Key`, 'success')
     await loadApiKeys()

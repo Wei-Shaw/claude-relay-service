@@ -338,6 +338,8 @@ import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useThemeStore } from '@/stores/theme'
 
+import { formatNumber } from '@/utils/tools'
+
 const props = defineProps({
   show: { type: Boolean, default: false },
   account: { type: Object, default: () => ({}) },
@@ -364,7 +366,8 @@ const platformLabelMap = {
   'openai-responses': 'OpenAI Responses',
   gemini: 'Gemini',
   'gemini-api': 'Gemini API',
-  droid: 'Droid'
+  droid: 'Droid',
+  bedrock: 'Claude AWS Bedrock'
 }
 
 const platformLabel = computed(() => platformLabelMap[props.account?.platform] || '未知平台')
@@ -388,13 +391,6 @@ const totalTokens = computed(() => props.summary?.totalTokens || 0)
 const overviewInputTokens = computed(() => props.overview?.total?.inputTokens || 0)
 const overviewOutputTokens = computed(() => props.overview?.total?.outputTokens || 0)
 
-const formatNumber = (value) => {
-  const num = Number(value || 0)
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`
-  if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`
-  return num.toLocaleString()
-}
-
 const formatCost = (value) => {
   const num = Number(value || 0)
   if (Number.isNaN(num)) return '$0.000000'
@@ -410,9 +406,7 @@ const formatDate = (value) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
     const parts = value.split('-')
-    if (parts.length === 3) {
-      return `${parts[1]}-${parts[2]}`
-    }
+    if (parts.length === 3) return `${parts[1]}-${parts[2]}`
     return value
   }
   const month = String(date.getMonth() + 1).padStart(2, '0')

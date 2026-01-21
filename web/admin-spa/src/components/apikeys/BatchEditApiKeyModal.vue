@@ -448,7 +448,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { showToast } from '@/utils/tools'
 import { useApiKeysStore } from '@/stores/apiKeys'
-import * as httpApi from '@/utils/http_apis'
+import * as httpApis from '@/utils/http_apis'
 import AccountSelector from '@/components/common/AccountSelector.vue'
 
 const props = defineProps({
@@ -549,6 +549,8 @@ const droidAccountSelectorValue = createAccountSelectorModel('droidAccountId')
 const isServiceSelectable = (service) => {
   if (!form.permissions) return true
   if (form.permissions === 'all') return true
+  if (Array.isArray(form.permissions) && form.permissions.length === 0) return true
+  if (Array.isArray(form.permissions)) return form.permissions.includes(service)
   return form.permissions === service
 }
 
@@ -588,15 +590,15 @@ const refreshAccounts = async () => {
       droidData,
       groupsData
     ] = await Promise.all([
-      httpApi.get('/admin/claude-accounts'),
-      httpApi.get('/admin/claude-console-accounts'),
-      httpApi.get('/admin/gemini-accounts'),
-      httpApi.get('/admin/gemini-api-accounts'), // 获取 Gemini-API 账号
-      httpApi.get('/admin/openai-accounts'),
-      httpApi.get('/admin/openai-responses-accounts'),
-      httpApi.get('/admin/bedrock-accounts'),
-      httpApi.get('/admin/droid-accounts'),
-      httpApi.get('/admin/account-groups')
+      httpApis.getClaudeAccountsApi(),
+      httpApis.getClaudeConsoleAccountsApi(),
+      httpApis.getGeminiAccountsApi(),
+      httpApis.getGeminiApiAccountsApi(), // 获取 Gemini-API 账号
+      httpApis.getOpenAIAccountsApi(),
+      httpApis.getOpenAIResponsesAccountsApi(),
+      httpApis.getBedrockAccountsApi(),
+      httpApis.getDroidAccountsApi(),
+      httpApis.getAccountGroupsApi()
     ])
 
     // 合并Claude OAuth账户和Claude Console账户
@@ -801,7 +803,7 @@ const batchUpdateApiKeys = async () => {
       updates.tagOperation = tagOperation.value
     }
 
-    const result = await httpApi.put('/admin/api-keys/batch', {
+    const result = await httpApis.batchUpdateApiKeysApi({
       keyIds: props.selectedKeys,
       updates
     })
@@ -882,7 +884,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<style scoped>
-/* 表单样式由全局样式提供 */
-</style>

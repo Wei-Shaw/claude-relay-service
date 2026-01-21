@@ -8,7 +8,7 @@
         服务费用统计
       </span>
       <span class="text-xs font-normal text-gray-500 dark:text-gray-400">
-        CC 倍率基准: Claude = 1.0
+        计费 = 官方费用 × 全局倍率 × Key倍率
       </span>
     </h3>
 
@@ -23,11 +23,21 @@
           <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {{ service.label }}
           </span>
-          <span
-            class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-          >
-            {{ service.rate }}x
-          </span>
+          <div class="flex items-center gap-1">
+            <span
+              class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+              title="全局倍率"
+            >
+              全局 {{ service.globalRate }}x
+            </span>
+            <span
+              v-if="!multiKeyMode"
+              class="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+              title="Key倍率"
+            >
+              Key {{ service.keyRate }}x
+            </span>
+          </div>
         </div>
 
         <!-- Token 详情 -->
@@ -67,7 +77,7 @@
             </span>
           </div>
           <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">折合CC</span>
+            <span class="text-gray-600 dark:text-gray-400">计费费用</span>
             <span class="font-semibold text-amber-600 dark:text-amber-400">
               {{ service.ccCost }}
             </span>
@@ -102,12 +112,13 @@
 </template>
 
 <script setup>
+import { formatNumber } from '@/utils/tools'
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 
 const apiStatsStore = useApiStatsStore()
-const { modelStats, serviceRates } = storeToRefs(apiStatsStore)
+const { modelStats, serviceRates, keyServiceRates, multiKeyMode } = storeToRefs(apiStatsStore)
 
 // 服务标签映射
 const serviceLabels = {
@@ -167,20 +178,23 @@ const serviceStats = computed(() => {
     }
   })
 
-  // 转换为数组并计算 CC 费用
+  // 转换为数组并计算计费费用
   return Object.entries(stats)
     .filter(
       ([, data]) =>
         data.inputTokens > 0 || data.outputTokens > 0 || data.cacheCreateTokens > 0 || data.cost > 0
     )
     .map(([service, data]) => {
-      const rate = serviceRates.value.rates[service] || 1.0
-      const ccCostValue = data.cost * rate
+      const globalRate = serviceRates.value.rates[service] || 1.0
+      // 批量模式下不使用 Key 倍率
+      const keyRate = multiKeyMode.value ? 1.0 : (keyServiceRates.value?.[service] ?? 1.0)
+      const ccCostValue = data.cost * globalRate * keyRate
       const p = data.pricing
       return {
         name: service,
         label: serviceLabels[service] || service,
-        rate: rate,
+        globalRate: globalRate,
+        keyRate: keyRate,
         inputTokens: data.inputTokens,
         outputTokens: data.outputTokens,
         cacheCreateTokens: data.cacheCreateTokens,
@@ -209,13 +223,6 @@ const formatCost = (cost) => {
 }
 
 // 格式化数字
-const formatNumber = (num) => {
-  if (!num) return '0'
-  if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B'
-  if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M'
-  if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K'
-  return num.toLocaleString()
-}
 </script>
 
 <style scoped>

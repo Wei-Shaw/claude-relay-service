@@ -8,6 +8,7 @@ const geminiApiAccountService = require('../../services/geminiApiAccountService'
 const openaiAccountService = require('../../services/openaiAccountService')
 const openaiResponsesAccountService = require('../../services/openaiResponsesAccountService')
 const droidAccountService = require('../../services/droidAccountService')
+const bedrockAccountService = require('../../services/bedrockAccountService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
@@ -104,6 +105,7 @@ async function getUsageDataByIndex(indexKey, keyPattern, scanPattern) {
 
 const accountTypeNames = {
   claude: 'Claude官方',
+  'claude-official': 'Claude官方',
   'claude-console': 'Claude Console',
   ccr: 'Claude Console Relay',
   openai: 'OpenAI',
@@ -111,6 +113,7 @@ const accountTypeNames = {
   gemini: 'Gemini',
   'gemini-api': 'Gemini API',
   droid: 'Droid',
+  bedrock: 'AWS Bedrock',
   unknown: '未知渠道'
 }
 
@@ -123,7 +126,8 @@ const resolveAccountByPlatform = async (accountId, platform) => {
     openai: openaiAccountService,
     'openai-responses': openaiResponsesAccountService,
     droid: droidAccountService,
-    ccr: ccrAccountService
+    ccr: ccrAccountService,
+    bedrock: bedrockAccountService
   }
 
   if (platform && serviceMap[platform]) {
@@ -247,7 +251,8 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       'openai-responses',
       'gemini',
       'gemini-api',
-      'droid'
+      'droid',
+      'bedrock'
     ]
     if (!allowedPlatforms.includes(platform)) {
       return res.status(400).json({
@@ -260,7 +265,8 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       openai: 'openai',
       'openai-responses': 'openai-responses',
       'gemini-api': 'gemini-api',
-      droid: 'droid'
+      droid: 'droid',
+      bedrock: 'bedrock'
     }
 
     const fallbackModelMap = {
@@ -270,7 +276,8 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       'openai-responses': 'gpt-4o-mini-2024-07-18',
       gemini: 'gemini-1.5-flash',
       'gemini-api': 'gemini-2.0-flash',
-      droid: 'unknown'
+      droid: 'unknown',
+      bedrock: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
     }
 
     // 获取账户信息以获取创建时间
@@ -301,6 +308,11 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
         case 'droid':
           accountData = await droidAccountService.getAccount(accountId)
           break
+        case 'bedrock': {
+          const result = await bedrockAccountService.getAccount(accountId)
+          accountData = result?.success ? result.data : null
+          break
+        }
       }
 
       if (accountData && accountData.createdAt) {
@@ -1107,7 +1119,7 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
   try {
     const { granularity = 'day', group = 'claude', days = 7, startDate, endDate } = req.query
 
-    const allowedGroups = ['claude', 'openai', 'gemini', 'droid']
+    const allowedGroups = ['claude', 'openai', 'gemini', 'droid', 'bedrock']
     if (!allowedGroups.includes(group)) {
       return res.status(400).json({
         success: false,
@@ -1119,7 +1131,8 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
       claude: 'Claude账户',
       openai: 'OpenAI账户',
       gemini: 'Gemini账户',
-      droid: 'Droid账户'
+      droid: 'Droid账户',
+      bedrock: 'Bedrock账户'
     }
 
     // 拉取各平台账号列表
@@ -1211,6 +1224,18 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
           id,
           name: account.name || account.ownerEmail || account.ownerName || `Droid账号 ${shortId}`,
           platform: 'droid'
+        }
+      })
+    } else if (group === 'bedrock') {
+      const result = await bedrockAccountService.getAllAccounts()
+      const bedrockAccounts = result?.success ? result.data : []
+      accounts = bedrockAccounts.map((account) => {
+        const id = String(account.id || '')
+        const shortId = id ? id.slice(0, 8) : '未知'
+        return {
+          id,
+          name: account.name || `Bedrock账号 ${shortId}`,
+          platform: 'bedrock'
         }
       })
     }
@@ -2616,6 +2641,8 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
       const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const realCost =
+        typeof record.realCost === 'number' ? record.realCost : costData?.costs?.total || 0
       const totalTokens =
         record.totalTokens ||
         usage.input_tokens +
@@ -2643,11 +2670,10 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
         totalTokens,
         isLongContextRequest: record.isLongContext || record.isLongContextRequest || false,
         cost: Number(computedCost.toFixed(6)),
-        costFormatted:
-          record.costFormatted ||
-          costData?.formatted?.total ||
-          CostCalculator.formatCost(computedCost),
-        costBreakdown: record.costBreakdown || {
+        costFormatted: CostCalculator.formatCost(computedCost),
+        realCost: Number(realCost.toFixed(6)),
+        realCostFormatted: CostCalculator.formatCost(realCost),
+        costBreakdown: record.realCostBreakdown || record.costBreakdown || {
           input: costData?.costs?.input || 0,
           output: costData?.costs?.output || 0,
           cacheCreate: costData?.costs?.cacheWrite || 0,
@@ -2930,6 +2956,8 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const realCost =
+        typeof record.realCost === 'number' ? record.realCost : costData?.costs?.total || 0
       const totalTokens =
         record.totalTokens ||
         usage.input_tokens +
@@ -2955,11 +2983,10 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
         totalTokens,
         isLongContextRequest: record.isLongContext || record.isLongContextRequest || false,
         cost: Number(computedCost.toFixed(6)),
-        costFormatted:
-          record.costFormatted ||
-          costData?.formatted?.total ||
-          CostCalculator.formatCost(computedCost),
-        costBreakdown: record.costBreakdown || {
+        costFormatted: CostCalculator.formatCost(computedCost),
+        realCost: Number(realCost.toFixed(6)),
+        realCostFormatted: CostCalculator.formatCost(realCost),
+        costBreakdown: record.realCostBreakdown || record.costBreakdown || {
           input: costData?.costs?.input || 0,
           output: costData?.costs?.output || 0,
           cacheCreate: costData?.costs?.cacheWrite || 0,

@@ -11,7 +11,13 @@
         <LogoTitle
           :loading="oemLoading"
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : '使用教程'"
+          :subtitle="
+            currentTab === 'stats'
+              ? 'API Key 使用统计'
+              : currentTab === 'quota'
+                ? '额度卡'
+                : '使用教程'
+          "
           :title="oemSettings.siteName"
         />
         <div class="flex items-center gap-2 md:gap-4">
@@ -52,7 +58,7 @@
     <div class="mb-4 sm:mb-6 md:mb-8">
       <div class="flex justify-center">
         <div
-          class="inline-flex w-full max-w-md rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl sm:w-auto"
+          class="inline-flex w-full max-w-2xl flex-wrap justify-center gap-1 rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl sm:w-auto sm:flex-nowrap"
         >
           <button
             :class="['tab-pill-button', currentTab === 'stats' ? 'active' : '']"
@@ -60,6 +66,13 @@
           >
             <i class="fas fa-chart-line mr-1 md:mr-2" />
             <span class="text-sm md:text-base">统计查询</span>
+          </button>
+          <button
+            :class="['tab-pill-button', currentTab === 'quota' ? 'active' : '']"
+            @click="switchToQuota"
+          >
+            <i class="fas fa-ticket-alt mr-1 md:mr-2" />
+            <span class="text-sm md:text-base">额度卡</span>
           </button>
           <button
             :class="['tab-pill-button', currentTab === 'tutorial' ? 'active' : '']"
@@ -221,6 +234,239 @@
       </div>
     </div>
 
+    <!-- 额度卡内容（含二级 tab） -->
+    <div v-if="currentTab === 'quota'" class="tab-content">
+      <div class="glass-strong rounded-2xl p-4 shadow-xl sm:rounded-3xl sm:p-6 md:p-8">
+        <!-- 二级 Tab -->
+        <div
+          class="mb-4 flex gap-2 border-b border-gray-200 pb-4 dark:border-gray-700 md:mb-6 md:pb-6"
+        >
+          <button
+            :class="[
+              'rounded-lg px-4 py-2 text-sm font-medium transition-all',
+              quotaSubTab === 'redeem'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            ]"
+            @click="quotaSubTab = 'redeem'"
+          >
+            <i class="fas fa-ticket-alt mr-2" />
+            兑换额度卡
+          </button>
+          <button
+            :class="[
+              'rounded-lg px-4 py-2 text-sm font-medium transition-all',
+              quotaSubTab === 'history'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            ]"
+            @click="switchToHistorySubTab"
+          >
+            <i class="fas fa-history mr-2" />
+            兑换记录
+          </button>
+        </div>
+
+        <!-- 兑换额度卡子内容 -->
+        <div v-if="quotaSubTab === 'redeem'">
+          <!-- 需要先输入 API Key -->
+          <div v-if="!apiId" class="py-8 text-center">
+            <div class="mb-4 text-gray-500 dark:text-gray-400">
+              <i class="fas fa-key mb-4 block text-4xl opacity-50" />
+              <p>请先在「统计查询」页面输入您的 API Key</p>
+            </div>
+            <button
+              class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
+              @click="currentTab = 'stats'"
+            >
+              前往输入 API Key
+            </button>
+          </div>
+
+          <!-- 兑换表单 -->
+          <div v-else>
+            <div class="mb-6 rounded-xl bg-blue-50 p-4 dark:bg-blue-900/20">
+              <p class="text-sm text-blue-700 dark:text-blue-300">
+                <i class="fas fa-info-circle mr-2" />
+                当前 API Key: <span class="font-medium">{{ statsData?.name || apiId }}</span>
+              </p>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  额度卡卡号
+                </label>
+                <input
+                  v-model="redeemCode"
+                  class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500"
+                  placeholder="请输入额度卡卡号"
+                  type="text"
+                  @keyup.enter="handleRedeem"
+                />
+              </div>
+
+              <button
+                class="w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-3 font-medium text-white transition-all hover:from-green-600 hover:to-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!redeemCode.trim() || redeemLoading"
+                @click="handleRedeem"
+              >
+                <i v-if="redeemLoading" class="fas fa-spinner fa-spin mr-2" />
+                <i v-else class="fas fa-check-circle mr-2" />
+                {{ redeemLoading ? '兑换中...' : '立即兑换' }}
+              </button>
+            </div>
+
+            <!-- 兑换结果 -->
+            <div v-if="redeemResult" class="mt-6">
+              <div
+                :class="[
+                  'rounded-xl p-4',
+                  redeemResult.success
+                    ? redeemResult.hasWarnings
+                      ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300'
+                      : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+                    : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                ]"
+              >
+                <div class="flex items-start gap-3">
+                  <i
+                    :class="[
+                      'mt-0.5 text-lg',
+                      redeemResult.success
+                        ? redeemResult.hasWarnings
+                          ? 'fas fa-exclamation-triangle'
+                          : 'fas fa-check-circle'
+                        : 'fas fa-times-circle'
+                    ]"
+                  />
+                  <div>
+                    <p class="font-medium">
+                      {{
+                        redeemResult.success
+                          ? redeemResult.hasWarnings
+                            ? '兑换成功（部分截断）'
+                            : '兑换成功'
+                          : '兑换失败'
+                      }}
+                    </p>
+                    <p class="mt-1 text-sm opacity-90">{{ redeemResult.message }}</p>
+                    <div v-if="redeemResult.success && redeemResult.data" class="mt-2 text-sm">
+                      <p v-if="redeemResult.data.quotaAdded">
+                        额度增加:
+                        <span class="font-medium">${{ redeemResult.data.quotaAdded }}</span>
+                      </p>
+                      <p v-if="redeemResult.data.timeAdded">
+                        有效期延长:
+                        <span class="font-medium"
+                          >{{ redeemResult.data.timeAdded
+                          }}{{
+                            redeemResult.data.timeUnit === 'days'
+                              ? '天'
+                              : redeemResult.data.timeUnit === 'hours'
+                                ? '小时'
+                                : '月'
+                          }}</span
+                        >
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 兑换记录子内容 -->
+        <div v-if="quotaSubTab === 'history'">
+          <!-- 需要先输入 API Key -->
+          <div v-if="!apiId" class="py-8 text-center">
+            <div class="mb-4 text-gray-500 dark:text-gray-400">
+              <i class="fas fa-key mb-4 block text-4xl opacity-50" />
+              <p>请先在「统计查询」页面输入您的 API Key</p>
+            </div>
+            <button
+              class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
+              @click="currentTab = 'stats'"
+            >
+              前往输入 API Key
+            </button>
+          </div>
+
+          <!-- 记录列表 -->
+          <div v-else>
+            <div v-if="historyLoading" class="py-8 text-center">
+              <i class="fas fa-spinner fa-spin text-2xl text-gray-400" />
+              <p class="mt-2 text-gray-500 dark:text-gray-400">加载中...</p>
+            </div>
+
+            <div v-else-if="redemptionHistory.length === 0" class="py-8 text-center">
+              <i class="fas fa-inbox text-4xl text-gray-300 dark:text-gray-600" />
+              <p class="mt-2 text-gray-500 dark:text-gray-400">暂无兑换记录</p>
+            </div>
+
+            <div v-else class="space-y-3">
+              <div
+                v-for="record in redemptionHistory"
+                :key="record.id"
+                class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0 flex-1">
+                    <div class="mb-1 flex items-center gap-2">
+                      <span
+                        :class="[
+                          'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                          record.cardType === 'quota'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                            : record.cardType === 'time'
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                              : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        ]"
+                      >
+                        {{
+                          record.cardType === 'quota'
+                            ? '额度卡'
+                            : record.cardType === 'time'
+                              ? '时间卡'
+                              : '组合卡'
+                        }}
+                      </span>
+                      <span
+                        v-if="record.status === 'revoked'"
+                        class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                      >
+                        已撤销
+                      </span>
+                    </div>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">
+                      <span v-if="record.quotaAdded">额度 +${{ record.quotaAdded }}</span>
+                      <span v-if="record.quotaAdded && record.timeAdded"> · </span>
+                      <span v-if="record.timeAdded"
+                        >有效期 +{{ record.timeAmount
+                        }}{{
+                          record.timeUnit === 'days'
+                            ? '天'
+                            : record.timeUnit === 'hours'
+                              ? '小时'
+                              : '月'
+                        }}</span
+                      >
+                    </p>
+                  </div>
+                  <div
+                    class="whitespace-nowrap text-right text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    {{ formatDateTime(record.redeemedAt) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- API Key 测试弹窗 -->
     <ApiKeyTestModal
       :api-key-name="statsData?.name || ''"
@@ -284,6 +530,8 @@ import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import { useThemeStore } from '@/stores/theme'
+import { redeemCardByApiIdApi, getRedemptionHistoryByApiIdApi } from '@/utils/http_apis'
+import { formatDateTime, showToast } from '@/utils/tools'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
@@ -338,25 +586,116 @@ const showNotice = ref(false)
 const dontShowAgain = ref(false)
 const NOTICE_STORAGE_KEY = 'apiStatsNoticeRead'
 
-// 检查是否可以测试 Claude（权限包含 claude 或 all）
+// 额度卡兑换相关状态
+const quotaSubTab = ref('redeem')
+const redeemCode = ref('')
+const redeemLoading = ref(false)
+const redeemResult = ref(null)
+const redemptionHistory = ref([])
+const historyLoading = ref(false)
+
+// 兑换额度卡
+const handleRedeem = async () => {
+  if (!redeemCode.value.trim() || !apiId.value) return
+
+  redeemLoading.value = true
+  redeemResult.value = null
+
+  const res = await redeemCardByApiIdApi({
+    apiId: apiId.value,
+    code: redeemCode.value.trim()
+  })
+
+  redeemLoading.value = false
+
+  if (res.success) {
+    const warnings = res.data?.warnings || []
+    const hasWarnings = warnings.length > 0
+    redeemResult.value = {
+      success: true,
+      message: hasWarnings ? warnings.join('；') : '额度卡兑换成功！',
+      data: res.data,
+      hasWarnings
+    }
+    redeemCode.value = ''
+    showToast(
+      hasWarnings ? '兑换成功（部分截断）' : '兑换成功',
+      hasWarnings ? 'warning' : 'success'
+    )
+    // 刷新统计数据
+    loadStatsWithApiId()
+  } else {
+    redeemResult.value = {
+      success: false,
+      message: res.error || res.message || '兑换失败'
+    }
+    showToast(res.error || res.message || '兑换失败', 'error')
+  }
+}
+
+// 加载兑换记录
+const loadRedemptionHistory = async () => {
+  if (!apiId.value) return
+
+  historyLoading.value = true
+  const res = await getRedemptionHistoryByApiIdApi(apiId.value)
+  historyLoading.value = false
+
+  if (res.success) {
+    redemptionHistory.value = res.data?.records || res.data || []
+  }
+}
+
+// 切换到额度卡 Tab
+const switchToQuota = () => {
+  currentTab.value = 'quota'
+  // 如果子标签是记录，刷新数据
+  if (quotaSubTab.value === 'history') {
+    loadRedemptionHistory()
+  }
+}
+
+// 切换到兑换记录子 Tab
+const switchToHistorySubTab = () => {
+  quotaSubTab.value = 'history'
+  loadRedemptionHistory()
+}
+
+// 解析 permissions（可能是 JSON 字符串或数组）
+const parsePermissions = (permissions) => {
+  if (!permissions) return []
+  if (Array.isArray(permissions)) return permissions
+  if (typeof permissions === 'string') {
+    if (permissions === 'all') return []
+    try {
+      const parsed = JSON.parse(permissions)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+// 检查是否可以测试 Claude（权限包含 claude 或全部）
 const canTestClaude = computed(() => {
-  const permissions = statsData.value?.permissions
-  if (!permissions) return true // 默认允许
-  return permissions === 'all' || permissions.includes('claude')
+  const permissions = parsePermissions(statsData.value?.permissions)
+  if (permissions.length === 0) return true
+  return permissions.includes('claude')
 })
 
 // 检查是否可以测试 Gemini
 const canTestGemini = computed(() => {
-  const permissions = statsData.value?.permissions
-  if (!permissions) return true
-  return permissions === 'all' || permissions.includes('gemini')
+  const permissions = parsePermissions(statsData.value?.permissions)
+  if (permissions.length === 0) return true
+  return permissions.includes('gemini')
 })
 
 // 检查是否可以测试 OpenAI
 const canTestOpenAI = computed(() => {
-  const permissions = statsData.value?.permissions
-  if (!permissions) return true
-  return permissions === 'all' || permissions.includes('openai')
+  const permissions = parsePermissions(statsData.value?.permissions)
+  if (permissions.length === 0) return true
+  return permissions.includes('openai')
 })
 
 // 检查是否有任何测试权限
@@ -366,18 +705,15 @@ const hasAnyTestPermission = computed(() => {
 
 // 可用服务文本
 const availableServicesText = computed(() => {
-  const permissions = statsData.value?.permissions
-  if (!permissions || permissions === 'all') return '全部服务'
+  const permissions = parsePermissions(statsData.value?.permissions)
+  if (permissions.length === 0) return '全部服务'
   const serviceNames = {
     claude: 'Claude',
     gemini: 'Gemini',
     openai: 'OpenAI',
     droid: 'Droid'
   }
-  return permissions
-    .split(',')
-    .map((s) => serviceNames[s.trim()] || s.trim())
-    .join(', ')
+  return permissions.map((s) => serviceNames[s] || s).join(', ')
 })
 
 // 切换测试菜单

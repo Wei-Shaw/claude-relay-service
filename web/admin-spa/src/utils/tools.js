@@ -1,3 +1,16 @@
+// App 配置
+export const APP_CONFIG = {
+  basePath: import.meta.env.VITE_APP_BASE_URL || (import.meta.env.DEV ? '/admin/' : '/web/admin/'),
+  apiPrefix: import.meta.env.DEV ? '/webapi' : ''
+}
+
+export const getAppUrl = (path = '') => {
+  if (path && !path.startsWith('/')) path = '/' + path
+  return APP_CONFIG.basePath + (path.startsWith('#') ? path : '#' + path)
+}
+
+export const getLoginUrl = () => getAppUrl('/login')
+
 // Toast 通知管理
 let toastContainer = null
 let toastId = 0
@@ -108,10 +121,12 @@ export const formatDate = (date, format = 'YYYY-MM-DD HH:mm:ss') => {
 // 相对时间格式化
 export const formatRelativeTime = (date) => {
   if (!date) return ''
-  const diffMs = new Date() - new Date(date)
+  const d = new Date(date)
+  const diffMs = new Date() - d
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMins / 60)
   const diffDays = Math.floor(diffHours / 24)
+  if (diffDays >= 7) return d.toLocaleDateString('zh-CN')
   if (diffDays > 0) return `${diffDays}天前`
   if (diffHours > 0) return `${diffHours}小时前`
   if (diffMins > 0) return `${diffMins}分钟前`
@@ -125,4 +140,25 @@ export const formatBytes = (bytes, decimals = 2) => {
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals < 0 ? 0 : decimals)) + ' ' + sizes[i]
+}
+
+// 日期时间格式化 (简化版)
+export const formatDateTime = (date) => {
+  if (!date) return ''
+  return new Date(date).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+// 金额格式化
+export const formatCost = (value) => {
+  const num = Number(value || 0)
+  if (num === 0) return '$0.00'
+  if (num < 0.01) return `$${num.toFixed(6)}`
+  return `$${num.toFixed(2)}`
 }

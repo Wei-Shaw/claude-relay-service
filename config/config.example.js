@@ -206,6 +206,14 @@ const config = {
     hotReload: process.env.HOT_RELOAD === 'true'
   },
 
+  // 💰 账户余额相关配置
+  accountBalance: {
+    // 是否允许执行自定义余额脚本（安全开关）
+    // 说明：脚本能力可发起任意 HTTP 请求并在服务端执行 extractor 逻辑，建议仅在受控环境开启
+    // 默认保持开启；如需禁用请显式设置：BALANCE_SCRIPT_ENABLED=false
+    enableBalanceScript: process.env.BALANCE_SCRIPT_ENABLED !== 'false'
+  },
+
   // 📬 用户消息队列配置
   // 优化说明：锁在请求发送成功后立即释放（而非请求完成后），因为 Claude API 限流基于请求发送时刻计算
   userMessageQueue: {
@@ -213,6 +221,13 @@ const config = {
     delayMs: parseInt(process.env.USER_MESSAGE_QUEUE_DELAY_MS) || 200, // 请求间隔（毫秒）
     timeoutMs: parseInt(process.env.USER_MESSAGE_QUEUE_TIMEOUT_MS) || 5000, // 队列等待超时（毫秒），锁持有时间短，无需长等待
     lockTtlMs: parseInt(process.env.USER_MESSAGE_QUEUE_LOCK_TTL_MS) || 5000 // 锁TTL（毫秒），5秒足以覆盖请求发送
+  },
+
+  // 🎫 额度卡兑换上限配置（防盗刷）
+  quotaCardLimits: {
+    enabled: process.env.QUOTA_CARD_LIMITS_ENABLED !== 'false', // 默认启用
+    maxExpiryDays: parseInt(process.env.QUOTA_CARD_MAX_EXPIRY_DAYS) || 90, // 最大有效期距今天数
+    maxTotalCostLimit: parseFloat(process.env.QUOTA_CARD_MAX_TOTAL_COST_LIMIT) || 1000 // 最大总额度（美元）
   }
 }
 

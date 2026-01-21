@@ -11,7 +11,9 @@
             >
               <i class="fas fa-layer-group text-sm text-white sm:text-base" />
             </div>
-            <h3 class="text-lg font-bold text-gray-900 sm:text-xl">账户分组管理</h3>
+            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
+              账户分组管理
+            </h3>
           </div>
           <button
             class="p-1 text-gray-400 transition-colors hover:text-gray-600"
@@ -151,7 +153,7 @@
     >
       <div class="modal-content w-full max-w-lg p-4 sm:p-6">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-lg font-bold text-gray-900">编辑分组</h3>
+          <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">编辑分组</h3>
           <button class="text-gray-400 transition-colors hover:text-gray-600" @click="cancelEdit">
             <i class="fas fa-times" />
           </button>
@@ -303,8 +305,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { showToast } from '@/utils/tools'
-import * as httpApi from '@/utils/http_apis'
+import { showToast, formatDate } from '@/utils/tools'
+
+import * as httpApis from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const emit = defineEmits(['close', 'refresh'])
@@ -362,17 +365,12 @@ const editForm = ref({
 })
 
 // 格式化日期
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN')
-}
 
 // 加载分组列表
 const loadGroups = async () => {
   loading.value = true
   try {
-    const response = await httpApi.get('/admin/account-groups')
+    const response = await httpApis.getAccountGroupsApi()
     groups.value = response.data || []
   } catch (error) {
     showToast('加载分组列表失败', 'error')
@@ -390,7 +388,7 @@ const createGroup = async () => {
 
   creating.value = true
   try {
-    await httpApi.post('/admin/account-groups', {
+    await httpApis.createAccountGroupApi({
       name: createForm.value.name,
       platform: createForm.value.platform,
       description: createForm.value.description
@@ -443,7 +441,7 @@ const updateGroup = async () => {
 
   updating.value = true
   try {
-    await httpApi.put(`/admin/account-groups/${editingGroup.value.id}`, {
+    await httpApis.updateAccountGroupApi(editingGroup.value.id, {
       name: editForm.value.name,
       description: editForm.value.description
     })
@@ -484,7 +482,7 @@ const deleteGroup = (group) => {
 const confirmDelete = async () => {
   if (!deletingGroup.value) return
   try {
-    await httpApi.del(`/admin/account-groups/${deletingGroup.value.id}`)
+    await httpApis.deleteAccountGroupApi(deletingGroup.value.id)
     showToast('分组删除成功', 'success')
     cancelDelete()
     await loadGroups()

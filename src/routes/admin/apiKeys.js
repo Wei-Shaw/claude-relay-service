@@ -8,15 +8,41 @@ const config = require('../../../config/config')
 
 const router = express.Router()
 
-// 有效的服务权限值
-const VALID_SERVICES = ['claude', 'gemini', 'openai', 'droid']
+// 有效的权限值列表
+const VALID_PERMISSIONS = ['claude', 'gemini', 'openai', 'droid']
 
-// 验证 permissions 值（支持单选和多选）
-const isValidPermissions = (permissions) => {
-  if (!permissions || permissions === 'all') return true
-  // 支持逗号分隔的多选格式
-  const services = permissions.split(',')
-  return services.every((s) => VALID_SERVICES.includes(s.trim()))
+/**
+ * 验证权限数组格式
+ * @param {any} permissions - 权限值（可以是数组或其他）
+ * @returns {string|null} - 返回错误消息，null 表示验证通过
+ */
+function validatePermissions(permissions) {
+  // 空值或未定义表示全部服务
+  if (permissions === undefined || permissions === null || permissions === '') {
+    return null
+  }
+  // 兼容旧格式字符串
+  if (typeof permissions === 'string') {
+    if (permissions === 'all' || VALID_PERMISSIONS.includes(permissions)) {
+      return null
+    }
+    return `Invalid permissions value. Must be an array of: ${VALID_PERMISSIONS.join(', ')}`
+  }
+  // 新格式数组
+  if (Array.isArray(permissions)) {
+    // 空数组表示全部服务
+    if (permissions.length === 0) {
+      return null
+    }
+    // 验证数组中的每个值
+    for (const perm of permissions) {
+      if (!VALID_PERMISSIONS.includes(perm)) {
+        return `Invalid permission value "${perm}". Valid values are: ${VALID_PERMISSIONS.join(', ')}`
+      }
+    }
+    return null
+  }
+  return `Permissions must be an array. Valid values are: ${VALID_PERMISSIONS.join(', ')}`
 }
 
 // 👥 用户管理 (用于API Key分配)
@@ -712,6 +738,91 @@ router.get('/api-keys/tags', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to get API key tags:', error)
     return res.status(500).json({ error: 'Failed to get API key tags', message: error.message })
+  }
+})
+
+// 获取标签详情（含使用数量）
+router.get('/api-keys/tags/details', authenticateAdmin, async (req, res) => {
+  try {
+    const tagDetails = await apiKeyService.getTagsWithCount()
+    logger.info(`📋 Retrieved ${tagDetails.length} tags with usage counts`)
+    return res.json({ success: true, data: tagDetails })
+  } catch (error) {
+    logger.error('❌ Failed to get tag details:', error)
+    return res.status(500).json({ error: 'Failed to get tag details', message: error.message })
+  }
+})
+
+// 创建新标签
+router.post('/api-keys/tags', authenticateAdmin, async (req, res) => {
+  try {
+    const { name } = req.body
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: '标签名称不能为空' })
+    }
+
+    const result = await apiKeyService.createTag(name.trim())
+    if (!result.success) {
+      return res.status(400).json({ error: result.error })
+    }
+
+    logger.info(`🏷️ Created new tag: ${name}`)
+    return res.json({ success: true, message: '标签创建成功' })
+  } catch (error) {
+    logger.error('❌ Failed to create tag:', error)
+    return res.status(500).json({ error: 'Failed to create tag', message: error.message })
+  }
+})
+
+// 删除标签（从所有 API Key 中移除）
+router.delete('/api-keys/tags/:tagName', authenticateAdmin, async (req, res) => {
+  try {
+    const { tagName } = req.params
+    if (!tagName) {
+      return res.status(400).json({ error: 'Tag name is required' })
+    }
+
+    const decodedTagName = decodeURIComponent(tagName)
+    const result = await apiKeyService.removeTagFromAllKeys(decodedTagName)
+
+    logger.info(`🏷️ Removed tag "${decodedTagName}" from ${result.affectedCount} API keys`)
+    return res.json({
+      success: true,
+      message: `Tag "${decodedTagName}" removed from ${result.affectedCount} API keys`,
+      affectedCount: result.affectedCount
+    })
+  } catch (error) {
+    logger.error('❌ Failed to delete tag:', error)
+    return res.status(500).json({ error: 'Failed to delete tag', message: error.message })
+  }
+})
+
+// 重命名标签
+router.put('/api-keys/tags/:tagName', authenticateAdmin, async (req, res) => {
+  try {
+    const { tagName } = req.params
+    const { newName } = req.body
+    if (!tagName || !newName || !newName.trim()) {
+      return res.status(400).json({ error: 'Tag name and new name are required' })
+    }
+
+    const decodedTagName = decodeURIComponent(tagName)
+    const trimmedNewName = newName.trim()
+    const result = await apiKeyService.renameTag(decodedTagName, trimmedNewName)
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error })
+    }
+
+    logger.info(`🏷️ Renamed tag "${decodedTagName}" to "${trimmedNewName}" in ${result.affectedCount} API keys`)
+    return res.json({
+      success: true,
+      message: `Tag renamed in ${result.affectedCount} API keys`,
+      affectedCount: result.affectedCount
+    })
+  } catch (error) {
+    logger.error('❌ Failed to rename tag:', error)
+    return res.status(500).json({ error: 'Failed to rename tag', message: error.message })
   }
 })
 
@@ -1436,16 +1547,10 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       }
     }
 
-    // 验证服务权限字段
-    if (
-      permissions !== undefined &&
-      permissions !== null &&
-      permissions !== '' &&
-      !isValidPermissions(permissions)
-    ) {
-      return res.status(400).json({
-        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, all, or comma-separated combination'
-      })
+    // 验证服务权限字段（支持数组格式）
+    const permissionsError = validatePermissions(permissions)
+    if (permissionsError) {
+      return res.status(400).json({ error: permissionsError })
     }
 
     const newKey = await apiKeyService.generateApiKey({
@@ -1535,15 +1640,10 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
         .json({ error: 'Base name must be less than 90 characters to allow for numbering' })
     }
 
-    if (
-      permissions !== undefined &&
-      permissions !== null &&
-      permissions !== '' &&
-      !isValidPermissions(permissions)
-    ) {
-      return res.status(400).json({
-        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, all, or comma-separated combination'
-      })
+    // 验证服务权限字段（支持数组格式）
+    const batchPermissionsError = validatePermissions(permissions)
+    if (batchPermissionsError) {
+      return res.status(400).json({ error: batchPermissionsError })
     }
 
     // 生成批量API Keys
@@ -1646,13 +1746,12 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
       })
     }
 
-    if (
-      updates.permissions !== undefined &&
-      !isValidPermissions(updates.permissions)
-    ) {
-      return res.status(400).json({
-        error: 'Invalid permissions value. Must be claude, gemini, openai, droid, all, or comma-separated combination'
-      })
+    // 验证服务权限字段（支持数组格式）
+    if (updates.permissions !== undefined) {
+      const updatePermissionsError = validatePermissions(updates.permissions)
+      if (updatePermissionsError) {
+        return res.status(400).json({ error: updatePermissionsError })
+      }
     }
 
     logger.info(
@@ -1927,11 +2026,10 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     }
 
     if (permissions !== undefined) {
-      // 验证权限值
-      if (!isValidPermissions(permissions)) {
-        return res.status(400).json({
-          error: 'Invalid permissions value. Must be claude, gemini, openai, droid, all, or comma-separated combination'
-        })
+      // 验证服务权限字段（支持数组格式）
+      const singlePermissionsError = validatePermissions(permissions)
+      if (singlePermissionsError) {
+        return res.status(400).json({ error: singlePermissionsError })
       }
       updates.permissions = permissions
     }

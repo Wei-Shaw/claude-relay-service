@@ -70,15 +70,8 @@ const tabs = computed(() => {
     })
   }
 
-  baseTabs.push(
-    { key: 'tutorial', name: '使用教程', shortName: '教程', icon: 'fas fa-graduation-cap' },
-    { key: 'settings', name: '系统设置', shortName: '设置', icon: 'fas fa-cogs' }
-  )
+  baseTabs.push({ key: 'settings', name: '系统设置', shortName: '设置', icon: 'fas fa-cogs' })
 
   return baseTabs
 })
 </script>
-
-<style scoped>
-/* 使用全局样式中定义的 .tab-btn 类 */
-</style>

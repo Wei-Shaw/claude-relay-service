@@ -208,6 +208,36 @@ class ServiceRatesService {
   }
 
   /**
+   * 根据账户类型获取服务类型（优先级高于模型推断）
+   */
+  getServiceFromAccountType(accountType) {
+    if (!accountType) return null
+
+    const mapping = {
+      claude: 'claude',
+      'claude-official': 'claude',
+      'claude-console': 'claude',
+      ccr: 'ccr',
+      bedrock: 'bedrock',
+      gemini: 'gemini',
+      'openai-responses': 'codex',
+      openai: 'codex',
+      azure: 'azure',
+      'azure-openai': 'azure',
+      droid: 'droid'
+    }
+
+    return mapping[accountType] || null
+  }
+
+  /**
+   * 获取服务类型（优先 accountType，后备 model）
+   */
+  getService(accountType, model) {
+    return this.getServiceFromAccountType(accountType) || this.getServiceFromModel(model)
+  }
+
+  /**
    * 获取所有支持的服务列表
    */
   async getAvailableServices() {

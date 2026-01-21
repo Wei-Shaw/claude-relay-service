@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import * as httpApi from '@/utils/http_apis'
+
+import * as httpApis from '@/utils/http_apis'
 
 export const useApiStatsStore = defineStore('apistats', () => {
   // 状态
@@ -35,6 +36,9 @@ export const useApiStatsStore = defineStore('apistats', () => {
 
   // 服务倍率配置
   const serviceRates = ref(null)
+
+  // Key 级别的服务倍率
+  const keyServiceRates = ref({})
 
   // 计算属性
   const currentPeriodData = computed(() => {
@@ -124,16 +128,19 @@ export const useApiStatsStore = defineStore('apistats', () => {
 
     try {
       // 获取 API Key ID
-      const idResult = await httpApi.getKeyId(trimmedKey)
+      const idResult = await httpApis.getKeyIdApi(trimmedKey)
 
       if (idResult.success) {
         apiId.value = idResult.data.id
 
         // 使用 apiId 查询统计数据
-        const statsResult = await httpApi.getUserStats(apiId.value)
+        const statsResult = await httpApis.getUserStatsApi(apiId.value)
 
         if (statsResult.success) {
           statsData.value = statsResult.data
+
+          // 保存 Key 级别的服务倍率
+          keyServiceRates.value = statsResult.data.serviceRates || {}
 
           // 同时加载今日和本月的统计数据
           await loadAllPeriodStats()
@@ -182,9 +189,9 @@ export const useApiStatsStore = defineStore('apistats', () => {
 
     try {
       const [dailyResult, monthlyResult, alltimeResult] = await Promise.all([
-        httpApi.getUserModelStats(apiId.value, 'daily'),
-        httpApi.getUserModelStats(apiId.value, 'monthly'),
-        httpApi.getUserModelStats(apiId.value, 'alltime')
+        httpApis.getUserModelStatsApi(apiId.value, 'daily'),
+        httpApis.getUserModelStatsApi(apiId.value, 'monthly'),
+        httpApis.getUserModelStatsApi(apiId.value, 'alltime')
       ])
 
       dailyModelStats.value = dailyResult.success ? dailyResult.data || [] : []
@@ -207,7 +214,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
   // 加载指定时间段的统计数据
   async function loadPeriodStats(period) {
     try {
-      const result = await httpApi.getUserModelStats(apiId.value, period)
+      const result = await httpApis.getUserModelStatsApi(apiId.value, period)
 
       if (result.success) {
         // 计算汇总数据
@@ -258,7 +265,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
     modelStatsLoading.value = true
 
     try {
-      const result = await httpApi.getUserModelStats(apiId.value, period)
+      const result = await httpApis.getUserModelStatsApi(apiId.value, period)
 
       if (result.success) {
         modelStats.value = result.data || []
@@ -310,10 +317,13 @@ export const useApiStatsStore = defineStore('apistats', () => {
     modelStats.value = []
 
     try {
-      const result = await httpApi.getUserStats(apiId.value)
+      const result = await httpApis.getUserStatsApi(apiId.value)
 
       if (result.success) {
         statsData.value = result.data
+
+        // 保存 Key 级别的服务倍率
+        keyServiceRates.value = result.data.serviceRates || {}
 
         // 调试：打印返回的限制数据
         console.log('API Stats - Full response:', result.data)
@@ -343,7 +353,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
   async function loadOemSettings() {
     oemLoading.value = true
     try {
-      const result = await httpApi.getOemSettings()
+      const result = await httpApis.getOemSettingsApi()
       if (result && result.success && result.data) {
         oemSettings.value = { ...oemSettings.value, ...result.data }
       }
@@ -363,7 +373,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
   // 加载服务倍率配置
   async function loadServiceRates() {
     try {
-      const result = await httpApi.getServiceRates()
+      const result = await httpApis.getServiceRatesApi()
       if (result && result.success && result.data) {
         serviceRates.value = result.data
       }
@@ -428,10 +438,11 @@ export const useApiStatsStore = defineStore('apistats', () => {
     modelStats.value = []
     apiKeys.value = keys
     apiIds.value = []
+    keyServiceRates.value = {} // 多 Key 模式清理 Key 倍率
 
     try {
       // 批量获取 API Key IDs
-      const idResults = await Promise.allSettled(keys.map((key) => httpApi.getKeyId(key)))
+      const idResults = await Promise.allSettled(keys.map((key) => httpApis.getKeyIdApi(key)))
 
       const validIds = []
       const validKeys = []
@@ -453,7 +464,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
       apiKeys.value = validKeys
 
       // 批量查询统计数据
-      const batchResult = await httpApi.getBatchStats(validIds)
+      const batchResult = await httpApis.getBatchStatsApi(validIds)
 
       if (batchResult.success) {
         aggregatedStats.value = batchResult.data.aggregated
@@ -489,7 +500,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
     modelStatsLoading.value = true
 
     try {
-      const result = await httpApi.getBatchModelStats(apiIds.value, period)
+      const result = await httpApis.getBatchModelStatsApi(apiIds.value, period)
 
       if (result.success) {
         modelStats.value = result.data || []
@@ -546,6 +557,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
     error.value = ''
     statsPeriod.value = 'daily'
     apiId.value = null
+    keyServiceRates.value = {}
     // 清除多 Key 模式数据
     apiKeys.value = []
     apiIds.value = []
@@ -587,6 +599,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
     individualStats,
     invalidKeys,
     serviceRates,
+    keyServiceRates,
 
     // Computed
     currentPeriodData,

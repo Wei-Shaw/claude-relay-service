@@ -53,7 +53,7 @@
               {{ model.formatted?.total || '$0.00' }}
             </span>
             <template v-if="serviceRates?.rates">
-              <span class="ml-2 text-gray-500">折合CC</span>
+              <span class="ml-2 text-gray-500">计费</span>
               <span class="ml-1 font-semibold text-amber-600 dark:text-amber-400">
                 {{ calculateCcCost(model) }}
               </span>
@@ -75,7 +75,7 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
-import { copyText } from '@/utils/tools'
+import { copyText, formatNumber } from '@/utils/tools'
 
 const props = defineProps({
   period: {
@@ -136,22 +136,6 @@ const calculateCcCost = (model) => {
 }
 
 // 格式化数字
-const formatNumber = (num) => {
-  if (typeof num !== 'number') {
-    num = parseInt(num) || 0
-  }
-
-  if (num === 0) return '0'
-
-  // 大数字使用简化格式
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  } else {
-    return num.toLocaleString()
-  }
-}
 </script>
 
 <style scoped>

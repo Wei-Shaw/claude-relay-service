@@ -12,6 +12,33 @@ const { authenticateAdmin } = require('../../middleware/auth')
 // 额度卡管理
 // ═══════════════════════════════════════════════════════════════════════════
 
+// 获取额度卡上限配置
+router.get('/quota-cards/limits', authenticateAdmin, async (req, res) => {
+  try {
+    const config = await quotaCardService.getLimitsConfig()
+    res.json({ success: true, data: config })
+  } catch (error) {
+    logger.error('❌ Failed to get quota card limits:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 更新额度卡上限配置
+router.put('/quota-cards/limits', authenticateAdmin, async (req, res) => {
+  try {
+    const { enabled, maxExpiryDays, maxTotalCostLimit } = req.body
+    const config = await quotaCardService.saveLimitsConfig({
+      enabled,
+      maxExpiryDays,
+      maxTotalCostLimit
+    })
+    res.json({ success: true, data: config })
+  } catch (error) {
+    logger.error('❌ Failed to save quota card limits:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
 // 获取额度卡列表
 router.get('/quota-cards', authenticateAdmin, async (req, res) => {
   try {
@@ -178,120 +205,6 @@ router.post('/redemptions/:id/revoke', authenticateAdmin, async (req, res) => {
     })
   } catch (error) {
     logger.error('❌ Failed to revoke redemption:', error)
-    res.status(500).json({
-      success: false,
-      error: error.message
-    })
-  }
-})
-
-// ═══════════════════════════════════════════════════════════════════════════
-// API Key 聚合类型转换
-// ═══════════════════════════════════════════════════════════════════════════
-
-// 获取转换预览
-router.get('/api-keys/:id/convert-preview', authenticateAdmin, async (req, res) => {
-  try {
-    const preview = await apiKeyService.getConvertToAggregatedPreview(req.params.id)
-    res.json({
-      success: true,
-      data: preview
-    })
-  } catch (error) {
-    logger.error('❌ Failed to get convert preview:', error)
-    res.status(500).json({
-      success: false,
-      error: error.message
-    })
-  }
-})
-
-// 执行转换
-router.post('/api-keys/:id/convert-to-aggregated', authenticateAdmin, async (req, res) => {
-  try {
-    const { quotaLimit, permissions, serviceQuotaLimits, quotaUsed } = req.body
-
-    if (quotaLimit === undefined || quotaLimit === null) {
-      return res.status(400).json({
-        success: false,
-        error: 'quotaLimit is required'
-      })
-    }
-
-    if (!permissions || !Array.isArray(permissions) || permissions.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'permissions must be a non-empty array'
-      })
-    }
-
-    const result = await apiKeyService.convertToAggregated(req.params.id, {
-      quotaLimit: parseFloat(quotaLimit),
-      permissions,
-      serviceQuotaLimits: serviceQuotaLimits || {},
-      quotaUsed: quotaUsed !== undefined ? parseFloat(quotaUsed) : null
-    })
-
-    res.json({
-      success: true,
-      data: result
-    })
-  } catch (error) {
-    logger.error('❌ Failed to convert to aggregated:', error)
-    res.status(500).json({
-      success: false,
-      error: error.message
-    })
-  }
-})
-
-// 手动增加额度
-router.post('/api-keys/:id/add-quota', authenticateAdmin, async (req, res) => {
-  try {
-    const { quotaAmount } = req.body
-
-    if (!quotaAmount || quotaAmount <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'quotaAmount must be a positive number'
-      })
-    }
-
-    const result = await apiKeyService.addQuota(req.params.id, parseFloat(quotaAmount))
-
-    res.json({
-      success: true,
-      data: result
-    })
-  } catch (error) {
-    logger.error('❌ Failed to add quota:', error)
-    res.status(500).json({
-      success: false,
-      error: error.message
-    })
-  }
-})
-
-// 手动减少额度
-router.post('/api-keys/:id/deduct-quota', authenticateAdmin, async (req, res) => {
-  try {
-    const { quotaAmount } = req.body
-
-    if (!quotaAmount || quotaAmount <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'quotaAmount must be a positive number'
-      })
-    }
-
-    const result = await apiKeyService.deductQuotaLimit(req.params.id, parseFloat(quotaAmount))
-
-    res.json({
-      success: true,
-      data: result
-    })
-  } catch (error) {
-    logger.error('❌ Failed to deduct quota:', error)
     res.status(500).json({
       success: false,
       error: error.message

@@ -1,8 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
-import { APP_CONFIG } from '@/config/app'
-import { showToast } from '@/utils/tools'
+import { APP_CONFIG, showToast } from '@/utils/tools'
 
 // 路由懒加载
 const LoginView = () => import('@/views/LoginView.vue')
@@ -15,7 +14,6 @@ const ApiKeysView = () => import('@/views/ApiKeysView.vue')
 const ApiKeyUsageRecordsView = () => import('@/views/ApiKeyUsageRecordsView.vue')
 const AccountsView = () => import('@/views/AccountsView.vue')
 const AccountUsageRecordsView = () => import('@/views/AccountUsageRecordsView.vue')
-const TutorialView = () => import('@/views/TutorialView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
 const QuotaCardsView = () => import('@/views/QuotaCardsView.vue')
@@ -122,18 +120,6 @@ const routes = [
         path: '',
         name: 'AccountUsageRecords',
         component: AccountUsageRecordsView
-      }
-    ]
-  },
-  {
-    path: '/tutorial',
-    component: MainLayout,
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        name: 'Tutorial',
-        component: TutorialView
       }
     ]
   },

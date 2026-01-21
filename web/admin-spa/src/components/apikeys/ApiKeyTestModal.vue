@@ -241,8 +241,8 @@
 
 <script setup>
 import { ref, computed, watch, onUnmounted, onMounted } from 'vue'
-import { API_PREFIX } from '@/utils/http_apis'
-import { getModels } from '@/utils/http_apis'
+import { APP_CONFIG } from '@/utils/tools'
+import { getModelsApi } from '@/utils/http_apis'
 
 const props = defineProps({
   show: {
@@ -303,7 +303,7 @@ const modelsFromApi = ref({
 // 加载模型列表
 const loadModels = async () => {
   try {
-    const result = await getModels()
+    const result = await getModelsApi()
     if (result.success && result.data) {
       modelsFromApi.value = {
         claude: result.data.claude || [],
@@ -488,7 +488,7 @@ async function startTest() {
 
   // 使用公开的测试端点，不需要管理员认证
   // apiStats 路由挂载在 /apiStats 下
-  const endpoint = `${API_PREFIX}/apiStats${serviceConfig.value.endpoint}`
+  const endpoint = `${APP_CONFIG.apiPrefix}/apiStats${serviceConfig.value.endpoint}`
 
   try {
     // 使用fetch发送POST请求并处理SSE

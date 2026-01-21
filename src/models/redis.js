@@ -502,6 +502,21 @@ class RedisClient {
     return [...keyIds]
   }
 
+  // 添加标签到全局标签集合
+  async addTag(tagName) {
+    await this.client.sadd('apikey:tags:all', tagName)
+  }
+
+  // 从全局标签集合删除标签
+  async removeTag(tagName) {
+    await this.client.srem('apikey:tags:all', tagName)
+  }
+
+  // 获取全局标签集合
+  async getGlobalTags() {
+    return await this.client.smembers('apikey:tags:all')
+  }
+
   /**
    * 使用索引获取所有 API Key 的标签（优化版本）
    * 优先级：索引就绪时用 apikey:tags:all > apikey:idx:all + pipeline > SCAN
@@ -1567,8 +1582,10 @@ class RedisClient {
     return result
   }
 
-  // 💰 增加当日费用
-  async incrementDailyCost(keyId, amount) {
+  // 💰 增加当日费用（支持倍率成本和真实成本分开记录）
+  // amount: 倍率后的成本（用于限额校验）
+  // realAmount: 真实成本（用于对账），如果不传则等于 amount
+  async incrementDailyCost(keyId, amount, realAmount = null) {
     const today = getDateStringInTimezone()
     const tzDate = getDateInTimezone()
     const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(
@@ -1582,25 +1599,33 @@ class RedisClient {
     const hourlyKey = `usage:cost:hourly:${keyId}:${currentHour}`
     const totalKey = `usage:cost:total:${keyId}` // 总费用键 - 永不过期，持续累加
 
+    // 真实成本键（用于对账）
+    const realTotalKey = `usage:cost:real:total:${keyId}`
+    const realDailyKey = `usage:cost:real:daily:${keyId}:${today}`
+    const actualRealAmount = realAmount !== null ? realAmount : amount
+
     logger.debug(
-      `💰 Incrementing cost for ${keyId}, amount: $${amount}, date: ${today}, dailyKey: ${dailyKey}`
+      `💰 Incrementing cost for ${keyId}, rated: $${amount}, real: $${actualRealAmount}, date: ${today}`
     )
 
     const results = await Promise.all([
       this.client.incrbyfloat(dailyKey, amount),
       this.client.incrbyfloat(monthlyKey, amount),
       this.client.incrbyfloat(hourlyKey, amount),
-      this.client.incrbyfloat(totalKey, amount), // ✅ 累加到总费用（永不过期）
-      // 设置过期时间（注意：totalKey 不设置过期时间，保持永久累计）
+      this.client.incrbyfloat(totalKey, amount), // 倍率后总费用（用于限额）
+      this.client.incrbyfloat(realTotalKey, actualRealAmount), // 真实总费用（用于对账）
+      this.client.incrbyfloat(realDailyKey, actualRealAmount), // 真实每日费用
+      // 设置过期时间（注意：totalKey 和 realTotalKey 不设置过期时间，保持永久累计）
       this.client.expire(dailyKey, 86400 * 30), // 30天
       this.client.expire(monthlyKey, 86400 * 90), // 90天
-      this.client.expire(hourlyKey, 86400 * 7) // 7天
+      this.client.expire(hourlyKey, 86400 * 7), // 7天
+      this.client.expire(realDailyKey, 86400 * 30) // 30天
     ])
 
     logger.debug(`💰 Cost incremented successfully, new daily total: $${results[0]}`)
   }
 
-  // 💰 获取费用统计
+  // 💰 获取费用统计（包含倍率成本和真实成本）
   async getCostStats(keyId) {
     const today = getDateStringInTimezone()
     const tzDate = getDateInTimezone()
@@ -1610,18 +1635,22 @@ class RedisClient {
     )}`
     const currentHour = `${today}:${String(getHourInTimezone(new Date())).padStart(2, '0')}`
 
-    const [daily, monthly, hourly, total] = await Promise.all([
+    const [daily, monthly, hourly, total, realTotal, realDaily] = await Promise.all([
       this.client.get(`usage:cost:daily:${keyId}:${today}`),
       this.client.get(`usage:cost:monthly:${keyId}:${currentMonth}`),
       this.client.get(`usage:cost:hourly:${keyId}:${currentHour}`),
-      this.client.get(`usage:cost:total:${keyId}`)
+      this.client.get(`usage:cost:total:${keyId}`),
+      this.client.get(`usage:cost:real:total:${keyId}`),
+      this.client.get(`usage:cost:real:daily:${keyId}:${today}`)
     ])
 
     return {
       daily: parseFloat(daily || 0),
       monthly: parseFloat(monthly || 0),
       hourly: parseFloat(hourly || 0),
-      total: parseFloat(total || 0)
+      total: parseFloat(total || 0),
+      realTotal: parseFloat(realTotal || 0),
+      realDaily: parseFloat(realDaily || 0)
     }
   }
 
@@ -1637,22 +1666,30 @@ class RedisClient {
     return result
   }
 
-  // 💰 增加本周 Opus 费用
-  async incrementWeeklyOpusCost(keyId, amount) {
+  // 💰 增加本周 Opus 费用（支持倍率成本和真实成本）
+  // amount: 倍率后的成本（用于限额校验）
+  // realAmount: 真实成本（用于对账），如果不传则等于 amount
+  async incrementWeeklyOpusCost(keyId, amount, realAmount = null) {
     const currentWeek = getWeekStringInTimezone()
     const weeklyKey = `usage:opus:weekly:${keyId}:${currentWeek}`
     const totalKey = `usage:opus:total:${keyId}`
+    const realWeeklyKey = `usage:opus:real:weekly:${keyId}:${currentWeek}`
+    const realTotalKey = `usage:opus:real:total:${keyId}`
+    const actualRealAmount = realAmount !== null ? realAmount : amount
 
     logger.debug(
-      `💰 Incrementing weekly Opus cost for ${keyId}, week: ${currentWeek}, amount: $${amount}`
+      `💰 Incrementing weekly Opus cost for ${keyId}, week: ${currentWeek}, rated: $${amount}, real: $${actualRealAmount}`
     )
 
     // 使用 pipeline 批量执行，提高性能
     const pipeline = this.client.pipeline()
     pipeline.incrbyfloat(weeklyKey, amount)
     pipeline.incrbyfloat(totalKey, amount)
+    pipeline.incrbyfloat(realWeeklyKey, actualRealAmount)
+    pipeline.incrbyfloat(realTotalKey, actualRealAmount)
     // 设置周费用键的过期时间为 2 周
     pipeline.expire(weeklyKey, 14 * 24 * 3600)
+    pipeline.expire(realWeeklyKey, 14 * 24 * 3600)
 
     const results = await pipeline.exec()
     logger.debug(`💰 Opus cost incremented successfully, new weekly total: $${results[0][1]}`)
@@ -2249,6 +2286,123 @@ class RedisClient {
 
   async deleteOAuthSession(sessionId) {
     const key = `oauth:${sessionId}`
+    return await this.client.del(key)
+  }
+
+  // 💰 账户余额缓存（API 查询结果）
+  async setAccountBalance(platform, accountId, balanceData, ttl = 3600) {
+    const key = `account_balance:${platform}:${accountId}`
+
+    const payload = {
+      balance:
+        balanceData && balanceData.balance !== null && balanceData.balance !== undefined
+          ? String(balanceData.balance)
+          : '',
+      currency: balanceData?.currency || 'USD',
+      lastRefreshAt: balanceData?.lastRefreshAt || new Date().toISOString(),
+      queryMethod: balanceData?.queryMethod || 'api',
+      status: balanceData?.status || 'success',
+      errorMessage: balanceData?.errorMessage || balanceData?.error || '',
+      rawData: balanceData?.rawData ? JSON.stringify(balanceData.rawData) : '',
+      quota: balanceData?.quota ? JSON.stringify(balanceData.quota) : ''
+    }
+
+    await this.client.hset(key, payload)
+    await this.client.expire(key, ttl)
+  }
+
+  async getAccountBalance(platform, accountId) {
+    const key = `account_balance:${platform}:${accountId}`
+    const [data, ttlSeconds] = await Promise.all([this.client.hgetall(key), this.client.ttl(key)])
+
+    if (!data || Object.keys(data).length === 0) {
+      return null
+    }
+
+    let rawData = null
+    if (data.rawData) {
+      try {
+        rawData = JSON.parse(data.rawData)
+      } catch (error) {
+        rawData = null
+      }
+    }
+
+    let quota = null
+    if (data.quota) {
+      try {
+        quota = JSON.parse(data.quota)
+      } catch (error) {
+        quota = null
+      }
+    }
+
+    return {
+      balance: data.balance ? parseFloat(data.balance) : null,
+      currency: data.currency || 'USD',
+      lastRefreshAt: data.lastRefreshAt || null,
+      queryMethod: data.queryMethod || null,
+      status: data.status || null,
+      errorMessage: data.errorMessage || '',
+      rawData,
+      quota,
+      ttlSeconds: Number.isFinite(ttlSeconds) ? ttlSeconds : null
+    }
+  }
+
+  // 📊 账户余额缓存（本地统计）
+  async setLocalBalance(platform, accountId, statisticsData, ttl = 300) {
+    const key = `account_balance_local:${platform}:${accountId}`
+
+    await this.client.hset(key, {
+      estimatedBalance: JSON.stringify(statisticsData || {}),
+      lastCalculated: new Date().toISOString()
+    })
+    await this.client.expire(key, ttl)
+  }
+
+  async getLocalBalance(platform, accountId) {
+    const key = `account_balance_local:${platform}:${accountId}`
+    const data = await this.client.hgetall(key)
+
+    if (!data || !data.estimatedBalance) {
+      return null
+    }
+
+    try {
+      return JSON.parse(data.estimatedBalance)
+    } catch (error) {
+      return null
+    }
+  }
+
+  async deleteAccountBalance(platform, accountId) {
+    const key = `account_balance:${platform}:${accountId}`
+    const localKey = `account_balance_local:${platform}:${accountId}`
+    await this.client.del(key, localKey)
+  }
+
+  // 🧩 账户余额脚本配置
+  async setBalanceScriptConfig(platform, accountId, scriptConfig) {
+    const key = `account_balance_script:${platform}:${accountId}`
+    await this.client.set(key, JSON.stringify(scriptConfig || {}))
+  }
+
+  async getBalanceScriptConfig(platform, accountId) {
+    const key = `account_balance_script:${platform}:${accountId}`
+    const raw = await this.client.get(key)
+    if (!raw) {
+      return null
+    }
+    try {
+      return JSON.parse(raw)
+    } catch (error) {
+      return null
+    }
+  }
+
+  async deleteBalanceScriptConfig(platform, accountId) {
+    const key = `account_balance_script:${platform}:${accountId}`
     return await this.client.del(key)
   }
 
@@ -4688,10 +4842,56 @@ redisClient.migrateGlobalStats = async function () {
 
   // 写入全局统计
   await this.client.hset('usage:global:total', total)
+
+  // 迁移月份索引（从现有的 usage:model:monthly:* key 中提取月份）
+  const monthlyKeys = await this.client.keys('usage:model:monthly:*')
+  const months = new Set()
+  for (const key of monthlyKeys) {
+    const match = key.match(/:(\d{4}-\d{2})$/)
+    if (match) {
+      months.add(match[1])
+    }
+  }
+  if (months.size > 0) {
+    await this.client.sadd('usage:model:monthly:months', ...months)
+    logger.info(`📅 迁移月份索引: ${months.size} 个月份 (${[...months].sort().join(', ')})`)
+  }
+
   logger.success(
     `✅ 迁移完成: ${keyIds.length} 个 API Key, ${total.requests} 请求, ${total.allTokens} tokens`
   )
   return { success: true, migrated: keyIds.length, total }
+}
+
+// 确保月份索引完整（后台检查，补充缺失的月份）
+redisClient.ensureMonthlyMonthsIndex = async function () {
+  const logger = require('../utils/logger')
+
+  // 扫描所有月份 key
+  const monthlyKeys = await this.client.keys('usage:model:monthly:*')
+  const allMonths = new Set()
+  for (const key of monthlyKeys) {
+    const match = key.match(/:(\d{4}-\d{2})$/)
+    if (match) {
+      allMonths.add(match[1])
+    }
+  }
+
+  if (allMonths.size === 0) {
+    return // 没有月份数据
+  }
+
+  // 获取索引中已有的月份
+  const existingMonths = await this.client.smembers('usage:model:monthly:months')
+  const existingSet = new Set(existingMonths)
+
+  // 找出缺失的月份
+  const missingMonths = [...allMonths].filter((m) => !existingSet.has(m))
+
+  if (missingMonths.length > 0) {
+    await this.client.sadd('usage:model:monthly:months', ...missingMonths)
+    logger.info(`📅 补充月份索引: ${missingMonths.length} 个月份 (${missingMonths.sort().join(', ')})`)
+  }
 }
 
 // 检查是否需要迁移

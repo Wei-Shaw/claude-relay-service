@@ -88,6 +88,52 @@
           </div>
         </div>
 
+        <!-- Limits Config Card -->
+        <div
+          class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50"
+        >
+          <div class="flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">兑换上限保护</span>
+              <label class="relative inline-flex cursor-pointer items-center">
+                <input
+                  v-model="limitsConfig.enabled"
+                  class="peer sr-only"
+                  type="checkbox"
+                  @change="saveLimitsConfig"
+                />
+                <div
+                  class="peer h-5 w-9 rounded-full bg-gray-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full dark:bg-gray-600"
+                />
+              </label>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-600 dark:text-gray-400">最大额度</span>
+              <input
+                v-model.number="limitsConfig.maxTotalCostLimit"
+                class="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                :disabled="!limitsConfig.enabled"
+                min="0"
+                type="number"
+                @change="saveLimitsConfig"
+              />
+              <span class="text-sm text-gray-500 dark:text-gray-400">$</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-600 dark:text-gray-400">最大有效期</span>
+              <input
+                v-model.number="limitsConfig.maxExpiryDays"
+                class="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                :disabled="!limitsConfig.enabled"
+                min="0"
+                type="number"
+                @change="saveLimitsConfig"
+              />
+              <span class="text-sm text-gray-500 dark:text-gray-400">天</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Tab Navigation -->
         <div class="border-b border-gray-200 dark:border-gray-700">
           <nav aria-label="Tabs" class="-mb-px flex space-x-8">
@@ -233,7 +279,7 @@
               </td>
               <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900 dark:text-white">
                 <span v-if="card.type === 'quota' || card.type === 'combo'"
-                  >{{ card.quotaAmount }} CC</span
+                  >${{ card.quotaAmount }}</span
                 >
                 <span v-if="card.type === 'combo'"> + </span>
                 <span v-if="card.type === 'time' || card.type === 'combo'">
@@ -410,7 +456,7 @@
                 </span>
               </td>
               <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900 dark:text-white">
-                <span v-if="redemption.quotaAdded > 0">{{ redemption.quotaAdded }} CC</span>
+                <span v-if="redemption.quotaAdded > 0">${{ redemption.quotaAdded }}</span>
                 <span v-if="redemption.quotaAdded > 0 && redemption.timeAdded > 0"> + </span>
                 <span v-if="redemption.timeAdded > 0">
                   {{ redemption.timeAdded }}
@@ -505,7 +551,7 @@
 
             <div v-if="newCard.type === 'quota' || newCard.type === 'combo'">
               <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >额度数量 (CC)</label
+                >额度数量 (美元)</label
               >
               <input
                 v-model.number="newCard.quotaAmount"
@@ -630,7 +676,7 @@
               </div>
               <span class="text-xs text-gray-500 dark:text-gray-400">
                 <template v-if="card.type === 'quota' || card.type === 'combo'">
-                  {{ card.quotaAmount }} CC
+                  ${{ card.quotaAmount }}
                 </template>
                 <template v-if="card.type === 'combo'"> + </template>
                 <template v-if="card.type === 'time' || card.type === 'combo'">
@@ -675,6 +721,44 @@
         </div>
       </div>
     </Teleport>
+    <!-- Revoke Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showRevokeModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+        @click.self="showRevokeModal = false"
+      >
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
+          <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">撤销核销</h3>
+          <div class="mb-4">
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              撤销原因（可选）
+            </label>
+            <input
+              v-model="revokeReason"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              placeholder="请输入撤销原因"
+              type="text"
+            />
+          </div>
+          <div class="flex justify-end gap-3">
+            <button
+              class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              @click="showRevokeModal = false"
+            >
+              取消
+            </button>
+            <button
+              class="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
+              @click="executeRevoke"
+            >
+              确认撤销
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Confirm Modal -->
     <ConfirmModal
       :cancel-text="confirmModalConfig.cancelText"
@@ -692,9 +776,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
-import * as httpApi from '@/utils/http_apis'
-import { showToast } from '@/utils/tools'
-import { copyText } from '@/utils/tools'
+
+import * as httpApis from '@/utils/http_apis'
+import { showToast, copyText, formatDate } from '@/utils/tools'
 
 const loading = ref(false)
 const creating = ref(false)
@@ -710,6 +794,9 @@ const confirmModalConfig = ref({
 })
 const confirmResolve = ref(null)
 const createdCards = ref([])
+const showRevokeModal = ref(false)
+const revokeReason = ref('')
+const revokingRedemption = ref(null)
 const activeTab = ref('cards')
 const selectedCards = ref([])
 
@@ -730,6 +817,12 @@ const stats = ref({
   redeemed: 0,
   revoked: 0,
   expired: 0
+})
+
+const limitsConfig = ref({
+  enabled: true,
+  maxExpiryDays: 90,
+  maxTotalCostLimit: 1000
 })
 
 const cards = ref([])
@@ -777,11 +870,6 @@ const newCard = ref({
   note: ''
 })
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
-
 const showConfirm = (
   title,
   message,
@@ -806,23 +894,30 @@ const handleCancelModal = () => {
 
 const loadCards = async () => {
   loading.value = true
-  try {
-    const offset = (currentPage.value - 1) * pageSize.value
-    const [cardsData, statsData, redemptionsData] = await Promise.all([
-      httpApi.get(`/admin/quota-cards?limit=${pageSize.value}&offset=${offset}`),
-      httpApi.get('/admin/quota-cards/stats'),
-      httpApi.get('/admin/redemptions')
-    ])
+  const offset = (currentPage.value - 1) * pageSize.value
+  const [cardsData, statsData, redemptionsData] = await Promise.all([
+    httpApis.getQuotaCardsWithParamsApi({ limit: pageSize.value, offset }),
+    httpApis.getQuotaCardsStatsApi(),
+    httpApis.getRedemptionsApi()
+  ])
 
-    cards.value = cardsData.data?.cards || []
-    totalCards.value = cardsData.data?.total || 0
-    stats.value = statsData.data || stats.value
-    redemptions.value = redemptionsData.data?.redemptions || []
-  } catch (error) {
-    console.error('Failed to load cards:', error)
-    showToast('加载卡片数据失败', 'error')
-  } finally {
-    loading.value = false
+  // 单独获取 limits 配置，兼容老后端
+  const limitsData = await httpApis.getQuotaCardLimitsApi().catch(() => ({ data: null }))
+
+  cards.value = cardsData.data?.cards || []
+  totalCards.value = cardsData.data?.total || 0
+  stats.value = statsData.data || stats.value
+  redemptions.value = redemptionsData.data?.redemptions || []
+  if (limitsData.data) {
+    limitsConfig.value = limitsData.data
+  }
+  loading.value = false
+}
+
+const saveLimitsConfig = async () => {
+  const result = await httpApis.updateQuotaCardLimitsApi(limitsConfig.value)
+  if (result.success) {
+    showToast('配置已保存', 'success')
   }
 }
 
@@ -845,8 +940,8 @@ const changePageSize = () => {
 
 const createCard = async () => {
   creating.value = true
-  try {
-    const result = await httpApi.post('/admin/quota-cards', newCard.value)
+  const result = await httpApis.createQuotaCardApi(newCard.value)
+  if (result.success) {
     showCreateModal.value = false
 
     // 处理返回的卡片数据
@@ -866,12 +961,10 @@ const createCard = async () => {
 
     showToast(`成功创建 ${createdCards.value.length} 张卡片`, 'success')
     loadCards()
-  } catch (error) {
-    console.error('Failed to create card:', error)
-    showToast(error.message || '创建卡片失败', 'error')
-  } finally {
-    creating.value = false
+  } else {
+    showToast(result.message || '创建卡片失败', 'error')
   }
+  creating.value = false
 }
 
 // 下载卡片
@@ -882,7 +975,7 @@ const downloadCards = () => {
     .map((card) => {
       let label = ''
       if (card.type === 'quota' || card.type === 'combo') {
-        label += `${card.quotaAmount}CC`
+        label += `$${card.quotaAmount}`
       }
       if (card.type === 'combo') {
         label += '_'
@@ -936,14 +1029,9 @@ const deleteCard = async (card) => {
   )
   if (!confirmed) return
 
-  try {
-    await httpApi.del(`/admin/quota-cards/${card.id}`)
-    showToast('卡片已删除', 'success')
-    loadCards()
-  } catch (error) {
-    console.error('Failed to delete card:', error)
-    showToast(error.message || '删除卡片失败', 'error')
-  }
+  await httpApis.deleteQuotaCardApi(card.id)
+  showToast('卡片已删除', 'success')
+  loadCards()
 }
 
 const deleteSelectedCards = async () => {
@@ -956,29 +1044,25 @@ const deleteSelectedCards = async () => {
   )
   if (!confirmed) return
 
-  try {
-    await Promise.all(selectedCards.value.map((id) => httpApi.del(`/admin/quota-cards/${id}`)))
-    showToast(`已删除 ${selectedCards.value.length} 张卡片`, 'success')
-    selectedCards.value = []
-    loadCards()
-  } catch (error) {
-    console.error('Failed to delete cards:', error)
-    showToast(error.message || '批量删除失败', 'error')
-  }
+  await Promise.all(selectedCards.value.map((id) => httpApis.deleteQuotaCardApi(id)))
+  showToast(`已删除 ${selectedCards.value.length} 张卡片`, 'success')
+  selectedCards.value = []
+  loadCards()
 }
 
-const revokeRedemption = async (redemption) => {
-  const reason = prompt('撤销原因（可选）：')
-  if (reason === null) return
+const revokeRedemption = (redemption) => {
+  revokingRedemption.value = redemption
+  revokeReason.value = ''
+  showRevokeModal.value = true
+}
 
-  try {
-    await httpApi.post(`/admin/redemptions/${redemption.id}/revoke`, { reason })
-    showToast('核销已撤销', 'success')
-    loadCards()
-  } catch (error) {
-    console.error('Failed to revoke redemption:', error)
-    showToast(error.message || '撤销核销失败', 'error')
-  }
+const executeRevoke = async () => {
+  if (!revokingRedemption.value) return
+  await httpApis.revokeRedemptionApi(revokingRedemption.value.id, { reason: revokeReason.value })
+  showToast('核销已撤销', 'success')
+  showRevokeModal.value = false
+  revokingRedemption.value = null
+  loadCards()
 }
 
 onMounted(() => {

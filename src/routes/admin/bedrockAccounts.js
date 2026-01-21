@@ -122,6 +122,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
       description,
       region,
       awsCredentials,
+      bearerToken,
       defaultModel,
       priority,
       accountType,
@@ -145,9 +146,9 @@ router.post('/', authenticateAdmin, async (req, res) => {
     }
 
     // 验证credentialType的有效性
-    if (credentialType && !['default', 'access_key', 'bearer_token'].includes(credentialType)) {
+    if (credentialType && !['access_key', 'bearer_token'].includes(credentialType)) {
       return res.status(400).json({
-        error: 'Invalid credential type. Must be "default", "access_key", or "bearer_token"'
+        error: 'Invalid credential type. Must be "access_key" or "bearer_token"'
       })
     }
 
@@ -156,10 +157,11 @@ router.post('/', authenticateAdmin, async (req, res) => {
       description: description || '',
       region: region || 'us-east-1',
       awsCredentials,
+      bearerToken,
       defaultModel,
       priority: priority || 50,
       accountType: accountType || 'shared',
-      credentialType: credentialType || 'default'
+      credentialType: credentialType || 'access_key'
     })
 
     if (!result.success) {
@@ -206,10 +208,10 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
     // 验证credentialType的有效性
     if (
       mappedUpdates.credentialType &&
-      !['default', 'access_key', 'bearer_token'].includes(mappedUpdates.credentialType)
+      !['access_key', 'bearer_token'].includes(mappedUpdates.credentialType)
     ) {
       return res.status(400).json({
-        error: 'Invalid credential type. Must be "default", "access_key", or "bearer_token"'
+        error: 'Invalid credential type. Must be "access_key" or "bearer_token"'
       })
     }
 
@@ -349,22 +351,15 @@ router.put('/:accountId/toggle-schedulable', authenticateAdmin, async (req, res)
   }
 })
 
-// 测试Bedrock账户连接
+// 测试Bedrock账户连接（SSE 流式）
 router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params
 
-    const result = await bedrockAccountService.testAccount(accountId)
-
-    if (!result.success) {
-      return res.status(500).json({ error: 'Account test failed', message: result.error })
-    }
-
-    logger.success(`🧪 Admin tested Bedrock account: ${accountId} - ${result.data.status}`)
-    return res.json({ success: true, data: result.data })
+    await bedrockAccountService.testAccountConnection(accountId, res)
   } catch (error) {
     logger.error('❌ Failed to test Bedrock account:', error)
-    return res.status(500).json({ error: 'Failed to test Bedrock account', message: error.message })
+    // 错误已在服务层处理，这里仅做日志记录
   }
 })
 

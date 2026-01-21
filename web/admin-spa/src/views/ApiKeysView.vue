@@ -221,6 +221,18 @@
                 <span class="relative">导出数据</span>
               </button>
 
+              <!-- 管理标签按钮 -->
+              <button
+                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
+                @click="showTagManagementModal = true"
+              >
+                <div
+                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                ></div>
+                <i class="fas fa-tags relative text-purple-500" />
+                <span class="relative">管理标签</span>
+              </button>
+
               <!-- 批量编辑按钮 - 移到刷新按钮旁边 -->
               <button
                 v-if="selectedApiKeys.length > 0"
@@ -2118,6 +2130,12 @@
       @open-timeline="openTimeline"
     />
 
+    <TagManagementModal
+      :show="showTagManagementModal"
+      @close="showTagManagementModal = false"
+      @updated="loadApiKeys"
+    />
+
     <ConfirmModal
       :cancel-text="confirmModalConfig.cancelText"
       :confirm-text="confirmModalConfig.confirmText"
@@ -2134,9 +2152,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from '@/utils/tools'
-import { copyText } from '@/utils/tools'
-import * as httpApi from '@/utils/http_apis'
+import { showToast, copyText, formatNumber, formatDate } from '@/utils/tools'
+
+import * as httpApis from '@/utils/http_apis'
 import { useAuthStore } from '@/stores/auth'
 import * as XLSX from 'xlsx-js-style'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
@@ -2147,6 +2165,7 @@ import BatchApiKeyModal from '@/components/apikeys/BatchApiKeyModal.vue'
 import BatchEditApiKeyModal from '@/components/apikeys/BatchEditApiKeyModal.vue'
 import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
 import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
+import TagManagementModal from '@/components/apikeys/TagManagementModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
@@ -2315,6 +2334,7 @@ const showRenewApiKeyModal = ref(false)
 const showNewApiKeyModal = ref(false)
 const showBatchApiKeyModal = ref(false)
 const showBatchEditModal = ref(false)
+const showTagManagementModal = ref(false)
 const editingApiKey = ref(null)
 const renewingApiKey = ref(null)
 const newApiKeyData = ref(null)
@@ -2445,15 +2465,15 @@ const loadAccounts = async (forceRefresh = false) => {
       droidData,
       groupsData
     ] = await Promise.all([
-      httpApi.getClaudeAccounts(),
-      httpApi.getClaudeConsoleAccounts(),
-      httpApi.getGeminiAccounts(),
-      httpApi.getGeminiApiAccounts(),
-      httpApi.getOpenAIAccounts(),
-      httpApi.getOpenAIResponsesAccounts(),
-      httpApi.getBedrockAccounts(),
-      httpApi.getDroidAccounts(),
-      httpApi.getAccountGroups()
+      httpApis.getClaudeAccountsApi(),
+      httpApis.getClaudeConsoleAccountsApi(),
+      httpApis.getGeminiAccountsApi(),
+      httpApis.getGeminiApiAccountsApi(),
+      httpApis.getOpenAIAccountsApi(),
+      httpApis.getOpenAIResponsesAccountsApi(),
+      httpApis.getBedrockAccountsApi(),
+      httpApis.getDroidAccountsApi(),
+      httpApis.getAccountGroupsApi()
     ])
 
     // 合并Claude OAuth账户和Claude Console账户
@@ -2559,7 +2579,7 @@ const loadAccounts = async (forceRefresh = false) => {
 // 加载已使用的模型列表
 const loadUsedModels = async () => {
   try {
-    const data = await httpApi.get('/admin/api-keys/used-models')
+    const data = await httpApis.getApiKeyUsedModelsApi()
     if (data.success) {
       availableModels.value = data.data || []
     }
@@ -2648,7 +2668,7 @@ const loadApiKeys = async (clearStatsCache = true) => {
       params.set('timeRange', globalDateFilter.preset)
     }
 
-    const data = await httpApi.getApiKeysWithParams(params.toString())
+    const data = await httpApis.getApiKeysWithParamsApi(params.toString())
     if (data.success) {
       // 更新数据
       apiKeys.value = data.data?.items || []
@@ -2729,7 +2749,7 @@ const loadPageStats = async () => {
       requestBody.endDate = endDate
     }
 
-    const response = await httpApi.post('/admin/api-keys/batch-stats', requestBody)
+    const response = await httpApis.getApiKeysBatchStatsApi(requestBody)
 
     if (response.success && response.data) {
       // 更新缓存
@@ -2783,7 +2803,7 @@ const loadPageLastUsage = async () => {
   keyIds.forEach((id) => lastUsageLoading.value.add(id))
 
   try {
-    const response = await httpApi.post('/admin/api-keys/batch-last-usage', { keyIds })
+    const response = await httpApis.getApiKeysBatchLastUsageApi({ keyIds })
 
     if (response.success && response.data) {
       // 更新缓存
@@ -2814,7 +2834,7 @@ const loadDeletedApiKeys = async () => {
   activeTab.value = 'deleted'
   deletedApiKeysLoading.value = true
   try {
-    const data = await httpApi.get('/admin/api-keys/deleted')
+    const data = await httpApis.getDeletedApiKeysApi()
     if (data.success) {
       deletedApiKeys.value = data.apiKeys || []
     }
@@ -2893,7 +2913,7 @@ let costSortStatusTimer = null
 // 获取费用排序索引状态
 const fetchCostSortStatus = async () => {
   try {
-    const data = await httpApi.get('/admin/api-keys/cost-sort-status')
+    const data = await httpApis.getApiKeysCostSortStatusApi()
     if (data.success) {
       costSortStatus.value = data.data || {}
 
@@ -2924,10 +2944,6 @@ const scheduleNextCostSortStatusRefresh = () => {
 }
 
 // 格式化数字
-const formatNumber = (num) => {
-  if (!num && num !== 0) return '0'
-  return num.toLocaleString('zh-CN')
-}
 
 // 格式化Token数量
 const formatTokenCount = (count) => {
@@ -3227,22 +3243,18 @@ const loadApiKeyModelStats = async (keyId, forceReload = false) => {
   const filter = getApiKeyDateFilter(keyId)
 
   try {
-    let url = `/admin/api-keys/${keyId}/model-stats`
-    const params = new URLSearchParams()
+    const params = {}
 
     if (filter.customStart && filter.customEnd) {
-      params.append('startDate', filter.customStart)
-      params.append('endDate', filter.customEnd)
-      params.append('period', 'custom')
+      params.startDate = filter.customStart
+      params.endDate = filter.customEnd
+      params.period = 'custom'
     } else {
-      const period =
+      params.period =
         filter.preset === 'today' ? 'daily' : filter.preset === '7days' ? 'daily' : 'monthly'
-      params.append('period', period)
     }
 
-    url += '?' + params.toString()
-
-    const data = await httpApi.get(url)
+    const data = await httpApis.getApiKeyModelStatsApi(keyId, params)
     if (data.success) {
       apiKeyModelStats.value[keyId] = data.data || []
     }
@@ -3906,7 +3918,7 @@ const toggleApiKeyStatus = async (key) => {
   if (!confirmed) return
 
   try {
-    const data = await httpApi.updateApiKey(key.id, { isActive: !key.isActive })
+    const data = await httpApis.updateApiKeyApi(key.id, { isActive: !key.isActive })
 
     if (data.success) {
       showToast(`API Key 已${key.isActive ? '禁用' : '激活'}`, 'success')
@@ -3937,7 +3949,7 @@ const deleteApiKey = async (keyId) => {
   if (!confirmed) return
 
   try {
-    const data = await httpApi.deleteApiKey(keyId)
+    const data = await httpApis.deleteApiKeyApi(keyId)
     if (data.success) {
       showToast('API Key 已删除', 'success')
       // 从选中列表中移除
@@ -3968,7 +3980,7 @@ const restoreApiKey = async (keyId) => {
   if (!confirmed) return
 
   try {
-    const data = await httpApi.restoreApiKey(keyId)
+    const data = await httpApis.restoreApiKeyApi(keyId)
     if (data.success) {
       showToast('API Key 已成功恢复', 'success')
       // 刷新已删除列表
@@ -3996,7 +4008,7 @@ const permanentDeleteApiKey = async (keyId) => {
   if (!confirmed) return
 
   try {
-    const data = await httpApi.permanentDeleteApiKey(keyId)
+    const data = await httpApis.permanentDeleteApiKeyApi(keyId)
     if (data.success) {
       showToast('API Key 已彻底删除', 'success')
       // 刷新已删除列表
@@ -4028,7 +4040,7 @@ const clearAllDeletedApiKeys = async () => {
   if (!confirmed) return
 
   try {
-    const data = await httpApi.del('/admin/api-keys/deleted/clear-all')
+    const data = await httpApis.clearAllDeletedApiKeysApi()
     if (data.success) {
       showToast(data.message || '已清空所有已删除的 API Keys', 'success')
 
@@ -4070,9 +4082,7 @@ const batchDeleteApiKeys = async () => {
   const keyIds = [...selectedApiKeys.value]
 
   try {
-    const data = await httpApi.del('/admin/api-keys/batch', {
-      data: { keyIds }
-    })
+    const data = await httpApis.batchDeleteApiKeysApi({ keyIds })
 
     if (data.success) {
       const { successCount, failedCount, errors } = data.data
@@ -4152,7 +4162,7 @@ const closeExpiryEdit = () => {
 const handleSaveExpiry = async ({ keyId, expiresAt, activateNow }) => {
   try {
     // 使用新的PATCH端点来修改过期时间
-    const data = await httpApi.updateApiKeyExpiration(keyId, {
+    const data = await httpApis.updateApiKeyExpirationApi(keyId, {
       expiresAt: expiresAt || null,
       activateNow: activateNow || false
     })
@@ -4188,21 +4198,6 @@ const handleSaveExpiry = async ({ keyId, expiresAt, activateNow }) => {
       expiryEditModalRef.value.resetSaving()
     }
   }
-}
-
-// 格式化日期时间
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date
-    .toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-    .replace(/\//g, '-')
 }
 
 // 格式化时间窗口倒计时
@@ -4472,18 +4467,12 @@ const exportToExcel = () => {
         过期时间: key.expiresAt ? formatDate(key.expiresAt) : '',
 
         // 权限配置
-        服务权限:
-          key.permissions === 'all'
-            ? '全部服务'
-            : key.permissions === 'claude'
-              ? '仅Claude'
-              : key.permissions === 'gemini'
-                ? '仅Gemini'
-                : key.permissions === 'openai'
-                  ? '仅OpenAI'
-                  : key.permissions === 'droid'
-                    ? '仅Droid'
-                    : key.permissions || '',
+        服务权限: (() => {
+          const p = key.permissions
+          if (!p || p === 'all') return '全部服务'
+          if (Array.isArray(p)) return p.length === 0 ? '全部服务' : p.join(', ')
+          return p
+        })(),
 
         // 限制配置
         令牌限制: key.tokenLimit === '0' || key.tokenLimit === 0 ? '无限制' : key.tokenLimit || '',

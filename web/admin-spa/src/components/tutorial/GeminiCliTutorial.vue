@@ -168,7 +168,7 @@
 </template>
 
 <script setup>
-import { useTutorialUrls } from '@/composables/useTutorialUrls'
+import { useTutorialUrls } from '@/utils/useTutorialUrls'
 import NodeInstallTutorial from './NodeInstallTutorial.vue'
 
 defineProps({

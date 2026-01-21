@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import router from '@/router'
-import { login as apiLogin, getAuthUser, getOemSettings } from '@/utils/http_apis'
+
+import { loginApi, getAuthUserApi, getOemSettingsApi } from '@/utils/http_apis'
 
 export const useAuthStore = defineStore('auth', () => {
   // 状态
@@ -29,7 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
     loginError.value = ''
 
     try {
-      const result = await apiLogin(credentials)
+      const result = await loginApi(credentials)
 
       if (result.success) {
         authToken.value = result.token
@@ -66,7 +67,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function verifyToken() {
     try {
-      const userResult = await getAuthUser()
+      const userResult = await getAuthUserApi()
       if (!userResult.success || !userResult.user) {
         logout()
         return
@@ -80,7 +81,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function loadOemSettings() {
     oemLoading.value = true
     try {
-      const result = await getOemSettings()
+      const result = await getOemSettingsApi()
       if (result.success && result.data) {
         oemSettings.value = { ...oemSettings.value, ...result.data }
 

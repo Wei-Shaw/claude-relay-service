@@ -61,6 +61,7 @@
 </template>
 
 <script setup>
+import { formatNumber } from '@/utils/tools'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 
@@ -68,22 +69,6 @@ const apiStatsStore = useApiStatsStore()
 const { statsPeriod, currentPeriodData } = storeToRefs(apiStatsStore)
 
 // 格式化数字
-const formatNumber = (num) => {
-  if (typeof num !== 'number') {
-    num = parseInt(num) || 0
-  }
-
-  if (num === 0) return '0'
-
-  // 大数字使用简化格式
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  } else {
-    return num.toLocaleString()
-  }
-}
 </script>
 
 <style scoped>

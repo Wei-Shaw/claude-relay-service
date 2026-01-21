@@ -475,7 +475,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useTutorialUrls } from '@/composables/useTutorialUrls'
+import { useTutorialUrls } from '@/utils/useTutorialUrls'
 import NodeInstallTutorial from './NodeInstallTutorial.vue'
 
 const props = defineProps({

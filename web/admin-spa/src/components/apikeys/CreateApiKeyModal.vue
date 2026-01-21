@@ -461,6 +461,51 @@
             />
           </div>
 
+          <!-- 服务倍率设置 -->
+          <div
+            class="rounded-lg border border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 p-3 dark:border-purple-700 dark:from-purple-900/20 dark:to-indigo-900/20 sm:p-4"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <input
+                  id="enableServiceRates"
+                  v-model="enableServiceRates"
+                  class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-purple-600 focus:ring-purple-500"
+                  type="checkbox"
+                />
+                <label
+                  class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  for="enableServiceRates"
+                >
+                  自定义服务倍率
+                </label>
+              </div>
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                与全局倍率相乘，用于 VIP 折扣等（如全局1.5 × Key倍率0.8 = 1.2）
+              </span>
+            </div>
+            <div v-if="enableServiceRates" class="mt-3 space-y-2">
+              <div
+                v-for="service in availableServices"
+                :key="service.key"
+                class="flex items-center gap-2"
+              >
+                <span class="w-20 text-xs text-gray-600 dark:text-gray-400">{{
+                  service.label
+                }}</span>
+                <input
+                  v-model.number="form.serviceRates[service.key]"
+                  class="form-input w-24 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  min="0"
+                  placeholder="1.0"
+                  step="0.1"
+                  type="number"
+                />
+                <span class="text-xs text-gray-400">默认 1.0</span>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
               >过期设置</label
@@ -582,17 +627,8 @@
             <div class="flex flex-wrap gap-4">
               <label class="flex cursor-pointer items-center">
                 <input
-                  :checked="form.permissions === 'all'"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="checkbox"
-                  @change="toggleAllServices"
-                />
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">全部服务</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input
-                  v-model="selectedServices"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  v-model="form.permissions"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                   value="claude"
                   @change="updatePermissions"
@@ -601,8 +637,8 @@
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
-                  v-model="selectedServices"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  v-model="form.permissions"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                   value="gemini"
                   @change="updatePermissions"
@@ -611,8 +647,8 @@
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
-                  v-model="selectedServices"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  v-model="form.permissions"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                   value="openai"
                   @change="updatePermissions"
@@ -621,8 +657,8 @@
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
-                  v-model="selectedServices"
-                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  v-model="form.permissions"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                   value="droid"
                   @change="updatePermissions"
@@ -631,7 +667,7 @@
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              控制此 API Key 可以访问哪些服务，可多选
+              不选择任何服务表示允许访问全部服务
             </p>
           </div>
 
@@ -666,7 +702,7 @@
                   v-model="form.claudeAccountId"
                   :accounts="localAccounts.claude"
                   default-option-text="使用共享账号池"
-                  :disabled="!isServiceEnabled('claude')"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('claude')"
                   :groups="localAccounts.claudeGroups"
                   placeholder="请选择Claude账号"
                   platform="claude"
@@ -680,7 +716,7 @@
                   v-model="form.geminiAccountId"
                   :accounts="localAccounts.gemini"
                   default-option-text="使用共享账号池"
-                  :disabled="!isServiceEnabled('gemini')"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('gemini')"
                   :groups="localAccounts.geminiGroups"
                   placeholder="请选择Gemini账号"
                   platform="gemini"
@@ -694,7 +730,7 @@
                   v-model="form.openaiAccountId"
                   :accounts="localAccounts.openai"
                   default-option-text="使用共享账号池"
-                  :disabled="!isServiceEnabled('openai')"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('openai')"
                   :groups="localAccounts.openaiGroups"
                   placeholder="请选择OpenAI账号"
                   platform="openai"
@@ -708,7 +744,7 @@
                   v-model="form.bedrockAccountId"
                   :accounts="localAccounts.bedrock"
                   default-option-text="使用共享账号池"
-                  :disabled="!isServiceEnabled('claude')"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('claude')"
                   :groups="[]"
                   placeholder="请选择Bedrock账号"
                   platform="bedrock"
@@ -722,7 +758,7 @@
                   v-model="form.droidAccountId"
                   :accounts="localAccounts.droid"
                   default-option-text="使用共享账号池"
-                  :disabled="!isServiceEnabled('droid')"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('droid')"
                   :groups="localAccounts.droidGroups"
                   placeholder="请选择Droid账号"
                   platform="droid"
@@ -908,7 +944,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { showToast } from '@/utils/tools'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
-import * as httpApi from '@/utils/http_apis'
+import * as httpApis from '@/utils/http_apis'
 import AccountSelector from '@/components/common/AccountSelector.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
@@ -998,12 +1034,25 @@ const unselectedTags = computed(() => {
 // 支持的客户端列表
 const supportedClients = ref([])
 
+// 服务倍率相关
+const enableServiceRates = ref(false)
+const availableServices = [
+  { key: 'claude', label: 'Claude' },
+  { key: 'gemini', label: 'Gemini' },
+  { key: 'codex', label: 'Codex' },
+  { key: 'droid', label: 'Droid' },
+  { key: 'bedrock', label: 'Bedrock' },
+  { key: 'azure', label: 'Azure' },
+  { key: 'ccr', label: 'CCR' }
+]
+
 // 表单数据
 const form = reactive({
   createType: 'single',
   batchCount: 10,
   name: '',
   description: '',
+  serviceRates: {}, // API Key 级别服务倍率
   rateLimitWindow: '',
   rateLimitRequests: '',
   rateLimitCost: '', // 新增：费用限制
@@ -1017,7 +1066,7 @@ const form = reactive({
   expirationMode: 'fixed', // 过期模式：fixed(固定) 或 activation(激活)
   activationDays: 30, // 激活后有效天数
   activationUnit: 'days', // 激活时间单位：hours 或 days
-  permissions: 'all',
+  permissions: [], // 数组格式，空数组表示全部服务
   claudeAccountId: '',
   geminiAccountId: '',
   openaiAccountId: '',
@@ -1031,37 +1080,9 @@ const form = reactive({
   tags: []
 })
 
-// 多选服务
-const allServices = ['claude', 'gemini', 'openai', 'droid']
-const selectedServices = ref([...allServices])
-
-// 切换全部服务
-const toggleAllServices = (event) => {
-  if (event.target.checked) {
-    selectedServices.value = [...allServices]
-    form.permissions = 'all'
-  } else {
-    selectedServices.value = []
-    form.permissions = ''
-  }
-}
-
-// 更新权限
+// 更新权限（数组格式，空数组=全部服务）
 const updatePermissions = () => {
-  if (selectedServices.value.length === allServices.length) {
-    form.permissions = 'all'
-  } else if (selectedServices.value.length === 1) {
-    form.permissions = selectedServices.value[0]
-  } else if (selectedServices.value.length > 1) {
-    form.permissions = selectedServices.value.join(',')
-  } else {
-    form.permissions = ''
-  }
-}
-
-// 检查服务是否启用
-const isServiceEnabled = (service) => {
-  return form.permissions === 'all' || selectedServices.value.includes(service)
+  // form.permissions 已经是数组，由 v-model 自动管理
 }
 
 // 加载支持的客户端和已存在的标签
@@ -1130,15 +1151,15 @@ const refreshAccounts = async () => {
       droidData,
       groupsData
     ] = await Promise.all([
-      httpApi.get('/admin/claude-accounts'),
-      httpApi.get('/admin/claude-console-accounts'),
-      httpApi.get('/admin/gemini-accounts'),
-      httpApi.get('/admin/gemini-api-accounts'), // 获取 Gemini-API 账号
-      httpApi.get('/admin/openai-accounts'),
-      httpApi.get('/admin/openai-responses-accounts'), // 获取 OpenAI-Responses 账号
-      httpApi.get('/admin/bedrock-accounts'),
-      httpApi.get('/admin/droid-accounts'),
-      httpApi.get('/admin/account-groups')
+      httpApis.getClaudeAccountsApi(),
+      httpApis.getClaudeConsoleAccountsApi(),
+      httpApis.getGeminiAccountsApi(),
+      httpApis.getGeminiApiAccountsApi(), // 获取 Gemini-API 账号
+      httpApis.getOpenAIAccountsApi(),
+      httpApis.getOpenAIResponsesAccountsApi(), // 获取 OpenAI-Responses 账号
+      httpApis.getBedrockAccountsApi(),
+      httpApis.getDroidAccountsApi(),
+      httpApis.getAccountGroupsApi()
     ])
 
     // 合并Claude OAuth账户和Claude Console账户
@@ -1431,8 +1452,19 @@ const createApiKey = async () => {
 
   try {
     // 准备提交的数据
+    // 过滤掉空值的服务倍率
+    const filteredServiceRates = {}
+    if (enableServiceRates.value) {
+      for (const [key, value] of Object.entries(form.serviceRates)) {
+        if (value !== null && value !== undefined && value !== '') {
+          filteredServiceRates[key] = value
+        }
+      }
+    }
+
     const baseData = {
       description: form.description || undefined,
+      serviceRates: filteredServiceRates,
       tokenLimit: 0, // 设置为0，清除历史token限制
       rateLimitWindow:
         form.rateLimitWindow !== '' && form.rateLimitWindow !== null
@@ -1514,7 +1546,7 @@ const createApiKey = async () => {
         name: form.name
       }
 
-      const result = await httpApi.post('/admin/api-keys', data)
+      const result = await httpApis.createApiKeyApi(data)
 
       if (result.success) {
         showToast('API Key 创建成功', 'success')
@@ -1532,7 +1564,7 @@ const createApiKey = async () => {
         count: form.batchCount
       }
 
-      const result = await httpApi.post('/admin/api-keys/batch', data)
+      const result = await httpApis.batchCreateApiKeysApi(data)
 
       if (result.success) {
         showToast(`成功创建 ${result.data.length} 个 API Key`, 'success')
@@ -1549,7 +1581,3 @@ const createApiKey = async () => {
   }
 }
 </script>
-
-<style scoped>
-/* 表单样式由全局样式提供 */
-</style>

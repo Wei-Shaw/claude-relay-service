@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getOemSettings, updateOemSettings } from '@/utils/http_apis'
+
+import { getOemSettingsApi, updateOemSettingsApi } from '@/utils/http_apis'
 
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
@@ -19,40 +20,24 @@ export const useSettingsStore = defineStore('settings', () => {
   // Actions
   const loadOemSettings = async () => {
     loading.value = true
-    try {
-      const result = await getOemSettings()
-
-      if (result && result.success) {
-        oemSettings.value = { ...oemSettings.value, ...result.data }
-        applyOemSettings()
-      }
-
-      return result
-    } catch (error) {
-      console.error('Failed to load OEM settings:', error)
-      throw error
-    } finally {
-      loading.value = false
+    const res = await getOemSettingsApi()
+    if (res.success) {
+      oemSettings.value = { ...oemSettings.value, ...res.data }
+      applyOemSettings()
     }
+    loading.value = false
+    return res
   }
 
   const saveOemSettings = async (settings) => {
     saving.value = true
-    try {
-      const result = await updateOemSettings(settings)
-
-      if (result && result.success) {
-        oemSettings.value = { ...oemSettings.value, ...result.data }
-        applyOemSettings()
-      }
-
-      return result
-    } catch (error) {
-      console.error('Failed to save OEM settings:', error)
-      throw error
-    } finally {
-      saving.value = false
+    const res = await updateOemSettingsApi(settings)
+    if (res.success) {
+      oemSettings.value = { ...oemSettings.value, ...res.data }
+      applyOemSettings()
     }
+    saving.value = false
+    return res
   }
 
   const resetOemSettings = async () => {

@@ -40,7 +40,6 @@ const tabRouteMap = computed(() => {
     apiKeys: '/api-keys',
     accounts: '/accounts',
     quotaCards: '/quota-cards',
-    tutorial: '/tutorial',
     settings: '/settings'
   }
 
@@ -69,7 +68,6 @@ const initActiveTab = () => {
       ApiKeys: 'apiKeys',
       Accounts: 'accounts',
       QuotaCards: 'quotaCards',
-      Tutorial: 'tutorial',
       Settings: 'settings'
     }
     if (routeName && nameToTabMap[routeName]) {
@@ -136,7 +134,3 @@ const handleTabChange = async (tabKey) => {
 
 // OEM设置已在App.vue中加载，无需重复加载
 </script>
-
-<style scoped>
-/* 使用全局定义的过渡样式 */
-</style>

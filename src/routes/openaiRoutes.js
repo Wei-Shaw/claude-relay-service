@@ -14,6 +14,7 @@ const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { IncrementalSSEParser } = require('../utils/sseParser')
+const { getSafeMessage } = require('../utils/errorSanitizer')
 
 // 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
@@ -22,8 +23,7 @@ function createProxyAgent(proxy) {
 
 // 检查 API Key 是否具备 OpenAI 权限
 function checkOpenAIPermissions(apiKeyData) {
-  const permissions = apiKeyData?.permissions || 'all'
-  return permissions === 'all' || permissions === 'openai'
+  return apiKeyService.hasPermission(apiKeyData?.permissions, 'openai')
 }
 
 function normalizeHeaders(headers = {}) {
@@ -70,7 +70,7 @@ function extractCodexUsageHeaders(headers) {
   return hasData ? snapshot : null
 }
 
-async function applyRateLimitTracking(req, usageSummary, model, context = '') {
+async function applyRateLimitTracking(req, usageSummary, model, context = '', accountType = null) {
   if (!req.rateLimitInfo) {
     return
   }
@@ -81,7 +81,9 @@ async function applyRateLimitTracking(req, usageSummary, model, context = '') {
     const { totalTokens, totalCost } = await updateRateLimitCounters(
       req.rateLimitInfo,
       usageSummary,
-      model
+      model,
+      req.apiKey?.id,
+      accountType
     )
 
     if (totalTokens > 0) {
@@ -613,7 +615,8 @@ const handleResponses = async (req, res) => {
             0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             actualModel,
-            accountId
+            accountId,
+            'openai'
           )
 
           logger.info(
@@ -629,7 +632,8 @@ const handleResponses = async (req, res) => {
               cacheReadTokens
             },
             actualModel,
-            'openai-non-stream'
+            'openai-non-stream',
+            'openai'
           )
         }
 
@@ -727,7 +731,8 @@ const handleResponses = async (req, res) => {
             0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             modelToRecord,
-            accountId
+            accountId,
+            'openai'
           )
 
           logger.info(
@@ -744,7 +749,8 @@ const handleResponses = async (req, res) => {
               cacheReadTokens
             },
             modelToRecord,
-            'openai-stream'
+            'openai-stream',
+            'openai'
           )
         } catch (error) {
           logger.error('Failed to record OpenAI usage:', error)
@@ -834,13 +840,15 @@ const handleResponses = async (req, res) => {
 
     let responsePayload = error.response?.data
     if (!responsePayload) {
-      responsePayload = { error: { message: error.message || 'Internal server error' } }
+      responsePayload = { error: { message: getSafeMessage(error) } }
     } else if (typeof responsePayload === 'string') {
-      responsePayload = { error: { message: responsePayload } }
+      responsePayload = { error: { message: getSafeMessage(responsePayload) } }
     } else if (typeof responsePayload === 'object' && !responsePayload.error) {
       responsePayload = {
-        error: { message: responsePayload.message || error.message || 'Internal server error' }
+        error: { message: getSafeMessage(responsePayload.message || error) }
       }
+    } else if (responsePayload.error?.message) {
+      responsePayload.error.message = getSafeMessage(responsePayload.error.message)
     }
 
     if (!res.headersSent) {
@@ -893,7 +901,7 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
       id: keyData.id,
       name: keyData.name,
       description: keyData.description,
-      permissions: keyData.permissions || 'all',
+      permissions: keyData.permissions,
       token_limit: keyData.tokenLimit,
       tokens_used: tokensUsed,
       tokens_remaining:

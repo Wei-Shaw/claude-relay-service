@@ -192,7 +192,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import * as httpApi from '@/utils/http_apis'
+import { updateFrontUserRoleApi } from '@/utils/http_apis'
 import { showToast } from '@/utils/tools'
 
 const props = defineProps({
@@ -221,7 +221,7 @@ const handleSubmit = async () => {
   error.value = ''
 
   try {
-    const response = await httpApi.patch(`/users/${props.user.id}/role`, {
+    const response = await updateFrontUserRoleApi(props.user.id, {
       role: selectedRole.value
     })
 
@@ -248,7 +248,3 @@ watch([() => props.show, () => props.user], ([show, user]) => {
   }
 })
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

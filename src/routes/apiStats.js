@@ -8,6 +8,7 @@ const openaiAccountService = require('../services/openaiAccountService')
 const serviceRatesService = require('../services/serviceRatesService')
 const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
 const modelsConfig = require('../../config/models')
+const { getSafeMessage } = require('../utils/errorSanitizer')
 
 const router = express.Router()
 
@@ -183,7 +184,7 @@ router.post('/api/user-stats', async (req, res) => {
         restrictedModels,
         enableClientRestriction: keyData.enableClientRestriction === 'true',
         allowedClients,
-        permissions: keyData.permissions || 'all',
+        permissions: keyData.permissions,
         // 添加激活相关字段
         expirationMode: keyData.expirationMode || 'fixed',
         isActivated: keyData.isActivated === 'true',
@@ -502,7 +503,20 @@ router.post('/api/user-stats', async (req, res) => {
         restrictedModels: fullKeyData.restrictedModels || [],
         enableClientRestriction: fullKeyData.enableClientRestriction || false,
         allowedClients: fullKeyData.allowedClients || []
-      }
+      },
+
+      // Key 级别的服务倍率
+      serviceRates: (() => {
+        try {
+          return fullKeyData.serviceRates
+            ? typeof fullKeyData.serviceRates === 'string'
+              ? JSON.parse(fullKeyData.serviceRates)
+              : fullKeyData.serviceRates
+            : {}
+        } catch (e) {
+          return {}
+        }
+      })()
     }
 
     return res.json({
@@ -625,7 +639,18 @@ router.post('/api/batch-stats', async (req, res) => {
             ...usage.monthly,
             cost: costStats.monthly
           },
-          totalCost: costStats.total
+          totalCost: costStats.total,
+          serviceRates: (() => {
+            try {
+              return keyData.serviceRates
+                ? typeof keyData.serviceRates === 'string'
+                  ? JSON.parse(keyData.serviceRates)
+                  : keyData.serviceRates
+                : {}
+            } catch (e) {
+              return {}
+            }
+          })()
         }
       })
     )
@@ -883,13 +908,11 @@ router.post('/api-key/test', async (req, res) => {
     if (!res.headersSent) {
       return res.status(500).json({
         error: 'Test failed',
-        message: error.message || 'Internal server error'
+        message: getSafeMessage(error)
       })
     }
 
-    res.write(
-      `data: ${JSON.stringify({ type: 'error', error: error.message || 'Test failed' })}\n\n`
-    )
+    res.write(`data: ${JSON.stringify({ type: 'error', error: getSafeMessage(error) })}\n\n`)
     res.end()
   }
 })
@@ -926,8 +949,7 @@ router.post('/api-key/test-gemini', async (req, res) => {
     }
 
     // 检查 Gemini 权限
-    const permissions = validation.keyData.permissions || 'all'
-    if (permissions !== 'all' && !permissions.includes('gemini')) {
+    if (!apiKeyService.hasPermission(validation.keyData.permissions, 'gemini')) {
       return res.status(403).json({
         error: 'Permission denied',
         message: 'This API key does not have Gemini permission'
@@ -1022,13 +1044,13 @@ router.post('/api-key/test-gemini', async (req, res) => {
 
       response.data.on('error', (err) => {
         res.write(
-          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: err.message })}\n\n`
+          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(err) })}\n\n`
         )
         res.end()
       })
     } catch (axiosError) {
       res.write(
-        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: axiosError.message })}\n\n`
+        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(axiosError) })}\n\n`
       )
       res.end()
     }
@@ -1038,13 +1060,11 @@ router.post('/api-key/test-gemini', async (req, res) => {
     if (!res.headersSent) {
       return res.status(500).json({
         error: 'Test failed',
-        message: error.message || 'Internal server error'
+        message: getSafeMessage(error)
       })
     }
 
-    res.write(
-      `data: ${JSON.stringify({ type: 'error', error: error.message || 'Test failed' })}\n\n`
-    )
+    res.write(`data: ${JSON.stringify({ type: 'error', error: getSafeMessage(error) })}\n\n`)
     res.end()
   }
 })
@@ -1081,8 +1101,7 @@ router.post('/api-key/test-openai', async (req, res) => {
     }
 
     // 检查 OpenAI 权限
-    const permissions = validation.keyData.permissions || 'all'
-    if (permissions !== 'all' && !permissions.includes('openai')) {
+    if (!apiKeyService.hasPermission(validation.keyData.permissions, 'openai')) {
       return res.status(403).json({
         error: 'Permission denied',
         message: 'This API key does not have OpenAI permission'
@@ -1179,13 +1198,13 @@ router.post('/api-key/test-openai', async (req, res) => {
 
       response.data.on('error', (err) => {
         res.write(
-          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: err.message })}\n\n`
+          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(err) })}\n\n`
         )
         res.end()
       })
     } catch (axiosError) {
       res.write(
-        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: axiosError.message })}\n\n`
+        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(axiosError) })}\n\n`
       )
       res.end()
     }
@@ -1195,13 +1214,11 @@ router.post('/api-key/test-openai', async (req, res) => {
     if (!res.headersSent) {
       return res.status(500).json({
         error: 'Test failed',
-        message: error.message || 'Internal server error'
+        message: getSafeMessage(error)
       })
     }
 
-    res.write(
-      `data: ${JSON.stringify({ type: 'error', error: error.message || 'Test failed' })}\n\n`
-    )
+    res.write(`data: ${JSON.stringify({ type: 'error', error: getSafeMessage(error) })}\n\n`)
     res.end()
   }
 })
@@ -1388,6 +1405,155 @@ router.get('/service-rates', async (req, res) => {
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to retrieve service rates'
+    })
+  }
+})
+
+// 🎫 公开的额度卡兑换接口（通过 apiId 验证身份）
+router.post('/api/redeem-card', async (req, res) => {
+  const quotaCardService = require('../services/quotaCardService')
+
+  try {
+    const { apiId, code } = req.body
+    const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
+    const hour = new Date().toISOString().slice(0, 13)
+
+    // 防暴力破解：检查失败锁定
+    const failKey = `redeem_card:fail:${clientIP}`
+    const failCount = parseInt((await redis.client.get(failKey)) || '0')
+    if (failCount >= 5) {
+      logger.security(`🔒 Card redemption locked for IP: ${clientIP}`)
+      return res.status(403).json({
+        success: false,
+        error: '失败次数过多，请1小时后再试'
+      })
+    }
+
+    // 防暴力破解：检查 IP 速率限制
+    const ipKey = `redeem_card:ip:${clientIP}:${hour}`
+    const ipCount = await redis.client.incr(ipKey)
+    await redis.client.expire(ipKey, 3600)
+    if (ipCount > 10) {
+      logger.security(`🚨 Card redemption rate limit for IP: ${clientIP}`)
+      return res.status(429).json({
+        success: false,
+        error: '请求过于频繁，请稍后再试'
+      })
+    }
+
+    if (!apiId || !code) {
+      return res.status(400).json({
+        success: false,
+        error: '请输入卡号'
+      })
+    }
+
+    // 验证 apiId 格式
+    if (
+      typeof apiId !== 'string' ||
+      !apiId.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'API ID 格式无效'
+      })
+    }
+
+    // 验证 API Key 存在且有效
+    const keyData = await redis.getApiKey(apiId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'API Key 不存在'
+      })
+    }
+
+    if (keyData.isActive !== 'true') {
+      return res.status(403).json({
+        success: false,
+        error: 'API Key 已禁用'
+      })
+    }
+
+    // 调用兑换服务
+    const result = await quotaCardService.redeemCard(code, apiId, null, keyData.name || 'API Stats')
+
+    // 成功时清除失败计数（静默处理，不影响成功响应）
+    redis.client.del(failKey).catch(() => {})
+
+    logger.api(`🎫 Card redeemed via API Stats: ${code} -> ${apiId}`)
+
+    res.json({
+      success: true,
+      data: result
+    })
+  } catch (error) {
+    // 失败时增加失败计数（静默处理，不影响错误响应）
+    const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
+    const failKey = `redeem_card:fail:${clientIP}`
+    redis.client
+      .incr(failKey)
+      .then(() => redis.client.expire(failKey, 3600))
+      .catch(() => {})
+
+    logger.error('❌ Failed to redeem card:', error)
+    res.status(400).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 📋 公开的兑换记录查询接口（通过 apiId 验证身份）
+router.get('/api/redemption-history', async (req, res) => {
+  const quotaCardService = require('../services/quotaCardService')
+
+  try {
+    const { apiId, limit = 50, offset = 0 } = req.query
+
+    if (!apiId) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少 API ID'
+      })
+    }
+
+    // 验证 apiId 格式
+    if (
+      typeof apiId !== 'string' ||
+      !apiId.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'API ID 格式无效'
+      })
+    }
+
+    // 验证 API Key 存在
+    const keyData = await redis.getApiKey(apiId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'API Key 不存在'
+      })
+    }
+
+    // 获取该 API Key 的兑换记录
+    const result = await quotaCardService.getRedemptions({
+      apiKeyId: apiId,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    })
+
+    res.json({
+      success: true,
+      data: result
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get redemption history:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
     })
   }
 })

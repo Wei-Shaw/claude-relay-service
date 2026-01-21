@@ -206,13 +206,22 @@
           <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
             >当前密码</label
           >
-          <input
-            v-model="changePasswordForm.currentPassword"
-            class="form-input w-full"
-            placeholder="请输入当前密码"
-            required
-            type="password"
-          />
+          <div class="relative">
+            <input
+              v-model="changePasswordForm.currentPassword"
+              class="form-input w-full pr-10"
+              placeholder="请输入当前密码"
+              required
+              :type="showCurrentPassword ? 'text' : 'password'"
+            />
+            <button
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              type="button"
+              @click="showCurrentPassword = !showCurrentPassword"
+            >
+              <i :class="showCurrentPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" />
+            </button>
+          </div>
         </div>
 
         <div>
@@ -282,7 +291,8 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { showToast } from '@/utils/tools'
-import * as httpApi from '@/utils/http_apis'
+
+import { checkUpdatesApi, changePasswordApi } from '@/utils/http_apis'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -314,6 +324,7 @@ const userMenuOpen = ref(false)
 // 修改密码模态框
 const showChangePasswordModal = ref(false)
 const changePasswordLoading = ref(false)
+const showCurrentPassword = ref(false)
 const changePasswordForm = reactive({
   currentPassword: '',
   newPassword: '',
@@ -363,7 +374,7 @@ const checkForUpdates = async () => {
   versionInfo.value.checkingUpdate = true
 
   try {
-    const result = await httpApi.get('/admin/check-updates')
+    const result = await checkUpdatesApi()
 
     if (result.success) {
       const data = result.data
@@ -443,7 +454,7 @@ const changePassword = async () => {
   changePasswordLoading.value = true
 
   try {
-    const data = await httpApi.post('/web/auth/change-password', {
+    const data = await changePasswordApi({
       currentPassword: changePasswordForm.currentPassword,
       newPassword: changePasswordForm.newPassword,
       newUsername: changePasswordForm.newUsername || undefined
