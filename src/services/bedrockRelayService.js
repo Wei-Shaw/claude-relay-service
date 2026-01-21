@@ -48,13 +48,17 @@ class BedrockRelayService {
         secretAccessKey: bedrockAccount.awsCredentials.secretAccessKey,
         sessionToken: bedrockAccount.awsCredentials.sessionToken
       }
+    } else if (bedrockAccount?.bearerToken) {
+      // Bearer Token 模式：AWS SDK >= 3.400.0 会自动检测环境变量
+      clientConfig.token = { token: bedrockAccount.bearerToken }
+      logger.debug(`🔑 使用 Bearer Token 认证 - 账户: ${bedrockAccount.name || 'unknown'}`)
     } else {
       // 检查是否有环境变量凭证
       if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
         clientConfig.credentials = fromEnv()
       } else {
         throw new Error(
-          'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥，或设置环境变量AWS_ACCESS_KEY_ID和AWS_SECRET_ACCESS_KEY'
+          'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥或Bearer Token，或设置环境变量AWS_ACCESS_KEY_ID和AWS_SECRET_ACCESS_KEY'
         )
       }
     }
@@ -339,8 +343,8 @@ class BedrockRelayService {
             res.write(`event: ${claudeEvent.type}\n`)
             res.write(`data: ${JSON.stringify(claudeEvent.data)}\n\n`)
 
-            // 提取使用统计
-            if (claudeEvent.type === 'message_stop' && claudeEvent.data.usage) {
+            // 提取使用统计 (usage is reported in message_delta per Claude API spec)
+            if (claudeEvent.type === 'message_delta' && claudeEvent.data.usage) {
               totalUsage = claudeEvent.data.usage
             }
 
@@ -431,6 +435,18 @@ class BedrockRelayService {
   _mapToBedrockModel(modelName) {
     // 标准Claude模型名到Bedrock模型名的映射表
     const modelMapping = {
+      // Claude 4.5 Opus
+      'claude-opus-4-5': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+      'claude-opus-4-5-20251101': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+
+      // Claude 4.5 Sonnet
+      'claude-sonnet-4-5': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+      'claude-sonnet-4-5-20250929': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+
+      // Claude 4.5 Haiku
+      'claude-haiku-4-5': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+      'claude-haiku-4-5-20251001': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+
       // Claude Sonnet 4
       'claude-sonnet-4': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
       'claude-sonnet-4-20250514': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
@@ -560,14 +576,28 @@ class BedrockRelayService {
       return {
         type: 'message_start',
         data: {
-          type: 'message',
-          id: `msg_${Date.now()}_bedrock`,
-          role: 'assistant',
-          content: [],
-          model: this.defaultModel,
-          stop_reason: null,
-          stop_sequence: null,
-          usage: bedrockChunk.message?.usage || { input_tokens: 0, output_tokens: 0 }
+          type: 'message_start',
+          message: {
+            id: `msg_${Date.now()}_bedrock`,
+            type: 'message',
+            role: 'assistant',
+            content: [],
+            model: this.defaultModel,
+            stop_reason: null,
+            stop_sequence: null,
+            usage: bedrockChunk.message?.usage || { input_tokens: 0, output_tokens: 0 }
+          }
+        }
+      }
+    }
+
+    if (bedrockChunk.type === 'content_block_start') {
+      return {
+        type: 'content_block_start',
+        data: {
+          type: 'content_block_start',
+          index: bedrockChunk.index || 0,
+          content_block: bedrockChunk.content_block || { type: 'text', text: '' }
         }
       }
     }
@@ -576,8 +606,19 @@ class BedrockRelayService {
       return {
         type: 'content_block_delta',
         data: {
+          type: 'content_block_delta',
           index: bedrockChunk.index || 0,
           delta: bedrockChunk.delta || {}
+        }
+      }
+    }
+
+    if (bedrockChunk.type === 'content_block_stop') {
+      return {
+        type: 'content_block_stop',
+        data: {
+          type: 'content_block_stop',
+          index: bedrockChunk.index || 0
         }
       }
     }
@@ -586,6 +627,7 @@ class BedrockRelayService {
       return {
         type: 'message_delta',
         data: {
+          type: 'message_delta',
           delta: bedrockChunk.delta || {},
           usage: bedrockChunk.usage || {}
         }
@@ -596,7 +638,7 @@ class BedrockRelayService {
       return {
         type: 'message_stop',
         data: {
-          usage: bedrockChunk.usage || {}
+          type: 'message_stop'
         }
       }
     }

@@ -62,12 +62,17 @@ class ClaudeCodeValidator {
 
     for (const entry of systemEntries) {
       const rawText = typeof entry?.text === 'string' ? entry.text : ''
-      const { bestScore } = bestSimilarityByTemplates(rawText)
+      const { bestScore, templateId, maskedRaw } = bestSimilarityByTemplates(rawText)
       if (bestScore < threshold) {
         logger.error(
           `Claude system prompt similarity below threshold: score=${bestScore.toFixed(4)}, threshold=${threshold}`
         )
-        logger.warn(`Claude system prompt detail: ${rawText}`)
+        const preview = typeof maskedRaw === 'string' ? maskedRaw.slice(0, 200) : ''
+        logger.warn(
+          `Claude system prompt detail: templateId=${templateId || 'unknown'}, preview=${preview}${
+            maskedRaw && maskedRaw.length > 200 ? '…' : ''
+          }`
+        )
         return false
       }
     }

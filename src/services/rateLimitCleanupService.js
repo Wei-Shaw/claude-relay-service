@@ -72,7 +72,8 @@ class RateLimitCleanupService {
       const results = {
         openai: { checked: 0, cleared: 0, errors: [] },
         claude: { checked: 0, cleared: 0, errors: [] },
-        claudeConsole: { checked: 0, cleared: 0, errors: [] }
+        claudeConsole: { checked: 0, cleared: 0, errors: [] },
+        tokenRefresh: { checked: 0, refreshed: 0, errors: [] }
       }
 
       // 清理 OpenAI 账号
@@ -84,21 +85,29 @@ class RateLimitCleanupService {
       // 清理 Claude Console 账号
       await this.cleanupClaudeConsoleAccounts(results.claudeConsole)
 
+      // 主动刷新等待重置的 Claude 账户 Token（防止 5小时/7天 等待期间 Token 过期）
+      await this.proactiveRefreshClaudeTokens(results.tokenRefresh)
+
       const totalChecked =
         results.openai.checked + results.claude.checked + results.claudeConsole.checked
       const totalCleared =
         results.openai.cleared + results.claude.cleared + results.claudeConsole.cleared
       const duration = Date.now() - startTime
 
-      if (totalCleared > 0) {
+      if (totalCleared > 0 || results.tokenRefresh.refreshed > 0) {
         logger.info(
-          `✅ Rate limit cleanup completed: ${totalCleared} accounts cleared out of ${totalChecked} checked (${duration}ms)`
+          `✅ Rate limit cleanup completed: ${totalCleared}/${totalChecked} accounts cleared, ${results.tokenRefresh.refreshed} tokens refreshed (${duration}ms)`
         )
         logger.info(`   OpenAI: ${results.openai.cleared}/${results.openai.checked}`)
         logger.info(`   Claude: ${results.claude.cleared}/${results.claude.checked}`)
         logger.info(
           `   Claude Console: ${results.claudeConsole.cleared}/${results.claudeConsole.checked}`
         )
+        if (results.tokenRefresh.checked > 0 || results.tokenRefresh.refreshed > 0) {
+          logger.info(
+            `   Token Refresh: ${results.tokenRefresh.refreshed}/${results.tokenRefresh.checked} refreshed`
+          )
+        }
 
         // 发送 webhook 恢复通知
         if (this.clearedAccounts.length > 0) {
@@ -114,7 +123,8 @@ class RateLimitCleanupService {
       const allErrors = [
         ...results.openai.errors,
         ...results.claude.errors,
-        ...results.claudeConsole.errors
+        ...results.claudeConsole.errors,
+        ...results.tokenRefresh.errors
       ]
       if (allErrors.length > 0) {
         logger.warn(`⚠️ Encountered ${allErrors.length} errors during cleanup:`, allErrors)
@@ -344,6 +354,75 @@ class RateLimitCleanupService {
       }
     } catch (error) {
       logger.error('Failed to cleanup Claude Console accounts:', error)
+      result.errors.push({ error: error.message })
+    }
+  }
+
+  /**
+   * 主动刷新 Claude 账户 Token（防止等待重置期间 Token 过期）
+   * 仅对因限流/配额限制而等待重置的账户执行刷新：
+   * - 429 限流账户（rateLimitAutoStopped=true）
+   * - 5小时限制自动停止账户（fiveHourAutoStopped=true）
+   * 不处理错误状态账户（error/temp_error）
+   */
+  async proactiveRefreshClaudeTokens(result) {
+    try {
+      const redis = require('../models/redis')
+      const accounts = await redis.getAllClaudeAccounts()
+      const now = Date.now()
+      const refreshAheadMs = 30 * 60 * 1000 // 提前30分钟刷新
+      const recentRefreshMs = 5 * 60 * 1000 // 5分钟内刷新过则跳过
+
+      for (const account of accounts) {
+        // 1. 必须激活
+        if (account.isActive !== 'true') {
+          continue
+        }
+
+        // 2. 必须有 refreshToken
+        if (!account.refreshToken) {
+          continue
+        }
+
+        // 3. 【优化】仅处理因限流/配额限制而等待重置的账户
+        // 正常调度的账户会在请求时自动刷新，无需主动刷新
+        // 错误状态账户的 Token 可能已失效，刷新也会失败
+        const isWaitingForReset =
+          account.rateLimitAutoStopped === 'true' || // 429 限流
+          account.fiveHourAutoStopped === 'true' // 5小时限制自动停止
+        if (!isWaitingForReset) {
+          continue
+        }
+
+        // 4. 【优化】如果最近 5 分钟内已刷新，跳过（避免重复刷新）
+        const lastRefreshAt = account.lastRefreshAt ? new Date(account.lastRefreshAt).getTime() : 0
+        if (now - lastRefreshAt < recentRefreshMs) {
+          continue
+        }
+
+        // 5. 检查 Token 是否即将过期（30分钟内）
+        const expiresAt = parseInt(account.expiresAt)
+        if (expiresAt && now < expiresAt - refreshAheadMs) {
+          continue
+        }
+
+        // 符合条件，执行刷新
+        result.checked++
+        try {
+          await claudeAccountService.refreshAccountToken(account.id)
+          result.refreshed++
+          logger.info(`🔄 Proactively refreshed token: ${account.name} (${account.id})`)
+        } catch (error) {
+          result.errors.push({
+            accountId: account.id,
+            accountName: account.name,
+            error: error.message
+          })
+          logger.warn(`⚠️ Proactive refresh failed for ${account.name}: ${error.message}`)
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to proactively refresh Claude tokens:', error)
       result.errors.push({ error: error.message })
     }
   }

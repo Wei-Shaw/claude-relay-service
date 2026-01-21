@@ -155,7 +155,7 @@ router.post('/api/user-stats', async (req, res) => {
         restrictedModels,
         enableClientRestriction: keyData.enableClientRestriction === 'true',
         allowedClients,
-        permissions: keyData.permissions || 'all',
+        permissions: keyData.permissions,
         // 添加激活相关字段
         expirationMode: keyData.expirationMode || 'fixed',
         isActivated: keyData.isActivated === 'true',

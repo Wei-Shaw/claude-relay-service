@@ -20,8 +20,7 @@ function createProxyAgent(proxy) {
 
 // 检查 API Key 是否具备 OpenAI 权限
 function checkOpenAIPermissions(apiKeyData) {
-  const permissions = apiKeyData?.permissions || 'all'
-  return permissions === 'all' || permissions === 'openai'
+  return apiKeyService.hasPermission(apiKeyData?.permissions, 'openai')
 }
 
 function normalizeHeaders(headers = {}) {
@@ -275,7 +274,9 @@ const handleResponses = async (req, res) => {
         'text_formatting',
         'truncation',
         'text',
-        'service_tier'
+        'service_tier',
+        'prompt_cache_retention',
+        'safety_identifier'
       ]
       fieldsToRemove.forEach((field) => {
         delete req.body[field]
@@ -905,7 +906,7 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
       id: keyData.id,
       name: keyData.name,
       description: keyData.description,
-      permissions: keyData.permissions || 'all',
+      permissions: keyData.permissions,
       token_limit: keyData.tokenLimit,
       tokens_used: keyData.usage.total.tokens,
       tokens_remaining:

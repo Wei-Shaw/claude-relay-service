@@ -53,6 +53,16 @@ class Application {
       await redis.connect()
       logger.success('✅ Redis connected successfully')
 
+      // 💳 初始化账户余额查询服务（Provider 注册）
+      try {
+        const accountBalanceService = require('./services/accountBalanceService')
+        const { registerAllProviders } = require('./services/balanceProviders')
+        registerAllProviders(accountBalanceService)
+        logger.info('✅ 账户余额查询服务已初始化')
+      } catch (error) {
+        logger.warn('⚠️ 账户余额查询服务初始化失败:', error.message)
+      }
+
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')
       await pricingService.initialize()
@@ -170,7 +180,7 @@ class Application {
       // 🔧 基础中间件
       this.app.use(
         express.json({
-          limit: '10mb',
+          limit: '100mb',
           verify: (req, res, buf, encoding) => {
             // 验证JSON格式
             if (buf && buf.length && !buf.toString(encoding || 'utf8').trim()) {
@@ -179,7 +189,7 @@ class Application {
           }
         })
       )
-      this.app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+      this.app.use(express.urlencoded({ extended: true, limit: '100mb' }))
       this.app.use(securityMiddleware)
 
       // 🎯 信任代理
@@ -269,6 +279,25 @@ class Application {
       this.app.use('/api', apiRoutes)
       this.app.use('/api', unifiedRoutes) // 统一智能路由（支持 /v1/chat/completions 等）
       this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同
+      // Anthropic (Claude Code) 路由：按路径强制分流到 Gemini OAuth 账户
+      // - /antigravity/api/v1/messages -> Antigravity OAuth
+      // - /gemini-cli/api/v1/messages -> Gemini CLI OAuth
+      this.app.use(
+        '/antigravity/api',
+        (req, res, next) => {
+          req._anthropicVendor = 'antigravity'
+          next()
+        },
+        apiRoutes
+      )
+      this.app.use(
+        '/gemini-cli/api',
+        (req, res, next) => {
+          req._anthropicVendor = 'gemini-cli'
+          next()
+        },
+        apiRoutes
+      )
       this.app.use('/admin', adminExtensionsRoutes)
       this.app.use('/admin', adminRoutes)
       this.app.use('/users', userRoutes)
