@@ -792,7 +792,10 @@ router.post('/api/batch-model-stats', async (req, res) => {
                 outputTokens: 0,
                 cacheCreateTokens: 0,
                 cacheReadTokens: 0,
-                allTokens: 0
+                allTokens: 0,
+                realCostMicro: 0,
+                ratedCostMicro: 0,
+                hasStoredCost: false
               })
             }
 
@@ -803,12 +806,18 @@ router.post('/api/batch-model-stats', async (req, res) => {
             modelUsage.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0
             modelUsage.cacheReadTokens += parseInt(data.cacheReadTokens) || 0
             modelUsage.allTokens += parseInt(data.allTokens) || 0
+            modelUsage.realCostMicro += parseInt(data.realCostMicro) || 0
+            modelUsage.ratedCostMicro += parseInt(data.ratedCostMicro) || 0
+            // 检查 Redis 数据是否包含成本字段
+            if ('realCostMicro' in data || 'ratedCostMicro' in data) {
+              modelUsage.hasStoredCost = true
+            }
           }
         }
       })
     )
 
-    // 转换为数组并计算费用
+    // 转换为数组并处理费用
     const modelStats = []
     for (const [model, usage] of modelUsageMap) {
       const usageData = {
@@ -818,7 +827,17 @@ router.post('/api/batch-model-stats', async (req, res) => {
         cache_read_input_tokens: usage.cacheReadTokens
       }
 
+      // 优先使用存储的费用，否则回退到重新计算
+      const hasStoredCost = usage.hasStoredCost
       const costData = CostCalculator.calculateCost(usageData, model)
+
+      // 如果有存储的费用，覆盖计算的费用
+      if (hasStoredCost) {
+        costData.costs.real = (usage.realCostMicro || 0) / 1000000
+        costData.costs.rated = (usage.ratedCostMicro || 0) / 1000000
+        costData.costs.total = costData.costs.real // 保持兼容
+        costData.formatted.total = `$${costData.costs.real.toFixed(6)}`
+      }
 
       modelStats.push({
         model,
@@ -830,7 +849,8 @@ router.post('/api/batch-model-stats', async (req, res) => {
         allTokens: usage.allTokens,
         costs: costData.costs,
         formatted: costData.formatted,
-        pricing: costData.pricing
+        pricing: costData.pricing,
+        isLegacy: !hasStoredCost
       })
     }
 
@@ -1343,7 +1363,20 @@ router.post('/api/user-model-stats', async (req, res) => {
           cache_read_input_tokens: parseInt(data.cacheReadTokens) || 0
         }
 
+        // 优先使用存储的费用，否则回退到重新计算
+        // 检查字段是否存在（而非 > 0），以支持真正的零成本场景
+        const realCostMicro = parseInt(data.realCostMicro) || 0
+        const ratedCostMicro = parseInt(data.ratedCostMicro) || 0
+        const hasStoredCost = 'realCostMicro' in data || 'ratedCostMicro' in data
         const costData = CostCalculator.calculateCost(usage, model)
+
+        // 如果有存储的费用，覆盖计算的费用
+        if (hasStoredCost) {
+          costData.costs.real = realCostMicro / 1000000
+          costData.costs.rated = ratedCostMicro / 1000000
+          costData.costs.total = costData.costs.real
+          costData.formatted.total = `$${costData.costs.real.toFixed(6)}`
+        }
 
         // alltime 键不存储 allTokens，需要计算
         const allTokens =
@@ -1364,7 +1397,8 @@ router.post('/api/user-model-stats', async (req, res) => {
           allTokens,
           costs: costData.costs,
           formatted: costData.formatted,
-          pricing: costData.pricing
+          pricing: costData.pricing,
+          isLegacy: !hasStoredCost
         })
       }
     }

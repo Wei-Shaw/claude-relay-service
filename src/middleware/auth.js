@@ -1195,12 +1195,16 @@ const authenticateApiKey = async (req, res, next) => {
           }), cost: $${dailyCost.toFixed(2)}/$${dailyCostLimit}`
         )
 
-        return res.status(429).json({
-          error: 'Daily cost limit exceeded',
-          message: `已达到每日费用限制 ($${dailyCostLimit})`,
+        // 使用 402 Payment Required 而非 429，避免客户端自动重试
+        return res.status(402).json({
+          error: {
+            type: 'insufficient_quota',
+            message: `已达到每日费用限制 ($${dailyCostLimit})`,
+            code: 'daily_cost_limit_exceeded'
+          },
           currentCost: dailyCost,
           costLimit: dailyCostLimit,
-          resetAt: new Date(new Date().setHours(24, 0, 0, 0)).toISOString() // 明天0点重置
+          resetAt: new Date(new Date().setHours(24, 0, 0, 0)).toISOString()
         })
       }
 
@@ -1224,9 +1228,13 @@ const authenticateApiKey = async (req, res, next) => {
           }), cost: $${totalCost.toFixed(2)}/$${totalCostLimit}`
         )
 
-        return res.status(429).json({
-          error: 'Total cost limit exceeded',
-          message: `已达到总费用限制 ($${totalCostLimit})`,
+        // 使用 402 Payment Required 而非 429，避免客户端自动重试
+        return res.status(402).json({
+          error: {
+            type: 'insufficient_quota',
+            message: `已达到总费用限制 ($${totalCostLimit})`,
+            code: 'total_cost_limit_exceeded'
+          },
           currentCost: totalCost,
           costLimit: totalCostLimit
         })
@@ -1265,12 +1273,16 @@ const authenticateApiKey = async (req, res, next) => {
           resetDate.setDate(now.getDate() + daysUntilMonday)
           resetDate.setHours(0, 0, 0, 0)
 
-          return res.status(429).json({
-            error: 'Weekly Opus cost limit exceeded',
-            message: `已达到 Opus 模型周费用限制 ($${weeklyOpusCostLimit})`,
+          // 使用 402 Payment Required 而非 429，避免客户端自动重试
+          return res.status(402).json({
+            error: {
+              type: 'insufficient_quota',
+              message: `已达到 Opus 模型周费用限制 ($${weeklyOpusCostLimit})`,
+              code: 'weekly_opus_cost_limit_exceeded'
+            },
             currentCost: weeklyOpusCost,
             costLimit: weeklyOpusCostLimit,
-            resetAt: resetDate.toISOString() // 下周一重置
+            resetAt: resetDate.toISOString()
           })
         }
 

@@ -214,12 +214,12 @@ class ClaudeCodeHeadersService {
   }
 
   /**
-   * 获取所有账号的 headers 信息
+   * 获取所有账号的 headers 信息（使用 scanKeys 替代 keys）
    */
   async getAllAccountHeaders() {
     try {
       const pattern = 'claude_code_headers:*'
-      const keys = await redis.getClient().keys(pattern)
+      const keys = await redis.scanKeys(pattern)
 
       const results = {}
       for (const key of keys) {

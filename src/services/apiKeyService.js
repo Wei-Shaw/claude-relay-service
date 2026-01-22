@@ -602,9 +602,7 @@ class ApiKeyService {
     const globalTags = await redis.getGlobalTags()
     // 过滤空值和空格
     return [
-      ...new Set(
-        [...indexTags, ...globalTags].map((t) => (t ? t.trim() : '')).filter((t) => t)
-      )
+      ...new Set([...indexTags, ...globalTags].map((t) => (t ? t.trim() : '')).filter((t) => t))
     ].sort()
   }
 
@@ -724,7 +722,9 @@ class ApiKeyService {
       const strTags = tags.filter((t) => typeof t === 'string')
       if (strTags.some((t) => t.trim() === normalizedOld)) {
         foundInKeys = true
-        const newTags = [...new Set(strTags.map((t) => (t.trim() === normalizedOld ? normalizedNew : t)))]
+        const newTags = [
+          ...new Set(strTags.map((t) => (t.trim() === normalizedOld ? normalizedNew : t)))
+        ]
         await this.updateApiKey(key.id, { tags: newTags })
         affectedCount++
       }
@@ -732,7 +732,9 @@ class ApiKeyService {
 
     // 检查全局集合是否有该标签
     const globalTags = await redis.getGlobalTags()
-    const foundInGlobal = globalTags.some((t) => typeof t === 'string' && t.trim() === normalizedOld)
+    const foundInGlobal = globalTags.some(
+      (t) => typeof t === 'string' && t.trim() === normalizedOld
+    )
 
     if (!foundInKeys && !foundInGlobal) {
       return { affectedCount: 0, error: '标签不存在' }
@@ -1537,7 +1539,16 @@ class ApiKeyService {
         isLongContextRequest = totalInputTokens > 200000
       }
 
-      // 记录API Key级别的使用统计
+      // 计算费用（应用服务倍率）
+      const realCost = costInfo.costs.total
+      let ratedCost = realCost
+      if (realCost > 0) {
+        const serviceRatesService = require('./serviceRatesService')
+        const service = serviceRatesService.getService(accountType, model)
+        ratedCost = await this.calculateRatedCost(keyId, service, realCost)
+      }
+
+      // 记录API Key级别的使用统计（包含费用）
       await redis.incrementTokenUsage(
         keyId,
         totalTokens,
@@ -1548,20 +1559,16 @@ class ApiKeyService {
         model,
         0, // ephemeral5mTokens - 暂时为0，后续处理
         0, // ephemeral1hTokens - 暂时为0，后续处理
-        isLongContextRequest
+        isLongContextRequest,
+        realCost,
+        ratedCost
       )
 
-      // 记录费用统计（应用服务倍率）
-      const realCost = costInfo.costs.total
-      let ratedCost = realCost
+      // 记录费用统计到每日/每月汇总
       if (realCost > 0) {
-        const serviceRatesService = require('./serviceRatesService')
-        const service = serviceRatesService.getService(accountType, model)
-        ratedCost = await this.calculateRatedCost(keyId, service, realCost)
-
         await redis.incrementDailyCost(keyId, ratedCost, realCost)
         logger.database(
-          `💰 Recorded cost for ${keyId}: rated=$${ratedCost.toFixed(6)}, real=$${realCost.toFixed(6)}, model: ${model}, service: ${service}`
+          `💰 Recorded cost for ${keyId}: rated=$${ratedCost.toFixed(6)}, real=$${realCost.toFixed(6)}, model: ${model}`
         )
 
         // 记录 Opus 周费用（如果适用）
@@ -1744,7 +1751,16 @@ class ApiKeyService {
         ephemeral1hTokens = usageObject.cache_creation.ephemeral_1h_input_tokens || 0
       }
 
-      // 记录API Key级别的使用统计 - 这个必须执行
+      // 计算费用（应用服务倍率）- 需要在 incrementTokenUsage 之前计算
+      const realCostWithDetails = costInfo.totalCost || 0
+      let ratedCostWithDetails = realCostWithDetails
+      if (realCostWithDetails > 0) {
+        const serviceRatesService = require('./serviceRatesService')
+        const service = serviceRatesService.getService(accountType, model)
+        ratedCostWithDetails = await this.calculateRatedCost(keyId, service, realCostWithDetails)
+      }
+
+      // 记录API Key级别的使用统计（包含费用）
       await redis.incrementTokenUsage(
         keyId,
         totalTokens,
@@ -1753,27 +1769,29 @@ class ApiKeyService {
         cacheCreateTokens,
         cacheReadTokens,
         model,
-        ephemeral5mTokens, // 传递5分钟缓存 tokens
-        ephemeral1hTokens, // 传递1小时缓存 tokens
-        costInfo.isLongContextRequest || false // 传递 1M 上下文请求标记
+        ephemeral5mTokens,
+        ephemeral1hTokens,
+        costInfo.isLongContextRequest || false,
+        realCostWithDetails,
+        ratedCostWithDetails
       )
 
-      // 记录费用统计（应用服务倍率）
-      const realCostWithDetails = costInfo.totalCost || 0
-      let ratedCostWithDetails = realCostWithDetails
+      // 记录费用到每日/每月汇总
       if (realCostWithDetails > 0) {
-        const serviceRatesService = require('./serviceRatesService')
-        const service = serviceRatesService.getService(accountType, model)
-        ratedCostWithDetails = await this.calculateRatedCost(keyId, service, realCostWithDetails)
-
         // 记录倍率成本和真实成本
         await redis.incrementDailyCost(keyId, ratedCostWithDetails, realCostWithDetails)
         logger.database(
-          `💰 Recorded cost for ${keyId}: rated=$${ratedCostWithDetails.toFixed(6)}, real=$${realCostWithDetails.toFixed(6)}, model: ${model}, service: ${service}`
+          `💰 Recorded cost for ${keyId}: rated=$${ratedCostWithDetails.toFixed(6)}, real=$${realCostWithDetails.toFixed(6)}, model: ${model}`
         )
 
         // 记录 Opus 周费用（如果适用，也应用倍率）
-        await this.recordOpusCost(keyId, ratedCostWithDetails, realCostWithDetails, model, accountType)
+        await this.recordOpusCost(
+          keyId,
+          ratedCostWithDetails,
+          realCostWithDetails,
+          model,
+          accountType
+        )
 
         // 记录详细的缓存费用（如果有）
         if (costInfo.ephemeral5mCost > 0 || costInfo.ephemeral1hCost > 0) {
@@ -2529,7 +2547,12 @@ class ApiKeyService {
 
       logger.success(`💸 Deducted $${actualDeducted} from key ${keyId}, new limit: $${newLimit}`)
 
-      return { success: true, previousLimit: currentLimit, newTotalCostLimit: newLimit, actualDeducted }
+      return {
+        success: true,
+        previousLimit: currentLimit,
+        newTotalCostLimit: newLimit,
+        actualDeducted
+      }
     } catch (error) {
       logger.error('❌ Failed to deduct total cost limit:', error)
       throw error

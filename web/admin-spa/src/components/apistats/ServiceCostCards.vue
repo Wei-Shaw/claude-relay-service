@@ -158,12 +158,13 @@ const serviceStats = computed(() => {
       outputTokens: 0,
       cacheCreateTokens: 0,
       cacheReadTokens: 0,
-      cost: 0,
+      realCost: 0,
+      ratedCost: 0,
       pricing: null
     }
   })
 
-  // 聚合模型数据
+  // 聚合模型数据 - 按模型逐个计算计费费用
   modelStats.value.forEach((model) => {
     const service = getServiceFromModel(model.model)
     if (stats[service]) {
@@ -171,24 +172,35 @@ const serviceStats = computed(() => {
       stats[service].outputTokens += model.outputTokens || 0
       stats[service].cacheCreateTokens += model.cacheCreateTokens || 0
       stats[service].cacheReadTokens += model.cacheReadTokens || 0
-      stats[service].cost += model.costs?.total || 0
+      // 累加官方费用
+      const modelRealCost = model.costs?.real ?? model.costs?.total ?? 0
+      stats[service].realCost += modelRealCost
+      // 按模型判断：有存储费用用存储的，否则用当前倍率计算
+      const globalRate = serviceRates.value.rates[service] || 1.0
+      const keyRate = multiKeyMode.value ? 1.0 : (keyServiceRates.value?.[service] ?? 1.0)
+      const modelRatedCost =
+        !model.isLegacy && model.costs?.rated !== undefined
+          ? model.costs.rated
+          : modelRealCost * globalRate * keyRate
+      stats[service].ratedCost += modelRatedCost
       if (!stats[service].pricing && model.pricing) {
         stats[service].pricing = model.pricing
       }
     }
   })
 
-  // 转换为数组并计算计费费用
+  // 转换为数组
   return Object.entries(stats)
     .filter(
       ([, data]) =>
-        data.inputTokens > 0 || data.outputTokens > 0 || data.cacheCreateTokens > 0 || data.cost > 0
+        data.inputTokens > 0 ||
+        data.outputTokens > 0 ||
+        data.cacheCreateTokens > 0 ||
+        data.realCost > 0
     )
     .map(([service, data]) => {
       const globalRate = serviceRates.value.rates[service] || 1.0
-      // 批量模式下不使用 Key 倍率
       const keyRate = multiKeyMode.value ? 1.0 : (keyServiceRates.value?.[service] ?? 1.0)
-      const ccCostValue = data.cost * globalRate * keyRate
       const p = data.pricing
       return {
         name: service,
@@ -199,14 +211,14 @@ const serviceStats = computed(() => {
         outputTokens: data.outputTokens,
         cacheCreateTokens: data.cacheCreateTokens,
         cacheReadTokens: data.cacheReadTokens,
-        officialCost: formatCost(data.cost),
-        ccCost: formatCost(ccCostValue),
+        officialCost: formatCost(data.realCost),
+        ccCost: formatCost(data.ratedCost),
         pricing: p
           ? {
-              input: formatCost(p.input * 1e6),
-              output: formatCost(p.output * 1e6),
-              cacheCreate: p.cacheCreate ? formatCost(p.cacheCreate * 1e6) : null,
-              cacheRead: p.cacheRead ? formatCost(p.cacheRead * 1e6) : null
+              input: formatCost(p.input),
+              output: formatCost(p.output),
+              cacheCreate: p.cacheCreate ? formatCost(p.cacheCreate) : null,
+              cacheRead: p.cacheRead ? formatCost(p.cacheRead) : null
             }
           : null
       }

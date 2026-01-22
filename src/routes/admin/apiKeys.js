@@ -45,6 +45,27 @@ function validatePermissions(permissions) {
   return `Permissions must be an array. Valid values are: ${VALID_PERMISSIONS.join(', ')}`
 }
 
+/**
+ * 验证 serviceRates 格式
+ * @param {any} serviceRates - 服务倍率对象
+ * @returns {string|null} - 返回错误消息，null 表示验证通过
+ */
+function validateServiceRates(serviceRates) {
+  if (serviceRates === undefined || serviceRates === null) {
+    return null
+  }
+  if (typeof serviceRates !== 'object' || Array.isArray(serviceRates)) {
+    return 'Service rates must be an object'
+  }
+  for (const [service, rate] of Object.entries(serviceRates)) {
+    const numRate = Number(rate)
+    if (!Number.isFinite(numRate) || numRate < 0) {
+      return `Invalid rate for service "${service}": must be a non-negative number`
+    }
+  }
+  return null
+}
+
 // 👥 用户管理 (用于API Key分配)
 
 // 获取所有用户列表（用于API Key分配）
@@ -814,7 +835,9 @@ router.put('/api-keys/tags/:tagName', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: result.error })
     }
 
-    logger.info(`🏷️ Renamed tag "${decodedTagName}" to "${trimmedNewName}" in ${result.affectedCount} API keys`)
+    logger.info(
+      `🏷️ Renamed tag "${decodedTagName}" to "${trimmedNewName}" in ${result.affectedCount} API keys`
+    )
     return res.json({
       success: true,
       message: `Tag renamed in ${result.affectedCount} API keys`,
@@ -1426,7 +1449,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       activationDays, // 新增：激活后有效天数
       activationUnit, // 新增：激活时间单位 (hours/days)
       expirationMode, // 新增：过期模式
-      icon // 新增：图标
+      icon, // 新增：图标
+      serviceRates // API Key 级别服务倍率
     } = req.body
 
     // 输入验证
@@ -1553,6 +1577,12 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: permissionsError })
     }
 
+    // 验证服务倍率
+    const serviceRatesError = validateServiceRates(serviceRates)
+    if (serviceRatesError) {
+      return res.status(400).json({ error: serviceRatesError })
+    }
+
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
@@ -1580,7 +1610,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       activationDays,
       activationUnit,
       expirationMode,
-      icon
+      icon,
+      serviceRates
     })
 
     logger.success(`🔑 Admin created new API key: ${name}`)
@@ -1622,7 +1653,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       activationDays,
       activationUnit,
       expirationMode,
-      icon
+      icon,
+      serviceRates
     } = req.body
 
     // 输入验证
@@ -1644,6 +1676,12 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
     const batchPermissionsError = validatePermissions(permissions)
     if (batchPermissionsError) {
       return res.status(400).json({ error: batchPermissionsError })
+    }
+
+    // 验证服务倍率
+    const batchServiceRatesError = validateServiceRates(serviceRates)
+    if (batchServiceRatesError) {
+      return res.status(400).json({ error: batchServiceRatesError })
     }
 
     // 生成批量API Keys
@@ -1680,7 +1718,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           activationDays,
           activationUnit,
           expirationMode,
-          icon
+          icon,
+          serviceRates
         })
 
         // 保留原始 API Key 供返回
@@ -1754,6 +1793,14 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
       }
     }
 
+    // 验证服务倍率
+    if (updates.serviceRates !== undefined) {
+      const updateServiceRatesError = validateServiceRates(updates.serviceRates)
+      if (updateServiceRatesError) {
+        return res.status(400).json({ error: updateServiceRatesError })
+      }
+    }
+
     logger.info(
       `🔄 Admin batch editing ${keyIds.length} API keys with updates: ${JSON.stringify(updates)}`
     )
@@ -1821,6 +1868,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
         if (updates.enabled !== undefined) {
           finalUpdates.enabled = updates.enabled
+        }
+        if (updates.serviceRates !== undefined) {
+          finalUpdates.serviceRates = updates.serviceRates
         }
 
         // 处理账户绑定
@@ -1939,7 +1989,8 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       totalCostLimit,
       weeklyOpusCostLimit,
       tags,
-      ownerId // 新增：所有者ID字段
+      ownerId, // 新增：所有者ID字段
+      serviceRates // API Key 级别服务倍率
     } = req.body
 
     // 只允许更新指定字段
@@ -2123,6 +2174,15 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'All tags must be non-empty strings' })
       }
       updates.tags = tags
+    }
+
+    // 处理服务倍率
+    if (serviceRates !== undefined) {
+      const singleServiceRatesError = validateServiceRates(serviceRates)
+      if (singleServiceRatesError) {
+        return res.status(400).json({ error: singleServiceRatesError })
+      }
+      updates.serviceRates = serviceRates
     }
 
     // 处理活跃/禁用状态状态, 放在过期处理后，以确保后续增加禁用key功能
