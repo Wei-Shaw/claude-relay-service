@@ -47,6 +47,22 @@
             </p>
           </div>
 
+          <div>
+            <label
+              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
+              >备注 (可选)</label
+            >
+            <textarea
+              v-model="form.description"
+              class="form-input w-full resize-none border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+              placeholder="描述此 API Key 的用途..."
+              rows="2"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
+              详细描述此 API Key 的使用场景和注意事项
+            </p>
+          </div>
+
           <!-- 所有者选择 -->
           <div>
             <label
@@ -784,6 +800,7 @@ const unselectedTags = computed(() => {
 // 表单数据
 const form = reactive({
   name: '',
+  description: '', // 新增：备注字段
   tokenLimit: '', // 保留用于检测历史数据
   rateLimitWindow: '',
   rateLimitRequests: '',
@@ -884,6 +901,7 @@ const updateApiKey = async () => {
     // 准备提交的数据
     const data = {
       name: form.name, // 添加名称字段
+      description: form.description || undefined, // 添加备注字段
       tokenLimit: 0, // 清除历史token限制
       rateLimitWindow:
         form.rateLimitWindow !== '' && form.rateLimitWindow !== null
@@ -1216,6 +1234,7 @@ onMounted(async () => {
   // 使用缓存的账号数据，不自动刷新（用户可点击"刷新账号"按钮手动刷新）
 
   form.name = props.apiKey.name
+  form.description = props.apiKey.description || ''
 
   // 处理速率限制迁移：如果有tokenLimit且没有rateLimitCost，提示用户
   form.tokenLimit = props.apiKey.tokenLimit || ''
