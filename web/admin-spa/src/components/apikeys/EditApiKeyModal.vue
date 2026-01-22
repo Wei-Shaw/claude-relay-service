@@ -369,7 +369,7 @@
 
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >Opus 模型周费用限制 (美元)</label
+              >Claude 模型周费用限制 (美元)</label
             >
             <div class="space-y-3">
               <div class="flex gap-2">
@@ -411,7 +411,8 @@
                 type="number"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户，0 或留空表示无限制
+                设置 Claude 模型的周费用限制（周一到周日），仅对 Claude 模型请求生效，0
+                或留空表示无限制
               </p>
             </div>
           </div>
@@ -1368,6 +1369,12 @@ onMounted(async () => {
       } catch {
         perms = VALID_PERMS.includes(perms) ? [perms] : []
       }
+    } else if (perms.includes(',')) {
+      // 兼容逗号分隔格式（如 "claude,openai"）
+      perms = perms
+        .split(',')
+        .map((p) => p.trim())
+        .filter((p) => VALID_PERMS.includes(p))
     } else if (VALID_PERMS.includes(perms)) {
       perms = [perms]
     } else {

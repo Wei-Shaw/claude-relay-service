@@ -4,6 +4,7 @@ const config = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const serviceRatesService = require('./serviceRatesService')
+const { isClaudeFamilyModel } = require('../utils/modelHelper')
 
 const ACCOUNT_TYPE_CONFIG = {
   claude: { prefix: 'claude:account:' },
@@ -65,6 +66,13 @@ function normalizePermissions(permissions) {
     // 旧格式 'all' 转为空数组
     if (permissions === 'all') {
       return []
+    }
+    // 兼容逗号分隔格式（修复历史错误数据，如 "claude,openai"）
+    if (permissions.includes(',')) {
+      return permissions
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean)
     }
     // 旧单个字符串转为数组
     return [permissions]
@@ -1222,8 +1230,8 @@ class ApiKeyService {
             // 特殊处理数组/对象字段
             updatedData[field] = JSON.stringify(value || (field === 'serviceRates' ? {} : []))
           } else if (field === 'permissions') {
-            // permissions 可能是数组或字符串
-            updatedData[field] = Array.isArray(value) ? JSON.stringify(value) : value || 'all'
+            // 权限字段：规范化后JSON序列化，与createApiKey保持一致
+            updatedData[field] = JSON.stringify(normalizePermissions(value))
           } else if (
             field === 'enableModelRestriction' ||
             field === 'enableClientRestriction' ||
@@ -1640,9 +1648,9 @@ class ApiKeyService {
   // realCost: 真实成本（用于对账），如果不传则等于 ratedCost
   async recordOpusCost(keyId, ratedCost, realCost, model, accountType) {
     try {
-      // 判断是否为 Opus 模型
-      if (!model || !model.toLowerCase().includes('claude-opus')) {
-        return // 不是 Opus 模型，直接返回
+      // 判断是否为 Claude 系列模型（包含 Bedrock 格式等）
+      if (!isClaudeFamilyModel(model)) {
+        return
       }
 
       // 判断是否为 claude-official、claude-console 或 ccr 账户
@@ -1658,7 +1666,7 @@ class ApiKeyService {
         `💰 Recorded Opus weekly cost for ${keyId}: rated=$${ratedCost.toFixed(6)}, real=$${realCost.toFixed(6)}, model: ${model}`
       )
     } catch (error) {
-      logger.error('❌ Failed to record Opus cost:', error)
+      logger.error('❌ Failed to record Opus weekly cost:', error)
     }
   }
 

@@ -1756,8 +1756,13 @@ class RedisClient {
   // 💰 获取本周 Opus 费用
   async getWeeklyOpusCost(keyId) {
     const currentWeek = getWeekStringInTimezone()
-    const costKey = `usage:opus:weekly:${keyId}:${currentWeek}`
-    const cost = await this.client.get(costKey)
+    const costKey = `usage:claude:weekly:${keyId}:${currentWeek}`
+    let cost = await this.client.get(costKey)
+    // 向后兼容：如果新 key 不存在，则回退读取旧的（仅 Opus 口径）周费用 key。
+    if (cost === null || cost === undefined) {
+      const legacyKey = `usage:opus:weekly:${keyId}:${currentWeek}`
+      cost = await this.client.get(legacyKey)
+    }
     const result = parseFloat(cost || 0)
     logger.debug(
       `💰 Getting weekly Opus cost for ${keyId}, week: ${currentWeek}, key: ${costKey}, value: ${cost}, result: ${result}`
@@ -1792,6 +1797,16 @@ class RedisClient {
 
     const results = await pipeline.exec()
     logger.debug(`💰 Opus cost incremented successfully, new weekly total: $${results[0][1]}`)
+  }
+
+  // 💰 覆盖设置本周 Opus 费用（用于启动回填/迁移）
+  async setWeeklyOpusCost(keyId, amount, weekString = null) {
+    const currentWeek = weekString || getWeekStringInTimezone()
+    const weeklyKey = `usage:opus:weekly:${keyId}:${currentWeek}`
+
+    await this.client.set(weeklyKey, String(amount || 0))
+    // 保留 2 周，足够覆盖"当前周 + 上周"查看/回填
+    await this.client.expire(weeklyKey, 14 * 24 * 3600)
   }
 
   // 💰 计算账户的每日费用（基于模型使用，使用索引集合替代 KEYS）
