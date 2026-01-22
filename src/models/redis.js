@@ -1081,8 +1081,13 @@ class RedisClient {
   // 💰 获取本周 Opus 费用
   async getWeeklyOpusCost(keyId) {
     const currentWeek = getWeekStringInTimezone()
-    const costKey = `usage:opus:weekly:${keyId}:${currentWeek}`
-    const cost = await this.client.get(costKey)
+    const costKey = `usage:claude:weekly:${keyId}:${currentWeek}`
+    let cost = await this.client.get(costKey)
+    // 向后兼容：如果新 key 不存在，则回退读取旧的（仅 Opus 口径）周费用 key。
+    if (cost === null || cost === undefined) {
+      const legacyKey = `usage:opus:weekly:${keyId}:${currentWeek}`
+      cost = await this.client.get(legacyKey)
+    }
     const result = parseFloat(cost || 0)
     logger.debug(
       `💰 Getting weekly Opus cost for ${keyId}, week: ${currentWeek}, key: ${costKey}, value: ${cost}, result: ${result}`
@@ -1090,11 +1095,12 @@ class RedisClient {
     return result
   }
 
-  // 💰 增加本周 Opus 费用
+  // 💰 增加本周 Claude 费用
   async incrementWeeklyOpusCost(keyId, amount) {
     const currentWeek = getWeekStringInTimezone()
-    const weeklyKey = `usage:opus:weekly:${keyId}:${currentWeek}`
-    const totalKey = `usage:opus:total:${keyId}`
+    // 注意：尽管函数名沿用旧的 Opus 命名，但当前实现统计的是 Claude 系列模型的“周费用”。
+    const weeklyKey = `usage:claude:weekly:${keyId}:${currentWeek}`
+    const totalKey = `usage:claude:total:${keyId}`
 
     logger.debug(
       `💰 Incrementing weekly Opus cost for ${keyId}, week: ${currentWeek}, amount: $${amount}`
@@ -1109,6 +1115,16 @@ class RedisClient {
 
     const results = await pipeline.exec()
     logger.debug(`💰 Opus cost incremented successfully, new weekly total: $${results[0][1]}`)
+  }
+
+  // 💰 覆盖设置本周 Claude 费用（用于启动回填/迁移）
+  async setWeeklyClaudeCost(keyId, amount, weekString = null) {
+    const currentWeek = weekString || getWeekStringInTimezone()
+    const weeklyKey = `usage:claude:weekly:${keyId}:${currentWeek}`
+
+    await this.client.set(weeklyKey, String(amount || 0))
+    // 保留 2 周，足够覆盖“当前周 + 上周”查看/回填
+    await this.client.expire(weeklyKey, 14 * 24 * 3600)
   }
 
   // 💰 计算账户的每日费用（基于模型使用）

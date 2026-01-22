@@ -324,7 +324,7 @@
 
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >Opus 模型周费用限制 (美元)</label
+              >Claude 模型周费用限制 (美元)</label
             >
             <div class="space-y-3">
               <div class="flex gap-2">
@@ -366,7 +366,8 @@
                 type="number"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户，0 或留空表示无限制
+                设置 Claude 模型的周费用限制（周一到周日），仅对 Claude 模型请求生效，0
+                或留空表示无限制
               </p>
             </div>
           </div>

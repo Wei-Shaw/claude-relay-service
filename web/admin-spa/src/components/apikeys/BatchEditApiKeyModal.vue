@@ -232,10 +232,10 @@
             />
           </div>
 
-          <!-- Opus 模型周费用限制 -->
+          <!-- Claude 模型周费用限制 -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Opus 模型周费用限制 (美元)
+              Claude 模型周费用限制 (美元)
             </label>
             <input
               v-model="form.weeklyOpusCostLimit"
@@ -246,7 +246,7 @@
               type="number"
             />
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户
+              设置 Claude 模型的周费用限制（周一到周日），仅对 Claude 模型请求生效
             </p>
           </div>
 
@@ -510,7 +510,7 @@ const form = reactive({
   concurrencyLimit: '',
   dailyCostLimit: '',
   totalCostLimit: '',
-  weeklyOpusCostLimit: '', // 新增Opus周费用限制
+  weeklyOpusCostLimit: '', // 新增Claude周费用限制
   permissions: '', // 空字符串表示不修改
   claudeAccountId: '',
   geminiAccountId: '',
