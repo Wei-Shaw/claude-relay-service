@@ -220,8 +220,8 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { API_PREFIX } from '@/config/api'
-import { showToast } from '@/utils/toast'
+import { APP_CONFIG } from '@/utils/tools'
+import { showToast } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -287,7 +287,7 @@ async function loadConfig() {
     // 根据平台获取配置端点
     let endpoint = ''
     if (platform === 'claude') {
-      endpoint = `${API_PREFIX}/admin/claude-accounts/${props.account.id}/test-config`
+      endpoint = `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test-config`
     } else {
       // 其他平台暂不支持
       loading.value = false
@@ -344,7 +344,7 @@ async function saveConfig() {
 
     let endpoint = ''
     if (platform === 'claude') {
-      endpoint = `${API_PREFIX}/admin/claude-accounts/${props.account.id}/test-config`
+      endpoint = `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test-config`
     } else {
       saving.value = false
       return

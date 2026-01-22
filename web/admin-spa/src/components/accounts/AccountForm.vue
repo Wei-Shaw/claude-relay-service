@@ -3978,10 +3978,10 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { showToast } from '@/utils/toast'
-import { apiClient } from '@/config/api'
+import { showToast } from '@/utils/tools'
+
+import * as httpApis from '@/utils/http_apis'
 import { useAccountsStore } from '@/stores/accounts'
-import { useConfirm } from '@/composables/useConfirm'
 import ProxyConfig from './ProxyConfig.vue'
 import OAuthFlow from './OAuthFlow.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -3998,7 +3998,28 @@ const props = defineProps({
 const emit = defineEmits(['close', 'success', 'platform-changed'])
 
 const accountsStore = useAccountsStore()
-const { showConfirmModal, confirmOptions, showConfirm, handleConfirm, handleCancel } = useConfirm()
+
+// 确认弹窗状态
+const showConfirmModal = ref(false)
+const confirmOptions = ref({ title: '', message: '', confirmText: '继续', cancelText: '取消' })
+let confirmResolve = null
+const showConfirm = (title, message, confirmText = '继续', cancelText = '取消') => {
+  return new Promise((resolve) => {
+    confirmOptions.value = { title, message, confirmText, cancelText }
+    confirmResolve = resolve
+    showConfirmModal.value = true
+  })
+}
+const handleConfirm = () => {
+  showConfirmModal.value = false
+  confirmResolve?.(true)
+  confirmResolve = null
+}
+const handleCancel = () => {
+  showConfirmModal.value = false
+  confirmResolve?.(false)
+  confirmResolve = null
+}
 
 // 是否为编辑模式
 const isEdit = computed(() => !!props.account)
@@ -4287,20 +4308,20 @@ const allowedModels = ref([
   'claude-3-5-haiku-20241022'
 ]) // 白名单模式下选中的模型列表
 
-// 常用模型列表
-const commonModels = [
-  { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5', color: 'blue' },
-  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', color: 'blue' },
-  { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5', color: 'indigo' },
-  { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', color: 'green' },
-  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', color: 'emerald' },
-  { value: 'claude-opus-4-20250514', label: 'Claude Opus 4', color: 'purple' },
-  { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1', color: 'purple' },
-  { value: 'deepseek-chat', label: 'DeepSeek Chat', color: 'cyan' },
-  { value: 'Qwen', label: 'Qwen', color: 'orange' },
-  { value: 'Kimi', label: 'Kimi', color: 'pink' },
-  { value: 'GLM', label: 'GLM', color: 'teal' }
-]
+// 常用模型列表（从 API 获取）
+const commonModels = ref([])
+
+// 加载模型列表
+const loadCommonModels = async () => {
+  try {
+    const result = await httpApis.getModelsApi()
+    if (result.success && result.data?.all) {
+      commonModels.value = result.data.all
+    }
+  } catch (error) {
+    console.error('Failed to load models:', error)
+  }
+}
 
 // 模型映射表数据
 const modelMappings = ref([])
@@ -4508,7 +4529,7 @@ const loadAccountUsage = async () => {
   if (!isEdit.value || !props.account?.id) return
 
   try {
-    const response = await apiClient.get(`/admin/claude-console-accounts/${props.account.id}/usage`)
+    const response = await httpApis.getClaudeConsoleAccountUsageApi(props.account.id)
     if (response) {
       // 更新表单中的使用量数据
       form.value.dailyUsage = response.dailyUsage || 0
@@ -5960,7 +5981,7 @@ const filteredGroups = computed(() => {
 const loadGroups = async () => {
   loadingGroups.value = true
   try {
-    const response = await apiClient.get('/admin/account-groups')
+    const response = await httpApis.getAccountGroupsApi()
     groups.value = response.data || []
   } catch (error) {
     showToast('加载分组列表失败', 'error')
@@ -6413,7 +6434,7 @@ watch(
             // 否则查找账户所属的分组
             const checkPromises = groups.value.map(async (group) => {
               try {
-                const response = await apiClient.get(`/admin/account-groups/${group.id}/members`)
+                const response = await httpApis.getAccountGroupMembersApi(group.id)
                 const members = response.data || []
                 if (members.some((m) => m.id === newAccount.id)) {
                   foundGroupIds.push(group.id)
@@ -6441,7 +6462,7 @@ watch(
 // 获取统一 User-Agent 信息
 const fetchUnifiedUserAgent = async () => {
   try {
-    const response = await apiClient.get('/admin/claude-code-version')
+    const response = await httpApis.getClaudeCodeVersionApi()
     if (response.success && response.userAgent) {
       unifiedUserAgent.value = response.userAgent
     } else {
@@ -6457,7 +6478,7 @@ const fetchUnifiedUserAgent = async () => {
 const clearUnifiedCache = async () => {
   clearingCache.value = true
   try {
-    const response = await apiClient.post('/admin/claude-code-version/clear')
+    const response = await httpApis.clearClaudeCodeVersionApi()
     if (response.success) {
       unifiedUserAgent.value = ''
       showToast('统一User-Agent缓存已清除', 'success')
@@ -6562,6 +6583,9 @@ onMounted(() => {
   if (isEdit.value) {
     initModelMappings()
   }
+
+  // 加载模型列表
+  loadCommonModels()
 
   // 获取Claude Code统一User-Agent信息
   fetchUnifiedUserAgent()

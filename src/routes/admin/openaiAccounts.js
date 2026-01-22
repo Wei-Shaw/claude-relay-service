@@ -80,7 +80,7 @@ router.post('/generate-auth-url', authenticateAdmin, async (req, res) => {
 
     const authUrl = `${OPENAI_CONFIG.BASE_URL}/oauth/authorize?${params.toString()}`
 
-    logger.success('🔗 Generated OpenAI OAuth authorization URL')
+    logger.success('Generated OpenAI OAuth authorization URL')
 
     return res.json({
       success: true,
@@ -191,7 +191,7 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
     // 清理 Redis 会话
     await redis.deleteOAuthSession(sessionId)
 
-    logger.success('✅ OpenAI OAuth token exchange successful')
+    logger.success('OpenAI OAuth token exchange successful')
 
     return res.json({
       success: true,
@@ -386,7 +386,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
         delete refreshedAccount.accessToken
         delete refreshedAccount.refreshToken
 
-        logger.success(`✅ 创建并验证 OpenAI 账户成功: ${name} (ID: ${tempAccount.id})`)
+        logger.success(`创建并验证 OpenAI 账户成功: ${name} (ID: ${tempAccount.id})`)
 
         return res.json({
           success: true,
@@ -450,7 +450,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
       }
     }
 
-    logger.success(`✅ 创建 OpenAI 账户成功: ${name} (ID: ${createdAccount.id})`)
+    logger.success(`创建 OpenAI 账户成功: ${name} (ID: ${createdAccount.id})`)
 
     return res.json({
       success: true,
@@ -541,7 +541,7 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
           })
         }
 
-        logger.success(`✅ Token 验证成功，继续更新账户信息`)
+        logger.success(`Token 验证成功，继续更新账户信息`)
       } catch (refreshError) {
         // 刷新失败，恢复原始 token
         logger.warn(`❌ Token 验证失败，恢复原始配置: ${refreshError.message}`)
@@ -755,7 +755,7 @@ router.post('/:accountId/reset-status', authenticateAdmin, async (req, res) => {
 
     const result = await openaiAccountService.resetAccountStatus(accountId)
 
-    logger.success(`✅ Admin reset status for OpenAI account: ${accountId}`)
+    logger.success(`Admin reset status for OpenAI account: ${accountId}`)
     return res.json({ success: true, data: result })
   } catch (error) {
     logger.error('❌ Failed to reset OpenAI account status:', error)

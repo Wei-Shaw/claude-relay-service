@@ -134,7 +134,9 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { apiClient } from '@/config/api'
+
+import { getAccountBalanceApi, refreshAccountBalanceApi } from '@/utils/http_apis'
+import { formatNumber } from '@/utils/tools'
 
 const props = defineProps({
   accountId: { type: String, required: true },
@@ -264,24 +266,17 @@ const load = async () => {
   loading.value = true
   requestError.value = null
 
-  try {
-    const response = await apiClient.get(`/admin/accounts/${props.accountId}/balance`, {
-      params: {
-        platform: props.platform,
-        queryApi: props.queryMode === 'api' ? true : props.queryMode === 'auto' ? 'auto' : false
-      }
-    })
-    if (response?.success) {
-      balanceData.value = response.data
-    } else {
-      requestError.value = response?.error || '加载失败'
-    }
-  } catch (error) {
-    requestError.value = error.message || '网络错误'
-    emit('error', error)
-  } finally {
-    loading.value = false
+  const params = {
+    platform: props.platform,
+    queryApi: props.queryMode === 'api' ? true : props.queryMode === 'auto' ? 'auto' : false
   }
+  const response = await getAccountBalanceApi(props.accountId, params)
+  if (response?.success) {
+    balanceData.value = response.data
+  } else {
+    requestError.value = response?.error || '加载失败'
+  }
+  loading.value = false
 }
 
 const refresh = async () => {
@@ -292,33 +287,18 @@ const refresh = async () => {
   refreshing.value = true
   requestError.value = null
 
-  try {
-    const response = await apiClient.post(`/admin/accounts/${props.accountId}/balance/refresh`, {
-      platform: props.platform
-    })
-    if (response?.success) {
-      balanceData.value = response.data
-      emit('refreshed', response.data)
-    } else {
-      requestError.value = response?.error || '刷新失败'
-    }
-  } catch (error) {
-    requestError.value = error.message || '网络错误'
-    emit('error', error)
-  } finally {
-    refreshing.value = false
+  const response = await refreshAccountBalanceApi(props.accountId, { platform: props.platform })
+  if (response?.success) {
+    balanceData.value = response.data
+    emit('refreshed', response.data)
+  } else {
+    requestError.value = response?.error || '刷新失败'
   }
+  refreshing.value = false
 }
 
 const reload = async () => {
   await load()
-}
-
-const formatNumber = (num) => {
-  if (num === Infinity) return '∞'
-  const value = Number(num)
-  if (!Number.isFinite(value)) return 'N/A'
-  return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 
 const formatQuotaNumber = (num) => {

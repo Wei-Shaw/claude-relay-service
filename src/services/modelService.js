@@ -18,7 +18,7 @@ class ModelService {
       (sum, config) => sum + config.models.length,
       0
     )
-    logger.success(`✅ Model service initialized with ${totalModels} models`)
+    logger.success(`Model service initialized with ${totalModels} models`)
   }
 
   /**

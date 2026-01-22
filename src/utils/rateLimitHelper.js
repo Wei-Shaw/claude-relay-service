@@ -7,9 +7,16 @@ function toNumber(value) {
   return Number.isFinite(num) ? num : 0
 }
 
-async function updateRateLimitCounters(rateLimitInfo, usageSummary, model) {
+// keyId 和 accountType 用于计算倍率成本
+async function updateRateLimitCounters(
+  rateLimitInfo,
+  usageSummary,
+  model,
+  keyId = null,
+  accountType = null
+) {
   if (!rateLimitInfo) {
-    return { totalTokens: 0, totalCost: 0 }
+    return { totalTokens: 0, totalCost: 0, ratedCost: 0 }
   }
 
   const client = redis.getClient()
@@ -59,11 +66,25 @@ async function updateRateLimitCounters(rateLimitInfo, usageSummary, model) {
     }
   }
 
-  if (totalCost > 0 && rateLimitInfo.costCountKey) {
-    await client.incrbyfloat(rateLimitInfo.costCountKey, totalCost)
+  // 计算倍率成本（用于限流计数）
+  let ratedCost = totalCost
+  if (totalCost > 0 && keyId) {
+    try {
+      const apiKeyService = require('../services/apiKeyService')
+      const serviceRatesService = require('../services/serviceRatesService')
+      const service = serviceRatesService.getService(accountType, model)
+      ratedCost = await apiKeyService.calculateRatedCost(keyId, service, totalCost)
+    } catch (error) {
+      // 倍率计算失败时使用真实成本
+      ratedCost = totalCost
+    }
   }
 
-  return { totalTokens, totalCost }
+  if (ratedCost > 0 && rateLimitInfo.costCountKey) {
+    await client.incrbyfloat(rateLimitInfo.costCountKey, ratedCost)
+  }
+
+  return { totalTokens, totalCost, ratedCost }
 }
 
 module.exports = {

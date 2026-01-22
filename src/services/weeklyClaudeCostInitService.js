@@ -1,6 +1,7 @@
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const pricingService = require('./pricingService')
+const serviceRatesService = require('./serviceRatesService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 
 function pad2(n) {
@@ -31,16 +32,16 @@ class WeeklyClaudeCostInitService {
     return dates
   }
 
-  _buildWeeklyClaudeKey(keyId, weekString) {
-    return `usage:claude:weekly:${keyId}:${weekString}`
+  _buildWeeklyOpusKey(keyId, weekString) {
+    return `usage:opus:weekly:${keyId}:${weekString}`
   }
 
   /**
-   * 启动回填：把“本周（周一到今天）Claude 全模型”周费用从按日/按模型统计里反算出来，
-   * 写入 `usage:claude:weekly:*`，保证周限额在重启后不归零。
+   * 启动回填：把"本周（周一到今天）Claude 全模型"周费用从按日/按模型统计里反算出来，
+   * 写入 `usage:opus:weekly:*`，保证周限额在重启后不归零。
    *
    * 说明：
-   * - 只回填本周，不做历史回填（符合“只要本周数据”诉求）
+   * - 只回填本周，不做历史回填（符合"只要本周数据"诉求）
    * - 会加分布式锁，避免多实例重复跑
    * - 会写 done 标记：同一周内重启默认不重复回填（需要时可手动删掉 done key）
    */
@@ -57,7 +58,7 @@ class WeeklyClaudeCostInitService {
     }
 
     const weekString = redis.getWeekStringInTimezone()
-    const doneKey = `init:weekly_claude_cost:${weekString}:done`
+    const doneKey = `init:weekly_opus_cost:${weekString}:done`
 
     try {
       const alreadyDone = await client.get(doneKey)
@@ -69,7 +70,7 @@ class WeeklyClaudeCostInitService {
       // 尽力而为：读取失败不阻断启动回填流程。
     }
 
-    const lockKey = `lock:init:weekly_claude_cost:${weekString}`
+    const lockKey = `lock:init:weekly_opus_cost:${weekString}`
     const lockValue = `${process.pid}:${Date.now()}`
     const lockTtlMs = 15 * 60 * 1000
 
@@ -85,6 +86,42 @@ class WeeklyClaudeCostInitService {
 
       const keyIds = await redis.scanApiKeyIds()
       const dates = this._getCurrentWeekDatesInTimezone()
+
+      // 预加载所有 API Key 数据和全局倍率（避免循环内重复查询）
+      const keyDataCache = new Map()
+      const globalRateCache = new Map()
+      const batchSize = 500
+      for (let i = 0; i < keyIds.length; i += batchSize) {
+        const batch = keyIds.slice(i, i + batchSize)
+        const pipeline = client.pipeline()
+        for (const keyId of batch) {
+          pipeline.hgetall(`apikey:${keyId}`)
+        }
+        const results = await pipeline.exec()
+        for (let j = 0; j < batch.length; j++) {
+          const [, data] = results[j] || []
+          if (data && Object.keys(data).length > 0) {
+            keyDataCache.set(batch[j], data)
+          }
+        }
+      }
+      logger.info(`💰 预加载 ${keyDataCache.size} 个 API Key 数据`)
+
+      // 推断账户类型的辅助函数（与运行时 recordOpusCost 一致，只统计 claude-official/claude-console/ccr）
+      const OPUS_ACCOUNT_TYPES = ['claude-official', 'claude-console', 'ccr']
+      const inferAccountType = (keyData) => {
+        if (keyData?.ccrAccountId) {
+          return 'ccr'
+        }
+        if (keyData?.claudeConsoleAccountId) {
+          return 'claude-console'
+        }
+        if (keyData?.claudeAccountId) {
+          return 'claude-official'
+        }
+        // bedrock/azure/gemini 等不计入周费用
+        return null
+      }
 
       const costByKeyId = new Map()
       let scannedKeys = 0
@@ -165,24 +202,51 @@ class WeeklyClaudeCostInitService {
             }
 
             const costInfo = pricingService.calculateCost(usage, entry.model)
-            const cost = costInfo && costInfo.totalCost ? costInfo.totalCost : 0
-            if (cost <= 0) {
+            const realCost = costInfo && costInfo.totalCost ? costInfo.totalCost : 0
+            if (realCost <= 0) {
               continue
             }
 
-            costByKeyId.set(entry.keyId, (costByKeyId.get(entry.keyId) || 0) + cost)
+            // 应用倍率：全局倍率 × Key 倍率（使用缓存数据）
+            const keyData = keyDataCache.get(entry.keyId)
+            const accountType = inferAccountType(keyData)
+
+            // 与运行时 recordOpusCost 一致：只统计 claude-official/claude-console/ccr 账户
+            if (!accountType || !OPUS_ACCOUNT_TYPES.includes(accountType)) {
+              continue
+            }
+
+            const service = serviceRatesService.getService(accountType, entry.model)
+
+            // 获取全局倍率（带缓存）
+            let globalRate = globalRateCache.get(service)
+            if (globalRate === undefined) {
+              globalRate = await serviceRatesService.getServiceRate(service)
+              globalRateCache.set(service, globalRate)
+            }
+
+            // 获取 Key 倍率
+            let keyRates = {}
+            try {
+              keyRates = JSON.parse(keyData?.serviceRates || '{}')
+            } catch (e) {
+              keyRates = {}
+            }
+            const keyRate = keyRates[service] ?? 1.0
+            const ratedCost = realCost * globalRate * keyRate
+
+            costByKeyId.set(entry.keyId, (costByKeyId.get(entry.keyId) || 0) + ratedCost)
           }
         } while (cursor !== '0')
       }
 
-      // 为所有 API Key 写入本周 claude:weekly key，避免读取时回退到旧 opus:weekly 造成口径混淆。
+      // 为所有 API Key 写入本周 opus:weekly key
       const ttlSeconds = 14 * 24 * 3600
-      const batchSize = 500
       for (let i = 0; i < keyIds.length; i += batchSize) {
         const batch = keyIds.slice(i, i + batchSize)
         const pipeline = client.pipeline()
         for (const keyId of batch) {
-          const weeklyKey = this._buildWeeklyClaudeKey(keyId, weekString)
+          const weeklyKey = this._buildWeeklyOpusKey(keyId, weekString)
           const cost = costByKeyId.get(keyId) || 0
           pipeline.set(weeklyKey, String(cost))
           pipeline.expire(weeklyKey, ttlSeconds)

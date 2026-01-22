@@ -85,17 +85,57 @@
                 class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
               >
                 <i class="fas fa-link" />
-                /api/v1/messages
+                {{ serviceConfig.displayEndpoint }}
               </span>
             </div>
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-500 dark:text-gray-400">测试模型</span>
-              <span class="font-medium text-gray-700 dark:text-gray-300">{{ testModel }}</span>
+            <div class="text-sm">
+              <div class="mb-1 flex items-center justify-between">
+                <span class="text-gray-500 dark:text-gray-400">测试模型</span>
+                <select
+                  v-model="testModel"
+                  class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                >
+                  <option v-for="model in availableModels" :key="model.value" :value="model.value">
+                    {{ model.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="text-right text-xs text-gray-400 dark:text-gray-500">
+                {{ testModel }}
+              </div>
+            </div>
+            <div class="text-sm">
+              <div class="mb-1 flex items-center justify-between">
+                <span class="text-gray-500 dark:text-gray-400">最大输出 Token</span>
+                <select
+                  v-model="maxTokens"
+                  class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                >
+                  <option v-for="opt in maxTokensOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
             </div>
             <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-500 dark:text-gray-400">模拟客户端</span>
-              <span class="font-medium text-gray-700 dark:text-gray-300">Claude Code</span>
+              <span class="text-gray-500 dark:text-gray-400">测试服务</span>
+              <span class="font-medium text-gray-700 dark:text-gray-300">{{
+                serviceConfig.name
+              }}</span>
             </div>
+          </div>
+
+          <!-- 提示词输入 -->
+          <div class="mb-4">
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              提示词
+            </label>
+            <textarea
+              v-model="testPrompt"
+              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              placeholder="输入测试提示词..."
+              rows="2"
+            />
           </div>
 
           <!-- 状态指示 -->
@@ -200,8 +240,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onUnmounted } from 'vue'
-import { API_PREFIX } from '@/config/api'
+import { ref, computed, watch, onUnmounted, onMounted } from 'vue'
+import { APP_CONFIG } from '@/utils/tools'
+import { getModelsApi } from '@/utils/http_apis'
 
 const props = defineProps({
   show: {
@@ -217,6 +258,12 @@ const props = defineProps({
   apiKeyName: {
     type: String,
     default: ''
+  },
+  // 服务类型: claude, gemini, openai
+  serviceType: {
+    type: String,
+    default: 'claude',
+    validator: (value) => ['claude', 'gemini', 'openai'].includes(value)
   }
 })
 
@@ -232,6 +279,77 @@ const abortController = ref(null)
 
 // 测试模型
 const testModel = ref('claude-sonnet-4-5-20250929')
+
+// 测试提示词
+const testPrompt = ref('hi')
+
+// 最大输出 token
+const maxTokens = ref(1000)
+const maxTokensOptions = [
+  { value: 100, label: '100' },
+  { value: 500, label: '500' },
+  { value: 1000, label: '1000' },
+  { value: 2000, label: '2000' },
+  { value: 4096, label: '4096' }
+]
+
+// 从 API 获取的模型列表
+const modelsFromApi = ref({
+  claude: [],
+  gemini: [],
+  openai: []
+})
+
+// 加载模型列表
+const loadModels = async () => {
+  try {
+    const result = await getModelsApi()
+    if (result.success && result.data) {
+      modelsFromApi.value = {
+        claude: result.data.claude || [],
+        gemini: result.data.gemini || [],
+        openai: result.data.openai || []
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load models:', error)
+  }
+}
+
+// 服务配置
+const serviceConfig = computed(() => {
+  const configs = {
+    claude: {
+      name: 'Claude',
+      endpoint: '/api-key/test',
+      defaultModel: 'claude-sonnet-4-5-20250929',
+      displayEndpoint: '/api/v1/messages'
+    },
+    gemini: {
+      name: 'Gemini',
+      endpoint: '/api-key/test-gemini',
+      defaultModel: 'gemini-2.5-pro',
+      displayEndpoint: '/gemini/v1/models/:model:streamGenerateContent'
+    },
+    openai: {
+      name: 'OpenAI (Codex)',
+      endpoint: '/api-key/test-openai',
+      defaultModel: 'gpt-5',
+      displayEndpoint: '/openai/responses'
+    }
+  }
+  return configs[props.serviceType] || configs.claude
+})
+
+// 可用模型列表（从 API 获取）
+const availableModels = computed(() => {
+  return modelsFromApi.value[props.serviceType] || []
+})
+
+// 组件挂载时加载模型
+onMounted(() => {
+  loadModels()
+})
 
 // 计算属性
 const displayName = computed(() => {
@@ -370,7 +488,7 @@ async function startTest() {
 
   // 使用公开的测试端点，不需要管理员认证
   // apiStats 路由挂载在 /apiStats 下
-  const endpoint = `${API_PREFIX}/apiStats/api-key/test`
+  const endpoint = `${APP_CONFIG.apiPrefix}/apiStats${serviceConfig.value.endpoint}`
 
   try {
     // 使用fetch发送POST请求并处理SSE
@@ -381,7 +499,9 @@ async function startTest() {
       },
       body: JSON.stringify({
         apiKey: props.apiKeyValue,
-        model: testModel.value
+        model: testModel.value,
+        prompt: testPrompt.value,
+        maxTokens: maxTokens.value
       }),
       signal: abortController.value.signal
     })
@@ -483,7 +603,20 @@ watch(
       responseText.value = ''
       errorMessage.value = ''
       testDuration.value = 0
+      // 重置为当前服务的默认模型
+      testModel.value = serviceConfig.value.defaultModel
+      // 重置提示词和 maxTokens
+      testPrompt.value = 'hi'
+      maxTokens.value = 1000
     }
+  }
+)
+
+// 监听服务类型变化，重置模型
+watch(
+  () => props.serviceType,
+  () => {
+    testModel.value = serviceConfig.value.defaultModel
   }
 )
 

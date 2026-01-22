@@ -267,6 +267,11 @@ router.get('/oem-settings', async (req, res) => {
       siteIcon: '',
       siteIconData: '', // Base64编码的图标数据
       showAdminButton: true, // 是否显示管理后台按钮
+      apiStatsNotice: {
+        enabled: false,
+        title: '',
+        content: ''
+      },
       updatedAt: new Date().toISOString()
     }
 
@@ -296,7 +301,7 @@ router.get('/oem-settings', async (req, res) => {
 // 更新OEM设置
 router.put('/oem-settings', authenticateAdmin, async (req, res) => {
   try {
-    const { siteName, siteIcon, siteIconData, showAdminButton } = req.body
+    const { siteName, siteIcon, siteIconData, showAdminButton, apiStatsNotice } = req.body
 
     // 验证输入
     if (!siteName || typeof siteName !== 'string' || siteName.trim().length === 0) {
@@ -328,6 +333,11 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       siteIcon: (siteIcon || '').trim(),
       siteIconData: (siteIconData || '').trim(), // Base64数据
       showAdminButton: showAdminButton !== false, // 默认为true
+      apiStatsNotice: {
+        enabled: apiStatsNotice?.enabled === true,
+        title: (apiStatsNotice?.title || '').trim().slice(0, 100),
+        content: (apiStatsNotice?.content || '').trim().slice(0, 2000)
+      },
       updatedAt: new Date().toISOString()
     }
 

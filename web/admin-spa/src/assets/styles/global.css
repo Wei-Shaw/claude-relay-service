@@ -47,6 +47,70 @@
   --table-hover: rgba(129, 140, 248, 0.1);
 }
 
+/* 覆盖 Tailwind v3 的暗黑模式背景色使用主题色 */
+.dark .bg-gray-800,
+.dark\:bg-gray-800:is(.dark *) {
+  background-color: var(--glass-strong-color) !important;
+}
+
+.dark .bg-gray-700,
+.dark\:bg-gray-700:is(.dark *) {
+  background-color: var(--bg-gradient-mid) !important;
+}
+
+.dark .bg-gray-900,
+.dark\:bg-gray-900:is(.dark *) {
+  background-color: var(--bg-gradient-start) !important;
+}
+
+/* 覆盖带透明度的背景色 */
+.dark\:bg-gray-800\/40:is(.dark *) {
+  background-color: color-mix(in srgb, var(--glass-strong-color) 40%, transparent) !important;
+}
+
+.dark\:bg-gray-700\/30:is(.dark *) {
+  background-color: color-mix(in srgb, var(--bg-gradient-mid) 30%, transparent) !important;
+}
+
+/* 覆盖 Tailwind v3 的暗黑模式渐变色 */
+.dark\:from-gray-700:is(.dark *) {
+  --tw-gradient-from: var(--bg-gradient-mid) !important;
+  --tw-gradient-to: var(--bg-gradient-mid) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.dark\:to-gray-800\/90:is(.dark *) {
+  --tw-gradient-to: var(--glass-strong-color) !important;
+}
+
+/* 覆盖 Tailwind v3 的暗黑模式悬停背景色 */
+.dark\:hover\:bg-gray-600:is(.dark *):hover {
+  background-color: var(--bg-gradient-end) !important;
+}
+
+.dark\:hover\:bg-gray-700:is(.dark *):hover {
+  background-color: var(--bg-gradient-mid) !important;
+}
+
+.dark\:hover\:bg-gray-500:is(.dark *):hover {
+  background-color: var(--text-secondary) !important;
+}
+
+.dark .border-gray-700,
+.dark\:border-gray-700:is(.dark *) {
+  border-color: var(--border-color) !important;
+}
+
+.dark .border-gray-600,
+.dark\:border-gray-600:is(.dark *) {
+  border-color: var(--border-color) !important;
+}
+
+/* 覆盖悬停边框色 */
+.dark\:hover\:border-gray-500:is(.dark *):hover {
+  border-color: var(--border-color) !important;
+}
+
 /* 优化后的transition - 避免布局跳动 */
 button,
 input,
@@ -99,9 +163,9 @@ body::before {
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(circle at 20% 80%, rgba(240, 147, 251, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(102, 126, 234, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+    radial-gradient(circle at 20% 80%, rgba(var(--accent-rgb), 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(var(--primary-rgb), 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(var(--secondary-rgb), 0.1) 0%, transparent 50%);
   pointer-events: none;
   z-index: -1;
 }
@@ -174,8 +238,8 @@ body::before {
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
   box-shadow:
-    0 10px 15px -3px rgba(102, 126, 234, 0.3),
-    0 4px 6px -2px rgba(102, 126, 234, 0.05);
+    0 10px 15px -3px rgba(var(--primary-rgb), 0.3),
+    0 4px 6px -2px rgba(var(--primary-rgb), 0.05);
   transform: translateY(-1px);
 }
 
@@ -215,15 +279,15 @@ body::before {
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
   box-shadow:
-    0 10px 15px -3px rgba(102, 126, 234, 0.3),
-    0 4px 6px -2px rgba(102, 126, 234, 0.05);
+    0 10px 15px -3px rgba(var(--primary-rgb), 0.3),
+    0 4px 6px -2px rgba(var(--primary-rgb), 0.05);
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 20px 25px -5px rgba(102, 126, 234, 0.3),
-    0 10px 10px -5px rgba(102, 126, 234, 0.1);
+    0 20px 25px -5px rgba(var(--primary-rgb), 0.3),
+    0 10px 10px -5px rgba(var(--primary-rgb), 0.1);
 }
 
 .btn-success {
@@ -275,7 +339,7 @@ body::before {
   outline: none;
   border-color: var(--primary-color);
   box-shadow:
-    0 0 0 3px rgba(102, 126, 234, 0.1),
+    0 0 0 3px rgba(var(--primary-rgb), 0.1),
     0 10px 15px -3px rgba(0, 0, 0, 0.1);
   background: rgba(255, 255, 255, 0.95);
   color: #1f2937;
@@ -283,9 +347,9 @@ body::before {
 
 .dark .form-input:focus {
   box-shadow:
-    0 0 0 3px rgba(129, 140, 248, 0.2),
+    0 0 0 3px rgba(var(--primary-rgb), 0.2),
     0 10px 15px -3px rgba(0, 0, 0, 0.2);
-  background: rgba(17, 24, 39, 0.95);
+  background: var(--glass-strong-color);
   color: #f3f4f6;
 }
 
@@ -332,19 +396,7 @@ body::before {
 }
 
 .dark .stat-card {
-  background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.8) 100%);
-}
-
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  background: linear-gradient(135deg, var(--glass-strong-color) 0%, var(--bg-gradient-start) 100%);
 }
 
 .stat-card:hover {
@@ -352,10 +404,6 @@ body::before {
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-.stat-card:hover::before {
-  opacity: 1;
 }
 
 .stat-icon {
@@ -407,15 +455,15 @@ body::before {
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
   box-shadow:
-    0 10px 15px -3px rgba(102, 126, 234, 0.3),
-    0 4px 6px -2px rgba(102, 126, 234, 0.05);
+    0 10px 15px -3px rgba(var(--primary-rgb), 0.3),
+    0 4px 6px -2px rgba(var(--primary-rgb), 0.05);
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 20px 25px -5px rgba(102, 126, 234, 0.3),
-    0 10px 10px -5px rgba(102, 126, 234, 0.1);
+    0 20px 25px -5px rgba(var(--primary-rgb), 0.3),
+    0 10px 10px -5px rgba(var(--primary-rgb), 0.1);
 }
 
 .btn-success {
@@ -466,7 +514,7 @@ body::before {
   outline: none;
   border-color: var(--primary-color);
   box-shadow:
-    0 0 0 3px rgba(102, 126, 234, 0.1),
+    0 0 0 3px rgba(var(--primary-rgb), 0.1),
     0 10px 15px -3px rgba(0, 0, 0, 0.1);
   background: rgba(255, 255, 255, 0.95);
   color: #1f2937;
@@ -474,9 +522,9 @@ body::before {
 
 .dark .form-input:focus {
   box-shadow:
-    0 0 0 3px rgba(129, 140, 248, 0.2),
+    0 0 0 3px rgba(var(--primary-rgb), 0.2),
     0 10px 15px -3px rgba(0, 0, 0, 0.2);
-  background: rgba(17, 24, 39, 0.95);
+  background: var(--glass-strong-color);
   color: #f3f4f6;
 }
 
@@ -527,8 +575,8 @@ body::before {
 }
 
 .dark .modal-content {
-  background: #1f2937;
-  border: 1px solid rgba(75, 85, 99, 0.5);
+  background: var(--bg-gradient-start);
+  border: 1px solid var(--border-color);
   box-shadow:
     0 25px 50px -12px rgba(0, 0, 0, 0.6),
     0 0 0 1px rgba(255, 255, 255, 0.02);
@@ -633,11 +681,11 @@ body::before {
 /* 自定义滚动条样式 */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(102, 126, 234, 0.3) rgba(102, 126, 234, 0.05);
+  scrollbar-color: rgba(var(--primary-rgb), 0.3) rgba(var(--primary-rgb), 0.05);
 }
 
 .dark .custom-scrollbar {
-  scrollbar-color: rgba(129, 140, 248, 0.3) rgba(129, 140, 248, 0.05);
+  scrollbar-color: rgba(var(--primary-rgb), 0.3) rgba(var(--primary-rgb), 0.05);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -646,38 +694,62 @@ body::before {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(102, 126, 234, 0.05);
+  background: rgba(var(--primary-rgb), 0.05);
   border-radius: 10px;
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(129, 140, 248, 0.05);
+  background: rgba(var(--primary-rgb), 0.05);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-rgb), 0.4) 0%,
+    rgba(var(--secondary-rgb), 0.4) 100%
+  );
   border-radius: 10px;
   transition: background 0.3s ease;
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, rgba(129, 140, 248, 0.4) 0%, rgba(167, 139, 250, 0.4) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-rgb), 0.4) 0%,
+    rgba(var(--secondary-rgb), 0.4) 100%
+  );
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.6) 0%, rgba(118, 75, 162, 0.6) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-rgb), 0.6) 0%,
+    rgba(var(--secondary-rgb), 0.6) 100%
+  );
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, rgba(129, 140, 248, 0.6) 0%, rgba(167, 139, 250, 0.6) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-rgb), 0.6) 0%,
+    rgba(var(--secondary-rgb), 0.6) 100%
+  );
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-rgb), 0.8) 0%,
+    rgba(var(--secondary-rgb), 0.8) 100%
+  );
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(135deg, rgba(129, 140, 248, 0.8) 0%, rgba(167, 139, 250, 0.8) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--primary-rgb), 0.8) 0%,
+    rgba(var(--secondary-rgb), 0.8) 100%
+  );
 }
 
 /* 弹窗滚动内容样式 */
@@ -690,8 +762,8 @@ body::before {
 @media (max-width: 768px) {
   .glass,
   .glass-strong {
-    margin: 16px;
-    border-radius: 20px;
+    margin: 0;
+    border-radius: 16px;
   }
 
   .stat-card {

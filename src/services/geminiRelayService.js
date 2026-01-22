@@ -163,7 +163,8 @@ async function* handleStreamResponse(response, model, apiKeyId, accountId = null
                   0, // cacheCreateTokens (Gemini 没有这个概念)
                   0, // cacheReadTokens (Gemini 没有这个概念)
                   model,
-                  accountId
+                  accountId,
+                  'gemini'
                 )
                 .catch((error) => {
                   logger.error('❌ Failed to record Gemini usage:', error)
@@ -317,7 +318,8 @@ async function sendGeminiRequest({
             0, // cacheCreateTokens
             0, // cacheReadTokens
             model,
-            accountId
+            accountId,
+            'gemini'
           )
           .catch((error) => {
             logger.error('❌ Failed to record Gemini usage:', error)

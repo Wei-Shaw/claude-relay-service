@@ -197,7 +197,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { showToast } from '@/utils/toast'
+import { showToast, formatNumber, formatDate } from '@/utils/tools'
 
 defineProps({
   show: {
@@ -214,26 +214,6 @@ const emit = defineEmits(['close'])
 
 const showFullKey = ref(false)
 
-const formatNumber = (num) => {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  }
-  return num.toString()
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return null
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 const copyToClipboard = async (text) => {
   try {
     await navigator.clipboard.writeText(text)
@@ -244,7 +224,3 @@ const copyToClipboard = async (text) => {
   }
 }
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

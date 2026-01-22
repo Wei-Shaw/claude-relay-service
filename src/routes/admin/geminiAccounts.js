@@ -74,7 +74,7 @@ router.post('/poll-auth-status', authenticateAdmin, async (req, res) => {
     const result = await geminiAccountService.pollAuthorizationStatus(sessionId)
 
     if (result.success) {
-      logger.success(`✅ Gemini OAuth authorization successful for session: ${sessionId}`)
+      logger.success(`Gemini OAuth authorization successful for session: ${sessionId}`)
       return res.json({ success: true, data: { tokens: result.tokens } })
     } else {
       return res.json({ success: false, error: result.error })
@@ -143,7 +143,7 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
       await redis.deleteOAuthSession(sessionId)
     }
 
-    logger.success('✅ Successfully exchanged Gemini authorization code')
+    logger.success('Successfully exchanged Gemini authorization code')
     return res.json({ success: true, data: { tokens, oauthProvider: resolvedOauthProvider } })
   } catch (error) {
     logger.error('❌ Failed to exchange Gemini authorization code:', error)
@@ -498,11 +498,96 @@ router.post('/:id/reset-status', authenticateAdmin, async (req, res) => {
 
     const result = await geminiAccountService.resetAccountStatus(id)
 
-    logger.success(`✅ Admin reset status for Gemini account: ${id}`)
+    logger.success(`Admin reset status for Gemini account: ${id}`)
     return res.json({ success: true, data: result })
   } catch (error) {
     logger.error('❌ Failed to reset Gemini account status:', error)
     return res.status(500).json({ error: 'Failed to reset status', message: error.message })
+  }
+})
+
+// 测试 Gemini 账户连通性
+router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+  const { model = 'gemini-2.5-flash' } = req.body
+  const startTime = Date.now()
+
+  try {
+    // 获取账户信息
+    const account = await geminiAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    // 确保 token 有效
+    const tokenResult = await geminiAccountService.ensureValidToken(accountId)
+    if (!tokenResult.success) {
+      return res.status(401).json({
+        error: 'Token refresh failed',
+        message: tokenResult.error
+      })
+    }
+
+    const { accessToken } = tokenResult
+
+    // 构造测试请求
+    const axios = require('axios')
+    const { createGeminiTestPayload } = require('../../utils/testPayloadHelper')
+    const { getProxyAgent } = require('../../utils/proxyHelper')
+
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+    const payload = createGeminiTestPayload(model)
+
+    const requestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
+      timeout: 30000
+    }
+
+    // 配置代理
+    if (account.proxy) {
+      const agent = getProxyAgent(account.proxy)
+      if (agent) {
+        requestConfig.httpsAgent = agent
+        requestConfig.httpAgent = agent
+      }
+    }
+
+    const response = await axios.post(apiUrl, payload, requestConfig)
+    const latency = Date.now() - startTime
+
+    // 提取响应文本
+    let responseText = ''
+    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      responseText = response.data.candidates[0].content.parts[0].text
+    }
+
+    logger.success(
+      `✅ Gemini account test passed: ${account.name} (${accountId}), latency: ${latency}ms`
+    )
+
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        accountName: account.name,
+        model,
+        latency,
+        responseText: responseText.substring(0, 200)
+      }
+    })
+  } catch (error) {
+    const latency = Date.now() - startTime
+    logger.error(`❌ Gemini account test failed: ${accountId}`, error.message)
+
+    return res.status(500).json({
+      success: false,
+      error: 'Test failed',
+      message: error.response?.data?.error?.message || error.message,
+      latency
+    })
   }
 })
 

@@ -476,8 +476,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
+
+import * as httpApis from '@/utils/http_apis'
+import { showToast, formatNumber, formatDate } from '@/utils/tools'
 import { debounce } from 'lodash-es'
 import UserUsageStatsModal from '@/components/admin/UserUsageStatsModal.vue'
 import ChangeRoleModal from '@/components/admin/ChangeRoleModal.vue'
@@ -531,26 +532,6 @@ const filteredUsers = computed(() => {
   return filtered
 })
 
-const formatNumber = (num) => {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  }
-  return num.toString()
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return null
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 const loadUsers = async () => {
   loading.value = true
   try {
@@ -564,8 +545,8 @@ const loadUsers = async () => {
     }
 
     const [usersResponse, statsResponse] = await Promise.all([
-      apiClient.get('/users', { params }),
-      apiClient.get('/users/stats/overview')
+      httpApis.getFrontUsersApi(params),
+      httpApis.getFrontUsersStatsOverviewApi()
     ])
 
     if (usersResponse.success) {
@@ -631,7 +612,7 @@ const handleConfirmAction = async () => {
 
   try {
     if (action === 'toggleStatus') {
-      const response = await apiClient.patch(`/users/${user.id}/status`, {
+      const response = await httpApis.updateFrontUserStatusApi(user.id, {
         isActive: !user.isActive
       })
 
@@ -643,7 +624,7 @@ const handleConfirmAction = async () => {
         showToast(`User ${user.isActive ? 'disabled' : 'enabled'} successfully`, 'success')
       }
     } else if (action === 'disableKeys') {
-      const response = await apiClient.post(`/users/${user.id}/disable-keys`)
+      const response = await httpApis.disableFrontUserKeysApi(user.id)
 
       if (response.success) {
         showToast(`Disabled ${response.disabledCount} API keys`, 'success')
@@ -669,7 +650,3 @@ onMounted(() => {
   loadUsers()
 })
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

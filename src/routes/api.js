@@ -27,14 +27,21 @@ const {
 } = require('../services/anthropicGeminiBridgeService')
 const router = express.Router()
 
-function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '') {
+function queueRateLimitUpdate(
+  rateLimitInfo,
+  usageSummary,
+  model,
+  context = '',
+  keyId = null,
+  accountType = null
+) {
   if (!rateLimitInfo) {
     return Promise.resolve({ totalTokens: 0, totalCost: 0 })
   }
 
   const label = context ? ` (${context})` : ''
 
-  return updateRateLimitCounters(rateLimitInfo, usageSummary, model)
+  return updateRateLimitCounters(rateLimitInfo, usageSummary, model, keyId, accountType)
     .then(({ totalTokens, totalCost }) => {
       if (totalTokens > 0) {
         logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
@@ -477,7 +484,7 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(_apiKeyId, usageObject, model, usageAccountId, 'claude')
+                .recordUsageWithDetails(_apiKeyId, usageObject, model, usageAccountId, accountType)
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
                 })
@@ -491,7 +498,9 @@ async function handleMessagesRequest(req, res) {
                   cacheReadTokens
                 },
                 model,
-                'claude-stream'
+                'claude-stream',
+                _apiKeyId,
+                accountType
               )
 
               usageDataCaptured = true
@@ -589,7 +598,9 @@ async function handleMessagesRequest(req, res) {
                   cacheReadTokens
                 },
                 model,
-                'claude-console-stream'
+                'claude-console-stream',
+                _apiKeyIdConsole,
+                accountType
               )
 
               usageDataCaptured = true
@@ -637,7 +648,8 @@ async function handleMessagesRequest(req, res) {
                 0,
                 0,
                 result.model,
-                accountId
+                accountId,
+                'bedrock'
               )
               .catch((error) => {
                 logger.error('❌ Failed to record Bedrock stream usage:', error)
@@ -652,7 +664,9 @@ async function handleMessagesRequest(req, res) {
                 cacheReadTokens: 0
               },
               result.model,
-              'bedrock-stream'
+              'bedrock-stream',
+              _apiKeyIdBedrock,
+              'bedrock'
             )
 
             usageDataCaptured = true
@@ -744,7 +758,9 @@ async function handleMessagesRequest(req, res) {
                   cacheReadTokens
                 },
                 model,
-                'ccr-stream'
+                'ccr-stream',
+                _apiKeyIdCcr,
+                'ccr'
               )
 
               usageDataCaptured = true
@@ -1104,7 +1120,8 @@ async function handleMessagesRequest(req, res) {
             cacheCreateTokens,
             cacheReadTokens,
             model,
-            responseAccountId
+            responseAccountId,
+            accountType
           )
 
           await queueRateLimitUpdate(
@@ -1116,7 +1133,9 @@ async function handleMessagesRequest(req, res) {
               cacheReadTokens
             },
             model,
-            'claude-non-stream'
+            'claude-non-stream',
+            _apiKeyIdNonStream,
+            accountType
           )
 
           usageRecorded = true

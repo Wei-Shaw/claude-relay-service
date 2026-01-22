@@ -1,7 +1,7 @@
 <template>
-  <div class="space-y-6 md:space-y-8">
+  <div class="space-y-4 sm:space-y-6 md:space-y-8">
     <div
-      class="grid grid-cols-1 items-stretch gap-4 md:gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]"
+      class="grid grid-cols-1 items-stretch gap-3 sm:gap-4 md:gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]"
     >
       <!-- 基础信息 / 批量概要 -->
       <div class="card-section">
@@ -60,9 +60,16 @@
         </div>
 
         <div v-else class="info-grid">
-          <div class="info-item">
+          <div
+            class="info-item cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            title="点击复制"
+            @click="copyText(statsData.name)"
+          >
             <p class="info-label">名称</p>
-            <p class="info-value break-all">{{ statsData.name }}</p>
+            <p class="info-value flex items-center gap-1 break-all">
+              {{ statsData.name }}
+              <i class="fas fa-copy text-xs text-gray-400" />
+            </p>
           </div>
           <div class="info-item">
             <p class="info-label">状态</p>
@@ -84,6 +91,18 @@
           <div class="info-item">
             <p class="info-label">权限</p>
             <p class="info-value">{{ formatPermissions(statsData.permissions) }}</p>
+          </div>
+          <div v-if="hasServiceRates" class="info-item xl:col-span-2">
+            <p class="info-label">服务倍率</p>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="(rate, service) in statsData.serviceRates"
+                :key="service"
+                class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+              >
+                {{ service }}: {{ rate }}x
+              </span>
+            </div>
           </div>
           <div class="info-item">
             <p class="info-label">创建时间</p>
@@ -265,7 +284,7 @@
             </div>
             <p
               v-else
-              class="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300"
+              class="rounded-xl bg-gray-100 px-3 py-2 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-300"
             >
               暂无额度使用数据
             </p>
@@ -282,6 +301,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import dayjs from 'dayjs'
 import { useApiStatsStore } from '@/stores/apistats'
+import { copyText, formatNumber, formatDate } from '@/utils/tools'
 
 const apiStatsStore = useApiStatsStore()
 const {
@@ -301,19 +321,15 @@ const topContributors = computed(() => {
     .slice(0, 3)
 })
 
+// 是否有自定义服务倍率
+const hasServiceRates = computed(() => {
+  return statsData.value?.serviceRates && Object.keys(statsData.value.serviceRates).length > 0
+})
+
 const calculateContribution = (stat) => {
   if (!aggregatedStats.value || !aggregatedStats.value.usage.allTokens) return 0
   const percentage = ((stat.usage?.allTokens || 0) / aggregatedStats.value.usage.allTokens) * 100
   return percentage.toFixed(1)
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return '无'
-  try {
-    return dayjs(dateString).format('YYYY年MM月DD日 HH:mm')
-  } catch (error) {
-    return '格式错误'
-  }
 }
 
 const formatExpireDate = (dateString) => {
@@ -341,21 +357,35 @@ const isApiKeyExpiringSoon = (expiresAt) => {
   return daysUntilExpire > 0 && daysUntilExpire <= 7
 }
 
-const formatNumber = (num) => {
-  if (typeof num !== 'number') num = parseInt(num) || 0
-  if (num === 0) return '0'
-  if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M'
-  if (num >= 1_000) return (num / 1_000).toFixed(1) + 'K'
-  return num.toLocaleString()
-}
-
 const formatPermissions = (permissions) => {
   const map = {
     claude: 'Claude',
     gemini: 'Gemini',
-    all: '全部模型'
+    codex: 'Codex',
+    droid: 'Droid',
+    bedrock: 'Bedrock',
+    azure: 'Azure',
+    ccr: 'CCR'
   }
-  return map[permissions] || permissions || '未知'
+  // 空值 = 全部服务
+  if (!permissions) return '全部服务'
+  // 尝试解析字符串格式的数组
+  let parsed = permissions
+  if (typeof permissions === 'string') {
+    if (permissions === 'all' || permissions === '[]') return '全部服务'
+    try {
+      parsed = JSON.parse(permissions)
+    } catch {
+      return map[permissions] || permissions
+    }
+  }
+  // 空数组 = 全部服务
+  if (Array.isArray(parsed) && parsed.length === 0) return '全部服务'
+  // 数组格式
+  if (Array.isArray(parsed)) {
+    return parsed.map((p) => map[p] || p).join(', ')
+  }
+  return map[permissions] || permissions
 }
 
 const boundAccountList = computed(() => {
@@ -510,11 +540,9 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 
 <style scoped>
 .card-section {
-  @apply flex h-full flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-md dark:border-slate-700/60 dark:bg-slate-900/70 md:p-6;
-}
-
-:global(.dark) .card-section {
-  backdrop-filter: blur(10px);
+  @apply flex h-full flex-col gap-4 rounded-2xl p-4 shadow-md md:p-6;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
 }
 
 .section-header {
@@ -526,11 +554,18 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .header-title {
-  @apply text-lg font-semibold text-slate-900 dark:text-slate-100 md:text-xl;
+  @apply text-lg font-semibold md:text-xl;
+  color: var(--text-primary, #1e293b);
+}
+
+:global(.dark) .header-title {
+  color: var(--text-primary, #f1f5f9);
 }
 
 .header-tag {
-  @apply ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-300;
+  @apply ml-auto rounded-full px-2 py-0.5 text-xs font-medium;
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary-color);
 }
 
 .info-grid {
@@ -551,20 +586,43 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .info-item {
-  @apply rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/60;
+  @apply rounded-xl p-4;
+  background: rgba(var(--primary-rgb), 0.03);
+  border: 1px solid var(--border-color);
   min-height: 86px;
 }
 
+:global(.dark) .info-item {
+  background: rgba(var(--primary-rgb), 0.08);
+}
+
 .info-label {
-  @apply text-xs uppercase tracking-wide text-slate-400;
+  @apply text-xs uppercase tracking-wide;
+  color: var(--text-secondary, #64748b);
+}
+
+:global(.dark) .info-label {
+  color: var(--text-secondary, #94a3b8);
 }
 
 .info-value {
-  @apply mt-2 text-sm text-slate-800 dark:text-slate-100;
+  @apply mt-2 text-sm;
+  color: var(--text-primary, #1e293b);
+}
+
+:global(.dark) .info-value {
+  color: var(--text-primary, #f1f5f9);
 }
 
 .contributor-item {
-  @apply flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300;
+  @apply flex items-center justify-between rounded-lg px-3 py-2 text-xs;
+  background: rgba(var(--primary-rgb), 0.05);
+  color: var(--text-secondary, #64748b);
+}
+
+:global(.dark) .contributor-item {
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--text-secondary, #cbd5e1);
 }
 
 .metric-grid {
@@ -572,7 +630,13 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .metric-card {
-  @apply rounded-xl border border-slate-200 bg-white/70 p-4 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/60;
+  @apply rounded-xl p-4 text-center shadow-sm;
+  background: rgba(var(--primary-rgb), 0.03);
+  border: 1px solid var(--border-color);
+}
+
+:global(.dark) .metric-card {
+  background: rgba(var(--primary-rgb), 0.08);
 }
 
 .metric-value {
@@ -580,11 +644,18 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .metric-label {
-  @apply mt-1 text-xs text-slate-500 dark:text-slate-300;
+  @apply mt-1 text-xs;
+  color: var(--text-secondary, #64748b);
+}
+
+:global(.dark) .metric-label {
+  color: var(--text-secondary, #cbd5e1);
 }
 
 .account-card {
-  @apply rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900/60;
+  @apply rounded-2xl p-4 shadow-sm transition-shadow hover:shadow-md;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
 }
 
 .account-icon {
@@ -600,15 +671,26 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .account-name {
-  @apply text-sm font-semibold text-slate-900 dark:text-slate-100;
+  @apply text-sm font-semibold;
+  color: var(--text-primary, #1e293b);
+}
+
+:global(.dark) .account-name {
+  color: var(--text-primary, #f1f5f9);
 }
 
 .account-sub {
-  @apply text-xs text-slate-500 dark:text-slate-400;
+  @apply text-xs;
+  color: var(--text-secondary, #64748b);
+}
+
+:global(.dark) .account-sub {
+  color: var(--text-secondary, #94a3b8);
 }
 
 .rate-badge {
-  @apply rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium dark:bg-slate-800;
+  @apply rounded-full px-2 py-0.5 text-xs font-medium;
+  background: rgba(var(--primary-rgb), 0.1);
 }
 
 .progress-row {
@@ -616,7 +698,12 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .progress-track {
-  @apply h-1.5 flex-1 rounded-full bg-slate-200 dark:bg-slate-700;
+  @apply h-1.5 flex-1 rounded-full;
+  background: rgba(var(--primary-rgb), 0.15);
+}
+
+:global(.dark) .progress-track {
+  background: rgba(var(--primary-rgb), 0.25);
 }
 
 .progress-bar {
@@ -624,11 +711,22 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .progress-value {
-  @apply text-xs font-semibold text-slate-600 dark:text-slate-200;
+  @apply text-xs font-semibold;
+  color: var(--text-secondary, #475569);
+}
+
+:global(.dark) .progress-value {
+  color: var(--text-secondary, #e2e8f0);
 }
 
 .quota-row {
-  @apply rounded-xl border border-slate-200 bg-white/60 p-3 dark:border-slate-700 dark:bg-slate-900/50;
+  @apply rounded-xl p-3;
+  background: rgba(var(--primary-rgb), 0.03);
+  border: 1px solid var(--border-color);
+}
+
+:global(.dark) .quota-row {
+  background: rgba(var(--primary-rgb), 0.08);
 }
 
 .quota-header {
@@ -648,10 +746,20 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .quota-percent {
-  @apply text-xs font-semibold text-slate-600 dark:text-slate-200;
+  @apply text-xs font-semibold;
+  color: var(--text-secondary, #475569);
+}
+
+:global(.dark) .quota-percent {
+  color: var(--text-secondary, #e2e8f0);
 }
 
 .quota-foot {
-  @apply mt-1 text-[11px] text-slate-400 dark:text-slate-300;
+  @apply mt-1 text-[11px];
+  color: var(--text-tertiary, #94a3b8);
+}
+
+:global(.dark) .quota-foot {
+  color: var(--text-tertiary, #cbd5e1);
 }
 </style>

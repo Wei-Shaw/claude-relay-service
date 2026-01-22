@@ -1,7 +1,7 @@
 <template>
-  <div class="card p-4 md:p-6">
+  <div class="card p-3 sm:p-4 md:p-6">
     <h3
-      class="mb-3 flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:mb-4 md:text-xl"
+      class="mb-2 flex flex-col text-base font-bold text-gray-900 dark:text-gray-100 sm:mb-3 sm:flex-row sm:items-center sm:text-lg md:mb-4 md:text-xl"
     >
       <span class="flex items-center">
         <i class="fas fa-coins mr-2 text-sm text-yellow-500 md:mr-3 md:text-base" />
@@ -61,6 +61,7 @@
 </template>
 
 <script setup>
+import { formatNumber } from '@/utils/tools'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 
@@ -68,22 +69,6 @@ const apiStatsStore = useApiStatsStore()
 const { statsPeriod, currentPeriodData } = storeToRefs(apiStatsStore)
 
 // 格式化数字
-const formatNumber = (num) => {
-  if (typeof num !== 'number') {
-    num = parseInt(num) || 0
-  }
-
-  if (num === 0) return '0'
-
-  // 大数字使用简化格式
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  } else {
-    return num.toLocaleString()
-  }
-}
 </script>
 
 <style scoped>

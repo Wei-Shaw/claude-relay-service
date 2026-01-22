@@ -31,53 +31,108 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
       }
     }
 
-    // 处理使用统计和绑定的 API Key 数量
-    const accountsWithStats = await Promise.all(
-      accounts.map(async (account) => {
-        // 检查并清除过期的限流状态
-        await geminiApiAccountService.checkAndClearRateLimit(account.id)
+    const accountIds = accounts.map((a) => a.id)
 
-        // 获取使用统计信息
-        let usageStats
-        try {
-          usageStats = await redis.getAccountUsageStats(account.id, 'gemini-api')
-        } catch (error) {
-          logger.debug(`Failed to get usage stats for Gemini-API account ${account.id}:`, error)
-          usageStats = {
-            daily: { requests: 0, tokens: 0, allTokens: 0 },
-            total: { requests: 0, tokens: 0, allTokens: 0 },
-            monthly: { requests: 0, tokens: 0, allTokens: 0 }
-          }
-        }
+    // 并行获取：轻量 API Keys + 分组信息 + daily cost + 清除限流状态
+    const [allApiKeys, allGroupInfosMap, dailyCostMap] = await Promise.all([
+      apiKeyService.getAllApiKeysLite(),
+      accountGroupService.batchGetAccountGroupsByIndex(accountIds, 'gemini'),
+      redis.batchGetAccountDailyCost(accountIds),
+      // 批量清除限流状态
+      Promise.all(accountIds.map((id) => geminiApiAccountService.checkAndClearRateLimit(id)))
+    ])
 
-        // 计算绑定的API Key数量（支持 api: 前缀）
-        const allKeys = await redis.getAllApiKeys()
-        let boundCount = 0
+    // 单次遍历构建绑定数映射（只算直连，不算 group）
+    const bindingCountMap = new Map()
+    for (const key of allApiKeys) {
+      const binding = key.geminiAccountId
+      if (!binding) {
+        continue
+      }
+      // 处理 api: 前缀
+      const accountId = binding.startsWith('api:') ? binding.substring(4) : binding
+      bindingCountMap.set(accountId, (bindingCountMap.get(accountId) || 0) + 1)
+    }
 
-        for (const key of allKeys) {
-          if (key.geminiAccountId) {
-            // 检查是否绑定了此 Gemini-API 账户（支持 api: 前缀）
-            if (key.geminiAccountId === `api:${account.id}`) {
-              boundCount++
-            }
-          }
-        }
+    // 批量获取使用统计
+    const client = redis.getClientSafe()
+    const today = redis.getDateStringInTimezone()
+    const tzDate = redis.getDateInTimezone()
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
 
-        // 获取分组信息
-        const groupInfos = await accountGroupService.getAccountGroups(account.id)
+    const statsPipeline = client.pipeline()
+    for (const accountId of accountIds) {
+      statsPipeline.hgetall(`account_usage:${accountId}`)
+      statsPipeline.hgetall(`account_usage:daily:${accountId}:${today}`)
+      statsPipeline.hgetall(`account_usage:monthly:${accountId}:${currentMonth}`)
+    }
+    const statsResults = await statsPipeline.exec()
 
-        return {
-          ...account,
-          groupInfos,
-          usage: {
-            daily: usageStats.daily,
-            total: usageStats.total,
-            averages: usageStats.averages || usageStats.monthly
-          },
-          boundApiKeys: boundCount
-        }
+    // 处理统计数据
+    const allUsageStatsMap = new Map()
+    for (let i = 0; i < accountIds.length; i++) {
+      const accountId = accountIds[i]
+      const [errTotal, total] = statsResults[i * 3]
+      const [errDaily, daily] = statsResults[i * 3 + 1]
+      const [errMonthly, monthly] = statsResults[i * 3 + 2]
+
+      const parseUsage = (data) => ({
+        requests: parseInt(data?.totalRequests || data?.requests) || 0,
+        tokens: parseInt(data?.totalTokens || data?.tokens) || 0,
+        inputTokens: parseInt(data?.totalInputTokens || data?.inputTokens) || 0,
+        outputTokens: parseInt(data?.totalOutputTokens || data?.outputTokens) || 0,
+        cacheCreateTokens: parseInt(data?.totalCacheCreateTokens || data?.cacheCreateTokens) || 0,
+        cacheReadTokens: parseInt(data?.totalCacheReadTokens || data?.cacheReadTokens) || 0,
+        allTokens:
+          parseInt(data?.totalAllTokens || data?.allTokens) ||
+          (parseInt(data?.totalInputTokens || data?.inputTokens) || 0) +
+            (parseInt(data?.totalOutputTokens || data?.outputTokens) || 0) +
+            (parseInt(data?.totalCacheCreateTokens || data?.cacheCreateTokens) || 0) +
+            (parseInt(data?.totalCacheReadTokens || data?.cacheReadTokens) || 0)
       })
-    )
+
+      allUsageStatsMap.set(accountId, {
+        total: errTotal ? {} : parseUsage(total),
+        daily: errDaily ? {} : parseUsage(daily),
+        monthly: errMonthly ? {} : parseUsage(monthly)
+      })
+    }
+
+    // 处理账户数据
+    const accountsWithStats = accounts.map((account) => {
+      const groupInfos = allGroupInfosMap.get(account.id) || []
+      const usageStats = allUsageStatsMap.get(account.id) || {
+        daily: { requests: 0, tokens: 0, allTokens: 0 },
+        total: { requests: 0, tokens: 0, allTokens: 0 },
+        monthly: { requests: 0, tokens: 0, allTokens: 0 }
+      }
+      const dailyCost = dailyCostMap.get(account.id) || 0
+      const boundCount = bindingCountMap.get(account.id) || 0
+
+      // 计算 averages（rpm/tpm）
+      const createdAt = account.createdAt ? new Date(account.createdAt) : new Date()
+      const daysSinceCreated = Math.max(
+        1,
+        Math.ceil((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
+      )
+      const totalMinutes = daysSinceCreated * 24 * 60
+      const totalRequests = usageStats.total.requests || 0
+      const totalTokens = usageStats.total.tokens || usageStats.total.allTokens || 0
+
+      return {
+        ...account,
+        groupInfos,
+        usage: {
+          daily: { ...usageStats.daily, cost: dailyCost },
+          total: usageStats.total,
+          averages: {
+            rpm: Math.round((totalRequests / totalMinutes) * 100) / 100,
+            tpm: Math.round((totalTokens / totalMinutes) * 100) / 100
+          }
+        },
+        boundApiKeys: boundCount
+      }
+    })
 
     res.json({ success: true, data: accountsWithStats })
   } catch (error) {
@@ -275,7 +330,7 @@ router.delete('/gemini-api-accounts/:id', authenticateAdmin, async (req, res) =>
       message += `，${unboundCount} 个 API Key 已切换为共享池模式`
     }
 
-    logger.success(`✅ ${message}`)
+    logger.success(`${message}`)
 
     res.json({
       success: true,
@@ -389,7 +444,7 @@ router.post('/gemini-api-accounts/:id/reset-status', authenticateAdmin, async (r
 
     const result = await geminiApiAccountService.resetAccountStatus(id)
 
-    logger.success(`✅ Admin reset status for Gemini-API account: ${id}`)
+    logger.success(`Admin reset status for Gemini-API account: ${id}`)
     return res.json({ success: true, data: result })
   } catch (error) {
     logger.error('❌ Failed to reset Gemini-API account status:', error)

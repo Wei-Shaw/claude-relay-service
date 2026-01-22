@@ -340,7 +340,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
-import { showToast } from '@/utils/toast'
+import { showToast, formatNumber, formatDate } from '@/utils/tools'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import UserApiKeysManager from '@/components/user/UserApiKeysManager.vue'
 import UserUsageStats from '@/components/user/UserUsageStats.vue'
@@ -353,26 +353,6 @@ const themeStore = useThemeStore()
 const activeTab = ref('overview')
 const userProfile = ref(null)
 const apiKeysStats = ref({ active: 0, deleted: 0 })
-
-const formatNumber = (num) => {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  }
-  return num.toString()
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return null
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
 
 const handleTabChange = (tab) => {
   activeTab.value = tab
@@ -430,7 +410,3 @@ onMounted(() => {
   loadApiKeysStats()
 })
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

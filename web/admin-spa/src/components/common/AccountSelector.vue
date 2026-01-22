@@ -297,6 +297,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { formatDate } from '@/utils/tools'
 
 const props = defineProps({
   modelValue: {
@@ -542,23 +543,6 @@ const hasResults = computed(() => {
 })
 
 // 格式化日期
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffInHours = (now - date) / (1000 * 60 * 60)
-
-  if (diffInHours < 24) {
-    return '今天创建'
-  } else if (diffInHours < 48) {
-    return '昨天创建'
-  } else if (diffInHours < 168) {
-    // 7天内
-    return `${Math.floor(diffInHours / 24)} 天前`
-  } else {
-    return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
-  }
-}
 
 // 更新下拉菜单位置
 const updateDropdownPosition = () => {

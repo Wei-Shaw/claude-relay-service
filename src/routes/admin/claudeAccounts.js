@@ -36,7 +36,7 @@ router.post('/claude-accounts/generate-auth-url', authenticateAdmin, async (req,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10分钟过期
     })
 
-    logger.success('🔗 Generated OAuth authorization URL with proxy support')
+    logger.success('Generated OAuth authorization URL with proxy support')
     return res.json({
       success: true,
       data: {
@@ -152,7 +152,7 @@ router.post('/claude-accounts/generate-setup-token-url', authenticateAdmin, asyn
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10分钟过期
     })
 
-    logger.success('🔗 Generated Setup Token authorization URL with proxy support')
+    logger.success('Generated Setup Token authorization URL with proxy support')
     return res.json({
       success: true,
       data: {
@@ -786,7 +786,7 @@ router.post('/claude-accounts/:accountId/update-profile', authenticateAdmin, asy
 
     const profileInfo = await claudeAccountService.fetchAndUpdateAccountProfile(accountId)
 
-    logger.success(`✅ Updated profile for Claude account: ${accountId}`)
+    logger.success(`Updated profile for Claude account: ${accountId}`)
     return res.json({
       success: true,
       message: 'Account profile updated successfully',
@@ -805,7 +805,7 @@ router.post('/claude-accounts/update-all-profiles', authenticateAdmin, async (re
   try {
     const result = await claudeAccountService.updateAllAccountProfiles()
 
-    logger.success('✅ Batch profile update completed')
+    logger.success('Batch profile update completed')
     return res.json({
       success: true,
       message: 'Batch profile update completed',
@@ -841,7 +841,7 @@ router.post('/claude-accounts/:accountId/reset-status', authenticateAdmin, async
 
     const result = await claudeAccountService.resetAccountStatus(accountId)
 
-    logger.success(`✅ Admin reset status for Claude account: ${accountId}`)
+    logger.success(`Admin reset status for Claude account: ${accountId}`)
     return res.json({ success: true, data: result })
   } catch (error) {
     logger.error('❌ Failed to reset Claude account status:', error)

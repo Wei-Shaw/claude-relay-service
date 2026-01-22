@@ -13,6 +13,7 @@ const openaiToClaude = require('../services/openaiToClaude')
 const apiKeyService = require('../services/apiKeyService')
 const unifiedClaudeScheduler = require('../services/unifiedClaudeScheduler')
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
+const { getSafeMessage } = require('../utils/errorSanitizer')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const pricingService = require('../services/pricingService')
@@ -23,14 +24,21 @@ function checkPermissions(apiKeyData, requiredPermission = 'claude') {
   return apiKeyService.hasPermission(apiKeyData?.permissions, requiredPermission)
 }
 
-function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '') {
+function queueRateLimitUpdate(
+  rateLimitInfo,
+  usageSummary,
+  model,
+  context = '',
+  keyId = null,
+  accountType = null
+) {
   if (!rateLimitInfo) {
     return
   }
 
   const label = context ? ` (${context})` : ''
 
-  updateRateLimitCounters(rateLimitInfo, usageSummary, model)
+  updateRateLimitCounters(rateLimitInfo, usageSummary, model, keyId, accountType)
     .then(({ totalTokens, totalCost }) => {
       if (totalTokens > 0) {
         logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
@@ -300,7 +308,9 @@ async function handleChatCompletion(req, res, apiKeyData) {
               cacheReadTokens
             },
             model,
-            `openai-${accountType}-stream`
+            `openai-${accountType}-stream`,
+            req.apiKey?.id,
+            accountType
           )
         }
       }
@@ -425,7 +435,9 @@ async function handleChatCompletion(req, res, apiKeyData) {
             cacheReadTokens
           },
           claudeRequest.model,
-          `openai-${accountType}-non-stream`
+          `openai-${accountType}-non-stream`,
+          req.apiKey?.id,
+          accountType
         )
       }
 
@@ -452,7 +464,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
         const status = error.status || 500
         res.status(status).json({
           error: {
-            message: error.message || 'Internal server error',
+            message: getSafeMessage(error),
             type: 'server_error',
             code: 'internal_error'
           }

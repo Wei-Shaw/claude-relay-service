@@ -24,9 +24,12 @@ function generateSessionString() {
  * @param {string} model - 模型名称
  * @param {object} options - 可选配置
  * @param {boolean} options.stream - 是否流式（默认false）
+ * @param {string} options.prompt - 自定义提示词（默认 'hi'）
+ * @param {number} options.maxTokens - 最大输出 token（默认 1000）
  * @returns {object} 测试请求体
  */
 function createClaudeTestPayload(model = 'claude-sonnet-4-5-20250929', options = {}) {
+  const { stream, prompt = 'hi', maxTokens = 1000 } = options
   const payload = {
     model,
     messages: [
@@ -35,7 +38,7 @@ function createClaudeTestPayload(model = 'claude-sonnet-4-5-20250929', options =
         content: [
           {
             type: 'text',
-            text: 'hi',
+            text: prompt,
             cache_control: {
               type: 'ephemeral'
             }
@@ -55,11 +58,11 @@ function createClaudeTestPayload(model = 'claude-sonnet-4-5-20250929', options =
     metadata: {
       user_id: generateSessionString()
     },
-    max_tokens: 21333,
+    max_tokens: maxTokens,
     temperature: 1
   }
 
-  if (options.stream) {
+  if (stream) {
     payload.stream = true
   }
 
@@ -234,9 +237,58 @@ async function sendStreamTestRequest(options) {
   }
 }
 
+/**
+ * 生成 Gemini 测试请求体
+ * @param {string} model - 模型名称
+ * @param {object} options - 可选配置
+ * @param {string} options.prompt - 自定义提示词（默认 'hi'）
+ * @param {number} options.maxTokens - 最大输出 token（默认 100）
+ * @returns {object} 测试请求体
+ */
+function createGeminiTestPayload(_model = 'gemini-2.5-pro', options = {}) {
+  const { prompt = 'hi', maxTokens = 100 } = options
+  return {
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: prompt }]
+      }
+    ],
+    generationConfig: {
+      maxOutputTokens: maxTokens,
+      temperature: 1
+    }
+  }
+}
+
+/**
+ * 生成 OpenAI Responses 测试请求体
+ * @param {string} model - 模型名称
+ * @param {object} options - 可选配置
+ * @param {string} options.prompt - 自定义提示词（默认 'hi'）
+ * @param {number} options.maxTokens - 最大输出 token（默认 100）
+ * @returns {object} 测试请求体
+ */
+function createOpenAITestPayload(model = 'gpt-5', options = {}) {
+  const { prompt = 'hi', maxTokens = 100 } = options
+  return {
+    model,
+    input: [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ],
+    max_output_tokens: maxTokens,
+    stream: true
+  }
+}
+
 module.exports = {
   randomHex,
   generateSessionString,
   createClaudeTestPayload,
+  createGeminiTestPayload,
+  createOpenAITestPayload,
   sendStreamTestRequest
 }

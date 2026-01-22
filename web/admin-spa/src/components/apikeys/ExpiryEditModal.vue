@@ -211,11 +211,24 @@
         </div>
       </div>
     </div>
+
+    <!-- ConfirmModal -->
+    <ConfirmModal
+      :cancel-text="confirmModalConfig.cancelText"
+      :confirm-text="confirmModalConfig.confirmText"
+      :message="confirmModalConfig.message"
+      :show="showConfirmModal"
+      :title="confirmModalConfig.title"
+      :type="confirmModalConfig.type"
+      @cancel="handleCancelModal"
+      @confirm="handleConfirmModal"
+    />
   </Teleport>
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const props = defineProps({
   show: {
@@ -231,6 +244,39 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save'])
 
 const saving = ref(false)
+
+// ConfirmModal 状态
+const showConfirmModal = ref(false)
+const confirmModalConfig = ref({
+  title: '',
+  message: '',
+  type: 'primary',
+  confirmText: '确认',
+  cancelText: '取消'
+})
+const confirmResolve = ref(null)
+
+const showConfirm = (
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  type = 'primary'
+) => {
+  return new Promise((resolve) => {
+    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
+    confirmResolve.value = resolve
+    showConfirmModal.value = true
+  })
+}
+const handleConfirmModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(true)
+}
+const handleCancelModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(false)
+}
 
 // 表单数据
 const localForm = reactive({
@@ -401,21 +447,13 @@ const handleSave = () => {
 
 // 立即激活
 const handleActivateNow = async () => {
-  // 使用确认弹窗
-  let confirmed = true
-  if (window.showConfirm) {
-    confirmed = await window.showConfirm(
-      '激活 API Key',
-      `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || (props.apiKey.activationUnit === 'hours' ? 24 : 30)} ${props.apiKey.activationUnit === 'hours' ? '小时' : '天'}后自动过期。`,
-      '确定激活',
-      '取消'
-    )
-  } else {
-    // 降级方案
-    confirmed = confirm(
-      `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || (props.apiKey.activationUnit === 'hours' ? 24 : 30)} ${props.apiKey.activationUnit === 'hours' ? '小时' : '天'}后自动过期。`
-    )
-  }
+  const confirmed = await showConfirm(
+    '激活 API Key',
+    `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || (props.apiKey.activationUnit === 'hours' ? 24 : 30)} ${props.apiKey.activationUnit === 'hours' ? '小时' : '天'}后自动过期。`,
+    '确定激活',
+    '取消',
+    'warning'
+  )
 
   if (!confirmed) {
     return

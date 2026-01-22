@@ -778,11 +778,13 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import Chart from 'chart.js/auto'
+
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
-import Chart from 'chart.js/auto'
+import { formatNumber, showToast } from '@/utils/tools'
+
+import { getBalanceSummaryApi } from '@/utils/http_apis'
 
 const dashboardStore = useDashboardStore()
 const themeStore = useThemeStore()
@@ -799,8 +801,7 @@ const {
   formattedUptime,
   dateFilter,
   trendGranularity,
-  apiKeysTrendMetric,
-  defaultTime
+  apiKeysTrendMetric
 } = storeToRefs(dashboardStore)
 
 const {
@@ -813,6 +814,9 @@ const {
   setAccountUsageGroup,
   disabledDate
 } = dashboardStore
+
+// 日期选择器默认时间
+const defaultTime = [new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)]
 
 // Chart 实例
 const modelUsageChart = ref(null)
@@ -905,23 +909,20 @@ const formatLastUpdate = (isoString) => {
 
 const loadBalanceSummary = async () => {
   loadingBalanceSummary.value = true
-  try {
-    const response = await apiClient.get('/admin/accounts/balance/summary')
-    if (response?.success) {
-      balanceSummary.value = response.data || {
-        totalBalance: 0,
-        totalCost: 0,
-        lowBalanceCount: 0,
-        platforms: {}
-      }
-      balanceSummaryUpdatedAt.value = new Date().toISOString()
+  const response = await getBalanceSummaryApi()
+  if (response?.success) {
+    balanceSummary.value = response.data || {
+      totalBalance: 0,
+      totalCost: 0,
+      lowBalanceCount: 0,
+      platforms: {}
     }
-  } catch (error) {
-    console.debug('加载余额汇总失败:', error)
+    balanceSummaryUpdatedAt.value = new Date().toISOString()
+  } else if (response?.message) {
+    console.debug('加载余额汇总失败:', response.message)
     showToast('加载余额汇总失败', 'error')
-  } finally {
-    loadingBalanceSummary.value = false
   }
+  loadingBalanceSummary.value = false
 }
 
 // 自动刷新相关
@@ -944,16 +945,6 @@ const chartColors = computed(() => ({
   grid: isDarkMode.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(0, 0, 0, 0.1)',
   legend: isDarkMode.value ? '#e5e7eb' : '#374151'
 }))
-
-// 格式化数字
-function formatNumber(num) {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(2) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(2) + 'K'
-  }
-  return num.toString()
-}
 
 function formatCostValue(cost) {
   if (!Number.isFinite(cost)) {
@@ -1091,15 +1082,15 @@ function createUsageTrendChart() {
       {
         label: '输入Token',
         data: inputData,
-        borderColor: 'rgb(102, 126, 234)',
-        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+        borderColor: themeStore.currentColorScheme.primary,
+        backgroundColor: `${themeStore.currentColorScheme.primary}1a`,
         tension: 0.3
       },
       {
         label: '输出Token',
         data: outputData,
-        borderColor: 'rgb(240, 147, 251)',
-        backgroundColor: 'rgba(240, 147, 251, 0.1)',
+        borderColor: themeStore.currentColorScheme.accent,
+        backgroundColor: `${themeStore.currentColorScheme.accent}1a`,
         tension: 0.3
       },
       {
@@ -1112,8 +1103,8 @@ function createUsageTrendChart() {
       {
         label: '缓存读取Token',
         data: cacheReadData,
-        borderColor: 'rgb(147, 51, 234)',
-        backgroundColor: 'rgba(147, 51, 234, 0.1)',
+        borderColor: themeStore.currentColorScheme.secondary,
+        backgroundColor: `${themeStore.currentColorScheme.secondary}1a`,
         tension: 0.3
       },
       {
@@ -1760,6 +1751,19 @@ watch(isDarkMode, () => {
     createAccountUsageTrendChart()
   })
 })
+
+// 监听色系变化，重新创建图表
+watch(
+  () => themeStore.colorScheme,
+  () => {
+    nextTick(() => {
+      createModelUsageChart()
+      createUsageTrendChart()
+      createApiKeysUsageTrendChart()
+      createAccountUsageTrendChart()
+    })
+  }
+)
 
 // 初始化
 onMounted(async () => {

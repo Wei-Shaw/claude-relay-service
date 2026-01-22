@@ -51,7 +51,7 @@
         <!-- 用户菜单 -->
         <div class="user-menu-container relative">
           <button
-            class="user-menu-button flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 sm:px-4 sm:py-2.5"
+            class="user-menu-button flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 sm:px-4 sm:py-2.5"
             @click="userMenuOpen = !userMenuOpen"
           >
             <i class="fas fa-user-circle text-sm sm:text-base" />
@@ -206,13 +206,22 @@
           <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
             >当前密码</label
           >
-          <input
-            v-model="changePasswordForm.currentPassword"
-            class="form-input w-full"
-            placeholder="请输入当前密码"
-            required
-            type="password"
-          />
+          <div class="relative">
+            <input
+              v-model="changePasswordForm.currentPassword"
+              class="form-input w-full pr-10"
+              placeholder="请输入当前密码"
+              required
+              :type="showCurrentPassword ? 'text' : 'password'"
+            />
+            <button
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              type="button"
+              @click="showCurrentPassword = !showCurrentPassword"
+            >
+              <i :class="showCurrentPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" />
+            </button>
+          </div>
         </div>
 
         <div>
@@ -263,16 +272,30 @@
       </form>
     </div>
   </div>
+
+  <!-- ConfirmModal -->
+  <ConfirmModal
+    :cancel-text="confirmModalConfig.cancelText"
+    :confirm-text="confirmModalConfig.confirmText"
+    :message="confirmModalConfig.message"
+    :show="showConfirmModal"
+    :title="confirmModalConfig.title"
+    :type="confirmModalConfig.type"
+    @cancel="handleCancelModal"
+    @confirm="handleConfirmModal"
+  />
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { showToast } from '@/utils/toast'
-import { apiClient } from '@/config/api'
+import { showToast } from '@/utils/tools'
+
+import { checkUpdatesApi, changePasswordApi } from '@/utils/http_apis'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -301,12 +324,46 @@ const userMenuOpen = ref(false)
 // 修改密码模态框
 const showChangePasswordModal = ref(false)
 const changePasswordLoading = ref(false)
+const showCurrentPassword = ref(false)
 const changePasswordForm = reactive({
   currentPassword: '',
   newPassword: '',
   confirmPassword: '',
   newUsername: ''
 })
+
+// ConfirmModal 状态
+const showConfirmModal = ref(false)
+const confirmModalConfig = ref({
+  title: '',
+  message: '',
+  type: 'primary',
+  confirmText: '确认',
+  cancelText: '取消'
+})
+const confirmResolve = ref(null)
+
+const showConfirm = (
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  type = 'primary'
+) => {
+  return new Promise((resolve) => {
+    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
+    confirmResolve.value = resolve
+    showConfirmModal.value = true
+  })
+}
+const handleConfirmModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(true)
+}
+const handleCancelModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(false)
+}
 
 // 检查更新（同时获取版本信息）
 const checkForUpdates = async () => {
@@ -317,7 +374,7 @@ const checkForUpdates = async () => {
   versionInfo.value.checkingUpdate = true
 
   try {
-    const result = await apiClient.get('/admin/check-updates')
+    const result = await checkUpdatesApi()
 
     if (result.success) {
       const data = result.data
@@ -397,7 +454,7 @@ const changePassword = async () => {
   changePasswordLoading.value = true
 
   try {
-    const data = await apiClient.post('/web/auth/change-password', {
+    const data = await changePasswordApi({
       currentPassword: changePasswordForm.currentPassword,
       newPassword: changePasswordForm.newPassword,
       newUsername: changePasswordForm.newUsername || undefined
@@ -426,8 +483,15 @@ const changePassword = async () => {
 }
 
 // 退出登录
-const logout = () => {
-  if (confirm('确定要退出登录吗？')) {
+const logout = async () => {
+  const confirmed = await showConfirm(
+    '退出登录',
+    '确定要退出登录吗？',
+    '确定退出',
+    '取消',
+    'warning'
+  )
+  if (confirmed) {
     authStore.logout()
     router.push('/login')
     showToast('已安全退出', 'success')
@@ -465,6 +529,12 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   min-height: 38px;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+  box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+}
+
+.user-menu-button:hover {
+  box-shadow: 0 6px 16px rgba(var(--primary-rgb), 0.4);
 }
 
 /* 添加光泽效果 */

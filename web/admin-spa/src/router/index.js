@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
-import { APP_CONFIG } from '@/config/app'
+import { APP_CONFIG, showToast } from '@/utils/tools'
 
 // 路由懒加载
 const LoginView = () => import('@/views/LoginView.vue')
@@ -14,9 +14,9 @@ const ApiKeysView = () => import('@/views/ApiKeysView.vue')
 const ApiKeyUsageRecordsView = () => import('@/views/ApiKeyUsageRecordsView.vue')
 const AccountsView = () => import('@/views/AccountsView.vue')
 const AccountUsageRecordsView = () => import('@/views/AccountUsageRecordsView.vue')
-const TutorialView = () => import('@/views/TutorialView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
+const QuotaCardsView = () => import('@/views/QuotaCardsView.vue')
 
 const routes = [
   {
@@ -124,18 +124,6 @@ const routes = [
     ]
   },
   {
-    path: '/tutorial',
-    component: MainLayout,
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        name: 'Tutorial',
-        component: TutorialView
-      }
-    ]
-  },
-  {
     path: '/settings',
     component: MainLayout,
     meta: { requiresAuth: true },
@@ -156,6 +144,18 @@ const routes = [
         path: '',
         name: 'UserManagement',
         component: UserManagementView
+      }
+    ]
+  },
+  {
+    path: '/quota-cards',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'QuotaCards',
+        component: QuotaCardsView
       }
     ]
   },
@@ -203,8 +203,6 @@ router.beforeEach(async (to, from, next) => {
       } catch (error) {
         // If the error is about disabled account, redirect to login with error
         if (error.message && error.message.includes('disabled')) {
-          // Import showToast to display the error
-          const { showToast } = await import('@/utils/toast')
           showToast(error.message, 'error')
         }
         return next('/user-login')

@@ -3,40 +3,11 @@ const openaiResponsesAccountService = require('./openaiResponsesAccountService')
 const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const { isSchedulable, sortAccountsByPriority } = require('../utils/commonHelper')
 
 class UnifiedOpenAIScheduler {
   constructor() {
     this.SESSION_MAPPING_PREFIX = 'unified_openai_session_mapping:'
-  }
-
-  // 🔢 按优先级和最后使用时间排序账户（与 Claude/Gemini 调度保持一致）
-  _sortAccountsByPriority(accounts) {
-    return accounts.sort((a, b) => {
-      const aPriority = Number.parseInt(a.priority, 10)
-      const bPriority = Number.parseInt(b.priority, 10)
-      const normalizedAPriority = Number.isFinite(aPriority) ? aPriority : 50
-      const normalizedBPriority = Number.isFinite(bPriority) ? bPriority : 50
-
-      // 首先按优先级排序（数字越小优先级越高）
-      if (normalizedAPriority !== normalizedBPriority) {
-        return normalizedAPriority - normalizedBPriority
-      }
-
-      // 优先级相同时，按最后使用时间排序（最久未使用的优先）
-      const aLastUsed = new Date(a.lastUsedAt || 0).getTime()
-      const bLastUsed = new Date(b.lastUsedAt || 0).getTime()
-      return aLastUsed - bLastUsed
-    })
-  }
-
-  // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
-  _isSchedulable(schedulable) {
-    // 如果是 undefined 或 null，默认为可调度
-    if (schedulable === undefined || schedulable === null) {
-      return true
-    }
-    // 明确设置为 false（布尔值）或 'false'（字符串）时不可调度
-    return schedulable !== false && schedulable !== 'false'
   }
 
   // 🔧 辅助方法：检查账户是否被限流（兼容字符串和对象格式）
@@ -85,9 +56,9 @@ class UnifiedOpenAIScheduler {
     let rateLimitChecked = false
     let stillLimited = false
 
-    let isSchedulable = this._isSchedulable(account.schedulable)
+    const accountSchedulable = isSchedulable(account.schedulable)
 
-    if (!isSchedulable) {
+    if (!accountSchedulable) {
       if (!hasRateLimitFlag) {
         return { canUse: false, reason: 'not_schedulable' }
       }
@@ -104,7 +75,6 @@ class UnifiedOpenAIScheduler {
       } else {
         account.schedulable = 'true'
       }
-      isSchedulable = true
       logger.info(`✅ OpenAI账号 ${account.name || accountId} 已解除限流，恢复调度权限`)
     }
 
@@ -224,7 +194,7 @@ class UnifiedOpenAIScheduler {
               }
             }
 
-            if (!this._isSchedulable(boundAccount.schedulable)) {
+            if (!isSchedulable(boundAccount.schedulable)) {
               const errorMsg = `Dedicated account ${boundAccount.name} is not schedulable`
               logger.warn(`⚠️ ${errorMsg}`)
               const error = new Error(errorMsg)
@@ -336,7 +306,7 @@ class UnifiedOpenAIScheduler {
       }
 
       // 按优先级和最后使用时间排序（与 Claude/Gemini 调度保持一致）
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      const sortedAccounts = sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
@@ -451,11 +421,12 @@ class UnifiedOpenAIScheduler {
       if (
         (account.isActive === true || account.isActive === 'true') &&
         account.status !== 'error' &&
-        account.status !== 'rateLimited' &&
         (account.accountType === 'shared' || !account.accountType)
       ) {
-        const hasRateLimitFlag = this._hasRateLimitFlag(account.rateLimitStatus)
-        const schedulable = this._isSchedulable(account.schedulable)
+        // 检查 rateLimitStatus 或 status === 'rateLimited'
+        const hasRateLimitFlag =
+          this._hasRateLimitFlag(account.rateLimitStatus) || account.status === 'rateLimited'
+        const schedulable = isSchedulable(account.schedulable)
 
         if (!schedulable && !hasRateLimitFlag) {
           logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - not schedulable`)
@@ -464,9 +435,23 @@ class UnifiedOpenAIScheduler {
 
         let isRateLimitCleared = false
         if (hasRateLimitFlag) {
-          isRateLimitCleared = await openaiResponsesAccountService.checkAndClearRateLimit(
-            account.id
-          )
+          // 区分正常限流和历史遗留数据
+          if (this._hasRateLimitFlag(account.rateLimitStatus)) {
+            // 有 rateLimitStatus，走正常清理逻辑
+            isRateLimitCleared = await openaiResponsesAccountService.checkAndClearRateLimit(
+              account.id
+            )
+          } else {
+            // 只有 status=rateLimited 但没有 rateLimitStatus，是历史遗留数据，直接清除
+            await openaiResponsesAccountService.updateAccount(account.id, {
+              status: 'active',
+              schedulable: 'true'
+            })
+            isRateLimitCleared = true
+            logger.info(
+              `✅ OpenAI-Responses账号 ${account.name} 清除历史遗留限流状态（status=rateLimited 但无 rateLimitStatus）`
+            )
+          }
 
           if (!isRateLimitCleared) {
             logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - rate limited`)
@@ -544,7 +529,7 @@ class UnifiedOpenAIScheduler {
           return false
         }
         // 检查是否可调度
-        if (!this._isSchedulable(account.schedulable)) {
+        if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 OpenAI-Responses account ${accountId} is not schedulable`)
           return false
         }
@@ -905,7 +890,7 @@ class UnifiedOpenAIScheduler {
       }
 
       // 按优先级和最后使用时间排序（与 Claude/Gemini 调度保持一致）
-      const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
+      const sortedAccounts = sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]

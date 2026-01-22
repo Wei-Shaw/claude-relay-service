@@ -150,7 +150,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 
 const router = useRouter()
@@ -195,7 +195,3 @@ onMounted(() => {
   themeStore.initTheme()
 })
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

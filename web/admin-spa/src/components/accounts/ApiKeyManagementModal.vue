@@ -381,13 +381,24 @@
         </div>
       </div>
     </div>
+    <ConfirmModal
+      :cancel-text="confirmModalConfig.cancelText"
+      :confirm-text="confirmModalConfig.confirmText"
+      :message="confirmModalConfig.message"
+      :show="showConfirmModal"
+      :title="confirmModalConfig.title"
+      :type="confirmModalConfig.type"
+      @cancel="handleCancelModal"
+      @confirm="handleConfirmModal"
+    />
   </Teleport>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { showToast } from '@/utils/toast'
-import { apiClient } from '@/config/api'
+import { showToast } from '@/utils/tools'
+import { getDroidAccountByIdApi, updateDroidAccountApi } from '@/utils/http_apis'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const props = defineProps({
   accountId: {
@@ -416,6 +427,39 @@ const statusFilter = ref('all') // 'all' | 'active' | 'error'
 const searchQuery = ref('')
 const searchMode = ref('fuzzy') // 'fuzzy' | 'exact'
 const batchDeleting = ref(false)
+
+// ConfirmModal 状态
+const showConfirmModal = ref(false)
+const confirmModalConfig = ref({
+  title: '',
+  message: '',
+  type: 'primary',
+  confirmText: '确认',
+  cancelText: '取消'
+})
+const confirmResolve = ref(null)
+
+const showConfirm = (
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  type = 'primary'
+) => {
+  return new Promise((resolve) => {
+    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
+    confirmResolve.value = resolve
+    showConfirmModal.value = true
+  })
+}
+const handleConfirmModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(true)
+}
+const handleCancelModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(false)
+}
 
 // 掩码显示 API Key（提前声明供 computed 使用）
 const maskApiKey = (key) => {
@@ -474,7 +518,7 @@ const errorKeysCount = computed(() => {
 const loadApiKeys = async () => {
   loading.value = true
   try {
-    const response = await apiClient.get(`/admin/droid-accounts/${props.accountId}`)
+    const response = await getDroidAccountByIdApi(props.accountId)
     const account = response.data
 
     // 解析 apiKeys
@@ -549,7 +593,15 @@ const loadApiKeys = async () => {
 
 // 删除 API Key
 const deleteApiKey = async (apiKey) => {
-  if (!confirm(`确定要删除 API Key "${maskApiKey(apiKey.key)}" 吗？`)) {
+  if (
+    !(await showConfirm(
+      '删除 API Key',
+      `确定要删除 API Key "${maskApiKey(apiKey.key)}" 吗？`,
+      '删除',
+      '取消',
+      'danger'
+    ))
+  ) {
     return
   }
 
@@ -561,7 +613,7 @@ const deleteApiKey = async (apiKey) => {
       apiKeyUpdateMode: 'delete'
     }
 
-    await apiClient.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+    await updateDroidAccountApi(props.accountId, updateData)
 
     showToast('API Key 已删除', 'success')
     await loadApiKeys()
@@ -577,9 +629,13 @@ const deleteApiKey = async (apiKey) => {
 // 重置 API Key 状态
 const resetApiKeyStatus = async (apiKey) => {
   if (
-    !confirm(
-      `确定要重置 API Key "${maskApiKey(apiKey.key)}" 的状态吗？这将清除错误信息并恢复为正常状态。`
-    )
+    !(await showConfirm(
+      '重置状态',
+      `确定要重置 API Key "${maskApiKey(apiKey.key)}" 的状态吗？这将清除错误信息并恢复为正常状态。`,
+      '重置',
+      '取消',
+      'warning'
+    ))
   ) {
     return
   }
@@ -598,7 +654,7 @@ const resetApiKeyStatus = async (apiKey) => {
       apiKeyUpdateMode: 'update'
     }
 
-    await apiClient.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+    await updateDroidAccountApi(props.accountId, updateData)
 
     showToast('API Key 状态已重置', 'success')
     await loadApiKeys()
@@ -619,7 +675,15 @@ const deleteAllErrorKeys = async () => {
     return
   }
 
-  if (!confirm(`确定要删除所有 ${errorKeys.length} 个异常状态的 API Key 吗？此操作不可恢复！`)) {
+  if (
+    !(await showConfirm(
+      '删除异常 API Key',
+      `确定要删除所有 ${errorKeys.length} 个异常状态的 API Key 吗？此操作不可恢复！`,
+      '删除',
+      '取消',
+      'danger'
+    ))
+  ) {
     return
   }
 
@@ -631,7 +695,7 @@ const deleteAllErrorKeys = async () => {
       apiKeyUpdateMode: 'delete'
     }
 
-    await apiClient.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+    await updateDroidAccountApi(props.accountId, updateData)
 
     showToast(`成功删除 ${errorKeys.length} 个异常 API Key`, 'success')
     await loadApiKeys()
@@ -652,15 +716,21 @@ const deleteAllKeys = async () => {
   }
 
   if (
-    !confirm(
-      `确定要删除所有 ${apiKeys.value.length} 个 API Key 吗？此操作不可恢复！\n\n请再次确认：这将删除该账户下的所有 API Key。`
-    )
+    !(await showConfirm(
+      '删除全部 API Key',
+      `确定要删除所有 ${apiKeys.value.length} 个 API Key 吗？此操作不可恢复！\n\n请再次确认：这将删除该账户下的所有 API Key。`,
+      '删除',
+      '取消',
+      'danger'
+    ))
   ) {
     return
   }
 
   // 二次确认
-  if (!confirm('最后确认：真的要删除所有 API Key 吗？')) {
+  if (
+    !(await showConfirm('最后确认', '真的要删除所有 API Key 吗？', '确认删除', '取消', 'danger'))
+  ) {
     return
   }
 
@@ -672,7 +742,7 @@ const deleteAllKeys = async () => {
       apiKeyUpdateMode: 'delete'
     }
 
-    await apiClient.put(`/admin/droid-accounts/${props.accountId}`, updateData)
+    await updateDroidAccountApi(props.accountId, updateData)
 
     showToast(`成功删除所有 ${keysToDelete.length} 个 API Key`, 'success')
     await loadApiKeys()
