@@ -1756,13 +1756,8 @@ class RedisClient {
   // 💰 获取本周 Opus 费用
   async getWeeklyOpusCost(keyId) {
     const currentWeek = getWeekStringInTimezone()
-    const costKey = `usage:claude:weekly:${keyId}:${currentWeek}`
-    let cost = await this.client.get(costKey)
-    // 向后兼容：如果新 key 不存在，则回退读取旧的（仅 Opus 口径）周费用 key。
-    if (cost === null || cost === undefined) {
-      const legacyKey = `usage:opus:weekly:${keyId}:${currentWeek}`
-      cost = await this.client.get(legacyKey)
-    }
+    const costKey = `usage:opus:weekly:${keyId}:${currentWeek}`
+    const cost = await this.client.get(costKey)
     const result = parseFloat(cost || 0)
     logger.debug(
       `💰 Getting weekly Opus cost for ${keyId}, week: ${currentWeek}, key: ${costKey}, value: ${cost}, result: ${result}`

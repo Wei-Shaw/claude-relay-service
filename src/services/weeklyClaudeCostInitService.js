@@ -31,16 +31,16 @@ class WeeklyClaudeCostInitService {
     return dates
   }
 
-  _buildWeeklyClaudeKey(keyId, weekString) {
-    return `usage:claude:weekly:${keyId}:${weekString}`
+  _buildWeeklyOpusKey(keyId, weekString) {
+    return `usage:opus:weekly:${keyId}:${weekString}`
   }
 
   /**
-   * 启动回填：把“本周（周一到今天）Claude 全模型”周费用从按日/按模型统计里反算出来，
-   * 写入 `usage:claude:weekly:*`，保证周限额在重启后不归零。
+   * 启动回填：把"本周（周一到今天）Claude 全模型"周费用从按日/按模型统计里反算出来，
+   * 写入 `usage:opus:weekly:*`，保证周限额在重启后不归零。
    *
    * 说明：
-   * - 只回填本周，不做历史回填（符合“只要本周数据”诉求）
+   * - 只回填本周，不做历史回填（符合"只要本周数据"诉求）
    * - 会加分布式锁，避免多实例重复跑
    * - 会写 done 标记：同一周内重启默认不重复回填（需要时可手动删掉 done key）
    */
@@ -175,14 +175,14 @@ class WeeklyClaudeCostInitService {
         } while (cursor !== '0')
       }
 
-      // 为所有 API Key 写入本周 claude:weekly key，避免读取时回退到旧 opus:weekly 造成口径混淆。
+      // 为所有 API Key 写入本周 opus:weekly key
       const ttlSeconds = 14 * 24 * 3600
       const batchSize = 500
       for (let i = 0; i < keyIds.length; i += batchSize) {
         const batch = keyIds.slice(i, i + batchSize)
         const pipeline = client.pipeline()
         for (const keyId of batch) {
-          const weeklyKey = this._buildWeeklyClaudeKey(keyId, weekString)
+          const weeklyKey = this._buildWeeklyOpusKey(keyId, weekString)
           const cost = costByKeyId.get(keyId) || 0
           pipeline.set(weeklyKey, String(cost))
           pipeline.expire(weeklyKey, ttlSeconds)
