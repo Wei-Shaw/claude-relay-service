@@ -14,7 +14,7 @@ const DEFAULT_CONFIG = {
   claudeCodeOnlyEnabled: false,
   globalSessionBindingEnabled: false,
   sessionBindingErrorMessage: '你的本地session已污染，请清理后使用。',
-  sessionBindingTtlDays: 30, // 会话绑定 TTL（天），默认30天
+  sessionBindingTtlDays: 1, // 会话绑定 TTL（天），默认1天（支持 /clear 场景，避免 Redis 累积）
   // 用户消息队列配置
   userMessageQueueEnabled: false, // 是否启用用户消息队列（默认关闭）
   userMessageQueueDelayMs: 200, // 请求间隔（毫秒）
