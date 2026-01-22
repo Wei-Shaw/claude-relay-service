@@ -1246,6 +1246,12 @@ onMounted(async () => {
       } catch {
         perms = VALID_PERMS.includes(perms) ? [perms] : []
       }
+    } else if (perms.includes(',')) {
+      // 兼容逗号分隔格式（如 "claude,openai"）
+      perms = perms
+        .split(',')
+        .map((p) => p.trim())
+        .filter((p) => VALID_PERMS.includes(p))
     } else if (VALID_PERMS.includes(perms)) {
       perms = [perms]
     } else {

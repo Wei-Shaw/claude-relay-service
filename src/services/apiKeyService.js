@@ -65,6 +65,13 @@ function normalizePermissions(permissions) {
     if (permissions === 'all') {
       return []
     }
+    // 兼容逗号分隔格式（修复历史错误数据，如 "claude,openai"）
+    if (permissions.includes(',')) {
+      return permissions
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean)
+    }
     // 旧单个字符串转为数组
     return [permissions]
   }
@@ -753,6 +760,9 @@ class ApiKeyService {
           if (field === 'restrictedModels' || field === 'allowedClients' || field === 'tags') {
             // 特殊处理数组字段
             updatedData[field] = JSON.stringify(value || [])
+          } else if (field === 'permissions') {
+            // 权限字段：规范化后JSON序列化，与createApiKey保持一致
+            updatedData[field] = JSON.stringify(normalizePermissions(value))
           } else if (
             field === 'enableModelRestriction' ||
             field === 'enableClientRestriction' ||
