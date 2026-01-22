@@ -33,7 +33,7 @@ const OAUTH_PROVIDERS = {
     scopes: ['https://www.googleapis.com/auth/cloud-platform']
   },
   [OAUTH_PROVIDER_ANTIGRAVITY]: {
-    // Antigravity OAuth 配置（参考 gcli2api）
+    // Antigravity OAuth 配置
     clientId:
       process.env.ANTIGRAVITY_OAUTH_CLIENT_ID ||
       '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com',
@@ -85,6 +85,28 @@ const keepAliveAgent = new https.Agent({
 })
 
 logger.info('🌐 Gemini HTTPS Agent initialized with TCP Keep-Alive support')
+
+const DEFAULT_ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_MS = 15000
+const ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_ENV = 'ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_MS'
+
+function readEnvPositiveInt(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === null || raw === '') {
+    return fallback
+  }
+  const parsed = parseInt(String(raw), 10)
+  if (!Number.isFinite(parsed) || Number.isNaN(parsed) || parsed <= 0) {
+    return fallback
+  }
+  return parsed
+}
+
+function getAntigravityStreamFirstByteTimeoutMs() {
+  return readEnvPositiveInt(
+    ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_ENV,
+    DEFAULT_ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_MS
+  )
+}
 
 async function fetchAvailableModelsAntigravity(
   accessToken,
@@ -543,7 +565,7 @@ async function createAccount(accountData) {
       expiresAt = oauthData.expiry_date ? new Date(oauthData.expiry_date).toISOString() : ''
     } else {
       // 如果只提供了 access token
-      ;({ accessToken } = accountData)
+      ; ({ accessToken } = accountData)
       refreshToken = accountData.refreshToken || ''
 
       // 构造完整的 OAuth 数据
@@ -879,15 +901,15 @@ async function getAllAccounts() {
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {
-              isRateLimited: rateLimitInfo.isRateLimited,
-              rateLimitedAt: rateLimitInfo.rateLimitedAt,
-              minutesRemaining: rateLimitInfo.minutesRemaining
-            }
+            isRateLimited: rateLimitInfo.isRateLimited,
+            rateLimitedAt: rateLimitInfo.rateLimitedAt,
+            minutesRemaining: rateLimitInfo.minutesRemaining
+          }
           : {
-              isRateLimited: false,
-              rateLimitedAt: null,
-              minutesRemaining: 0
-            }
+            isRateLimited: false,
+            rateLimitedAt: null,
+            minutesRemaining: 0
+          }
       })
     }
   }
@@ -1028,12 +1050,23 @@ function isSubscriptionExpired(account) {
 
 // 检查账户是否被限流
 function isRateLimited(account) {
-  if (account.rateLimitStatus === 'limited' && account.rateLimitedAt) {
-    const limitedAt = new Date(account.rateLimitedAt).getTime()
+  if (account.rateLimitStatus === 'limited') {
     const now = Date.now()
-    const limitDuration = 60 * 60 * 1000 // 1小时
 
-    return now < limitedAt + limitDuration
+    if (account.rateLimitResetAt) {
+      const resetAt = new Date(account.rateLimitResetAt).getTime()
+      if (!Number.isNaN(resetAt)) {
+        return now < resetAt
+      }
+    }
+
+    if (account.rateLimitedAt) {
+      const limitedAt = new Date(account.rateLimitedAt).getTime()
+      if (!Number.isNaN(limitedAt)) {
+        const limitDuration = 60 * 60 * 1000 // 1小时（旧逻辑）
+        return now < limitedAt + limitDuration
+      }
+    }
   }
   return false
 }
@@ -1171,21 +1204,32 @@ async function markAccountUsed(accountId) {
 }
 
 // 设置账户限流状态
-async function setAccountRateLimited(accountId, isLimited = true) {
+async function setAccountRateLimited(accountId, isLimited = true, resetsInSeconds = null) {
+  const now = new Date()
+  const seconds =
+    Number.isFinite(resetsInSeconds) && !Number.isNaN(resetsInSeconds) && resetsInSeconds > 0
+      ? Math.trunc(resetsInSeconds)
+      : null
+
+  const defaultSeconds = 60 * 60 // 1小时（历史默认值）
+  const resetAt = new Date(now.getTime() + (seconds || defaultSeconds) * 1000)
+
   const updates = isLimited
     ? {
-        rateLimitStatus: 'limited',
-        rateLimitedAt: new Date().toISOString()
-      }
+      rateLimitStatus: 'limited',
+      rateLimitedAt: now.toISOString(),
+      rateLimitResetAt: resetAt.toISOString()
+    }
     : {
-        rateLimitStatus: '',
-        rateLimitedAt: ''
-      }
+      rateLimitStatus: '',
+      rateLimitedAt: '',
+      rateLimitResetAt: ''
+    }
 
   await updateAccount(accountId, updates)
 }
 
-// 获取账户的限流信息（参考 claudeAccountService 的实现）
+// 获取账户的限流信息
 async function getAccountRateLimitInfo(accountId) {
   try {
     const account = await getAccount(accountId)
@@ -1198,12 +1242,24 @@ async function getAccountRateLimitInfo(accountId) {
       const now = new Date()
       const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60))
 
-      // Gemini 限流持续时间为 1 小时
-      const minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit)
-      const rateLimitEndAt = new Date(rateLimitedAt.getTime() + 60 * 60 * 1000).toISOString()
+      let willBeAvailableAt = null
+      if (account.rateLimitResetAt) {
+        const parsedReset = new Date(account.rateLimitResetAt)
+        if (!Number.isNaN(parsedReset.getTime())) {
+          willBeAvailableAt = parsedReset
+        }
+      }
+
+      // 兼容旧逻辑：没有 resetAt 时默认 1 小时
+      if (!willBeAvailableAt) {
+        willBeAvailableAt = new Date(rateLimitedAt.getTime() + 60 * 60 * 1000)
+      }
+
+      const minutesRemaining = Math.max(0, Math.ceil((willBeAvailableAt - now) / 60000))
+      const rateLimitEndAt = willBeAvailableAt.toISOString()
 
       return {
-        isRateLimited: minutesRemaining > 0,
+        isRateLimited: willBeAvailableAt > now,
         rateLimitedAt: account.rateLimitedAt,
         minutesSinceRateLimit,
         minutesRemaining,
@@ -1224,7 +1280,7 @@ async function getAccountRateLimitInfo(accountId) {
   }
 }
 
-// 获取配置的OAuth客户端 - 参考GeminiCliSimulator的getOauthClient方法（支持代理）
+// 获取配置的OAuth客户端（支持代理）
 async function getOauthClient(accessToken, refreshToken, proxyConfig = null, oauthProvider = null) {
   const normalizedProvider = normalizeOauthProvider(oauthProvider)
   const oauthConfig = getOauthProviderConfig(normalizedProvider)
@@ -1411,7 +1467,7 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
   return response.data
 }
 
-// 获取onboard层级 - 参考GeminiCliSimulator的getOnboardTier方法
+// 获取onboard层级
 function getOnboardTier(loadRes) {
   // 用户层级枚举
   const UserTierId = {
@@ -1510,7 +1566,7 @@ async function onboardUser(client, tierId, projectId, clientMetadata, proxyConfi
   return lroRes.data
 }
 
-// 完整的用户设置流程 - 参考setup.ts的逻辑（支持代理）
+// 完整的用户设置流程（支持代理）
 async function setupUser(
   client,
   initialProjectId = null,
@@ -1760,6 +1816,33 @@ async function generateContentAntigravity(
       let buffer = ''
       let invalidLines = 0
       let invalidSample = null
+      let gotAnyData = false
+      let settled = false
+
+      const firstByteTimeoutMs = getAntigravityStreamFirstByteTimeoutMs()
+      const firstByteTimer = setTimeout(() => {
+        if (settled || gotAnyData) {
+          return
+        }
+        settled = true
+        logger.warn('⚠️ Antigravity stream no data within first byte timeout, aborting', {
+          model,
+          firstByteTimeoutMs
+        })
+        abortController.abort()
+        reject(
+          new Error(`Antigravity stream timed out before first byte (${firstByteTimeoutMs}ms)`)
+        )
+      }, firstByteTimeoutMs)
+
+      const settleOnce = (fn) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        clearTimeout(firstByteTimer)
+        fn()
+      }
 
       const handleLine = (line) => {
         const trimmed = typeof line === 'string' ? line.trim() : ''
@@ -1787,6 +1870,10 @@ async function generateContentAntigravity(
       }
 
       stream.on('data', (chunk) => {
+        if (!gotAnyData) {
+          gotAnyData = true
+          clearTimeout(firstByteTimer)
+        }
         buffer += chunk.toString()
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
@@ -1796,31 +1883,35 @@ async function generateContentAntigravity(
       })
 
       stream.on('end', () => {
-        if (buffer.trim()) {
-          handleLine(buffer)
-        }
+        settleOnce(() => {
+          if (buffer.trim()) {
+            handleLine(buffer)
+          }
 
-        logger.info('✅ Antigravity generateContent API调用成功 (流式收集完成)', {
-          chunksCount: collectedPayloads.length,
-          invalidLines,
-          invalidSample
+          logger.info('✅ Antigravity generateContent API调用成功 (流式收集完成)', {
+            chunksCount: collectedPayloads.length,
+            invalidLines,
+            invalidSample
+          })
+
+          if (collectedPayloads.length > 0) {
+            const mergedResponse = mergeAntigravityStreamChunks(collectedPayloads, lastPayload)
+            resolve(mergedResponse)
+            return
+          }
+          if (lastPayload) {
+            resolve(lastPayload)
+            return
+          }
+          reject(new Error('Empty response from Antigravity stream'))
         })
-
-        if (collectedPayloads.length > 0) {
-          const mergedResponse = mergeAntigravityStreamChunks(collectedPayloads, lastPayload)
-          resolve(mergedResponse)
-          return
-        }
-        if (lastPayload) {
-          resolve(lastPayload)
-          return
-        }
-        reject(new Error('Empty response from Antigravity stream'))
       })
 
       stream.on('error', (err) => {
-        logger.error('❌ Antigravity stream collection error:', err)
-        reject(err)
+        settleOnce(() => {
+          logger.error('❌ Antigravity stream collection error:', err)
+          reject(err)
+        })
       })
     })
   } finally {
@@ -2248,7 +2339,8 @@ async function resetAccountStatus(accountId) {
     // 清除错误相关字段
     errorMessage: '',
     rateLimitedAt: '',
-    rateLimitStatus: ''
+    rateLimitStatus: '',
+    rateLimitResetAt: ''
   }
 
   await updateAccount(accountId, updates)

@@ -805,7 +805,15 @@
                     @error="(error) => handleBalanceError(account.id, error)"
                     @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
                   />
-                  <div class="mt-1 text-xs">
+                  <div class="mt-1 flex items-center gap-2 text-xs">
+                    <el-tooltip
+                      v-if="balanceRefreshErrors[account.id]"
+                      :content="formatBalanceRefreshError(balanceRefreshErrors[account.id])"
+                      effect="dark"
+                      placement="top"
+                    >
+                      <i class="fas fa-exclamation-circle text-red-500" />
+                    </el-tooltip>
                     <button
                       v-if="
                         !(account.platform === 'gemini' && account.oauthProvider === 'antigravity')
@@ -1492,7 +1500,15 @@
               @error="(error) => handleBalanceError(account.id, error)"
               @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
             />
-            <div class="mt-1 text-xs">
+            <div class="mt-1 flex items-center gap-2 text-xs">
+              <el-tooltip
+                v-if="balanceRefreshErrors[account.id]"
+                :content="formatBalanceRefreshError(balanceRefreshErrors[account.id])"
+                effect="dark"
+                placement="top"
+              >
+                <i class="fas fa-exclamation-circle text-red-500" />
+              </el-tooltip>
               <button
                 v-if="!(account.platform === 'gemini' && account.oauthProvider === 'antigravity')"
                 class="text-blue-500 hover:underline dark:text-blue-300"
@@ -2203,7 +2219,8 @@ const supportedUsagePlatforms = [
   'openai-responses',
   'gemini',
   'droid',
-  'gemini-api'
+  'gemini-api',
+  'bedrock'
 ]
 
 // 过期时间编辑弹窗状态
@@ -2547,7 +2564,7 @@ const closeAccountUsageModal = () => {
 }
 
 // 测试账户连通性相关函数
-const supportedTestPlatforms = ['claude', 'claude-console']
+const supportedTestPlatforms = ['claude', 'claude-console', 'bedrock']
 
 const canTestAccount = (account) => {
   return !!account && supportedTestPlatforms.includes(account.platform)
@@ -2886,6 +2903,40 @@ const showTrailingEllipsis = computed(() => {
   return shouldShowLastPage.value && pages[pages.length - 1] < totalPages.value - 1
 })
 
+const isAntigravityAccount = (account) => {
+  return account?.platform === 'gemini' && account?.oauthProvider === 'antigravity'
+}
+
+const balanceRefreshErrors = ref({})
+
+const recordBalanceRefreshError = (accountId, message) => {
+  if (!accountId) return
+  const text = String(message || '').trim() || '刷新失败'
+  balanceRefreshErrors.value = {
+    ...balanceRefreshErrors.value,
+    [accountId]: { message: text, at: new Date().toISOString() }
+  }
+}
+
+const clearBalanceRefreshError = (accountId) => {
+  if (!accountId) return
+  if (!balanceRefreshErrors.value?.[accountId]) return
+  const next = { ...balanceRefreshErrors.value }
+  delete next[accountId]
+  balanceRefreshErrors.value = next
+}
+
+const formatBalanceRefreshError = (errorInfo) => {
+  if (!errorInfo) return ''
+  const at = errorInfo.at ? new Date(errorInfo.at) : null
+  const timeText =
+    at && !Number.isNaN(at.getTime())
+      ? at.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      : '未知时间'
+  const message = String(errorInfo.message || '').trim() || '刷新失败'
+  return `最后失败 ${timeText}: ${message}`
+}
+
 const paginatedAccounts = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
@@ -2899,6 +2950,9 @@ const canRefreshVisibleBalances = computed(() => {
   }
 
   return targets.some((account) => {
+    if (isAntigravityAccount(account)) {
+      return true
+    }
     const info = account?.balanceInfo
     return info?.scriptEnabled !== false && !!info?.scriptConfigured
   })
@@ -2907,12 +2961,13 @@ const canRefreshVisibleBalances = computed(() => {
 const refreshBalanceTooltip = computed(() => {
   if (accountsLoading.value) return '正在加载账户...'
   if (refreshingBalances.value) return '刷新中...'
-  if (!canRefreshVisibleBalances.value) return '当前页未配置余额脚本，无法刷新'
-  return '刷新当前页余额（仅对已配置余额脚本的账户生效）'
+  if (!canRefreshVisibleBalances.value) return '当前页没有可刷新的账户（脚本或 Antigravity）'
+  return '刷新当前页余额/配额（脚本或 Antigravity API）'
 })
 
 // 余额刷新成功回调
 const handleBalanceRefreshed = (accountId, balanceInfo) => {
+  clearBalanceRefreshError(accountId)
   accounts.value = accounts.value.map((account) => {
     if (account.id !== accountId) return account
     return { ...account, balanceInfo }
@@ -2920,8 +2975,9 @@ const handleBalanceRefreshed = (accountId, balanceInfo) => {
 }
 
 // 余额请求错误回调（仅提示，不中断页面）
-const handleBalanceError = (_accountId, error) => {
+const handleBalanceError = (accountId, error) => {
   const message = error?.message || '余额查询失败'
+  recordBalanceRefreshError(accountId, message)
   showToast(message, 'error')
 }
 
@@ -2935,12 +2991,15 @@ const refreshVisibleBalances = async () => {
   }
 
   const eligibleTargets = targets.filter((account) => {
+    if (isAntigravityAccount(account)) {
+      return true
+    }
     const info = account?.balanceInfo
     return info?.scriptEnabled !== false && !!info?.scriptConfigured
   })
 
   if (eligibleTargets.length === 0) {
-    showToast('当前页没有配置余额脚本的账户', 'warning')
+    showToast('当前页没有可刷新的账户', 'warning')
     return
   }
 
@@ -2948,18 +3007,36 @@ const refreshVisibleBalances = async () => {
 
   refreshingBalances.value = true
   try {
-    const results = await Promise.all(
-      eligibleTargets.map(async (account) => {
-        try {
-          const response = await apiClient.post(`/admin/accounts/${account.id}/balance/refresh`, {
-            platform: account.platform
-          })
-          return { id: account.id, success: !!response?.success, data: response?.data || null }
-        } catch (error) {
-          return { id: account.id, success: false, error: error?.message || '刷新失败' }
+    const runWithConcurrency = async (items, limit, worker) => {
+      const results = []
+      const executing = []
+
+      for (const item of items) {
+        const p = Promise.resolve().then(() => worker(item))
+        results.push(p)
+
+        const e = p.then(() => executing.splice(executing.indexOf(e), 1))
+        executing.push(e)
+
+        if (executing.length >= limit) {
+          await Promise.race(executing)
         }
-      })
-    )
+      }
+
+      return await Promise.all(results)
+    }
+
+    const results = await runWithConcurrency(eligibleTargets, 5, async (account) => {
+      clearBalanceRefreshError(account.id)
+      try {
+        const response = await apiClient.post(`/admin/accounts/${account.id}/balance/refresh`, {
+          platform: account.platform
+        })
+        return { id: account.id, success: !!response?.success, data: response?.data || null }
+      } catch (error) {
+        return { id: account.id, success: false, error: error?.message || '刷新失败' }
+      }
+    })
 
     const updatedMap = results.reduce((map, item) => {
       if (item.success && item.data) {
@@ -2971,7 +3048,7 @@ const refreshVisibleBalances = async () => {
     const successCount = results.filter((r) => r.success).length
     const failCount = results.length - successCount
 
-    const skippedText = skippedCount > 0 ? `，跳过 ${skippedCount} 个未配置脚本` : ''
+    const skippedText = skippedCount > 0 ? `，跳过 ${skippedCount} 个不可刷新` : ''
     if (Object.keys(updatedMap).length > 0) {
       accounts.value = accounts.value.map((account) => {
         const balanceInfo = updatedMap[account.id]
@@ -2983,6 +3060,9 @@ const refreshVisibleBalances = async () => {
     if (failCount === 0) {
       showToast(`成功刷新 ${successCount} 个账户余额${skippedText}`, 'success')
     } else {
+      results
+        .filter((item) => !item.success)
+        .forEach((item) => recordBalanceRefreshError(item.id, item.error || '刷新失败'))
       showToast(`刷新完成：${successCount} 成功，${failCount} 失败${skippedText}`, 'warning')
     }
   } finally {

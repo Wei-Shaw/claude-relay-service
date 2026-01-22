@@ -24,9 +24,17 @@ function round2(value) {
   return Math.round(value * 100) / 100
 }
 
+function normalizeAntigravityQuotaModelId(modelId) {
+  const raw = String(modelId || '').trim()
+  if (!raw) return ''
+  return raw.replace(/^models\//i, '')
+}
+
 function normalizeQuotaCategory(displayName, modelId) {
   const name = String(displayName || '')
-  const id = String(modelId || '')
+  const id = normalizeAntigravityQuotaModelId(modelId)
+  const lowerName = name.toLowerCase()
+  const lowerId = id.toLowerCase()
 
   if (name.includes('Gemini') && name.includes('Pro')) {
     return 'Gemini Pro'
@@ -34,7 +42,10 @@ function normalizeQuotaCategory(displayName, modelId) {
   if (name.includes('Gemini') && name.includes('Flash')) {
     return 'Gemini Flash'
   }
-  if (name.includes('Gemini') && name.toLowerCase().includes('image')) {
+  if (name.includes('Gemini') && lowerName.includes('image')) {
+    return 'Gemini Image'
+  }
+  if (lowerName.includes('imagen')) {
     return 'Gemini Image'
   }
 
@@ -48,10 +59,10 @@ function normalizeQuotaCategory(displayName, modelId) {
   if (id.startsWith('gemini-3-flash') || id.startsWith('gemini-2.5-flash')) {
     return 'Gemini Flash'
   }
-  if (id.includes('image')) {
+  if (lowerId.startsWith('imagen-') || lowerId.includes('image')) {
     return 'Gemini Image'
   }
-  if (id.includes('claude') || id.includes('gpt-oss')) {
+  if (lowerId.includes('claude') || lowerId.includes('gpt-oss')) {
     return 'Claude'
   }
 
@@ -89,28 +100,24 @@ function buildAntigravityQuota(modelsResponse) {
 
   const categoryMap = new Map()
 
-  for (const [modelId, modelDataRaw] of Object.entries(models)) {
-    if (!modelDataRaw || typeof modelDataRaw !== 'object') {
-      continue
+  const buildEntry = (category, rawModelId, modelDataRaw) => {
+    const modelId = normalizeAntigravityQuotaModelId(rawModelId)
+    if (!modelId) {
+      return null
     }
 
-    const displayName = modelDataRaw.displayName || modelDataRaw.display_name || modelId
-    const quotaInfo = modelDataRaw.quotaInfo || modelDataRaw.quota_info || null
-
+    const quotaInfo = modelDataRaw?.quotaInfo || modelDataRaw?.quota_info || null
     const remainingFraction = parseRemainingFraction(quotaInfo)
     if (remainingFraction === null) {
-      continue
+      return null
     }
 
+    const displayName = modelDataRaw?.displayName || modelDataRaw?.display_name || modelId
     const remainingPercent = round2(remainingFraction * 100)
     const usedPercent = round2(100 - remainingPercent)
     const resetAt = quotaInfo?.resetTime || quotaInfo?.reset_time || null
 
-    const category = normalizeQuotaCategory(displayName, modelId)
-    if (!allowedCategories.has(category)) {
-      continue
-    }
-    const entry = {
+    return {
       category,
       modelId,
       displayName: String(displayName || modelId || category),
@@ -118,9 +125,82 @@ function buildAntigravityQuota(modelsResponse) {
       usedPercent,
       resetAt: typeof resetAt === 'string' && resetAt.trim() ? resetAt : null
     }
+  }
+
+  const pickPreferred = (category, matcher) => {
+    let best = null
+
+    for (const [rawModelId, modelDataRaw] of Object.entries(models)) {
+      if (!modelDataRaw || typeof modelDataRaw !== 'object') {
+        continue
+      }
+
+      const modelId = normalizeAntigravityQuotaModelId(rawModelId)
+      if (!modelId) continue
+      if (!matcher(modelId.toLowerCase())) {
+        continue
+      }
+
+      const entry = buildEntry(category, modelId, modelDataRaw)
+      if (!entry) continue
+
+      // 同类若命中多个，取更保守（剩余更低）的那个
+      if (!best || (entry.remainingPercent ?? 0) < (best.remainingPercent ?? 0)) {
+        best = entry
+      }
+    }
+
+    return best
+  }
+
+  // 优先匹配固定模型集合
+  const proEntry = pickPreferred(
+    'Gemini Pro',
+    (id) => id === 'gemini-3-pro-high' || id.startsWith('gemini-2.5-pro')
+  )
+  if (proEntry) categoryMap.set('Gemini Pro', proEntry)
+
+  const claudeEntry = pickPreferred(
+    'Claude',
+    (id) => id === 'claude-sonnet-4-5-thinking' || id.includes('claude')
+  )
+  if (claudeEntry) categoryMap.set('Claude', claudeEntry)
+
+  const flashEntry = pickPreferred(
+    'Gemini Flash',
+    (id) => id === 'gemini-3-flash' || id.startsWith('gemini-2.5-flash')
+  )
+  if (flashEntry) categoryMap.set('Gemini Flash', flashEntry)
+
+  const imageEntry = pickPreferred(
+    'Gemini Image',
+    (id) => id === 'gemini-3-pro-image' || id.startsWith('imagen-')
+  )
+  if (imageEntry) categoryMap.set('Gemini Image', imageEntry)
+
+  for (const [modelId, modelDataRaw] of Object.entries(models)) {
+    if (!modelDataRaw || typeof modelDataRaw !== 'object') {
+      continue
+    }
+
+    const normalizedId = normalizeAntigravityQuotaModelId(modelId)
+    if (!normalizedId) {
+      continue
+    }
+
+    const displayName = modelDataRaw.displayName || modelDataRaw.display_name || normalizedId
+    const category = normalizeQuotaCategory(displayName, normalizedId)
+    if (!allowedCategories.has(category)) {
+      continue
+    }
+
+    const entry = buildEntry(category, normalizedId, modelDataRaw)
+    if (!entry) {
+      continue
+    }
 
     const existing = categoryMap.get(category)
-    if (!existing || entry.remainingPercent < existing.remainingPercent) {
+    if (!existing || (entry.remainingPercent ?? 0) < (existing.remainingPercent ?? 0)) {
       categoryMap.set(category, entry)
     }
   }

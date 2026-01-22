@@ -585,12 +585,13 @@ class UnifiedGeminiScheduler {
   }
 
   // 🚫 标记账户为限流状态
-  async markAccountRateLimited(accountId, accountType, sessionHash = null) {
+  async markAccountRateLimited(accountId, accountType, sessionHash = null, resetsInSeconds = null) {
     try {
       if (accountType === 'gemini') {
-        await geminiAccountService.setAccountRateLimited(accountId, true)
+        await geminiAccountService.setAccountRateLimited(accountId, true, resetsInSeconds)
       } else if (accountType === 'gemini-api') {
-        await geminiApiAccountService.setAccountRateLimited(accountId, true)
+        const durationMinutes = resetsInSeconds ? Math.ceil(resetsInSeconds / 60) : null
+        await geminiApiAccountService.setAccountRateLimited(accountId, true, durationMinutes)
       }
 
       // 删除会话映射
@@ -649,14 +650,24 @@ class UnifiedGeminiScheduler {
         return false
       }
 
-      if (account.rateLimitStatus === 'limited' && account.rateLimitedAt) {
-        const limitedAt = new Date(account.rateLimitedAt).getTime()
+      if (account.rateLimitStatus === 'limited') {
         const now = Date.now()
-        // 使用账户配置的限流时长，默认1小时
-        const rateLimitDuration = parseInt(account.rateLimitDuration) || 60
-        const limitDuration = rateLimitDuration * 60 * 1000
+        if (account.rateLimitResetAt) {
+          const resetAt = new Date(account.rateLimitResetAt).getTime()
+          if (!Number.isNaN(resetAt)) {
+            return now < resetAt
+          }
+        }
 
-        return now < limitedAt + limitDuration
+        if (account.rateLimitedAt) {
+          const limitedAt = new Date(account.rateLimitedAt).getTime()
+          if (!Number.isNaN(limitedAt)) {
+            // 使用账户配置的限流时长，默认1小时
+            const rateLimitDuration = parseInt(account.rateLimitDuration) || 60
+            const limitDuration = rateLimitDuration * 60 * 1000
+            return now < limitedAt + limitDuration
+          }
+        }
       }
       return false
     } catch (error) {

@@ -64,7 +64,10 @@
             :key="row.category"
             class="flex items-center gap-2 rounded-md bg-gray-50 px-2 py-1.5 dark:bg-gray-700/60"
           >
-            <span class="h-2 w-2 shrink-0 rounded-full" :class="row.dotClass"></span>
+            <span
+              class="h-2 w-2 shrink-0 rounded-full"
+              :class="row.isUnknown ? 'border border-gray-400 bg-transparent' : row.dotClass"
+            ></span>
             <span
               class="min-w-0 flex-1 truncate text-xs font-medium text-gray-800 dark:text-gray-100"
               :title="row.category"
@@ -76,8 +79,11 @@
               <div class="h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-600">
                 <div
                   class="h-1.5 rounded-full transition-all"
-                  :class="row.barClass"
-                  :style="{ width: `${row.remainingPercent ?? 0}%` }"
+                  :class="row.isUnknown ? 'bg-gray-300 dark:bg-gray-500' : row.barClass"
+                  :style="{
+                    width: `${row.barWidth}%`,
+                    ...(row.barStyle || {})
+                  }"
                 ></div>
               </div>
               <div
@@ -125,6 +131,10 @@
         class="text-xs text-gray-400 dark:text-gray-500"
       >
         缓存至: {{ formatCacheExpiry(balanceData.cacheExpiresAt) }}
+      </div>
+
+      <div v-if="balanceData.lastRefreshAt" class="text-xs text-gray-400 dark:text-gray-500">
+        更新: {{ formatLastUpdate(balanceData.lastRefreshAt) }}（{{ sourceLabel }}）
       </div>
     </div>
 
@@ -189,6 +199,22 @@ const antigravityRows = computed(() => {
   const list = Array.isArray(buckets) ? buckets : []
   const map = new Map(list.map((b) => [b?.category, b]))
 
+  const toPercent = (value) => {
+    if (value === null || value === undefined) {
+      return null
+    }
+    const num =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string' && value.trim()
+          ? Number(value)
+          : NaN
+    if (!Number.isFinite(num)) {
+      return null
+    }
+    return Math.max(0, Math.min(100, num))
+  }
+
   const order = ['Gemini Pro', 'Claude', 'Gemini Flash', 'Gemini Image']
   const styles = {
     'Gemini Pro': { dotClass: 'bg-blue-500', barClass: 'bg-blue-500 dark:bg-blue-400' },
@@ -199,9 +225,14 @@ const antigravityRows = computed(() => {
 
   return order.map((category) => {
     const raw = map.get(category) || null
-    const remaining = raw?.remaining
-    const remainingPercent = Number.isFinite(Number(remaining))
-      ? Math.max(0, Math.min(100, Number(remaining)))
+    const remainingPercent = toPercent(raw?.remaining)
+    const isUnknown = remainingPercent === null
+
+    const barStyle = isUnknown
+      ? {
+          backgroundImage:
+            'repeating-linear-gradient(45deg, rgba(156,163,175,0.6) 0, rgba(156,163,175,0.6) 6px, rgba(209,213,219,0.6) 6px, rgba(209,213,219,0.6) 12px)'
+        }
       : null
 
     return {
@@ -209,11 +240,21 @@ const antigravityRows = computed(() => {
       remainingPercent,
       remainingText: remainingPercent === null ? '—' : `${Math.round(remainingPercent)}%`,
       resetAt: raw?.resetAt || null,
+      isUnknown,
+      barWidth: isUnknown ? 100 : remainingPercent,
+      barStyle,
       dotClass: styles[category]?.dotClass || 'bg-gray-400',
       barClass: styles[category]?.barClass || 'bg-gray-400'
     }
   })
 })
+
+const formatLastUpdate = (isoString) => {
+  if (!isoString) return '未知'
+  const date = new Date(isoString)
+  if (Number.isNaN(date.getTime())) return '未知'
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
 
 const quotaBarClass = computed(() => {
   const percentage = quotaInfo.value?.percentage || 0

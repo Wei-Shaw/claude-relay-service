@@ -11,6 +11,12 @@ const {
 } = require('../utils/antigravityModel')
 const { cleanJsonSchemaForGemini } = require('../utils/geminiSchemaCleaner')
 const { dumpAntigravityUpstreamRequest } = require('../utils/antigravityUpstreamDump')
+const { dumpAntigravityUpstreamResponse } = require('../utils/antigravityUpstreamResponseDump')
+const {
+  parseGoogleErrorReason,
+  parseGoogleErrorDetailModel,
+  parseGoogleRetryDelayMs
+} = require('../utils/googleErrorParser')
 
 const keepAliveAgent = new https.Agent({
   keepAlive: true,
@@ -21,6 +27,250 @@ const keepAliveAgent = new https.Agent({
 })
 
 const ANTIGRAVITY_REQUEST_TYPE = 'agent'
+const DEFAULT_MODEL_UNAVAILABLE_COOLDOWN_MS = 60 * 1000
+const MODEL_UNAVAILABLE_COOLDOWN_ENV = 'ANTIGRAVITY_MODEL_UNAVAILABLE_COOLDOWN_MS'
+const DEFAULT_MODEL_CAPACITY_COOLDOWN_MS = 15 * 1000
+const MODEL_CAPACITY_COOLDOWN_ENV = 'ANTIGRAVITY_MODEL_CAPACITY_COOLDOWN_MS'
+const DEFAULT_MAX_FALLBACKS_PER_REQUEST = 1
+const MAX_FALLBACKS_PER_REQUEST_ENV = 'ANTIGRAVITY_MAX_FALLBACKS_PER_REQUEST'
+const MAX_UPSTREAM_ERROR_BODY_BYTES = 64 * 1024
+
+// 针对 Antigravity 上游 429 的模型级冷却，避免短时间内打穿账号池/端点。
+// 仅用于 Antigravity 上游，不影响 Gemini 直连等其它链路。
+const modelUnavailableCooldowns = new Map()
+
+function readEnvPositiveInt(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === null || raw === '') {
+    return fallback
+  }
+  const parsed = parseInt(String(raw), 10)
+  if (!Number.isFinite(parsed) || Number.isNaN(parsed) || parsed <= 0) {
+    return fallback
+  }
+  return parsed
+}
+
+function readEnvNonNegativeInt(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === null || raw === '') {
+    return fallback
+  }
+  const parsed = parseInt(String(raw), 10)
+  if (!Number.isFinite(parsed) || Number.isNaN(parsed) || parsed < 0) {
+    return fallback
+  }
+  return parsed
+}
+
+function getModelUnavailableCooldownMs() {
+  return readEnvPositiveInt(MODEL_UNAVAILABLE_COOLDOWN_ENV, DEFAULT_MODEL_UNAVAILABLE_COOLDOWN_MS)
+}
+
+function getModelCapacityCooldownMs() {
+  return readEnvPositiveInt(MODEL_CAPACITY_COOLDOWN_ENV, DEFAULT_MODEL_CAPACITY_COOLDOWN_MS)
+}
+
+function getMaxFallbacksPerRequest() {
+  return readEnvNonNegativeInt(MAX_FALLBACKS_PER_REQUEST_ENV, DEFAULT_MAX_FALLBACKS_PER_REQUEST)
+}
+
+function getModelCooldownInfo(model) {
+  const key = String(model || '').trim()
+  if (!key) {
+    return { remainingMs: 0, reason: '' }
+  }
+  const entry = modelUnavailableCooldowns.get(key)
+  if (!entry || !entry.untilMs) {
+    return { remainingMs: 0, reason: '' }
+  }
+  const remaining = entry.untilMs - Date.now()
+  if (remaining <= 0) {
+    modelUnavailableCooldowns.delete(key)
+    return { remainingMs: 0, reason: '' }
+  }
+  return { remainingMs: remaining, reason: entry.reason ? String(entry.reason) : '' }
+}
+
+function setModelCooldown(model, cooldownMs, reason) {
+  const key = String(model || '').trim()
+  if (!key) {
+    return
+  }
+  const duration = Number.isFinite(cooldownMs) && cooldownMs > 0 ? Math.trunc(cooldownMs) : 0
+  if (!duration) {
+    return
+  }
+  modelUnavailableCooldowns.set(key, {
+    untilMs: Date.now() + duration,
+    reason: reason ? String(reason) : ''
+  })
+}
+
+function createSyntheticAxiosError({ status, message, data, code, headers } = {}) {
+  const err = new Error(message || 'Antigravity upstream error')
+  err.name = 'AxiosError'
+  err.isAxiosError = true
+  err.code = code
+  err.response = {
+    status: Number.isFinite(status) ? status : 500,
+    data: data || null,
+    headers: headers || {}
+  }
+  return err
+}
+
+function isReadableStream(value) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    typeof value.on === 'function' &&
+    typeof value.pipe === 'function'
+  )
+}
+
+async function readReadableStreamToString(stream, maxBytes = MAX_UPSTREAM_ERROR_BODY_BYTES) {
+  if (!isReadableStream(stream)) {
+    return null
+  }
+
+  return await new Promise((resolve) => {
+    let resolved = false
+    let totalBytes = 0
+    const chunks = []
+
+    const finalize = (text) => {
+      if (resolved) {
+        return
+      }
+      resolved = true
+      resolve(text)
+    }
+
+    const cleanup = () => {
+      stream.removeListener('data', onData)
+      stream.removeListener('end', onEnd)
+      stream.removeListener('error', onError)
+    }
+
+    const onData = (chunk) => {
+      try {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), 'utf8')
+        const remaining = Math.max(0, maxBytes - totalBytes)
+        if (remaining <= 0) {
+          cleanup()
+          try {
+            stream.destroy()
+          } catch (_) {
+            // ignore
+          }
+          finalize(Buffer.concat(chunks).toString('utf8'))
+          return
+        }
+
+        if (buf.length > remaining) {
+          chunks.push(buf.subarray(0, remaining))
+          totalBytes += remaining
+          cleanup()
+          try {
+            stream.destroy()
+          } catch (_) {
+            // ignore
+          }
+          finalize(Buffer.concat(chunks).toString('utf8'))
+          return
+        }
+
+        chunks.push(buf)
+        totalBytes += buf.length
+      } catch (_) {
+        cleanup()
+        try {
+          stream.destroy()
+        } catch (err) {
+          // ignore
+        }
+        finalize(Buffer.concat(chunks).toString('utf8'))
+      }
+    }
+
+    const onEnd = () => {
+      cleanup()
+      finalize(Buffer.concat(chunks).toString('utf8'))
+    }
+
+    const onError = () => {
+      cleanup()
+      finalize(Buffer.concat(chunks).toString('utf8'))
+    }
+
+    stream.on('data', onData)
+    stream.on('end', onEnd)
+    stream.on('error', onError)
+  })
+}
+
+async function normalizeAxiosErrorResponseBody(error) {
+  const data = error?.response?.data
+  if (!data) {
+    return null
+  }
+  if (typeof data === 'string') {
+    return data
+  }
+  if (Buffer.isBuffer(data)) {
+    try {
+      const text = data.toString('utf8')
+      error.response.data = text
+      return text
+    } catch (_) {
+      return null
+    }
+  }
+  if (isReadableStream(data)) {
+    const text = await readReadableStreamToString(data)
+    if (typeof text === 'string') {
+      error.response.data = text
+      return text
+    }
+    return null
+  }
+  if (typeof data === 'object') {
+    try {
+      const json = JSON.stringify(data)
+      error.response.data = json
+      return json
+    } catch (_) {
+      return null
+    }
+  }
+  const text = String(data)
+  error.response.data = text
+  return text
+}
+
+function pickUpstreamResponseHeaders(headers) {
+  if (!headers || typeof headers !== 'object') {
+    return null
+  }
+  const get = (key) => {
+    const direct = headers[key]
+    if (direct !== undefined) {
+      return direct
+    }
+    const lower = String(key).toLowerCase()
+    return headers[lower]
+  }
+  const picked = {
+    'retry-after': get('retry-after') || null,
+    'x-cloudaicompanion-trace-id': get('x-cloudaicompanion-trace-id') || null,
+    'content-type': get('content-type') || null,
+    'content-length': get('content-length') || null,
+    date: get('date') || null,
+    server: get('server') || null
+  }
+  return picked
+}
 
 // 对齐 谷歌 近期变更：Antigravity 会校验 systemInstruction 结构。
 // 采用最短前置提示词 并且只做前置插入，不覆盖用户原有 system parts。
@@ -28,102 +278,6 @@ const ANTIGRAVITY_MIN_SYSTEM_PROMPT =
   'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Proactiveness**'
 const ANTIGRAVITY_MIN_SYSTEM_PROMPT_MARKER =
   'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.'
-
-/**
- * 从 Google API 429 错误响应中解析 retry-after 延迟。
- * [dadongwo] 解析 retry delay 实现。
- * 策略:
- *   1. error.details[] 中找 RetryInfo.retryDelay (如 "0.847655010s")
- *   2. error.details[] 中找 ErrorInfo.metadata.quotaResetDelay (如 "373.801628ms")
- *   3. 正则匹配 error.message 中的 "after Xs"
- * @param {object|string|Buffer} errorBody 错误响应体
- * @returns {number|null} 延迟毫秒数，解析失败返回 null
- */
-function parseRetryDelay(errorBody) {
-  let parsed = null
-  // 安全解析 JSON
-  if (typeof errorBody === 'string') {
-    try {
-      parsed = JSON.parse(errorBody)
-    } catch (_) {
-      parsed = null
-    }
-  } else if (Buffer.isBuffer(errorBody)) {
-    try {
-      parsed = JSON.parse(errorBody.toString('utf8'))
-    } catch (_) {
-      parsed = null
-    }
-  } else if (errorBody && typeof errorBody === 'object') {
-    parsed = errorBody
-  }
-  if (!parsed || typeof parsed !== 'object') {
-    return null
-  }
-  const details = parsed.error?.details
-  if (Array.isArray(details)) {
-    // 策略1: RetryInfo.retryDelay
-    for (const detail of details) {
-      if (detail?.['@type'] === 'type.googleapis.com/google.rpc.RetryInfo') {
-        const { retryDelay } = detail
-        if (typeof retryDelay === 'string' && retryDelay) {
-          const ms = parseDurationToMs(retryDelay)
-          if (ms !== null) {
-            return ms
-          }
-        }
-      }
-    }
-    // 策略2: ErrorInfo.metadata.quotaResetDelay
-    for (const detail of details) {
-      if (detail?.['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo') {
-        const quotaResetDelay = detail.metadata?.quotaResetDelay
-        if (typeof quotaResetDelay === 'string' && quotaResetDelay) {
-          const ms = parseDurationToMs(quotaResetDelay)
-          if (ms !== null) {
-            return ms
-          }
-        }
-      }
-    }
-  }
-  // 策略3: 正则匹配 error.message
-  const message = parsed.error?.message
-  if (typeof message === 'string' && message) {
-    const match = message.match(/after\s+(\d+)s\.?/i)
-    if (match && match[1]) {
-      const seconds = parseInt(match[1], 10)
-      if (!Number.isNaN(seconds)) {
-        return seconds * 1000
-      }
-    }
-  }
-  return null
-}
-/**
- * 解析 Go 风格 duration 字符串为毫秒 (如 "0.847655010s", "373.801628ms")
- */
-function parseDurationToMs(durationStr) {
-  if (!durationStr || typeof durationStr !== 'string') {
-    return null
-  }
-  const str = durationStr.trim().toLowerCase()
-  // 秒: "0.847655010s"
-  if (str.endsWith('s') && !str.endsWith('ms')) {
-    const num = parseFloat(str.slice(0, -1))
-    if (!Number.isNaN(num)) {
-      return Math.round(num * 1000)
-    }
-  }
-  // 毫秒: "373.801628ms"
-  if (str.endsWith('ms')) {
-    const num = parseFloat(str.slice(0, -2))
-    if (!Number.isNaN(num)) {
-      return Math.round(num)
-    }
-  }
-  return null
-}
 
 function getAntigravityApiUrl() {
   return process.env.ANTIGRAVITY_API_URL || 'https://daily-cloudcode-pa.sandbox.googleapis.com'
@@ -153,6 +307,24 @@ function getAntigravityApiUrlCandidates() {
   }
 
   return [configured, prod, daily].filter(Boolean)
+}
+
+function getAntigravityHeaders(accessToken, baseUrl) {
+  const resolvedBaseUrl = baseUrl || getAntigravityApiUrl()
+  let host = 'daily-cloudcode-pa.sandbox.googleapis.com'
+  try {
+    host = new URL(resolvedBaseUrl).host || host
+  } catch (e) {
+    // ignore
+  }
+
+  return {
+    Host: host,
+    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.11.3 windows/amd64',
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'Accept-Encoding': 'gzip'
+  }
 }
 
 function generateAntigravityProjectId() {
@@ -388,8 +560,27 @@ async function request({
     userPromptId
   })
 
+  const cooldownInfo = getModelCooldownInfo(model)
+  if (cooldownInfo.remainingMs > 0) {
+    const retryAfterSeconds = Math.max(1, Math.ceil(cooldownInfo.remainingMs / 1000))
+    const cooldownReason = String(cooldownInfo.reason || '').trim()
+    const cooldownMessage =
+      cooldownReason === 'MODEL_CAPACITY_EXHAUSTED'
+        ? `Model capacity exhausted (cooldown ${retryAfterSeconds}s)`
+        : `The requested model is currently unavailable (cooldown ${retryAfterSeconds}s)`
+    throw createSyntheticAxiosError({
+      status: 429,
+      code: 'ANTIGRAVITY_MODEL_COOLDOWN',
+      message: cooldownMessage,
+      data: { error: { message: cooldownMessage, reason: cooldownReason || null } },
+      headers: { 'retry-after': String(retryAfterSeconds) }
+    })
+  }
+
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
   let endpoints = getAntigravityApiUrlCandidates()
+  const maxFallbacksPerRequest = getMaxFallbacksPerRequest()
+  let fallbackCount = 0
 
   // Claude 模型在 sandbox(daily) 环境下对 tool_use/tool_result 的兼容性不稳定，优先走 prod。
   // 保持可配置优先：若用户显式设置了 ANTIGRAVITY_API_URL，则不改变顺序。
@@ -553,15 +744,56 @@ async function request({
       } catch (error) {
         lastError = error
         const status = error?.response?.status || null
+        const upstreamHeaders = error?.response?.headers || null
+        const upstreamBodyText = await normalizeAxiosErrorResponseBody(error)
+        const upstreamReason = parseGoogleErrorReason(upstreamBodyText)
+        const upstreamModel = parseGoogleErrorDetailModel(upstreamBodyText)
+        const retryDelayMs = parseGoogleRetryDelayMs(upstreamBodyText)
+
+        dumpAntigravityUpstreamResponse({
+          requestId: envelope.requestId,
+          model,
+          statusCode: status,
+          statusText: error?.response?.statusText || null,
+          responseType: 'error',
+          headers: pickUpstreamResponseHeaders(upstreamHeaders),
+          summary: {
+            baseUrl,
+            url,
+            stream: Boolean(stream),
+            reason: upstreamReason,
+            model: upstreamModel,
+            retryDelayMs: retryDelayMs || null
+          },
+          error: {
+            name: error?.name || null,
+            code: error?.code || null,
+            message: error?.message || null
+          },
+          rawData: typeof upstreamBodyText === 'string' ? upstreamBodyText.slice(0, 4096) : null
+        }).catch(() => {})
 
         const hasNext = index + 1 < endpoints.length
-        if (hasNext && isRetryable(error)) {
+        const isQuotaOrRateLimited =
+          status === 429 &&
+          (upstreamReason === 'QUOTA_EXHAUSTED' || upstreamReason === 'RATE_LIMIT_EXCEEDED')
+        const canFallback =
+          hasNext &&
+          !isQuotaOrRateLimited &&
+          fallbackCount < maxFallbacksPerRequest &&
+          isRetryable(error)
+
+        if (canFallback) {
           logger.warn('⚠️ Antigravity upstream error, retrying with fallback baseUrl', {
             status,
             from: baseUrl,
             to: endpoints[index + 1],
-            model
+            model,
+            reason: upstreamReason || undefined,
+            fallbackCount: fallbackCount + 1,
+            maxFallbacksPerRequest
           })
+          fallbackCount += 1
           continue
         }
         throw error
@@ -574,9 +806,8 @@ async function request({
   try {
     return await attemptRequest()
   } catch (error) {
-    // 如果是 429 RESOURCE_EXHAUSTED 且尚未重试过，等待 2 秒后重试一次
     const status = error?.response?.status
-    if (status === 429 && !retriedAfterDelay && !signal?.aborted) {
+    if (status === 429 && !signal?.aborted) {
       const data = error?.response?.data
 
       // 安全地将 data 转为字符串，避免 stream 对象导致循环引用崩溃
@@ -609,45 +840,93 @@ async function request({
       }
 
       const msg = safeDataToString(data)
+      const msgLower = msg.toLowerCase()
+      const upstreamReason = parseGoogleErrorReason(data) || null
+      const retryDelayMs = parseGoogleRetryDelayMs(data)
+      const traceId =
+        error?.response?.headers?.['x-cloudaicompanion-trace-id'] ||
+        error?.response?.headers?.['X-Cloudaicompanion-Trace-Id'] ||
+        null
+
+      error.antigravity = {
+        ...(error.antigravity && typeof error.antigravity === 'object' ? error.antigravity : {}),
+        reason: upstreamReason,
+        retryDelayMs: retryDelayMs || null,
+        traceId
+      }
 
       // 🔍 [诊断日志] 详细记录 429 错误信息
       logger.error(`❌ [Antigravity诊断] 429 错误详情`, {
         model,
         stream,
         errorMessage: msg.substring(0, 500),
+        reason: upstreamReason,
+        retryDelayMs: retryDelayMs || null,
+        traceId,
         responseHeaders: error?.response?.headers,
-        isResourceExhausted: msg.toLowerCase().includes('resource_exhausted'),
-        isNoCapacity: msg.toLowerCase().includes('no capacity'),
+        isResourceExhausted: msgLower.includes('resource_exhausted'),
+        isNoCapacity: msgLower.includes('no capacity'),
+        isModelUnavailable: msgLower.includes('requested model is currently unavailable'),
         url: error?.config?.url,
         tip: '如果此错误频繁发生在非流式 + 工具请求上，可能是 API 限制'
       })
 
-      if (
-        msg.toLowerCase().includes('resource_exhausted') ||
-        msg.toLowerCase().includes('no capacity')
-      ) {
-        retriedAfterDelay = true
-        logger.warn('⏳ Antigravity 429 RESOURCE_EXHAUSTED, waiting 2s before retry', {
-          model,
-          stream
-        })
-
-        //  从响应体解析精确延迟，失败时回退 2000ms
-        let parsedData = data
-        if (typeof data === 'string') {
-          try {
-            parsedData = JSON.parse(data)
-          } catch (_) {
-            parsedData = null
-          }
+      // 429：按 reason 分流
+      if (upstreamReason === 'RATE_LIMIT_EXCEEDED' || upstreamReason === 'QUOTA_EXHAUSTED') {
+        // 交由上层（账号池/调度器）处理：这里不做延迟重试，避免同账号反复撞限流。
+        if (retryDelayMs && retryDelayMs > 0 && error?.response?.headers) {
+          error.response.headers['retry-after'] = String(
+            Math.max(1, Math.ceil(retryDelayMs / 1000))
+          )
         }
-        const delayMs = parseRetryDelay(parsedData) || 2000
-        logger.warn(`⏳ Antigravity 429 RESOURCE_EXHAUSTED, waiting ${delayMs}ms before retry`, {
+      } else {
+        const looksLikeCapacityExhausted =
+          upstreamReason === 'MODEL_CAPACITY_EXHAUSTED' ||
+          (!upstreamReason && msgLower.includes('no capacity'))
+
+        if (looksLikeCapacityExhausted) {
+          if (!retriedAfterDelay) {
+            retriedAfterDelay = true
+            const delayMs = retryDelayMs && retryDelayMs > 0 ? retryDelayMs : 2000
+            const boundedDelayMs = Math.min(delayMs, 10000)
+            logger.warn(
+              `⏳ Antigravity 429 capacity exhausted, waiting ${boundedDelayMs}ms before retry`,
+              {
+                model,
+                stream,
+                reason: upstreamReason || undefined,
+                parsedDelayMs: retryDelayMs || null
+              }
+            )
+            await new Promise((resolve) => setTimeout(resolve, boundedDelayMs))
+            return await attemptRequest()
+          }
+
+          // 二次失败：进入模型级冷却，避免短时间内反复打穿（不做模型降级）。
+          const cooldownMs = Math.max(getModelCapacityCooldownMs(), retryDelayMs || 0)
+          setModelCooldown(model, cooldownMs, 'MODEL_CAPACITY_EXHAUSTED')
+          if (error?.response?.headers) {
+            error.response.headers['retry-after'] = String(
+              Math.max(1, Math.ceil(cooldownMs / 1000))
+            )
+          }
+          logger.warn('⏳ Antigravity model capacity exhausted, entering model cooldown', {
+            model,
+            cooldownMs
+          })
+        }
+      }
+
+      // 模型不可用：按模型级冷却处理，避免短时间内反复请求。
+      if (msgLower.includes('requested model is currently unavailable')) {
+        const cooldownMs =
+          (retryDelayMs && retryDelayMs > 0 ? retryDelayMs : null) ||
+          getModelUnavailableCooldownMs()
+        setModelCooldown(model, cooldownMs, 'model_unavailable')
+        logger.warn('⏳ Antigravity model unavailable, entering cooldown', {
           model,
-          parsedDelayMs: delayMs
+          cooldownMs
         })
-        await new Promise((resolve) => setTimeout(resolve, delayMs))
-        return await attemptRequest()
       }
     }
     throw error
