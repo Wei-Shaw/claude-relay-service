@@ -1189,6 +1189,110 @@ async function handleOnboardUser(req, res) {
 }
 
 /**
+ * 处理 retrieveUserQuota 请求
+ * POST /v1internal:retrieveUserQuota
+ *
+ * 功能：查询用户在各个Gemini模型上的配额使用情况
+ * 请求体：{ "project": "项目ID" }
+ * 响应：{ "buckets": [...] }
+ */
+async function handleRetrieveUserQuota(req, res) {
+  try {
+    // 1. 权限检查
+    if (!ensureGeminiPermission(req, res)) {
+      return undefined
+    }
+
+    // 2. 会话哈希
+    const sessionHash = sessionHelper.generateSessionHash(req.body)
+
+    // 3. 账户选择
+    const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
+    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
+      req.apiKey,
+      sessionHash,
+      requestedModel
+    )
+    const { accountId, accountType } = schedulerResult
+
+    // 4. 账户类型验证 - v1internal 路由只支持 OAuth 账户
+    if (accountType === 'gemini-api') {
+      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
+      return res.status(400).json({
+        error: {
+          message:
+            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
+          type: 'invalid_account_type'
+        }
+      })
+    }
+
+    // 5. 获取账户
+    const account = await geminiAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({
+        error: {
+          message: 'Gemini account not found',
+          type: 'account_not_found'
+        }
+      })
+    }
+    const { accessToken, refreshToken, projectId } = account
+
+    // 6. 从请求体提取项目字段（注意：字段名是 "project"，不是 "cloudaicompanionProject"）
+    const requestProject = req.body.project
+
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
+    logger.info(`RetrieveUserQuota request (${version})`, {
+      requestedProject: requestProject || null,
+      accountProject: projectId || null,
+      apiKeyId: req.apiKey?.id || 'unknown'
+    })
+
+    // 7. 解析账户的代理配置
+    const proxyConfig = parseProxyConfig(account)
+
+    // 8. 获取OAuth客户端
+    const client = await geminiAccountService.getOauthClient(accessToken, refreshToken, proxyConfig)
+
+    // 9. 智能处理项目ID（与其他 v1internal 接口保持一致）
+    const effectiveProject = projectId || requestProject || null
+
+    logger.info('📋 retrieveUserQuota项目ID处理逻辑', {
+      accountProjectId: projectId,
+      requestProject,
+      effectiveProject,
+      decision: projectId ? '使用账户配置' : requestProject ? '使用请求参数' : '不使用项目ID'
+    })
+
+    // 10. 构建请求体（注入 effectiveProject）
+    const requestBody = { ...req.body }
+    if (effectiveProject) {
+      requestBody.project = effectiveProject
+    }
+
+    // 11. 调用底层服务转发请求
+    const response = await geminiAccountService.forwardToCodeAssist(
+      client,
+      'retrieveUserQuota',
+      requestBody,
+      proxyConfig
+    )
+
+    res.json(response)
+  } catch (error) {
+    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
+    logger.error(`Error in retrieveUserQuota endpoint (${version})`, {
+      error: error.message
+    })
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    })
+  }
+}
+
+/**
  * 处理 countTokens 请求
  */
 async function handleCountTokens(req, res) {
@@ -2698,6 +2802,7 @@ module.exports = {
   handleSimpleEndpoint,
   handleLoadCodeAssist,
   handleOnboardUser,
+  handleRetrieveUserQuota,
   handleCountTokens,
   handleGenerateContent,
   handleStreamGenerateContent,

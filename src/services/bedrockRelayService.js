@@ -343,8 +343,8 @@ class BedrockRelayService {
             res.write(`event: ${claudeEvent.type}\n`)
             res.write(`data: ${JSON.stringify(claudeEvent.data)}\n\n`)
 
-            // 提取使用统计
-            if (claudeEvent.type === 'message_stop' && claudeEvent.data.usage) {
+            // 提取使用统计 (usage is reported in message_delta per Claude API spec)
+            if (claudeEvent.type === 'message_delta' && claudeEvent.data.usage) {
               totalUsage = claudeEvent.data.usage
             }
 
@@ -576,14 +576,28 @@ class BedrockRelayService {
       return {
         type: 'message_start',
         data: {
-          type: 'message',
-          id: `msg_${Date.now()}_bedrock`,
-          role: 'assistant',
-          content: [],
-          model: this.defaultModel,
-          stop_reason: null,
-          stop_sequence: null,
-          usage: bedrockChunk.message?.usage || { input_tokens: 0, output_tokens: 0 }
+          type: 'message_start',
+          message: {
+            id: `msg_${Date.now()}_bedrock`,
+            type: 'message',
+            role: 'assistant',
+            content: [],
+            model: this.defaultModel,
+            stop_reason: null,
+            stop_sequence: null,
+            usage: bedrockChunk.message?.usage || { input_tokens: 0, output_tokens: 0 }
+          }
+        }
+      }
+    }
+
+    if (bedrockChunk.type === 'content_block_start') {
+      return {
+        type: 'content_block_start',
+        data: {
+          type: 'content_block_start',
+          index: bedrockChunk.index || 0,
+          content_block: bedrockChunk.content_block || { type: 'text', text: '' }
         }
       }
     }
@@ -592,8 +606,19 @@ class BedrockRelayService {
       return {
         type: 'content_block_delta',
         data: {
+          type: 'content_block_delta',
           index: bedrockChunk.index || 0,
           delta: bedrockChunk.delta || {}
+        }
+      }
+    }
+
+    if (bedrockChunk.type === 'content_block_stop') {
+      return {
+        type: 'content_block_stop',
+        data: {
+          type: 'content_block_stop',
+          index: bedrockChunk.index || 0
         }
       }
     }
@@ -602,6 +627,7 @@ class BedrockRelayService {
       return {
         type: 'message_delta',
         data: {
+          type: 'message_delta',
           delta: bedrockChunk.delta || {},
           usage: bedrockChunk.usage || {}
         }
@@ -612,7 +638,7 @@ class BedrockRelayService {
       return {
         type: 'message_stop',
         data: {
-          usage: bedrockChunk.usage || {}
+          type: 'message_stop'
         }
       }
     }
