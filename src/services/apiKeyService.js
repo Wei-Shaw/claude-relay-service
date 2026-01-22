@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid')
 const config = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const { isClaudeFamilyModel } = require('../utils/modelHelper')
 
 const ACCOUNT_TYPE_CONFIG = {
   claude: { prefix: 'claude:account:' },
@@ -1019,6 +1020,9 @@ class ApiKeyService {
         logger.database(
           `💰 Recorded cost for ${keyId}: $${costInfo.costs.total.toFixed(6)}, model: ${model}`
         )
+
+        // 记录 Claude 周费用（如果适用）
+        await this.recordClaudeWeeklyCost(keyId, costInfo.costs.total, model, null)
       } else {
         logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
       }
@@ -1082,33 +1086,29 @@ class ApiKeyService {
     }
   }
 
-  // 📊 记录 Opus 模型费用（仅限 claude 和 claude-console 账户）
-  async recordOpusCost(keyId, cost, model, accountType) {
+  // 📊 记录 Claude 模型周费用（API Key 维度）
+  async recordClaudeWeeklyCost(keyId, cost, model, accountType) {
     try {
-      // 判断是否为 Opus 模型
-      if (!model || !model.toLowerCase().includes('claude-opus')) {
-        return // 不是 Opus 模型，直接返回
+      // 判断是否为 Claude 系列模型（包含 Bedrock 格式等）
+      if (!isClaudeFamilyModel(model)) {
+        return
       }
 
-      // 判断是否为 claude、claude-console 或 ccr 账户
-      if (
-        !accountType ||
-        (accountType !== 'claude' && accountType !== 'claude-console' && accountType !== 'ccr')
-      ) {
-        logger.debug(`⚠️ Skipping Opus cost recording for non-Claude account type: ${accountType}`)
-        return // 不是 claude 账户，直接返回
-      }
-
-      // 记录 Opus 周费用
+      // 记录 Claude 周费用
       await redis.incrementWeeklyOpusCost(keyId, cost)
       logger.database(
-        `💰 Recorded Opus weekly cost for ${keyId}: $${cost.toFixed(
+        `💰 Recorded Claude weekly cost for ${keyId}: $${cost.toFixed(
           6
-        )}, model: ${model}, account type: ${accountType}`
+        )}, model: ${model}${accountType ? `, account type: ${accountType}` : ''}`
       )
     } catch (error) {
-      logger.error('❌ Failed to record Opus cost:', error)
+      logger.error('❌ Failed to record Claude weekly cost:', error)
     }
+  }
+
+  // 向后兼容：旧名字是 Opus-only 口径；现在周费用统计已扩展为 Claude 全模型口径。
+  async recordOpusCost(keyId, cost, model, accountType) {
+    return this.recordClaudeWeeklyCost(keyId, cost, model, accountType)
   }
 
   // 📊 记录使用情况（新版本，支持详细的缓存类型）
@@ -1210,8 +1210,8 @@ class ApiKeyService {
           `💰 Recorded cost for ${keyId}: $${costInfo.totalCost.toFixed(6)}, model: ${model}`
         )
 
-        // 记录 Opus 周费用（如果适用）
-        await this.recordOpusCost(keyId, costInfo.totalCost, model, accountType)
+        // 记录 Claude 周费用（如果适用）
+        await this.recordClaudeWeeklyCost(keyId, costInfo.totalCost, model, accountType)
 
         // 记录详细的缓存费用（如果有）
         if (costInfo.ephemeral5mCost > 0 || costInfo.ephemeral1hCost > 0) {

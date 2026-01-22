@@ -94,6 +94,15 @@ class Application {
         )
       }
 
+      // 💰 启动回填：本周 Claude 周费用（用于 API Key 维度周限额）
+      try {
+        logger.info('💰 Backfilling current-week Claude weekly cost...')
+        const weeklyClaudeCostInitService = require('./services/weeklyClaudeCostInitService')
+        await weeklyClaudeCostInitService.backfillCurrentWeekClaudeCosts()
+      } catch (error) {
+        logger.warn('⚠️ Weekly Claude cost backfill failed (startup continues):', error.message)
+      }
+
       // 🕐 初始化Claude账户会话窗口
       logger.info('🕐 Initializing Claude account session windows...')
       const claudeAccountService = require('./services/claudeAccountService')

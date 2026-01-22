@@ -188,10 +188,54 @@ function isOpus45OrNewer(modelName) {
   return false
 }
 
+/**
+ * 判断某个 model 名称是否属于 Anthropic Claude 系列模型。
+ *
+ * 用于 API Key 维度的限额/统计（Claude 周费用）。这里刻意覆盖以下命名：
+ * - 标准 Anthropic 模型：claude-*，包括 claude-3-opus、claude-sonnet-*、claude-haiku-* 等
+ * - Bedrock 模型：{region}.anthropic.claude-... / anthropic.claude-...
+ * - 少数情况下 model 字段可能只包含家族关键词（sonnet/haiku/opus），也视为 Claude 系列
+ *
+ * 注意：会先去掉支持的 vendor 前缀（例如 "ccr,"）。
+ */
+function isClaudeFamilyModel(modelName) {
+  if (!modelName || typeof modelName !== 'string') {
+    return false
+  }
+
+  const { baseModel } = parseVendorPrefixedModel(modelName)
+  const m = (baseModel || '').trim().toLowerCase()
+  if (!m) {
+    return false
+  }
+
+  // Bedrock 模型格式
+  if (
+    m.includes('.anthropic.claude-') ||
+    m.startsWith('anthropic.claude-') ||
+    m.includes('.claude-')
+  ) {
+    return true
+  }
+
+  // 标准 Anthropic 模型 ID
+  if (m.startsWith('claude-') || m.includes('claude-')) {
+    return true
+  }
+
+  // 兜底：某些下游链路里 model 字段可能不带 "claude-" 前缀，但仍包含家族关键词。
+  if (m.includes('opus') || m.includes('sonnet') || m.includes('haiku')) {
+    return true
+  }
+
+  return false
+}
+
 module.exports = {
   parseVendorPrefixedModel,
   hasVendorPrefix,
   getEffectiveModel,
   getVendorType,
-  isOpus45OrNewer
+  isOpus45OrNewer,
+  isClaudeFamilyModel
 }
