@@ -452,6 +452,8 @@ class UnifiedOpenAIScheduler {
         (account.isActive === true || account.isActive === 'true') &&
         account.status !== 'error' &&
         account.status !== 'rateLimited' &&
+        account.status !== 'quotaExceeded' &&
+        account.status !== 'unauthorized' &&
         (account.accountType === 'shared' || !account.accountType)
       ) {
         const hasRateLimitFlag = this._hasRateLimitFlag(account.rateLimitStatus)
@@ -539,7 +541,9 @@ class UnifiedOpenAIScheduler {
           !account ||
           (account.isActive !== true && account.isActive !== 'true') ||
           account.status === 'error' ||
-          account.status === 'unauthorized'
+          account.status === 'unauthorized' ||
+          account.status === 'rateLimited' ||
+          account.status === 'quotaExceeded'
         ) {
           return false
         }
@@ -845,7 +849,10 @@ class UnifiedOpenAIScheduler {
         if (
           account &&
           (account.isActive === true || account.isActive === 'true') &&
-          account.status !== 'error'
+          account.status !== 'error' &&
+          account.status !== 'rateLimited' &&
+          account.status !== 'quotaExceeded' &&
+          account.status !== 'unauthorized'
         ) {
           const readiness = await this._ensureAccountReadyForScheduling(account, account.id, {
             sanitized: false
