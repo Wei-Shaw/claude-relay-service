@@ -1,0 +1,111 @@
+### d53a399d - revert: 回退到安全漏洞修复版本
+**作者**: shaw | **时间**: 4 weeks ago
+
+### 6165fad0 - docs: 添加安全漏洞警告
+**作者**: shaw | **时间**: 4 weeks ago
+
+### 1f06af4a - chore: trigger release [force release]
+**作者**: shaw | **时间**: 4 weeks ago
+
+### fc571332 - chore: sync VERSION file with release v1.1.249 [skip ci]
+**作者**: github-actions[bot] | **时间**: 4 weeks ago
+
+### 45b81bd4 - fix: 修复 authenticateUserOrAdmin 认证绕过漏洞
+**作者**: Junming Chen | **时间**: 3 weeks ago
+
+### 3c64038f - Create SECURITY.md for security policy [skip ci]
+**作者**: Wesley Liddick | **时间**: 3 weeks ago
+
+### a345812c - chore: sync VERSION file with release v1.1.250 [skip ci]
+**作者**: github-actions[bot] | **时间**: 3 weeks ago
+
+### c4448db6 - fix: 防止客户端断开连接时服务崩溃
+**作者**: Chapoly1305 | **时间**: 3 weeks ago
+
+### 0a59a0f9 - chore: sync VERSION file with release v1.1.251 [skip ci]
+**作者**: github-actions[bot] | **时间**: 3 weeks ago
+
+### 2693fd77 - fix: 移除context_management字段，避免报错
+**作者**: shaw | **时间**: 2 weeks ago
+
+### 39ba345a - chore: sync VERSION file with release v1.1.252 [skip ci]
+**作者**: github-actions[bot] | **时间**: 2 weeks ago
+
+### a749ddfe - fix: 主动刷新等待重置的 Claude 账户 Token（防止 5小时/7天 等待期间 Token 过期）
+**作者**: QTom | **时间**: 2 weeks ago
+
+### adf2890f - fix: 去除context_management会导致压缩失败还原逻辑 [skip ci]
+**作者**: shaw | **时间**: 2 weeks ago
+
+### 8a4dadbb - fix(security): 修复余额脚本功能的RCE和SSRF漏洞
+**作者**: shaw | **时间**: 2 weeks ago
+
+### b9c088ce - chore: sync VERSION file with release v1.1.253 [skip ci]
+**作者**: github-actions[bot] | **时间**: 2 weeks ago
+
+### 6682e0a9 - fix: 主动刷新等待重置的 Claude 账户 Token（防止 5小时/7天 等待期间 Token 过期）
+**作者**: QTom | **时间**: 2 weeks ago
+
+### b924c3c5 - update readme
+**作者**: shaw | **时间**: 13 days ago
+
+### 6caabb54 - update readme
+**作者**: shaw | **时间**: 13 days ago
+
+### e20ce86a - feat: Antigravity 账号注入 systemInstruction 和 requestType header
+**作者**: shaw | **时间**: 13 days ago
+
+### 114e9fac - chore: sync VERSION file with release v1.1.254 [skip ci]
+**作者**: github-actions[bot] | **时间**: 13 days ago
+
+### 4723328b - fix: 添加 OpenAI 兼容路由对 Claude Console 账户的支持
+**作者**: QTom | **时间**: 12 days ago
+
+### 1dad810d - refactor: 统一权限检查逻辑，使用 apiKeyService.hasPermission
+**作者**: QTom | **时间**: 12 days ago
+
+### 810fe9fe - chore: sync VERSION file with release v1.1.255 [skip ci]
+**作者**: github-actions[bot] | **时间**: 12 days ago
+
+### 28b27e6a - fix: claude subscription detection
+**作者**: jett | **时间**: 12 days ago
+
+### ed835d0c - using TTL-based random suffix
+**作者**: jett | **时间**: 12 days ago
+
+### b397954e - fix lint
+**作者**: jett | **时间**: 11 days ago
+
+### 549c95eb - feat: 为 AWS Bedrock 账户添加 Bearer Token 认证支持
+**作者**: juenjunli | **时间**: 11 days ago
+
+### b0787377 - fix
+**作者**: juenjunli | **时间**: 11 days ago
+
+### 94f239b5 - feat: 添加 Claude 4.5 系列模型支持到 AWS Bedrock 映射表
+**作者**: juenjunli | **时间**: 11 days ago
+
+### 962e01b0 - chore: sync VERSION file with release v1.1.256 [skip ci]
+**作者**: github-actions[bot] | **时间**: 11 days ago
+
+### f535b35a - fix(memory): use bodyStore to avoid closure capturing request body
+**作者**: root | **时间**: 9 days ago
+
+### b2602773 - fix(memory): clear bodyString after req.write() to prevent closure capture
+**作者**: root | **时间**: 9 days ago
+
+### ba815de0 - fix(memory): extract req properties to avoid closure capturing entire request object
+**作者**: root | **时间**: 9 days ago
+
+### 9d1a4510 - fix(memory): comprehensive req closure capture fixes
+**作者**: root | **时间**: 9 days ago
+
+### b1485374 - style: fix prettier formatting
+**作者**: root | **时间**: 9 days ago
+
+### 189d53d7 - style: fix ESLint prefer-const and formatting
+**作者**: root | **时间**: 9 days ago
+
+### 35ab34d6 - chore: sync VERSION file with release v1.1.257 [skip ci]
+**作者**: github-actions[bot] | **时间**: 7 days ago
+

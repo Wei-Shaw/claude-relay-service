@@ -364,7 +364,8 @@ const platformLabelMap = {
   'openai-responses': 'OpenAI Responses',
   gemini: 'Gemini',
   'gemini-api': 'Gemini API',
-  droid: 'Droid'
+  droid: 'Droid',
+  bedrock: 'Claude AWS Bedrock'
 }
 
 const platformLabel = computed(() => platformLabelMap[props.account?.platform] || '未知平台')

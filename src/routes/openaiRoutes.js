@@ -904,7 +904,7 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
       id: keyData.id,
       name: keyData.name,
       description: keyData.description,
-      permissions: keyData.permissions || 'all',
+      permissions: keyData.permissions,
       token_limit: keyData.tokenLimit,
       tokens_used: keyData.usage.total.tokens,
       tokens_remaining:

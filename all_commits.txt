@@ -1,0 +1,37 @@
+35ab34d6|chore: sync VERSION file with release v1.1.257 [skip ci]
+189d53d7|style: fix ESLint prefer-const and formatting
+b1485374|style: fix prettier formatting
+9d1a4510|fix(memory): comprehensive req closure capture fixes
+ba815de0|fix(memory): extract req properties to avoid closure capturing entire request object
+b2602773|fix(memory): clear bodyString after req.write() to prevent closure capture
+f535b35a|fix(memory): use bodyStore to avoid closure capturing request body
+962e01b0|chore: sync VERSION file with release v1.1.256 [skip ci]
+94f239b5|feat: 添加 Claude 4.5 系列模型支持到 AWS Bedrock 映射表
+b0787377|fix
+549c95eb|feat: 为 AWS Bedrock 账户添加 Bearer Token 认证支持
+b397954e|fix lint
+ed835d0c|using TTL-based random suffix
+28b27e6a|fix: claude subscription detection
+810fe9fe|chore: sync VERSION file with release v1.1.255 [skip ci]
+1dad810d|refactor: 统一权限检查逻辑，使用 apiKeyService.hasPermission
+4723328b|fix: 添加 OpenAI 兼容路由对 Claude Console 账户的支持
+114e9fac|chore: sync VERSION file with release v1.1.254 [skip ci]
+e20ce86a|feat: Antigravity 账号注入 systemInstruction 和 requestType header
+6caabb54|update readme
+b924c3c5|update readme
+6682e0a9|fix: 主动刷新等待重置的 Claude 账户 Token（防止 5小时/7天 等待期间 Token 过期）
+b9c088ce|chore: sync VERSION file with release v1.1.253 [skip ci]
+8a4dadbb|fix(security): 修复余额脚本功能的RCE和SSRF漏洞
+adf2890f|fix: 去除context_management会导致压缩失败还原逻辑 [skip ci]
+a749ddfe|fix: 主动刷新等待重置的 Claude 账户 Token（防止 5小时/7天 等待期间 Token 过期）
+39ba345a|chore: sync VERSION file with release v1.1.252 [skip ci]
+2693fd77|fix: 移除context_management字段，避免报错
+0a59a0f9|chore: sync VERSION file with release v1.1.251 [skip ci]
+c4448db6|fix: 防止客户端断开连接时服务崩溃
+a345812c|chore: sync VERSION file with release v1.1.250 [skip ci]
+3c64038f|Create SECURITY.md for security policy [skip ci]
+45b81bd4|fix: 修复 authenticateUserOrAdmin 认证绕过漏洞
+fc571332|chore: sync VERSION file with release v1.1.249 [skip ci]
+1f06af4a|chore: trigger release [force release]
+6165fad0|docs: 添加安全漏洞警告
+d53a399d|revert: 回退到安全漏洞修复版本
