@@ -1473,8 +1473,12 @@ class RedisClient {
       // 多抽样检查：抽取最多 3 个 keyId 检查是否有 alltime 数据
       const sampleIndices = new Set()
       sampleIndices.add(0) // 始终包含第一个
-      if (keyIds.length > 1) sampleIndices.add(keyIds.length - 1) // 包含最后一个
-      if (keyIds.length > 2) sampleIndices.add(Math.floor(keyIds.length / 2)) // 包含中间一个
+      if (keyIds.length > 1) {
+        sampleIndices.add(keyIds.length - 1)
+      } // 包含最后一个
+      if (keyIds.length > 2) {
+        sampleIndices.add(Math.floor(keyIds.length / 2))
+      } // 包含中间一个
 
       let hasAnyAlltimeData = false
       for (const idx of sampleIndices) {

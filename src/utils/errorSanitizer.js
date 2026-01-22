@@ -94,14 +94,23 @@ function mapToErrorCode(error, options = {}) {
 
   // 先按 HTTP 状态码快速匹配
   if (statusCode) {
-    if (statusCode === 401) matchedCode = 'E003'
-    else if (statusCode === 403) matchedCode = 'E009'
-    else if (statusCode === 404) matchedCode = 'E010'
-    else if (statusCode === 429) matchedCode = 'E004'
-    else if (statusCode === 502) matchedCode = 'E007'
-    else if (statusCode === 503) matchedCode = 'E001'
-    else if (statusCode === 504) matchedCode = 'E008'
-    else if (statusCode === 529) matchedCode = 'E012'
+    if (statusCode === 401) {
+      matchedCode = 'E003'
+    } else if (statusCode === 403) {
+      matchedCode = 'E009'
+    } else if (statusCode === 404) {
+      matchedCode = 'E010'
+    } else if (statusCode === 429) {
+      matchedCode = 'E004'
+    } else if (statusCode === 502) {
+      matchedCode = 'E007'
+    } else if (statusCode === 503) {
+      matchedCode = 'E001'
+    } else if (statusCode === 504) {
+      matchedCode = 'E008'
+    } else if (statusCode === 529) {
+      matchedCode = 'E012'
+    }
   }
 
   // 再按消息内容精确匹配（可能覆盖状态码匹配）
@@ -117,10 +126,15 @@ function mapToErrorCode(error, options = {}) {
   // 按错误 code 匹配（网络错误）
   if (errorCode) {
     const codeStr = String(errorCode).toUpperCase()
-    if (codeStr === 'ENOTFOUND' || codeStr === 'EAI_AGAIN') matchedCode = 'E002'
-    else if (codeStr === 'ECONNREFUSED' || codeStr === 'ECONNRESET') matchedCode = 'E002'
-    else if (codeStr === 'ETIMEDOUT' || codeStr === 'ESOCKETTIMEDOUT') matchedCode = 'E008'
-    else if (codeStr === 'ECONNABORTED') matchedCode = 'E002'
+    if (codeStr === 'ENOTFOUND' || codeStr === 'EAI_AGAIN') {
+      matchedCode = 'E002'
+    } else if (codeStr === 'ECONNREFUSED' || codeStr === 'ECONNRESET') {
+      matchedCode = 'E002'
+    } else if (codeStr === 'ETIMEDOUT' || codeStr === 'ESOCKETTIMEDOUT') {
+      matchedCode = 'E008'
+    } else if (codeStr === 'ECONNABORTED') {
+      matchedCode = 'E002'
+    }
   }
 
   const result = ERROR_CODES[matchedCode]
@@ -135,12 +149,24 @@ function mapToErrorCode(error, options = {}) {
  * 提取原始错误消息
  */
 function extractOriginalMessage(error) {
-  if (!error) return ''
-  if (typeof error === 'string') return error
-  if (error.message) return error.message
-  if (error.response?.data?.error?.message) return error.response.data.error.message
-  if (error.response?.data?.error) return String(error.response.data.error)
-  if (error.response?.data?.message) return error.response.data.message
+  if (!error) {
+    return ''
+  }
+  if (typeof error === 'string') {
+    return error
+  }
+  if (error.message) {
+    return error.message
+  }
+  if (error.response?.data?.error?.message) {
+    return error.response.data.error.message
+  }
+  if (error.response?.data?.error) {
+    return String(error.response.data.error)
+  }
+  if (error.response?.data?.message) {
+    return error.response.data.message
+  }
   return ''
 }
 
@@ -188,7 +214,9 @@ function getSafeMessage(error, options = {}) {
 
 // 兼容旧接口
 function sanitizeErrorMessage(message) {
-  if (!message) return 'Service temporarily unavailable'
+  if (!message) {
+    return 'Service temporarily unavailable'
+  }
   return mapToErrorCode({ message }, { logOriginal: false }).message
 }
 
@@ -201,9 +229,13 @@ function extractErrorMessage(body) {
 }
 
 function isAccountDisabledError(statusCode, body) {
-  if (statusCode !== 400) return false
+  if (statusCode !== 400) {
+    return false
+  }
   const message = extractOriginalMessage(body)
-  if (!message) return false
+  if (!message) {
+    return false
+  }
   const lower = message.toLowerCase()
   return (
     lower.includes('organization has been disabled') ||

@@ -8,7 +8,13 @@ function toNumber(value) {
 }
 
 // keyId 和 accountType 用于计算倍率成本
-async function updateRateLimitCounters(rateLimitInfo, usageSummary, model, keyId = null, accountType = null) {
+async function updateRateLimitCounters(
+  rateLimitInfo,
+  usageSummary,
+  model,
+  keyId = null,
+  accountType = null
+) {
   if (!rateLimitInfo) {
     return { totalTokens: 0, totalCost: 0, ratedCost: 0 }
   }

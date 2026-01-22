@@ -1193,7 +1193,9 @@ async function importData() {
               pipeline.hset(`usage:global:daily:${date}`, field, value)
             }
           }
-          logger.info(`📥 Importing ${Object.keys(globalStats.globalDaily).length} global daily stats`)
+          logger.info(
+            `📥 Importing ${Object.keys(globalStats.globalDaily).length} global daily stats`
+          )
         }
 
         // 导入全局每月统计
@@ -1203,7 +1205,9 @@ async function importData() {
               pipeline.hset(`usage:global:monthly:${month}`, field, value)
             }
           }
-          logger.info(`📥 Importing ${Object.keys(globalStats.globalMonthly).length} global monthly stats`)
+          logger.info(
+            `📥 Importing ${Object.keys(globalStats.globalMonthly).length} global monthly stats`
+          )
         }
 
         // 导入每日统计

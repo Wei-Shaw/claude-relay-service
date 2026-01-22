@@ -2673,13 +2673,14 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
         costFormatted: CostCalculator.formatCost(computedCost),
         realCost: Number(realCost.toFixed(6)),
         realCostFormatted: CostCalculator.formatCost(realCost),
-        costBreakdown: record.realCostBreakdown || record.costBreakdown || {
-          input: costData?.costs?.input || 0,
-          output: costData?.costs?.output || 0,
-          cacheCreate: costData?.costs?.cacheWrite || 0,
-          cacheRead: costData?.costs?.cacheRead || 0,
-          total: costData?.costs?.total || computedCost
-        },
+        costBreakdown: record.realCostBreakdown ||
+          record.costBreakdown || {
+            input: costData?.costs?.input || 0,
+            output: costData?.costs?.output || 0,
+            cacheCreate: costData?.costs?.cacheWrite || 0,
+            cacheRead: costData?.costs?.cacheRead || 0,
+            total: costData?.costs?.total || computedCost
+          },
         responseTime: record.responseTime || null
       })
     }
@@ -2986,13 +2987,14 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
         costFormatted: CostCalculator.formatCost(computedCost),
         realCost: Number(realCost.toFixed(6)),
         realCostFormatted: CostCalculator.formatCost(realCost),
-        costBreakdown: record.realCostBreakdown || record.costBreakdown || {
-          input: costData?.costs?.input || 0,
-          output: costData?.costs?.output || 0,
-          cacheCreate: costData?.costs?.cacheWrite || 0,
-          cacheRead: costData?.costs?.cacheRead || 0,
-          total: costData?.costs?.total || computedCost
-        },
+        costBreakdown: record.realCostBreakdown ||
+          record.costBreakdown || {
+            input: costData?.costs?.input || 0,
+            output: costData?.costs?.output || 0,
+            cacheCreate: costData?.costs?.cacheWrite || 0,
+            cacheRead: costData?.costs?.cacheRead || 0,
+            total: costData?.costs?.total || computedCost
+          },
         responseTime: record.responseTime || null
       })
     }

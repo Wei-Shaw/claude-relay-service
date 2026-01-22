@@ -27,7 +27,14 @@ const {
 } = require('../services/anthropicGeminiBridgeService')
 const router = express.Router()
 
-function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '', keyId = null, accountType = null) {
+function queueRateLimitUpdate(
+  rateLimitInfo,
+  usageSummary,
+  model,
+  context = '',
+  keyId = null,
+  accountType = null
+) {
   if (!rateLimitInfo) {
     return Promise.resolve({ totalTokens: 0, totalCost: 0 })
   }

@@ -162,7 +162,7 @@ class ApiKeyService {
     const hashedKey = this._hashApiKey(apiKey)
 
     // 处理 permissions
-    let permissionsValue = permissions
+    const permissionsValue = permissions
 
     const keyData = {
       id: keyId,
@@ -623,7 +623,9 @@ class ApiKeyService {
 
     // 统计 API Key 上的标签（trim 后统计）
     for (const key of apiKeys) {
-      if (key.isDeleted === 'true') continue
+      if (key.isDeleted === 'true') {
+        continue
+      }
       let tags = []
       try {
         const parsed = key.tags ? JSON.parse(key.tags) : []
@@ -666,7 +668,9 @@ class ApiKeyService {
     let affectedCount = 0
 
     for (const key of apiKeys) {
-      if (key.isDeleted === 'true') continue
+      if (key.isDeleted === 'true') {
+        continue
+      }
       let tags = []
       try {
         const parsed = key.tags ? JSON.parse(key.tags) : []
@@ -709,7 +713,9 @@ class ApiKeyService {
     let foundInKeys = false
 
     for (const key of apiKeys) {
-      if (key.isDeleted === 'true') continue
+      if (key.isDeleted === 'true') {
+        continue
+      }
       let tags = []
       try {
         const parsed = key.tags ? JSON.parse(key.tags) : []

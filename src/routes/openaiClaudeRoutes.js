@@ -24,7 +24,14 @@ function checkPermissions(apiKeyData, requiredPermission = 'claude') {
   return apiKeyService.hasPermission(apiKeyData?.permissions, requiredPermission)
 }
 
-function queueRateLimitUpdate(rateLimitInfo, usageSummary, model, context = '', keyId = null, accountType = null) {
+function queueRateLimitUpdate(
+  rateLimitInfo,
+  usageSummary,
+  model,
+  context = '',
+  keyId = null,
+  accountType = null
+) {
   if (!rateLimitInfo) {
     return
   }

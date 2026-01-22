@@ -828,7 +828,7 @@ router.post('/api/batch-model-stats', async (req, res) => {
       }
 
       // 优先使用存储的费用，否则回退到重新计算
-      const hasStoredCost = usage.hasStoredCost
+      const { hasStoredCost } = usage
       const costData = CostCalculator.calculateCost(usageData, model)
 
       // 如果有存储的费用，覆盖计算的费用

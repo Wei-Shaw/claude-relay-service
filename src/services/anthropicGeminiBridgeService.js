@@ -1800,7 +1800,13 @@ function dumpToolsPayload({ vendor, model, tools, toolChoice }) {
  * 更新速率限制计数器
  * 跟踪 token 使用量和成本
  */
-async function applyRateLimitTracking(rateLimitInfo, usageSummary, model, context = '', keyId = null) {
+async function applyRateLimitTracking(
+  rateLimitInfo,
+  usageSummary,
+  model,
+  context = '',
+  keyId = null
+) {
   if (!rateLimitInfo) {
     return
   }

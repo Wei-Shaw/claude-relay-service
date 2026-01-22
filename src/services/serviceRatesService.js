@@ -211,7 +211,9 @@ class ServiceRatesService {
    * 根据账户类型获取服务类型（优先级高于模型推断）
    */
   getServiceFromAccountType(accountType) {
-    if (!accountType) return null
+    if (!accountType) {
+      return null
+    }
 
     const mapping = {
       claude: 'claude',
