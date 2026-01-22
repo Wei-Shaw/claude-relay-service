@@ -162,7 +162,7 @@ class ApiKeyService {
     const hashedKey = this._hashApiKey(apiKey)
 
     // 处理 permissions
-    const permissionsValue = permissions
+    const _permissionsValue = permissions
 
     const keyData = {
       id: keyId,
@@ -234,14 +234,6 @@ class ApiKeyService {
     }
 
     logger.success(`🔑 Generated new API key: ${name} (${keyId})`)
-
-    // 解析 permissions 用于返回
-    let parsedPermissions = keyData.permissions
-    try {
-      parsedPermissions = JSON.parse(keyData.permissions)
-    } catch (e) {
-      // 不是 JSON，保持原值（传统 Key 的字符串格式）
-    }
 
     return {
       id: keyId,
@@ -408,14 +400,6 @@ class ApiKeyService {
         tags = keyData.tags ? JSON.parse(keyData.tags) : []
       } catch (e) {
         tags = []
-      }
-
-      // 解析 permissions（聚合 Key 为数组，传统 Key 为字符串）
-      let permissions = keyData.permissions || 'all'
-      try {
-        permissions = JSON.parse(keyData.permissions)
-      } catch (e) {
-        // 不是 JSON，保持原值
       }
 
       // 解析 serviceRates
@@ -1549,7 +1533,6 @@ class ApiKeyService {
       const realCost = costInfo.costs.total
       let ratedCost = realCost
       if (realCost > 0) {
-        const serviceRatesService = require('./serviceRatesService')
         const service = serviceRatesService.getService(accountType, model)
         ratedCost = await this.calculateRatedCost(keyId, service, realCost)
       }
@@ -1761,7 +1744,6 @@ class ApiKeyService {
       const realCostWithDetails = costInfo.totalCost || 0
       let ratedCostWithDetails = realCostWithDetails
       if (realCostWithDetails > 0) {
-        const serviceRatesService = require('./serviceRatesService')
         const service = serviceRatesService.getService(accountType, model)
         ratedCostWithDetails = await this.calculateRatedCost(keyId, service, realCostWithDetails)
       }

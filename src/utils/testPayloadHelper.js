@@ -245,7 +245,7 @@ async function sendStreamTestRequest(options) {
  * @param {number} options.maxTokens - 最大输出 token（默认 100）
  * @returns {object} 测试请求体
  */
-function createGeminiTestPayload(model = 'gemini-2.5-pro', options = {}) {
+function createGeminiTestPayload(_model = 'gemini-2.5-pro', options = {}) {
   const { prompt = 'hi', maxTokens = 100 } = options
   return {
     contents: [

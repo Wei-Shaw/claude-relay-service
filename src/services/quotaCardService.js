@@ -508,7 +508,7 @@ class QuotaCardService {
           redemptionData.apiKeyId,
           parseFloat(redemptionData.quotaAdded)
         )
-        actualDeducted = result.actualDeducted
+        ;({ actualDeducted } = result)
       }
 
       // 注意：时间卡撤销比较复杂，这里简化处理，不回退时间

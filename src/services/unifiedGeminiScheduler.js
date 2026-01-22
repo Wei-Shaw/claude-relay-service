@@ -45,9 +45,9 @@ class UnifiedGeminiScheduler {
   }
 
   // 🔧 辅助方法：检查账户是否激活（兼容字符串和布尔值）
-  _isActive(isActive) {
+  _isActive(activeValue) {
     // 兼容布尔值 true 和字符串 'true'
-    return isActive === true || isActive === 'true'
+    return activeValue === true || activeValue === 'true'
   }
 
   // 🎯 统一调度Gemini账号

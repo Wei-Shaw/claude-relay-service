@@ -333,10 +333,14 @@ const getAppVersion = () => {
     if (fs.existsSync(versionFile)) {
       return fs.readFileSync(versionFile, 'utf8').trim()
     }
-  } catch {}
+  } catch {
+    // ignore
+  }
   try {
     return require('../../package.json').version
-  } catch {}
+  } catch {
+    // ignore
+  }
   return '1.0.0'
 }
 

@@ -405,6 +405,7 @@ class DroidRelayService {
   ) {
     return new Promise((resolve, reject) => {
       const url = new URL(apiUrl)
+      const keyId = apiKeyData?.id
       const bodyString = JSON.stringify(processedBody)
       const contentLength = Buffer.byteLength(bodyString)
       const requestHeaders = {
@@ -1198,6 +1199,7 @@ class DroidRelayService {
     skipUsageRecord = false
   ) {
     const { data } = response
+    const keyId = apiKeyData?.id
 
     // 从响应中提取 usage 数据
     const usage = data.usage || {}

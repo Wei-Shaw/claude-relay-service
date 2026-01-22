@@ -4916,7 +4916,6 @@ redisClient.removeFromIndex = async function (indexKey, id) {
 
 // 迁移全局统计数据（从 API Key 数据聚合）
 redisClient.migrateGlobalStats = async function () {
-  const logger = require('../utils/logger')
   logger.info('🔄 开始迁移全局统计数据...')
 
   const keyIds = await this.scanApiKeyIds()
@@ -4978,8 +4977,6 @@ redisClient.migrateGlobalStats = async function () {
 
 // 确保月份索引完整（后台检查，补充缺失的月份）
 redisClient.ensureMonthlyMonthsIndex = async function () {
-  const logger = require('../utils/logger')
-
   // 扫描所有月份 key
   const monthlyKeys = await this.client.keys('usage:model:monthly:*')
   const allMonths = new Set()
@@ -5064,7 +5061,6 @@ redisClient.getApiKeyCount = async function () {
 
 // 清理过期的系统分钟统计数据（启动时调用）
 redisClient.cleanupSystemMetrics = async function () {
-  const logger = require('../utils/logger')
   logger.info('🧹 清理过期的系统分钟统计数据...')
 
   const keys = await this.scanKeys('system:metrics:minute:*')
@@ -5074,7 +5070,6 @@ redisClient.cleanupSystemMetrics = async function () {
   }
 
   // 计算当前分钟时间戳和保留窗口
-  const config = require('../../config/config')
   const metricsWindow = config.system?.metricsWindow || 5
   const currentMinute = Math.floor(Date.now() / 60000)
   const keepAfter = currentMinute - metricsWindow * 2 // 保留窗口的2倍
