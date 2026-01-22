@@ -138,21 +138,24 @@ const createLogFormat = (colorize = false) => {
 const logFormat = createLogFormat(false)
 const consoleFormat = createLogFormat(true)
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID
+const logDir = isTestEnv
+  ? path.join(os.tmpdir(), 'claude-relay-service-logs')
+  : config.logging.dirname
 
 // 📁 确保日志目录存在并设置权限
-if (!fs.existsSync(config.logging.dirname)) {
-  fs.mkdirSync(config.logging.dirname, { recursive: true, mode: 0o755 })
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true, mode: 0o755 })
 }
 
 // 🔄 增强的日志轮转配置
 const createRotateTransport = (filename, level = null) => {
   const transport = new DailyRotateFile({
-    filename: path.join(config.logging.dirname, filename),
+    filename: path.join(logDir, filename),
     datePattern: 'YYYY-MM-DD',
     zippedArchive: true,
     maxSize: config.logging.maxSize,
     maxFiles: config.logging.maxFiles,
-    auditFile: path.join(config.logging.dirname, `.${filename.replace('%DATE%', 'audit')}.json`),
+    auditFile: path.join(logDir, `.${filename.replace('%DATE%', 'audit')}.json`),
     format: logFormat
   })
 
@@ -224,7 +227,7 @@ const logger = winston.createLogger({
   // 🚨 异常处理
   exceptionHandlers: [
     new winston.transports.File({
-      filename: path.join(config.logging.dirname, 'exceptions.log'),
+      filename: path.join(logDir, 'exceptions.log'),
       format: logFormat,
       maxsize: 10485760, // 10MB
       maxFiles: 5
@@ -237,7 +240,7 @@ const logger = winston.createLogger({
   // 🔄 未捕获异常处理
   rejectionHandlers: [
     new winston.transports.File({
-      filename: path.join(config.logging.dirname, 'rejections.log'),
+      filename: path.join(logDir, 'rejections.log'),
       format: logFormat,
       maxsize: 10485760, // 10MB
       maxFiles: 5
@@ -404,7 +407,7 @@ logger.authDetail = (message, data = {}) => {
 // 🎬 启动日志记录系统
 logger.start('Logger initialized', {
   level: process.env.LOG_LEVEL || config.logging.level,
-  directory: config.logging.dirname,
+  directory: logDir,
   maxSize: config.logging.maxSize,
   maxFiles: config.logging.maxFiles,
   envOverride: process.env.LOG_LEVEL ? true : false

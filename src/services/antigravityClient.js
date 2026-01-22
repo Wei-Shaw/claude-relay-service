@@ -11,6 +11,12 @@ const {
 } = require('../utils/antigravityModel')
 const { cleanJsonSchemaForGemini } = require('../utils/geminiSchemaCleaner')
 const { dumpAntigravityUpstreamRequest } = require('../utils/antigravityUpstreamDump')
+const { dumpAntigravityUpstreamResponse } = require('../utils/antigravityUpstreamResponseDump')
+const {
+  parseGoogleErrorReason,
+  parseGoogleErrorDetailModel,
+  parseGoogleRetryDelayMs
+} = require('../utils/googleErrorParser')
 
 const keepAliveAgent = new https.Agent({
   keepAlive: true,
@@ -19,6 +25,259 @@ const keepAliveAgent = new https.Agent({
   maxSockets: 100,
   maxFreeSockets: 10
 })
+
+const ANTIGRAVITY_REQUEST_TYPE = 'agent'
+const DEFAULT_MODEL_UNAVAILABLE_COOLDOWN_MS = 60 * 1000
+const MODEL_UNAVAILABLE_COOLDOWN_ENV = 'ANTIGRAVITY_MODEL_UNAVAILABLE_COOLDOWN_MS'
+const DEFAULT_MODEL_CAPACITY_COOLDOWN_MS = 15 * 1000
+const MODEL_CAPACITY_COOLDOWN_ENV = 'ANTIGRAVITY_MODEL_CAPACITY_COOLDOWN_MS'
+const DEFAULT_MAX_FALLBACKS_PER_REQUEST = 1
+const MAX_FALLBACKS_PER_REQUEST_ENV = 'ANTIGRAVITY_MAX_FALLBACKS_PER_REQUEST'
+const MAX_UPSTREAM_ERROR_BODY_BYTES = 64 * 1024
+
+// 针对 Antigravity 上游 429 的模型级冷却，避免短时间内打穿账号池/端点。
+// 仅用于 Antigravity 上游，不影响 Gemini 直连等其它链路。
+const modelUnavailableCooldowns = new Map()
+
+function readEnvPositiveInt(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === null || raw === '') {
+    return fallback
+  }
+  const parsed = parseInt(String(raw), 10)
+  if (!Number.isFinite(parsed) || Number.isNaN(parsed) || parsed <= 0) {
+    return fallback
+  }
+  return parsed
+}
+
+function readEnvNonNegativeInt(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === null || raw === '') {
+    return fallback
+  }
+  const parsed = parseInt(String(raw), 10)
+  if (!Number.isFinite(parsed) || Number.isNaN(parsed) || parsed < 0) {
+    return fallback
+  }
+  return parsed
+}
+
+function getModelUnavailableCooldownMs() {
+  return readEnvPositiveInt(MODEL_UNAVAILABLE_COOLDOWN_ENV, DEFAULT_MODEL_UNAVAILABLE_COOLDOWN_MS)
+}
+
+function getModelCapacityCooldownMs() {
+  return readEnvPositiveInt(MODEL_CAPACITY_COOLDOWN_ENV, DEFAULT_MODEL_CAPACITY_COOLDOWN_MS)
+}
+
+function getMaxFallbacksPerRequest() {
+  return readEnvNonNegativeInt(MAX_FALLBACKS_PER_REQUEST_ENV, DEFAULT_MAX_FALLBACKS_PER_REQUEST)
+}
+
+function getModelCooldownInfo(model) {
+  const key = String(model || '').trim()
+  if (!key) {
+    return { remainingMs: 0, reason: '' }
+  }
+  const entry = modelUnavailableCooldowns.get(key)
+  if (!entry || !entry.untilMs) {
+    return { remainingMs: 0, reason: '' }
+  }
+  const remaining = entry.untilMs - Date.now()
+  if (remaining <= 0) {
+    modelUnavailableCooldowns.delete(key)
+    return { remainingMs: 0, reason: '' }
+  }
+  return { remainingMs: remaining, reason: entry.reason ? String(entry.reason) : '' }
+}
+
+function setModelCooldown(model, cooldownMs, reason) {
+  const key = String(model || '').trim()
+  if (!key) {
+    return
+  }
+  const duration = Number.isFinite(cooldownMs) && cooldownMs > 0 ? Math.trunc(cooldownMs) : 0
+  if (!duration) {
+    return
+  }
+  modelUnavailableCooldowns.set(key, {
+    untilMs: Date.now() + duration,
+    reason: reason ? String(reason) : ''
+  })
+}
+
+function createSyntheticAxiosError({ status, message, data, code, headers } = {}) {
+  const err = new Error(message || 'Antigravity upstream error')
+  err.name = 'AxiosError'
+  err.isAxiosError = true
+  err.code = code
+  err.response = {
+    status: Number.isFinite(status) ? status : 500,
+    data: data || null,
+    headers: headers || {}
+  }
+  return err
+}
+
+function isReadableStream(value) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    typeof value.on === 'function' &&
+    typeof value.pipe === 'function'
+  )
+}
+
+async function readReadableStreamToString(stream, maxBytes = MAX_UPSTREAM_ERROR_BODY_BYTES) {
+  if (!isReadableStream(stream)) {
+    return null
+  }
+
+  return await new Promise((resolve) => {
+    let resolved = false
+    let totalBytes = 0
+    const chunks = []
+
+    const finalize = (text) => {
+      if (resolved) {
+        return
+      }
+      resolved = true
+      resolve(text)
+    }
+
+    const cleanup = () => {
+      stream.removeListener('data', onData)
+      stream.removeListener('end', onEnd)
+      stream.removeListener('error', onError)
+    }
+
+    const onData = (chunk) => {
+      try {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), 'utf8')
+        const remaining = Math.max(0, maxBytes - totalBytes)
+        if (remaining <= 0) {
+          cleanup()
+          try {
+            stream.destroy()
+          } catch (_) {
+            // ignore
+          }
+          finalize(Buffer.concat(chunks).toString('utf8'))
+          return
+        }
+
+        if (buf.length > remaining) {
+          chunks.push(buf.subarray(0, remaining))
+          totalBytes += remaining
+          cleanup()
+          try {
+            stream.destroy()
+          } catch (_) {
+            // ignore
+          }
+          finalize(Buffer.concat(chunks).toString('utf8'))
+          return
+        }
+
+        chunks.push(buf)
+        totalBytes += buf.length
+      } catch (_) {
+        cleanup()
+        try {
+          stream.destroy()
+        } catch (err) {
+          // ignore
+        }
+        finalize(Buffer.concat(chunks).toString('utf8'))
+      }
+    }
+
+    const onEnd = () => {
+      cleanup()
+      finalize(Buffer.concat(chunks).toString('utf8'))
+    }
+
+    const onError = () => {
+      cleanup()
+      finalize(Buffer.concat(chunks).toString('utf8'))
+    }
+
+    stream.on('data', onData)
+    stream.on('end', onEnd)
+    stream.on('error', onError)
+  })
+}
+
+async function normalizeAxiosErrorResponseBody(error) {
+  const data = error?.response?.data
+  if (!data) {
+    return null
+  }
+  if (typeof data === 'string') {
+    return data
+  }
+  if (Buffer.isBuffer(data)) {
+    try {
+      const text = data.toString('utf8')
+      error.response.data = text
+      return text
+    } catch (_) {
+      return null
+    }
+  }
+  if (isReadableStream(data)) {
+    const text = await readReadableStreamToString(data)
+    if (typeof text === 'string') {
+      error.response.data = text
+      return text
+    }
+    return null
+  }
+  if (typeof data === 'object') {
+    try {
+      const json = JSON.stringify(data)
+      error.response.data = json
+      return json
+    } catch (_) {
+      return null
+    }
+  }
+  const text = String(data)
+  error.response.data = text
+  return text
+}
+
+function pickUpstreamResponseHeaders(headers) {
+  if (!headers || typeof headers !== 'object') {
+    return null
+  }
+  const get = (key) => {
+    const direct = headers[key]
+    if (direct !== undefined) {
+      return direct
+    }
+    const lower = String(key).toLowerCase()
+    return headers[lower]
+  }
+  const picked = {
+    'retry-after': get('retry-after') || null,
+    'x-cloudaicompanion-trace-id': get('x-cloudaicompanion-trace-id') || null,
+    'content-type': get('content-type') || null,
+    'content-length': get('content-length') || null,
+    date: get('date') || null,
+    server: get('server') || null
+  }
+  return picked
+}
+
+// 对齐 谷歌 近期变更：Antigravity 会校验 systemInstruction 结构。
+// 采用最短前置提示词 并且只做前置插入，不覆盖用户原有 system parts。
+const ANTIGRAVITY_MIN_SYSTEM_PROMPT =
+  'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Proactiveness**'
+const ANTIGRAVITY_MIN_SYSTEM_PROMPT_MARKER =
+  'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.'
 
 function getAntigravityApiUrl() {
   return process.env.ANTIGRAVITY_API_URL || 'https://daily-cloudcode-pa.sandbox.googleapis.com'
@@ -39,7 +298,7 @@ function getAntigravityApiUrlCandidates() {
     return [configured]
   }
 
-  // 默认行为：优先 daily（与旧逻辑一致），失败时再尝试 prod（对齐 CLIProxyAPI）。
+  // [dadongwo] 默认行为：优先 daily，失败时再尝试 prod。
   if (configured === normalizeBaseUrl(daily)) {
     return [configured, prod]
   }
@@ -106,6 +365,7 @@ function buildAntigravityEnvelope({ requestData, projectId, sessionId, userPromp
     requestId: `req-${uuidv4()}`,
     model,
     userAgent: 'antigravity',
+    requestType: ANTIGRAVITY_REQUEST_TYPE,
     request: {
       ...requestPayload
     }
@@ -118,6 +378,30 @@ function buildAntigravityEnvelope({ requestData, projectId, sessionId, userPromp
 
   normalizeAntigravityEnvelope(envelope)
   return { model, envelope }
+}
+
+function ensureAntigravitySystemInstruction(requestPayload) {
+  if (!requestPayload || typeof requestPayload !== 'object') {
+    return
+  }
+
+  const existing = requestPayload.systemInstruction
+  const sys = existing && typeof existing === 'object' ? existing : {}
+
+  sys.role = 'user'
+
+  const parts = Array.isArray(sys.parts) ? sys.parts.slice() : []
+
+  const hasPrompt = parts.some((part) => {
+    const text = typeof part?.text === 'string' ? part.text : ''
+    return text.includes(ANTIGRAVITY_MIN_SYSTEM_PROMPT_MARKER)
+  })
+  if (!hasPrompt) {
+    parts.unshift({ text: ANTIGRAVITY_MIN_SYSTEM_PROMPT })
+  }
+
+  sys.parts = parts
+  requestPayload.systemInstruction = sys
 }
 
 function normalizeAntigravityThinking(model, requestPayload) {
@@ -195,11 +479,13 @@ function normalizeAntigravityEnvelope(envelope) {
     return
   }
 
+  ensureAntigravitySystemInstruction(requestPayload)
+
   if (requestPayload.safetySettings !== undefined) {
     delete requestPayload.safetySettings
   }
 
-  // 对齐 CLIProxyAPI：有 tools 时默认启用 VALIDATED（除非显式 NONE）
+  // [dadongwo] 有 tools 时默认启用 VALIDATED（除非显式 NONE）
   if (Array.isArray(requestPayload.tools) && requestPayload.tools.length > 0) {
     const existing = requestPayload?.toolConfig?.functionCallingConfig || null
     if (existing?.mode !== 'NONE') {
@@ -208,7 +494,7 @@ function normalizeAntigravityEnvelope(envelope) {
     }
   }
 
-  // 对齐 CLIProxyAPI：非 Claude 模型移除 maxOutputTokens（Antigravity 环境不稳定）
+  // [dadongwo] 非 Claude 模型移除 maxOutputTokens（Antigravity 环境不稳定）
   normalizeAntigravityThinking(model, requestPayload)
   if (!model.includes('claude')) {
     if (requestPayload.generationConfig && typeof requestPayload.generationConfig === 'object') {
@@ -275,8 +561,27 @@ async function request({
     userPromptId
   })
 
+  const cooldownInfo = getModelCooldownInfo(model)
+  if (cooldownInfo.remainingMs > 0) {
+    const retryAfterSeconds = Math.max(1, Math.ceil(cooldownInfo.remainingMs / 1000))
+    const cooldownReason = String(cooldownInfo.reason || '').trim()
+    const cooldownMessage =
+      cooldownReason === 'MODEL_CAPACITY_EXHAUSTED'
+        ? `Model capacity exhausted (cooldown ${retryAfterSeconds}s)`
+        : `The requested model is currently unavailable (cooldown ${retryAfterSeconds}s)`
+    throw createSyntheticAxiosError({
+      status: 429,
+      code: 'ANTIGRAVITY_MODEL_COOLDOWN',
+      message: cooldownMessage,
+      data: { error: { message: cooldownMessage, reason: cooldownReason || null } },
+      headers: { 'retry-after': String(retryAfterSeconds) }
+    })
+  }
+
   const proxyAgent = ProxyHelper.createProxyAgent(proxyConfig)
   let endpoints = getAntigravityApiUrlCandidates()
+  const maxFallbacksPerRequest = getMaxFallbacksPerRequest()
+  let fallbackCount = 0
 
   // Claude 模型在 sandbox(daily) 环境下对 tool_use/tool_result 的兼容性不稳定，优先走 prod。
   // 保持可配置优先：若用户显式设置了 ANTIGRAVITY_API_URL，则不改变顺序。
@@ -395,6 +700,36 @@ async function request({
       }
 
       try {
+        // 🔍 [诊断日志] 详细记录请求信息，用于排查 429 问题
+        const envelopeStr = JSON.stringify(envelope)
+        const toolsCount = envelope.request?.tools?.[0]?.functionDeclarations?.length || 0
+        const thinkingConfig = envelope.request?.generationConfig?.thinkingConfig
+        const hasThinking = !!thinkingConfig
+        const contentsCount = envelope.request?.contents?.length || 0
+
+        logger.info(`🔬 [Antigravity诊断] ${stream ? '流式' : '非流式'}请求`, {
+          endpoint: stream ? 'streamGenerateContent' : 'generateContent',
+          model,
+          baseUrl,
+          envelopeSize: envelopeStr.length,
+          toolsCount,
+          hasThinking,
+          thinkingBudget: thinkingConfig?.thinkingBudget || 'N/A',
+          contentsCount,
+          hasParams: !!params,
+          paramsAlt: params?.alt || 'N/A'
+        })
+
+        // 非流式请求额外警告
+        if (!stream && toolsCount > 0) {
+          logger.warn(`⚠️ [Antigravity诊断] 非流式请求包含工具定义`, {
+            toolsCount,
+            model,
+            envelopeSize: envelopeStr.length,
+            tip: '非流式+工具可能触发 429，考虑改用流式'
+          })
+        }
+
         dumpAntigravityUpstreamRequest({
           requestId: envelope.requestId,
           model,
@@ -410,15 +745,56 @@ async function request({
       } catch (error) {
         lastError = error
         const status = error?.response?.status || null
+        const upstreamHeaders = error?.response?.headers || null
+        const upstreamBodyText = await normalizeAxiosErrorResponseBody(error)
+        const upstreamReason = parseGoogleErrorReason(upstreamBodyText)
+        const upstreamModel = parseGoogleErrorDetailModel(upstreamBodyText)
+        const retryDelayMs = parseGoogleRetryDelayMs(upstreamBodyText)
+
+        dumpAntigravityUpstreamResponse({
+          requestId: envelope.requestId,
+          model,
+          statusCode: status,
+          statusText: error?.response?.statusText || null,
+          responseType: 'error',
+          headers: pickUpstreamResponseHeaders(upstreamHeaders),
+          summary: {
+            baseUrl,
+            url,
+            stream: Boolean(stream),
+            reason: upstreamReason,
+            model: upstreamModel,
+            retryDelayMs: retryDelayMs || null
+          },
+          error: {
+            name: error?.name || null,
+            code: error?.code || null,
+            message: error?.message || null
+          },
+          rawData: typeof upstreamBodyText === 'string' ? upstreamBodyText.slice(0, 4096) : null
+        }).catch(() => {})
 
         const hasNext = index + 1 < endpoints.length
-        if (hasNext && isRetryable(error)) {
+        const isQuotaOrRateLimited =
+          status === 429 &&
+          (upstreamReason === 'QUOTA_EXHAUSTED' || upstreamReason === 'RATE_LIMIT_EXCEEDED')
+        const canFallback =
+          hasNext &&
+          !isQuotaOrRateLimited &&
+          fallbackCount < maxFallbacksPerRequest &&
+          isRetryable(error)
+
+        if (canFallback) {
           logger.warn('⚠️ Antigravity upstream error, retrying with fallback baseUrl', {
             status,
             from: baseUrl,
             to: endpoints[index + 1],
-            model
+            model,
+            reason: upstreamReason || undefined,
+            fallbackCount: fallbackCount + 1,
+            maxFallbacksPerRequest
           })
+          fallbackCount += 1
           continue
         }
         throw error
@@ -431,9 +807,8 @@ async function request({
   try {
     return await attemptRequest()
   } catch (error) {
-    // 如果是 429 RESOURCE_EXHAUSTED 且尚未重试过，等待 2 秒后重试一次
     const status = error?.response?.status
-    if (status === 429 && !retriedAfterDelay && !signal?.aborted) {
+    if (status === 429 && !signal?.aborted) {
       const data = error?.response?.data
 
       // 安全地将 data 转为字符串，避免 stream 对象导致循环引用崩溃
@@ -466,14 +841,93 @@ async function request({
       }
 
       const msg = safeDataToString(data)
-      if (
-        msg.toLowerCase().includes('resource_exhausted') ||
-        msg.toLowerCase().includes('no capacity')
-      ) {
-        retriedAfterDelay = true
-        logger.warn('⏳ Antigravity 429 RESOURCE_EXHAUSTED, waiting 2s before retry', { model })
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-        return await attemptRequest()
+      const msgLower = msg.toLowerCase()
+      const upstreamReason = parseGoogleErrorReason(data) || null
+      const retryDelayMs = parseGoogleRetryDelayMs(data)
+      const traceId =
+        error?.response?.headers?.['x-cloudaicompanion-trace-id'] ||
+        error?.response?.headers?.['X-Cloudaicompanion-Trace-Id'] ||
+        null
+
+      error.antigravity = {
+        ...(error.antigravity && typeof error.antigravity === 'object' ? error.antigravity : {}),
+        reason: upstreamReason,
+        retryDelayMs: retryDelayMs || null,
+        traceId
+      }
+
+      // 🔍 [诊断日志] 详细记录 429 错误信息
+      logger.error(`❌ [Antigravity诊断] 429 错误详情`, {
+        model,
+        stream,
+        errorMessage: msg.substring(0, 500),
+        reason: upstreamReason,
+        retryDelayMs: retryDelayMs || null,
+        traceId,
+        responseHeaders: error?.response?.headers,
+        isResourceExhausted: msgLower.includes('resource_exhausted'),
+        isNoCapacity: msgLower.includes('no capacity'),
+        isModelUnavailable: msgLower.includes('requested model is currently unavailable'),
+        url: error?.config?.url,
+        tip: '如果此错误频繁发生在非流式 + 工具请求上，可能是 API 限制'
+      })
+
+      // 429：按 reason 分流
+      if (upstreamReason === 'RATE_LIMIT_EXCEEDED' || upstreamReason === 'QUOTA_EXHAUSTED') {
+        // 交由上层（账号池/调度器）处理：这里不做延迟重试，避免同账号反复撞限流。
+        if (retryDelayMs && retryDelayMs > 0 && error?.response?.headers) {
+          error.response.headers['retry-after'] = String(
+            Math.max(1, Math.ceil(retryDelayMs / 1000))
+          )
+        }
+      } else {
+        const looksLikeCapacityExhausted =
+          upstreamReason === 'MODEL_CAPACITY_EXHAUSTED' ||
+          (!upstreamReason && msgLower.includes('no capacity'))
+
+        if (looksLikeCapacityExhausted) {
+          if (!retriedAfterDelay) {
+            retriedAfterDelay = true
+            const delayMs = retryDelayMs && retryDelayMs > 0 ? retryDelayMs : 2000
+            const boundedDelayMs = Math.min(delayMs, 10000)
+            logger.warn(
+              `⏳ Antigravity 429 capacity exhausted, waiting ${boundedDelayMs}ms before retry`,
+              {
+                model,
+                stream,
+                reason: upstreamReason || undefined,
+                parsedDelayMs: retryDelayMs || null
+              }
+            )
+            await new Promise((resolve) => setTimeout(resolve, boundedDelayMs))
+            return await attemptRequest()
+          }
+
+          // 二次失败：进入模型级冷却，避免短时间内反复打穿（不做模型降级）。
+          const cooldownMs = Math.max(getModelCapacityCooldownMs(), retryDelayMs || 0)
+          setModelCooldown(model, cooldownMs, 'MODEL_CAPACITY_EXHAUSTED')
+          if (error?.response?.headers) {
+            error.response.headers['retry-after'] = String(
+              Math.max(1, Math.ceil(cooldownMs / 1000))
+            )
+          }
+          logger.warn('⏳ Antigravity model capacity exhausted, entering model cooldown', {
+            model,
+            cooldownMs
+          })
+        }
+      }
+
+      // 模型不可用：按模型级冷却处理，避免短时间内反复请求。
+      if (msgLower.includes('requested model is currently unavailable')) {
+        const cooldownMs =
+          (retryDelayMs && retryDelayMs > 0 ? retryDelayMs : null) ||
+          getModelUnavailableCooldownMs()
+        setModelCooldown(model, cooldownMs, 'model_unavailable')
+        logger.warn('⏳ Antigravity model unavailable, entering cooldown', {
+          model,
+          cooldownMs
+        })
       }
     }
     throw error
@@ -592,4 +1046,31 @@ module.exports = {
   request,
   fetchAvailableModels,
   countTokens
+}
+function getAntigravityHeaders(accessToken, baseUrl) {
+  const resolvedBaseUrl = baseUrl || getAntigravityApiUrl()
+  let host = 'daily-cloudcode-pa.sandbox.googleapis.com'
+  try {
+    host = new URL(resolvedBaseUrl).host || host
+  } catch (e) {
+    // ignore
+  }
+
+  // 🔧 [dadongwo] 对齐上游 Antigravity Headers
+  // 补充缺失的 X-Goog-Api-Client 和 Client-Metadata
+  return {
+    Host: host,
+    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.11.5 windows/amd64',
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'Accept-Encoding': 'gzip',
+    // [dadongwo] 补充 X-Goog-Api-Client 和 Client-Metadata
+    'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
+    'Client-Metadata': JSON.stringify({
+      ideType: 'IDE_UNSPECIFIED',
+      ideVersion: 'vscode/1.100.0',
+      extensionVersion: '0.1.0',
+      surface: 'vscode'
+    })
+  }
 }

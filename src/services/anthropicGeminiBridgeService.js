@@ -9,7 +9,7 @@
  *
  * 【支持的后端 (vendor)】
  * - gemini-cli: 原生 Google Gemini API
- * - antigravity: Claude 代理层 (CLIProxyAPI)，使用 Gemini 格式但有额外约束
+ * - antigravity: Claude 代理层，使用 Gemini 格式但有额外约束
  *
  * 【核心处理流程】
  * 1. 接收 Anthropic 格式请求 (/v1/messages)
@@ -43,6 +43,7 @@ const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { parseSSELine } = require('../utils/sseParser')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const { cleanJsonSchemaForGemini } = require('../utils/geminiSchemaCleaner')
+const { parseGoogleErrorReason, parseGoogleRetryDelayMs } = require('../utils/googleErrorParser')
 const {
   dumpAnthropicNonStreamResponse,
   dumpAnthropicStreamSummary
@@ -89,6 +90,12 @@ This information may or may not be relevant to the coding task, it is up for you
 </identity>
 <communication_style>
 - **Proactiveness**. As an agent, you are allowed to be proactive, but only in the course of completing the user's task. For example, if the user asks you to add a new component, you can edit the code, verify build and test statuses, and take any other obvious follow-up actions, such as performing additional research. However, avoid surprising the user. For example, if the user asks HOW to approach something, you should answer their question and instead of jumping into editing a file.</communication_style>`
+
+// Antigravity 429 reason 分流
+const ANTIGRAVITY_DEFAULT_RATE_LIMIT_SECONDS = 30
+const ANTIGRAVITY_QUOTA_LOCKOUT_SECONDS = [60, 300, 1800, 7200] // 60s→5m→30m→2h
+const ANTIGRAVITY_QUOTA_STRIKE_TTL_MS = 6 * 60 * 60 * 1000
+const antigravityQuotaStrikesByAccountId = new Map()
 
 // ============================================================================
 // 辅助函数：基础工具
@@ -238,19 +245,778 @@ const MAX_ANTIGRAVITY_TOOL_RESULT_CHARS = 200000
 // ============================================================================
 
 /**
- * 截断文本并添加截断提示（带换行）
- * @param {string} text - 原始文本
- * @param {number} maxChars - 最大字符数
- * @returns {string} 截断后的文本
+ * 检查两个模型是否兼容（同一模型家族）
+ * 用于防止跨模型签名错误
+ * 模型兼容性检查
+ * @param {string} cachedFamily - 缓存的模型家族
+ * @param {string} targetModel - 目标模型名称
+ * @returns {boolean} 是否兼容
  */
-function truncateText(text, maxChars) {
+function isModelCompatible(cachedFamily, targetModel) {
+  if (!cachedFamily || !targetModel) {
+    return true // 无法判断时默认兼容
+  }
+
+  const c = cachedFamily.toLowerCase()
+  const t = targetModel.toLowerCase()
+
+  if (c === t) {
+    return true
+  }
+
+  // 检查特定模型家族
+  if (c.includes('gemini-1.5') && t.includes('gemini-1.5')) {
+    return true
+  }
+  if (c.includes('gemini-2.0') && t.includes('gemini-2.0')) {
+    return true
+  }
+  if (c.includes('gemini-2.5') && t.includes('gemini-2.5')) {
+    return true
+  }
+  if (c.includes('claude-3-5') && t.includes('claude-3-5')) {
+    return true
+  }
+  if (c.includes('claude-3-7') && t.includes('claude-3-7')) {
+    return true
+  }
+  if (c.includes('claude-sonnet-4') && t.includes('claude-sonnet-4')) {
+    return true
+  }
+  if (c.includes('claude-opus-4') && t.includes('claude-opus-4')) {
+    return true
+  }
+
+  // 严格模式：不同家族不兼容
+  return false
+}
+
+/**
+ * 从模型名称提取模型家族标识
+ * @param {string} modelName - 模型名称
+ * @returns {string} 模型家族标识
+ */
+function extractModelFamily(modelName) {
+  if (!modelName) {
+    return ''
+  }
+  const name = modelName.toLowerCase()
+
+  // Gemini 模型
+  if (name.includes('gemini-2.5')) {
+    return 'gemini-2.5'
+  }
+  if (name.includes('gemini-2.0')) {
+    return 'gemini-2.0'
+  }
+  if (name.includes('gemini-1.5')) {
+    return 'gemini-1.5'
+  }
+
+  // Claude 模型
+  if (name.includes('claude-opus-4')) {
+    return 'claude-opus-4'
+  }
+  if (name.includes('claude-sonnet-4')) {
+    return 'claude-sonnet-4'
+  }
+  if (name.includes('claude-3-7')) {
+    return 'claude-3-7'
+  }
+  if (name.includes('claude-3-5')) {
+    return 'claude-3-5'
+  }
+
+  return name
+}
+
+// ============================================================================
+// ContextManager: 上下文管理器
+// 上下文管理器
+// ============================================================================
+
+/**
+ * 净化策略枚举
+ * - None: 不清理
+ * - Soft: 保留最近 2 轮（4 条消息）的 thinking blocks
+ * - Aggressive: 移除所有历史 thinking blocks
+ */
+const PurificationStrategy = {
+  None: 'none',
+  Soft: 'soft',
+  Aggressive: 'aggressive'
+}
+
+/**
+ * 估算消息的 Token 使用量
+ * 轻量级估算：约 3.5 字符 = 1 token
+ * Token 使用量估算
+ * @param {Object} body - Anthropic 请求体
+ * @returns {number} 估算的 token 数量
+ */
+function estimateTokenUsage(body) {
+  let total = 0
+
+  const estimateFromStr = (s) => {
+    if (!s || typeof s !== 'string') {
+      return 0
+    }
+    return Math.ceil(s.length / 3.5)
+  }
+
+  // System prompt
+  if (body.system) {
+    if (typeof body.system === 'string') {
+      total += estimateFromStr(body.system)
+    } else if (Array.isArray(body.system)) {
+      for (const block of body.system) {
+        if (block?.text) {
+          total += estimateFromStr(block.text)
+        }
+      }
+    }
+  }
+
+  // Messages
+  for (const msg of body.messages || []) {
+    total += 4 // message overhead
+
+    const content = msg?.content
+    if (typeof content === 'string') {
+      total += estimateFromStr(content)
+    } else if (Array.isArray(content)) {
+      for (const block of content) {
+        if (!block) {
+          continue
+        }
+
+        if (block.type === 'text') {
+          total += estimateFromStr(block.text)
+        } else if (block.type === 'thinking') {
+          total += estimateFromStr(block.thinking)
+          total += 100 // signature overhead
+        } else if (block.type === 'redacted_thinking') {
+          total += estimateFromStr(block.data)
+        } else if (block.type === 'tool_use') {
+          total += 20 // function call overhead
+          total += estimateFromStr(block.name)
+          if (block.input) {
+            try {
+              total += estimateFromStr(JSON.stringify(block.input))
+            } catch (_) {
+              // ignore
+            }
+          }
+        } else if (block.type === 'tool_result') {
+          total += 10 // result overhead
+          if (typeof block.content === 'string') {
+            total += estimateFromStr(block.content)
+          } else if (Array.isArray(block.content)) {
+            for (const item of block.content) {
+              if (item?.text) {
+                total += estimateFromStr(item.text)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Tools definition overhead
+  if (Array.isArray(body.tools)) {
+    for (const tool of body.tools) {
+      try {
+        total += estimateFromStr(JSON.stringify(tool))
+      } catch (_) {
+        // ignore
+      }
+    }
+  }
+
+  // Thinking budget overhead
+  if (body.thinking?.budget_tokens) {
+    total += Number(body.thinking.budget_tokens) || 0
+  }
+
+  return total
+}
+
+/**
+ * 根据上下文使用率确定净化策略
+ * - > 90%: Aggressive（激进剥离所有历史 thinking）
+ * - > 60%: Soft（保留最近 2 轮 thinking）
+ * - < 60%: None（不处理）
+ * @param {number} usageRatio - 使用率 (0-1)
+ * @returns {string} 净化策略
+ */
+function determinePurificationStrategy(usageRatio) {
+  if (usageRatio > 0.9) {
+    return PurificationStrategy.Aggressive
+  }
+  if (usageRatio > 0.6) {
+    return PurificationStrategy.Soft
+  }
+  return PurificationStrategy.None
+}
+
+/**
+ * 净化历史消息中的 thinking blocks
+ * 历史思考净化
+ * @param {Array} messages - 消息列表（会被原地修改）
+ * @param {string} strategy - 净化策略
+ * @returns {boolean} 是否进行了修改
+ */
+function purifyHistoryThinking(messages, strategy) {
+  if (strategy === PurificationStrategy.None) {
+    return false
+  }
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return false
+  }
+
+  let modified = false
+  const totalMsgs = messages.length
+
+  // Soft 模式保护最后 4 条消息（约 2 轮对话）
+  const protectedCount = strategy === PurificationStrategy.Soft ? 4 : 0
+  const startProtectionIdx = Math.max(0, totalMsgs - protectedCount)
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    const isProtected = i >= startProtectionIdx
+
+    // 只处理 assistant 消息
+    if (msg?.role !== 'assistant' || isProtected) {
+      continue
+    }
+
+    if (!Array.isArray(msg.content)) {
+      continue
+    }
+
+    const originalLen = msg.content.length
+    // 过滤掉 thinking 和 redacted_thinking blocks
+    msg.content = msg.content.filter(
+      (block) => block?.type !== 'thinking' && block?.type !== 'redacted_thinking'
+    )
+
+    if (msg.content.length !== originalLen) {
+      modified = true
+
+      // 如果消息变空，添加占位符保持对话结构
+      if (msg.content.length === 0) {
+        msg.content.push({ type: 'text', text: '...' })
+        logger.debug('[ContextManager] Replaced empty assistant message with placeholder')
+      }
+    }
+  }
+
+  if (modified) {
+    logger.info(
+      `[ContextManager] Purified history with strategy: ${strategy} (Protected last ${protectedCount} msgs)`
+    )
+  }
+
+  return modified
+}
+
+// ============================================================================
+// Thinking Utils: 工具循环检测与修复
+// 思考工具
+// ============================================================================
+
+const MIN_SIGNATURE_LENGTH = 50
+
+/**
+ * 分析会话状态，检测工具循环和中断
+ * 分析对话状态
+ * @param {Array} messages - 消息列表
+ * @returns {Object} { inToolLoop, interruptedTool, lastAssistantIdx }
+ */
+function analyzeConversationState(messages) {
+  const state = {
+    inToolLoop: false,
+    interruptedTool: false,
+    lastAssistantIdx: null
+  }
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return state
+  }
+
+  // 找到最后一条 assistant 消息
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === 'assistant') {
+      state.lastAssistantIdx = i
+      break
+    }
+  }
+
+  if (state.lastAssistantIdx === null) {
+    return state
+  }
+
+  // 检查 assistant 消息是否有 tool_use
+  const assistantMsg = messages[state.lastAssistantIdx]
+  const assistantContent = Array.isArray(assistantMsg?.content) ? assistantMsg.content : []
+  const hasToolUse = assistantContent.some((b) => b?.type === 'tool_use')
+
+  if (!hasToolUse) {
+    return state
+  }
+
+  // 检查最后一条消息
+  const lastMsg = messages[messages.length - 1]
+  if (lastMsg?.role !== 'user') {
+    return state
+  }
+
+  const lastContent = lastMsg?.content
+  if (Array.isArray(lastContent)) {
+    // Case 1: 最后消息是 ToolResult -> 活跃的工具循环
+    if (lastContent.some((b) => b?.type === 'tool_result')) {
+      state.inToolLoop = true
+      logger.debug('[Thinking-Recovery] Active tool loop detected (last msg is ToolResult).')
+    } else {
+      // Case 2: 最后消息是文本 -> 中断的工具调用
+      state.interruptedTool = true
+      logger.debug('[Thinking-Recovery] Interrupted tool detected (last msg is Text user).')
+    }
+  } else if (typeof lastContent === 'string') {
+    // Case 2: 字符串内容 -> 中断的工具调用
+    state.interruptedTool = true
+    logger.debug('[Thinking-Recovery] Interrupted tool detected (last msg is String user).')
+  }
+
+  return state
+}
+
+/**
+ * 修复断裂的工具循环
+ * 当 assistant 消息有 tool_use 但缺少有效的 thinking block 时，
+ * 注入合成消息来关闭循环，避免 "Assistant message must start with thinking" 错误
+ * 关闭工具循环以启用思考
+ * @param {Array} messages - 消息列表（会被原地修改）
+ * @returns {boolean} 是否进行了修改
+ */
+function closeToolLoopForThinking(messages) {
+  const state = analyzeConversationState(messages)
+
+  if (!state.inToolLoop && !state.interruptedTool) {
+    return false
+  }
+
+  // 检查最后一条 assistant 消息是否有有效的 thinking block
+  let hasValidThinking = false
+  if (state.lastAssistantIdx !== null) {
+    const assistantMsg = messages[state.lastAssistantIdx]
+    const content = Array.isArray(assistantMsg?.content) ? assistantMsg.content : []
+
+    for (const block of content) {
+      if (block?.type === 'thinking') {
+        const thinking = block.thinking || ''
+        const signature = block.signature || ''
+        if (thinking && signature.length >= MIN_SIGNATURE_LENGTH) {
+          hasValidThinking = true
+          break
+        }
+      }
+    }
+  }
+
+  if (hasValidThinking) {
+    return false
+  }
+
+  if (state.inToolLoop) {
+    logger.info(
+      '[Thinking-Recovery] Broken tool loop (ToolResult without preceding Thinking). Recovery triggered.'
+    )
+
+    // 注入确认消息来"关闭"历史轮次
+    messages.push({
+      role: 'assistant',
+      content: [
+        { type: 'text', text: '[System: Tool execution completed. Proceeding to final response.]' }
+      ]
+    })
+    messages.push({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Please provide the final result based on the tool output above.' }
+      ]
+    })
+    return true
+  }
+
+  if (state.interruptedTool) {
+    logger.info('[Thinking-Recovery] Interrupted tool call detected. Injecting synthetic closure.')
+
+    // 在 assistant 的 tool_use 后插入闭包消息
+    if (state.lastAssistantIdx !== null) {
+      messages.splice(state.lastAssistantIdx + 1, 0, {
+        role: 'assistant',
+        content: [{ type: 'text', text: '[Tool call was interrupted by user.]' }]
+      })
+    }
+    return true
+  }
+
+  return false
+}
+
+// ============================================================================
+// Streaming 参数重映射: 修复 Gemini 返回的工具调用参数
+// 流式参数重映射
+// ============================================================================
+
+/**
+ * 重映射工具调用参数
+ * Gemini 有时会使用与 Claude Code 期望不同的参数名
+ * 此函数修复这些不一致，避免工具调用失败
+ *
+ * 常见映射：
+ * - Grep/Glob: description → pattern, query → pattern, paths → path
+ * - Read: path → file_path
+ * - LS: 默认 path = "."
+ * - EnterPlanMode: 清除所有参数（禁止携带任何参数）
+ *
+ * @param {string} name - 工具名称
+ * @param {Object} args - 工具参数（会被原地修改）
+ */
+function remapFunctionCallArgs(name, args) {
+  if (!args || typeof args !== 'object') {
+    return
+  }
+
+  const nameLower = (name || '').toLowerCase()
+
+  // [IMPORTANT] Claude Code CLI 的 EnterPlanMode 工具禁止携带任何参数
+  // 代理层注入的 reason 参数会导致 InputValidationError
+  if (nameLower === 'enterplanmode') {
+    for (const key of Object.keys(args)) {
+      delete args[key]
+    }
+    return
+  }
+
+  // Grep, Search, Glob 工具参数修复
+  if (
+    nameLower === 'grep' ||
+    nameLower === 'search' ||
+    nameLower === 'glob' ||
+    nameLower === 'search_code_definitions' ||
+    nameLower === 'search_code_snippets'
+  ) {
+    // Gemini 幻觉：将参数描述映射到 "description" 字段
+    if (args.description && !args.pattern) {
+      args.pattern = args.description
+      delete args.description
+      logger.debug(`[Streaming] Remapped ${name}: description → pattern`)
+    }
+
+    // Gemini 使用 "query"，Claude Code 期望 "pattern"
+    if (args.query && !args.pattern) {
+      args.pattern = args.query
+      delete args.query
+      logger.debug(`[Streaming] Remapped ${name}: query → pattern`)
+    }
+
+    // [CRITICAL FIX] Claude Code 使用 "path" (string)，不是 "paths" (array)!
+    if (!args.path) {
+      if (args.paths) {
+        const { paths } = args
+        let pathStr = '.'
+        if (Array.isArray(paths) && paths.length > 0) {
+          pathStr = typeof paths[0] === 'string' ? paths[0] : '.'
+        } else if (typeof paths === 'string') {
+          pathStr = paths
+        }
+        args.path = pathStr
+        delete args.paths
+        logger.debug(`[Streaming] Remapped ${name}: paths → path("${pathStr}")`)
+      } else {
+        // 默认使用当前目录
+        args.path = '.'
+        logger.debug(`[Streaming] Added default path: "."`)
+      }
+    }
+    return
+  }
+
+  // Read 工具参数修复
+  if (nameLower === 'read') {
+    // Gemini 可能使用 "path"，Claude Code 期望 "file_path"
+    if (args.path && !args.file_path) {
+      args.file_path = args.path
+      delete args.path
+      logger.debug('[Streaming] Remapped Read: path → file_path')
+    }
+    return
+  }
+
+  // LS 工具参数修复
+  if (nameLower === 'ls') {
+    // 确保 "path" 参数存在
+    if (!args.path) {
+      args.path = '.'
+      logger.debug('[Streaming] Remapped LS: default path → "."')
+    }
+    return
+  }
+
+  // [通用修复] 如果工具有 "paths" (只有一个元素的数组) 但没有 "path"，转换它
+  if (!args.path && args.paths) {
+    const { paths } = args
+    if (Array.isArray(paths) && paths.length === 1 && typeof paths[0] === 'string') {
+      args.path = paths[0]
+      delete args.paths
+      logger.debug(`[Streaming] Generic fix for tool '${name}': paths[0] → path("${args.path}")`)
+    }
+  }
+}
+
+// ============================================================================
+// Request 处理增强: 三阶段分区排序 + 连续消息合并
+// 请求处理增强
+// ============================================================================
+
+/**
+ * 对 assistant 消息内容进行三阶段分区排序
+ * 确保 thinking blocks 始终在最前面（符合 Anthropic/Gemini 协议要求）
+ * 思考块排序
+ * @param {Array} messages - 消息列表（会被原地修改）
+ * @returns {boolean} 是否进行了修改
+ */
+function sortThinkingBlocksFirst(messages) {
+  if (!Array.isArray(messages)) {
+    return false
+  }
+
+  let modified = false
+
+  for (const msg of messages) {
+    if (msg?.role !== 'assistant') {
+      continue
+    }
+
+    if (!Array.isArray(msg.content) || msg.content.length <= 1) {
+      continue
+    }
+
+    const blocks = msg.content
+    const thinkingBlocks = []
+    const textBlocks = []
+    const toolBlocks = []
+    const otherBlocks = []
+
+    let sawNonThinking = false
+    let needsReorder = false
+
+    // 检测是否需要重排序
+    for (const block of blocks) {
+      if (!block) {
+        continue
+      }
+
+      if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+        if (sawNonThinking) {
+          needsReorder = true
+        }
+      } else if (block.type === 'text' || block.type === 'tool_use') {
+        sawNonThinking = true
+      } else {
+        sawNonThinking = true
+      }
+    }
+
+    if (!needsReorder && blocks.length <= 1) {
+      continue
+    }
+
+    // 执行三阶段分区
+    for (const block of blocks) {
+      if (!block) {
+        continue
+      }
+
+      if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+        thinkingBlocks.push(block)
+      } else if (block.type === 'text') {
+        // 过滤空文本
+        const text = block.text?.trim()
+        if (text && text !== '(no content)') {
+          textBlocks.push(block)
+        }
+      } else if (block.type === 'tool_use') {
+        toolBlocks.push(block)
+      } else {
+        otherBlocks.push(block)
+      }
+    }
+
+    // 重建：Thinking -> Text/Other -> Tool
+    const newContent = [...thinkingBlocks, ...textBlocks, ...otherBlocks, ...toolBlocks]
+
+    if (newContent.length !== blocks.length || needsReorder) {
+      msg.content = newContent
+      modified = true
+
+      if (needsReorder) {
+        logger.warn('[FIX #709] Reordered assistant messages to [Thinking, Text, Tool] structure.')
+      }
+    }
+  }
+
+  return modified
+}
+
+/**
+ * 合并连续的同角色消息
+ * 场景：当从 Spec/Plan 模式切换回编码模式时，可能出现连续两条 "user" 消息
+ * 这会违反角色交替规则，导致 400 报错
+ * 合并连续消息
+ * @param {Array} messages - 消息列表（会被原地修改）
+ * @returns {boolean} 是否进行了修改
+ */
+function mergeConsecutiveMessages(messages) {
+  if (!Array.isArray(messages) || messages.length <= 1) {
+    return false
+  }
+
+  const merged = []
+  let current = messages[0]
+
+  for (let i = 1; i < messages.length; i++) {
+    const next = messages[i]
+
+    if (current?.role === next?.role) {
+      // 合并内容
+      const currentContent = current.content
+      const nextContent = next.content
+
+      if (Array.isArray(currentContent) && Array.isArray(nextContent)) {
+        current.content = [...currentContent, ...nextContent]
+      } else if (Array.isArray(currentContent) && typeof nextContent === 'string') {
+        current.content.push({ type: 'text', text: nextContent })
+      } else if (typeof currentContent === 'string' && typeof nextContent === 'string') {
+        current.content = `${currentContent}\n\n${nextContent}`
+      } else if (typeof currentContent === 'string' && Array.isArray(nextContent)) {
+        current.content = [{ type: 'text', text: currentContent }, ...nextContent]
+      }
+    } else {
+      merged.push(current)
+      current = next
+    }
+  }
+  merged.push(current)
+
+  if (merged.length !== messages.length) {
+    messages.length = 0
+    messages.push(...merged)
+    logger.info(
+      `[FIX #813] Merged consecutive messages: ${messages.length + merged.length - messages.length} -> ${messages.length}`
+    )
+    return true
+  }
+
+  return false
+}
+
+/**
+ * 安全截断（尽量不在 HTML 标签 / JSON 未闭合结构中间截断）
+ * 仅用于 Antigravity 的 tool_result 压缩，避免影响其他路径。
+ */
+function truncateTextSafe(text, maxChars) {
   if (!text || typeof text !== 'string') {
+    return ''
+  }
+  if (!Number.isFinite(maxChars) || maxChars <= 0) {
     return ''
   }
   if (text.length <= maxChars) {
     return text
   }
-  return `${text.slice(0, maxChars)}\n...[truncated ${text.length - maxChars} chars]`
+
+  let splitPos = maxChars
+  const sub = text.slice(0, maxChars)
+
+  // 1) 尽量不要把 "<...>" 标签截断到一半
+  const lastOpen = sub.lastIndexOf('<')
+  if (lastOpen >= 0) {
+    const lastClose = sub.lastIndexOf('>')
+    if (lastClose < lastOpen) {
+      splitPos = Math.min(splitPos, lastOpen)
+    }
+  }
+
+  // 2) 尽量不要把 JSON 大括号截断到一半（只在截断点附近时回退）
+  const lastOpenBrace = sub.lastIndexOf('{')
+  if (lastOpenBrace >= 0) {
+    const lastCloseBrace = sub.lastIndexOf('}')
+    if (lastCloseBrace < lastOpenBrace && maxChars - lastOpenBrace < 100) {
+      splitPos = Math.min(splitPos, lastOpenBrace)
+    }
+  }
+
+  const truncated = text.slice(0, splitPos)
+  const omitted = Math.max(0, text.length - splitPos)
+  return `${truncated}\n...[truncated ${omitted} chars]`
+}
+
+/**
+ * 深度清理 HTML（移除 style/script/base64 等高噪声内容）
+ * 仅用于 Antigravity 的 tool_result 压缩，避免影响其他路径。
+ */
+function deepCleanHtmlForAntigravity(html) {
+  if (!html || typeof html !== 'string') {
+    return ''
+  }
+
+  let result = html
+
+  // 移除 <style>...</style>
+  result = result.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '[style omitted]')
+  // 移除 <script>...</script>
+  result = result.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '[script omitted]')
+  // 移除 data:*;base64,...
+  result = result.replace(/data:[^;/]+\/[^;]+;base64,[A-Za-z0-9+/=]+/gi, '[base64 omitted]')
+  // 归一化空行
+  result = result.replace(/\n\s*\n/g, '\n')
+
+  return result
+}
+
+/**
+ * 深度递归清理 JSON 中的 cache_control 字段
+ * 这是最后一道防线，确保发送给 Antigravity 的请求中不包含任何 cache_control
+ * 用于处理嵌套结构和非标准位置的 cache_control
+ * 文本安全截断
+ * @param {Object|Array} value - 待清理的 JSON 对象
+ */
+function deepCleanCacheControl(value) {
+  if (!value || typeof value !== 'object') {
+    return
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      deepCleanCacheControl(item)
+    }
+    return
+  }
+
+  // 删除当前层的 cache_control
+  if (Object.prototype.hasOwnProperty.call(value, 'cache_control')) {
+    delete value.cache_control
+  }
+
+  // 递归处理所有子属性
+  for (const key of Object.keys(value)) {
+    deepCleanCacheControl(value[key])
+  }
 }
 
 /**
@@ -264,6 +1030,98 @@ function truncateInlineText(text, maxChars) {
     return text
   }
   return `${text.slice(0, maxChars)}...[truncated ${text.length - maxChars} chars]`
+}
+
+/**
+ * Antigravity：对工具输出做语义摘要（优先减少 history 体积）
+ * 目标：
+ * - 降低因 prompt 过大导致的 429 / 断流缺 finishReason / 降级 end_turn 概率
+ * - 不改变工具调用语义（只处理 tool_result 文本，不动 tool_use / tool_choice）
+ *
+ * 压缩策略：
+ * 1. 大文件提示 → 提取关键信息（文件路径、字符数）
+ * 2. 浏览器快照 → 头部 70% + 尾部 30% 保留
+ * 3. 其他 → 简单截断
+ */
+function compactToolResultTextForAntigravity(text, maxChars) {
+  if (!text || typeof text !== 'string') {
+    return ''
+  }
+  if (!Number.isFinite(maxChars) || maxChars <= 0) {
+    return ''
+  }
+
+  const normalized = text.replace(/\r\n/g, '\n')
+
+  // [NEW] 针对 HTML 工具输出做深度预处理，减少无意义 token 占用
+  const cleaned = /<html\b|<body\b|<!doctype\b/i.test(normalized)
+    ? deepCleanHtmlForAntigravity(normalized)
+    : normalized
+
+  // 1) Claude Code 常见：工具输出过大已写入文件。该提示本身可能很长且会反复滚入 history。
+  const savedOutputRegex =
+    /result\s*\(\s*(?<count>[\d,]+)\s*characters\s*\)\s*exceeds\s+maximum\s+allowed\s+tokens\.\s*Output\s+(?:has\s+been\s+)?saved\s+to\s+(?<path>[^\r\n]+)/i
+  const savedMatch = savedOutputRegex.exec(cleaned)
+  if (savedMatch) {
+    const rawPath = String(savedMatch?.groups?.path || '').trim()
+    const filePath = rawPath
+      .replace(/[)\]"']+$/, '')
+      .replace(/\.$/, '')
+      .trim()
+    const count = String(savedMatch?.groups?.count || '').trim()
+
+    const lines = cleaned.split('\n').map((l) => l.trim())
+    const noticeLine =
+      lines.find((l) => /exceeds maximum allowed tokens/i.test(l) && /saved to/i.test(l)) ||
+      `result (${count || 'N/A'} characters) exceeds maximum allowed tokens. Output has been saved to ${filePath}`
+
+    const formatLine =
+      lines.find((l) => /^Format:/i.test(l)) ||
+      lines.find((l) => /JSON array with schema/i.test(l)) ||
+      lines.find((l) => /schema:/i.test(l)) ||
+      null
+
+    const compactLines = [
+      noticeLine,
+      formatLine && formatLine !== noticeLine ? formatLine : null,
+      filePath
+        ? `[tool_result omitted to reduce prompt size; read file locally if needed: ${filePath}]`
+        : '[tool_result omitted to reduce prompt size; read the saved file locally if needed]'
+    ].filter(Boolean)
+
+    return truncateTextSafe(compactLines.join('\n'), maxChars)
+  }
+
+  // 2) 浏览器快照类：常见为超大文本（Page Snapshot / ref=...），会把 history 撑爆。
+  //    为了尽量不影响可用性，采用“头+尾保留”的方式，只在明显超大时触发。
+  if (cleaned.length > 20000) {
+    const looksLikeSnapshot =
+      /page snapshot|页面快照/i.test(cleaned) ||
+      (cleaned.match(/\bref\s*[=:]\s*['"]?[a-z0-9_-]{2,}/gi) || []).length > 30 ||
+      (cleaned.match(/\[ref=/gi) || []).length > 30
+
+    if (!looksLikeSnapshot) {
+      return truncateTextSafe(cleaned, maxChars)
+    }
+
+    const desiredMax = Math.min(maxChars, 16000)
+    if (desiredMax >= 2000 && cleaned.length > desiredMax) {
+      const meta = `[page snapshot summarized to reduce prompt size; original ${cleaned.length} chars]`
+      const overhead = meta.length + 200
+      const budget = Math.max(0, desiredMax - overhead)
+      if (budget >= 1000) {
+        const headLen = Math.min(10000, Math.max(500, Math.floor(budget * 0.7)))
+        const tailLen = Math.min(3000, Math.max(0, budget - headLen))
+        const head = cleaned.slice(0, headLen)
+        const tail = tailLen > 0 ? cleaned.slice(-tailLen) : ''
+        const omitted = Math.max(0, cleaned.length - headLen - tailLen)
+        const summarized = `${meta}\n---[HEAD]---\n${head}\n---[...omitted ${omitted} chars]---\n---[TAIL]---\n${tail}`
+        return truncateTextSafe(summarized, maxChars)
+      }
+    }
+  }
+
+  return truncateTextSafe(cleaned, maxChars)
 }
 
 /**
@@ -467,6 +1325,14 @@ function sanitizeToolResultBlocksForAntigravity(blocks) {
   let usedChars = 0
   let removedImage = false
 
+  // ✨✨✨ 添加日志,方便确认 MCP 数据是不是被压缩了 ✨✨✨
+  if (blocks.length > 0) {
+    logger.info(
+      `✂️ [Truncation Check] Processing ${blocks.length} blocks for truncation (MAX: ${MAX_ANTIGRAVITY_TOOL_RESULT_CHARS} chars)`
+    )
+  }
+  // ✨✨✨ 添加结束 ✨✨✨
+
   for (const block of blocks) {
     if (!block || typeof block !== 'object') {
       continue
@@ -486,7 +1352,10 @@ function sanitizeToolResultBlocksForAntigravity(blocks) {
       if (remaining <= 0) {
         break
       }
-      const text = truncateText(block.text, remaining)
+      // [ENABLED] 使用语义压缩减少 prompt 体积，降低 429/断流概率
+      // 工具结果压缩
+      const text = compactToolResultTextForAntigravity(block.text, remaining)
+
       cleaned.push({ ...block, text })
       usedChars += text.length
       continue
@@ -524,13 +1393,14 @@ function normalizeToolResultContent(content, { vendor = null } = {}) {
   }
   if (typeof content === 'string') {
     if (vendor === 'antigravity') {
-      return truncateText(content, MAX_ANTIGRAVITY_TOOL_RESULT_CHARS)
+      // [ENABLED] 使用语义压缩减少 prompt 体积，降低 429/断流概率
+      // 工具结果压缩
+      return compactToolResultTextForAntigravity(content, MAX_ANTIGRAVITY_TOOL_RESULT_CHARS)
     }
     return content
   }
   // Claude Code 的 tool_result.content 通常是 content blocks 数组（例如 [{type:"text",text:"..."}]）。
-  // 为对齐 CLIProxyAPI/Antigravity 的行为，这里优先保留原始 JSON 结构（数组/对象），
-  // 避免上游将其视为“无效 tool_result”从而触发 tool_use concurrency 400。
+  // [dadongwo] 保留原始 JSON 结构（数组/对象），避免上游将其视为“无效 tool_result”从而触发 400。
   if (Array.isArray(content) || (content && typeof content === 'object')) {
     if (vendor === 'antigravity' && Array.isArray(content)) {
       return sanitizeToolResultBlocksForAntigravity(content)
@@ -905,7 +1775,25 @@ function convertAnthropicToolsToGeminiTools(tools, { vendor = null } = {}) {
     return sanitized
   }
 
-  const functionDeclarations = tools
+  // [FIX] 检测是否有 web_search / googleSearch 类型的服务器工具
+  // Claude API 中的 web_search 工具可能有以下形式：
+  // - type: "web_search_20250305" 或类似
+  // - name: "web_search" / "google_search"
+  const isWebSearchTool = (tool) => {
+    if (!tool) {
+      return false
+    }
+    const toolType = tool.type || ''
+    const toolName = tool.name || ''
+    return (
+      toolType.includes('web_search') || toolName === 'web_search' || toolName === 'google_search'
+    )
+  }
+
+  const hasWebSearchTool = tools.some(isWebSearchTool)
+  const nonWebSearchTools = tools.filter((t) => !isWebSearchTool(t))
+
+  const functionDeclarations = nonWebSearchTools
     .map((tool) => {
       const toolDef = tool?.custom && typeof tool.custom === 'object' ? tool.custom : tool
       if (!toolDef || !toolDef.name) {
@@ -920,19 +1808,19 @@ function convertAnthropicToolsToGeminiTools(tools, { vendor = null } = {}) {
       const schema =
         vendor === 'antigravity'
           ? compactJsonSchemaDescriptionsForAntigravity(
-              cleanJsonSchemaForGemini(toolDef.input_schema)
-            )
+            cleanJsonSchemaForGemini(toolDef.input_schema)
+          )
           : sanitizeSchemaForFunctionDeclarations(toolDef.input_schema) || {
-              type: 'object',
-              properties: {}
-            }
+            type: 'object',
+            properties: {}
+          }
 
       const baseDecl = {
         name: toolDef.name,
         description: toolDescription
       }
 
-      // CLIProxyAPI/Antigravity 侧使用 parametersJsonSchema（而不是 parameters）。
+      // [dadongwo] Antigravity 使用 parametersJsonSchema（而不是 parameters）
       if (vendor === 'antigravity') {
         return { ...baseDecl, parametersJsonSchema: schema }
       }
@@ -940,15 +1828,25 @@ function convertAnthropicToolsToGeminiTools(tools, { vendor = null } = {}) {
     })
     .filter(Boolean)
 
-  if (functionDeclarations.length === 0) {
-    return null
+  // [FIX] 解决 "Multiple tools are supported only when they are all search tools" 400 错误
+  // Gemini v1internal 接口不允许在同一个工具定义中混用 Google Search 和 Function Declarations
+  // 工具参数处理
+  if (functionDeclarations.length > 0) {
+    // 如果有本地工具（functionDeclarations），则只使用本地工具，放弃 googleSearch
+    if (hasWebSearchTool) {
+      logger.info(
+        `⚠️ [Tool-Conflict] Skipping googleSearch injection due to ${functionDeclarations.length} existing function declarations. Gemini v1internal does not support mixed tool types.`
+      )
+    }
+    return [{ functionDeclarations }]
   }
 
-  return [
-    {
-      functionDeclarations
-    }
-  ]
+  // 如果只有 web_search 没有其他本地工具，返回 googleSearch
+  if (hasWebSearchTool) {
+    return [{ googleSearch: {} }]
+  }
+
+  return null
 }
 
 /**
@@ -1025,7 +1923,7 @@ function convertAnthropicToolChoiceToGeminiToolConfig(toolChoice) {
 function convertAnthropicMessagesToGeminiContents(
   messages,
   toolUseIdToName,
-  { vendor = null, stripThinking = false, sessionId = null } = {}
+  { vendor = null, stripThinking = false, sessionId = null, targetModel = null } = {}
 ) {
   const contents = []
   for (const message of messages || []) {
@@ -1073,6 +1971,23 @@ function convertAnthropicMessagesToGeminiContents(
                 logger.debug('[SignatureCache] Restored signature from cache for thinking block')
               }
             }
+
+            // [NEW] 跨模型兼容性检查
+            // 检查签名是否来自兼容的模型家族，防止跨模型签名错误
+            if (signature && targetModel) {
+              const cachedFamily = signatureCache.getSignatureFamily(signature)
+              if (cachedFamily && !isModelCompatible(cachedFamily, targetModel)) {
+                logger.warn(
+                  `⚠️ [Thinking-Compatibility] Incompatible signature detected (Family: ${cachedFamily}, Target: ${targetModel}). Dropping signature.`
+                )
+                // 丢弃不兼容的签名，将 thinking 降级为普通文本
+                if (hasThinkingText) {
+                  parts.push({ text: thinkingText })
+                }
+                continue
+              }
+            }
+
             const hasSignature = Boolean(signature)
 
             // Claude Code 有时会发送空的 thinking block（无 thinking / 无 signature）。
@@ -1178,9 +2093,9 @@ function convertAnthropicMessagesToGeminiContents(
               parsedResponse !== null
                 ? parsedResponse
                 : {
-                    content: raw || '',
-                    is_error: part.is_error === true
-                  }
+                  content: raw || '',
+                  is_error: part.is_error === true
+                }
 
             parts.push({
               functionResponse: {
@@ -1301,7 +2216,45 @@ function buildGeminiRequestFromAnthropic(
   baseModel,
   { vendor = null, sessionId = null } = {}
 ) {
-  const normalizedMessages = normalizeAnthropicMessages(body.messages || [], { vendor })
+  // ========================================================================
+  // [NEW] 预处理阶段：消息清理和优化
+  // 模型处理优化
+  // ========================================================================
+
+  // 复制消息列表以避免修改原始数据
+  const messages = JSON.parse(JSON.stringify(body.messages || []))
+
+  // [FIX #813] 合并连续的同角色消息
+  // 确保请求符合 Anthropic 和 Gemini 的角色交替协议
+  mergeConsecutiveMessages(messages)
+
+  // [FIX #709] 预排序 thinking blocks
+  // 确保 assistant 消息中的 thinking blocks 始终在最前面
+  sortThinkingBlocksFirst(messages)
+
+  // [NEW] ContextManager: 上下文压力检测和历史净化
+  // 仅对 Antigravity vendor 启用（因为它对 prompt 长度更敏感）
+  if (vendor === 'antigravity') {
+    // 确定上下文限制（Flash: ~1M, Pro: ~2M）
+    const contextLimit = baseModel?.toLowerCase().includes('flash') ? 1000000 : 2000000
+    const estimatedUsage = estimateTokenUsage({ ...body, messages })
+    const usageRatio = estimatedUsage / contextLimit
+
+    const strategy = determinePurificationStrategy(usageRatio)
+    if (strategy !== PurificationStrategy.None) {
+      logger.info(
+        `[ContextManager] Context pressure: ${(usageRatio * 100).toFixed(1)}% (${estimatedUsage} / ${contextLimit}), Strategy: ${strategy}`
+      )
+      purifyHistoryThinking(messages, strategy)
+    }
+
+    // [NEW] 工具循环修复
+    // 检测并修复断裂的工具循环，避免 "Assistant message must start with thinking" 错误
+    closeToolLoopForThinking(messages)
+  }
+
+  // 使用预处理后的消息进行后续转换
+  const normalizedMessages = normalizeAnthropicMessages(messages, { vendor })
   const toolUseIdToName = buildToolUseIdToNameMap(normalizedMessages || [])
 
   // 提前判断是否可以启用 thinking，以便决定是否需要剥离 thinking blocks
@@ -1320,7 +2273,8 @@ function buildGeminiRequestFromAnthropic(
       vendor,
       // 当 Antigravity 无法启用 thinking 时，剥离所有 thinking blocks
       stripThinking: vendor === 'antigravity' && !canEnableThinking,
-      sessionId
+      sessionId,
+      targetModel: baseModel // 用于签名兼容性检查
     }
   )
   const systemParts = buildSystemParts(body.system)
@@ -1391,6 +2345,13 @@ function buildGeminiRequestFromAnthropic(
     // Anthropic 的默认语义是 tools 存在且未设置 tool_choice 时为 auto。
     // Gemini/Antigravity 的 function calling 默认可能不会启用，因此显式设置为 AUTO，避免“永远不产出 tool_use”。
     geminiRequestBody.toolConfig = { functionCallingConfig: { mode: 'AUTO' } }
+  }
+
+  // [FIX #593] 最后一道防线：递归深度清理所有 cache_control 字段
+  // 确保发送给 Antigravity/Gemini 的请求中不包含任何 cache_control
+  // VS Code 插件等客户端可能在多轮对话中将历史消息的 cache_control 字段原封不动发回
+  if (vendor === 'antigravity') {
+    deepCleanCacheControl(geminiRequestBody)
   }
 
   return { model: baseModel, request: geminiRequestBody }
@@ -1682,7 +2643,7 @@ function convertGeminiPayloadToAnthropicContent(payload) {
         type: 'tool_use',
         id: toolUseId,
         name: functionCall.name,
-        input: functionCall.args || {}
+        input: normalizeToolUseInput(functionCall.args)
       })
     }
   }
@@ -1749,6 +2710,49 @@ function stripToolsFromRequest(requestData) {
   delete nextRequest.request.tools
   delete nextRequest.request.toolConfig
   return nextRequest
+}
+
+function parseAntigravity429Meta(error) {
+  const body = error?.response?.data
+  const reason = parseGoogleErrorReason(body) || null
+  const retryDelayMs = parseGoogleRetryDelayMs(body)
+  return { reason, retryDelayMs: retryDelayMs || null }
+}
+
+function bumpAntigravityQuotaStrike(accountId) {
+  const key = String(accountId || '').trim()
+  if (!key) {
+    return 1
+  }
+
+  const now = Date.now()
+  const existing = antigravityQuotaStrikesByAccountId.get(key)
+  const isFresh = existing && now - (existing.lastAtMs || 0) <= ANTIGRAVITY_QUOTA_STRIKE_TTL_MS
+  const nextCount = Math.min(
+    ANTIGRAVITY_QUOTA_LOCKOUT_SECONDS.length,
+    (isFresh ? existing.count || 0 : 0) + 1
+  )
+
+  antigravityQuotaStrikesByAccountId.set(key, { count: nextCount, lastAtMs: now })
+  return nextCount
+}
+
+function resolveAntigravityAccountRateLimitSeconds({ accountId, reason, retryDelayMs }) {
+  const parsedSeconds =
+    retryDelayMs && retryDelayMs > 0 ? Math.max(1, Math.ceil(retryDelayMs / 1000)) : null
+
+  if (reason === 'RATE_LIMIT_EXCEEDED') {
+    return Math.max(ANTIGRAVITY_DEFAULT_RATE_LIMIT_SECONDS, parsedSeconds || 0)
+  }
+
+  if (reason === 'QUOTA_EXHAUSTED') {
+    const strike = bumpAntigravityQuotaStrike(accountId)
+    const idx = Math.min(strike - 1, ANTIGRAVITY_QUOTA_LOCKOUT_SECONDS.length - 1)
+    const base = ANTIGRAVITY_QUOTA_LOCKOUT_SECONDS[idx]
+    return Math.max(base, parsedSeconds || 0)
+  }
+
+  return null
 }
 
 /**
@@ -1977,7 +2981,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     }
   }
 
-  // Antigravity 默认启用 tools（对齐 CLIProxyAPI）。若上游拒绝 schema，会在下方自动重试去掉 tools/toolConfig。
+  // [dadongwo] Antigravity 默认启用 tools。若上游拒绝 schema，会在下方自动重试去掉 tools/toolConfig。
 
   const abortController = new AbortController()
   req.on('close', () => {
@@ -2020,27 +3024,40 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             accountId
           })
           rawResponse = await attemptRequest(stripToolsFromRequest(requestData))
-        } else if (
-          // [429 账户切换] 检测到 Antigravity 配额耗尽错误时，尝试切换账户重试
-          vendor === 'antigravity' &&
-          sanitized.statusCode === 429 &&
-          (sanitized.message?.toLowerCase()?.includes('exhausted') ||
-            sanitized.upstreamMessage?.toLowerCase()?.includes('exhausted') ||
-            sanitized.message?.toLowerCase()?.includes('capacity'))
-        ) {
+        } else if (vendor === 'antigravity' && sanitized.statusCode === 429) {
+          const { reason, retryDelayMs } = parseAntigravity429Meta(error)
+          const resetsInSeconds = resolveAntigravityAccountRateLimitSeconds({
+            accountId,
+            reason,
+            retryDelayMs
+          })
+
+          if (!resetsInSeconds) {
+            throw error
+          }
+
           logger.warn(
-            '⚠️ Antigravity 429 quota exhausted (non-stream), switching account and retrying',
+            '⚠️ Antigravity 429 rate limited (non-stream), switching account and retrying',
             {
               vendor,
               accountId,
-              model: effectiveModel
+              model: effectiveModel,
+              reason,
+              resetsInSeconds
             }
           )
-          // 删除当前会话映射，让调度器选择其他账户
-          if (sessionHash) {
-            await unifiedGeminiScheduler._deleteSessionMapping(sessionHash)
+
+          try {
+            await unifiedGeminiScheduler.markAccountRateLimited(
+              accountId,
+              'gemini',
+              sessionHash,
+              resetsInSeconds
+            )
+          } catch (limitError) {
+            logger.warn('Failed to mark Gemini account as rate limited (antigravity):', limitError)
           }
-          // 重新选择账户
+
           try {
             const newAccountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(
               req.apiKey,
@@ -2049,37 +3066,67 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
               { oauthProvider: vendor }
             )
             const newAccountId = newAccountSelection.accountId
-            const newClient = await geminiAccountService.getGeminiClient(newAccountId)
+
+            const newAccount = await geminiAccountService.getAccount(newAccountId)
+            if (!newAccount) {
+              throw new Error(`Retry account not found: ${newAccountId}`)
+            }
+
+            let newProxyConfig = null
+            if (newAccount.proxy) {
+              try {
+                newProxyConfig =
+                  typeof newAccount.proxy === 'string'
+                    ? JSON.parse(newAccount.proxy)
+                    : newAccount.proxy
+              } catch (e) {
+                logger.warn('Failed to parse proxy configuration for retry:', e)
+              }
+            }
+
+            const newClient = await geminiAccountService.getOauthClient(
+              newAccount.accessToken,
+              newAccount.refreshToken,
+              newProxyConfig,
+              newAccount.oauthProvider
+            )
+
             if (!newClient) {
               throw new Error('Failed to get new Gemini client for retry')
             }
+
+            let newProjectId = newAccount.projectId
+            if (vendor === 'antigravity') {
+              newProjectId = ensureAntigravityProjectId(newAccount)
+            }
+
             logger.info(
               `🔄 Retrying non-stream with new account: ${newAccountId} (was: ${accountId})`
             )
-            // 用新账户的 client 重试
+
             rawResponse =
               vendor === 'antigravity'
                 ? await geminiAccountService.generateContentAntigravity(
-                    newClient,
-                    requestData,
-                    null,
-                    projectId,
-                    upstreamSessionId,
-                    proxyConfig
-                  )
+                  newClient,
+                  requestData,
+                  null,
+                  newProjectId,
+                  upstreamSessionId,
+                  newProxyConfig
+                )
                 : await geminiAccountService.generateContent(
-                    newClient,
-                    requestData,
-                    null,
-                    projectId,
-                    upstreamSessionId,
-                    proxyConfig
-                  )
-            // 更新 accountId 以便后续使用记录
+                  newClient,
+                  requestData,
+                  null,
+                  newProjectId,
+                  upstreamSessionId,
+                  newProxyConfig
+                )
+
             accountId = newAccountId
           } catch (retryError) {
             logger.error('❌ Failed to retry non-stream with new account:', retryError)
-            throw error // 抛出原始错误
+            throw error
           }
         } else {
           throw error
@@ -2087,7 +3134,42 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       }
 
       const payload = rawResponse?.response || rawResponse
+
+      // 🔍 调试日志：检查原始响应结构
+      logger.info('🔍 [调试] 非流式 rawResponse 结构', {
+        hasResponse: !!rawResponse?.response,
+        payloadHasCandidates: !!payload?.candidates,
+        payloadPartsCount: payload?.candidates?.[0]?.content?.parts?.length,
+        payloadFinishReason: payload?.candidates?.[0]?.finishReason,
+        firstPartType: payload?.candidates?.[0]?.content?.parts?.[0]
+          ? Object.keys(payload.candidates[0].content.parts[0])
+          : []
+      })
+
       let content = convertGeminiPayloadToAnthropicContent(payload)
+
+      // 🔍 调试日志：检查转换后的 Anthropic 内容
+      logger.info('🔍 [调试] 转换后 Anthropic content', {
+        blocksCount: content?.length,
+        blockTypes: content?.map((b) => b.type) || []
+      })
+
+      if (!Array.isArray(content) || content.length === 0) {
+        logger.warn('⚠️ Non-stream upstream returned empty content; using fallback text', {
+          vendor,
+          accountId,
+          model: effectiveModel,
+          payloadFinishReason: payload?.candidates?.[0]?.finishReason || null,
+          usageMetadata: payload?.usageMetadata || null
+        })
+        content = [
+          {
+            type: 'text',
+            text: '上游返回空响应（可能被截断、连接中断或限流导致）。请重试，或改用 stream=true。'
+          }
+        ]
+      }
+
       let hasToolUse = content.some((block) => block.type === 'tool_use')
 
       // Antigravity 某些模型可能不会返回 functionCall（导致永远没有 tool_use），但会把 “Write: xxx” 以纯文本形式输出。
@@ -2169,14 +3251,24 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     } catch (error) {
       const sanitized = sanitizeUpstreamError(error)
       logger.error('Upstream Gemini error (via /v1/messages):', sanitized)
+      const statusCode = sanitized.statusCode || 502
+      if (!res.headersSent && statusCode === 429) {
+        const retryAfter =
+          error?.response?.headers?.['retry-after'] ||
+          error?.response?.headers?.['Retry-After'] ||
+          null
+        if (retryAfter) {
+          res.setHeader('Retry-After', String(retryAfter))
+        }
+      }
       dumpAnthropicNonStreamResponse(
         req,
-        sanitized.statusCode || 502,
+        statusCode,
         buildAnthropicError(sanitized.upstreamMessage || sanitized.message),
         { vendor, accountId, effectiveModel, forcedVendor: vendor, upstreamError: sanitized }
       )
       return res
-        .status(sanitized.statusCode || 502)
+        .status(statusCode)
         .json(buildAnthropicError(sanitized.upstreamMessage || sanitized.message))
     }
   }
@@ -2219,24 +3311,37 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           accountId
         })
         streamResponse = await startStream(stripToolsFromRequest(requestData))
-      } else if (
-        // [429 账户切换] 检测到 Antigravity 配额耗尽错误时，尝试切换账户重试
-        vendor === 'antigravity' &&
-        sanitized.statusCode === 429 &&
-        (sanitized.message?.toLowerCase()?.includes('exhausted') ||
-          sanitized.upstreamMessage?.toLowerCase()?.includes('exhausted') ||
-          sanitized.message?.toLowerCase()?.includes('capacity'))
-      ) {
-        logger.warn('⚠️ Antigravity 429 quota exhausted, switching account and retrying', {
+      } else if (vendor === 'antigravity' && sanitized.statusCode === 429) {
+        const { reason, retryDelayMs } = parseAntigravity429Meta(error)
+        const resetsInSeconds = resolveAntigravityAccountRateLimitSeconds({
+          accountId,
+          reason,
+          retryDelayMs
+        })
+
+        if (!resetsInSeconds) {
+          throw error
+        }
+
+        logger.warn('⚠️ Antigravity 429 rate limited, switching account and retrying', {
           vendor,
           accountId,
-          model: effectiveModel
+          model: effectiveModel,
+          reason,
+          resetsInSeconds
         })
-        // 删除当前会话映射，让调度器选择其他账户
-        if (sessionHash) {
-          await unifiedGeminiScheduler._deleteSessionMapping(sessionHash)
+
+        try {
+          await unifiedGeminiScheduler.markAccountRateLimited(
+            accountId,
+            'gemini',
+            sessionHash,
+            resetsInSeconds
+          )
+        } catch (limitError) {
+          logger.warn('Failed to mark Gemini account as rate limited (antigravity):', limitError)
         }
-        // 重新选择账户
+
         try {
           const newAccountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(
             req.apiKey,
@@ -2245,37 +3350,67 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             { oauthProvider: vendor }
           )
           const newAccountId = newAccountSelection.accountId
-          const newClient = await geminiAccountService.getGeminiClient(newAccountId)
+
+          const newAccount = await geminiAccountService.getAccount(newAccountId)
+          if (!newAccount) {
+            throw new Error(`Retry account not found: ${newAccountId}`)
+          }
+
+          let newProxyConfig = null
+          if (newAccount.proxy) {
+            try {
+              newProxyConfig =
+                typeof newAccount.proxy === 'string'
+                  ? JSON.parse(newAccount.proxy)
+                  : newAccount.proxy
+            } catch (e) {
+              logger.warn('Failed to parse proxy configuration for retry:', e)
+            }
+          }
+
+          const newClient = await geminiAccountService.getOauthClient(
+            newAccount.accessToken,
+            newAccount.refreshToken,
+            newProxyConfig,
+            newAccount.oauthProvider
+          )
+
           if (!newClient) {
             throw new Error('Failed to get new Gemini client for retry')
           }
+
+          let newProjectId = newAccount.projectId
+          if (vendor === 'antigravity') {
+            newProjectId = ensureAntigravityProjectId(newAccount)
+          }
+
           logger.info(`🔄 Retrying with new account: ${newAccountId} (was: ${accountId})`)
-          // 用新账户的 client 重试
+
           streamResponse =
             vendor === 'antigravity'
               ? await geminiAccountService.generateContentStreamAntigravity(
-                  newClient,
-                  requestData,
-                  null,
-                  projectId,
-                  upstreamSessionId,
-                  abortController.signal,
-                  proxyConfig
-                )
+                newClient,
+                requestData,
+                null,
+                newProjectId,
+                upstreamSessionId,
+                abortController.signal,
+                newProxyConfig
+              )
               : await geminiAccountService.generateContentStream(
-                  newClient,
-                  requestData,
-                  null,
-                  projectId,
-                  upstreamSessionId,
-                  abortController.signal,
-                  proxyConfig
-                )
-          // 更新 accountId 以便后续使用记录
+                newClient,
+                requestData,
+                null,
+                newProjectId,
+                upstreamSessionId,
+                abortController.signal,
+                newProxyConfig
+              )
+
           accountId = newAccountId
         } catch (retryError) {
           logger.error('❌ Failed to retry with new account:', retryError)
-          throw error // 抛出原始错误
+          throw error
         }
       } else {
         throw error
@@ -2317,6 +3452,19 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     // ========================================================================
     let activityTimeout = null
     const STREAM_ACTIVITY_TIMEOUT_MS = 45000 // 45秒无数据视为卡死
+    const STREAM_FIRST_BYTE_TIMEOUT_MS = isAntigravityVendor
+      ? (() => {
+        const raw = process.env.ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_MS
+        const parsed = parseInt(String(raw || ''), 10)
+        if (!Number.isFinite(parsed) || Number.isNaN(parsed) || parsed <= 0) {
+          return 15000
+        }
+        return parsed
+      })()
+      : 0
+
+    let firstByteTimeout = null
+    let receivedAnyUpstreamBytes = false
 
     const resetActivityTimeout = () => {
       if (activityTimeout) {
@@ -2338,6 +3486,11 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           abortController.abort()
         }
 
+        if (firstByteTimeout) {
+          clearTimeout(firstByteTimeout)
+          firstByteTimeout = null
+        }
+
         writeAnthropicSseEvent(res, 'error', {
           type: 'error',
           error: {
@@ -2351,6 +3504,34 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
 
     // 🔥【这里！】一定要加这句来启动它！
     resetActivityTimeout()
+
+    // Antigravity 专用：首包探测，避免“握手成功但长期无任何字节”的假流卡住。
+    if (isAntigravityVendor && STREAM_FIRST_BYTE_TIMEOUT_MS > 0) {
+      firstByteTimeout = setTimeout(() => {
+        if (finished || receivedAnyUpstreamBytes) {
+          return
+        }
+
+        finished = true
+        logger.warn('⚠️ Antigravity upstream stream no first byte, forcing termination.', {
+          requestId: req.requestId,
+          timeoutMs: STREAM_FIRST_BYTE_TIMEOUT_MS
+        })
+
+        if (!abortController.signal.aborted) {
+          abortController.abort()
+        }
+
+        writeAnthropicSseEvent(res, 'error', {
+          type: 'error',
+          error: {
+            type: 'overloaded_error',
+            message: 'Upstream stream timed out before first byte. Please try again.'
+          }
+        })
+        res.end()
+      }, STREAM_FIRST_BYTE_TIMEOUT_MS)
+    }
     // ========================================================================
 
     let buffer = ''
@@ -2362,9 +3543,86 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     let finishReason = null
     let emittedAnyToolUse = false
     let sseEventIndex = 0
+    let invalidSseLines = 0
+    let invalidSseSample = null
+    let rescueAttempted = false
+    let forcedRescueAttempted = false
     const emittedToolCallKeys = new Set()
     const emittedToolUseNames = new Set()
     const pendingToolCallsById = new Map()
+    let mcpXmlBuffer = ''
+    let inMcpXml = false
+
+    const extractPlannedToolAliasFromTodoWrite = (messages) => {
+      if (!Array.isArray(messages)) {
+        return null
+      }
+
+      for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const message = messages[i]
+        if (!message || message.role !== 'assistant' || !Array.isArray(message.content)) {
+          continue
+        }
+        const todoWriteToolUse = message.content.find(
+          (b) => b?.type === 'tool_use' && b?.name === 'TodoWrite'
+        )
+        const todos = todoWriteToolUse?.input?.todos
+        if (!Array.isArray(todos) || todos.length === 0) {
+          continue
+        }
+        const activeTodo =
+          todos.find((t) => t?.status === 'in_progress') ||
+          todos.find((t) => t?.status === 'pending')
+        let activeForm = ''
+        if (typeof activeTodo?.activeForm === 'string') {
+          activeForm = activeTodo.activeForm.trim()
+        } else if (typeof activeTodo?.active_form === 'string') {
+          activeForm = activeTodo.active_form.trim()
+        }
+        if (activeForm) {
+          return activeForm
+        }
+        const content = typeof activeTodo?.content === 'string' ? activeTodo.content : ''
+        const match = /^([a-zA-Z0-9_]+)\s*-/.exec(content)
+        return match?.[1] || null
+      }
+
+      return null
+    }
+
+    const resolveToolNameFromAlias = (alias) => {
+      if (!alias) {
+        return null
+      }
+      const decls = requestData?.request?.tools?.[0]?.functionDeclarations
+      const names = Array.isArray(decls) ? decls.map((d) => d?.name).filter(Boolean) : []
+      if (names.length === 0) {
+        return null
+      }
+      if (names.includes(alias)) {
+        return alias
+      }
+      const prefixed = `mcp__mcp-router__${alias}`
+      if (names.includes(prefixed)) {
+        return prefixed
+      }
+
+      const byAlias = new Map()
+      for (const name of names) {
+        const resolvedAlias = typeof name === 'string' ? name.split('__').pop() : ''
+        if (!resolvedAlias) {
+          continue
+        }
+        const list = byAlias.get(resolvedAlias) || []
+        list.push(name)
+        byAlias.set(resolvedAlias, list)
+      }
+      const candidates = byAlias.get(alias) || []
+      return candidates.length === 1 ? candidates[0] : null
+    }
+
+    const plannedToolAlias = extractPlannedToolAliasFromTodoWrite(req.body?.messages)
+    const plannedToolName = plannedToolAlias ? resolveToolNameFromAlias(plannedToolAlias) : null
 
     let currentIndex = wantsThinkingBlockFirst ? 0 : -1
     let currentBlockType = wantsThinkingBlockFirst ? 'thinking' : null
@@ -2434,6 +3692,12 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     }
 
     const emitToolUseBlock = (name, args, id = null) => {
+      // [NEW] 参数重映射：修复 Gemini 返回的工具调用参数
+      // 在发出工具调用之前应用修复，确保 Claude Code 能正确处理
+      if (args && typeof args === 'object') {
+        remapFunctionCallArgs(name, args)
+      }
+
       const toolUseId = typeof id === 'string' && id ? id : buildToolUseId()
       const jsonArgs = stableJsonStringify(args || {})
 
@@ -2509,6 +3773,107 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       return { args: null, json, canContinue }
     }
 
+    /**
+     * MCP XML Bridge（仅用于流式 text_delta）：
+     * 将文本中的 <mcp__xxx>{...}</mcp__xxx> 转换为 tool_use，避免 Claude Code 把“工具标签”当普通文本吞掉。
+     *
+     * 设计要点：
+     * - 只在命中 "<mcp__" 时启动缓冲；不影响普通文本路径。
+     * - 标签不完整时缓冲等待后续 delta；缓冲过大则降级为原文输出，避免卡死。
+     */
+    const processMcpXmlBridgeDelta = (deltaText) => {
+      if (!deltaText || typeof deltaText !== 'string') {
+        return []
+      }
+
+      const actions = []
+      const MAX_BUFFER_CHARS = 65536
+
+      const appendToBuffer = (s) => {
+        if (!s) {
+          return
+        }
+        mcpXmlBuffer += s
+        if (mcpXmlBuffer.length > MAX_BUFFER_CHARS) {
+          actions.push({ type: 'text', text: mcpXmlBuffer })
+          mcpXmlBuffer = ''
+          inMcpXml = false
+        }
+      }
+
+      if (!inMcpXml) {
+        const startIdx = deltaText.indexOf('<mcp__')
+        if (startIdx === -1) {
+          return [{ type: 'text', text: deltaText }]
+        }
+
+        const prefix = deltaText.slice(0, startIdx)
+        if (prefix) {
+          actions.push({ type: 'text', text: prefix })
+        }
+
+        inMcpXml = true
+        appendToBuffer(deltaText.slice(startIdx))
+      } else {
+        appendToBuffer(deltaText)
+      }
+
+      while (inMcpXml && mcpXmlBuffer) {
+        const startIdx = mcpXmlBuffer.indexOf('<mcp__')
+        if (startIdx === -1) {
+          if (mcpXmlBuffer) {
+            actions.push({ type: 'text', text: mcpXmlBuffer })
+          }
+          mcpXmlBuffer = ''
+          inMcpXml = false
+          break
+        }
+
+        if (startIdx > 0) {
+          actions.push({ type: 'text', text: mcpXmlBuffer.slice(0, startIdx) })
+          mcpXmlBuffer = mcpXmlBuffer.slice(startIdx)
+        }
+
+        const tagEnd = mcpXmlBuffer.indexOf('>')
+        if (tagEnd === -1) {
+          inMcpXml = true
+          break
+        }
+
+        const toolName = mcpXmlBuffer.slice(1, tagEnd) // 去掉 "<"
+        const endTag = `</${toolName}>`
+        const closeIdx = mcpXmlBuffer.indexOf(endTag, tagEnd + 1)
+        if (closeIdx === -1) {
+          inMcpXml = true
+          break
+        }
+
+        const inputStr = mcpXmlBuffer.slice(tagEnd + 1, closeIdx).trim()
+        let input = null
+        if (inputStr) {
+          try {
+            input = JSON.parse(inputStr)
+          } catch (_) {
+            input = { input: inputStr }
+          }
+        } else {
+          input = {}
+        }
+
+        actions.push({ type: 'tool', name: toolName, args: input })
+
+        const afterClose = closeIdx + endTag.length
+        mcpXmlBuffer = mcpXmlBuffer.slice(afterClose)
+        inMcpXml = mcpXmlBuffer.includes('<mcp__')
+        if (!mcpXmlBuffer) {
+          inMcpXml = false
+          break
+        }
+      }
+
+      return actions
+    }
+
     const flushPendingToolCallById = (id, { force = false } = {}) => {
       const pending = pendingToolCallsById.get(id)
       if (!pending) {
@@ -2550,6 +3915,146 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       pendingToolCallsById.delete(id)
     }
 
+    const tryRescueAfterMissingFinishReason = async () => {
+      if (!isAntigravityVendor) {
+        return null
+      }
+      if (rescueAttempted) {
+        return null
+      }
+      // 已经有 tool_use 时，不做救援，避免重复调用
+      if (emittedAnyToolUse) {
+        return null
+      }
+      rescueAttempted = true
+
+      const rescueTimeoutMs = 30000
+      logger.warn('⚠️ Missing finishReason: attempting non-stream rescue', {
+        requestId: req.requestId,
+        model: effectiveModel,
+        rescueTimeoutMs,
+        plannedToolAlias,
+        plannedToolName,
+        invalidSseLines,
+        invalidSseSample
+      })
+
+      try {
+        const rawResponse = await geminiAccountService.generateContentAntigravity(
+          client,
+          requestData,
+          null,
+          projectId,
+          upstreamSessionId,
+          proxyConfig,
+          { abortTimeoutMs: rescueTimeoutMs }
+        )
+        const { response } = rawResponse || {}
+        const payload = response || rawResponse
+        const { usageMetadata: nextUsageMetadata } = payload || {}
+        if (nextUsageMetadata) {
+          usageMetadata = nextUsageMetadata
+        }
+
+        const rescuedContent = convertGeminiPayloadToAnthropicContent(payload)
+        const rescuedToolUse = Array.isArray(rescuedContent)
+          ? rescuedContent.find((b) => b?.type === 'tool_use' && b?.name)
+          : null
+
+        if (rescuedToolUse) {
+          if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+            stopCurrentBlock()
+          }
+          currentBlockType = 'tool_use'
+          emitToolUseBlock(rescuedToolUse.name, rescuedToolUse.input, rescuedToolUse.id)
+          logger.warn('⚠️ Rescue succeeded: emitted tool_use after missing finishReason', {
+            requestId: req.requestId,
+            tool: rescuedToolUse.name
+          })
+          return { tool: rescuedToolUse.name }
+        }
+
+        // 二次救援（强制工具调用）：当 TodoWrite 明确标记了下一步工具时，尝试强制生成该 tool_use
+        if (plannedToolName && !forcedRescueAttempted) {
+          forcedRescueAttempted = true
+          const backoffMs = 800
+          await new Promise((resolve) => setTimeout(resolve, backoffMs))
+
+          const forcedRequestData = JSON.parse(JSON.stringify(requestData || {}))
+          if (forcedRequestData?.request) {
+            forcedRequestData.request.toolConfig = {
+              functionCallingConfig: {
+                mode: 'ANY',
+                allowedFunctionNames: [plannedToolName]
+              }
+            }
+          }
+
+          const forcedRawResponse = await geminiAccountService.generateContentAntigravity(
+            client,
+            forcedRequestData,
+            null,
+            projectId,
+            upstreamSessionId,
+            proxyConfig,
+            { abortTimeoutMs: rescueTimeoutMs }
+          )
+          const { response: forcedResponse } = forcedRawResponse || {}
+          const forcedPayload = forcedResponse || forcedRawResponse
+          const { usageMetadata: forcedUsageMetadata } = forcedPayload || {}
+          if (forcedUsageMetadata) {
+            usageMetadata = forcedUsageMetadata
+          }
+
+          const forcedContent = convertGeminiPayloadToAnthropicContent(forcedPayload)
+          const forcedToolUse = Array.isArray(forcedContent)
+            ? forcedContent.find((b) => b?.type === 'tool_use' && b?.name)
+            : null
+          if (forcedToolUse) {
+            if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+              stopCurrentBlock()
+            }
+            currentBlockType = 'tool_use'
+            emitToolUseBlock(forcedToolUse.name, forcedToolUse.input, forcedToolUse.id)
+            logger.warn('⚠️ Forced rescue succeeded: emitted tool_use after missing finishReason', {
+              requestId: req.requestId,
+              tool: forcedToolUse.name,
+              plannedToolAlias,
+              plannedToolName
+            })
+            return { tool: forcedToolUse.name, forced: true }
+          }
+        }
+
+        // 完全空响应时，至少把非流式的文本结果返回给客户端（避免 CLI 直接中断）
+        if (!emittedText && Array.isArray(rescuedContent)) {
+          const rescuedText = rescuedContent
+            .filter((b) => b?.type === 'text' && typeof b.text === 'string' && b.text)
+            .map((b) => b.text)
+            .join('')
+          if (rescuedText) {
+            switchBlockType('text')
+            emittedText = rescuedText
+            writeAnthropicSseEvent(res, 'content_block_delta', {
+              type: 'content_block_delta',
+              index: currentIndex,
+              delta: { type: 'text_delta', text: rescuedText }
+            })
+            return { textLength: rescuedText.length }
+          }
+        }
+      } catch (error) {
+        const { statusCode, upstreamMessage, message } = sanitizeUpstreamError(error)
+        logger.warn('⚠️ Non-stream rescue failed', {
+          requestId: req.requestId,
+          statusCode: statusCode || null,
+          upstreamMessage: upstreamMessage || message
+        })
+      }
+
+      return null
+    }
+
     const finalize = async () => {
       if (finished) {
         return
@@ -2561,37 +4066,150 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         flushPendingToolCallById(id, { force: true })
       }
 
-      // 上游可能在没有 finishReason 的情况下静默结束（例如 browser_snapshot 输出过大被截断）。
-      // 这种情况下主动向客户端发送错误，避免长时间挂起。
+      // MCP XML Bridge 兜底：若有未闭合标签，降级为原文输出，避免客户端永远看不到内容。
+      if (mcpXmlBuffer) {
+        const raw = mcpXmlBuffer
+        mcpXmlBuffer = ''
+        inMcpXml = false
+        switchBlockType('text')
+        writeAnthropicSseEvent(res, 'content_block_delta', {
+          type: 'content_block_delta',
+          index: currentIndex,
+          delta: { type: 'text_delta', text: raw }
+        })
+      }
+
+      // 🔧 [dadongwo] 不依赖 finishReason 判断流结束
+      // 上游 Antigravity 服务可能在某些情况下（如输出过大、超时）提前结束流，但不发送 finishReason。
+      // 只要 HTTP 流正常结束且有内容，就视为正常完成。
       if (!finishReason) {
-        logger.warn(
-          '⚠️ Upstream stream ended without finishReason; sending overloaded_error to client',
-          {
+        const hasAnyContent = !!(emittedText || emittedAnyToolUse || emittedThinking)
+        const inputTokens = usageMetadata?.promptTokenCount || 0
+        const outputTokens = resolveUsageOutputTokens(usageMetadata)
+
+        // ✅ 有内容时：直接正常完成，不触发救援，不追加错误提示
+        if (hasAnyContent) {
+          logger.info('🔄 [dadongwo] 流结束无finishReason但有内容，正常完成', {
             requestId: req.requestId,
             model: effectiveModel,
-            hasToolCalls: emittedAnyToolUse
-          }
-        )
+            hasToolCalls: emittedAnyToolUse,
+            emittedTextLength: emittedText?.length || 0,
+            emittedThinking: !!emittedThinking,
+            sseEventCount: sseEventIndex
+          })
 
-        writeAnthropicSseEvent(res, 'error', {
-          type: 'error',
-          error: {
-            type: 'overloaded_error',
-            message:
-              'Upstream connection interrupted unexpectedly (missing finish reason). Please retry.'
+          if (vendor === 'antigravity') {
+            dumpAntigravityStreamSummary({
+              requestId: req.requestId,
+              model: effectiveModel,
+              totalEvents: sseEventIndex,
+              finishReason: 'STOP_INFERRED', // 推断为 STOP（dadongwo 优化）
+              hasThinking: Boolean(emittedThinking || emittedThoughtSignature),
+              hasToolCalls: emittedAnyToolUse,
+              toolCallNames: Array.from(emittedToolUseNames).filter(Boolean),
+              usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+              textPreview: emittedText ? emittedText.slice(0, 500) : ''
+            }).catch(() => { })
           }
+
+          // 关闭当前块（如果有）
+          if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+            stopCurrentBlock()
+          }
+
+          // 发送正常的结束事件
+          writeAnthropicSseEvent(res, 'message_delta', {
+            type: 'message_delta',
+            delta: {
+              stop_reason: emittedAnyToolUse ? 'tool_use' : 'end_turn',
+              stop_sequence: null
+            },
+            usage: {
+              output_tokens: outputTokens
+            }
+          })
+
+          writeAnthropicSseEvent(res, 'message_stop', { type: 'message_stop' })
+
+          dumpAnthropicStreamSummary(req, {
+            vendor,
+            accountId,
+            effectiveModel,
+            responseModel,
+            stop_reason: emittedAnyToolUse ? 'tool_use' : 'end_turn',
+            tool_use_names: Array.from(emittedToolUseNames).filter(Boolean),
+            text_preview: emittedText ? emittedText.slice(0, 800) : '',
+            usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+            inferred_stop: true // 标记为推断完成
+          })
+
+          res.end()
+          return
+        }
+
+        // ⚠️ 完全空响应：尝试救援
+        logger.warn('⚠️ 流结束无finishReason且无内容，尝试救援', {
+          requestId: req.requestId,
+          model: effectiveModel,
+          sseEventCount: sseEventIndex
         })
 
-        // 记录摘要便于排查
-        dumpAnthropicStreamSummary(req, {
-          vendor,
-          accountId,
-          effectiveModel,
-          responseModel,
-          stop_reason: 'error',
-          tool_use_names: Array.from(emittedToolUseNames).filter(Boolean),
-          text_preview: emittedText ? emittedText.slice(0, 800) : '',
-          usage: { input_tokens: 0, output_tokens: 0 }
+        await tryRescueAfterMissingFinishReason()
+
+        // 救援后再检查是否有内容
+        const hasContentAfterRescue = !!(emittedText || emittedAnyToolUse || emittedThinking)
+
+        if (hasContentAfterRescue) {
+          logger.info('🔄 救援成功，正常完成响应', {
+            requestId: req.requestId,
+            textLength: emittedText?.length || 0,
+            hasToolCalls: emittedAnyToolUse
+          })
+
+          if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+            stopCurrentBlock()
+          }
+
+          writeAnthropicSseEvent(res, 'message_delta', {
+            type: 'message_delta',
+            delta: {
+              stop_reason: emittedAnyToolUse ? 'tool_use' : 'end_turn',
+              stop_sequence: null
+            },
+            usage: {
+              output_tokens: resolveUsageOutputTokens(usageMetadata)
+            }
+          })
+
+          writeAnthropicSseEvent(res, 'message_stop', { type: 'message_stop' })
+
+          dumpAnthropicStreamSummary(req, {
+            vendor,
+            accountId,
+            effectiveModel,
+            responseModel,
+            stop_reason: emittedAnyToolUse ? 'tool_use' : 'end_turn',
+            tool_use_names: Array.from(emittedToolUseNames).filter(Boolean),
+            text_preview: emittedText ? emittedText.slice(0, 800) : '',
+            usage: {
+              input_tokens: inputTokens,
+              output_tokens: resolveUsageOutputTokens(usageMetadata)
+            },
+            rescue_succeeded: true
+          })
+
+          res.end()
+          return
+        }
+
+        // 救援失败：追加兜底文本，避免客户端卡死
+        const fallbackText = '上游流式连接异常中断（无有效内容）。请重试。'
+        switchBlockType('text')
+        emittedText = fallbackText
+        writeAnthropicSseEvent(res, 'content_block_delta', {
+          type: 'content_block_delta',
+          index: currentIndex,
+          delta: { type: 'text_delta', text: fallbackText }
         })
 
         if (vendor === 'antigravity') {
@@ -2600,14 +4218,45 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             model: effectiveModel,
             totalEvents: sseEventIndex,
             finishReason: null,
-            hasThinking: Boolean(emittedThinking || emittedThoughtSignature),
-            hasToolCalls: emittedAnyToolUse,
-            toolCallNames: Array.from(emittedToolUseNames).filter(Boolean),
-            usage: { input_tokens: 0, output_tokens: 0 },
-            textPreview: emittedText ? emittedText.slice(0, 500) : '',
-            error: 'missing_finish_reason'
-          }).catch(() => {})
+            hasThinking: false,
+            hasToolCalls: false,
+            toolCallNames: [],
+            usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+            textPreview: fallbackText,
+            invalidLines: invalidSseLines,
+            invalidSample: invalidSseSample,
+            error: 'empty_response_fallback'
+          }).catch(() => { })
         }
+
+        if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+          stopCurrentBlock()
+        }
+
+        writeAnthropicSseEvent(res, 'message_delta', {
+          type: 'message_delta',
+          delta: {
+            stop_reason: 'end_turn',
+            stop_sequence: null
+          },
+          usage: {
+            output_tokens: outputTokens
+          }
+        })
+
+        writeAnthropicSseEvent(res, 'message_stop', { type: 'message_stop' })
+
+        dumpAnthropicStreamSummary(req, {
+          vendor,
+          accountId,
+          effectiveModel,
+          responseModel,
+          stop_reason: 'end_turn',
+          tool_use_names: [],
+          text_preview: fallbackText,
+          usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+          empty_response_fallback: true
+        })
 
         res.end()
         return
@@ -2661,7 +4310,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           toolCallNames: Array.from(emittedToolUseNames).filter(Boolean),
           usage: { input_tokens: inputTokens, output_tokens: outputTokens },
           textPreview: emittedText ? emittedText.slice(0, 500) : ''
-        }).catch(() => {})
+        }).catch(() => { })
       }
 
       if (req.apiKey?.id && (inputTokens > 0 || outputTokens > 0)) {
@@ -2685,6 +4334,13 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
 
     streamResponse.on('data', (chunk) => {
       resetActivityTimeout() // <--- 【新增】收到数据了，重置倒计时！
+      if (!receivedAnyUpstreamBytes) {
+        receivedAnyUpstreamBytes = true
+        if (firstByteTimeout) {
+          clearTimeout(firstByteTimeout)
+          firstByteTimeout = null
+        }
+      }
 
       if (finished) {
         return
@@ -2703,6 +4359,16 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         if (parsed.type === 'control') {
           continue
         }
+        if (parsed.type === 'invalid') {
+          invalidSseLines += 1
+          if (!invalidSseSample) {
+            invalidSseSample = {
+              jsonStrPreview: (parsed.jsonStr || '').slice(0, 200),
+              error: parsed.error?.message || 'unknown'
+            }
+          }
+          continue
+        }
         if (parsed.type !== 'data' || !parsed.data) {
           continue
         }
@@ -2717,7 +4383,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             eventIndex: sseEventIndex,
             eventType: parsed.type,
             data: payload
-          }).catch(() => {})
+          }).catch(() => { })
         }
 
         const { usageMetadata: currentUsageMetadata, candidates } = payload || {}
@@ -2729,6 +4395,12 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         const { finishReason: currentFinishReason } = candidate || {}
         if (currentFinishReason) {
           finishReason = currentFinishReason
+          // 🔍 调试：记录收到 finishReason 的时间点
+          logger.info('🔍 [调试] 流式收到 finishReason', {
+            requestId: req.requestId,
+            finishReason: currentFinishReason,
+            sseEventIndex
+          })
         }
 
         const parts = extractGeminiParts(payload)
@@ -2865,6 +4537,11 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             // [签名缓存] 当 thinking 内容和签名都有时，缓存供后续请求使用
             if (isAntigravityVendor && sessionHash && emittedThoughtSignature) {
               signatureCache.cacheSignature(sessionHash, fullThought, emittedThoughtSignature)
+              // [模型家族缓存] 记录签名来源模型家族，用于跨模型兼容性检查
+              const modelFamily = extractModelFamily(baseModel)
+              if (modelFamily) {
+                signatureCache.cacheSignatureFamily(emittedThoughtSignature, modelFamily)
+              }
             }
           }
         }
@@ -2878,13 +4555,34 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             delta = fullText
           }
           if (delta) {
-            switchBlockType('text')
+            const actions = processMcpXmlBridgeDelta(delta)
+            for (const action of actions) {
+              if (!action) {
+                continue
+              }
+
+              if (action.type === 'text') {
+                if (!action.text) {
+                  continue
+                }
+                switchBlockType('text')
+                writeAnthropicSseEvent(res, 'content_block_delta', {
+                  type: 'content_block_delta',
+                  index: currentIndex,
+                  delta: { type: 'text_delta', text: action.text }
+                })
+                continue
+              }
+
+              if (action.type === 'tool') {
+                if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+                  stopCurrentBlock()
+                }
+                emitToolUseBlock(action.name, action.args || {}, null)
+              }
+            }
+
             emittedText = fullText
-            writeAnthropicSseEvent(res, 'content_block_delta', {
-              type: 'content_block_delta',
-              index: currentIndex,
-              delta: { type: 'text_delta', text: delta }
-            })
           }
         }
       }
@@ -2894,6 +4592,10 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       if (activityTimeout) {
         clearTimeout(activityTimeout)
       } // <--- 【新增】正常结束，取消报警
+      if (firstByteTimeout) {
+        clearTimeout(firstByteTimeout)
+        firstByteTimeout = null
+      }
 
       finalize().catch((e) => logger.error('Failed to finalize Anthropic SSE response:', e))
     })
@@ -2902,6 +4604,10 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       if (activityTimeout) {
         clearTimeout(activityTimeout)
       } // <--- 【新增】报错了，取消报警
+      if (firstByteTimeout) {
+        clearTimeout(firstByteTimeout)
+        firstByteTimeout = null
+      }
 
       if (finished) {
         return
@@ -2952,16 +4658,26 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
 
     // 4. 确保返回 JSON 响应给客户端 (让客户端知道出错了并重试)
     if (!res.headersSent) {
+      const statusCode = sanitized.statusCode || 502
+      if (statusCode === 429) {
+        const retryAfter =
+          error?.response?.headers?.['retry-after'] ||
+          error?.response?.headers?.['Retry-After'] ||
+          null
+        if (retryAfter) {
+          res.setHeader('Retry-After', String(retryAfter))
+        }
+      }
       // 记录非流式响应日志
       dumpAnthropicNonStreamResponse(
         req,
-        sanitized.statusCode || 502,
+        statusCode,
         buildAnthropicError(sanitized.upstreamMessage || sanitized.message),
         { vendor, accountId, effectiveModel, forcedVendor: vendor, upstreamError: sanitized }
       )
 
       return res
-        .status(sanitized.statusCode || 502)
+        .status(statusCode)
         .json(buildAnthropicError(sanitized.upstreamMessage || sanitized.message))
     }
 
@@ -3050,7 +4766,8 @@ async function handleAnthropicCountTokensToGemini(req, res, { vendor }) {
     {
       vendor,
       stripThinking: vendor === 'antigravity' && !canEnableThinking,
-      sessionId: sessionHash
+      sessionId: sessionHash,
+      targetModel: model // 用于签名兼容性检查
     }
   )
 

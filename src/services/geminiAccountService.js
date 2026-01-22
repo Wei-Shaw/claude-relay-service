@@ -4,6 +4,7 @@ const crypto = require('crypto')
 const https = require('https')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
+const { parseSSELine } = require('../utils/sseParser')
 const { OAuth2Client } = require('google-auth-library')
 const { maskToken } = require('../utils/tokenMask')
 const ProxyHelper = require('../utils/proxyHelper')
@@ -32,7 +33,7 @@ const OAUTH_PROVIDERS = {
     scopes: ['https://www.googleapis.com/auth/cloud-platform']
   },
   [OAUTH_PROVIDER_ANTIGRAVITY]: {
-    // Antigravity OAuth 配置（参考 gcli2api）
+    // Antigravity OAuth 配置
     clientId:
       process.env.ANTIGRAVITY_OAUTH_CLIENT_ID ||
       '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com',
@@ -84,6 +85,28 @@ const keepAliveAgent = new https.Agent({
 })
 
 logger.info('🌐 Gemini HTTPS Agent initialized with TCP Keep-Alive support')
+
+const DEFAULT_ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_MS = 15000
+const ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_ENV = 'ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_MS'
+
+function readEnvPositiveInt(name, fallback) {
+  const raw = process.env[name]
+  if (raw === undefined || raw === null || raw === '') {
+    return fallback
+  }
+  const parsed = parseInt(String(raw), 10)
+  if (!Number.isFinite(parsed) || Number.isNaN(parsed) || parsed <= 0) {
+    return fallback
+  }
+  return parsed
+}
+
+function getAntigravityStreamFirstByteTimeoutMs() {
+  return readEnvPositiveInt(
+    ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_ENV,
+    DEFAULT_ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_MS
+  )
+}
 
 async function fetchAvailableModelsAntigravity(
   accessToken,
@@ -542,7 +565,7 @@ async function createAccount(accountData) {
       expiresAt = oauthData.expiry_date ? new Date(oauthData.expiry_date).toISOString() : ''
     } else {
       // 如果只提供了 access token
-      ;({ accessToken } = accountData)
+      ; ({ accessToken } = accountData)
       refreshToken = accountData.refreshToken || ''
 
       // 构造完整的 OAuth 数据
@@ -878,15 +901,15 @@ async function getAllAccounts() {
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {
-              isRateLimited: rateLimitInfo.isRateLimited,
-              rateLimitedAt: rateLimitInfo.rateLimitedAt,
-              minutesRemaining: rateLimitInfo.minutesRemaining
-            }
+            isRateLimited: rateLimitInfo.isRateLimited,
+            rateLimitedAt: rateLimitInfo.rateLimitedAt,
+            minutesRemaining: rateLimitInfo.minutesRemaining
+          }
           : {
-              isRateLimited: false,
-              rateLimitedAt: null,
-              minutesRemaining: 0
-            }
+            isRateLimited: false,
+            rateLimitedAt: null,
+            minutesRemaining: 0
+          }
       })
     }
   }
@@ -1027,12 +1050,23 @@ function isSubscriptionExpired(account) {
 
 // 检查账户是否被限流
 function isRateLimited(account) {
-  if (account.rateLimitStatus === 'limited' && account.rateLimitedAt) {
-    const limitedAt = new Date(account.rateLimitedAt).getTime()
+  if (account.rateLimitStatus === 'limited') {
     const now = Date.now()
-    const limitDuration = 60 * 60 * 1000 // 1小时
 
-    return now < limitedAt + limitDuration
+    if (account.rateLimitResetAt) {
+      const resetAt = new Date(account.rateLimitResetAt).getTime()
+      if (!Number.isNaN(resetAt)) {
+        return now < resetAt
+      }
+    }
+
+    if (account.rateLimitedAt) {
+      const limitedAt = new Date(account.rateLimitedAt).getTime()
+      if (!Number.isNaN(limitedAt)) {
+        const limitDuration = 60 * 60 * 1000 // 1小时（旧逻辑）
+        return now < limitedAt + limitDuration
+      }
+    }
   }
   return false
 }
@@ -1170,21 +1204,32 @@ async function markAccountUsed(accountId) {
 }
 
 // 设置账户限流状态
-async function setAccountRateLimited(accountId, isLimited = true) {
+async function setAccountRateLimited(accountId, isLimited = true, resetsInSeconds = null) {
+  const now = new Date()
+  const seconds =
+    Number.isFinite(resetsInSeconds) && !Number.isNaN(resetsInSeconds) && resetsInSeconds > 0
+      ? Math.trunc(resetsInSeconds)
+      : null
+
+  const defaultSeconds = 60 * 60 // 1小时（历史默认值）
+  const resetAt = new Date(now.getTime() + (seconds || defaultSeconds) * 1000)
+
   const updates = isLimited
     ? {
-        rateLimitStatus: 'limited',
-        rateLimitedAt: new Date().toISOString()
-      }
+      rateLimitStatus: 'limited',
+      rateLimitedAt: now.toISOString(),
+      rateLimitResetAt: resetAt.toISOString()
+    }
     : {
-        rateLimitStatus: '',
-        rateLimitedAt: ''
-      }
+      rateLimitStatus: '',
+      rateLimitedAt: '',
+      rateLimitResetAt: ''
+    }
 
   await updateAccount(accountId, updates)
 }
 
-// 获取账户的限流信息（参考 claudeAccountService 的实现）
+// 获取账户的限流信息
 async function getAccountRateLimitInfo(accountId) {
   try {
     const account = await getAccount(accountId)
@@ -1197,12 +1242,24 @@ async function getAccountRateLimitInfo(accountId) {
       const now = new Date()
       const minutesSinceRateLimit = Math.floor((now - rateLimitedAt) / (1000 * 60))
 
-      // Gemini 限流持续时间为 1 小时
-      const minutesRemaining = Math.max(0, 60 - minutesSinceRateLimit)
-      const rateLimitEndAt = new Date(rateLimitedAt.getTime() + 60 * 60 * 1000).toISOString()
+      let willBeAvailableAt = null
+      if (account.rateLimitResetAt) {
+        const parsedReset = new Date(account.rateLimitResetAt)
+        if (!Number.isNaN(parsedReset.getTime())) {
+          willBeAvailableAt = parsedReset
+        }
+      }
+
+      // 兼容旧逻辑：没有 resetAt 时默认 1 小时
+      if (!willBeAvailableAt) {
+        willBeAvailableAt = new Date(rateLimitedAt.getTime() + 60 * 60 * 1000)
+      }
+
+      const minutesRemaining = Math.max(0, Math.ceil((willBeAvailableAt - now) / 60000))
+      const rateLimitEndAt = willBeAvailableAt.toISOString()
 
       return {
-        isRateLimited: minutesRemaining > 0,
+        isRateLimited: willBeAvailableAt > now,
         rateLimitedAt: account.rateLimitedAt,
         minutesSinceRateLimit,
         minutesRemaining,
@@ -1223,7 +1280,7 @@ async function getAccountRateLimitInfo(accountId) {
   }
 }
 
-// 获取配置的OAuth客户端 - 参考GeminiCliSimulator的getOauthClient方法（支持代理）
+// 获取配置的OAuth客户端（支持代理）
 async function getOauthClient(accessToken, refreshToken, proxyConfig = null, oauthProvider = null) {
   const normalizedProvider = normalizeOauthProvider(oauthProvider)
   const oauthConfig = getOauthProviderConfig(normalizedProvider)
@@ -1410,7 +1467,7 @@ async function loadCodeAssist(client, projectId = null, proxyConfig = null) {
   return response.data
 }
 
-// 获取onboard层级 - 参考GeminiCliSimulator的getOnboardTier方法
+// 获取onboard层级
 function getOnboardTier(loadRes) {
   // 用户层级枚举
   const UserTierId = {
@@ -1509,7 +1566,7 @@ async function onboardUser(client, tierId, projectId, clientMetadata, proxyConfi
   return lroRes.data
 }
 
-// 完整的用户设置流程 - 参考setup.ts的逻辑（支持代理）
+// 完整的用户设置流程（支持代理）
 async function setupUser(
   client,
   initialProjectId = null,
@@ -1699,13 +1756,15 @@ async function generateContent(
 }
 
 // 调用 Antigravity 上游生成内容（非流式）
+// 🔧 [dadongwo] 内部使用流式 API 避免 429 限流
 async function generateContentAntigravity(
   client,
   requestData,
   userPromptId,
   projectId = null,
   sessionId = null,
-  proxyConfig = null
+  proxyConfig = null,
+  options = {}
 ) {
   const { token } = await client.getAccessToken()
   const { model } = antigravityClient.buildAntigravityEnvelope({
@@ -1715,24 +1774,407 @@ async function generateContentAntigravity(
     userPromptId
   })
 
-  logger.info('🪐 Antigravity generateContent API调用开始', {
+  logger.info('🪐 Antigravity generateContent API调用开始 (使用流式内部收集)', {
     model,
     userPromptId,
     projectId,
     sessionId
   })
 
-  const { response } = await antigravityClient.request({
-    accessToken: token,
-    proxyConfig,
-    requestData,
-    projectId,
-    sessionId,
-    userPromptId,
-    stream: false
-  })
-  logger.info('✅ Antigravity generateContent API调用成功')
-  return response.data
+  // 🔧 关键修改：使用流式 API 避免 429 错误
+  // 原因：非流式 + 工具 + Thinking 模式会频繁触发 429 RESOURCE_EXHAUSTED
+  // [dadongwo] 所有请求转为流式处理以避免 429 RESOURCE_EXHAUSTED
+  //
+  // 重要：流式 axios timeout=0（无限），这里额外用 AbortController 做兜底，
+  // 对齐原非流式默认 10min 的超时语义，避免请求挂死。
+  const abortController = new AbortController()
+  const abortTimeoutMs =
+    Number.isFinite(options?.abortTimeoutMs) && options.abortTimeoutMs > 0
+      ? Math.trunc(options.abortTimeoutMs)
+      : 600000
+  const abortTimer = setTimeout(() => abortController.abort(), abortTimeoutMs)
+
+  try {
+    const { response } = await antigravityClient.request({
+      accessToken: token,
+      proxyConfig,
+      requestData,
+      projectId,
+      sessionId,
+      userPromptId,
+      stream: true, // 改用流式
+      params: { alt: 'sse' }, // SSE 格式
+      signal: abortController.signal
+    })
+
+    return await new Promise((resolve, reject) => {
+      // 🔧 axios responseType=stream 时，数据在 response.data
+      const stream = response.data
+
+      const collectedPayloads = []
+      let lastPayload = null
+      let buffer = ''
+      let invalidLines = 0
+      let invalidSample = null
+      let gotAnyData = false
+      let settled = false
+
+      const firstByteTimeoutMs = getAntigravityStreamFirstByteTimeoutMs()
+      const firstByteTimer = setTimeout(() => {
+        if (settled || gotAnyData) {
+          return
+        }
+        settled = true
+        logger.warn('⚠️ Antigravity stream no data within first byte timeout, aborting', {
+          model,
+          firstByteTimeoutMs
+        })
+        abortController.abort()
+        reject(
+          new Error(`Antigravity stream timed out before first byte (${firstByteTimeoutMs}ms)`)
+        )
+      }, firstByteTimeoutMs)
+
+      const settleOnce = (fn) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        clearTimeout(firstByteTimer)
+        fn()
+      }
+
+      const handleLine = (line) => {
+        const trimmed = typeof line === 'string' ? line.trim() : ''
+        if (!trimmed) {
+          return
+        }
+        const parsed = parseSSELine(trimmed)
+        if (parsed.type === 'control' || parsed.type === 'other') {
+          return
+        }
+        if (parsed.type === 'invalid') {
+          invalidLines += 1
+          if (!invalidSample) {
+            invalidSample = {
+              jsonStrPreview: (parsed.jsonStr || '').slice(0, 200),
+              error: parsed.error?.message || 'unknown'
+            }
+          }
+          return
+        }
+
+        const payload = parsed.data?.response || parsed.data
+        collectedPayloads.push(payload)
+        lastPayload = payload
+      }
+
+      stream.on('data', (chunk) => {
+        if (!gotAnyData) {
+          gotAnyData = true
+          clearTimeout(firstByteTimer)
+        }
+        buffer += chunk.toString()
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          handleLine(line)
+        }
+      })
+
+      stream.on('end', () => {
+        settleOnce(() => {
+          if (buffer.trim()) {
+            handleLine(buffer)
+          }
+
+          logger.info('✅ Antigravity generateContent API调用成功 (流式收集完成)', {
+            chunksCount: collectedPayloads.length,
+            invalidLines,
+            invalidSample
+          })
+
+          if (collectedPayloads.length > 0) {
+            const mergedResponse = mergeAntigravityStreamChunks(collectedPayloads, lastPayload)
+            resolve(mergedResponse)
+            return
+          }
+          if (lastPayload) {
+            resolve(lastPayload)
+            return
+          }
+          reject(new Error('Empty response from Antigravity stream'))
+        })
+      })
+
+      stream.on('error', (err) => {
+        settleOnce(() => {
+          logger.error('❌ Antigravity stream collection error:', err)
+          reject(err)
+        })
+      })
+    })
+  } finally {
+    clearTimeout(abortTimer)
+  }
+}
+
+// 合并流式 chunks 为完整响应
+function mergeAntigravityStreamChunks(chunks, baseResponse) {
+  if (!chunks || chunks.length === 0) {
+    return baseResponse
+  }
+
+  // 🔧 关键修复：处理嵌套结构 { response: {...}, traceId }
+  // 有些 chunk 格式是 { response: { candidates: [...] }, traceId: "..." }
+  // 有些 chunk 格式是直接的 { candidates: [...] }
+  const unwrapChunk = (c) => c?.response || c
+
+  const resolveSignature = (part) => {
+    if (!part) {
+      return ''
+    }
+    return part.thoughtSignature || part.thought_signature || part.signature || ''
+  }
+
+  const resolveFunctionCallArgs = (functionCall) => {
+    if (!functionCall || typeof functionCall !== 'object') {
+      return { args: null, json: '', canContinue: false }
+    }
+    const canContinue =
+      functionCall.willContinue === true ||
+      functionCall.will_continue === true ||
+      functionCall.continue === true ||
+      functionCall.willContinue === 'true' ||
+      functionCall.will_continue === 'true'
+
+    const raw =
+      functionCall.args !== undefined
+        ? functionCall.args
+        : functionCall.partialArgs !== undefined
+          ? functionCall.partialArgs
+          : functionCall.partial_args !== undefined
+            ? functionCall.partial_args
+            : functionCall.argsJson !== undefined
+              ? functionCall.argsJson
+              : functionCall.args_json !== undefined
+                ? functionCall.args_json
+                : ''
+
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      return { args: raw, json: '', canContinue }
+    }
+
+    const json =
+      typeof raw === 'string' ? raw : raw === null || raw === undefined ? '' : String(raw)
+    if (!json) {
+      return { args: null, json: '', canContinue }
+    }
+
+    try {
+      const parsed = JSON.parse(json)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return { args: parsed, json: '', canContinue }
+      }
+    } catch (_) {
+      // ignore: treat as partial JSON string
+    }
+
+    return { args: null, json, canContinue }
+  }
+
+  // 使用最后一个 chunk 作为基础结构（包含完整的 usageMetadata / modelVersion 等）
+  const lastChunk = unwrapChunk(baseResponse) || unwrapChunk(chunks[chunks.length - 1])
+  const result = JSON.parse(JSON.stringify(lastChunk))
+
+  const mergedParts = []
+  const pendingToolCallsById = new Map()
+  let mergedFinishReason = null
+
+  const pushOrAppendTextPart = ({ text, thought, signature, extra }) => {
+    if (typeof text !== 'string' || !text) {
+      return
+    }
+    const last = mergedParts[mergedParts.length - 1]
+    const canAppend =
+      last &&
+      typeof last === 'object' &&
+      typeof last.text === 'string' &&
+      !last.functionCall &&
+      Boolean(last.thought) === Boolean(thought)
+    if (canAppend) {
+      last.text += text
+      if (signature && !resolveSignature(last)) {
+        last.thoughtSignature = signature
+      } else if (signature) {
+        last.thoughtSignature = signature
+      }
+      return
+    }
+    const part = { ...(extra || {}), text }
+    if (thought) {
+      part.thought = true
+    }
+    if (signature) {
+      part.thoughtSignature = signature
+    }
+    mergedParts.push(part)
+  }
+
+  const flushPendingToolCallById = (id, { force = false } = {}) => {
+    const pending = pendingToolCallsById.get(id)
+    if (!pending || !pending.name) {
+      return
+    }
+
+    if (!pending.args && pending.argsJson) {
+      try {
+        const parsed = JSON.parse(pending.argsJson)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          pending.args = parsed
+          pending.argsJson = ''
+        }
+      } catch (_) {
+        // keep buffering
+      }
+    }
+
+    if (!pending.args) {
+      if (!force) {
+        return
+      }
+      pending.args = {}
+    }
+
+    const part = {}
+    if (pending.thought) {
+      part.thought = true
+    }
+    if (pending.signature) {
+      part.thoughtSignature = pending.signature
+    }
+    part.functionCall = {
+      id,
+      name: pending.name,
+      args: pending.args
+    }
+    mergedParts.push(part)
+    pendingToolCallsById.delete(id)
+  }
+
+  for (const rawChunk of chunks) {
+    const chunk = unwrapChunk(rawChunk)
+    const candidate = chunk?.candidates?.[0]
+    if (candidate?.finishReason) {
+      mergedFinishReason = candidate.finishReason
+    }
+
+    const parts = candidate?.content?.parts
+    if (!Array.isArray(parts)) {
+      continue
+    }
+
+    for (const part of parts) {
+      if (!part || typeof part !== 'object') {
+        continue
+      }
+
+      const signature = resolveSignature(part)
+      const isThought = part.thought === true
+
+      const { functionCall } = part
+      if (functionCall?.name) {
+        const id = typeof functionCall.id === 'string' && functionCall.id ? functionCall.id : null
+        const { args, json, canContinue } = resolveFunctionCallArgs(functionCall)
+
+        // 无 id 无法聚合：仅在拿到可用 args 时 emit，避免产生空 tool_use
+        if (!id) {
+          if (args) {
+            const fcPart = {}
+            if (isThought) {
+              fcPart.thought = true
+            }
+            if (signature) {
+              fcPart.thoughtSignature = signature
+            }
+            fcPart.functionCall = { name: functionCall.name, args }
+            mergedParts.push(fcPart)
+          }
+          continue
+        }
+
+        const pending = pendingToolCallsById.get(id) || {
+          id,
+          name: functionCall.name,
+          args: null,
+          argsJson: '',
+          thought: Boolean(isThought),
+          signature: signature || ''
+        }
+        pending.name = functionCall.name
+        if (signature) {
+          pending.signature = signature
+        }
+        if (isThought) {
+          pending.thought = true
+        }
+        if (args) {
+          pending.args = args
+          pending.argsJson = ''
+        } else if (json) {
+          pending.argsJson += json
+        }
+        pendingToolCallsById.set(id, pending)
+
+        if (!canContinue) {
+          flushPendingToolCallById(id)
+        }
+        continue
+      }
+
+      // 仅有 signature（无文本/无工具调用）：必须保留，否则后续 thinking 会被 drop
+      if (signature && !part.text) {
+        const last = mergedParts[mergedParts.length - 1]
+        if (last && typeof last === 'object' && last.thought === true && !last.functionCall) {
+          last.thoughtSignature = signature
+        } else {
+          mergedParts.push({ thought: true, text: '', thoughtSignature: signature })
+        }
+        continue
+      }
+
+      if (typeof part.text === 'string' && part.text) {
+        pushOrAppendTextPart({
+          text: part.text,
+          thought: isThought,
+          signature: signature || '',
+          extra: part.inlineData ? { inlineData: part.inlineData } : null
+        })
+        continue
+      }
+
+      // 兜底：保留未知结构，避免丢字段（例如未来新增字段）
+      mergedParts.push(JSON.parse(JSON.stringify(part)))
+    }
+  }
+
+  // 若存在未完成工具调用（例如 args 分段但上游提前结束），尽力 flush，避免响应语义不完整
+  for (const id of pendingToolCallsById.keys()) {
+    flushPendingToolCallById(id, { force: true })
+  }
+
+  if (result?.candidates?.[0]) {
+    if (!result.candidates[0].content) {
+      result.candidates[0].content = { role: 'model', parts: [] }
+    }
+    result.candidates[0].content.parts = mergedParts.length > 0 ? mergedParts : [{ text: '' }]
+
+    if (!result.candidates[0].finishReason && mergedFinishReason) {
+      result.candidates[0].finishReason = mergedFinishReason
+    }
+  }
+
+  return result
 }
 
 // 调用 Code Assist API 生成内容（流式）
@@ -1897,7 +2339,8 @@ async function resetAccountStatus(accountId) {
     // 清除错误相关字段
     errorMessage: '',
     rateLimitedAt: '',
-    rateLimitStatus: ''
+    rateLimitStatus: '',
+    rateLimitResetAt: ''
   }
 
   await updateAccount(accountId, updates)

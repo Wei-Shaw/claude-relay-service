@@ -185,11 +185,28 @@ function cleanJsonSchemaForGemini(schema) {
     result.enum = [schema.const]
   }
 
-  // enum
+  // enum - Gemini v1internal 严格要求 enum 数组中的所有元素必须是字符串
+  // MCP 工具定义可能包含数字或布尔值的 enum，需要统一转换为字符串
+  // 移除 min/max 属性
   if (Array.isArray(schema.enum)) {
-    const en = schema.enum.filter(
-      (v) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
-    )
+    const en = schema.enum
+      .filter((v) => v !== undefined)
+      .map((v) => {
+        if (typeof v === 'string') {
+          return v
+        }
+        if (typeof v === 'number') {
+          return String(v)
+        }
+        if (typeof v === 'boolean') {
+          return String(v)
+        }
+        if (v === null) {
+          return 'null'
+        }
+        // 复杂类型转为 JSON 字符串
+        return JSON.stringify(v)
+      })
     if (en.length) {
       result.enum = en
     }
