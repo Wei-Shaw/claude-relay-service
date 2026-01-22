@@ -26,11 +26,13 @@ class QuotaCardService {
       }
       // 没有 Redis 配置时，使用 config.js 默认值
       const config = require('../../config/config')
-      return config.quotaCardLimits || {
-        enabled: true,
-        maxExpiryDays: 90,
-        maxTotalCostLimit: 1000
-      }
+      return (
+        config.quotaCardLimits || {
+          enabled: true,
+          maxExpiryDays: 90,
+          maxTotalCostLimit: 1000
+        }
+      )
     } catch (error) {
       logger.error('❌ Failed to get limits config:', error)
       return { enabled: true, maxExpiryDays: 90, maxTotalCostLimit: 1000 }
@@ -343,7 +345,9 @@ class QuotaCardService {
           const maxAllowed = limits.maxTotalCostLimit - beforeLimit
           if (amountToAdd > maxAllowed) {
             amountToAdd = Math.max(0, maxAllowed)
-            warnings.push(`额度已达上限，本次仅增加 ${amountToAdd} CC（原卡面 ${card.quotaAmount} CC）`)
+            warnings.push(
+              `额度已达上限，本次仅增加 ${amountToAdd} CC（原卡面 ${card.quotaAmount} CC）`
+            )
             logger.warn(`额度卡兑换超出上限，已截断：原 ${card.quotaAmount} -> 实际 ${amountToAdd}`)
           }
         }
@@ -395,7 +399,10 @@ class QuotaCardService {
             await redis.client.hset(`apikey:${apiKeyId}`, 'expiresAt', maxExpiry.toISOString())
             afterExpiry = maxExpiry.toISOString()
             // 计算实际增加的天数，截断时统一用天
-            const actualDays = Math.max(0, Math.ceil((maxExpiry - baseDate) / (1000 * 60 * 60 * 24)))
+            const actualDays = Math.max(
+              0,
+              Math.ceil((maxExpiry - baseDate) / (1000 * 60 * 60 * 24))
+            )
             timeAdded = actualDays
             actualTimeUnit = 'days'
           } else {
