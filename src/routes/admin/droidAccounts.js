@@ -623,7 +623,7 @@ router.post('/droid-accounts/:accountId/test', authenticateAdmin, async (req, re
       })
     }
 
-    const accessToken = tokenResult.accessToken
+    const { accessToken } = tokenResult
 
     // 构造测试请求
     const axios = require('axios')

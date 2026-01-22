@@ -528,7 +528,7 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
       })
     }
 
-    const accessToken = tokenResult.accessToken
+    const { accessToken } = tokenResult
 
     // 构造测试请求
     const axios = require('axios')
