@@ -79,6 +79,7 @@ class BedrockAccountService {
 
     const client = redis.getClientSafe()
     await client.set(`bedrock_account:${accountId}`, JSON.stringify(accountData))
+    await redis.addToIndex('bedrock_account:index', accountId)
 
     logger.info(`✅ 创建Bedrock账户成功 - ID: ${accountId}, 名称: ${name}, 区域: ${region}`)
 
@@ -208,12 +209,18 @@ class BedrockAccountService {
   // 📋 获取所有账户列表
   async getAllAccounts() {
     try {
-      const client = redis.getClientSafe()
-      const keys = await client.keys('bedrock_account:*')
+      const _client = redis.getClientSafe()
+      const accountIds = await redis.getAllIdsByIndex(
+        'bedrock_account:index',
+        'bedrock_account:*',
+        /^bedrock_account:(.+)$/
+      )
+      const keys = accountIds.map((id) => `bedrock_account:${id}`)
       const accounts = []
+      const dataList = await redis.batchGetChunked(keys)
 
-      for (const key of keys) {
-        const accountData = await client.get(key)
+      for (let i = 0; i < keys.length; i++) {
+        const accountData = dataList[i]
         if (accountData) {
           const account = JSON.parse(accountData)
 
@@ -375,6 +382,7 @@ class BedrockAccountService {
 
       const client = redis.getClientSafe()
       await client.del(`bedrock_account:${accountId}`)
+      await redis.removeFromIndex('bedrock_account:index', accountId)
 
       logger.info(`✅ 删除Bedrock账户成功 - ID: ${accountId}`)
 

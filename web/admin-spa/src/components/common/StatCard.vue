@@ -59,7 +59,3 @@ const iconBgClass = computed(() => {
   return colorMap[props.iconColor] || colorMap.primary
 })
 </script>
-
-<style scoped>
-/* 使用全局样式中定义的 .stat-card 和 .stat-icon 类 */
-</style>

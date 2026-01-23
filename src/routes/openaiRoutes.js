@@ -9,9 +9,12 @@ const openaiAccountService = require('../services/openaiAccountService')
 const openaiResponsesAccountService = require('../services/openaiResponsesAccountService')
 const openaiResponsesRelayService = require('../services/openaiResponsesRelayService')
 const apiKeyService = require('../services/apiKeyService')
+const redis = require('../models/redis')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
+const { IncrementalSSEParser } = require('../utils/sseParser')
+const { getSafeMessage } = require('../utils/errorSanitizer')
 
 // 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
@@ -67,7 +70,7 @@ function extractCodexUsageHeaders(headers) {
   return hasData ? snapshot : null
 }
 
-async function applyRateLimitTracking(req, usageSummary, model, context = '') {
+async function applyRateLimitTracking(req, usageSummary, model, context = '', accountType = null) {
   if (!req.rateLimitInfo) {
     return
   }
@@ -78,7 +81,9 @@ async function applyRateLimitTracking(req, usageSummary, model, context = '') {
     const { totalTokens, totalCost } = await updateRateLimitCounters(
       req.rateLimitInfo,
       usageSummary,
-      model
+      model,
+      req.apiKey?.id,
+      accountType
     )
 
     if (totalTokens > 0) {
@@ -577,7 +582,6 @@ const handleResponses = async (req, res) => {
     }
 
     // 处理响应并捕获 usage 数据和真实的 model
-    let buffer = ''
     let usageData = null
     let actualModel = null
     let usageReported = false
@@ -613,7 +617,8 @@ const handleResponses = async (req, res) => {
             0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             actualModel,
-            accountId
+            accountId,
+            'openai'
           )
 
           logger.info(
@@ -629,7 +634,8 @@ const handleResponses = async (req, res) => {
               cacheReadTokens
             },
             actualModel,
-            'openai-non-stream'
+            'openai-non-stream',
+            'openai'
           )
         }
 
@@ -645,74 +651,50 @@ const handleResponses = async (req, res) => {
       }
     }
 
-    // 解析 SSE 事件以捕获 usage 数据和 model
-    const parseSSEForUsage = (data) => {
-      const lines = data.split('\n')
+    // 使用增量 SSE 解析器
+    const sseParser = new IncrementalSSEParser()
 
-      for (const line of lines) {
-        if (line.startsWith('event: response.completed')) {
-          // 下一行应该是数据
-          continue
+    // 处理解析出的事件
+    const processSSEEvent = (eventData) => {
+      // 检查是否是 response.completed 事件
+      if (eventData.type === 'response.completed' && eventData.response) {
+        // 从响应中获取真实的 model
+        if (eventData.response.model) {
+          actualModel = eventData.response.model
+          logger.debug(`📊 Captured actual model: ${actualModel}`)
         }
 
-        if (line.startsWith('data: ')) {
-          try {
-            const jsonStr = line.slice(6) // 移除 'data: ' 前缀
-            const eventData = JSON.parse(jsonStr)
+        // 获取 usage 数据
+        if (eventData.response.usage) {
+          usageData = eventData.response.usage
+          logger.debug('📊 Captured OpenAI usage data:', usageData)
+        }
+      }
 
-            // 检查是否是 response.completed 事件
-            if (eventData.type === 'response.completed' && eventData.response) {
-              // 从响应中获取真实的 model
-              if (eventData.response.model) {
-                actualModel = eventData.response.model
-                logger.debug(`📊 Captured actual model: ${actualModel}`)
-              }
-
-              // 获取 usage 数据
-              if (eventData.response.usage) {
-                usageData = eventData.response.usage
-                logger.debug('📊 Captured OpenAI usage data:', usageData)
-              }
-            }
-
-            // 检查是否有限流错误
-            if (eventData.error && eventData.error.type === 'usage_limit_reached') {
-              rateLimitDetected = true
-              if (eventData.error.resets_in_seconds) {
-                rateLimitResetsInSeconds = eventData.error.resets_in_seconds
-                logger.warn(
-                  `🚫 Rate limit detected in stream, resets in ${rateLimitResetsInSeconds} seconds`
-                )
-              }
-            }
-          } catch (e) {
-            // 忽略解析错误
-          }
+      // 检查是否有限流错误
+      if (eventData.error && eventData.error.type === 'usage_limit_reached') {
+        rateLimitDetected = true
+        if (eventData.error.resets_in_seconds) {
+          rateLimitResetsInSeconds = eventData.error.resets_in_seconds
+          logger.warn(
+            `🚫 Rate limit detected in stream, resets in ${rateLimitResetsInSeconds} seconds`
+          )
         }
       }
     }
 
     upstream.data.on('data', (chunk) => {
       try {
-        const chunkStr = chunk.toString()
-
         // 转发数据给客户端
         if (!res.destroyed) {
           res.write(chunk)
         }
 
-        // 同时解析数据以捕获 usage 信息
-        buffer += chunkStr
-
-        // 处理完整的 SSE 事件
-        if (buffer.includes('\n\n')) {
-          const events = buffer.split('\n\n')
-          buffer = events.pop() || '' // 保留最后一个可能不完整的事件
-
-          for (const event of events) {
-            if (event.trim()) {
-              parseSSEForUsage(event)
-            }
+        // 使用增量解析器处理数据
+        const events = sseParser.feed(chunk.toString())
+        for (const event of events) {
+          if (event.type === 'data' && event.data) {
+            processSSEEvent(event.data)
           }
         }
       } catch (error) {
@@ -722,8 +704,14 @@ const handleResponses = async (req, res) => {
 
     upstream.data.on('end', async () => {
       // 处理剩余的 buffer
-      if (buffer.trim()) {
-        parseSSEForUsage(buffer)
+      const remaining = sseParser.getRemaining()
+      if (remaining.trim()) {
+        const events = sseParser.feed('\n\n') // 强制刷新剩余内容
+        for (const event of events) {
+          if (event.type === 'data' && event.data) {
+            processSSEEvent(event.data)
+          }
+        }
       }
 
       // 记录使用统计
@@ -745,7 +733,8 @@ const handleResponses = async (req, res) => {
             0, // OpenAI没有cache_creation_tokens
             cacheReadTokens,
             modelToRecord,
-            accountId
+            accountId,
+            'openai'
           )
 
           logger.info(
@@ -762,7 +751,8 @@ const handleResponses = async (req, res) => {
               cacheReadTokens
             },
             modelToRecord,
-            'openai-stream'
+            'openai-stream',
+            'openai'
           )
         } catch (error) {
           logger.error('Failed to record OpenAI usage:', error)
@@ -852,13 +842,15 @@ const handleResponses = async (req, res) => {
 
     let responsePayload = error.response?.data
     if (!responsePayload) {
-      responsePayload = { error: { message: error.message || 'Internal server error' } }
+      responsePayload = { error: { message: getSafeMessage(error) } }
     } else if (typeof responsePayload === 'string') {
-      responsePayload = { error: { message: responsePayload } }
+      responsePayload = { error: { message: getSafeMessage(responsePayload) } }
     } else if (typeof responsePayload === 'object' && !responsePayload.error) {
       responsePayload = {
-        error: { message: responsePayload.message || error.message || 'Internal server error' }
+        error: { message: getSafeMessage(responsePayload.message || error) }
       }
+    } else if (responsePayload.error?.message) {
+      responsePayload.error.message = getSafeMessage(responsePayload.error.message)
     }
 
     if (!res.headersSent) {
@@ -876,16 +868,18 @@ router.post('/v1/responses/compact', authenticateApiKey, handleResponses)
 // 使用情况统计端点
 router.get('/usage', authenticateApiKey, async (req, res) => {
   try {
-    const { usage } = req.apiKey
+    const keyData = req.apiKey
+    // 按需查询 usage 数据
+    const usage = await redis.getUsageStats(keyData.id)
 
     res.json({
       object: 'usage',
-      total_tokens: usage.total.tokens,
-      total_requests: usage.total.requests,
-      daily_tokens: usage.daily.tokens,
-      daily_requests: usage.daily.requests,
-      monthly_tokens: usage.monthly.tokens,
-      monthly_requests: usage.monthly.requests
+      total_tokens: usage?.total?.tokens || 0,
+      total_requests: usage?.total?.requests || 0,
+      daily_tokens: usage?.daily?.tokens || 0,
+      daily_requests: usage?.daily?.requests || 0,
+      monthly_tokens: usage?.monthly?.tokens || 0,
+      monthly_requests: usage?.monthly?.requests || 0
     })
   } catch (error) {
     logger.error('Failed to get usage stats:', error)
@@ -902,25 +896,26 @@ router.get('/usage', authenticateApiKey, async (req, res) => {
 router.get('/key-info', authenticateApiKey, async (req, res) => {
   try {
     const keyData = req.apiKey
+    // 按需查询 usage 数据（仅 key-info 端点需要）
+    const usage = await redis.getUsageStats(keyData.id)
+    const tokensUsed = usage?.total?.tokens || 0
     res.json({
       id: keyData.id,
       name: keyData.name,
       description: keyData.description,
       permissions: keyData.permissions,
       token_limit: keyData.tokenLimit,
-      tokens_used: keyData.usage.total.tokens,
+      tokens_used: tokensUsed,
       tokens_remaining:
-        keyData.tokenLimit > 0
-          ? Math.max(0, keyData.tokenLimit - keyData.usage.total.tokens)
-          : null,
+        keyData.tokenLimit > 0 ? Math.max(0, keyData.tokenLimit - tokensUsed) : null,
       rate_limit: {
         window: keyData.rateLimitWindow,
         requests: keyData.rateLimitRequests
       },
       usage: {
-        total: keyData.usage.total,
-        daily: keyData.usage.daily,
-        monthly: keyData.usage.monthly
+        total: usage?.total || {},
+        daily: usage?.daily || {},
+        monthly: usage?.monthly || {}
       }
     })
   } catch (error) {

@@ -45,6 +45,27 @@ function validatePermissions(permissions) {
   return `Permissions must be an array. Valid values are: ${VALID_PERMISSIONS.join(', ')}`
 }
 
+/**
+ * 验证 serviceRates 格式
+ * @param {any} serviceRates - 服务倍率对象
+ * @returns {string|null} - 返回错误消息，null 表示验证通过
+ */
+function validateServiceRates(serviceRates) {
+  if (serviceRates === undefined || serviceRates === null) {
+    return null
+  }
+  if (typeof serviceRates !== 'object' || Array.isArray(serviceRates)) {
+    return 'Service rates must be an object'
+  }
+  for (const [service, rate] of Object.entries(serviceRates)) {
+    const numRate = Number(rate)
+    if (!Number.isFinite(numRate) || numRate < 0) {
+      return `Invalid rate for service "${service}": must be a non-negative number`
+    }
+  }
+  return null
+}
+
 // 👥 用户管理 (用于API Key分配)
 
 // 获取所有用户列表（用于API Key分配）
@@ -116,14 +137,14 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
     const costStats = await redis.getCostStats(keyId)
     const dailyCost = await redis.getDailyCost(keyId)
     const today = redis.getDateStringInTimezone()
-    const client = redis.getClientSafe()
 
     // 获取所有相关的Redis键
-    const costKeys = await client.keys(`usage:cost:*:${keyId}:*`)
+    const costKeys = await redis.scanKeys(`usage:cost:*:${keyId}:*`)
+    const costValues = await redis.batchGetChunked(costKeys)
     const keyValues = {}
 
-    for (const key of costKeys) {
-      keyValues[key] = await client.get(key)
+    for (let i = 0; i < costKeys.length; i++) {
+      keyValues[costKeys[i]] = costValues[i]
     }
 
     return res.json({
@@ -324,20 +345,28 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       })
     }
 
-    // 为每个API Key添加owner的displayName
-    for (const apiKey of result.items) {
-      if (apiKey.userId) {
-        try {
-          const user = await userService.getUserById(apiKey.userId, false)
-          if (user) {
-            apiKey.ownerDisplayName = user.displayName || user.username || 'Unknown User'
-          } else {
-            apiKey.ownerDisplayName = 'Unknown User'
-          }
-        } catch (error) {
-          logger.debug(`无法获取用户 ${apiKey.userId} 的信息:`, error)
-          apiKey.ownerDisplayName = 'Unknown User'
+    // 为每个API Key添加owner的displayName（批量获取优化）
+    const userIdsToFetch = [...new Set(result.items.filter((k) => k.userId).map((k) => k.userId))]
+    const userMap = new Map()
+
+    if (userIdsToFetch.length > 0) {
+      // 批量获取用户信息
+      const users = await Promise.all(
+        userIdsToFetch.map((id) => userService.getUserById(id, false).catch(() => null))
+      )
+      userIdsToFetch.forEach((id, i) => {
+        if (users[i]) {
+          userMap.set(id, users[i])
         }
+      })
+    }
+
+    for (const apiKey of result.items) {
+      if (apiKey.userId && userMap.has(apiKey.userId)) {
+        const user = userMap.get(apiKey.userId)
+        apiKey.ownerDisplayName = user.displayName || user.username || 'Unknown User'
+      } else if (apiKey.userId) {
+        apiKey.ownerDisplayName = 'Unknown User'
       } else {
         apiKey.ownerDisplayName =
           apiKey.createdBy === 'admin' ? 'Admin' : apiKey.createdBy || 'Admin'
@@ -608,6 +637,56 @@ router.get('/api-keys/cost-sort-status', authenticateAdmin, async (req, res) => 
   }
 })
 
+// 获取 API Key 索引状态
+router.get('/api-keys/index-status', authenticateAdmin, async (req, res) => {
+  try {
+    const apiKeyIndexService = require('../../services/apiKeyIndexService')
+    const status = await apiKeyIndexService.getStatus()
+    return res.json({ success: true, data: status })
+  } catch (error) {
+    logger.error('❌ Failed to get API Key index status:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get index status',
+      message: error.message
+    })
+  }
+})
+
+// 手动重建 API Key 索引
+router.post('/api-keys/index-rebuild', authenticateAdmin, async (req, res) => {
+  try {
+    const apiKeyIndexService = require('../../services/apiKeyIndexService')
+    const status = await apiKeyIndexService.getStatus()
+
+    if (status.building) {
+      return res.status(409).json({
+        success: false,
+        error: 'INDEX_BUILDING',
+        message: '索引正在重建中，请稍后再试',
+        progress: status.progress
+      })
+    }
+
+    // 异步重建，不等待完成
+    apiKeyIndexService.rebuildIndexes().catch((err) => {
+      logger.error('❌ Failed to rebuild API Key index:', err)
+    })
+
+    return res.json({
+      success: true,
+      message: 'API Key 索引重建已开始'
+    })
+  } catch (error) {
+    logger.error('❌ Failed to trigger API Key index rebuild:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to trigger rebuild',
+      message: error.message
+    })
+  }
+})
+
 // 强制刷新费用排序索引
 router.post('/api-keys/cost-sort-refresh', authenticateAdmin, async (req, res) => {
   try {
@@ -673,28 +752,100 @@ router.get('/supported-clients', authenticateAdmin, async (req, res) => {
 // 获取已存在的标签列表
 router.get('/api-keys/tags', authenticateAdmin, async (req, res) => {
   try {
-    const apiKeys = await apiKeyService.getAllApiKeys()
-    const tagSet = new Set()
-
-    // 收集所有API Keys的标签
-    for (const apiKey of apiKeys) {
-      if (apiKey.tags && Array.isArray(apiKey.tags)) {
-        apiKey.tags.forEach((tag) => {
-          if (tag && tag.trim()) {
-            tagSet.add(tag.trim())
-          }
-        })
-      }
-    }
-
-    // 转换为数组并排序
-    const tags = Array.from(tagSet).sort()
+    const tags = await apiKeyService.getAllTags()
 
     logger.info(`📋 Retrieved ${tags.length} unique tags from API keys`)
     return res.json({ success: true, data: tags })
   } catch (error) {
     logger.error('❌ Failed to get API key tags:', error)
     return res.status(500).json({ error: 'Failed to get API key tags', message: error.message })
+  }
+})
+
+// 获取标签详情（含使用数量）
+router.get('/api-keys/tags/details', authenticateAdmin, async (req, res) => {
+  try {
+    const tagDetails = await apiKeyService.getTagsWithCount()
+    logger.info(`📋 Retrieved ${tagDetails.length} tags with usage counts`)
+    return res.json({ success: true, data: tagDetails })
+  } catch (error) {
+    logger.error('❌ Failed to get tag details:', error)
+    return res.status(500).json({ error: 'Failed to get tag details', message: error.message })
+  }
+})
+
+// 创建新标签
+router.post('/api-keys/tags', authenticateAdmin, async (req, res) => {
+  try {
+    const { name } = req.body
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: '标签名称不能为空' })
+    }
+
+    const result = await apiKeyService.createTag(name.trim())
+    if (!result.success) {
+      return res.status(400).json({ error: result.error })
+    }
+
+    logger.info(`🏷️ Created new tag: ${name}`)
+    return res.json({ success: true, message: '标签创建成功' })
+  } catch (error) {
+    logger.error('❌ Failed to create tag:', error)
+    return res.status(500).json({ error: 'Failed to create tag', message: error.message })
+  }
+})
+
+// 删除标签（从所有 API Key 中移除）
+router.delete('/api-keys/tags/:tagName', authenticateAdmin, async (req, res) => {
+  try {
+    const { tagName } = req.params
+    if (!tagName) {
+      return res.status(400).json({ error: 'Tag name is required' })
+    }
+
+    const decodedTagName = decodeURIComponent(tagName)
+    const result = await apiKeyService.removeTagFromAllKeys(decodedTagName)
+
+    logger.info(`🏷️ Removed tag "${decodedTagName}" from ${result.affectedCount} API keys`)
+    return res.json({
+      success: true,
+      message: `Tag "${decodedTagName}" removed from ${result.affectedCount} API keys`,
+      affectedCount: result.affectedCount
+    })
+  } catch (error) {
+    logger.error('❌ Failed to delete tag:', error)
+    return res.status(500).json({ error: 'Failed to delete tag', message: error.message })
+  }
+})
+
+// 重命名标签
+router.put('/api-keys/tags/:tagName', authenticateAdmin, async (req, res) => {
+  try {
+    const { tagName } = req.params
+    const { newName } = req.body
+    if (!tagName || !newName || !newName.trim()) {
+      return res.status(400).json({ error: 'Tag name and new name are required' })
+    }
+
+    const decodedTagName = decodeURIComponent(tagName)
+    const trimmedNewName = newName.trim()
+    const result = await apiKeyService.renameTag(decodedTagName, trimmedNewName)
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error })
+    }
+
+    logger.info(
+      `🏷️ Renamed tag "${decodedTagName}" to "${trimmedNewName}" in ${result.affectedCount} API keys`
+    )
+    return res.json({
+      success: true,
+      message: `Tag renamed in ${result.affectedCount} API keys`,
+      affectedCount: result.affectedCount
+    })
+  } catch (error) {
+    logger.error('❌ Failed to rename tag:', error)
+    return res.status(500).json({ error: 'Failed to rename tag', message: error.message })
   }
 })
 
@@ -1298,7 +1449,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       activationDays, // 新增：激活后有效天数
       activationUnit, // 新增：激活时间单位 (hours/days)
       expirationMode, // 新增：过期模式
-      icon // 新增：图标
+      icon, // 新增：图标
+      serviceRates // API Key 级别服务倍率
     } = req.body
 
     // 输入验证
@@ -1425,6 +1577,12 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: permissionsError })
     }
 
+    // 验证服务倍率
+    const serviceRatesError = validateServiceRates(serviceRates)
+    if (serviceRatesError) {
+      return res.status(400).json({ error: serviceRatesError })
+    }
+
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
@@ -1452,7 +1610,8 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       activationDays,
       activationUnit,
       expirationMode,
-      icon
+      icon,
+      serviceRates
     })
 
     logger.success(`🔑 Admin created new API key: ${name}`)
@@ -1494,7 +1653,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       activationDays,
       activationUnit,
       expirationMode,
-      icon
+      icon,
+      serviceRates
     } = req.body
 
     // 输入验证
@@ -1516,6 +1676,12 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
     const batchPermissionsError = validatePermissions(permissions)
     if (batchPermissionsError) {
       return res.status(400).json({ error: batchPermissionsError })
+    }
+
+    // 验证服务倍率
+    const batchServiceRatesError = validateServiceRates(serviceRates)
+    if (batchServiceRatesError) {
+      return res.status(400).json({ error: batchServiceRatesError })
     }
 
     // 生成批量API Keys
@@ -1552,7 +1718,8 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           activationDays,
           activationUnit,
           expirationMode,
-          icon
+          icon,
+          serviceRates
         })
 
         // 保留原始 API Key 供返回
@@ -1626,6 +1793,14 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
       }
     }
 
+    // 验证服务倍率
+    if (updates.serviceRates !== undefined) {
+      const updateServiceRatesError = validateServiceRates(updates.serviceRates)
+      if (updateServiceRatesError) {
+        return res.status(400).json({ error: updateServiceRatesError })
+      }
+    }
+
     logger.info(
       `🔄 Admin batch editing ${keyIds.length} API keys with updates: ${JSON.stringify(updates)}`
     )
@@ -1694,6 +1869,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         if (updates.enabled !== undefined) {
           finalUpdates.enabled = updates.enabled
         }
+        if (updates.serviceRates !== undefined) {
+          finalUpdates.serviceRates = updates.serviceRates
+        }
 
         // 处理账户绑定
         if (updates.claudeAccountId !== undefined) {
@@ -1750,7 +1928,7 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         // 执行更新
         await apiKeyService.updateApiKey(keyId, finalUpdates)
         results.successCount++
-        logger.success(`✅ Batch edit: API key ${keyId} updated successfully`)
+        logger.success(`Batch edit: API key ${keyId} updated successfully`)
       } catch (error) {
         results.failedCount++
         results.errors.push(`Failed to update key ${keyId}: ${error.message}`)
@@ -1811,7 +1989,8 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       totalCostLimit,
       weeklyOpusCostLimit,
       tags,
-      ownerId // 新增：所有者ID字段
+      ownerId, // 新增：所有者ID字段
+      serviceRates // API Key 级别服务倍率
     } = req.body
 
     // 只允许更新指定字段
@@ -1995,6 +2174,15 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'All tags must be non-empty strings' })
       }
       updates.tags = tags
+    }
+
+    // 处理服务倍率
+    if (serviceRates !== undefined) {
+      const singleServiceRatesError = validateServiceRates(serviceRates)
+      if (singleServiceRatesError) {
+        return res.status(400).json({ error: singleServiceRatesError })
+      }
+      updates.serviceRates = serviceRates
     }
 
     // 处理活跃/禁用状态状态, 放在过期处理后，以确保后续增加禁用key功能
@@ -2200,7 +2388,7 @@ router.delete('/api-keys/batch', authenticateAdmin, async (req, res) => {
         await apiKeyService.deleteApiKey(keyId)
         results.successCount++
 
-        logger.success(`✅ Batch delete: API key ${keyId} deleted successfully`)
+        logger.success(`Batch delete: API key ${keyId} deleted successfully`)
       } catch (error) {
         results.failedCount++
         results.errors.push({
@@ -2255,13 +2443,13 @@ router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
 // 📋 获取已删除的API Keys
 router.get('/api-keys/deleted', authenticateAdmin, async (req, res) => {
   try {
-    const deletedApiKeys = await apiKeyService.getAllApiKeys(true) // Include deleted
-    const onlyDeleted = deletedApiKeys.filter((key) => key.isDeleted === 'true')
+    const deletedApiKeys = await apiKeyService.getAllApiKeysFast(true) // Include deleted
+    const onlyDeleted = deletedApiKeys.filter((key) => key.isDeleted === true)
 
     // Add additional metadata for deleted keys
     const enrichedKeys = onlyDeleted.map((key) => ({
       ...key,
-      isDeleted: key.isDeleted === 'true',
+      isDeleted: key.isDeleted === true,
       deletedAt: key.deletedAt,
       deletedBy: key.deletedBy,
       deletedByType: key.deletedByType,
@@ -2288,7 +2476,7 @@ router.post('/api-keys/:keyId/restore', authenticateAdmin, async (req, res) => {
     const result = await apiKeyService.restoreApiKey(keyId, adminUsername, 'admin')
 
     if (result.success) {
-      logger.success(`✅ Admin ${adminUsername} restored API key: ${keyId}`)
+      logger.success(`Admin ${adminUsername} restored API key: ${keyId}`)
       return res.json({
         success: true,
         message: 'API Key 已成功恢复',

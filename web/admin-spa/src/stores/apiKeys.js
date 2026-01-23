@@ -1,9 +1,9 @@
-import { apiClient } from '@/config/api'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+import * as httpApis from '@/utils/http_apis'
+
 export const useApiKeysStore = defineStore('apiKeys', () => {
-  // 状态
   const apiKeys = ref([])
   const loading = ref(false)
   const error = ref(null)
@@ -11,145 +11,62 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
   const sortBy = ref('')
   const sortOrder = ref('asc')
 
-  // Actions
-
-  // 获取API Keys列表
   const fetchApiKeys = async () => {
     loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.get('/admin/api-keys')
-      if (response.success) {
-        apiKeys.value = response.data || []
-      } else {
-        throw new Error(response.message || '获取API Keys失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    const res = await httpApis.getApiKeysApi()
+    if (res.success) apiKeys.value = res.data || []
+    else error.value = res.message
+    loading.value = false
   }
 
-  // 创建API Key
   const createApiKey = async (data) => {
     loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/api-keys', data)
-      if (response.success) {
-        await fetchApiKeys()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建API Key失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    const res = await httpApis.createApiKeyApi(data)
+    if (res.success) await fetchApiKeys()
+    else error.value = res.message
+    loading.value = false
+    return res
   }
 
-  // 更新API Key
   const updateApiKey = async (id, data) => {
     loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/api-keys/${id}`, data)
-      if (response.success) {
-        await fetchApiKeys()
-        return response
-      } else {
-        throw new Error(response.message || '更新API Key失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    const res = await httpApis.updateApiKeyApi(id, data)
+    if (res.success) await fetchApiKeys()
+    else error.value = res.message
+    loading.value = false
+    return res
   }
 
-  // 切换API Key状态
   const toggleApiKey = async (id) => {
     loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/api-keys/${id}/toggle`)
-      if (response.success) {
-        await fetchApiKeys()
-        return response
-      } else {
-        throw new Error(response.message || '切换状态失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    const res = await httpApis.toggleApiKeyApi(id)
+    if (res.success) await fetchApiKeys()
+    else error.value = res.message
+    loading.value = false
+    return res
   }
 
-  // 续期API Key
-  const renewApiKey = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/api-keys/${id}`, data)
-      if (response.success) {
-        await fetchApiKeys()
-        return response
-      } else {
-        throw new Error(response.message || '续期失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+  const renewApiKey = (id, data) => updateApiKey(id, data)
 
-  // 删除API Key
   const deleteApiKey = async (id) => {
     loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.delete(`/admin/api-keys/${id}`)
-      if (response.success) {
-        await fetchApiKeys()
-        return response
-      } else {
-        throw new Error(response.message || '删除失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    const res = await httpApis.deleteApiKeyApi(id)
+    if (res.success) await fetchApiKeys()
+    else error.value = res.message
+    loading.value = false
+    return res
   }
 
-  // 获取API Key统计
   const fetchApiKeyStats = async (id, timeRange = 'all') => {
-    try {
-      const response = await apiClient.get(`/admin/api-keys/${id}/stats`, {
-        params: { timeRange }
-      })
-      if (response.success) {
-        return response.stats
-      } else {
-        throw new Error(response.message || '获取统计失败')
-      }
-    } catch (err) {
-      console.error('获取API Key统计失败:', err)
-      return null
-    }
+    const res = await httpApis.getApiKeyStatsApi(id, { timeRange })
+    return res.success ? res.stats : null
   }
 
-  // 排序API Keys
+  const fetchTags = async () => {
+    const res = await httpApis.getApiKeyTagsApi()
+    return res.success ? res.data || [] : []
+  }
+
   const sortApiKeys = (field) => {
     if (sortBy.value === field) {
       sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
@@ -159,22 +76,6 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
     }
   }
 
-  // 获取已存在的标签
-  const fetchTags = async () => {
-    try {
-      const response = await apiClient.get('/admin/api-keys/tags')
-      if (response.success) {
-        return response.data || []
-      } else {
-        throw new Error(response.message || '获取标签失败')
-      }
-    } catch (err) {
-      console.error('获取标签失败:', err)
-      return []
-    }
-  }
-
-  // 重置store
   const reset = () => {
     apiKeys.value = []
     loading.value = false
@@ -185,15 +86,12 @@ export const useApiKeysStore = defineStore('apiKeys', () => {
   }
 
   return {
-    // State
     apiKeys,
     loading,
     error,
     statsTimeRange,
     sortBy,
     sortOrder,
-
-    // Actions
     fetchApiKeys,
     createApiKey,
     updateApiKey,

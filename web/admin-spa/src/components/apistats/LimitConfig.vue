@@ -1,9 +1,9 @@
 <template>
-  <div class="flex h-full flex-col gap-4 md:gap-6">
+  <div class="flex h-full flex-col gap-3 sm:gap-4 md:gap-6">
     <!-- 限制配置 / 聚合模式提示 -->
-    <div class="card flex h-full flex-col p-4 md:p-6">
+    <div class="card flex h-full flex-col p-3 sm:p-4 md:p-6">
       <h3
-        class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
+        class="mb-2 flex items-center text-base font-bold text-gray-900 dark:text-gray-100 sm:mb-3 sm:text-lg md:mb-4 md:text-xl"
       >
         <i class="fas fa-shield-alt mr-2 text-sm text-red-500 md:mr-3 md:text-base" />
         {{ multiKeyMode ? '限制配置（聚合查询模式）' : '限制配置' }}
@@ -102,7 +102,7 @@
       </div>
 
       <!-- 仅在单 Key 模式下显示限制配置 -->
-      <div v-if="!multiKeyMode" class="space-y-4 md:space-y-5">
+      <div v-if="!multiKeyMode && statsData?.limits" class="space-y-4 md:space-y-5">
         <!-- 每日费用限制 -->
         <div>
           <div class="mb-2 flex items-center justify-between">
@@ -167,11 +167,11 @@
           </div>
         </div>
 
-        <!-- Opus 模型周费用限制 -->
+        <!-- Claude 模型周费用限制 -->
         <div v-if="statsData.limits.weeklyOpusCostLimit > 0">
           <div class="mb-2 flex items-center justify-between">
             <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
-              >Opus 模型周费用限制</span
+              >Claude 模型周费用限制</span
             >
             <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
               ${{ statsData.limits.weeklyOpusCost.toFixed(4) }} / ${{
@@ -272,7 +272,7 @@
               <span
                 v-for="client in statsData.restrictions.allowedClients"
                 :key="client"
-                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300 md:text-sm"
+                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-blue-700 shadow-sm dark:bg-gray-800 dark:text-blue-300 md:text-sm"
               >
                 <i class="fas fa-id-badge" />
                 {{ client }}
@@ -321,6 +321,7 @@
 </template>
 
 <script setup>
+import { formatNumber } from '@/utils/tools'
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
@@ -383,7 +384,7 @@ const getTotalCostProgressColor = () => {
   return 'bg-blue-500'
 }
 
-// 获取Opus周费用进度
+// 获取Claude周费用进度
 const getOpusWeeklyCostProgress = () => {
   if (
     !statsData.value.limits.weeklyOpusCostLimit ||
@@ -395,7 +396,7 @@ const getOpusWeeklyCostProgress = () => {
   return Math.min(percentage, 100)
 }
 
-// 获取Opus周费用进度条颜色
+// 获取Claude周费用进度条颜色
 const getOpusWeeklyCostProgressColor = () => {
   const progress = getOpusWeeklyCostProgress()
   if (progress >= 100) return 'bg-red-500'
@@ -404,22 +405,6 @@ const getOpusWeeklyCostProgressColor = () => {
 }
 
 // 格式化数字
-const formatNumber = (num) => {
-  if (typeof num !== 'number') {
-    num = parseInt(num) || 0
-  }
-
-  if (num === 0) return '0'
-
-  // 大数字使用简化格式
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  } else {
-    return num.toLocaleString()
-  }
-}
 </script>
 
 <style scoped>

@@ -49,8 +49,8 @@
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
   box-shadow:
-    0 10px 15px -3px rgba(102, 126, 234, 0.3),
-    0 4px 6px -2px rgba(102, 126, 234, 0.05);
+    0 10px 15px -3px rgba(var(--primary-rgb), 0.3),
+    0 4px 6px -2px rgba(var(--primary-rgb), 0.05);
   transform: translateY(-1px);
 }
 
@@ -87,27 +87,11 @@
   transition: all 0.3s ease;
 }
 
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
 .stat-card:hover {
   transform: translateY(-4px);
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-.stat-card:hover::before {
-  opacity: 1;
 }
 
 .stat-icon {
@@ -160,15 +144,15 @@
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
   box-shadow:
-    0 10px 15px -3px rgba(102, 126, 234, 0.3),
-    0 4px 6px -2px rgba(102, 126, 234, 0.05);
+    0 10px 15px -3px rgba(var(--primary-rgb), 0.3),
+    0 4px 6px -2px rgba(var(--primary-rgb), 0.05);
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 20px 25px -5px rgba(102, 126, 234, 0.3),
-    0 10px 10px -5px rgba(102, 126, 234, 0.1);
+    0 20px 25px -5px rgba(var(--primary-rgb), 0.3),
+    0 10px 10px -5px rgba(var(--primary-rgb), 0.1);
 }
 
 .btn-success {
@@ -202,7 +186,7 @@
 }
 
 .btn-secondary {
-  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  background: linear-gradient(135deg, var(--text-secondary) 0%, var(--bg-gradient-end) 100%);
   color: white;
   box-shadow:
     0 10px 15px -3px rgba(107, 114, 128, 0.3),
@@ -231,7 +215,7 @@
   outline: none;
   border-color: var(--primary-color);
   box-shadow:
-    0 0 0 3px rgba(102, 126, 234, 0.1),
+    0 0 0 3px rgba(var(--primary-rgb), 0.1),
     0 10px 15px -3px rgba(0, 0, 0, 0.1);
   background: rgba(255, 255, 255, 0.95);
 }
@@ -251,7 +235,7 @@
 }
 
 .table-row:hover {
-  background: rgba(102, 126, 234, 0.05);
+  background: rgba(var(--primary-rgb), 0.05);
   transform: scale(1.005);
 }
 
@@ -276,8 +260,8 @@
 }
 
 .dark .modal-content {
-  background: rgba(17, 24, 39, 0.95);
-  border: 1px solid rgba(75, 85, 99, 0.3);
+  background: var(--glass-strong-color);
+  border: 1px solid var(--border-color);
   box-shadow:
     0 10px 25px -5px rgba(0, 0, 0, 0.3),
     0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -419,8 +403,8 @@
   /* 玻璃态容器 */
   .glass,
   .glass-strong {
-    margin: 16px;
-    border-radius: 20px;
+    margin: 0;
+    border-radius: 16px;
   }
 
   /* 统计卡片 */

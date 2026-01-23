@@ -163,8 +163,8 @@ defineExpose({
 }
 
 :global(.dark) .toast {
-  background: #1f2937;
-  border: 1px solid #374151;
+  background: var(--bg-gradient-start);
+  border: 1px solid var(--border-color);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
@@ -234,8 +234,8 @@ defineExpose({
 }
 
 :global(.dark) .toast-close:hover {
-  background: #374151;
-  color: #9ca3af;
+  background: var(--bg-gradient-mid);
+  color: var(--text-secondary);
 }
 
 .toast-progress {

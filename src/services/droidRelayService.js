@@ -90,7 +90,7 @@ class DroidRelayService {
     return normalizedBody
   }
 
-  async _applyRateLimitTracking(rateLimitInfo, usageSummary, model, context = '') {
+  async _applyRateLimitTracking(rateLimitInfo, usageSummary, model, context = '', keyId = null) {
     if (!rateLimitInfo) {
       return
     }
@@ -99,7 +99,9 @@ class DroidRelayService {
       const { totalTokens, totalCost } = await updateRateLimitCounters(
         rateLimitInfo,
         usageSummary,
-        model
+        model,
+        keyId,
+        'droid'
       )
 
       if (totalTokens > 0) {
@@ -403,6 +405,7 @@ class DroidRelayService {
   ) {
     return new Promise((resolve, reject) => {
       const url = new URL(apiUrl)
+      const keyId = apiKeyData?.id
       const bodyString = JSON.stringify(processedBody)
       const contentLength = Buffer.byteLength(bodyString)
       const requestHeaders = {
@@ -606,10 +609,11 @@ class DroidRelayService {
               clientRequest?.rateLimitInfo,
               usageSummary,
               model,
-              ' [stream]'
+              ' [stream]',
+              keyId
             )
 
-            logger.success(`✅ Droid stream completed - Account: ${account.name}`)
+            logger.success(`Droid stream completed - Account: ${account.name}`)
           } else {
             logger.success(
               `✅ Droid stream completed - Account: ${account.name}, usage recording skipped`
@@ -1195,6 +1199,7 @@ class DroidRelayService {
     skipUsageRecord = false
   ) {
     const { data } = response
+    const keyId = apiKeyData?.id
 
     // 从响应中提取 usage 数据
     const usage = data.usage || {}
@@ -1225,7 +1230,8 @@ class DroidRelayService {
         clientRequest?.rateLimitInfo,
         usageSummary,
         model,
-        endpointLabel
+        endpointLabel,
+        keyId
       )
 
       logger.success(

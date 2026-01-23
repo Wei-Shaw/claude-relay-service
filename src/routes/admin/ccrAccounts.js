@@ -377,7 +377,7 @@ router.post('/:accountId/reset-usage', authenticateAdmin, async (req, res) => {
     const { accountId } = req.params
     await ccrAccountService.resetDailyUsage(accountId)
 
-    logger.success(`✅ Admin manually reset daily usage for CCR account: ${accountId}`)
+    logger.success(`Admin manually reset daily usage for CCR account: ${accountId}`)
     return res.json({ success: true, message: 'Daily usage reset successfully' })
   } catch (error) {
     logger.error('❌ Failed to reset CCR account daily usage:', error)
@@ -390,7 +390,7 @@ router.post('/:accountId/reset-status', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params
     const result = await ccrAccountService.resetAccountStatus(accountId)
-    logger.success(`✅ Admin reset status for CCR account: ${accountId}`)
+    logger.success(`Admin reset status for CCR account: ${accountId}`)
     return res.json({ success: true, data: result })
   } catch (error) {
     logger.error('❌ Failed to reset CCR account status:', error)
@@ -403,13 +403,98 @@ router.post('/reset-all-usage', authenticateAdmin, async (req, res) => {
   try {
     await ccrAccountService.resetAllDailyUsage()
 
-    logger.success('✅ Admin manually reset daily usage for all CCR accounts')
+    logger.success('Admin manually reset daily usage for all CCR accounts')
     return res.json({ success: true, message: 'All daily usage reset successfully' })
   } catch (error) {
     logger.error('❌ Failed to reset all CCR accounts daily usage:', error)
     return res
       .status(500)
       .json({ error: 'Failed to reset all daily usage', message: error.message })
+  }
+})
+
+// 测试 CCR 账户连通性
+router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+  const { model = 'claude-sonnet-4-20250514' } = req.body
+  const startTime = Date.now()
+
+  try {
+    // 获取账户信息
+    const account = await ccrAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    // 获取解密后的凭据
+    const credentials = await ccrAccountService.getDecryptedCredentials(accountId)
+    if (!credentials) {
+      return res.status(401).json({ error: 'Credentials not found or decryption failed' })
+    }
+
+    // 构造测试请求
+    const axios = require('axios')
+    const { getProxyAgent } = require('../../utils/proxyHelper')
+
+    const baseUrl = account.baseUrl || 'https://api.anthropic.com'
+    const apiUrl = `${baseUrl}/v1/messages`
+    const payload = {
+      model,
+      max_tokens: 100,
+      messages: [{ role: 'user', content: 'Say "Hello" in one word.' }]
+    }
+
+    const requestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': credentials.apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      timeout: 30000
+    }
+
+    // 配置代理
+    if (account.proxy) {
+      const agent = getProxyAgent(account.proxy)
+      if (agent) {
+        requestConfig.httpsAgent = agent
+        requestConfig.httpAgent = agent
+      }
+    }
+
+    const response = await axios.post(apiUrl, payload, requestConfig)
+    const latency = Date.now() - startTime
+
+    // 提取响应文本
+    let responseText = ''
+    if (response.data?.content?.[0]?.text) {
+      responseText = response.data.content[0].text
+    }
+
+    logger.success(
+      `✅ CCR account test passed: ${account.name} (${accountId}), latency: ${latency}ms`
+    )
+
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        accountName: account.name,
+        model,
+        latency,
+        responseText: responseText.substring(0, 200)
+      }
+    })
+  } catch (error) {
+    const latency = Date.now() - startTime
+    logger.error(`❌ CCR account test failed: ${accountId}`, error.message)
+
+    return res.status(500).json({
+      success: false,
+      error: 'Test failed',
+      message: error.response?.data?.error?.message || error.message,
+      latency
+    })
   }
 })
 

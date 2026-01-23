@@ -211,7 +211,7 @@ async function exchangeCodeForTokens(authorizationCode, codeVerifier, state, pro
       dataKeys: response.data ? Object.keys(response.data) : []
     })
 
-    logger.success('✅ OAuth token exchange successful', {
+    logger.success('OAuth token exchange successful', {
       status: response.status,
       hasAccessToken: !!response.data?.access_token,
       hasRefreshToken: !!response.data?.refresh_token,
@@ -431,7 +431,7 @@ async function exchangeSetupTokenCode(authorizationCode, codeVerifier, state, pr
       dataKeys: response.data ? Object.keys(response.data) : []
     })
 
-    logger.success('✅ Setup Token exchange successful', {
+    logger.success('Setup Token exchange successful', {
       status: response.status,
       hasAccessToken: !!response.data?.access_token,
       scopes: response.data?.scope,
@@ -661,7 +661,7 @@ async function getOrganizationInfo(sessionKey, proxyConfig = null) {
       throw new Error('未找到具有chat能力的组织')
     }
 
-    logger.success('✅ Found organization', {
+    logger.success('Found organization', {
       uuid: bestOrg.uuid,
       capabilities: maxCapabilities
     })
@@ -778,7 +778,7 @@ async function authorizeWithCookie(sessionKey, organizationUuid, scope, proxyCon
     // 构建完整的授权码（包含state，如果有的话）
     const fullCode = responseState ? `${authorizationCode}#${responseState}` : authorizationCode
 
-    logger.success('✅ Got authorization code via Cookie', {
+    logger.success('Got authorization code via Cookie', {
       codeLength: authorizationCode.length,
       codePrefix: `${authorizationCode.substring(0, 10)}...`
     })
@@ -854,7 +854,7 @@ async function oauthWithCookie(sessionKey, proxyConfig = null, isSetupToken = fa
     ? await exchangeSetupTokenCode(authorizationCode, codeVerifier, state, proxyConfig)
     : await exchangeCodeForTokens(authorizationCode, codeVerifier, state, proxyConfig)
 
-  logger.success('✅ Cookie-based OAuth flow completed', {
+  logger.success('Cookie-based OAuth flow completed', {
     isSetupToken,
     organizationUuid,
     hasAccessToken: !!tokenData.accessToken,

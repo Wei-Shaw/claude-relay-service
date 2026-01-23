@@ -125,8 +125,13 @@
 
 <script setup>
 import { reactive, ref, watch } from 'vue'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
+
+import {
+  getAccountBalanceScriptApi,
+  updateAccountBalanceScriptApi,
+  testAccountBalanceScriptApi
+} from '@/utils/http_apis'
+import { showToast } from '@/utils/tools'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -200,55 +205,41 @@ const resetForm = () => {
 
 const loadConfig = async () => {
   if (!props.account?.id || !props.account?.platform) return
-  try {
-    const res = await apiClient.get(
-      `/admin/accounts/${props.account.id}/balance/script?platform=${props.account.platform}`
-    )
-    if (res?.success && res.data) {
-      Object.assign(form, res.data)
-    }
-  } catch (error) {
-    showToast('加载脚本配置失败', 'error')
+  const res = await getAccountBalanceScriptApi(props.account.id, props.account.platform)
+  if (res?.success && res.data) {
+    Object.assign(form, res.data)
   }
 }
 
 const saveConfig = async () => {
   if (!props.account?.id || !props.account?.platform) return
   saving.value = true
-  try {
-    await apiClient.put(
-      `/admin/accounts/${props.account.id}/balance/script?platform=${props.account.platform}`,
-      { ...form }
-    )
+  const res = await updateAccountBalanceScriptApi(props.account.id, props.account.platform, {
+    ...form
+  })
+  if (res?.success) {
     showToast('已保存', 'success')
     emit('saved')
-  } catch (error) {
-    showToast(error.message || '保存失败', 'error')
-  } finally {
-    saving.value = false
+  } else {
+    showToast(res?.message || '保存失败', 'error')
   }
+  saving.value = false
 }
 
 const testScript = async () => {
   if (!props.account?.id || !props.account?.platform) return
   testing.value = true
   testResult.value = null
-  try {
-    const res = await apiClient.post(
-      `/admin/accounts/${props.account.id}/balance/script/test?platform=${props.account.platform}`,
-      { ...form }
-    )
-    if (res?.success) {
-      testResult.value = res.data
-      showToast('测试完成', 'success')
-    } else {
-      showToast(res?.error || '测试失败', 'error')
-    }
-  } catch (error) {
-    showToast(error.message || '测试失败', 'error')
-  } finally {
-    testing.value = false
+  const res = await testAccountBalanceScriptApi(props.account.id, props.account.platform, {
+    ...form
+  })
+  if (res?.success) {
+    testResult.value = res.data
+    showToast('测试完成', 'success')
+  } else {
+    showToast(res?.error || '测试失败', 'error')
   }
+  testing.value = false
 }
 
 const applyPreset = () => {

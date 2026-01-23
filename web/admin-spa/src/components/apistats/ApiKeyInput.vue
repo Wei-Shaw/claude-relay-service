@@ -57,15 +57,23 @@
         <!-- API Key 输入 -->
         <div class="lg:col-span-3">
           <!-- 单 Key 模式输入框 -->
-          <input
-            v-if="!multiKeyMode"
-            v-model="apiKey"
-            class="wide-card-input w-full"
-            :disabled="loading"
-            placeholder="请输入您的 API Key (cr_...)"
-            type="password"
-            @keyup.enter="queryStats"
-          />
+          <div v-if="!multiKeyMode" class="relative">
+            <input
+              v-model="apiKey"
+              class="wide-card-input w-full pr-10"
+              :disabled="loading"
+              placeholder="请输入您的 API Key (cr_...)"
+              :type="showPassword ? 'text' : 'password'"
+              @keyup.enter="queryStats"
+            />
+            <button
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              type="button"
+              @click="showPassword = !showPassword"
+            >
+              <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" />
+            </button>
+          </div>
 
           <!-- 多 Key 模式输入框 -->
           <div v-else class="relative">
@@ -125,13 +133,15 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 
 const apiStatsStore = useApiStatsStore()
 const { apiKey, loading, multiKeyMode } = storeToRefs(apiStatsStore)
 const { queryStats, clearInput } = apiStatsStore
+
+const showPassword = ref(false)
 
 // 解析输入的 API Keys
 const parsedApiKeys = computed(() => {
@@ -262,11 +272,11 @@ const hasValidInput = computed(() => {
 }
 
 :global(.dark) .wide-card-input:focus {
-  border-color: #60a5fa;
+  border-color: var(--primary-color);
   box-shadow:
-    0 0 0 3px rgba(96, 165, 250, 0.15),
+    0 0 0 3px rgba(var(--primary-rgb), 0.15),
     0 10px 15px -3px rgba(0, 0, 0, 0.4);
-  background: rgba(31, 41, 55, 0.95);
+  background: var(--glass-strong-color);
   color: #f3f4f6;
 }
 
@@ -289,18 +299,18 @@ const hasValidInput = computed(() => {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
   box-shadow:
-    0 10px 15px -3px rgba(102, 126, 234, 0.3),
-    0 4px 6px -2px rgba(102, 126, 234, 0.05);
+    0 10px 15px -3px rgba(var(--primary-rgb), 0.3),
+    0 4px 6px -2px rgba(var(--primary-rgb), 0.05);
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow:
-    0 20px 25px -5px rgba(102, 126, 234, 0.3),
-    0 10px 10px -5px rgba(102, 126, 234, 0.1);
+    0 20px 25px -5px rgba(var(--primary-rgb), 0.3),
+    0 10px 10px -5px rgba(var(--primary-rgb), 0.1);
 }
 
 .btn-primary:disabled {
@@ -322,8 +332,8 @@ const hasValidInput = computed(() => {
 }
 
 :global(.dark) .security-notice {
-  background: rgba(31, 41, 55, 0.8) !important;
-  border: 1px solid rgba(75, 85, 99, 0.5) !important;
+  background: var(--glass-strong-color) !important;
+  border: 1px solid var(--border-color) !important;
   color: #d1d5db !important;
 }
 
@@ -334,8 +344,8 @@ const hasValidInput = computed(() => {
 }
 
 :global(.dark) .security-notice:hover {
-  background: rgba(31, 41, 55, 0.9) !important;
-  border-color: rgba(75, 85, 99, 0.6) !important;
+  background: var(--glass-strong-color) !important;
+  border-color: var(--border-color) !important;
   color: #e5e7eb !important;
 }
 
@@ -371,7 +381,7 @@ const hasValidInput = computed(() => {
 }
 
 :global(.dark) .mode-switch-group {
-  background: #1f2937;
+  background: var(--bg-gradient-start);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
@@ -392,7 +402,7 @@ const hasValidInput = computed(() => {
 }
 
 :global(.dark) .mode-switch-btn {
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .mode-switch-btn:hover:not(.active) {
@@ -407,12 +417,12 @@ const hasValidInput = computed(() => {
 
 .mode-switch-btn.active {
   color: white;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+  box-shadow: 0 2px 4px rgba(var(--primary-rgb), 0.2);
 }
 
 .mode-switch-btn.active:hover {
-  box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 6px rgba(var(--primary-rgb), 0.3);
 }
 
 .mode-switch-btn i {

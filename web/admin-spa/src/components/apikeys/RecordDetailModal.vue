@@ -155,7 +155,7 @@
 <script setup>
 import { computed } from 'vue'
 import dayjs from 'dayjs'
-import { formatNumber } from '@/utils/format'
+import { formatNumber } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -177,7 +177,7 @@ const formattedTime = computed(() => {
 })
 
 const formattedCosts = computed(() => {
-  const breakdown = props.record?.costBreakdown || {}
+  const breakdown = props.record?.realCostBreakdown || props.record?.costBreakdown || {}
   const formatValue = (value) => {
     const num = typeof value === 'number' ? value : 0
     if (num >= 1) return `$${num.toFixed(2)}`

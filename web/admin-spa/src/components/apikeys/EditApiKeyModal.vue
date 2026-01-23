@@ -47,6 +47,51 @@
             </p>
           </div>
 
+          <!-- 服务倍率设置 -->
+          <div
+            class="rounded-lg border border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 p-3 dark:border-purple-700 dark:from-purple-900/20 dark:to-indigo-900/20 sm:p-4"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <input
+                  id="editEnableServiceRates"
+                  v-model="enableServiceRates"
+                  class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-purple-600 focus:ring-purple-500"
+                  type="checkbox"
+                />
+                <label
+                  class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  for="editEnableServiceRates"
+                >
+                  自定义服务倍率
+                </label>
+              </div>
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                与全局倍率相乘，用于 VIP 折扣等（如全局1.5 × Key倍率0.8 = 1.2）
+              </span>
+            </div>
+            <div v-if="enableServiceRates" class="mt-3 space-y-2">
+              <div
+                v-for="service in availableServices"
+                :key="service.key"
+                class="flex items-center gap-2"
+              >
+                <span class="w-20 text-xs text-gray-600 dark:text-gray-400">{{
+                  service.label
+                }}</span>
+                <input
+                  v-model.number="form.serviceRates[service.key]"
+                  class="form-input w-24 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  min="0"
+                  placeholder="1.0"
+                  step="0.1"
+                  type="number"
+                />
+                <span class="text-xs text-gray-400">默认 1.0</span>
+              </div>
+            </div>
+          </div>
+
           <!-- 所有者选择 -->
           <div>
             <label
@@ -324,7 +369,7 @@
 
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >Opus 模型周费用限制 (美元)</label
+              >Claude 模型周费用限制 (美元)</label
             >
             <div class="space-y-3">
               <div class="flex gap-2">
@@ -366,7 +411,8 @@
                 type="number"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置 Opus 模型的周费用限制（周一到周日），仅限 Claude 官方账户，0 或留空表示无限制
+                设置 Claude 模型的周费用限制（周一到周日），仅对 Claude 模型请求生效，0
+                或留空表示无限制
               </p>
             </div>
           </div>
@@ -419,6 +465,7 @@
                   class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                   value="claude"
+                  @change="updatePermissions"
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">Claude</span>
               </label>
@@ -428,6 +475,7 @@
                   class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                   value="gemini"
+                  @change="updatePermissions"
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">Gemini</span>
               </label>
@@ -437,6 +485,7 @@
                   class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                   value="openai"
+                  @change="updatePermissions"
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">OpenAI</span>
               </label>
@@ -446,6 +495,7 @@
                   class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                   value="droid"
+                  @change="updatePermissions"
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">Droid</span>
               </label>
@@ -713,16 +763,29 @@
         </form>
       </div>
     </div>
+
+    <!-- ConfirmModal -->
+    <ConfirmModal
+      :cancel-text="confirmModalConfig.cancelText"
+      :confirm-text="confirmModalConfig.confirmText"
+      :message="confirmModalConfig.message"
+      :show="showConfirmModal"
+      :title="confirmModalConfig.title"
+      :type="confirmModalConfig.type"
+      @cancel="handleCancelModal"
+      @confirm="handleConfirmModal"
+    />
   </Teleport>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
-import { apiClient } from '@/config/api'
+import * as httpApis from '@/utils/http_apis'
 import AccountSelector from '@/components/common/AccountSelector.vue'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const props = defineProps({
   apiKey: {
@@ -753,6 +816,40 @@ const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
 const accountsLoading = ref(false)
+
+// ConfirmModal 状态
+const showConfirmModal = ref(false)
+const confirmModalConfig = ref({
+  title: '',
+  message: '',
+  type: 'primary',
+  confirmText: '确认',
+  cancelText: '取消'
+})
+const confirmResolve = ref(null)
+
+const showConfirm = (
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  type = 'primary'
+) => {
+  return new Promise((resolve) => {
+    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
+    confirmResolve.value = resolve
+    showConfirmModal.value = true
+  })
+}
+const handleConfirmModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(true)
+}
+const handleCancelModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(false)
+}
+
 const localAccounts = ref({
   claude: [],
   gemini: [],
@@ -780,9 +877,22 @@ const unselectedTags = computed(() => {
   return availableTags.value.filter((tag) => !form.tags.includes(tag))
 })
 
+// 服务倍率相关
+const enableServiceRates = ref(false)
+const availableServices = [
+  { key: 'claude', label: 'Claude' },
+  { key: 'gemini', label: 'Gemini' },
+  { key: 'codex', label: 'Codex' },
+  { key: 'droid', label: 'Droid' },
+  { key: 'bedrock', label: 'Bedrock' },
+  { key: 'azure', label: 'Azure' },
+  { key: 'ccr', label: 'CCR' }
+]
+
 // 表单数据
 const form = reactive({
   name: '',
+  serviceRates: {}, // API Key 级别服务倍率
   tokenLimit: '', // 保留用于检测历史数据
   rateLimitWindow: '',
   rateLimitRequests: '',
@@ -806,6 +916,11 @@ const form = reactive({
   isActive: true,
   ownerId: '' // 新增：所有者ID
 })
+
+// 更新权限（数组格式，空数组=全部服务）
+const updatePermissions = () => {
+  // form.permissions 已经是数组，由 v-model 自动管理
+}
 
 // 添加限制的模型
 const addRestrictedModel = () => {
@@ -860,18 +975,13 @@ const removeTag = (index) => {
 const updateApiKey = async () => {
   // 检查是否设置了时间窗口但费用限制为0
   if (form.rateLimitWindow && (!form.rateLimitCost || parseFloat(form.rateLimitCost) === 0)) {
-    let confirmed = false
-    if (window.showConfirm) {
-      confirmed = await window.showConfirm(
-        '费用限制提醒',
-        '您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n\n是否继续？',
-        '继续保存',
-        '返回修改'
-      )
-    } else {
-      // 降级方案
-      confirmed = confirm('您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n是否继续？')
-    }
+    const confirmed = await showConfirm(
+      '费用限制提醒',
+      '您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n\n是否继续？',
+      '继续保存',
+      '返回修改',
+      'warning'
+    )
     if (!confirmed) {
       return
     }
@@ -881,8 +991,19 @@ const updateApiKey = async () => {
 
   try {
     // 准备提交的数据
+    // 过滤掉空值的服务倍率
+    const filteredServiceRates = {}
+    if (enableServiceRates.value) {
+      for (const [key, value] of Object.entries(form.serviceRates)) {
+        if (value !== null && value !== undefined && value !== '') {
+          filteredServiceRates[key] = value
+        }
+      }
+    }
+
     const data = {
       name: form.name, // 添加名称字段
+      serviceRates: filteredServiceRates,
       tokenLimit: 0, // 清除历史token限制
       rateLimitWindow:
         form.rateLimitWindow !== '' && form.rateLimitWindow !== null
@@ -980,7 +1101,7 @@ const updateApiKey = async () => {
       data.ownerId = form.ownerId
     }
 
-    const result = await apiClient.put(`/admin/api-keys/${props.apiKey.id}`, data)
+    const result = await httpApis.updateApiKeyApi(props.apiKey.id, data)
 
     if (result.success) {
       emit('success')
@@ -1010,15 +1131,15 @@ const refreshAccounts = async () => {
       droidData,
       groupsData
     ] = await Promise.all([
-      apiClient.get('/admin/claude-accounts'),
-      apiClient.get('/admin/claude-console-accounts'),
-      apiClient.get('/admin/gemini-accounts'),
-      apiClient.get('/admin/gemini-api-accounts'),
-      apiClient.get('/admin/openai-accounts'),
-      apiClient.get('/admin/openai-responses-accounts'),
-      apiClient.get('/admin/bedrock-accounts'),
-      apiClient.get('/admin/droid-accounts'),
-      apiClient.get('/admin/account-groups')
+      httpApis.getClaudeAccountsApi(),
+      httpApis.getClaudeConsoleAccountsApi(),
+      httpApis.getGeminiAccountsApi(),
+      httpApis.getGeminiApiAccountsApi(),
+      httpApis.getOpenAIAccountsApi(),
+      httpApis.getOpenAIResponsesAccountsApi(),
+      httpApis.getBedrockAccountsApi(),
+      httpApis.getDroidAccountsApi(),
+      httpApis.getAccountGroupsApi()
     ])
 
     // 合并Claude OAuth账户和Claude Console账户
@@ -1131,7 +1252,7 @@ const refreshAccounts = async () => {
 // 加载用户列表
 const loadUsers = async () => {
   try {
-    const response = await apiClient.get('/admin/users')
+    const response = await httpApis.getUsersApi()
     if (response.success) {
       availableUsers.value = response.data || []
     }
@@ -1215,6 +1336,8 @@ onMounted(async () => {
   // 使用缓存的账号数据，不自动刷新（用户可点击"刷新账号"按钮手动刷新）
 
   form.name = props.apiKey.name
+  form.serviceRates = props.apiKey.serviceRates || {}
+  enableServiceRates.value = Object.keys(form.serviceRates).length > 0
 
   // 处理速率限制迁移：如果有tokenLimit且没有rateLimitCost，提示用户
   form.tokenLimit = props.apiKey.tokenLimit || ''
@@ -1246,6 +1369,12 @@ onMounted(async () => {
       } catch {
         perms = VALID_PERMS.includes(perms) ? [perms] : []
       }
+    } else if (perms.includes(',')) {
+      // 兼容逗号分隔格式（如 "claude,openai"）
+      perms = perms
+        .split(',')
+        .map((p) => p.trim())
+        .filter((p) => VALID_PERMS.includes(p))
     } else if (VALID_PERMS.includes(perms)) {
       perms = [perms]
     } else {
@@ -1289,7 +1418,3 @@ onMounted(async () => {
   form.ownerId = props.apiKey.userId || 'admin'
 })
 </script>
-
-<style scoped>
-/* 表单样式由全局样式提供 */
-</style>

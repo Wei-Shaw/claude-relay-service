@@ -51,8 +51,8 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Chart } from 'chart.js/auto'
 import { useDashboardStore } from '@/stores/dashboard'
-import { useChartConfig } from '@/composables/useChartConfig'
-import { formatNumber } from '@/utils/format'
+import { useChartConfig } from '@/utils/useChartConfig'
+import { formatNumber } from '@/utils/tools'
 
 const dashboardStore = useDashboardStore()
 const chartCanvas = ref(null)
@@ -144,7 +144,3 @@ onUnmounted(() => {
   }
 })
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

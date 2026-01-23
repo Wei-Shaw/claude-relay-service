@@ -2,103 +2,40 @@ const droidAccountService = require('./droidAccountService')
 const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const {
+  isTruthy,
+  isAccountHealthy,
+  sortAccountsByPriority,
+  normalizeEndpointType
+} = require('../utils/commonHelper')
 
 class DroidScheduler {
   constructor() {
     this.STICKY_PREFIX = 'droid'
   }
 
-  _normalizeEndpointType(endpointType) {
-    if (!endpointType) {
-      return 'anthropic'
-    }
-    const normalized = String(endpointType).toLowerCase()
-    if (normalized === 'openai') {
-      return 'openai'
-    }
-    if (normalized === 'comm') {
-      return 'comm'
-    }
-    if (normalized === 'anthropic') {
-      return 'anthropic'
-    }
-    return 'anthropic'
-  }
-
-  _isTruthy(value) {
-    if (value === undefined || value === null) {
-      return false
-    }
-    if (typeof value === 'boolean') {
-      return value
-    }
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true'
-    }
-    return Boolean(value)
-  }
-
-  _isAccountActive(account) {
-    if (!account) {
-      return false
-    }
-    const isActive = this._isTruthy(account.isActive)
-    if (!isActive) {
-      return false
-    }
-
-    const status = (account.status || 'active').toLowerCase()
-    const unhealthyStatuses = new Set(['error', 'unauthorized', 'blocked'])
-    return !unhealthyStatuses.has(status)
-  }
-
   _isAccountSchedulable(account) {
-    return this._isTruthy(account?.schedulable ?? true)
+    return isTruthy(account?.schedulable ?? true)
   }
 
   _matchesEndpoint(account, endpointType) {
-    const normalizedEndpoint = this._normalizeEndpointType(endpointType)
-    const accountEndpoint = this._normalizeEndpointType(account?.endpointType)
+    const normalizedEndpoint = normalizeEndpointType(endpointType)
+    const accountEndpoint = normalizeEndpointType(account?.endpointType)
     if (normalizedEndpoint === accountEndpoint) {
       return true
     }
-
-    // comm 端点可以使用任何类型的账户
     if (normalizedEndpoint === 'comm') {
       return true
     }
-
     const sharedEndpoints = new Set(['anthropic', 'openai'])
     return sharedEndpoints.has(normalizedEndpoint) && sharedEndpoints.has(accountEndpoint)
-  }
-
-  _sortCandidates(candidates) {
-    return [...candidates].sort((a, b) => {
-      const priorityA = parseInt(a.priority, 10) || 50
-      const priorityB = parseInt(b.priority, 10) || 50
-
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB
-      }
-
-      const lastUsedA = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0
-      const lastUsedB = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0
-
-      if (lastUsedA !== lastUsedB) {
-        return lastUsedA - lastUsedB
-      }
-
-      const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-      const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0
-      return createdA - createdB
-    })
   }
 
   _composeStickySessionKey(endpointType, sessionHash, apiKeyId) {
     if (!sessionHash) {
       return null
     }
-    const normalizedEndpoint = this._normalizeEndpointType(endpointType)
+    const normalizedEndpoint = normalizeEndpointType(endpointType)
     const apiKeyPart = apiKeyId || 'default'
     return `${this.STICKY_PREFIX}:${normalizedEndpoint}:${apiKeyPart}:${sessionHash}`
   }
@@ -121,7 +58,7 @@ class DroidScheduler {
     )
 
     return accounts.filter(
-      (account) => account && this._isAccountActive(account) && this._isAccountSchedulable(account)
+      (account) => account && isAccountHealthy(account) && this._isAccountSchedulable(account)
     )
   }
 
@@ -145,7 +82,7 @@ class DroidScheduler {
   }
 
   async selectAccount(apiKeyData, endpointType, sessionHash) {
-    const normalizedEndpoint = this._normalizeEndpointType(endpointType)
+    const normalizedEndpoint = normalizeEndpointType(endpointType)
     const stickyKey = this._composeStickySessionKey(normalizedEndpoint, sessionHash, apiKeyData?.id)
 
     let candidates = []
@@ -175,7 +112,7 @@ class DroidScheduler {
     const filtered = candidates.filter(
       (account) =>
         account &&
-        this._isAccountActive(account) &&
+        isAccountHealthy(account) &&
         this._isAccountSchedulable(account) &&
         this._matchesEndpoint(account, normalizedEndpoint)
     )
@@ -203,7 +140,7 @@ class DroidScheduler {
       }
     }
 
-    const sorted = this._sortCandidates(filtered)
+    const sorted = sortAccountsByPriority(filtered)
     const selected = sorted[0]
 
     if (!selected) {

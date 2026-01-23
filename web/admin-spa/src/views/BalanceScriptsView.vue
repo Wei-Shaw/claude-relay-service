@@ -194,8 +194,13 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
+
+import {
+  getDefaultBalanceScriptApi,
+  updateDefaultBalanceScriptApi,
+  testDefaultBalanceScriptApi
+} from '@/utils/http_apis'
+import { showToast } from '@/utils/tools'
 
 const form = reactive({
   baseUrl: '',
@@ -236,50 +241,35 @@ const presetScript = `({
 })`
 
 const loadConfig = async () => {
-  try {
-    const res = await apiClient.get('/admin/balance-scripts/default')
-    if (res?.success && res.data) {
-      Object.assign(form, res.data)
-    }
-  } catch (error) {
-    showToast('加载配置失败', 'error')
+  const res = await getDefaultBalanceScriptApi()
+  if (res?.success && res.data) {
+    Object.assign(form, res.data)
   }
 }
 
 const saveConfig = async () => {
   saving.value = true
-  try {
-    const payload = { ...form }
-    await apiClient.put('/admin/balance-scripts/default', payload)
+  const res = await updateDefaultBalanceScriptApi({ ...form })
+  if (res?.success) {
     showToast('配置已保存', 'success')
-  } catch (error) {
-    showToast(error.message || '保存失败', 'error')
-  } finally {
-    saving.value = false
+  } else {
+    showToast(res?.message || '保存失败', 'error')
   }
+  saving.value = false
 }
 
 const testScript = async () => {
   testing.value = true
   testResult.value = null
-  try {
-    const payload = {
-      ...form,
-      ...testForm,
-      scriptBody: form.scriptBody
-    }
-    const res = await apiClient.post('/admin/balance-scripts/default/test', payload)
-    if (res?.success) {
-      testResult.value = res.data
-      showToast('测试完成', 'success')
-    } else {
-      showToast(res?.error || '测试失败', 'error')
-    }
-  } catch (error) {
-    showToast(error.message || '测试失败', 'error')
-  } finally {
-    testing.value = false
+  const payload = { ...form, ...testForm, scriptBody: form.scriptBody }
+  const res = await testDefaultBalanceScriptApi(payload)
+  if (res?.success) {
+    testResult.value = res.data
+    showToast('测试完成', 'success')
+  } else {
+    showToast(res?.error || '测试失败', 'error')
   }
+  testing.value = false
 }
 
 const applyPreset = () => {

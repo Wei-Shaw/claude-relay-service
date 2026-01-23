@@ -48,6 +48,18 @@
             <i class="fas fa-robot mr-2"></i>
             Claude 转发
           </button>
+          <button
+            :class="[
+              'border-b-2 pb-2 text-sm font-medium transition-colors',
+              activeSection === 'serviceRates'
+                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+            @click="activeSection = 'serviceRates'"
+          >
+            <i class="fas fa-balance-scale mr-2"></i>
+            服务倍率
+          </button>
         </nav>
       </div>
 
@@ -191,6 +203,68 @@
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       隐藏后，用户需要直接访问 /admin/login 页面登录
                     </p>
+                  </td>
+                </tr>
+
+                <!-- API Stats 通知 -->
+                <tr class="border-b border-gray-100 dark:border-gray-700">
+                  <td class="w-48 whitespace-nowrap px-6 py-4">
+                    <div class="flex items-center">
+                      <div
+                        class="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600"
+                      >
+                        <i class="fas fa-bell text-xs text-white" />
+                      </div>
+                      <div>
+                        <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          统计页通知
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">API Stats</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <div class="flex items-center">
+                      <label class="inline-flex cursor-pointer items-center">
+                        <input
+                          v-model="oemSettings.apiStatsNotice.enabled"
+                          class="peer sr-only"
+                          type="checkbox"
+                        />
+                        <div
+                          class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+                        ></div>
+                        <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
+                          oemSettings.apiStatsNotice.enabled ? '已启用' : '已禁用'
+                        }}</span>
+                      </label>
+                    </div>
+                    <div v-if="oemSettings.apiStatsNotice.enabled" class="mt-3 space-y-3">
+                      <div>
+                        <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                          标题
+                        </label>
+                        <input
+                          v-model="oemSettings.apiStatsNotice.title"
+                          class="form-input w-full max-w-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                          maxlength="100"
+                          placeholder="通知标题"
+                          type="text"
+                        />
+                      </div>
+                      <div>
+                        <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                          内容
+                        </label>
+                        <textarea
+                          v-model="oemSettings.apiStatsNotice.content"
+                          class="form-input w-full max-w-md resize-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                          maxlength="2000"
+                          placeholder="通知内容（支持换行）"
+                          rows="3"
+                        ></textarea>
+                      </div>
+                    </div>
                   </td>
                 </tr>
 
@@ -1025,6 +1099,113 @@
             </div>
           </div>
         </div>
+
+        <!-- 服务倍率配置部分 -->
+        <div v-show="activeSection === 'serviceRates'">
+          <!-- 加载状态 -->
+          <div v-if="serviceRatesLoading" class="py-12 text-center">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-gray-500 dark:text-gray-400">正在加载配置...</p>
+          </div>
+
+          <div v-else>
+            <!-- 说明卡片 -->
+            <div
+              class="mb-6 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-6 dark:from-blue-900/20 dark:to-indigo-900/20"
+            >
+              <div class="flex items-start">
+                <div
+                  class="mr-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white"
+                >
+                  <i class="fas fa-info"></i>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    服务倍率说明
+                  </h3>
+                  <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    服务倍率用于计算不同服务的计费费用。以
+                    <strong>{{ serviceRates.baseService || 'claude' }}</strong>
+                    为基准（倍率 1.0），其他服务按倍率换算。例如：Gemini 倍率 0.5 表示消耗 $1 只扣除
+                    $0.5 额度。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 倍率配置表格 -->
+            <div class="rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80">
+              <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                  <i class="fas fa-sliders-h mr-2 text-blue-500"></i>
+                  倍率配置
+                </h2>
+                <button
+                  class="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                  :disabled="serviceRatesSaving"
+                  @click="saveServiceRates"
+                >
+                  <i class="fas fa-save mr-2"></i>
+                  {{ serviceRatesSaving ? '保存中...' : '保存配置' }}
+                </button>
+              </div>
+
+              <div class="space-y-4">
+                <div
+                  v-for="(rate, service) in serviceRates.rates"
+                  :key="service"
+                  class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+                >
+                  <div class="flex items-center">
+                    <div
+                      class="mr-3 flex h-10 w-10 items-center justify-center rounded-lg"
+                      :class="getServiceIconClass(service)"
+                    >
+                      <i class="text-white" :class="getServiceIcon(service)"></i>
+                    </div>
+                    <div>
+                      <div class="font-medium text-gray-900 dark:text-gray-100">
+                        {{ getServiceName(service) }}
+                      </div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ service }}
+                        <span
+                          v-if="service === serviceRates.baseService"
+                          class="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+                        >
+                          基准服务
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <input
+                      v-model.number="serviceRates.rates[service]"
+                      class="w-24 rounded-lg border border-gray-300 px-3 py-2 text-center text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                      max="10"
+                      min="0.1"
+                      step="0.1"
+                      type="number"
+                    />
+                    <span class="text-sm text-gray-500 dark:text-gray-400">倍</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 更新信息 -->
+              <div
+                v-if="serviceRates.updatedAt"
+                class="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-500 dark:bg-gray-700/50 dark:text-gray-400"
+              >
+                <i class="fas fa-history mr-2"></i>
+                最后更新：{{ formatDateTime(serviceRates.updatedAt) }}
+                <span v-if="serviceRates.updatedBy" class="ml-2">
+                  由 <strong>{{ serviceRates.updatedBy }}</strong> 修改
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1603,15 +1784,29 @@
         </div>
       </div>
     </div>
+
+    <!-- ConfirmModal -->
+    <ConfirmModal
+      :cancel-text="confirmModalConfig.cancelText"
+      :confirm-text="confirmModalConfig.confirmText"
+      :message="confirmModalConfig.message"
+      :show="showConfirmModal"
+      :title="confirmModalConfig.title"
+      :type="confirmModalConfig.type"
+      @cancel="handleCancelModal"
+      @confirm="handleConfirmModal"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { showToast } from '@/utils/toast'
+import { showToast } from '@/utils/tools'
 import { useSettingsStore } from '@/stores/settings'
-import { apiClient } from '@/config/api'
+
+import * as httpApis from '@/utils/http_apis'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 // 定义组件名称，用于keep-alive排除
 defineOptions({
@@ -1633,6 +1828,39 @@ const isMounted = ref(true)
 
 // API请求取消控制器
 const abortController = ref(new AbortController())
+
+// ConfirmModal 状态
+const showConfirmModal = ref(false)
+const confirmModalConfig = ref({
+  title: '',
+  message: '',
+  type: 'primary',
+  confirmText: '确认',
+  cancelText: '取消'
+})
+const confirmResolve = ref(null)
+
+const showConfirm = (
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  type = 'primary'
+) => {
+  return new Promise((resolve) => {
+    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
+    confirmResolve.value = resolve
+    showConfirmModal.value = true
+  })
+}
+const handleConfirmModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(true)
+}
+const handleCancelModal = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(false)
+}
 
 // 计算属性：隐藏管理后台按钮（反转 showAdminButton 的值）
 const hideAdminButton = computed({
@@ -1688,6 +1916,24 @@ const claudeConfig = ref({
   updatedBy: null
 })
 
+// 服务倍率配置
+const serviceRatesLoading = ref(false)
+const serviceRatesSaving = ref(false)
+const serviceRates = ref({
+  baseService: 'claude',
+  rates: {
+    claude: 1.0,
+    codex: 1.0,
+    gemini: 1.0,
+    droid: 1.0,
+    bedrock: 1.0,
+    azure: 1.0,
+    ccr: 1.0
+  },
+  updatedAt: null,
+  updatedBy: null
+})
+
 // 平台表单相关
 const showAddPlatformModal = ref(false)
 const editingPlatform = ref(null)
@@ -1727,6 +1973,8 @@ const sectionWatcher = watch(activeSection, async (newSection) => {
     await loadWebhookConfig()
   } else if (newSection === 'claude') {
     await loadClaudeConfig()
+  } else if (newSection === 'serviceRates') {
+    await loadServiceRates()
   }
 })
 
@@ -1854,6 +2102,9 @@ onMounted(async () => {
     if (activeSection.value === 'webhook') {
       await loadWebhookConfig()
     }
+    if (activeSection.value === 'serviceRates') {
+      await loadServiceRates()
+    }
   } catch (error) {
     showToast('加载设置失败', 'error')
   }
@@ -1890,7 +2141,7 @@ onBeforeUnmount(() => {
 const loadWebhookConfig = async () => {
   if (!isMounted.value) return
   try {
-    const response = await apiClient.get('/admin/webhook/config', {
+    const response = await httpApis.getWebhookConfigApi({
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -1923,7 +2174,7 @@ const saveWebhookConfig = async () => {
       }
     }
 
-    const response = await apiClient.post('/admin/webhook/config', payload, {
+    const response = await httpApis.updateWebhookConfigApi(payload, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -1943,7 +2194,7 @@ const loadClaudeConfig = async () => {
   if (!isMounted.value) return
   claudeConfigLoading.value = true
   try {
-    const response = await apiClient.get('/admin/claude-relay-config', {
+    const response = await httpApis.getClaudeRelayConfigApi({
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -1996,7 +2247,7 @@ const saveClaudeConfig = async () => {
       concurrentRequestQueueTimeoutMs: claudeConfig.value.concurrentRequestQueueTimeoutMs
     }
 
-    const response = await apiClient.put('/admin/claude-relay-config', payload, {
+    const response = await httpApis.updateClaudeRelayConfigApi(payload, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2013,6 +2264,102 @@ const saveClaudeConfig = async () => {
     showToast('保存 Claude 转发配置失败', 'error')
     console.error(error)
   }
+}
+
+// 加载服务倍率配置
+const loadServiceRates = async () => {
+  if (!isMounted.value) return
+  serviceRatesLoading.value = true
+  try {
+    const response = await httpApis.getAdminServiceRatesApi({
+      signal: abortController.value.signal
+    })
+    if (response.success && isMounted.value) {
+      serviceRates.value = {
+        baseService: response.data?.baseService || 'claude',
+        rates: response.data?.rates || serviceRates.value.rates,
+        updatedAt: response.data?.updatedAt,
+        updatedBy: response.data?.updatedBy
+      }
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return
+    if (!isMounted.value) return
+    console.error('加载服务倍率配置失败:', error)
+  } finally {
+    if (isMounted.value) {
+      serviceRatesLoading.value = false
+    }
+  }
+}
+
+// 保存服务倍率配置
+const saveServiceRates = async () => {
+  if (!isMounted.value) return
+  serviceRatesSaving.value = true
+  try {
+    const response = await httpApis.updateAdminServiceRatesApi(
+      {
+        rates: serviceRates.value.rates,
+        baseService: serviceRates.value.baseService
+      },
+      { signal: abortController.value.signal }
+    )
+    if (response.success && isMounted.value) {
+      serviceRates.value.updatedAt = response.data?.updatedAt || new Date().toISOString()
+      serviceRates.value.updatedBy = response.data?.updatedBy
+      showToast('服务倍率配置已保存', 'success')
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return
+    if (!isMounted.value) return
+    showToast('保存服务倍率配置失败', 'error')
+    console.error(error)
+  } finally {
+    if (isMounted.value) {
+      serviceRatesSaving.value = false
+    }
+  }
+}
+
+// 服务图标和名称映射
+const getServiceIcon = (service) => {
+  const icons = {
+    claude: 'fas fa-robot',
+    codex: 'fas fa-code',
+    gemini: 'fas fa-gem',
+    droid: 'fas fa-android',
+    bedrock: 'fab fa-aws',
+    azure: 'fab fa-microsoft',
+    ccr: 'fas fa-server'
+  }
+  return icons[service] || 'fas fa-cog'
+}
+
+const getServiceIconClass = (service) => {
+  const classes = {
+    claude: 'bg-gradient-to-br from-orange-500 to-amber-600',
+    codex: 'bg-gradient-to-br from-green-500 to-emerald-600',
+    gemini: 'bg-gradient-to-br from-blue-500 to-indigo-600',
+    droid: 'bg-gradient-to-br from-green-600 to-lime-600',
+    bedrock: 'bg-gradient-to-br from-yellow-500 to-orange-600',
+    azure: 'bg-gradient-to-br from-blue-600 to-cyan-600',
+    ccr: 'bg-gradient-to-br from-purple-500 to-pink-600'
+  }
+  return classes[service] || 'bg-gradient-to-br from-gray-500 to-gray-600'
+}
+
+const getServiceName = (service) => {
+  const names = {
+    claude: 'Claude',
+    codex: 'Codex (OpenAI)',
+    gemini: 'Gemini',
+    droid: 'Droid',
+    bedrock: 'AWS Bedrock',
+    azure: 'Azure OpenAI',
+    ccr: 'CCR'
+  }
+  return names[service] || service
 }
 
 // 验证 URL
@@ -2126,14 +2473,16 @@ const savePlatform = async () => {
     let response
     if (editingPlatform.value) {
       // 更新平台
-      response = await apiClient.put(
-        `/admin/webhook/platforms/${editingPlatform.value.id}`,
+      response = await httpApis.updateWebhookPlatformApi(
+        editingPlatform.value.id,
         platformForm.value,
-        { signal: abortController.value.signal }
+        {
+          signal: abortController.value.signal
+        }
       )
     } else {
       // 添加平台
-      response = await apiClient.post('/admin/webhook/platforms', platformForm.value, {
+      response = await httpApis.createWebhookPlatformApi(platformForm.value, {
         signal: abortController.value.signal
       })
     }
@@ -2193,12 +2542,12 @@ const editPlatform = (platform) => {
 const deletePlatform = async (id) => {
   if (!isMounted.value) return
 
-  if (!confirm('确定要删除这个平台吗？')) {
+  if (!(await showConfirm('删除平台', '确定要删除这个平台吗？', '删除', '取消', 'danger'))) {
     return
   }
 
   try {
-    const response = await apiClient.delete(`/admin/webhook/platforms/${id}`, {
+    const response = await httpApis.deleteWebhookPlatformApi(id, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2218,13 +2567,9 @@ const togglePlatform = async (id) => {
   if (!isMounted.value) return
 
   try {
-    const response = await apiClient.post(
-      `/admin/webhook/platforms/${id}/toggle`,
-      {},
-      {
-        signal: abortController.value.signal
-      }
-    )
+    const response = await httpApis.toggleWebhookPlatformApi(id, {
+      signal: abortController.value.signal
+    })
     if (response.success && isMounted.value) {
       showToast(response.message, 'success')
       await loadWebhookConfig()
@@ -2273,7 +2618,7 @@ const testPlatform = async (platform) => {
       testData.url = platform.url
     }
 
-    const response = await apiClient.post('/admin/webhook/test', testData, {
+    const response = await httpApis.testWebhookApi(testData, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2296,7 +2641,7 @@ const testPlatformForm = async () => {
 
   testingConnection.value = true
   try {
-    const response = await apiClient.post('/admin/webhook/test', platformForm.value, {
+    const response = await httpApis.testWebhookApi(platformForm.value, {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
@@ -2319,13 +2664,9 @@ const sendTestNotification = async () => {
   if (!isMounted.value) return
 
   try {
-    const response = await apiClient.post(
-      '/admin/webhook/test-notification',
-      {},
-      {
-        signal: abortController.value.signal
-      }
-    )
+    const response = await httpApis.testWebhookNotificationApi({
+      signal: abortController.value.signal
+    })
     if (response.success && isMounted.value) {
       showToast('测试通知已发送', 'success')
     }
@@ -2467,7 +2808,8 @@ const saveOemSettings = async () => {
       siteName: oemSettings.value.siteName,
       siteIcon: oemSettings.value.siteIcon,
       siteIconData: oemSettings.value.siteIconData,
-      showAdminButton: oemSettings.value.showAdminButton
+      showAdminButton: oemSettings.value.showAdminButton,
+      apiStatsNotice: oemSettings.value.apiStatsNotice
     }
     const result = await settingsStore.saveOemSettings(settings)
     if (result && result.success) {
@@ -2482,7 +2824,16 @@ const saveOemSettings = async () => {
 
 // 重置OEM设置
 const resetOemSettings = async () => {
-  if (!confirm('确定要重置为默认设置吗？\n\n这将清除所有自定义的网站名称和图标设置。')) return
+  if (
+    !(await showConfirm(
+      '重置设置',
+      '确定要重置为默认设置吗？\n\n这将清除所有自定义的网站名称和图标设置。',
+      '重置',
+      '取消',
+      'warning'
+    ))
+  )
+    return
 
   try {
     const result = await settingsStore.resetOemSettings()
@@ -2548,8 +2899,8 @@ const formatDateTime = settingsStore.formatDateTime
 }
 
 :root.dark .card {
-  background: #1f2937;
-  border: 1px solid #374151;
+  background: var(--bg-gradient-start);
+  border: 1px solid var(--border-color);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
@@ -2560,7 +2911,7 @@ const formatDateTime = settingsStore.formatDateTime
 }
 
 :root.dark .table-container {
-  border: 1px solid #4b5563;
+  border: 1px solid var(--border-color);
 }
 
 .table-row {
@@ -2572,7 +2923,7 @@ const formatDateTime = settingsStore.formatDateTime
 }
 
 :root.dark .table-row:hover {
-  background-color: #374151;
+  background-color: var(--bg-gradient-mid);
 }
 
 .form-input {

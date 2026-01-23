@@ -351,7 +351,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { showToast } from '@/utils/toast'
+import { showToast, formatNumber } from '@/utils/tools'
 
 const userStore = useUserStore()
 
@@ -359,15 +359,6 @@ const loading = ref(true)
 const selectedPeriod = ref('week')
 const usageStats = ref(null)
 const userApiKeys = ref([])
-
-const formatNumber = (num) => {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  }
-  return num.toString()
-}
 
 const loadUsageStats = async () => {
   loading.value = true
@@ -391,7 +382,3 @@ onMounted(() => {
   loadUsageStats()
 })
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

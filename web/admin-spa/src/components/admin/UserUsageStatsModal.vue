@@ -347,8 +347,8 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
+import { getFrontUserUsageStatsApi, getFrontUserByIdApi } from '@/utils/http_apis'
+import { showToast, formatNumber, formatDate } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -368,36 +368,14 @@ const selectedPeriod = ref('week')
 const usageStats = ref(null)
 const userDetails = ref(null)
 
-const formatNumber = (num) => {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  }
-  return num.toString()
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return null
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 const loadUsageStats = async () => {
   if (!props.user) return
 
   loading.value = true
   try {
     const [statsResponse, userResponse] = await Promise.all([
-      apiClient.get(`/users/${props.user.id}/usage-stats`, {
-        params: { period: selectedPeriod.value }
-      }),
-      apiClient.get(`/users/${props.user.id}`)
+      getFrontUserUsageStatsApi(props.user.id, { period: selectedPeriod.value }),
+      getFrontUserByIdApi(props.user.id)
     ])
 
     if (statsResponse.success) {
@@ -422,7 +400,3 @@ watch([() => props.show, () => props.user], ([show, user]) => {
   }
 })
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

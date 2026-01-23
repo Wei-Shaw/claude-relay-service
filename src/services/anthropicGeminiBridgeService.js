@@ -1800,7 +1800,13 @@ function dumpToolsPayload({ vendor, model, tools, toolChoice }) {
  * 更新速率限制计数器
  * 跟踪 token 使用量和成本
  */
-async function applyRateLimitTracking(rateLimitInfo, usageSummary, model, context = '') {
+async function applyRateLimitTracking(
+  rateLimitInfo,
+  usageSummary,
+  model,
+  context = '',
+  keyId = null
+) {
   if (!rateLimitInfo) {
     return
   }
@@ -1811,7 +1817,9 @@ async function applyRateLimitTracking(rateLimitInfo, usageSummary, model, contex
     const { totalTokens, totalCost } = await updateRateLimitCounters(
       rateLimitInfo,
       usageSummary,
-      model
+      model,
+      keyId,
+      'gemini'
     )
     if (totalTokens > 0) {
       logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
@@ -2134,13 +2142,15 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           0,
           0,
           effectiveModel,
-          accountId
+          accountId,
+          'gemini'
         )
         await applyRateLimitTracking(
           req.rateLimitInfo,
           { inputTokens, outputTokens, cacheCreateTokens: 0, cacheReadTokens: 0 },
           effectiveModel,
-          'anthropic-messages'
+          'anthropic-messages',
+          req.apiKey?.id
         )
       }
 
@@ -2672,7 +2682,8 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           0,
           0,
           effectiveModel,
-          accountId
+          accountId,
+          'gemini'
         )
         await applyRateLimitTracking(
           req.rateLimitInfo,

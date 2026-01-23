@@ -105,7 +105,7 @@ class PricingService {
       // 设置文件监听器
       this.setupFileWatcher()
 
-      logger.success('💰 Pricing service initialized successfully')
+      logger.success('Pricing service initialized successfully')
     } catch (error) {
       logger.error('❌ Failed to initialize pricing service:', error)
     }
@@ -298,7 +298,7 @@ class PricingService {
             this.pricingData = jsonData
             this.lastUpdated = new Date()
 
-            logger.success(`💰 Downloaded pricing data for ${Object.keys(jsonData).length} models`)
+            logger.success(`Downloaded pricing data for ${Object.keys(jsonData).length} models`)
 
             // 设置或重新设置文件监听器
             this.setupFileWatcher()
@@ -762,7 +762,7 @@ class PricingService {
       this.lastUpdated = new Date()
 
       const modelCount = Object.keys(jsonData).length
-      logger.success(`💰 Reloaded pricing data for ${modelCount} models from file`)
+      logger.success(`Reloaded pricing data for ${modelCount} models from file`)
 
       // 显示一些统计信息
       const claudeModels = Object.keys(jsonData).filter((k) => k.includes('claude')).length

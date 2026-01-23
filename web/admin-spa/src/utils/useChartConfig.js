@@ -1,6 +1,9 @@
 import { Chart } from 'chart.js/auto'
+import { useThemeStore } from '@/stores/theme'
 
 export function useChartConfig() {
+  const themeStore = useThemeStore()
+
   // 设置Chart.js默认配置
   Chart.defaults.font.family =
     "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
@@ -22,6 +25,12 @@ export function useChartConfig() {
     )
     gradient.addColorStop(1, `${color}00`)
     return gradient
+  }
+
+  // 获取当前主题的颜色方案
+  const getThemeColors = () => {
+    const scheme = themeStore.currentColorScheme
+    return [scheme.primary, scheme.secondary, scheme.accent, '#4facfe', '#00f2fe']
   }
 
   // 通用图表选项
@@ -91,9 +100,12 @@ export function useChartConfig() {
     }
   }
 
-  // 颜色方案
+  // 颜色方案 - 动态获取主题色
   const colorSchemes = {
-    primary: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe'],
+    get primary() {
+      const scheme = themeStore.currentColorScheme
+      return [scheme.primary, scheme.secondary, scheme.accent, '#4facfe', '#00f2fe']
+    },
     success: ['#10b981', '#059669', '#34d399', '#6ee7b7', '#a7f3d0'],
     warning: ['#f59e0b', '#d97706', '#fbbf24', '#fcd34d', '#fde68a'],
     danger: ['#ef4444', '#dc2626', '#f87171', '#fca5a5', '#fecaca']
@@ -101,6 +113,7 @@ export function useChartConfig() {
 
   return {
     getGradient,
+    getThemeColors,
     commonOptions,
     colorSchemes
   }

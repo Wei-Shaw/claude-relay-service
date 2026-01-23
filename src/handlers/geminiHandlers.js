@@ -14,9 +14,11 @@ const crypto = require('crypto')
 const sessionHelper = require('../utils/sessionHelper')
 const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
 const apiKeyService = require('../services/apiKeyService')
+const redis = require('../models/redis')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { parseSSELine } = require('../utils/sseParser')
 const axios = require('axios')
+const { getSafeMessage } = require('../utils/errorSanitizer')
 const ProxyHelper = require('../utils/proxyHelper')
 
 // ============================================================================
@@ -136,7 +138,9 @@ async function applyRateLimitTracking(req, usageSummary, model, context = '') {
     const { totalTokens, totalCost } = await updateRateLimitCounters(
       req.rateLimitInfo,
       usageSummary,
-      model
+      model,
+      req.apiKey?.id,
+      'gemini'
     )
 
     if (totalTokens > 0) {
@@ -353,7 +357,7 @@ async function handleMessages(req, res) {
       logger.error('Failed to select Gemini account:', error)
       return res.status(503).json({
         error: {
-          message: error.message || 'No available Gemini accounts',
+          message: getSafeMessage(error) || 'No available Gemini accounts',
           type: 'service_unavailable'
         }
       })
@@ -492,7 +496,8 @@ async function handleMessages(req, res) {
               0,
               0,
               model,
-              accountId
+              accountId,
+              'gemini'
             )
           }
         }
@@ -596,7 +601,8 @@ async function handleMessages(req, res) {
                 0,
                 0,
                 model,
-                accountId
+                accountId,
+                'gemini'
               )
               .then(() => {
                 logger.info(
@@ -614,7 +620,7 @@ async function handleMessages(req, res) {
           if (!res.headersSent) {
             res.status(500).json({
               error: {
-                message: error.message || 'Stream error',
+                message: getSafeMessage(error) || 'Stream error',
                 type: 'api_error'
               }
             })
@@ -662,7 +668,7 @@ async function handleMessages(req, res) {
     const status = errorStatus || 500
     const errorResponse = {
       error: error.error || {
-        message: error.message || 'Internal server error',
+        message: getSafeMessage(error) || 'Internal server error',
         type: 'api_error'
       }
     }
@@ -830,16 +836,18 @@ function handleModelDetails(req, res) {
  */
 async function handleUsage(req, res) {
   try {
-    const { usage } = req.apiKey
+    const keyData = req.apiKey
+    // 按需查询 usage 数据
+    const usage = await redis.getUsageStats(keyData.id)
 
     res.json({
       object: 'usage',
-      total_tokens: usage.total.tokens,
-      total_requests: usage.total.requests,
-      daily_tokens: usage.daily.tokens,
-      daily_requests: usage.daily.requests,
-      monthly_tokens: usage.monthly.tokens,
-      monthly_requests: usage.monthly.requests
+      total_tokens: usage?.total?.tokens || 0,
+      total_requests: usage?.total?.requests || 0,
+      daily_tokens: usage?.daily?.tokens || 0,
+      daily_requests: usage?.daily?.requests || 0,
+      monthly_tokens: usage?.monthly?.tokens || 0,
+      monthly_requests: usage?.monthly?.requests || 0
     })
   } catch (error) {
     logger.error('Failed to get usage stats:', error)
@@ -858,17 +866,18 @@ async function handleUsage(req, res) {
 async function handleKeyInfo(req, res) {
   try {
     const keyData = req.apiKey
+    // 按需查询 usage 数据（仅 key-info 端点需要）
+    const usage = await redis.getUsageStats(keyData.id)
+    const tokensUsed = usage?.total?.tokens || 0
 
     res.json({
       id: keyData.id,
       name: keyData.name,
       permissions: keyData.permissions,
       token_limit: keyData.tokenLimit,
-      tokens_used: keyData.usage.total.tokens,
+      tokens_used: tokensUsed,
       tokens_remaining:
-        keyData.tokenLimit > 0
-          ? Math.max(0, keyData.tokenLimit - keyData.usage.total.tokens)
-          : null,
+        keyData.tokenLimit > 0 ? Math.max(0, keyData.tokenLimit - tokensUsed) : null,
       rate_limit: {
         window: keyData.rateLimitWindow,
         requests: keyData.rateLimitRequests
@@ -1408,7 +1417,7 @@ async function handleCountTokens(req, res) {
     logger.error(`Error in countTokens endpoint (${version})`, { error: error.message })
     res.status(500).json({
       error: {
-        message: error.message || 'Internal server error',
+        message: getSafeMessage(error) || 'Internal server error',
         type: 'api_error'
       }
     })
@@ -1594,7 +1603,8 @@ async function handleGenerateContent(req, res) {
           0,
           0,
           model,
-          account.id
+          account.id,
+          'gemini'
         )
         logger.info(
           `📊 Recorded Gemini usage - Input: ${usage.promptTokenCount}, Output: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`
@@ -1630,7 +1640,7 @@ async function handleGenerateContent(req, res) {
     })
     res.status(500).json({
       error: {
-        message: error.message || 'Internal server error',
+        message: getSafeMessage(error) || 'Internal server error',
         type: 'api_error'
       }
     })
@@ -1914,7 +1924,8 @@ async function handleStreamGenerateContent(req, res) {
             0,
             0,
             model,
-            account.id
+            account.id,
+            'gemini'
           ),
           applyRateLimitTracking(
             req,
@@ -1951,7 +1962,7 @@ async function handleStreamGenerateContent(req, res) {
       if (!res.headersSent) {
         res.status(500).json({
           error: {
-            message: error.message || 'Stream error',
+            message: getSafeMessage(error) || 'Stream error',
             type: 'api_error'
           }
         })
@@ -1961,7 +1972,7 @@ async function handleStreamGenerateContent(req, res) {
             res.write(
               `data: ${JSON.stringify({
                 error: {
-                  message: error.message || 'Stream error',
+                  message: getSafeMessage(error) || 'Stream error',
                   type: 'stream_error',
                   code: error.code
                 }
@@ -1990,7 +2001,7 @@ async function handleStreamGenerateContent(req, res) {
     if (!res.headersSent) {
       res.status(500).json({
         error: {
-          message: error.message || 'Internal server error',
+          message: getSafeMessage(error) || 'Internal server error',
           type: 'api_error'
         }
       })
@@ -2251,7 +2262,8 @@ async function handleStandardGenerateContent(req, res) {
           0,
           0,
           model,
-          accountId
+          accountId,
+          'gemini'
         )
         logger.info(
           `📊 Recorded Gemini usage - Input: ${usage.promptTokenCount}, Output: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`
@@ -2273,7 +2285,7 @@ async function handleStandardGenerateContent(req, res) {
 
     res.status(500).json({
       error: {
-        message: error.message || 'Internal server error',
+        message: getSafeMessage(error) || 'Internal server error',
         type: 'api_error'
       }
     })
@@ -2680,7 +2692,8 @@ async function handleStandardStreamGenerateContent(req, res) {
             0,
             0,
             model,
-            accountId
+            accountId,
+            'gemini'
           )
           .then(() => {
             logger.info(
@@ -2708,7 +2721,7 @@ async function handleStandardStreamGenerateContent(req, res) {
       if (!res.headersSent) {
         res.status(500).json({
           error: {
-            message: error.message || 'Stream error',
+            message: getSafeMessage(error) || 'Stream error',
             type: 'api_error'
           }
         })
@@ -2718,7 +2731,7 @@ async function handleStandardStreamGenerateContent(req, res) {
             res.write(
               `data: ${JSON.stringify({
                 error: {
-                  message: error.message || 'Stream error',
+                  message: getSafeMessage(error) || 'Stream error',
                   type: 'stream_error',
                   code: error.code
                 }

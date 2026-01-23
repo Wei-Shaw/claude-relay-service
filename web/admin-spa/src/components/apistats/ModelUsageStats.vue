@@ -1,21 +1,21 @@
 <template>
-  <div class="card p-4 md:p-6">
-    <div class="mb-4 md:mb-6">
+  <div class="card p-3 sm:p-4 md:p-6">
+    <div class="mb-2 sm:mb-3 md:mb-4">
       <h3
-        class="flex flex-col text-lg font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center md:text-xl"
+        class="flex flex-col text-base font-bold text-gray-900 dark:text-gray-100 sm:flex-row sm:items-center sm:text-lg md:text-xl"
       >
         <span class="flex items-center">
           <i class="fas fa-robot mr-2 text-sm text-indigo-500 md:mr-3 md:text-base" />
           模型使用统计
         </span>
         <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
-          >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
+          >({{ periodLabel }})</span
         >
       </h3>
     </div>
 
     <!-- 模型统计加载状态 -->
-    <div v-if="modelStatsLoading" class="py-6 text-center md:py-8">
+    <div v-if="loading" class="py-6 text-center md:py-8">
       <i
         class="fas fa-spinner loading-spinner mb-2 text-xl text-gray-600 dark:text-gray-400 md:text-2xl"
       />
@@ -23,49 +23,41 @@
     </div>
 
     <!-- 模型统计数据 -->
-    <div v-else-if="modelStats.length > 0" class="space-y-3 md:space-y-4">
-      <div v-for="(model, index) in modelStats" :key="index" class="model-usage-item">
-        <div class="mb-2 flex items-start justify-between md:mb-3">
-          <div class="min-w-0 flex-1">
-            <h4 class="break-all text-base font-bold text-gray-900 dark:text-gray-100 md:text-lg">
+    <div v-else-if="stats.length > 0" class="space-y-2">
+      <div v-for="(model, index) in stats" :key="index" class="model-usage-item">
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+            <h4
+              class="cursor-pointer text-sm font-bold text-gray-900 hover:text-indigo-600 dark:text-gray-100 dark:hover:text-indigo-400"
+              title="点击复制"
+              @click="copyModelName(model.model)"
+            >
               {{ model.model }}
+              <i class="fas fa-copy ml-1 text-xs text-gray-400" />
             </h4>
-            <p class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">
-              {{ model.requests }} 次请求
-            </p>
-          </div>
-          <div class="ml-3 flex-shrink-0 text-right">
-            <div class="text-base font-bold text-green-600 md:text-lg">
-              {{ model.formatted?.total || '$0.000000' }}
-            </div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 md:text-sm">总费用</div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2 text-xs md:grid-cols-4 md:gap-3 md:text-sm">
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">输入 Token</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.inputTokens) }}
+            <div class="flex flex-wrap gap-x-2 text-xs text-gray-500 dark:text-gray-400">
+              <span>{{ model.requests }}次</span>
+              <span>输入:{{ formatNumber(model.inputTokens) }}</span>
+              <span>输出:{{ formatNumber(model.outputTokens) }}</span>
+              <span v-if="model.cacheCreateTokens"
+                >缓存创建:{{ formatNumber(model.cacheCreateTokens) }}</span
+              >
+              <span v-if="model.cacheReadTokens"
+                >缓存读取:{{ formatNumber(model.cacheReadTokens) }}</span
+              >
             </div>
           </div>
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">输出 Token</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.outputTokens) }}
-            </div>
-          </div>
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">缓存创建</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.cacheCreateTokens) }}
-            </div>
-          </div>
-          <div class="rounded bg-gray-50 p-2 dark:bg-gray-700">
-            <div class="text-gray-600 dark:text-gray-400">缓存读取</div>
-            <div class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatNumber(model.cacheReadTokens) }}
-            </div>
+          <div class="flex-shrink-0 text-xs sm:text-sm">
+            <span class="text-gray-500">官方API</span>
+            <span class="ml-1 font-semibold text-green-600">
+              {{ model.formatted?.total || '$0.00' }}
+            </span>
+            <template v-if="serviceRates?.rates">
+              <span class="ml-2 text-gray-500">计费</span>
+              <span class="ml-1 font-semibold text-amber-600 dark:text-amber-400">
+                {{ calculateCcCost(model) }}
+              </span>
+            </template>
           </div>
         </div>
       </div>
@@ -74,37 +66,84 @@
     <!-- 无模型数据 -->
     <div v-else class="py-6 text-center text-gray-500 dark:text-gray-400 md:py-8">
       <i class="fas fa-chart-pie mb-3 text-2xl md:text-3xl" />
-      <p class="text-sm md:text-base">
-        暂无{{ statsPeriod === 'daily' ? '今日' : '本月' }}模型使用数据
-      </p>
+      <p class="text-sm md:text-base">暂无{{ periodLabel }}模型使用数据</p>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
+import { copyText, formatNumber } from '@/utils/tools'
+
+const props = defineProps({
+  period: {
+    type: String,
+    default: 'daily',
+    validator: (value) => ['daily', 'monthly', 'alltime'].includes(value)
+  }
+})
 
 const apiStatsStore = useApiStatsStore()
-const { statsPeriod, modelStats, modelStatsLoading } = storeToRefs(apiStatsStore)
+const { dailyModelStats, monthlyModelStats, alltimeModelStats, modelStatsLoading, serviceRates } =
+  storeToRefs(apiStatsStore)
+
+// 根据 period 选择对应的数据
+const stats = computed(() => {
+  if (props.period === 'daily') return dailyModelStats.value
+  if (props.period === 'monthly') return monthlyModelStats.value
+  if (props.period === 'alltime') return alltimeModelStats.value
+  return []
+})
+
+const loading = computed(() => modelStatsLoading.value)
+
+const periodLabel = computed(() => {
+  if (props.period === 'daily') return '今日'
+  if (props.period === 'monthly') return '本月'
+  if (props.period === 'alltime') return '所有时间'
+  return ''
+})
+
+// 复制模型名称
+const copyModelName = (name) => copyText(name, '模型名称已复制')
+
+// 根据模型名称判断服务类型
+const getServiceFromModel = (model) => {
+  if (!model) return 'claude'
+  const m = model.toLowerCase()
+  if (m.includes('claude') || m.includes('sonnet') || m.includes('opus') || m.includes('haiku'))
+    return 'claude'
+  if (m.includes('gpt') || m.includes('o1') || m.includes('o3') || m.includes('o4')) return 'codex'
+  if (m.includes('gemini')) return 'gemini'
+  if (m.includes('droid') || m.includes('factory')) return 'droid'
+  if (m.includes('bedrock') || m.includes('amazon')) return 'bedrock'
+  if (m.includes('azure')) return 'azure'
+  return 'claude'
+}
+
+// 计算 CC 扣费
+const calculateCcCost = (model) => {
+  // 使用 isLegacy 判断是否有存储的计费费用
+  if (!model.isLegacy && model.costs?.rated !== undefined) {
+    const ccCost = model.costs.rated
+    if (ccCost >= 1) return '$' + ccCost.toFixed(2)
+    if (ccCost >= 0.01) return '$' + ccCost.toFixed(4)
+    return '$' + ccCost.toFixed(6)
+  }
+  // 回退到重新计算（历史数据）
+  const cost = model.costs?.total || 0
+  if (!cost || !serviceRates.value?.rates) return '$0.00'
+  const service = getServiceFromModel(model.model)
+  const rate = serviceRates.value.rates[service] || 1.0
+  const ccCost = cost * rate
+  if (ccCost >= 1) return '$' + ccCost.toFixed(2)
+  if (ccCost >= 0.01) return '$' + ccCost.toFixed(4)
+  return '$' + ccCost.toFixed(6)
+}
 
 // 格式化数字
-const formatNumber = (num) => {
-  if (typeof num !== 'number') {
-    num = parseInt(num) || 0
-  }
-
-  if (num === 0) return '0'
-
-  // 大数字使用简化格式
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  } else {
-    return num.toLocaleString()
-  }
-}
 </script>
 
 <style scoped>

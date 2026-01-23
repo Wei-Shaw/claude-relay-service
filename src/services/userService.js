@@ -74,6 +74,7 @@ class UserService {
       // 保存用户信息
       await redis.set(`${this.userPrefix}${user.id}`, JSON.stringify(user))
       await redis.set(`${this.usernamePrefix}${username}`, user.id)
+      await redis.addToIndex('user:index', user.id)
 
       // 如果是新用户，尝试转移匹配的API Keys
       if (isNewUser) {
@@ -167,8 +168,8 @@ class UserService {
         `📊 Calculated user ${userId} usage: ${totalUsage.requests} requests, ${totalUsage.inputTokens} input tokens, $${totalUsage.totalCost.toFixed(4)} total cost from ${userApiKeys.length} API keys`
       )
 
-      // Count only non-deleted API keys for the user's active count
-      const activeApiKeyCount = userApiKeys.filter((key) => key.isDeleted !== 'true').length
+      // Count only non-deleted API keys for the user's active count（布尔值比较）
+      const activeApiKeyCount = userApiKeys.filter((key) => !key.isDeleted).length
 
       return {
         totalUsage,
@@ -191,14 +192,18 @@ class UserService {
   // 📋 获取所有用户列表（管理员功能）
   async getAllUsers(options = {}) {
     try {
-      const client = redis.getClientSafe()
       const { page = 1, limit = 20, role, isActive } = options
-      const pattern = `${this.userPrefix}*`
-      const keys = await client.keys(pattern)
+      const userIds = await redis.getAllIdsByIndex(
+        'user:index',
+        `${this.userPrefix}*`,
+        /^user:(.+)$/
+      )
+      const keys = userIds.map((id) => `${this.userPrefix}${id}`)
+      const dataList = await redis.batchGetChunked(keys)
 
       const users = []
-      for (const key of keys) {
-        const userData = await client.get(key)
+      for (let i = 0; i < keys.length; i++) {
+        const userData = dataList[i]
         if (userData) {
           const user = JSON.parse(userData)
 
@@ -398,14 +403,15 @@ class UserService {
     try {
       const client = redis.getClientSafe()
       const pattern = `${this.userSessionPrefix}*`
-      const keys = await client.keys(pattern)
+      const keys = await redis.scanKeys(pattern)
+      const dataList = await redis.batchGetChunked(keys)
 
-      for (const key of keys) {
-        const sessionData = await client.get(key)
+      for (let i = 0; i < keys.length; i++) {
+        const sessionData = dataList[i]
         if (sessionData) {
           const session = JSON.parse(sessionData)
           if (session.userId === userId) {
-            await client.del(key)
+            await client.del(keys[i])
           }
         }
       }
@@ -454,9 +460,13 @@ class UserService {
   // 📊 获取用户统计信息
   async getUserStats() {
     try {
-      const client = redis.getClientSafe()
-      const pattern = `${this.userPrefix}*`
-      const keys = await client.keys(pattern)
+      const userIds = await redis.getAllIdsByIndex(
+        'user:index',
+        `${this.userPrefix}*`,
+        /^user:(.+)$/
+      )
+      const keys = userIds.map((id) => `${this.userPrefix}${id}`)
+      const dataList = await redis.batchGetChunked(keys)
 
       const stats = {
         totalUsers: 0,
@@ -472,8 +482,8 @@ class UserService {
         }
       }
 
-      for (const key of keys) {
-        const userData = await client.get(key)
+      for (let i = 0; i < keys.length; i++) {
+        const userData = dataList[i]
         if (userData) {
           const user = JSON.parse(userData)
           stats.totalUsers++
@@ -522,7 +532,7 @@ class UserService {
       const { displayName, username, email } = user
 
       // 获取所有API Keys
-      const allApiKeys = await apiKeyService.getAllApiKeys()
+      const allApiKeys = await apiKeyService.getAllApiKeysFast()
 
       // 找到没有用户ID的API Keys（即由Admin创建的）
       const unownedApiKeys = allApiKeys.filter((key) => !key.userId || key.userId === '')

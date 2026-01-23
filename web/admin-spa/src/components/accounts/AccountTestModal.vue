@@ -86,7 +86,13 @@
             </div>
             <div class="flex items-center justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">测试模型</span>
-              <span class="font-medium text-gray-700 dark:text-gray-300">{{ testModel }}</span>
+              <select
+                v-model="selectedModel"
+                class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                :disabled="testStatus === 'testing'"
+              >
+                <option v-for="m in availableModels" :key="m" :value="m">{{ m }}</option>
+              </select>
             </div>
           </div>
 
@@ -193,7 +199,7 @@
 
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
-import { API_PREFIX } from '@/config/api'
+import { APP_CONFIG } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -215,41 +221,112 @@ const errorMessage = ref('')
 const testDuration = ref(0)
 const testStartTime = ref(null)
 const eventSource = ref(null)
+const selectedModel = ref('')
 
-// 测试模型
-const testModel = ref('claude-sonnet-4-5-20250929')
+// 可用模型列表 - 根据账户类型
+const availableModels = computed(() => {
+  if (!props.account) return []
+  const platform = props.account.platform
+  const modelLists = {
+    claude: ['claude-sonnet-4-5-20250929', 'claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022'],
+    'claude-console': [
+      'claude-sonnet-4-5-20250929',
+      'claude-sonnet-4-20250514',
+      'claude-3-5-haiku-20241022'
+    ],
+    bedrock: [
+      'claude-sonnet-4-5-20250929',
+      'claude-sonnet-4-20250514',
+      'claude-3-5-haiku-20241022'
+    ],
+    gemini: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+    'openai-responses': ['gpt-4o-mini', 'gpt-4o', 'o3-mini'],
+    'azure-openai': [props.account.deploymentName || 'gpt-4o-mini'],
+    droid: ['claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022'],
+    ccr: ['claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022']
+  }
+  return modelLists[platform] || []
+})
+
+// 默认测试模型
+const defaultModel = computed(() => {
+  if (!props.account) return ''
+  const platform = props.account.platform
+  const models = {
+    claude: 'claude-sonnet-4-5-20250929',
+    'claude-console': 'claude-sonnet-4-5-20250929',
+    bedrock: 'claude-sonnet-4-5-20250929',
+    gemini: 'gemini-2.5-flash',
+    'openai-responses': 'gpt-4o-mini',
+    'azure-openai': props.account.deploymentName || 'gpt-4o-mini',
+    droid: 'claude-sonnet-4-20250514',
+    ccr: 'claude-sonnet-4-20250514'
+  }
+  return models[platform] || ''
+})
+
+// 监听账户变化，重置选中的模型
+watch(
+  () => props.account,
+  () => {
+    selectedModel.value = defaultModel.value
+  },
+  { immediate: true }
+)
+
+// 是否使用 SSE 流式响应
+const useSSE = computed(() => {
+  if (!props.account) return false
+  return ['claude', 'claude-console'].includes(props.account.platform)
+})
 
 // 计算属性
 const platformLabel = computed(() => {
   if (!props.account) return '未知'
   const platform = props.account.platform
-  if (platform === 'claude') return 'Claude OAuth'
-  if (platform === 'claude-console') return 'Claude Console'
-  if (platform === 'bedrock') return 'AWS Bedrock'
-  return platform
+  const labels = {
+    claude: 'Claude OAuth',
+    'claude-console': 'Claude Console',
+    bedrock: 'AWS Bedrock',
+    gemini: 'Gemini',
+    'openai-responses': 'OpenAI Responses',
+    'azure-openai': 'Azure OpenAI',
+    droid: 'Droid',
+    ccr: 'CCR'
+  }
+  return labels[platform] || platform
 })
 
 const platformIcon = computed(() => {
   if (!props.account) return 'fas fa-question'
   const platform = props.account.platform
-  if (platform === 'claude' || platform === 'claude-console' || platform === 'bedrock')
-    return 'fas fa-brain'
-  return 'fas fa-robot'
+  const icons = {
+    claude: 'fas fa-brain',
+    'claude-console': 'fas fa-brain',
+    bedrock: 'fab fa-aws',
+    gemini: 'fas fa-gem',
+    'openai-responses': 'fas fa-code',
+    'azure-openai': 'fab fa-microsoft',
+    droid: 'fas fa-robot',
+    ccr: 'fas fa-key'
+  }
+  return icons[platform] || 'fas fa-robot'
 })
 
 const platformBadgeClass = computed(() => {
   if (!props.account) return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
   const platform = props.account.platform
-  if (platform === 'claude') {
-    return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
+  const classes = {
+    claude: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300',
+    'claude-console': 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300',
+    bedrock: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300',
+    gemini: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
+    'openai-responses': 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300',
+    'azure-openai': 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300',
+    droid: 'bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300',
+    ccr: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
   }
-  if (platform === 'claude-console') {
-    return 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
-  }
-  if (platform === 'bedrock') {
-    return 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
-  }
-  return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+  return classes[platform] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
 })
 
 // Bedrock 账号类型相关
@@ -298,15 +375,16 @@ const statusTitle = computed(() => {
 })
 
 const statusDescription = computed(() => {
+  const apiName = platformLabel.value || 'API'
   switch (testStatus.value) {
     case 'idle':
       return '点击下方按钮开始测试账户连通性'
     case 'testing':
       return '正在发送测试请求并等待响应'
     case 'success':
-      return '账户可以正常访问 Claude API'
+      return `账户可以正常访问 ${apiName}`
     case 'error':
-      return errorMessage.value || '无法连接到 Claude API'
+      return errorMessage.value || `无法连接到 ${apiName}`
     default:
       return ''
   }
@@ -391,16 +469,17 @@ const statusTextClass = computed(() => {
 function getTestEndpoint() {
   if (!props.account) return ''
   const platform = props.account.platform
-  if (platform === 'claude') {
-    return `${API_PREFIX}/admin/claude-accounts/${props.account.id}/test`
+  const endpoints = {
+    claude: `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test`,
+    'claude-console': `${APP_CONFIG.apiPrefix}/admin/claude-console-accounts/${props.account.id}/test`,
+    bedrock: `${APP_CONFIG.apiPrefix}/admin/bedrock-accounts/${props.account.id}/test`,
+    gemini: `${APP_CONFIG.apiPrefix}/admin/gemini-accounts/${props.account.id}/test`,
+    'openai-responses': `${APP_CONFIG.apiPrefix}/admin/openai-responses-accounts/${props.account.id}/test`,
+    'azure-openai': `${APP_CONFIG.apiPrefix}/admin/azure-openai-accounts/${props.account.id}/test`,
+    droid: `${APP_CONFIG.apiPrefix}/admin/droid-accounts/${props.account.id}/test`,
+    ccr: `${APP_CONFIG.apiPrefix}/admin/ccr-accounts/${props.account.id}/test`
   }
-  if (platform === 'claude-console') {
-    return `${API_PREFIX}/admin/claude-console-accounts/${props.account.id}/test`
-  }
-  if (platform === 'bedrock') {
-    return `${API_PREFIX}/admin/bedrock-accounts/${props.account.id}/test`
-  }
-  return ''
+  return endpoints[platform] || ''
 }
 
 async function startTest() {
@@ -429,14 +508,14 @@ async function startTest() {
     // 获取认证token
     const authToken = localStorage.getItem('authToken')
 
-    // 使用fetch发送POST请求并处理SSE
+    // 使用fetch发送POST请求
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: authToken ? `Bearer ${authToken}` : ''
       },
-      body: JSON.stringify({ model: testModel.value })
+      body: JSON.stringify({ model: selectedModel.value })
     })
 
     if (!response.ok) {
@@ -444,30 +523,45 @@ async function startTest() {
       throw new Error(errorData.message || `HTTP ${response.status}`)
     }
 
-    // 处理SSE流
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let streamDone = false
+    // 根据账户类型处理响应
+    if (useSSE.value) {
+      // SSE 流式响应 (Claude/Console)
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let streamDone = false
 
-    while (!streamDone) {
-      const { done, value } = await reader.read()
-      if (done) {
-        streamDone = true
-        continue
-      }
+      while (!streamDone) {
+        const { done, value } = await reader.read()
+        if (done) {
+          streamDone = true
+          continue
+        }
 
-      const chunk = decoder.decode(value)
-      const lines = chunk.split('\n')
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.substring(6))
-            handleSSEEvent(data)
-          } catch {
-            // 忽略解析错误
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6))
+              handleSSEEvent(data)
+            } catch {
+              // 忽略解析错误
+            }
           }
         }
+      }
+    } else {
+      // JSON 响应 (其他平台)
+      const data = await response.json()
+      testDuration.value = Date.now() - testStartTime.value
+
+      if (data.success) {
+        testStatus.value = 'success'
+        responseText.value = data.data?.responseText || 'Test passed'
+      } else {
+        testStatus.value = 'error'
+        errorMessage.value = data.message || 'Test failed'
       }
     }
   } catch (err) {
@@ -538,14 +632,14 @@ watch(
         const credentialType = props.account.credentialType
         if (credentialType === 'bearer_token') {
           // Bearer Token 模式使用 Sonnet 4.5
-          testModel.value = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'
+          selectedModel.value = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'
         } else {
           // Access Key 模式使用 Haiku（更快更便宜）
-          testModel.value = 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
+          selectedModel.value = 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
         }
       } else {
         // 其他平台使用默认模型
-        testModel.value = 'claude-sonnet-4-5-20250929'
+        selectedModel.value = 'claude-sonnet-4-5-20250929'
       }
     }
   }

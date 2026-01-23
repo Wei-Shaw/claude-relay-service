@@ -1,9 +1,24 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { apiClient } from '@/config/api'
+
+import * as httpApis from '@/utils/http_apis'
+
+// 平台配置映射
+const PLATFORM_CONFIG = {
+  claude: { endpoint: 'claude-accounts', stateKey: 'claudeAccounts' },
+  'claude-console': { endpoint: 'claude-console-accounts', stateKey: 'claudeConsoleAccounts' },
+  bedrock: { endpoint: 'bedrock-accounts', stateKey: 'bedrockAccounts' },
+  gemini: { endpoint: 'gemini-accounts', stateKey: 'geminiAccounts' },
+  openai: { endpoint: 'openai-accounts', stateKey: 'openaiAccounts' },
+  azure_openai: { endpoint: 'azure-openai-accounts', stateKey: 'azureOpenaiAccounts' },
+  'openai-responses': {
+    endpoint: 'openai-responses-accounts',
+    stateKey: 'openaiResponsesAccounts'
+  },
+  droid: { endpoint: 'droid-accounts', stateKey: 'droidAccounts' }
+}
 
 export const useAccountsStore = defineStore('accounts', () => {
-  // 状态
   const claudeAccounts = ref([])
   const claudeConsoleAccounts = ref([])
   const bedrockAccounts = ref([])
@@ -17,861 +32,227 @@ export const useAccountsStore = defineStore('accounts', () => {
   const sortBy = ref('')
   const sortOrder = ref('asc')
 
-  // Actions
-
-  // 获取Claude账户列表
-  const fetchClaudeAccounts = async () => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.get('/admin/claude-accounts')
-      if (response.success) {
-        claudeAccounts.value = response.data || []
-      } else {
-        throw new Error(response.message || '获取Claude账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+  // 状态映射
+  const stateMap = {
+    claudeAccounts,
+    claudeConsoleAccounts,
+    bedrockAccounts,
+    geminiAccounts,
+    openaiAccounts,
+    azureOpenaiAccounts,
+    openaiResponsesAccounts,
+    droidAccounts
   }
 
-  // 获取Claude Console账户列表
-  const fetchClaudeConsoleAccounts = async () => {
+  // 通用获取账户
+  const fetchAccounts = async (apiFunc, stateRef) => {
     loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.get('/admin/claude-console-accounts')
-      if (response.success) {
-        claudeConsoleAccounts.value = response.data || []
-      } else {
-        throw new Error(response.message || '获取Claude Console账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    const res = await apiFunc()
+    if (res.success) stateRef.value = res.data || []
+    else error.value = res.message
+    loading.value = false
   }
 
-  // 获取Bedrock账户列表
-  const fetchBedrockAccounts = async () => {
+  // 通用创建/更新账户
+  const mutateAccount = async (apiFunc, fetchFunc, ...args) => {
     loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.get('/admin/bedrock-accounts')
-      if (response.success) {
-        bedrockAccounts.value = response.data || []
-      } else {
-        throw new Error(response.message || '获取Bedrock账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    const res = await apiFunc(...args)
+    if (res.success) await fetchFunc()
+    else error.value = res.message
+    loading.value = false
+    return res
   }
 
-  // 获取Gemini账户列表
-  const fetchGeminiAccounts = async () => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.get('/admin/gemini-accounts')
-      if (response.success) {
-        geminiAccounts.value = response.data || []
-      } else {
-        throw new Error(response.message || '获取Gemini账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+  // 获取各平台账户
+  const fetchClaudeAccounts = () => fetchAccounts(httpApis.getClaudeAccountsApi, claudeAccounts)
+  const fetchClaudeConsoleAccounts = () =>
+    fetchAccounts(httpApis.getClaudeConsoleAccountsApi, claudeConsoleAccounts)
+  const fetchBedrockAccounts = () => fetchAccounts(httpApis.getBedrockAccountsApi, bedrockAccounts)
+  const fetchGeminiAccounts = () => fetchAccounts(httpApis.getGeminiAccountsApi, geminiAccounts)
+  const fetchOpenAIAccounts = () => fetchAccounts(httpApis.getOpenAIAccountsApi, openaiAccounts)
+  const fetchAzureOpenAIAccounts = () =>
+    fetchAccounts(httpApis.getAzureOpenAIAccountsApi, azureOpenaiAccounts)
+  const fetchOpenAIResponsesAccounts = () =>
+    fetchAccounts(httpApis.getOpenAIResponsesAccountsApi, openaiResponsesAccounts)
+  const fetchDroidAccounts = () => fetchAccounts(httpApis.getDroidAccountsApi, droidAccounts)
 
-  // 获取OpenAI账户列表
-  const fetchOpenAIAccounts = async () => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.get('/admin/openai-accounts')
-      if (response.success) {
-        openaiAccounts.value = response.data || []
-      } else {
-        throw new Error(response.message || '获取OpenAI账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 获取Azure OpenAI账户列表
-  const fetchAzureOpenAIAccounts = async () => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.get('/admin/azure-openai-accounts')
-      if (response.success) {
-        azureOpenaiAccounts.value = response.data || []
-      } else {
-        throw new Error(response.message || '获取Azure OpenAI账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 获取OpenAI-Responses账户列表
-  const fetchOpenAIResponsesAccounts = async () => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.get('/admin/openai-responses-accounts')
-      if (response.success) {
-        openaiResponsesAccounts.value = response.data || []
-      } else {
-        throw new Error(response.message || '获取OpenAI-Responses账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 获取Droid账户列表
-  const fetchDroidAccounts = async () => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.get('/admin/droid-accounts')
-      if (response.success) {
-        droidAccounts.value = response.data || []
-      } else {
-        throw new Error(response.message || '获取Droid账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 获取所有账户
   const fetchAllAccounts = async () => {
     loading.value = true
-    error.value = null
-    try {
-      await Promise.all([
-        fetchClaudeAccounts(),
-        fetchClaudeConsoleAccounts(),
-        fetchBedrockAccounts(),
-        fetchGeminiAccounts(),
-        fetchOpenAIAccounts(),
-        fetchAzureOpenAIAccounts(),
-        fetchOpenAIResponsesAccounts(),
-        fetchDroidAccounts()
-      ])
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    await Promise.all([
+      fetchClaudeAccounts(),
+      fetchClaudeConsoleAccounts(),
+      fetchBedrockAccounts(),
+      fetchGeminiAccounts(),
+      fetchOpenAIAccounts(),
+      fetchAzureOpenAIAccounts(),
+      fetchOpenAIResponsesAccounts(),
+      fetchDroidAccounts()
+    ])
+    loading.value = false
   }
 
-  // 创建Claude账户
-  const createClaudeAccount = async (data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/claude-accounts', data)
-      if (response.success) {
-        await fetchClaudeAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建Claude账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+  // 创建账户
+  const createClaudeAccount = (data) =>
+    mutateAccount(httpApis.createClaudeAccountApi, fetchClaudeAccounts, data)
+  const createClaudeConsoleAccount = (data) =>
+    mutateAccount(httpApis.createClaudeConsoleAccountApi, fetchClaudeConsoleAccounts, data)
+  const createBedrockAccount = (data) =>
+    mutateAccount(httpApis.createBedrockAccountApi, fetchBedrockAccounts, data)
+  const createGeminiAccount = (data) =>
+    mutateAccount(httpApis.createGeminiAccountApi, fetchGeminiAccounts, data)
+  const createOpenAIAccount = (data) =>
+    mutateAccount(httpApis.createOpenAIAccountApi, fetchOpenAIAccounts, data)
+  const createDroidAccount = (data) =>
+    mutateAccount(httpApis.createDroidAccountApi, fetchDroidAccounts, data)
+  const createAzureOpenAIAccount = (data) =>
+    mutateAccount(httpApis.createAzureOpenAIAccountApi, fetchAzureOpenAIAccounts, data)
+  const createOpenAIResponsesAccount = (data) =>
+    mutateAccount(httpApis.createOpenAIResponsesAccountApi, fetchOpenAIResponsesAccounts, data)
+  const createGeminiApiAccount = (data) =>
+    mutateAccount(httpApis.createGeminiApiAccountApi, fetchGeminiAccounts, data)
 
-  // 创建Claude Console账户
-  const createClaudeConsoleAccount = async (data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/claude-console-accounts', data)
-      if (response.success) {
-        await fetchClaudeConsoleAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建Claude Console账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 创建Bedrock账户
-  const createBedrockAccount = async (data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/bedrock-accounts', data)
-      if (response.success) {
-        await fetchBedrockAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建Bedrock账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 创建Gemini账户
-  const createGeminiAccount = async (data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/gemini-accounts', data)
-      if (response.success) {
-        await fetchGeminiAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建Gemini账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 创建OpenAI账户
-  const createOpenAIAccount = async (data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/openai-accounts', data)
-      if (response.success) {
-        await fetchOpenAIAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建OpenAI账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 创建Droid账户
-  const createDroidAccount = async (data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/droid-accounts', data)
-      if (response.success) {
-        await fetchDroidAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建Droid账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新Droid账户
-  const updateDroidAccount = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/droid-accounts/${id}`, data)
-      if (response.success) {
-        await fetchDroidAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '更新Droid账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 创建Azure OpenAI账户
-  const createAzureOpenAIAccount = async (data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/azure-openai-accounts', data)
-      if (response.success) {
-        await fetchAzureOpenAIAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建Azure OpenAI账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 创建OpenAI-Responses账户
-  const createOpenAIResponsesAccount = async (data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/openai-responses-accounts', data)
-      if (response.success) {
-        await fetchOpenAIResponsesAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建OpenAI-Responses账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 创建Gemini API账户
-  const createGeminiApiAccount = async (data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/gemini-api-accounts', data)
-      if (response.success) {
-        await fetchGeminiAccounts()
-        return response.data
-      } else {
-        throw new Error(response.message || '创建Gemini API账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新Claude账户
-  const updateClaudeAccount = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/claude-accounts/${id}`, data)
-      if (response.success) {
-        await fetchClaudeAccounts()
-        return response
-      } else {
-        throw new Error(response.message || '更新Claude账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新Claude Console账户
-  const updateClaudeConsoleAccount = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/claude-console-accounts/${id}`, data)
-      if (response.success) {
-        await fetchClaudeConsoleAccounts()
-        return response
-      } else {
-        throw new Error(response.message || '更新Claude Console账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新Bedrock账户
-  const updateBedrockAccount = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/bedrock-accounts/${id}`, data)
-      if (response.success) {
-        await fetchBedrockAccounts()
-        return response
-      } else {
-        throw new Error(response.message || '更新Bedrock账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新Gemini账户
-  const updateGeminiAccount = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/gemini-accounts/${id}`, data)
-      if (response.success) {
-        await fetchGeminiAccounts()
-        return response
-      } else {
-        throw new Error(response.message || '更新Gemini账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新OpenAI账户
-  const updateOpenAIAccount = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/openai-accounts/${id}`, data)
-      if (response.success) {
-        await fetchOpenAIAccounts()
-        return response
-      } else {
-        throw new Error(response.message || '更新OpenAI账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新Azure OpenAI账户
-  const updateAzureOpenAIAccount = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/azure-openai-accounts/${id}`, data)
-      if (response.success) {
-        await fetchAzureOpenAIAccounts()
-        return response
-      } else {
-        throw new Error(response.message || '更新Azure OpenAI账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新OpenAI-Responses账户
-  const updateOpenAIResponsesAccount = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/openai-responses-accounts/${id}`, data)
-      if (response.success) {
-        await fetchOpenAIResponsesAccounts()
-        return response
-      } else {
-        throw new Error(response.message || '更新OpenAI-Responses账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新Gemini API账户
-  const updateGeminiApiAccount = async (id, data) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.put(`/admin/gemini-api-accounts/${id}`, data)
-      if (response.success) {
-        await fetchGeminiAccounts()
-        return response
-      } else {
-        throw new Error(response.message || '更新Gemini API账户失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+  // 更新账户
+  const updateClaudeAccount = (id, data) =>
+    mutateAccount(httpApis.updateClaudeAccountApi, fetchClaudeAccounts, id, data)
+  const updateClaudeConsoleAccount = (id, data) =>
+    mutateAccount(httpApis.updateClaudeConsoleAccountApi, fetchClaudeConsoleAccounts, id, data)
+  const updateBedrockAccount = (id, data) =>
+    mutateAccount(httpApis.updateBedrockAccountApi, fetchBedrockAccounts, id, data)
+  const updateGeminiAccount = (id, data) =>
+    mutateAccount(httpApis.updateGeminiAccountApi, fetchGeminiAccounts, id, data)
+  const updateOpenAIAccount = (id, data) =>
+    mutateAccount(httpApis.updateOpenAIAccountApi, fetchOpenAIAccounts, id, data)
+  const updateAzureOpenAIAccount = (id, data) =>
+    mutateAccount(httpApis.updateAzureOpenAIAccountApi, fetchAzureOpenAIAccounts, id, data)
+  const updateOpenAIResponsesAccount = (id, data) =>
+    mutateAccount(httpApis.updateOpenAIResponsesAccountApi, fetchOpenAIResponsesAccounts, id, data)
+  const updateGeminiApiAccount = (id, data) =>
+    mutateAccount(httpApis.updateGeminiApiAccountApi, fetchGeminiAccounts, id, data)
+  const updateDroidAccount = (id, data) =>
+    mutateAccount(httpApis.updateDroidAccountApi, fetchDroidAccounts, id, data)
 
   // 切换账户状态
   const toggleAccount = async (platform, id) => {
+    const config = PLATFORM_CONFIG[platform]
+    if (!config) return { success: false, message: '未知平台' }
     loading.value = true
-    error.value = null
-    try {
-      let endpoint
-      if (platform === 'claude') {
-        endpoint = `/admin/claude-accounts/${id}/toggle`
-      } else if (platform === 'claude-console') {
-        endpoint = `/admin/claude-console-accounts/${id}/toggle`
-      } else if (platform === 'bedrock') {
-        endpoint = `/admin/bedrock-accounts/${id}/toggle`
-      } else if (platform === 'gemini') {
-        endpoint = `/admin/gemini-accounts/${id}/toggle`
-      } else if (platform === 'openai') {
-        endpoint = `/admin/openai-accounts/${id}/toggle`
-      } else if (platform === 'azure_openai') {
-        endpoint = `/admin/azure-openai-accounts/${id}/toggle`
-      } else if (platform === 'openai-responses') {
-        endpoint = `/admin/openai-responses-accounts/${id}/toggle`
-      } else {
-        endpoint = `/admin/openai-accounts/${id}/toggle`
-      }
-
-      const response = await apiClient.put(endpoint)
-      if (response.success) {
-        if (platform === 'claude') {
-          await fetchClaudeAccounts()
-        } else if (platform === 'claude-console') {
-          await fetchClaudeConsoleAccounts()
-        } else if (platform === 'bedrock') {
-          await fetchBedrockAccounts()
-        } else if (platform === 'gemini') {
-          await fetchGeminiAccounts()
-        } else if (platform === 'openai') {
-          await fetchOpenAIAccounts()
-        } else if (platform === 'azure_openai') {
-          await fetchAzureOpenAIAccounts()
-        } else if (platform === 'openai-responses') {
-          await fetchOpenAIResponsesAccounts()
-        } else {
-          await fetchOpenAIAccounts()
-        }
-        return response
-      } else {
-        throw new Error(response.message || '切换状态失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    const res = await httpApis.toggleAccountStatusApi(`/admin/${config.endpoint}/${id}/toggle`)
+    if (res.success)
+      await fetchAccounts(
+        httpApis[
+          `get${config.stateKey.charAt(0).toUpperCase() + config.stateKey.slice(1).replace('Accounts', '')}AccountsApi`
+        ],
+        stateMap[config.stateKey]
+      )
+    else error.value = res.message
+    loading.value = false
+    return res
   }
 
   // 删除账户
   const deleteAccount = async (platform, id) => {
+    const config = PLATFORM_CONFIG[platform]
+    if (!config) return { success: false, message: '未知平台' }
     loading.value = true
-    error.value = null
-    try {
-      let endpoint
-      if (platform === 'claude') {
-        endpoint = `/admin/claude-accounts/${id}`
-      } else if (platform === 'claude-console') {
-        endpoint = `/admin/claude-console-accounts/${id}`
-      } else if (platform === 'bedrock') {
-        endpoint = `/admin/bedrock-accounts/${id}`
-      } else if (platform === 'gemini') {
-        endpoint = `/admin/gemini-accounts/${id}`
-      } else if (platform === 'openai') {
-        endpoint = `/admin/openai-accounts/${id}`
-      } else if (platform === 'azure_openai') {
-        endpoint = `/admin/azure-openai-accounts/${id}`
-      } else if (platform === 'openai-responses') {
-        endpoint = `/admin/openai-responses-accounts/${id}`
-      } else {
-        endpoint = `/admin/openai-accounts/${id}`
+    const res = await httpApis.deleteAccountByEndpointApi(`/admin/${config.endpoint}/${id}`)
+    if (res.success) {
+      const fetchMap = {
+        claude: fetchClaudeAccounts,
+        'claude-console': fetchClaudeConsoleAccounts,
+        bedrock: fetchBedrockAccounts,
+        gemini: fetchGeminiAccounts,
+        openai: fetchOpenAIAccounts,
+        azure_openai: fetchAzureOpenAIAccounts,
+        'openai-responses': fetchOpenAIResponsesAccounts,
+        droid: fetchDroidAccounts
       }
-
-      const response = await apiClient.delete(endpoint)
-      if (response.success) {
-        if (platform === 'claude') {
-          await fetchClaudeAccounts()
-        } else if (platform === 'claude-console') {
-          await fetchClaudeConsoleAccounts()
-        } else if (platform === 'bedrock') {
-          await fetchBedrockAccounts()
-        } else if (platform === 'gemini') {
-          await fetchGeminiAccounts()
-        } else if (platform === 'openai') {
-          await fetchOpenAIAccounts()
-        } else if (platform === 'azure_openai') {
-          await fetchAzureOpenAIAccounts()
-        } else if (platform === 'openai-responses') {
-          await fetchOpenAIResponsesAccounts()
-        } else {
-          await fetchOpenAIAccounts()
-        }
-        return response
-      } else {
-        throw new Error(response.message || '删除失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
+      await fetchMap[platform]()
+    } else {
+      error.value = res.message
     }
+    loading.value = false
+    return res
   }
 
   // 刷新Claude Token
   const refreshClaudeToken = async (id) => {
     loading.value = true
-    error.value = null
-    try {
-      const response = await apiClient.post(`/admin/claude-accounts/${id}/refresh`)
-      if (response.success) {
-        await fetchClaudeAccounts()
-        return response
-      } else {
-        throw new Error(response.message || 'Token刷新失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+    const res = await httpApis.refreshClaudeAccountApi(id)
+    if (res.success) await fetchClaudeAccounts()
+    else error.value = res.message
+    loading.value = false
+    return res
   }
 
-  // 生成Claude OAuth URL
+  // OAuth 相关
   const generateClaudeAuthUrl = async (proxyConfig) => {
-    try {
-      const response = await apiClient.post('/admin/claude-accounts/generate-auth-url', proxyConfig)
-      if (response.success) {
-        return response.data // 返回整个对象，包含authUrl和sessionId
-      } else {
-        throw new Error(response.message || '生成授权URL失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.generateClaudeAuthUrlApi(proxyConfig)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // 交换Claude OAuth Code
   const exchangeClaudeCode = async (data) => {
-    try {
-      const response = await apiClient.post('/admin/claude-accounts/exchange-code', data)
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error(response.message || '交换授权码失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.exchangeClaudeCodeApi(data)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // 生成Claude Setup Token URL
   const generateClaudeSetupTokenUrl = async (proxyConfig) => {
-    try {
-      const response = await apiClient.post(
-        '/admin/claude-accounts/generate-setup-token-url',
-        proxyConfig
-      )
-      if (response.success) {
-        return response.data // 返回整个对象，包含authUrl和sessionId
-      } else {
-        throw new Error(response.message || '生成Setup Token URL失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.generateClaudeSetupTokenUrlApi(proxyConfig)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // 交换Claude Setup Token Code
   const exchangeClaudeSetupTokenCode = async (data) => {
-    try {
-      const response = await apiClient.post(
-        '/admin/claude-accounts/exchange-setup-token-code',
-        data
-      )
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error(response.message || '交换Setup Token授权码失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.exchangeClaudeSetupTokenApi(data)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // Cookie自动授权 - 普通OAuth
   const oauthWithCookie = async (payload) => {
-    try {
-      const response = await apiClient.post('/admin/claude-accounts/oauth-with-cookie', payload)
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error(response.message || 'Cookie授权失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.claudeOAuthWithCookieApi(payload)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // Cookie自动授权 - Setup Token
   const oauthSetupTokenWithCookie = async (payload) => {
-    try {
-      const response = await apiClient.post(
-        '/admin/claude-accounts/setup-token-with-cookie',
-        payload
-      )
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error(response.message || 'Cookie授权失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.claudeSetupTokenWithCookieApi(payload)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // 生成Gemini OAuth URL
   const generateGeminiAuthUrl = async (proxyConfig) => {
-    try {
-      const response = await apiClient.post('/admin/gemini-accounts/generate-auth-url', proxyConfig)
-      if (response.success) {
-        return response.data // 返回整个对象，包含authUrl和sessionId
-      } else {
-        throw new Error(response.message || '生成授权URL失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.generateGeminiAuthUrlApi(proxyConfig)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // 交换Gemini OAuth Code
   const exchangeGeminiCode = async (data) => {
-    try {
-      const response = await apiClient.post('/admin/gemini-accounts/exchange-code', data)
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error(response.message || '交换授权码失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.exchangeGeminiCodeApi(data)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // 生成OpenAI OAuth URL
   const generateOpenAIAuthUrl = async (proxyConfig) => {
-    try {
-      const response = await apiClient.post('/admin/openai-accounts/generate-auth-url', proxyConfig)
-      if (response.success) {
-        return response.data // 返回整个对象，包含authUrl和sessionId
-      } else {
-        throw new Error(response.message || '生成授权URL失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.generateOpenAIAuthUrlApi(proxyConfig)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // 生成Droid OAuth URL
-  const generateDroidAuthUrl = async (proxyConfig) => {
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/droid-accounts/generate-auth-url', proxyConfig)
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error(response.message || '生成授权URL失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
-  }
-
-  // 交换OpenAI OAuth Code
   const exchangeOpenAICode = async (data) => {
-    try {
-      const response = await apiClient.post('/admin/openai-accounts/exchange-code', data)
-      if (response.success) {
-        return response.data
-      } else {
-        throw new Error(response.message || '交换授权码失败')
-      }
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+    const res = await httpApis.exchangeOpenAICodeApi(data)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // 交换Droid OAuth Code
-  const exchangeDroidCode = async (data) => {
-    error.value = null
-    try {
-      const response = await apiClient.post('/admin/droid-accounts/exchange-code', data)
-      return response
-    } catch (err) {
-      error.value = err.message
-      throw err
-    }
+  const generateDroidAuthUrl = async (proxyConfig) => {
+    const res = await httpApis.generateDroidAuthUrlApi(proxyConfig)
+    if (!res.success) error.value = res.message
+    return res.success ? res.data : null
   }
 
-  // 排序账户
+  const exchangeDroidCode = (data) => httpApis.exchangeDroidCodeApi(data)
+
   const sortAccounts = (field) => {
     if (sortBy.value === field) {
       sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
@@ -881,7 +262,6 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
-  // 重置store
   const reset = () => {
     claudeAccounts.value = []
     claudeConsoleAccounts.value = []
@@ -898,7 +278,6 @@ export const useAccountsStore = defineStore('accounts', () => {
   }
 
   return {
-    // State
     claudeAccounts,
     claudeConsoleAccounts,
     bedrockAccounts,
@@ -911,8 +290,6 @@ export const useAccountsStore = defineStore('accounts', () => {
     error,
     sortBy,
     sortOrder,
-
-    // Actions
     fetchClaudeAccounts,
     fetchClaudeConsoleAccounts,
     fetchBedrockAccounts,

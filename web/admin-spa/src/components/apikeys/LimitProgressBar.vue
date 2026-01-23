@@ -218,7 +218,7 @@ const compactBarClass = computed(() => {
     case 'total':
       return 'bg-blue-500 dark:bg-blue-400'
     default:
-      return 'bg-slate-400 dark:bg-slate-500'
+      return 'bg-gray-400 dark:bg-gray-500'
   }
 })
 

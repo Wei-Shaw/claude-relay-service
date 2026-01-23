@@ -221,6 +221,18 @@
                 <span class="relative">导出数据</span>
               </button>
 
+              <!-- 管理标签按钮 -->
+              <button
+                class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-500 sm:w-auto"
+                @click="showTagManagementModal = true"
+              >
+                <div
+                  class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                ></div>
+                <i class="fas fa-tags relative text-purple-500" />
+                <span class="relative">管理标签</span>
+              </button>
+
               <!-- 批量编辑按钮 - 移到刷新按钮旁边 -->
               <button
                 v-if="selectedApiKeys.length > 0"
@@ -425,16 +437,13 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <template v-for="(key, index) in paginatedApiKeys" :key="key.id">
+                  <template v-for="key in paginatedApiKeys" :key="key.id">
                     <!-- API Key 主行 - 添加斑马条纹和增强分隔 -->
                     <tr
                       :class="[
-                        'table-row transition-all duration-150',
-                        index % 2 === 0
-                          ? 'bg-white dark:bg-gray-800/40'
-                          : 'bg-gray-50/70 dark:bg-gray-700/30',
+                        'table-row',
                         'border-b-2 border-gray-200/80 dark:border-gray-700/50',
-                        'hover:bg-blue-50/60 hover:shadow-sm dark:hover:bg-blue-900/20'
+                        'hover:shadow-sm'
                       ]"
                     >
                       <td
@@ -458,8 +467,9 @@
                         <div class="min-w-0">
                           <!-- 名称 -->
                           <div
-                            class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
-                            :title="key.name"
+                            class="cursor-pointer truncate text-sm font-semibold text-gray-900 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                            title="点击复制"
+                            @click.stop="copyText(key.name)"
                           >
                             {{ key.name }}
                           </div>
@@ -1265,7 +1275,11 @@
                     @change="updateSelectAllState"
                   />
                   <div>
-                    <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <h4
+                      class="cursor-pointer text-sm font-semibold text-gray-900 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                      title="点击复制"
+                      @click.stop="copyText(key.name)"
+                    >
                       {{ key.name }}
                     </h4>
                     <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -1854,8 +1868,9 @@
                           </div>
                           <div class="min-w-0">
                             <div
-                              class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100"
-                              :title="key.name"
+                              class="cursor-pointer truncate text-sm font-semibold text-gray-900 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                              title="点击复制"
+                              @click.stop="copyText(key.name)"
                             >
                               {{ key.name }}
                             </div>
@@ -2114,15 +2129,32 @@
       @close="showUsageDetailModal = false"
       @open-timeline="openTimeline"
     />
+
+    <TagManagementModal
+      :show="showTagManagementModal"
+      @close="showTagManagementModal = false"
+      @updated="loadApiKeys"
+    />
+
+    <ConfirmModal
+      :cancel-text="confirmModalConfig.cancelText"
+      :confirm-text="confirmModalConfig.confirmText"
+      :message="confirmModalConfig.message"
+      :show="showConfirmModal"
+      :title="confirmModalConfig.title"
+      :type="confirmModalConfig.type"
+      @cancel="handleCancel"
+      @confirm="handleConfirm"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from '@/utils/toast'
-import { apiClient } from '@/config/api'
-import { useClientsStore } from '@/stores/clients'
+import { showToast, copyText, formatNumber, formatDate } from '@/utils/tools'
+
+import * as httpApis from '@/utils/http_apis'
 import { useAuthStore } from '@/stores/auth'
 import * as XLSX from 'xlsx-js-style'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
@@ -2133,13 +2165,14 @@ import BatchApiKeyModal from '@/components/apikeys/BatchApiKeyModal.vue'
 import BatchEditApiKeyModal from '@/components/apikeys/BatchEditApiKeyModal.vue'
 import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
 import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
+import TagManagementModal from '@/components/apikeys/TagManagementModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
+import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 // 响应式数据
 const router = useRouter()
-const clientsStore = useClientsStore()
 const authStore = useAuthStore()
 const apiKeys = ref([])
 
@@ -2301,10 +2334,44 @@ const showRenewApiKeyModal = ref(false)
 const showNewApiKeyModal = ref(false)
 const showBatchApiKeyModal = ref(false)
 const showBatchEditModal = ref(false)
+const showTagManagementModal = ref(false)
 const editingApiKey = ref(null)
 const renewingApiKey = ref(null)
 const newApiKeyData = ref(null)
 const batchApiKeyData = ref([])
+
+// ConfirmModal 状态
+const showConfirmModal = ref(false)
+const confirmModalConfig = ref({
+  title: '',
+  message: '',
+  type: 'primary',
+  confirmText: '确认',
+  cancelText: '取消'
+})
+const confirmResolve = ref(null)
+
+const showConfirm = (
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  type = 'primary'
+) => {
+  return new Promise((resolve) => {
+    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
+    confirmResolve.value = resolve
+    showConfirmModal.value = true
+  })
+}
+const handleConfirm = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(true)
+}
+const handleCancel = () => {
+  showConfirmModal.value = false
+  confirmResolve.value?.(false)
+}
 
 // 计算排序后的API Keys（现在由后端处理，这里直接返回）
 const sortedApiKeys = computed(() => {
@@ -2398,15 +2465,15 @@ const loadAccounts = async (forceRefresh = false) => {
       droidData,
       groupsData
     ] = await Promise.all([
-      apiClient.get('/admin/claude-accounts'),
-      apiClient.get('/admin/claude-console-accounts'),
-      apiClient.get('/admin/gemini-accounts'),
-      apiClient.get('/admin/gemini-api-accounts'), // 加载 Gemini-API 账号
-      apiClient.get('/admin/openai-accounts'),
-      apiClient.get('/admin/openai-responses-accounts'), // 加载 OpenAI-Responses 账号
-      apiClient.get('/admin/bedrock-accounts'),
-      apiClient.get('/admin/droid-accounts'),
-      apiClient.get('/admin/account-groups')
+      httpApis.getClaudeAccountsApi(),
+      httpApis.getClaudeConsoleAccountsApi(),
+      httpApis.getGeminiAccountsApi(),
+      httpApis.getGeminiApiAccountsApi(),
+      httpApis.getOpenAIAccountsApi(),
+      httpApis.getOpenAIResponsesAccountsApi(),
+      httpApis.getBedrockAccountsApi(),
+      httpApis.getDroidAccountsApi(),
+      httpApis.getAccountGroupsApi()
     ])
 
     // 合并Claude OAuth账户和Claude Console账户
@@ -2512,7 +2579,7 @@ const loadAccounts = async (forceRefresh = false) => {
 // 加载已使用的模型列表
 const loadUsedModels = async () => {
   try {
-    const data = await apiClient.get('/admin/api-keys/used-models')
+    const data = await httpApis.getApiKeyUsedModelsApi()
     if (data.success) {
       availableModels.value = data.data || []
     }
@@ -2601,7 +2668,7 @@ const loadApiKeys = async (clearStatsCache = true) => {
       params.set('timeRange', globalDateFilter.preset)
     }
 
-    const data = await apiClient.get(`/admin/api-keys?${params.toString()}`)
+    const data = await httpApis.getApiKeysWithParamsApi(params.toString())
     if (data.success) {
       // 更新数据
       apiKeys.value = data.data?.items || []
@@ -2682,7 +2749,7 @@ const loadPageStats = async () => {
       requestBody.endDate = endDate
     }
 
-    const response = await apiClient.post('/admin/api-keys/batch-stats', requestBody)
+    const response = await httpApis.getApiKeysBatchStatsApi(requestBody)
 
     if (response.success && response.data) {
       // 更新缓存
@@ -2736,7 +2803,7 @@ const loadPageLastUsage = async () => {
   keyIds.forEach((id) => lastUsageLoading.value.add(id))
 
   try {
-    const response = await apiClient.post('/admin/api-keys/batch-last-usage', { keyIds })
+    const response = await httpApis.getApiKeysBatchLastUsageApi({ keyIds })
 
     if (response.success && response.data) {
       // 更新缓存
@@ -2767,7 +2834,7 @@ const loadDeletedApiKeys = async () => {
   activeTab.value = 'deleted'
   deletedApiKeysLoading.value = true
   try {
-    const data = await apiClient.get('/admin/api-keys/deleted')
+    const data = await httpApis.getDeletedApiKeysApi()
     if (data.success) {
       deletedApiKeys.value = data.apiKeys || []
     }
@@ -2846,7 +2913,7 @@ let costSortStatusTimer = null
 // 获取费用排序索引状态
 const fetchCostSortStatus = async () => {
   try {
-    const data = await apiClient.get('/admin/api-keys/cost-sort-status')
+    const data = await httpApis.getApiKeysCostSortStatusApi()
     if (data.success) {
       costSortStatus.value = data.data || {}
 
@@ -2877,10 +2944,6 @@ const scheduleNextCostSortStatusRefresh = () => {
 }
 
 // 格式化数字
-const formatNumber = (num) => {
-  if (!num && num !== 0) return '0'
-  return num.toLocaleString('zh-CN')
-}
 
 // 格式化Token数量
 const formatTokenCount = (count) => {
@@ -3180,22 +3243,18 @@ const loadApiKeyModelStats = async (keyId, forceReload = false) => {
   const filter = getApiKeyDateFilter(keyId)
 
   try {
-    let url = `/admin/api-keys/${keyId}/model-stats`
-    const params = new URLSearchParams()
+    const params = {}
 
     if (filter.customStart && filter.customEnd) {
-      params.append('startDate', filter.customStart)
-      params.append('endDate', filter.customEnd)
-      params.append('period', 'custom')
+      params.startDate = filter.customStart
+      params.endDate = filter.customEnd
+      params.period = 'custom'
     } else {
-      const period =
+      params.period =
         filter.preset === 'today' ? 'daily' : filter.preset === '7days' ? 'daily' : 'monthly'
-      params.append('period', period)
     }
 
-    url += '?' + params.toString()
-
-    const data = await apiClient.get(url)
+    const data = await httpApis.getApiKeyModelStatsApi(keyId, params)
     if (data.success) {
       apiKeyModelStats.value[keyId] = data.data || []
     }
@@ -3847,27 +3906,19 @@ const toggleApiKeyStatus = async (key) => {
 
   // 禁用时需要二次确认
   if (key.isActive) {
-    if (window.showConfirm) {
-      confirmed = await window.showConfirm(
-        '禁用 API Key',
-        `确定要禁用 API Key "${key.name}" 吗？禁用后所有使用此 Key 的请求将返回 401 错误。`,
-        '确定禁用',
-        '取消'
-      )
-    } else {
-      // 降级方案
-      confirmed = confirm(
-        `确定要禁用 API Key "${key.name}" 吗？禁用后所有使用此 Key 的请求将返回 401 错误。`
-      )
-    }
+    confirmed = await showConfirm(
+      '禁用 API Key',
+      `确定要禁用 API Key "${key.name}" 吗？禁用后所有使用此 Key 的请求将返回 401 错误。`,
+      '确定禁用',
+      '取消',
+      'warning'
+    )
   }
 
   if (!confirmed) return
 
   try {
-    const data = await apiClient.put(`/admin/api-keys/${key.id}`, {
-      isActive: !key.isActive
-    })
+    const data = await httpApis.updateApiKeyApi(key.id, { isActive: !key.isActive })
 
     if (data.success) {
       showToast(`API Key 已${key.isActive ? '禁用' : '激活'}`, 'success')
@@ -3887,24 +3938,18 @@ const toggleApiKeyStatus = async (key) => {
 // 更新API Key图标
 // 删除API Key
 const deleteApiKey = async (keyId) => {
-  let confirmed = false
-
-  if (window.showConfirm) {
-    confirmed = await window.showConfirm(
-      '删除 API Key',
-      '确定要删除这个 API Key 吗？此操作不可恢复。',
-      '确定删除',
-      '取消'
-    )
-  } else {
-    // 降级方案
-    confirmed = confirm('确定要删除这个 API Key 吗？此操作不可恢复。')
-  }
+  const confirmed = await showConfirm(
+    '删除 API Key',
+    '确定要删除这个 API Key 吗？此操作不可恢复。',
+    '确定删除',
+    '取消',
+    'danger'
+  )
 
   if (!confirmed) return
 
   try {
-    const data = await apiClient.delete(`/admin/api-keys/${keyId}`)
+    const data = await httpApis.deleteApiKeyApi(keyId)
     if (data.success) {
       showToast('API Key 已删除', 'success')
       // 从选中列表中移除
@@ -3924,24 +3969,18 @@ const deleteApiKey = async (keyId) => {
 
 // 恢复API Key
 const restoreApiKey = async (keyId) => {
-  let confirmed = false
-
-  if (window.showConfirm) {
-    confirmed = await window.showConfirm(
-      '恢复 API Key',
-      '确定要恢复这个 API Key 吗？恢复后可以重新使用。',
-      '确定恢复',
-      '取消'
-    )
-  } else {
-    // 降级方案
-    confirmed = confirm('确定要恢复这个 API Key 吗？恢复后可以重新使用。')
-  }
+  const confirmed = await showConfirm(
+    '恢复 API Key',
+    '确定要恢复这个 API Key 吗？恢复后可以重新使用。',
+    '确定恢复',
+    '取消',
+    'primary'
+  )
 
   if (!confirmed) return
 
   try {
-    const data = await apiClient.post(`/admin/api-keys/${keyId}/restore`)
+    const data = await httpApis.restoreApiKeyApi(keyId)
     if (data.success) {
       showToast('API Key 已成功恢复', 'success')
       // 刷新已删除列表
@@ -3958,24 +3997,18 @@ const restoreApiKey = async (keyId) => {
 
 // 彻底删除API Key
 const permanentDeleteApiKey = async (keyId) => {
-  let confirmed = false
-
-  if (window.showConfirm) {
-    confirmed = await window.showConfirm(
-      '彻底删除 API Key',
-      '确定要彻底删除这个 API Key 吗？此操作不可恢复，所有相关数据将被永久删除。',
-      '确定彻底删除',
-      '取消'
-    )
-  } else {
-    // 降级方案
-    confirmed = confirm('确定要彻底删除这个 API Key 吗？此操作不可恢复，所有相关数据将被永久删除。')
-  }
+  const confirmed = await showConfirm(
+    '彻底删除 API Key',
+    '确定要彻底删除这个 API Key 吗？此操作不可恢复，所有相关数据将被永久删除。',
+    '确定彻底删除',
+    '取消',
+    'danger'
+  )
 
   if (!confirmed) return
 
   try {
-    const data = await apiClient.delete(`/admin/api-keys/${keyId}/permanent`)
+    const data = await httpApis.permanentDeleteApiKeyApi(keyId)
     if (data.success) {
       showToast('API Key 已彻底删除', 'success')
       // 刷新已删除列表
@@ -3996,24 +4029,18 @@ const clearAllDeletedApiKeys = async () => {
     return
   }
 
-  let confirmed = false
-
-  if (window.showConfirm) {
-    confirmed = await window.showConfirm(
-      '清空所有已删除的 API Keys',
-      `确定要彻底删除全部 ${count} 个已删除的 API Keys 吗？此操作不可恢复，所有相关数据将被永久删除。`,
-      '确定清空全部',
-      '取消'
-    )
-  } else {
-    // 降级方案
-    confirmed = confirm(`确定要彻底删除全部 ${count} 个已删除的 API Keys 吗？此操作不可恢复。`)
-  }
+  const confirmed = await showConfirm(
+    '清空所有已删除的 API Keys',
+    `确定要彻底删除全部 ${count} 个已删除的 API Keys 吗？此操作不可恢复，所有相关数据将被永久删除。`,
+    '确定清空全部',
+    '取消',
+    'danger'
+  )
 
   if (!confirmed) return
 
   try {
-    const data = await apiClient.delete('/admin/api-keys/deleted/clear-all')
+    const data = await httpApis.clearAllDeletedApiKeysApi()
     if (data.success) {
       showToast(data.message || '已清空所有已删除的 API Keys', 'success')
 
@@ -4042,23 +4069,20 @@ const batchDeleteApiKeys = async () => {
     return
   }
 
-  let confirmed = false
-  const message = `确定要删除选中的 ${selectedCount} 个 API Key 吗？此操作不可恢复。`
-
-  if (window.showConfirm) {
-    confirmed = await window.showConfirm('批量删除 API Keys', message, '确定删除', '取消')
-  } else {
-    confirmed = confirm(message)
-  }
+  const confirmed = await showConfirm(
+    '批量删除 API Keys',
+    `确定要删除选中的 ${selectedCount} 个 API Key 吗？此操作不可恢复。`,
+    '确定删除',
+    '取消',
+    'danger'
+  )
 
   if (!confirmed) return
 
   const keyIds = [...selectedApiKeys.value]
 
   try {
-    const data = await apiClient.delete('/admin/api-keys/batch', {
-      data: { keyIds }
-    })
+    const data = await httpApis.batchDeleteApiKeysApi({ keyIds })
 
     if (data.success) {
       const { successCount, failedCount, errors } = data.data
@@ -4138,7 +4162,7 @@ const closeExpiryEdit = () => {
 const handleSaveExpiry = async ({ keyId, expiresAt, activateNow }) => {
   try {
     // 使用新的PATCH端点来修改过期时间
-    const data = await apiClient.patch(`/admin/api-keys/${keyId}/expiration`, {
+    const data = await httpApis.updateApiKeyExpirationApi(keyId, {
       expiresAt: expiresAt || null,
       activateNow: activateNow || false
     })
@@ -4174,21 +4198,6 @@ const handleSaveExpiry = async ({ keyId, expiresAt, activateNow }) => {
       expiryEditModalRef.value.resetSaving()
     }
   }
-}
-
-// 格式化日期时间
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date
-    .toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-    .replace(/\//g, '-')
 }
 
 // 格式化时间窗口倒计时
@@ -4458,18 +4467,12 @@ const exportToExcel = () => {
         过期时间: key.expiresAt ? formatDate(key.expiresAt) : '',
 
         // 权限配置
-        服务权限:
-          key.permissions === 'all'
-            ? '全部服务'
-            : key.permissions === 'claude'
-              ? '仅Claude'
-              : key.permissions === 'gemini'
-                ? '仅Gemini'
-                : key.permissions === 'openai'
-                  ? '仅OpenAI'
-                  : key.permissions === 'droid'
-                    ? '仅Droid'
-                    : key.permissions || '',
+        服务权限: (() => {
+          const p = key.permissions
+          if (!p || p === 'all') return '全部服务'
+          if (Array.isArray(p)) return p.length === 0 ? '全部服务' : p.join(', ')
+          return p
+        })(),
 
         // 限制配置
         令牌限制: key.tokenLimit === '0' || key.tokenLimit === 0 ? '无限制' : key.tokenLimit || '',
@@ -4803,7 +4806,8 @@ onMounted(async () => {
   fetchCostSortStatus()
 
   // 先加载 API Keys（优先显示列表）
-  await Promise.all([clientsStore.loadSupportedClients(), loadApiKeys(), loadUsedModels()])
+  // supported-clients 由 Create/Edit 模态框按需加载，无需预加载
+  await Promise.all([loadApiKeys(), loadUsedModels()])
 
   // 初始化全选状态
   updateSelectAllState()
@@ -4874,27 +4878,41 @@ onUnmounted(() => {
 }
 
 .dark .table-container::-webkit-scrollbar-track {
-  background: #374151;
+  background: var(--bg-gradient-mid);
 }
 
 .dark .table-container::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: var(--bg-gradient-end);
 }
 
 .dark .table-container::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: var(--text-secondary);
 }
 
-.table-row {
-  transition: background-color 0.2s ease;
+/* 统一 hover 背景 - 所有 td 使用主题色 */
+.table-container tbody tr:hover > td {
+  background-color: rgba(var(--primary-rgb), 0.06) !important;
 }
 
-.table-row:hover {
-  background-color: rgba(0, 0, 0, 0.02);
+.dark .table-container tbody tr:hover > td {
+  background-color: rgba(var(--primary-rgb), 0.16) !important;
 }
 
-.dark .table-row:hover {
-  background-color: rgba(255, 255, 255, 0.02);
+/* 所有 td 的斑马纹背景 */
+.table-container tbody tr:nth-child(odd) > td {
+  background-color: #ffffff;
+}
+
+.table-container tbody tr:nth-child(even) > td {
+  background-color: #f9fafb;
+}
+
+.dark .table-container tbody tr:nth-child(odd) > td {
+  background-color: var(--bg-gradient-start);
+}
+
+.dark .table-container tbody tr:nth-child(even) > td {
+  background-color: var(--bg-gradient-mid);
 }
 
 /* 固定操作列在右侧，兼容浅色和深色模式 */
@@ -4911,33 +4929,7 @@ onUnmounted(() => {
 }
 
 .dark .table-container thead .operations-column {
-  background: linear-gradient(to bottom, #374151, #1f2937);
-}
-
-/* tbody 中的操作列背景处理 - 使用纯色避免滚动时重叠 */
-.table-container tbody tr:nth-child(odd) .operations-column {
-  background-color: #ffffff;
-}
-
-.table-container tbody tr:nth-child(even) .operations-column {
-  background-color: #f9fafb;
-}
-
-.dark .table-container tbody tr:nth-child(odd) .operations-column {
-  background-color: #1f2937;
-}
-
-.dark .table-container tbody tr:nth-child(even) .operations-column {
-  background-color: #374151;
-}
-
-/* hover 状态下的操作列背景 */
-.table-container tbody tr:hover .operations-column {
-  background-color: #eff6ff;
-}
-
-.dark .table-container tbody tr:hover .operations-column {
-  background-color: #1e3a5f;
+  background: linear-gradient(to bottom, var(--bg-gradient-mid), var(--bg-gradient-start));
 }
 
 .table-container tbody .operations-column {
@@ -4964,39 +4956,7 @@ onUnmounted(() => {
 
 .dark .table-container thead .checkbox-column,
 .dark .table-container thead .name-column {
-  background: linear-gradient(to bottom, #374151, #1f2937);
-}
-
-/* tbody 中的左侧固定列背景处理 - 使用纯色避免滚动时重叠 */
-.table-container tbody tr:nth-child(odd) .checkbox-column,
-.table-container tbody tr:nth-child(odd) .name-column {
-  background-color: #ffffff;
-}
-
-.table-container tbody tr:nth-child(even) .checkbox-column,
-.table-container tbody tr:nth-child(even) .name-column {
-  background-color: #f9fafb;
-}
-
-.dark .table-container tbody tr:nth-child(odd) .checkbox-column,
-.dark .table-container tbody tr:nth-child(odd) .name-column {
-  background-color: #1f2937;
-}
-
-.dark .table-container tbody tr:nth-child(even) .checkbox-column,
-.dark .table-container tbody tr:nth-child(even) .name-column {
-  background-color: #374151;
-}
-
-/* hover 状态下的左侧固定列背景 */
-.table-container tbody tr:hover .checkbox-column,
-.table-container tbody tr:hover .name-column {
-  background-color: #eff6ff;
-}
-
-.dark .table-container tbody tr:hover .checkbox-column,
-.dark .table-container tbody tr:hover .name-column {
-  background-color: #1e3a5f;
+  background: linear-gradient(to bottom, var(--bg-gradient-mid), var(--bg-gradient-start));
 }
 
 /* 名称列右侧阴影（分隔效果） */

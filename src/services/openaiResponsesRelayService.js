@@ -7,6 +7,11 @@ const apiKeyService = require('./apiKeyService')
 const unifiedOpenAIScheduler = require('./unifiedOpenAIScheduler')
 const config = require('../../config/config')
 const crypto = require('crypto')
+const LRUCache = require('../utils/lruCache')
+
+// lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
+const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
+const LAST_USED_AT_THROTTLE_MS = 60000
 
 // 抽取缓存写入 token，兼容多种字段命名
 function extractCacheCreationTokens(usageData) {
@@ -37,6 +42,21 @@ function extractCacheCreationTokens(usageData) {
 class OpenAIResponsesRelayService {
   constructor() {
     this.defaultTimeout = config.requestTimeout || 600000
+  }
+
+  // 节流更新 lastUsedAt
+  async _throttledUpdateLastUsedAt(accountId) {
+    const now = Date.now()
+    const lastUpdate = lastUsedAtThrottle.get(accountId)
+
+    if (lastUpdate && now - lastUpdate < LAST_USED_AT_THROTTLE_MS) {
+      return // 跳过更新
+    }
+
+    lastUsedAtThrottle.set(accountId, now, LAST_USED_AT_THROTTLE_MS)
+    await openaiResponsesAccountService.updateAccount(accountId, {
+      lastUsedAt: new Date().toISOString()
+    })
   }
 
   // 处理请求转发
@@ -259,10 +279,8 @@ class OpenAIResponsesRelayService {
         return res.status(response.status).json(errorData)
       }
 
-      // 更新最后使用时间
-      await openaiResponsesAccountService.updateAccount(account.id, {
-        lastUsedAt: new Date().toISOString()
-      })
+      // 更新最后使用时间（节流）
+      await this._throttledUpdateLastUsedAt(account.id)
 
       // 处理流式响应
       if (req.body?.stream && response.data && typeof response.data.pipe === 'function') {
@@ -539,7 +557,8 @@ class OpenAIResponsesRelayService {
             cacheCreateTokens,
             cacheReadTokens,
             modelToRecord,
-            account.id
+            account.id,
+            'openai-responses'
           )
 
           logger.info(
@@ -667,7 +686,8 @@ class OpenAIResponsesRelayService {
           cacheCreateTokens,
           cacheReadTokens,
           actualModel,
-          account.id
+          account.id,
+          'openai-responses'
         )
 
         logger.info(

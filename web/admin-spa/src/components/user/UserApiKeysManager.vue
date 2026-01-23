@@ -85,7 +85,7 @@
                 <div
                   :class="[
                     'h-2 w-2 rounded-full',
-                    apiKey.isDeleted === 'true' || apiKey.deletedAt
+                    apiKey.isDeleted === true || apiKey.deletedAt
                       ? 'bg-gray-400'
                       : apiKey.isActive
                         ? 'bg-green-400'
@@ -97,7 +97,7 @@
                 <div class="flex items-center">
                   <p class="text-sm font-medium text-gray-900">{{ apiKey.name }}</p>
                   <span
-                    v-if="apiKey.isDeleted === 'true' || apiKey.deletedAt"
+                    v-if="apiKey.isDeleted === true || apiKey.deletedAt"
                     class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800"
                   >
                     Deleted
@@ -249,7 +249,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { showToast } from '@/utils/toast'
+import { showToast, formatNumber, formatDate } from '@/utils/tools'
 import CreateApiKeyModal from './CreateApiKeyModal.vue'
 import ViewApiKeyModal from './ViewApiKeyModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -279,26 +279,6 @@ const sortedApiKeys = computed(() => {
 const activeApiKeysCount = computed(() => {
   return apiKeys.value.filter((key) => !(key.isDeleted === 'true' || key.deletedAt)).length
 })
-
-const formatNumber = (num) => {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  }
-  return num.toString()
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return null
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
 
 const loadApiKeys = async () => {
   loading.value = true
@@ -348,7 +328,3 @@ onMounted(() => {
   loadApiKeys()
 })
 </script>
-
-<style scoped>
-/* 组件特定样式 */
-</style>

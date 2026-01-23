@@ -103,7 +103,7 @@ program
     try {
       const [, apiKeys, accounts] = await Promise.all([
         redis.getSystemStats(),
-        apiKeyService.getAllApiKeys(),
+        apiKeyService.getAllApiKeysFast(),
         claudeAccountService.getAllAccounts()
       ])
 
@@ -284,7 +284,7 @@ async function listApiKeys() {
   const spinner = ora('正在获取 API Keys...').start()
 
   try {
-    const apiKeys = await apiKeyService.getAllApiKeys()
+    const apiKeys = await apiKeyService.getAllApiKeysFast()
     spinner.succeed(`找到 ${apiKeys.length} 个 API Keys`)
 
     if (apiKeys.length === 0) {
@@ -314,7 +314,7 @@ async function listApiKeys() {
 
       tableData.push([
         key.name,
-        key.apiKey ? `${key.apiKey.substring(0, 20)}...` : '-',
+        key.maskedKey || '-',
         key.isActive ? '🟢 活跃' : '🔴 停用',
         expiryStatus,
         `${(key.usage?.total?.tokens || 0).toLocaleString()}`,
@@ -333,7 +333,7 @@ async function listApiKeys() {
 async function updateApiKeyExpiry() {
   try {
     // 获取所有 API Keys
-    const apiKeys = await apiKeyService.getAllApiKeys()
+    const apiKeys = await apiKeyService.getAllApiKeysFast()
 
     if (apiKeys.length === 0) {
       console.log(styles.warning('没有找到任何 API Keys'))
@@ -347,7 +347,7 @@ async function updateApiKeyExpiry() {
         name: 'selectedKey',
         message: '选择要修改的 API Key:',
         choices: apiKeys.map((key) => ({
-          name: `${key.name} (${key.apiKey?.substring(0, 20)}...) - ${key.expiresAt ? new Date(key.expiresAt).toLocaleDateString() : '永不过期'}`,
+          name: `${key.name} (${key.maskedKey || key.id.substring(0, 8)}) - ${key.expiresAt ? new Date(key.expiresAt).toLocaleDateString() : '永不过期'}`,
           value: key
         }))
       }
@@ -463,7 +463,7 @@ async function renewApiKeys() {
   const spinner = ora('正在查找即将过期的 API Keys...').start()
 
   try {
-    const apiKeys = await apiKeyService.getAllApiKeys()
+    const apiKeys = await apiKeyService.getAllApiKeysFast()
     const now = new Date()
     const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
@@ -562,7 +562,7 @@ async function renewApiKeys() {
 
 async function deleteApiKey() {
   try {
-    const apiKeys = await apiKeyService.getAllApiKeys()
+    const apiKeys = await apiKeyService.getAllApiKeysFast()
 
     if (apiKeys.length === 0) {
       console.log(styles.warning('没有找到任何 API Keys'))
@@ -575,7 +575,7 @@ async function deleteApiKey() {
         name: 'selectedKeys',
         message: '选择要删除的 API Keys (空格选择，回车确认):',
         choices: apiKeys.map((key) => ({
-          name: `${key.name} (${key.apiKey?.substring(0, 20)}...)`,
+          name: `${key.name} (${key.maskedKey || key.id.substring(0, 8)})`,
           value: key.id
         }))
       }

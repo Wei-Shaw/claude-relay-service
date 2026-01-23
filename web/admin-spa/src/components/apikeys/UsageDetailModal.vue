@@ -248,6 +248,8 @@ import { computed } from 'vue'
 import LimitProgressBar from './LimitProgressBar.vue'
 import WindowCountdown from './WindowCountdown.vue'
 
+import { formatNumber } from '@/utils/tools'
+
 const props = defineProps({
   show: {
     type: Boolean,
@@ -305,10 +307,6 @@ const opusUsagePercentage = computed(() => {
 })
 
 // 方法
-const formatNumber = (num) => {
-  if (!num && num !== 0) return '0'
-  return num.toLocaleString('zh-CN')
-}
 
 // 格式化Token数量（使用K/M单位）
 const formatTokenCount = (count) => {
@@ -328,7 +326,3 @@ const openTimeline = () => {
   emit('open-timeline', props.apiKey?.id)
 }
 </script>
-
-<style scoped>
-/* 使用项目的通用样式，不需要额外定义 */
-</style>

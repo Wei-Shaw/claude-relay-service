@@ -259,8 +259,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
+import { updateCcrAccountApi, createCcrAccountApi } from '@/utils/http_apis'
+import { showToast } from '@/utils/tools'
 import ProxyConfig from '@/components/accounts/ProxyConfig.vue'
 
 const props = defineProps({
@@ -344,7 +344,7 @@ const submit = async () => {
       if (form.value.apiKey && form.value.apiKey.trim().length > 0) {
         updates.apiKey = form.value.apiKey
       }
-      const res = await apiClient.put(`/admin/ccr-accounts/${props.account.id}`, updates)
+      const res = await updateCcrAccountApi(props.account.id, updates)
       if (res.success) {
         // 不在这里显示 toast，由父组件统一处理
         emit('success')
@@ -367,7 +367,7 @@ const submit = async () => {
         dailyQuota: Number(form.value.dailyQuota || 0),
         quotaResetTime: form.value.quotaResetTime || '00:00'
       }
-      const res = await apiClient.post('/admin/ccr-accounts', payload)
+      const res = await createCcrAccountApi(payload)
       if (res.success) {
         // 不在这里显示 toast，由父组件统一处理
         emit('success')

@@ -295,9 +295,8 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
-import { apiClient } from '@/config/api'
-import { showToast } from '@/utils/toast'
-import { formatNumber } from '@/utils/format'
+import { getApiKeyUsageRecordsApi } from '@/utils/http_apis'
+import { showToast, formatNumber, formatDate } from '@/utils/tools'
 import RecordDetailModal from '@/components/apikeys/RecordDetailModal.vue'
 
 const route = useRoute()
@@ -344,11 +343,6 @@ const dateRangeHint = computed(() => {
   if (!filters.dateRange || filters.dateRange.length !== 2) return ''
   return `${formatDate(filters.dateRange[0])} ~ ${formatDate(filters.dateRange[1])}`
 })
-
-const formatDate = (value) => {
-  if (!value) return '--'
-  return dayjs(value).format('YYYY-MM-DD HH:mm:ss')
-}
 
 const formatCost = (value) => {
   const num = typeof value === 'number' ? value : 0
@@ -410,9 +404,7 @@ const syncResponseState = (data) => {
 const fetchRecords = async (page = pagination.currentPage) => {
   loading.value = true
   try {
-    const response = await apiClient.get(`/admin/api-keys/${keyId.value}/usage-records`, {
-      params: buildParams(page)
-    })
+    const response = await getApiKeyUsageRecordsApi(keyId.value, buildParams(page))
     syncResponseState(response.data || {})
   } catch (error) {
     showToast(`加载请求记录失败：${error.message || '未知错误'}`, 'error')
@@ -465,8 +457,9 @@ const exportCsv = async () => {
     const maxPages = 50 // 50 * 200 = 10000，超过后端 5000 上限已足够
 
     while (page <= totalPages && page <= maxPages) {
-      const response = await apiClient.get(`/admin/api-keys/${keyId.value}/usage-records`, {
-        params: { ...buildParams(page), pageSize: 200 }
+      const response = await getApiKeyUsageRecordsApi(keyId.value, {
+        ...buildParams(page),
+        pageSize: 200
       })
       const payload = response.data || {}
       aggregated.push(...(payload.records || []))
