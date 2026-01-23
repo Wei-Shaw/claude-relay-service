@@ -4119,6 +4119,10 @@ const getSchedulableReason = (account) => {
     if (account.status === 'unauthorized') {
       return 'API Key无效或已过期（401错误）'
     }
+    // 检查配额超限状态
+    if (account.status === 'quota_exceeded') {
+      return '余额不足'
+    }
     if (account.overloadStatus === 'overloaded') {
       return '服务过载（529错误）'
     }

@@ -673,6 +673,23 @@ class UnifiedClaudeScheduler {
         }
       }
 
+      // 主动检查配额超限状态并尝试恢复（在过滤之前执行，确保可以恢复配额超限的账户）
+      if (currentAccount.status === 'quota_exceeded') {
+        // 触发配额检查，如果已到重置时间会自动恢复账户
+        const isStillExceeded = await claudeConsoleAccountService.isAccountQuotaExceeded(
+          currentAccount.id
+        )
+        if (!isStillExceeded) {
+          // 重新获取账户最新状态
+          const refreshedAccount = await claudeConsoleAccountService.getAccount(currentAccount.id)
+          if (refreshedAccount) {
+            // 更新当前循环中的账户数据
+            currentAccount = refreshedAccount
+            logger.info(`✅ Account ${currentAccount.name} recovered from quota_exceeded status`)
+          }
+        }
+      }
+
       logger.info(
         `🔍 Checking Claude Console account: ${currentAccount.name} - isActive: ${currentAccount.isActive}, status: ${currentAccount.status}, accountType: ${currentAccount.accountType}, schedulable: ${currentAccount.schedulable}`
       )
