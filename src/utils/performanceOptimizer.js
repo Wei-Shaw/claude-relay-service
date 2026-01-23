@@ -21,8 +21,8 @@ const httpsAgentStream = new https.Agent({
   keepAlive: KEEP_ALIVE_ENABLED,
   maxSockets: STREAM_MAX_SOCKETS,
   maxFreeSockets: KEEP_ALIVE_ENABLED ? MAX_FREE_SOCKETS : 0,
-  timeout: 0,
-  freeSocketTimeout: KEEP_ALIVE_ENABLED ? FREE_SOCKET_TIMEOUT : 0
+  // Node 原生 Agent 无 freeSocketTimeout；用 timeout 控制空闲 socket 的回收（不影响请求层 REQUEST_TIMEOUT）
+  timeout: KEEP_ALIVE_ENABLED ? FREE_SOCKET_TIMEOUT : 0
 })
 
 // 非流式请求 agent：较小 maxSockets
@@ -30,8 +30,8 @@ const httpsAgentNonStream = new https.Agent({
   keepAlive: KEEP_ALIVE_ENABLED,
   maxSockets: NON_STREAM_MAX_SOCKETS,
   maxFreeSockets: KEEP_ALIVE_ENABLED ? MAX_FREE_SOCKETS : 0,
-  timeout: 0, // 不限制，由请求层 REQUEST_TIMEOUT 控制
-  freeSocketTimeout: KEEP_ALIVE_ENABLED ? FREE_SOCKET_TIMEOUT : 0
+  // Node 原生 Agent 无 freeSocketTimeout；用 timeout 控制空闲 socket 的回收（不影响请求层 REQUEST_TIMEOUT）
+  timeout: KEEP_ALIVE_ENABLED ? FREE_SOCKET_TIMEOUT : 0
 })
 
 // HTTP agent（非流式）
@@ -39,8 +39,8 @@ const httpAgent = new http.Agent({
   keepAlive: KEEP_ALIVE_ENABLED,
   maxSockets: NON_STREAM_MAX_SOCKETS,
   maxFreeSockets: KEEP_ALIVE_ENABLED ? MAX_FREE_SOCKETS : 0,
-  timeout: 0, // 不限制，由请求层 REQUEST_TIMEOUT 控制
-  freeSocketTimeout: KEEP_ALIVE_ENABLED ? FREE_SOCKET_TIMEOUT : 0
+  // Node 原生 Agent 无 freeSocketTimeout；用 timeout 控制空闲 socket 的回收（不影响请求层 REQUEST_TIMEOUT）
+  timeout: KEEP_ALIVE_ENABLED ? FREE_SOCKET_TIMEOUT : 0
 })
 
 // 定价数据缓存（按文件路径区分）
