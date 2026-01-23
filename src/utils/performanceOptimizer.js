@@ -13,32 +13,34 @@ const STREAM_MAX_SOCKETS = parseInt(process.env.HTTPS_MAX_SOCKETS_STREAM) || 655
 const NON_STREAM_MAX_SOCKETS = parseInt(process.env.HTTPS_MAX_SOCKETS_NON_STREAM) || 16384
 const MAX_FREE_SOCKETS = parseInt(process.env.HTTPS_MAX_FREE_SOCKETS) || 2048
 const FREE_SOCKET_TIMEOUT = parseInt(process.env.HTTPS_FREE_SOCKET_TIMEOUT) || 30000
+// 是否启用 Keep-Alive（环境变量控制，默认关闭以避免部署时连接问题）
+const KEEP_ALIVE_ENABLED = process.env.HTTPS_KEEP_ALIVE === 'true'
 
 // 流式请求 agent：高 maxSockets，timeout=0（不限制）
 const httpsAgentStream = new https.Agent({
-  keepAlive: true,
+  keepAlive: KEEP_ALIVE_ENABLED,
   maxSockets: STREAM_MAX_SOCKETS,
-  maxFreeSockets: MAX_FREE_SOCKETS,
+  maxFreeSockets: KEEP_ALIVE_ENABLED ? MAX_FREE_SOCKETS : 0,
   timeout: 0,
-  freeSocketTimeout: FREE_SOCKET_TIMEOUT
+  freeSocketTimeout: KEEP_ALIVE_ENABLED ? FREE_SOCKET_TIMEOUT : 0
 })
 
 // 非流式请求 agent：较小 maxSockets
 const httpsAgentNonStream = new https.Agent({
-  keepAlive: true,
+  keepAlive: KEEP_ALIVE_ENABLED,
   maxSockets: NON_STREAM_MAX_SOCKETS,
-  maxFreeSockets: MAX_FREE_SOCKETS,
+  maxFreeSockets: KEEP_ALIVE_ENABLED ? MAX_FREE_SOCKETS : 0,
   timeout: 0, // 不限制，由请求层 REQUEST_TIMEOUT 控制
-  freeSocketTimeout: FREE_SOCKET_TIMEOUT
+  freeSocketTimeout: KEEP_ALIVE_ENABLED ? FREE_SOCKET_TIMEOUT : 0
 })
 
 // HTTP agent（非流式）
 const httpAgent = new http.Agent({
-  keepAlive: true,
+  keepAlive: KEEP_ALIVE_ENABLED,
   maxSockets: NON_STREAM_MAX_SOCKETS,
-  maxFreeSockets: MAX_FREE_SOCKETS,
+  maxFreeSockets: KEEP_ALIVE_ENABLED ? MAX_FREE_SOCKETS : 0,
   timeout: 0, // 不限制，由请求层 REQUEST_TIMEOUT 控制
-  freeSocketTimeout: FREE_SOCKET_TIMEOUT
+  freeSocketTimeout: KEEP_ALIVE_ENABLED ? FREE_SOCKET_TIMEOUT : 0
 })
 
 // 定价数据缓存（按文件路径区分）
