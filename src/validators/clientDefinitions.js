@@ -97,7 +97,7 @@ function isValidClientId(clientId) {
  * @returns {boolean} 是否允许
  */
 function isPathAllowedForClient(clientId, path) {
-  const definition = Object.values(CLIENT_DEFINITIONS).find((d) => d.id === clientId)
+  const definition = getClientDefinitionById(clientId)
   if (!definition) {
     return false
   }

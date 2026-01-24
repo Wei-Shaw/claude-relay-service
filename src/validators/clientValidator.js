@@ -5,14 +5,23 @@
 
 const logger = require('../utils/logger')
 const {
-  CLIENT_DEFINITIONS,
+  CLIENT_IDS,
   getAllClientDefinitions,
+  getClientDefinitionById,
   isPathAllowedForClient
 } = require('./clientDefinitions')
 const ClaudeCodeValidator = require('./clients/claudeCodeValidator')
 const GeminiCliValidator = require('./clients/geminiCliValidator')
 const CodexCliValidator = require('./clients/codexCliValidator')
 const DroidCliValidator = require('./clients/droidCliValidator')
+
+// 客户端ID到验证器的映射表
+const VALIDATOR_MAP = {
+  [CLIENT_IDS.CLAUDE_CODE]: ClaudeCodeValidator,
+  [CLIENT_IDS.GEMINI_CLI]: GeminiCliValidator,
+  [CLIENT_IDS.CODEX_CLI]: CodexCliValidator,
+  [CLIENT_IDS.DROID_CLI]: DroidCliValidator
+}
 
 /**
  * 客户端验证器类
@@ -24,19 +33,12 @@ class ClientValidator {
    * @returns {Object|null} 验证器实例
    */
   static getValidator(clientId) {
-    switch (clientId) {
-      case 'claude_code':
-        return ClaudeCodeValidator
-      case 'gemini_cli':
-        return GeminiCliValidator
-      case 'codex_cli':
-        return CodexCliValidator
-      case 'droid_cli':
-        return DroidCliValidator
-      default:
-        logger.warn(`Unknown client ID: ${clientId}`)
-        return null
+    const validator = VALIDATOR_MAP[clientId]
+    if (!validator) {
+      logger.warn(`Unknown client ID: ${clientId}`)
+      return null
     }
+    return validator
   }
 
   /**
@@ -44,7 +46,7 @@ class ClientValidator {
    * @returns {Array<string>} 客户端ID列表
    */
   static getSupportedClients() {
-    return ['claude_code', 'gemini_cli', 'codex_cli', 'droid_cli']
+    return Object.keys(VALIDATOR_MAP)
   }
 
   /**
@@ -115,7 +117,7 @@ class ClientValidator {
             allowed: true,
             matchedClient: clientId,
             clientName: validator.getName(),
-            clientInfo: Object.values(CLIENT_DEFINITIONS).find((def) => def.id === clientId)
+            clientInfo: getClientDefinitionById(clientId)
           }
         }
       } catch (error) {
