@@ -4129,6 +4129,14 @@ const getSchedulableReason = (account) => {
     if (account.rateLimitStatus === 'limited') {
       return '触发限流（429错误）'
     }
+    // 检查配额超限状态（quotaAutoStopped 或 quotaStoppedAt 任一存在即表示配额超限）
+    if (
+      account.quotaAutoStopped === 'true' ||
+      account.quotaAutoStopped === true ||
+      account.quotaStoppedAt
+    ) {
+      return '余额不足'
+    }
     if (account.status === 'blocked' && account.errorMessage) {
       return account.errorMessage
     }
@@ -4207,6 +4215,15 @@ const getSchedulableReason = (account) => {
   return '手动停止调度'
 }
 
+// 检查是否是配额超限状态（用于状态显示判断）
+const isQuotaExceeded = (account) => {
+  return (
+    account.quotaAutoStopped === 'true' ||
+    account.quotaAutoStopped === true ||
+    !!account.quotaStoppedAt
+  )
+}
+
 // 获取账户状态文本
 const getAccountStatusText = (account) => {
   // 检查是否被封锁
@@ -4225,9 +4242,9 @@ const getAccountStatusText = (account) => {
   if (account.status === 'temp_error') return '临时异常'
   // 检查是否错误
   if (account.status === 'error' || !account.isActive) return '错误'
-  // 检查是否可调度
-  if (account.schedulable === false) return '已暂停'
-  // 否则正常
+  // 配额超限时显示"正常"（不显示"已暂停"）
+  if (account.schedulable === false && !isQuotaExceeded(account)) return '已暂停'
+  // 否则正常（包括配额超限状态）
   return '正常'
 }
 
@@ -4253,7 +4270,8 @@ const getAccountStatusClass = (account) => {
   if (account.status === 'error' || !account.isActive) {
     return 'bg-red-100 text-red-800'
   }
-  if (account.schedulable === false) {
+  // 配额超限时显示绿色（正常）
+  if (account.schedulable === false && !isQuotaExceeded(account)) {
     return 'bg-gray-100 text-gray-800'
   }
   return 'bg-green-100 text-green-800'
@@ -4281,7 +4299,8 @@ const getAccountStatusDotClass = (account) => {
   if (account.status === 'error' || !account.isActive) {
     return 'bg-red-500'
   }
-  if (account.schedulable === false) {
+  // 配额超限时显示绿色（正常）
+  if (account.schedulable === false && !isQuotaExceeded(account)) {
     return 'bg-gray-500'
   }
   return 'bg-green-500'
