@@ -86,6 +86,20 @@ async function dumpAntigravityUpstreamRequest(requestInfo) {
           Host: requestInfo.headers.Host || requestInfo.headers.host || null,
           'User-Agent':
             requestInfo.headers['User-Agent'] || requestInfo.headers['user-agent'] || null,
+          'Content-Type':
+            requestInfo.headers['Content-Type'] || requestInfo.headers['content-type'] || null,
+          'Accept-Encoding':
+            requestInfo.headers['Accept-Encoding'] ||
+            requestInfo.headers['accept-encoding'] ||
+            null,
+          'X-Goog-Api-Client':
+            requestInfo.headers['X-Goog-Api-Client'] ||
+            requestInfo.headers['x-goog-api-client'] ||
+            null,
+          'Client-Metadata':
+            requestInfo.headers['Client-Metadata'] ||
+            requestInfo.headers['client-metadata'] ||
+            null,
           Authorization: (() => {
             const raw = requestInfo.headers.Authorization || requestInfo.headers.authorization
             if (!raw) {

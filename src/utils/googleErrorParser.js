@@ -34,6 +34,24 @@ function parseGoogleErrorReason(errorBody) {
   const parsed = safeJsonParse(errorBody)
   const details = parsed?.error?.details
   if (!Array.isArray(details)) {
+    const code = parsed?.error?.code
+    const status = parsed?.error?.status
+    const message = parsed?.error?.message
+
+    // Google canonical status: RESOURCE_EXHAUSTED (常用于 429: quota / rate limit)。
+    // 在某些 Antigravity / Cloud Code 上游响应中不包含 details.reason，这里做兼容映射，
+    // 让上层可以区分“有明确信息的 QUOTA/RATE”与“泛化的 RESOURCE_EXHAUSTED”，并采取重试/冷却策略。
+    if (code === 429 && status === 'RESOURCE_EXHAUSTED') {
+      return 'RESOURCE_EXHAUSTED'
+    }
+    if (
+      code === 429 &&
+      typeof message === 'string' &&
+      message.toLowerCase().includes('resource has been exhausted')
+    ) {
+      return 'RESOURCE_EXHAUSTED'
+    }
+
     return null
   }
   for (const detail of details) {

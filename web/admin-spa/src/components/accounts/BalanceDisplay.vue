@@ -52,8 +52,11 @@
       </div>
 
       <!-- 配额（如适用） -->
-      <div v-if="quotaInfo && isAntigravityQuota" class="space-y-2">
-        <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+      <div v-if="isAntigravityQuota" class="space-y-2">
+        <div
+          v-if="quotaInfo"
+          class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400"
+        >
           <span>剩余</span>
           <span>{{ formatQuotaNumber(quotaInfo.remaining) }}</span>
         </div>
@@ -90,13 +93,42 @@
                 class="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-300"
               >
                 <span>{{ row.remainingText }}</span>
-                <span v-if="row.resetAt" class="text-gray-400 dark:text-gray-400">{{
-                  formatResetTime(row.resetAt)
-                }}</span>
+                <div class="flex flex-col items-end leading-tight">
+                  <span
+                    v-if="row.cooldownResetAt"
+                    class="text-amber-600 dark:text-amber-400"
+                    :title="row.cooldownTooltip"
+                  >
+                    限流 {{ formatResetTime(row.cooldownResetAt) }}
+                  </span>
+                  <span v-if="row.resetAt" class="text-gray-400 dark:text-gray-400">{{
+                    formatResetTime(row.resetAt)
+                  }}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <details
+          v-if="antigravityModelCooldowns.length"
+          class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
+        >
+          <summary class="cursor-pointer select-none">
+            限流模型（{{ antigravityModelCooldowns.length }}）
+          </summary>
+          <div class="mt-1 space-y-1">
+            <div
+              v-for="item in antigravityModelCooldowns"
+              :key="`${item.modelId}:${item.resetAt}`"
+              class="flex items-center justify-between gap-2"
+              :title="item.reason || ''"
+            >
+              <span class="min-w-0 flex-1 truncate font-mono text-[11px]">{{ item.modelId }}</span>
+              <span class="shrink-0">{{ formatResetTime(item.resetAt) }}</span>
+            </div>
+          </div>
+        </details>
       </div>
 
       <div v-else-if="quotaInfo" class="space-y-1">
@@ -192,6 +224,24 @@ const isAntigravityQuota = computed(() => {
   return balanceData.value?.quota?.type === 'antigravity'
 })
 
+const antigravityModelCooldowns = computed(() => {
+  if (!isAntigravityQuota.value) return []
+  const list = balanceData.value?.quota?.modelCooldowns
+  const items = Array.isArray(list) ? list : []
+
+  return items
+    .filter((item) => item && typeof item === 'object' && typeof item.resetAt === 'string' && item.resetAt)
+    .map((item) => {
+      const modelIdRaw = typeof item.modelId === 'string' ? item.modelId : String(item.modelId || '')
+      const modelId = modelIdRaw.trim().replace(/^models\//i, '') || 'unknown'
+      return {
+        modelId,
+        resetAt: item.resetAt,
+        reason: item.reason || null
+      }
+    })
+})
+
 const antigravityRows = computed(() => {
   if (!isAntigravityQuota.value) return []
 
@@ -215,7 +265,16 @@ const antigravityRows = computed(() => {
     return Math.max(0, Math.min(100, num))
   }
 
-  const order = ['Gemini Pro', 'Claude', 'Gemini Flash', 'Gemini Image']
+  const baseOrder = ['Gemini Pro', 'Claude', 'Gemini Flash', 'Gemini Image']
+  const extraOrder = []
+  for (const bucket of list) {
+    const category = bucket?.category
+    if (!category) continue
+    if (baseOrder.includes(category)) continue
+    if (extraOrder.includes(category)) continue
+    extraOrder.push(category)
+  }
+  const order = [...baseOrder, ...extraOrder]
   const styles = {
     'Gemini Pro': { dotClass: 'bg-blue-500', barClass: 'bg-blue-500 dark:bg-blue-400' },
     Claude: { dotClass: 'bg-purple-500', barClass: 'bg-purple-500 dark:bg-purple-400' },
@@ -227,6 +286,20 @@ const antigravityRows = computed(() => {
     const raw = map.get(category) || null
     const remainingPercent = toPercent(raw?.remaining)
     const isUnknown = remainingPercent === null
+    const cooldownResetAt =
+      typeof raw?.cooldown?.resetAt === 'string' && raw.cooldown.resetAt ? raw.cooldown.resetAt : null
+    const cooldownModels = Array.isArray(raw?.cooldown?.models) ? raw.cooldown.models : []
+    const cooldownTooltip =
+      cooldownModels.length > 0
+        ? cooldownModels
+            .map((item) => {
+              const modelId = item?.modelId || 'unknown'
+              const reason = item?.reason ? ` (${item.reason})` : ''
+              const resetAt = item?.resetAt ? `: ${formatResetTime(item.resetAt)}` : ''
+              return `${modelId}${reason}${resetAt}`
+            })
+            .join('\n')
+        : ''
 
     const barStyle = isUnknown
       ? {
@@ -240,6 +313,8 @@ const antigravityRows = computed(() => {
       remainingPercent,
       remainingText: remainingPercent === null ? '—' : `${Math.round(remainingPercent)}%`,
       resetAt: raw?.resetAt || null,
+      cooldownResetAt,
+      cooldownTooltip,
       isUnknown,
       barWidth: isUnknown ? 100 : remainingPercent,
       barStyle,
@@ -386,6 +461,11 @@ const formatResetTime = (isoString) => {
   const diff = date.getTime() - now.getTime()
   if (!Number.isFinite(diff)) return '未知'
   if (diff < 0) return '已过期'
+
+  if (diff < 60 * 1000) {
+    const seconds = Math.max(1, Math.ceil(diff / 1000))
+    return `${seconds}秒后`
+  }
 
   const minutes = Math.floor(diff / (1000 * 60))
   const hours = Math.floor(minutes / 60)

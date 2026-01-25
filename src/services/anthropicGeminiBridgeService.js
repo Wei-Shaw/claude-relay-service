@@ -686,12 +686,65 @@ function closeToolLoopForThinking(messages) {
  * @param {string} name - 工具名称
  * @param {Object} args - 工具参数（会被原地修改）
  */
-function remapFunctionCallArgs(name, args) {
+function remapFunctionCallArgs(name, args, { vendor = null, model = null } = {}) {
   if (!args || typeof args !== 'object') {
     return
   }
 
   const nameLower = (name || '').toLowerCase()
+  const isAntigravityGeminiModel = vendor === 'antigravity' && isGeminiModelId(model)
+
+  const coerceToString = (value) => {
+    if (value === null || value === undefined) {
+      return ''
+    }
+    if (typeof value === 'string') {
+      return value
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map((v) => coerceToString(v))
+        .filter(Boolean)
+        .join('\n')
+    }
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value)
+      } catch (_) {
+        return String(value)
+      }
+    }
+    return String(value)
+  }
+
+  const coerceToBoolean = (value) => {
+    if (typeof value === 'boolean') {
+      return value
+    }
+    if (typeof value === 'number') {
+      return value !== 0
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase()
+      if (
+        normalized === 'true' ||
+        normalized === '1' ||
+        normalized === 'yes' ||
+        normalized === 'on'
+      ) {
+        return true
+      }
+      if (
+        normalized === 'false' ||
+        normalized === '0' ||
+        normalized === 'no' ||
+        normalized === 'off'
+      ) {
+        return false
+      }
+    }
+    return null
+  }
 
   // [IMPORTANT] Claude Code CLI 的 EnterPlanMode 工具禁止携带任何参数
   // 代理层注入的 reason 参数会导致 InputValidationError
@@ -700,6 +753,204 @@ function remapFunctionCallArgs(name, args) {
       delete args[key]
     }
     return
+  }
+
+  // Antigravity Gemini 更容易出现参数“幻觉/错位”，这里做更强的纠错（严格限定在 antigravity + gemini-*）。
+  if (isAntigravityGeminiModel) {
+    if (nameLower === 'bash') {
+      if (args.command && typeof args.command === 'object' && args.command.command) {
+        args.command = args.command.command
+      }
+      if (!args.command) {
+        const fallback =
+          args.cmd || args.shell || args.script || args.command_line || args.commandLine
+        if (fallback) {
+          args.command = fallback
+        }
+      }
+      args.command = coerceToString(args.command)
+      if (!args.command) {
+        delete args.command
+      }
+      if (args.command && args.cmd) {
+        delete args.cmd
+      }
+      if (args.command && args.shell) {
+        delete args.shell
+      }
+      if (args.command && args.script) {
+        delete args.script
+      }
+      if (args.command && args.command_line) {
+        delete args.command_line
+      }
+      if (args.command && args.commandLine) {
+        delete args.commandLine
+      }
+      return
+    }
+
+    if (nameLower === 'write') {
+      if (!args.file_path) {
+        const pathCandidate =
+          args.filePath ||
+          args.filepath ||
+          args.path ||
+          args.filename ||
+          args.file ||
+          args.target ||
+          null
+        if (pathCandidate) {
+          args.file_path = pathCandidate
+        }
+      }
+      if (args.file_path) {
+        args.file_path = coerceToString(args.file_path).trim()
+      }
+      if (args.filePath) {
+        delete args.filePath
+      }
+      if (args.filepath) {
+        delete args.filepath
+      }
+      if (args.path) {
+        delete args.path
+      }
+      if (args.filename) {
+        delete args.filename
+      }
+      if (args.file) {
+        delete args.file
+      }
+      if (args.target) {
+        delete args.target
+      }
+
+      if (args.content === undefined) {
+        const contentCandidate =
+          args.text || args.data || args.contents || args.body || args.value || args.output || null
+        if (contentCandidate !== null && contentCandidate !== undefined) {
+          args.content = contentCandidate
+        }
+      }
+      if (args.content !== undefined) {
+        args.content = coerceToString(args.content)
+      }
+      if (args.text) {
+        delete args.text
+      }
+      if (args.data) {
+        delete args.data
+      }
+      if (args.contents) {
+        delete args.contents
+      }
+      if (args.body) {
+        delete args.body
+      }
+      if (args.value) {
+        delete args.value
+      }
+      if (args.output) {
+        delete args.output
+      }
+      return
+    }
+
+    if (nameLower === 'edit') {
+      if (!args.file_path) {
+        const pathCandidate =
+          args.filePath ||
+          args.filepath ||
+          args.path ||
+          args.filename ||
+          args.file ||
+          args.target ||
+          null
+        if (pathCandidate) {
+          args.file_path = pathCandidate
+        }
+      }
+      if (args.file_path) {
+        args.file_path = coerceToString(args.file_path).trim()
+      }
+      if (args.filePath) {
+        delete args.filePath
+      }
+      if (args.filepath) {
+        delete args.filepath
+      }
+      if (args.path) {
+        delete args.path
+      }
+      if (args.filename) {
+        delete args.filename
+      }
+      if (args.file) {
+        delete args.file
+      }
+      if (args.target) {
+        delete args.target
+      }
+
+      if (args.old_string === undefined) {
+        const oldCandidate = args.oldString || args.before || args.search || args.from || null
+        if (oldCandidate !== null && oldCandidate !== undefined) {
+          args.old_string = oldCandidate
+        }
+      }
+      if (args.new_string === undefined) {
+        const newCandidate = args.newString || args.after || args.replace || args.to || null
+        if (newCandidate !== null && newCandidate !== undefined) {
+          args.new_string = newCandidate
+        }
+      }
+      if (args.old_string !== undefined) {
+        args.old_string = coerceToString(args.old_string)
+      }
+      if (args.new_string !== undefined) {
+        args.new_string = coerceToString(args.new_string)
+      }
+      if (args.oldString) {
+        delete args.oldString
+      }
+      if (args.newString) {
+        delete args.newString
+      }
+      if (args.before) {
+        delete args.before
+      }
+      if (args.after) {
+        delete args.after
+      }
+      if (args.search) {
+        delete args.search
+      }
+      if (args.replace) {
+        delete args.replace
+      }
+      if (args.from) {
+        delete args.from
+      }
+      if (args.to) {
+        delete args.to
+      }
+
+      if (args.replace_all !== undefined) {
+        const b = coerceToBoolean(args.replace_all)
+        if (b !== null) {
+          args.replace_all = b
+        }
+      } else if (args.replaceAll !== undefined) {
+        const b = coerceToBoolean(args.replaceAll)
+        if (b !== null) {
+          args.replace_all = b
+        }
+        delete args.replaceAll
+      }
+
+      return
+    }
   }
 
   // Grep, Search, Glob 工具参数修复
@@ -1639,10 +1890,12 @@ function normalizeAnthropicMessages(messages, { vendor = null } = {}) {
  * @param {Object} options - 选项，包含 vendor
  * @returns {Array|null} Gemini 格式的工具定义，或 null
  */
-function convertAnthropicToolsToGeminiTools(tools, { vendor = null } = {}) {
+function convertAnthropicToolsToGeminiTools(tools, { vendor = null, targetModel = null } = {}) {
   if (!Array.isArray(tools) || tools.length === 0) {
     return null
   }
+
+  const isAntigravityGeminiModel = vendor === 'antigravity' && isGeminiModelId(targetModel)
 
   // 说明：Gemini / Antigravity 对工具 schema 的接受程度不同；这里做“尽可能兼容”的最小清洗，降低 400 概率。
   const sanitizeSchemaForFunctionDeclarations = (schema) => {
@@ -1775,6 +2028,322 @@ function convertAnthropicToolsToGeminiTools(tools, { vendor = null } = {}) {
     return sanitized
   }
 
+  const convertJsonSchemaToAntigravityParameters = (schema, depth = 0) => {
+    const MAX_DEPTH = 8
+    if (schema === null || schema === undefined) {
+      return { type: 'OBJECT', properties: {} }
+    }
+    if (depth > MAX_DEPTH) {
+      return { type: 'OBJECT', properties: {} }
+    }
+    if (typeof schema !== 'object') {
+      return { type: 'OBJECT', properties: {} }
+    }
+    if (Array.isArray(schema)) {
+      return {
+        type: 'ARRAY',
+        items: schema[0]
+          ? convertJsonSchemaToAntigravityParameters(schema[0], depth + 1)
+          : { type: 'OBJECT', properties: {} }
+      }
+    }
+
+    const rawType = schema.type
+    const resolvedType = (() => {
+      if (typeof rawType === 'string') {
+        return rawType
+      }
+      if (Array.isArray(rawType)) {
+        const first = rawType.find((t) => typeof t === 'string' && t !== 'null')
+        return first || 'object'
+      }
+      if (schema.properties || schema.required) {
+        return 'object'
+      }
+      if (schema.items) {
+        return 'array'
+      }
+      return 'object'
+    })()
+
+    const typeMap = {
+      object: 'OBJECT',
+      array: 'ARRAY',
+      string: 'STRING',
+      integer: 'INTEGER',
+      number: 'NUMBER',
+      boolean: 'BOOLEAN'
+    }
+
+    const out = { type: typeMap[String(resolvedType || '').toLowerCase()] || 'OBJECT' }
+
+    if (typeof schema.description === 'string' && schema.description) {
+      out.description = schema.description
+    }
+
+    if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+      out.enum = schema.enum.slice(0, 60)
+    }
+
+    if (out.type === 'ARRAY') {
+      out.items = convertJsonSchemaToAntigravityParameters(schema.items || null, depth + 1)
+      return out
+    }
+
+    if (out.type === 'OBJECT') {
+      const props =
+        schema.properties && typeof schema.properties === 'object' ? schema.properties : {}
+      const nextProps = {}
+      for (const [propName, propSchema] of Object.entries(props)) {
+        nextProps[propName] = convertJsonSchemaToAntigravityParameters(propSchema, depth + 1)
+      }
+      out.properties = nextProps
+
+      if (Array.isArray(schema.required) && schema.required.length > 0) {
+        const keys = new Set(Object.keys(nextProps))
+        const req = schema.required.filter((k) => typeof k === 'string' && keys.has(k))
+        if (req.length > 0) {
+          out.required = req
+        }
+      }
+      return out
+    }
+
+    // primitives
+    if (typeof schema.minimum === 'number') {
+      out.minimum = schema.minimum
+    }
+    if (typeof schema.maximum === 'number') {
+      out.maximum = schema.maximum
+    }
+    if (typeof schema.minLength === 'number') {
+      out.minLength = schema.minLength
+    }
+    if (typeof schema.maxLength === 'number') {
+      out.maxLength = schema.maxLength
+    }
+    if (typeof schema.minItems === 'number') {
+      out.minItems = schema.minItems
+    }
+    if (typeof schema.maxItems === 'number') {
+      out.maxItems = schema.maxItems
+    }
+    return out
+  }
+
+  // Antigravity Gemini 对 schema 校验/解析更挑剔：做“更激进”的降级，仅保留最核心的约束结构，
+  // 避免 $ref/anyOf/oneOf/allOf/if-then-else/patternProperties 等触发上游 schema reject。
+  const sanitizeSchemaForAntigravityGemini = (schema, depth = 0) => {
+    const MAX_DEPTH = 6
+    const MAX_PROPERTIES = 60
+    const MAX_ENUM = 60
+    const MAX_DESCRIPTION = 200
+
+    if (schema === null || schema === undefined) {
+      return null
+    }
+
+    if (depth > MAX_DEPTH) {
+      return { type: 'object', properties: {} }
+    }
+
+    // JSON Schema boolean form：true/false（尽量避免 false 直接导致整体不可用）
+    if (typeof schema === 'boolean') {
+      return schema ? { type: 'object', properties: {} } : { type: 'object', properties: {} }
+    }
+
+    if (typeof schema !== 'object') {
+      return schema
+    }
+
+    if (Array.isArray(schema)) {
+      return schema
+        .map((item) => sanitizeSchemaForAntigravityGemini(item, depth + 1))
+        .filter((item) => item !== null && item !== undefined)
+    }
+
+    if (schema.$ref) {
+      return { type: 'object', properties: {} }
+    }
+
+    const pickFirstBranch = (key) => {
+      const arr = schema[key]
+      if (!Array.isArray(arr) || arr.length === 0) {
+        return null
+      }
+      for (const item of arr) {
+        const sanitized = sanitizeSchemaForAntigravityGemini(item, depth + 1)
+        if (sanitized) {
+          return sanitized
+        }
+      }
+      return null
+    }
+
+    // 优先处理组合 schema：挑一个可用分支即可，避免复杂结构
+    const anyOfPicked = pickFirstBranch('anyOf')
+    if (anyOfPicked) {
+      return anyOfPicked
+    }
+    const oneOfPicked = pickFirstBranch('oneOf')
+    if (oneOfPicked) {
+      return oneOfPicked
+    }
+    const allOfPicked = pickFirstBranch('allOf')
+    if (allOfPicked) {
+      return allOfPicked
+    }
+
+    const allowedKeys = new Set([
+      'type',
+      'properties',
+      'required',
+      'description',
+      'enum',
+      'items',
+      'minimum',
+      'maximum',
+      'minItems',
+      'maxItems',
+      'minLength',
+      'maxLength'
+    ])
+
+    const sanitized = {}
+    for (const [key, value] of Object.entries(schema)) {
+      if (key === '$schema' || key === '$id') {
+        continue
+      }
+      if (key === 'title' || key === 'default' || key === 'examples' || key === 'example') {
+        continue
+      }
+      if (key === 'format') {
+        continue
+      }
+      // Gemini/Antigravity 不稳定/不支持：直接丢弃
+      if (
+        key === 'additionalProperties' ||
+        key === 'patternProperties' ||
+        key === 'dependencies' ||
+        key === 'dependentRequired' ||
+        key === 'dependentSchemas' ||
+        key === 'if' ||
+        key === 'then' ||
+        key === 'else' ||
+        key === 'not' ||
+        key === 'definitions' ||
+        key === '$defs'
+      ) {
+        continue
+      }
+      if (!allowedKeys.has(key)) {
+        continue
+      }
+
+      if (key === 'type') {
+        if (typeof value === 'string') {
+          sanitized.type = value
+        } else if (Array.isArray(value)) {
+          const first = value.find((t) => typeof t === 'string' && t !== 'null')
+          if (first) {
+            sanitized.type = first
+          }
+        }
+        continue
+      }
+
+      if (key === 'description') {
+        if (typeof value === 'string' && value) {
+          sanitized.description =
+            value.length > MAX_DESCRIPTION ? value.slice(0, MAX_DESCRIPTION) : value
+        }
+        continue
+      }
+
+      if (key === 'enum') {
+        if (Array.isArray(value) && value.length > 0) {
+          const en = value
+            .filter(
+              (item) =>
+                typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'
+            )
+            .slice(0, MAX_ENUM)
+          if (en.length > 0) {
+            sanitized.enum = en
+          }
+        }
+        continue
+      }
+
+      if (key === 'required') {
+        if (Array.isArray(value) && value.length > 0) {
+          const req = value.filter((item) => typeof item === 'string')
+          if (req.length > 0) {
+            sanitized.required = req
+          }
+        }
+        continue
+      }
+
+      if (key === 'properties') {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          const props = {}
+          const entries = Object.entries(value).slice(0, MAX_PROPERTIES)
+          for (const [propName, propSchema] of entries) {
+            const propSanitized = sanitizeSchemaForAntigravityGemini(propSchema, depth + 1)
+            if (propSanitized && typeof propSanitized === 'object') {
+              props[propName] = propSanitized
+            }
+          }
+          sanitized.properties = props
+        }
+        continue
+      }
+
+      if (key === 'items') {
+        const itemsSanitized = sanitizeSchemaForAntigravityGemini(value, depth + 1)
+        if (itemsSanitized && typeof itemsSanitized === 'object') {
+          sanitized.items = itemsSanitized
+        }
+        continue
+      }
+
+      const sanitizedValue = sanitizeSchemaForAntigravityGemini(value, depth + 1)
+      if (sanitizedValue === null || sanitizedValue === undefined) {
+        continue
+      }
+      sanitized[key] = sanitizedValue
+    }
+
+    // 兜底：尽量规整为 object schema，避免上游对空/不确定 type 的奇怪处理
+    if (!sanitized.type) {
+      if (sanitized.items) {
+        sanitized.type = 'array'
+      } else if (sanitized.properties || sanitized.required) {
+        sanitized.type = 'object'
+      } else if (sanitized.enum) {
+        sanitized.type = 'string'
+      } else {
+        sanitized.type = 'object'
+      }
+    }
+
+    if (sanitized.type === 'object') {
+      if (!sanitized.properties) {
+        sanitized.properties = {}
+      }
+      if (Array.isArray(sanitized.required) && sanitized.required.length > 0) {
+        const keys = new Set(Object.keys(sanitized.properties))
+        sanitized.required = sanitized.required.filter((k) => keys.has(k))
+        if (sanitized.required.length === 0) {
+          delete sanitized.required
+        }
+      }
+    }
+
+    return sanitized
+  }
+
   // [FIX] 检测是否有 web_search / googleSearch 类型的服务器工具
   // Claude API 中的 web_search 工具可能有以下形式：
   // - type: "web_search_20250305" 或类似
@@ -1808,12 +2377,14 @@ function convertAnthropicToolsToGeminiTools(tools, { vendor = null } = {}) {
       const schema =
         vendor === 'antigravity'
           ? compactJsonSchemaDescriptionsForAntigravity(
-            cleanJsonSchemaForGemini(toolDef.input_schema)
-          )
+              isAntigravityGeminiModel
+                ? sanitizeSchemaForAntigravityGemini(cleanJsonSchemaForGemini(toolDef.input_schema))
+                : cleanJsonSchemaForGemini(toolDef.input_schema)
+            )
           : sanitizeSchemaForFunctionDeclarations(toolDef.input_schema) || {
-            type: 'object',
-            properties: {}
-          }
+              type: 'object',
+              properties: {}
+            }
 
       const baseDecl = {
         name: toolDef.name,
@@ -1822,6 +2393,9 @@ function convertAnthropicToolsToGeminiTools(tools, { vendor = null } = {}) {
 
       // [dadongwo] Antigravity 使用 parametersJsonSchema（而不是 parameters）
       if (vendor === 'antigravity') {
+        if (isAntigravityGeminiModel) {
+          return { ...baseDecl, parameters: convertJsonSchemaToAntigravityParameters(schema) }
+        }
         return { ...baseDecl, parametersJsonSchema: schema }
       }
       return { ...baseDecl, parameters: schema }
@@ -1893,6 +2467,184 @@ function convertAnthropicToolChoiceToGeminiToolConfig(toolChoice) {
   }
 
   return null
+}
+
+function isGeminiModelId(model) {
+  return String(model || '')
+    .trim()
+    .toLowerCase()
+    .startsWith('gemini-')
+}
+
+function resolveAnthropicToolName(tool) {
+  const toolDef = tool?.custom && typeof tool.custom === 'object' ? tool.custom : tool
+  return toolDef?.name || null
+}
+
+function extractLastUserTextFromAnthropicMessages(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return ''
+  }
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i]
+    if (msg?.role !== 'user') {
+      continue
+    }
+    const content = msg?.content
+    if (typeof content === 'string') {
+      const text = extractAnthropicText(content)
+      if (text && typeof text === 'string' && !shouldSkipText(text)) {
+        return text
+      }
+      continue
+    }
+
+    if (Array.isArray(content)) {
+      const parts = []
+      for (const part of content) {
+        if (!part || part.type !== 'text') {
+          continue
+        }
+        const text = extractAnthropicText(part.text || '')
+        if (!text || shouldSkipText(text)) {
+          continue
+        }
+        parts.push(text)
+      }
+      if (parts.length > 0) {
+        return parts.join('\n')
+      }
+    }
+  }
+  return ''
+}
+
+function buildAntigravityGeminiToolRouting({ tools, messages }) {
+  if (!Array.isArray(tools) || tools.length === 0) {
+    return { tools: null, toolConfigOverride: null }
+  }
+
+  const originalCount = tools.length
+  const availableNames = new Set()
+  for (const tool of tools) {
+    const name = resolveAnthropicToolName(tool)
+    if (name) {
+      availableNames.add(name)
+    }
+  }
+
+  const userText = extractLastUserTextFromAnthropicMessages(messages)
+  const text = String(userText || '').trim()
+  const lower = text.toLowerCase()
+
+  const needsTool =
+    /创建|新建|写入|写到|保存|生成文件|输出到文件|写文件|改动|修改|编辑|读取|打开|查看文件|搜索|查找|运行|执行|命令|终端|shell|bash|cmd|powershell|mcp|资源|工具调用/.test(
+      text
+    ) ||
+    /\b(create|write|save|edit|modify|read|open|view|search|grep|find|run|execute|command|terminal|bash|powershell|mcp)\b/.test(
+      lower
+    )
+
+  // 不强行“降级体验”：仅在明显需要工具且工具集合过大时才做路由裁剪
+  const TOOL_ROUTING_THRESHOLD = 20
+  if (!needsTool || originalCount <= TOOL_ROUTING_THRESHOLD) {
+    return { tools, toolConfigOverride: null }
+  }
+
+  const wantsWrite =
+    /创建.*文件|新建.*文件|写入.*文件|写.*文件|保存到.*文件|输出到.*文件|生成.*文件/.test(text) ||
+    /\b(create|write|save).*(file|txt|json|md)\b/.test(lower)
+
+  const wantsEdit =
+    /修改.*文件|编辑.*文件|把.*改成|替换.*内容/.test(text) ||
+    /\b(edit|modify|change|replace).*(file|content)\b/.test(lower)
+
+  const wantsRead =
+    /读取.*文件|打开.*文件|查看.*文件|看看.*文件|读取内容|查看内容/.test(text) ||
+    /\b(read|open|view).*(file|content)\b/.test(lower)
+
+  const wantsCommand =
+    /运行|执行|命令|终端|shell|bash|cmd|powershell/.test(text) ||
+    /\b(run|execute|command|terminal|bash|powershell)\b/.test(lower)
+
+  const wantsSearch =
+    /搜索|查找|grep|ripgrep|rg|glob|定位/.test(text) || /\b(search|find|grep|rg|glob)\b/.test(lower)
+
+  const wantsMcp = /mcp|资源|server|uri/.test(lower) || /mcp|资源/.test(text)
+
+  const baseNames = [
+    'Read',
+    'Edit',
+    'Write',
+    'Grep',
+    'Glob',
+    'Bash',
+    'WebFetch',
+    'WebSearch',
+    'ListMcpResourcesTool',
+    'ReadMcpResourceTool'
+  ]
+
+  const selected = new Set()
+  const add = (name) => {
+    if (!name || !availableNames.has(name)) {
+      return
+    }
+    selected.add(name)
+  }
+
+  for (const name of baseNames) {
+    add(name)
+  }
+
+  if (wantsSearch) {
+    add('Grep')
+    add('Glob')
+  }
+  if (wantsCommand) {
+    add('Bash')
+  }
+  if (wantsRead) {
+    add('Read')
+  }
+  if (wantsEdit) {
+    add('Edit')
+    add('Read')
+  }
+  if (wantsWrite) {
+    add('Write')
+    add('Read')
+    add('Edit')
+  }
+  if (wantsMcp) {
+    add('ListMcpResourcesTool')
+    add('ReadMcpResourceTool')
+  }
+
+  const allowedFunctionNames = Array.from(selected)
+  if (allowedFunctionNames.length === 0) {
+    return { tools, toolConfigOverride: null }
+  }
+
+  const filteredTools = tools.filter((tool) => {
+    const name = resolveAnthropicToolName(tool)
+    return name && selected.has(name)
+  })
+
+  // 对于“明确要求动手”的场景，显式设置 VALIDATED（对齐 IDE 的 function calling 配置）
+  const shouldForceValidated = wantsWrite || wantsEdit || wantsCommand
+  const toolConfigOverride = shouldForceValidated
+    ? { functionCallingConfig: { mode: 'VALIDATED' } }
+    : null
+
+  logger.info('🔧 [Antigravity-Gemini] Tool routing applied', {
+    originalToolsCount: originalCount,
+    filteredToolsCount: filteredTools.length,
+    forcedValidated: shouldForceValidated,
+    allowedFunctionNames
+  })
+
+  return { tools: filteredTools, toolConfigOverride }
 }
 
 // ============================================================================
@@ -2093,9 +2845,9 @@ function convertAnthropicMessagesToGeminiContents(
               parsedResponse !== null
                 ? parsedResponse
                 : {
-                  content: raw || '',
-                  is_error: part.is_error === true
-                }
+                    content: raw || '',
+                    is_error: part.is_error === true
+                  }
 
             parts.push({
               functionResponse: {
@@ -2214,7 +2966,7 @@ function canEnableAntigravityThinking(messages) {
 function buildGeminiRequestFromAnthropic(
   body,
   baseModel,
-  { vendor = null, sessionId = null } = {}
+  { vendor = null, sessionId = null, enableAntigravityGeminiToolRouting = false } = {}
 ) {
   // ========================================================================
   // [NEW] 预处理阶段：消息清理和优化
@@ -2333,7 +3085,25 @@ function buildGeminiRequestFromAnthropic(
     geminiRequestBody.systemInstruction = { parts: systemParts }
   }
 
-  const geminiTools = convertAnthropicToolsToGeminiTools(body.tools, { vendor })
+  const isAntigravityGeminiModel = vendor === 'antigravity' && isGeminiModelId(baseModel)
+
+  let effectiveTools = body.tools
+  let toolConfigOverride = null
+  if (isAntigravityGeminiModel && enableAntigravityGeminiToolRouting && !body?.tool_choice) {
+    const routing = buildAntigravityGeminiToolRouting({
+      tools: Array.isArray(body.tools) ? body.tools : null,
+      messages: normalizedMessages || []
+    })
+    if (routing?.tools) {
+      effectiveTools = routing.tools
+    }
+    toolConfigOverride = routing?.toolConfigOverride || null
+  }
+
+  const geminiTools = convertAnthropicToolsToGeminiTools(effectiveTools, {
+    vendor,
+    targetModel: baseModel
+  })
   if (geminiTools) {
     geminiRequestBody.tools = geminiTools
   }
@@ -2341,10 +3111,14 @@ function buildGeminiRequestFromAnthropic(
   const toolConfig = convertAnthropicToolChoiceToGeminiToolConfig(body.tool_choice)
   if (toolConfig) {
     geminiRequestBody.toolConfig = toolConfig
+  } else if (toolConfigOverride && geminiTools) {
+    geminiRequestBody.toolConfig = toolConfigOverride
   } else if (geminiTools) {
     // Anthropic 的默认语义是 tools 存在且未设置 tool_choice 时为 auto。
     // Gemini/Antigravity 的 function calling 默认可能不会启用，因此显式设置为 AUTO，避免“永远不产出 tool_use”。
-    geminiRequestBody.toolConfig = { functionCallingConfig: { mode: 'AUTO' } }
+    geminiRequestBody.toolConfig = {
+      functionCallingConfig: { mode: isAntigravityGeminiModel ? 'VALIDATED' : 'AUTO' }
+    }
   }
 
   // [FIX #593] 最后一道防线：递归深度清理所有 cache_control 字段
@@ -2741,6 +3515,16 @@ function resolveAntigravityAccountRateLimitSeconds({ accountId, reason, retryDel
   const parsedSeconds =
     retryDelayMs && retryDelayMs > 0 ? Math.max(1, Math.ceil(retryDelayMs / 1000)) : null
 
+  // Cloud Code/Antigravity 有时只返回 RESOURCE_EXHAUSTED 而没有 details.reason；
+  // 该错误通常是短周期限流或临时资源不足，按 rate limit 处理（避免持续撞 429）。
+  if (reason === 'RESOURCE_EXHAUSTED') {
+    return Math.max(ANTIGRAVITY_DEFAULT_RATE_LIMIT_SECONDS, parsedSeconds || 0)
+  }
+
+  if (reason === 'MODEL_CAPACITY_EXHAUSTED') {
+    return Math.max(ANTIGRAVITY_DEFAULT_RATE_LIMIT_SECONDS, parsedSeconds || 0)
+  }
+
   if (reason === 'RATE_LIMIT_EXCEEDED') {
     return Math.max(ANTIGRAVITY_DEFAULT_RATE_LIMIT_SECONDS, parsedSeconds || 0)
   }
@@ -2960,10 +3744,13 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     sessionId: sessionHash
   })
 
-  // Antigravity 上游对 function calling 的启用/校验更严格：参考实现普遍使用 VALIDATED。
-  // 这里仅在 tools 存在且未显式禁用（tool_choice=none）时应用，避免破坏原始语义。
+  // Antigravity 上游对 Claude 模型的 function calling 启用/校验更严格：参考实现普遍使用 VALIDATED。
+  // 注意：严格限定在 claude-*，避免影响 gemini-* 的 function calling 行为（只作用于 antigravity 的 claude 模型）。
   if (
     vendor === 'antigravity' &&
+    String(effectiveModel || '')
+      .toLowerCase()
+      .includes('claude') &&
     Array.isArray(requestData?.request?.tools) &&
     requestData.request.tools.length > 0
   ) {
@@ -2983,7 +3770,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
 
   // [dadongwo] Antigravity 默认启用 tools。若上游拒绝 schema，会在下方自动重试去掉 tools/toolConfig。
 
-  const abortController = new AbortController()
+  let abortController = new AbortController()
   req.on('close', () => {
     if (!abortController.signal.aborted) {
       abortController.abort()
@@ -3048,14 +3835,19 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           )
 
           try {
-            await unifiedGeminiScheduler.markAccountRateLimited(
+            await unifiedGeminiScheduler.markAccountModelRateLimited(
               accountId,
               'gemini',
               sessionHash,
-              resetsInSeconds
+              effectiveModel,
+              resetsInSeconds,
+              reason
             )
           } catch (limitError) {
-            logger.warn('Failed to mark Gemini account as rate limited (antigravity):', limitError)
+            logger.warn(
+              'Failed to mark Gemini account model as rate limited (antigravity):',
+              limitError
+            )
           }
 
           try {
@@ -3107,21 +3899,21 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             rawResponse =
               vendor === 'antigravity'
                 ? await geminiAccountService.generateContentAntigravity(
-                  newClient,
-                  requestData,
-                  null,
-                  newProjectId,
-                  upstreamSessionId,
-                  newProxyConfig
-                )
+                    newClient,
+                    requestData,
+                    null,
+                    newProjectId,
+                    upstreamSessionId,
+                    newProxyConfig
+                  )
                 : await geminiAccountService.generateContent(
-                  newClient,
-                  requestData,
-                  null,
-                  newProjectId,
-                  upstreamSessionId,
-                  newProxyConfig
-                )
+                    newClient,
+                    requestData,
+                    null,
+                    newProjectId,
+                    upstreamSessionId,
+                    newProxyConfig
+                  )
 
             accountId = newAccountId
           } catch (retryError) {
@@ -3133,7 +3925,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         }
       }
 
-      const payload = rawResponse?.response || rawResponse
+      let payload = rawResponse?.response || rawResponse
 
       // 🔍 调试日志：检查原始响应结构
       logger.info('🔍 [调试] 非流式 rawResponse 结构', {
@@ -3145,6 +3937,57 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           ? Object.keys(payload.candidates[0].content.parts[0])
           : []
       })
+
+      // ✅ 策略B（仅 antigravity + gemini-*）：默认不裁剪 tools；只有上游明显失败才降级裁剪并重试一次
+      {
+        const isAntigravityGeminiModel = vendor === 'antigravity' && isGeminiModelId(effectiveModel)
+        const canRetryWithToolRouting =
+          isAntigravityGeminiModel &&
+          !req.body?.tool_choice &&
+          Array.isArray(req.body?.tools) &&
+          req.body.tools.length > 0
+
+        if (canRetryWithToolRouting) {
+          const initialUsageMetadata = payload?.usageMetadata || {}
+          const initialOutputTokens = resolveUsageOutputTokens(initialUsageMetadata)
+          const initialFinishReason = payload?.candidates?.[0]?.finishReason || null
+          const normalizedFinishReason = String(initialFinishReason || '').toUpperCase()
+          const parts = extractGeminiParts(payload)
+          const hasAnyTextPart = parts.some((p) => typeof p?.text === 'string' && p.text)
+          const hasAnyFunctionCallPart = parts.some(
+            (p) => p?.functionCall && typeof p.functionCall === 'object'
+          )
+
+          const isToolLoopFailure =
+            normalizedFinishReason === 'UNEXPECTED_TOOL_CALL' ||
+            normalizedFinishReason === 'MALFORMED_FUNCTION_CALL'
+
+          if (
+            isToolLoopFailure &&
+            initialOutputTokens === 0 &&
+            !hasAnyTextPart &&
+            !hasAnyFunctionCallPart
+          ) {
+            logger.warn(
+              '⚠️ [Antigravity-Gemini] Upstream tool loop failure; retrying with routed tools',
+              {
+                requestId: req.requestId,
+                model: effectiveModel,
+                finishReason: initialFinishReason,
+                toolsCount: Array.isArray(req.body?.tools) ? req.body.tools.length : 0
+              }
+            )
+
+            const routedRequestData = buildGeminiRequestFromAnthropic(req.body, effectiveModel, {
+              vendor,
+              sessionId: sessionHash,
+              enableAntigravityGeminiToolRouting: true
+            })
+            const routedRawResponse = await attemptRequest(routedRequestData)
+            payload = routedRawResponse?.response || routedRawResponse
+          }
+        }
+      }
 
       let content = convertGeminiPayloadToAnthropicContent(payload)
 
@@ -3300,120 +4143,297 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       )
     }
 
-    let streamResponse
-    try {
-      streamResponse = await startStream(requestData)
-    } catch (error) {
-      const sanitized = sanitizeUpstreamError(error)
-      if (shouldRetryWithoutTools(sanitized) && requestData.request?.tools) {
-        logger.warn('⚠️ Tool schema rejected by upstream, retrying stream without tools', {
-          vendor,
-          accountId
-        })
-        streamResponse = await startStream(stripToolsFromRequest(requestData))
-      } else if (vendor === 'antigravity' && sanitized.statusCode === 429) {
-        const { reason, retryDelayMs } = parseAntigravity429Meta(error)
-        const resetsInSeconds = resolveAntigravityAccountRateLimitSeconds({
-          accountId,
-          reason,
-          retryDelayMs
-        })
-
-        if (!resetsInSeconds) {
-          throw error
+    const createStreamResponse = async (payload) => {
+      try {
+        return await startStream(payload)
+      } catch (error) {
+        const sanitized = sanitizeUpstreamError(error)
+        if (shouldRetryWithoutTools(sanitized) && payload?.request?.tools) {
+          logger.warn('⚠️ Tool schema rejected by upstream, retrying stream without tools', {
+            vendor,
+            accountId
+          })
+          return await startStream(stripToolsFromRequest(payload))
         }
-
-        logger.warn('⚠️ Antigravity 429 rate limited, switching account and retrying', {
-          vendor,
-          accountId,
-          model: effectiveModel,
-          reason,
-          resetsInSeconds
-        })
-
-        try {
-          await unifiedGeminiScheduler.markAccountRateLimited(
+        if (vendor === 'antigravity' && sanitized.statusCode === 429) {
+          const { reason, retryDelayMs } = parseAntigravity429Meta(error)
+          const resetsInSeconds = resolveAntigravityAccountRateLimitSeconds({
             accountId,
-            'gemini',
-            sessionHash,
-            resetsInSeconds
-          )
-        } catch (limitError) {
-          logger.warn('Failed to mark Gemini account as rate limited (antigravity):', limitError)
-        }
+            reason,
+            retryDelayMs
+          })
 
-        try {
-          const newAccountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(
-            req.apiKey,
-            sessionHash,
-            effectiveModel,
-            { oauthProvider: vendor }
-          )
-          const newAccountId = newAccountSelection.accountId
-
-          const newAccount = await geminiAccountService.getAccount(newAccountId)
-          if (!newAccount) {
-            throw new Error(`Retry account not found: ${newAccountId}`)
+          if (!resetsInSeconds) {
+            throw error
           }
 
-          let newProxyConfig = null
-          if (newAccount.proxy) {
-            try {
-              newProxyConfig =
-                typeof newAccount.proxy === 'string'
-                  ? JSON.parse(newAccount.proxy)
-                  : newAccount.proxy
-            } catch (e) {
-              logger.warn('Failed to parse proxy configuration for retry:', e)
+          logger.warn('⚠️ Antigravity 429 rate limited, switching account and retrying', {
+            vendor,
+            accountId,
+            model: effectiveModel,
+            reason,
+            resetsInSeconds
+          })
+
+          try {
+            await unifiedGeminiScheduler.markAccountModelRateLimited(
+              accountId,
+              'gemini',
+              sessionHash,
+              effectiveModel,
+              resetsInSeconds,
+              reason
+            )
+          } catch (limitError) {
+            logger.warn(
+              'Failed to mark Gemini account model as rate limited (antigravity):',
+              limitError
+            )
+          }
+
+          try {
+            const newAccountSelection = await unifiedGeminiScheduler.selectAccountForApiKey(
+              req.apiKey,
+              sessionHash,
+              effectiveModel,
+              { oauthProvider: vendor }
+            )
+            const newAccountId = newAccountSelection.accountId
+
+            const newAccount = await geminiAccountService.getAccount(newAccountId)
+            if (!newAccount) {
+              throw new Error(`Retry account not found: ${newAccountId}`)
+            }
+
+            let newProxyConfig = null
+            if (newAccount.proxy) {
+              try {
+                newProxyConfig =
+                  typeof newAccount.proxy === 'string'
+                    ? JSON.parse(newAccount.proxy)
+                    : newAccount.proxy
+              } catch (e) {
+                logger.warn('Failed to parse proxy configuration for retry:', e)
+              }
+            }
+
+            const newClient = await geminiAccountService.getOauthClient(
+              newAccount.accessToken,
+              newAccount.refreshToken,
+              newProxyConfig,
+              newAccount.oauthProvider
+            )
+
+            if (!newClient) {
+              throw new Error('Failed to get new Gemini client for retry')
+            }
+
+            let newProjectId = newAccount.projectId
+            if (vendor === 'antigravity') {
+              newProjectId = ensureAntigravityProjectId(newAccount)
+            }
+
+            logger.info(`🔄 Retrying with new account: ${newAccountId} (was: ${accountId})`)
+
+            const response =
+              vendor === 'antigravity'
+                ? await geminiAccountService.generateContentStreamAntigravity(
+                    newClient,
+                    payload,
+                    null,
+                    newProjectId,
+                    upstreamSessionId,
+                    abortController.signal,
+                    newProxyConfig
+                  )
+                : await geminiAccountService.generateContentStream(
+                    newClient,
+                    payload,
+                    null,
+                    newProjectId,
+                    upstreamSessionId,
+                    abortController.signal,
+                    newProxyConfig
+                  )
+
+            accountId = newAccountId
+            return response
+          } catch (retryError) {
+            logger.error('❌ Failed to retry with new account:', retryError)
+            throw error
+          }
+        }
+        throw error
+      }
+    }
+
+    const probeAntigravityGeminiToolLoopFailure = async (upstreamStream) => {
+      const PROBE_TIMEOUT_MS = 1200
+      const PROBE_MAX_BYTES = 256 * 1024
+      const PROBE_MAX_EVENTS = 10
+
+      return await new Promise((resolve) => {
+        let done = false
+        let buffered = ''
+        let bytes = 0
+        let events = 0
+        const chunks = []
+        let finishReason = null
+        let usageMetadata = null
+        let hasAnyTextPart = false
+        let hasAnyFunctionCallPart = false
+
+        const cleanup = () => {
+          upstreamStream.off('data', onData)
+          upstreamStream.off('end', onEnd)
+          upstreamStream.off('error', onError)
+        }
+
+        const finalize = (result) => {
+          if (done) {
+            return
+          }
+          done = true
+          clearTimeout(timer)
+          cleanup()
+          try {
+            upstreamStream.pause()
+          } catch (_) {
+            // ignore
+          }
+          resolve(result)
+        }
+
+        const maybeDecide = () => {
+          if (hasAnyTextPart || hasAnyFunctionCallPart) {
+            finalize({ chunks, shouldRetry: false, finishReason })
+            return true
+          }
+
+          const normalized = String(finishReason || '').toUpperCase()
+          const isToolLoopFailure =
+            normalized === 'UNEXPECTED_TOOL_CALL' || normalized === 'MALFORMED_FUNCTION_CALL'
+          if (!isToolLoopFailure) {
+            return false
+          }
+
+          const outputTokens = resolveUsageOutputTokens(usageMetadata || {})
+          finalize({ chunks, shouldRetry: outputTokens === 0, finishReason })
+          return true
+        }
+
+        const timer = setTimeout(() => {
+          finalize({ chunks, shouldRetry: false, finishReason })
+        }, PROBE_TIMEOUT_MS)
+
+        const onEnd = () => {
+          if (!maybeDecide()) {
+            finalize({ chunks, shouldRetry: false, finishReason })
+          }
+        }
+
+        const onError = () => {
+          finalize({ chunks, shouldRetry: false, finishReason })
+        }
+
+        const onData = (chunk) => {
+          chunks.push(chunk)
+          bytes += chunk.length || 0
+          if (bytes >= PROBE_MAX_BYTES) {
+            return finalize({ chunks, shouldRetry: false, finishReason })
+          }
+
+          buffered += chunk.toString()
+          const lines = buffered.split('\n')
+          buffered = lines.pop() || ''
+
+          for (const line of lines) {
+            if (!line.trim()) {
+              continue
+            }
+            const parsed = parseSSELine(line)
+            if (parsed.type !== 'data' || !parsed.data) {
+              continue
+            }
+
+            const payload = parsed.data?.response || parsed.data
+            events += 1
+
+            const currentUsageMetadata = payload?.usageMetadata
+            if (currentUsageMetadata) {
+              usageMetadata = currentUsageMetadata
+            }
+
+            const currentFinishReason = payload?.candidates?.[0]?.finishReason
+            if (currentFinishReason) {
+              finishReason = currentFinishReason
+            }
+
+            const parts = extractGeminiParts(payload)
+            if (parts.some((p) => typeof p?.text === 'string' && p.text)) {
+              hasAnyTextPart = true
+            }
+            if (parts.some((p) => p?.functionCall && typeof p.functionCall === 'object')) {
+              hasAnyFunctionCallPart = true
+            }
+
+            if (maybeDecide()) {
+              return
+            }
+            if (events >= PROBE_MAX_EVENTS) {
+              return finalize({ chunks, shouldRetry: false, finishReason })
             }
           }
-
-          const newClient = await geminiAccountService.getOauthClient(
-            newAccount.accessToken,
-            newAccount.refreshToken,
-            newProxyConfig,
-            newAccount.oauthProvider
-          )
-
-          if (!newClient) {
-            throw new Error('Failed to get new Gemini client for retry')
-          }
-
-          let newProjectId = newAccount.projectId
-          if (vendor === 'antigravity') {
-            newProjectId = ensureAntigravityProjectId(newAccount)
-          }
-
-          logger.info(`🔄 Retrying with new account: ${newAccountId} (was: ${accountId})`)
-
-          streamResponse =
-            vendor === 'antigravity'
-              ? await geminiAccountService.generateContentStreamAntigravity(
-                newClient,
-                requestData,
-                null,
-                newProjectId,
-                upstreamSessionId,
-                abortController.signal,
-                newProxyConfig
-              )
-              : await geminiAccountService.generateContentStream(
-                newClient,
-                requestData,
-                null,
-                newProjectId,
-                upstreamSessionId,
-                abortController.signal,
-                newProxyConfig
-              )
-
-          accountId = newAccountId
-        } catch (retryError) {
-          logger.error('❌ Failed to retry with new account:', retryError)
-          throw error
         }
-      } else {
-        throw error
+
+        upstreamStream.on('data', onData)
+        upstreamStream.on('end', onEnd)
+        upstreamStream.on('error', onError)
+      })
+    }
+
+    let streamResponse = await createStreamResponse(requestData)
+
+    const isAntigravityVendor = vendor === 'antigravity'
+    const isAntigravityGeminiModel = isAntigravityVendor && isGeminiModelId(effectiveModel)
+    let probedChunks = null
+
+    // ✅ 策略B（仅 antigravity + gemini-*）：默认不裁剪 tools；只有上游明显失败才降级裁剪并重试一次
+    if (
+      isAntigravityGeminiModel &&
+      !req.body?.tool_choice &&
+      Array.isArray(req.body?.tools) &&
+      req.body.tools.length > 0 &&
+      Array.isArray(requestData?.request?.tools) &&
+      requestData.request.tools.length > 0
+    ) {
+      const probe = await probeAntigravityGeminiToolLoopFailure(streamResponse)
+      probedChunks = Array.isArray(probe?.chunks) ? probe.chunks : null
+
+      if (probe?.shouldRetry) {
+        logger.warn(
+          '⚠️ [Antigravity-Gemini] Upstream tool loop failure; retrying stream with routed tools',
+          {
+            requestId: req.requestId,
+            model: effectiveModel,
+            finishReason: probe.finishReason || null,
+            toolsCount: Array.isArray(req.body?.tools) ? req.body.tools.length : 0
+          }
+        )
+
+        if (!abortController.signal.aborted) {
+          abortController.abort()
+        }
+        abortController = new AbortController()
+
+        requestData = buildGeminiRequestFromAnthropic(req.body, effectiveModel, {
+          vendor,
+          sessionId: sessionHash,
+          enableAntigravityGeminiToolRouting: true
+        })
+
+        streamResponse = await createStreamResponse(requestData)
+        probedChunks = null
       }
     }
 
@@ -3442,7 +4462,6 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       }
     })
 
-    const isAntigravityVendor = vendor === 'antigravity'
     const wantsThinkingBlockFirst =
       isAntigravityVendor &&
       requestData?.request?.generationConfig?.thinkingConfig?.include_thoughts === true
@@ -3454,13 +4473,13 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     const STREAM_ACTIVITY_TIMEOUT_MS = 45000 // 45秒无数据视为卡死
     const STREAM_FIRST_BYTE_TIMEOUT_MS = isAntigravityVendor
       ? (() => {
-        const raw = process.env.ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_MS
-        const parsed = parseInt(String(raw || ''), 10)
-        if (!Number.isFinite(parsed) || Number.isNaN(parsed) || parsed <= 0) {
-          return 15000
-        }
-        return parsed
-      })()
+          const raw = process.env.ANTIGRAVITY_STREAM_FIRST_BYTE_TIMEOUT_MS
+          const parsed = parseInt(String(raw || ''), 10)
+          if (!Number.isFinite(parsed) || Number.isNaN(parsed) || parsed <= 0) {
+            return 15000
+          }
+          return parsed
+        })()
       : 0
 
     let firstByteTimeout = null
@@ -3541,12 +4560,14 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     let finished = false
     let usageMetadata = null
     let finishReason = null
+    let finishMessage = null
     let emittedAnyToolUse = false
     let sseEventIndex = 0
     let invalidSseLines = 0
     let invalidSseSample = null
     let rescueAttempted = false
     let forcedRescueAttempted = false
+    let malformedRescueAttempted = false
     const emittedToolCallKeys = new Set()
     const emittedToolUseNames = new Set()
     const pendingToolCallsById = new Map()
@@ -3624,6 +4645,71 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
     const plannedToolAlias = extractPlannedToolAliasFromTodoWrite(req.body?.messages)
     const plannedToolName = plannedToolAlias ? resolveToolNameFromAlias(plannedToolAlias) : null
 
+    const parseLooseJsonObject = (input) => {
+      if (typeof input !== 'string') {
+        return null
+      }
+      let str = input.trim()
+      if (!str) {
+        return null
+      }
+      const firstBrace = str.indexOf('{')
+      const lastBrace = str.lastIndexOf('}')
+      if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+        return null
+      }
+      str = str.slice(firstBrace, lastBrace + 1)
+
+      const normalized = str
+        .replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)/g, '$1"$2"$3')
+        .replace(/\bTrue\b/g, 'true')
+        .replace(/\bFalse\b/g, 'false')
+        .replace(/\bNone\b/g, 'null')
+        .replace(/'/g, '"')
+
+      try {
+        const parsed = JSON.parse(normalized)
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null
+      } catch (_) {
+        return null
+      }
+    }
+
+    const tryParseMalformedFinishMessageToolUse = (message) => {
+      if (typeof message !== 'string' || !message) {
+        return null
+      }
+      const callIdx = message.indexOf('call:')
+      if (callIdx === -1) {
+        return null
+      }
+      const after = message.slice(callIdx + 5).trim()
+      if (!after) {
+        return null
+      }
+      const braceIdx = after.indexOf('{')
+      const alias = braceIdx === -1 ? after.trim() : after.slice(0, braceIdx).trim()
+      if (!alias) {
+        return null
+      }
+      const toolName = resolveToolNameFromAlias(alias)
+      if (!toolName) {
+        return null
+      }
+
+      const rawArgs = braceIdx === -1 ? '' : after.slice(braceIdx)
+      let args = parseLooseJsonObject(rawArgs)
+      if (!args && rawArgs) {
+        // 最小兜底：常见 "command:\"...\"" 场景
+        const commandMatch = rawArgs.match(/command\s*:\s*"([^"]*)"/i)
+        if (commandMatch && commandMatch[1] !== undefined) {
+          args = { command: commandMatch[1] }
+        }
+      }
+
+      return { name: toolName, args: args || {} }
+    }
+
     let currentIndex = wantsThinkingBlockFirst ? 0 : -1
     let currentBlockType = wantsThinkingBlockFirst ? 'thinking' : null
 
@@ -3695,7 +4781,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       // [NEW] 参数重映射：修复 Gemini 返回的工具调用参数
       // 在发出工具调用之前应用修复，确保 Claude Code 能正确处理
       if (args && typeof args === 'object') {
-        remapFunctionCallArgs(name, args)
+        remapFunctionCallArgs(name, args, { vendor, model: effectiveModel })
       }
 
       const toolUseId = typeof id === 'string' && id ? id : buildToolUseId()
@@ -4055,6 +5141,115 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       return null
     }
 
+    const tryRescueAfterMalformedFunctionCall = async () => {
+      if (!isAntigravityVendor || !isAntigravityGeminiModel) {
+        return null
+      }
+      if (malformedRescueAttempted) {
+        return null
+      }
+      if (emittedAnyToolUse) {
+        return null
+      }
+      malformedRescueAttempted = true
+
+      const rescued = tryParseMalformedFinishMessageToolUse(finishMessage)
+      if (rescued?.name) {
+        if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+          stopCurrentBlock()
+        }
+        currentBlockType = 'tool_use'
+        emitToolUseBlock(rescued.name, rescued.args || {}, null)
+        logger.warn('⚠️ MALFORMED_FUNCTION_CALL rescued via finishMessage', {
+          requestId: req.requestId,
+          tool: rescued.name
+        })
+        return { tool: rescued.name, source: 'finishMessage' }
+      }
+
+      // 二次救援：当 TodoWrite 能推断下一步工具时，强制生成该 tool_use
+      if (plannedToolName && !forcedRescueAttempted) {
+        forcedRescueAttempted = true
+        const rescueTimeoutMs = 30000
+        const backoffMs = 800
+        await new Promise((resolve) => setTimeout(resolve, backoffMs))
+
+        logger.warn('⚠️ MALFORMED_FUNCTION_CALL: attempting forced tool rescue', {
+          requestId: req.requestId,
+          model: effectiveModel,
+          plannedToolAlias,
+          plannedToolName
+        })
+
+        try {
+          const forcedRequestData = JSON.parse(JSON.stringify(requestData || {}))
+          if (forcedRequestData?.request) {
+            forcedRequestData.request.toolConfig = {
+              functionCallingConfig: {
+                mode: 'ANY',
+                allowedFunctionNames: [plannedToolName]
+              }
+            }
+
+            const sys = forcedRequestData.request.systemInstruction
+            const sysObj = sys && typeof sys === 'object' ? sys : {}
+            const parts = Array.isArray(sysObj.parts) ? sysObj.parts.slice() : []
+            parts.push({
+              text: 'When calling tools, DO NOT output textual call:Tool{...}. Use structured functionCall only.'
+            })
+            forcedRequestData.request.systemInstruction = { ...sysObj, role: 'user', parts }
+          }
+
+          const forcedRawResponse = await geminiAccountService.generateContentAntigravity(
+            client,
+            forcedRequestData,
+            null,
+            projectId,
+            upstreamSessionId,
+            proxyConfig,
+            { abortTimeoutMs: rescueTimeoutMs }
+          )
+          const { response: forcedResponse } = forcedRawResponse || {}
+          const forcedPayload = forcedResponse || forcedRawResponse
+          const { usageMetadata: forcedUsageMetadata } = forcedPayload || {}
+          if (forcedUsageMetadata) {
+            usageMetadata = forcedUsageMetadata
+          }
+
+          const forcedContent = convertGeminiPayloadToAnthropicContent(forcedPayload)
+          const forcedToolUse = Array.isArray(forcedContent)
+            ? forcedContent.find((b) => b?.type === 'tool_use' && b?.name)
+            : null
+          if (forcedToolUse) {
+            if (currentBlockType === 'text' || currentBlockType === 'thinking') {
+              stopCurrentBlock()
+            }
+            currentBlockType = 'tool_use'
+            emitToolUseBlock(forcedToolUse.name, forcedToolUse.input, forcedToolUse.id)
+            logger.warn(
+              '⚠️ Forced rescue succeeded: emitted tool_use after MALFORMED_FUNCTION_CALL',
+              {
+                requestId: req.requestId,
+                tool: forcedToolUse.name,
+                plannedToolAlias,
+                plannedToolName
+              }
+            )
+            return { tool: forcedToolUse.name, forced: true }
+          }
+        } catch (error) {
+          const { statusCode, upstreamMessage, message } = sanitizeUpstreamError(error)
+          logger.warn('⚠️ Forced rescue failed after MALFORMED_FUNCTION_CALL', {
+            requestId: req.requestId,
+            statusCode: statusCode || null,
+            upstreamMessage: upstreamMessage || message
+          })
+        }
+      }
+
+      return null
+    }
+
     const finalize = async () => {
       if (finished) {
         return
@@ -4077,6 +5272,24 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           index: currentIndex,
           delta: { type: 'text_delta', text: raw }
         })
+      }
+
+      const isMalformedFunctionCall =
+        String(finishReason || '').toUpperCase() === 'MALFORMED_FUNCTION_CALL'
+      if (isAntigravityGeminiModel && isMalformedFunctionCall) {
+        await tryRescueAfterMalformedFunctionCall()
+        const hasAnyContentAfterRescue = !!(emittedText || emittedAnyToolUse || emittedThinking)
+        if (!hasAnyContentAfterRescue) {
+          const fallbackText =
+            '上游返回 MALFORMED_FUNCTION_CALL（疑似工具调用格式不兼容）。请重试，或减少工具/上下文长度。'
+          switchBlockType('text')
+          emittedText = fallbackText
+          writeAnthropicSseEvent(res, 'content_block_delta', {
+            type: 'content_block_delta',
+            index: currentIndex,
+            delta: { type: 'text_delta', text: fallbackText }
+          })
+        }
       }
 
       // 🔧 [dadongwo] 不依赖 finishReason 判断流结束
@@ -4109,7 +5322,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
               toolCallNames: Array.from(emittedToolUseNames).filter(Boolean),
               usage: { input_tokens: inputTokens, output_tokens: outputTokens },
               textPreview: emittedText ? emittedText.slice(0, 500) : ''
-            }).catch(() => { })
+            }).catch(() => {})
           }
 
           // 关闭当前块（如果有）
@@ -4226,7 +5439,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             invalidLines: invalidSseLines,
             invalidSample: invalidSseSample,
             error: 'empty_response_fallback'
-          }).catch(() => { })
+          }).catch(() => {})
         }
 
         if (currentBlockType === 'text' || currentBlockType === 'thinking') {
@@ -4310,7 +5523,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           toolCallNames: Array.from(emittedToolUseNames).filter(Boolean),
           usage: { input_tokens: inputTokens, output_tokens: outputTokens },
           textPreview: emittedText ? emittedText.slice(0, 500) : ''
-        }).catch(() => { })
+        }).catch(() => {})
       }
 
       if (req.apiKey?.id && (inputTokens > 0 || outputTokens > 0)) {
@@ -4332,7 +5545,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       }
     }
 
-    streamResponse.on('data', (chunk) => {
+    const handleUpstreamChunk = (chunk) => {
       resetActivityTimeout() // <--- 【新增】收到数据了，重置倒计时！
       if (!receivedAnyUpstreamBytes) {
         receivedAnyUpstreamBytes = true
@@ -4383,7 +5596,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             eventIndex: sseEventIndex,
             eventType: parsed.type,
             data: payload
-          }).catch(() => { })
+          }).catch(() => {})
         }
 
         const { usageMetadata: currentUsageMetadata, candidates } = payload || {}
@@ -4392,7 +5605,8 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         }
 
         const [candidate] = Array.isArray(candidates) ? candidates : []
-        const { finishReason: currentFinishReason } = candidate || {}
+        const { finishReason: currentFinishReason, finishMessage: currentFinishMessage } =
+          candidate || {}
         if (currentFinishReason) {
           finishReason = currentFinishReason
           // 🔍 调试：记录收到 finishReason 的时间点
@@ -4401,6 +5615,9 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             finishReason: currentFinishReason,
             sseEventIndex
           })
+        }
+        if (typeof currentFinishMessage === 'string' && currentFinishMessage) {
+          finishMessage = currentFinishMessage
         }
 
         const parts = extractGeminiParts(payload)
@@ -4586,7 +5803,28 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           }
         }
       }
-    })
+    }
+
+    try {
+      streamResponse.pause()
+    } catch (_) {
+      // ignore
+    }
+
+    streamResponse.on('data', handleUpstreamChunk)
+
+    if (Array.isArray(probedChunks) && probedChunks.length > 0) {
+      for (const chunk of probedChunks) {
+        handleUpstreamChunk(chunk)
+      }
+      probedChunks = null
+    }
+
+    try {
+      streamResponse.resume()
+    } catch (_) {
+      // ignore
+    }
 
     streamResponse.on('end', () => {
       if (activityTimeout) {

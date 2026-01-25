@@ -23,6 +23,9 @@ const antigravityClient = require('./antigravityClient')
 const OAUTH_PROVIDER_GEMINI_CLI = 'gemini-cli'
 const OAUTH_PROVIDER_ANTIGRAVITY = 'antigravity'
 
+const MODEL_RATE_LIMITS_FIELD = 'modelRateLimits'
+const MAX_MODEL_RATE_LIMIT_ENTRIES = 100
+
 const OAUTH_PROVIDERS = {
   [OAUTH_PROVIDER_GEMINI_CLI]: {
     // Gemini CLI OAuth 配置（公开）
@@ -67,6 +70,78 @@ function normalizeOauthProvider(oauthProvider) {
   return oauthProvider === OAUTH_PROVIDER_ANTIGRAVITY
     ? OAUTH_PROVIDER_ANTIGRAVITY
     : OAUTH_PROVIDER_GEMINI_CLI
+}
+
+function normalizeModelId(modelId) {
+  return String(modelId || '')
+    .trim()
+    .replace(/^models\//i, '')
+}
+
+function safeJsonParse(value) {
+  if (value === null || value === undefined) {
+    return null
+  }
+  if (typeof value === 'object') {
+    return value
+  }
+  if (typeof value !== 'string') {
+    return null
+  }
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+  try {
+    return JSON.parse(trimmed)
+  } catch (_) {
+    return null
+  }
+}
+
+function parseModelRateLimits(raw) {
+  const parsed = safeJsonParse(raw)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return {}
+  }
+  return parsed
+}
+
+function pruneModelRateLimits(map) {
+  if (!map || typeof map !== 'object') {
+    return {}
+  }
+
+  const now = Date.now()
+  const entries = Object.entries(map).filter(([key, value]) => {
+    if (!key) {
+      return false
+    }
+    if (!value || typeof value !== 'object') {
+      return false
+    }
+    const { resetAt } = value
+    if (typeof resetAt !== 'string' || !resetAt) {
+      return true
+    }
+    const ts = new Date(resetAt).getTime()
+    if (!Number.isFinite(ts)) {
+      return true
+    }
+    return ts > now
+  })
+
+  if (entries.length <= MAX_MODEL_RATE_LIMIT_ENTRIES) {
+    return Object.fromEntries(entries)
+  }
+
+  entries.sort((a, b) => {
+    const aTs = new Date(a?.[1]?.resetAt || 0).getTime()
+    const bTs = new Date(b?.[1]?.resetAt || 0).getTime()
+    return (bTs || 0) - (aTs || 0)
+  })
+
+  return Object.fromEntries(entries.slice(0, MAX_MODEL_RATE_LIMIT_ENTRIES))
 }
 
 function getOauthProviderConfig(oauthProvider) {
@@ -565,7 +640,7 @@ async function createAccount(accountData) {
       expiresAt = oauthData.expiry_date ? new Date(oauthData.expiry_date).toISOString() : ''
     } else {
       // 如果只提供了 access token
-      ; ({ accessToken } = accountData)
+      ;({ accessToken } = accountData)
       refreshToken = accountData.refreshToken || ''
 
       // 构造完整的 OAuth 数据
@@ -679,6 +754,14 @@ async function getAccount(accountId) {
     }
   }
 
+  if (accountData[MODEL_RATE_LIMITS_FIELD]) {
+    accountData[MODEL_RATE_LIMITS_FIELD] = pruneModelRateLimits(
+      parseModelRateLimits(accountData[MODEL_RATE_LIMITS_FIELD])
+    )
+  } else {
+    accountData[MODEL_RATE_LIMITS_FIELD] = {}
+  }
+
   // 转换 schedulable 字符串为布尔值（与 claudeConsoleAccountService 保持一致）
   accountData.schedulable = accountData.schedulable !== 'false' // 默认为true，只有明确设置为'false'才为false
 
@@ -703,6 +786,11 @@ async function updateAccount(accountId, updates) {
   // 处理代理设置
   if (updates.proxy !== undefined) {
     updates.proxy = updates.proxy ? JSON.stringify(updates.proxy) : ''
+  }
+
+  if (updates[MODEL_RATE_LIMITS_FIELD] !== undefined) {
+    const pruned = pruneModelRateLimits(parseModelRateLimits(updates[MODEL_RATE_LIMITS_FIELD]))
+    updates[MODEL_RATE_LIMITS_FIELD] = Object.keys(pruned).length > 0 ? JSON.stringify(pruned) : ''
   }
 
   // 处理 schedulable 字段，确保正确转换为字符串存储
@@ -870,6 +958,10 @@ async function getAllAccounts() {
         }
       }
 
+      const modelRateLimits = pruneModelRateLimits(
+        parseModelRateLimits(accountData[MODEL_RATE_LIMITS_FIELD])
+      )
+
       // 转换 schedulable 字符串为布尔值（与 getAccount 保持一致）
       accountData.schedulable = accountData.schedulable !== 'false' // 默认为true，只有明确设置为'false'才为false
 
@@ -882,6 +974,7 @@ async function getAllAccounts() {
       // 不解密敏感字段，只返回基本信息
       accounts.push({
         ...accountData,
+        [MODEL_RATE_LIMITS_FIELD]: modelRateLimits,
         geminiOauth: accountData.geminiOauth ? '[ENCRYPTED]' : '',
         accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
         refreshToken: accountData.refreshToken ? '[ENCRYPTED]' : '',
@@ -901,15 +994,15 @@ async function getAllAccounts() {
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {
-            isRateLimited: rateLimitInfo.isRateLimited,
-            rateLimitedAt: rateLimitInfo.rateLimitedAt,
-            minutesRemaining: rateLimitInfo.minutesRemaining
-          }
+              isRateLimited: rateLimitInfo.isRateLimited,
+              rateLimitedAt: rateLimitInfo.rateLimitedAt,
+              minutesRemaining: rateLimitInfo.minutesRemaining
+            }
           : {
-            isRateLimited: false,
-            rateLimitedAt: null,
-            minutesRemaining: 0
-          }
+              isRateLimited: false,
+              rateLimitedAt: null,
+              minutesRemaining: 0
+            }
       })
     }
   }
@@ -1216,17 +1309,66 @@ async function setAccountRateLimited(accountId, isLimited = true, resetsInSecond
 
   const updates = isLimited
     ? {
-      rateLimitStatus: 'limited',
-      rateLimitedAt: now.toISOString(),
-      rateLimitResetAt: resetAt.toISOString()
-    }
+        rateLimitStatus: 'limited',
+        rateLimitedAt: now.toISOString(),
+        rateLimitResetAt: resetAt.toISOString()
+      }
     : {
-      rateLimitStatus: '',
-      rateLimitedAt: '',
-      rateLimitResetAt: ''
-    }
+        rateLimitStatus: '',
+        rateLimitedAt: '',
+        rateLimitResetAt: ''
+      }
 
   await updateAccount(accountId, updates)
+}
+
+async function setAccountModelRateLimited(
+  accountId,
+  modelId,
+  isLimited = true,
+  resetsInSeconds = null,
+  reason = null
+) {
+  const normalizedModel = normalizeModelId(modelId)
+  if (!normalizedModel) {
+    throw new Error('modelId is required')
+  }
+
+  const account = await getAccount(accountId)
+  if (!account) {
+    throw new Error('Account not found')
+  }
+
+  const oauthProvider = normalizeOauthProvider(account.oauthProvider)
+  if (oauthProvider !== OAUTH_PROVIDER_ANTIGRAVITY) {
+    return
+  }
+
+  const existing = pruneModelRateLimits(parseModelRateLimits(account[MODEL_RATE_LIMITS_FIELD]))
+  const now = new Date()
+
+  if (!isLimited) {
+    delete existing[normalizedModel]
+    await updateAccount(accountId, { [MODEL_RATE_LIMITS_FIELD]: existing })
+    return
+  }
+
+  const seconds =
+    Number.isFinite(resetsInSeconds) && !Number.isNaN(resetsInSeconds) && resetsInSeconds > 0
+      ? Math.trunc(resetsInSeconds)
+      : null
+
+  const defaultSeconds = 30
+  const resetAt = new Date(now.getTime() + (seconds || defaultSeconds) * 1000)
+
+  existing[normalizedModel] = {
+    status: 'limited',
+    reason: reason || null,
+    limitedAt: now.toISOString(),
+    resetAt: resetAt.toISOString()
+  }
+
+  await updateAccount(accountId, { [MODEL_RATE_LIMITS_FIELD]: existing })
 }
 
 // 获取账户的限流信息
@@ -2383,6 +2525,7 @@ module.exports = {
   refreshAccountToken,
   markAccountUsed,
   setAccountRateLimited,
+  setAccountModelRateLimited,
   getAccountRateLimitInfo,
   isTokenExpired,
   getOauthClient,

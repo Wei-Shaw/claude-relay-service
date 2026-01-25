@@ -141,7 +141,8 @@ class UnifiedGeminiScheduler {
           // 验证映射的账户是否仍然可用
           const isAvailable = await this._isAccountAvailable(
             mappedAccount.accountId,
-            mappedAccount.accountType
+            mappedAccount.accountType,
+            requestedModel
           )
           if (isAvailable) {
             // 🚀 智能会话续期（续期 unified 映射键，按配置）
@@ -248,7 +249,11 @@ class UnifiedGeminiScheduler {
           this._isActive(boundAccount.isActive) &&
           boundAccount.status !== 'error'
         ) {
-          const isRateLimited = await this.isAccountRateLimited(accountId)
+          const isRateLimited = await this.isAccountRateLimited(
+            accountId,
+            'gemini-api',
+            requestedModel
+          )
           if (!isRateLimited) {
             // 检查模型支持
             if (
@@ -305,7 +310,11 @@ class UnifiedGeminiScheduler {
           ) {
             return availableAccounts
           }
-          const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
+          const isRateLimited = await this.isAccountRateLimited(
+            boundAccount.id,
+            'gemini',
+            requestedModel
+          )
           if (!isRateLimited) {
             // 检查模型支持
             if (
@@ -387,7 +396,7 @@ class UnifiedGeminiScheduler {
         }
 
         // 检查是否被限流
-        const isRateLimited = await this.isAccountRateLimited(account.id)
+        const isRateLimited = await this.isAccountRateLimited(account.id, 'gemini', requestedModel)
         if (!isRateLimited) {
           availableAccounts.push({
             ...account,
@@ -425,7 +434,11 @@ class UnifiedGeminiScheduler {
           }
 
           // 检查是否被限流
-          const isRateLimited = await this.isAccountRateLimited(account.id)
+          const isRateLimited = await this.isAccountRateLimited(
+            account.id,
+            'gemini-api',
+            requestedModel
+          )
           if (!isRateLimited) {
             availableAccounts.push({
               ...account,
@@ -461,7 +474,7 @@ class UnifiedGeminiScheduler {
   }
 
   // 🔍 检查账户是否可用
-  async _isAccountAvailable(accountId, accountType) {
+  async _isAccountAvailable(accountId, accountType, requestedModel = null) {
     try {
       if (accountType === 'gemini') {
         const account = await geminiAccountService.getAccount(accountId)
@@ -473,7 +486,7 @@ class UnifiedGeminiScheduler {
           logger.info(`🚫 Gemini account ${accountId} is not schedulable`)
           return false
         }
-        return !(await this.isAccountRateLimited(accountId))
+        return !(await this.isAccountRateLimited(accountId, 'gemini', requestedModel))
       } else if (accountType === 'gemini-api') {
         const account = await geminiApiAccountService.getAccount(accountId)
         if (!account || !this._isActive(account.isActive) || account.status === 'error') {
@@ -484,7 +497,7 @@ class UnifiedGeminiScheduler {
           logger.info(`🚫 Gemini-API account ${accountId} is not schedulable`)
           return false
         }
-        return !(await this.isAccountRateLimited(accountId))
+        return !(await this.isAccountRateLimited(accountId, 'gemini-api', requestedModel))
       }
       return false
     } catch (error) {
@@ -628,8 +641,43 @@ class UnifiedGeminiScheduler {
     }
   }
 
+  async markAccountModelRateLimited(
+    accountId,
+    accountType,
+    _sessionHash = null,
+    requestedModel = null,
+    resetsInSeconds = null,
+    reason = null
+  ) {
+    try {
+      if (!requestedModel) {
+        throw new Error('requestedModel is required')
+      }
+
+      if (accountType !== 'gemini') {
+        throw new Error(`Unsupported accountType for model rate limit: ${accountType}`)
+      }
+
+      await geminiAccountService.setAccountModelRateLimited(
+        accountId,
+        requestedModel,
+        true,
+        resetsInSeconds,
+        reason
+      )
+
+      return { success: true }
+    } catch (error) {
+      logger.error(
+        `❌ Failed to mark account model as rate limited: ${accountId} (${accountType})`,
+        error
+      )
+      throw error
+    }
+  }
+
   // 🔍 检查账户是否处于限流状态
-  async isAccountRateLimited(accountId, accountType = null) {
+  async isAccountRateLimited(accountId, accountType = null, requestedModel = null) {
     try {
       let account = null
 
@@ -648,6 +696,21 @@ class UnifiedGeminiScheduler {
 
       if (!account) {
         return false
+      }
+
+      if (accountType === 'gemini' && requestedModel && account.oauthProvider === 'antigravity') {
+        const normalizedModel = String(requestedModel)
+          .trim()
+          .replace(/^models\//i, '')
+        if (normalizedModel) {
+          const entry = account.modelRateLimits?.[normalizedModel]
+          if (entry && entry.status === 'limited' && entry.resetAt) {
+            const resetAt = new Date(entry.resetAt).getTime()
+            if (Number.isFinite(resetAt)) {
+              return Date.now() < resetAt
+            }
+          }
+        }
       }
 
       if (account.rateLimitStatus === 'limited') {
@@ -700,7 +763,8 @@ class UnifiedGeminiScheduler {
           if (memberIds.includes(mappedAccount.accountId)) {
             const isAvailable = await this._isAccountAvailable(
               mappedAccount.accountId,
-              mappedAccount.accountType
+              mappedAccount.accountType,
+              requestedModel
             )
             if (isAvailable) {
               // 🚀 智能会话续期（续期 unified 映射键，按配置）
@@ -780,7 +844,11 @@ class UnifiedGeminiScheduler {
           }
 
           // 检查是否被限流
-          const isRateLimited = await this.isAccountRateLimited(account.id, accountType)
+          const isRateLimited = await this.isAccountRateLimited(
+            account.id,
+            accountType,
+            requestedModel
+          )
           if (!isRateLimited) {
             availableAccounts.push({
               ...account,

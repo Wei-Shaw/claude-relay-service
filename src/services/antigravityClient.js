@@ -280,7 +280,7 @@ const ANTIGRAVITY_MIN_SYSTEM_PROMPT_MARKER =
   'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.'
 
 function getAntigravityApiUrl() {
-  return process.env.ANTIGRAVITY_API_URL || 'https://daily-cloudcode-pa.sandbox.googleapis.com'
+  return process.env.ANTIGRAVITY_API_URL || 'https://daily-cloudcode-pa.googleapis.com'
 }
 
 function normalizeBaseUrl(url) {
@@ -293,9 +293,14 @@ function getAntigravityApiUrlCandidates() {
   const daily = 'https://daily-cloudcode-pa.sandbox.googleapis.com'
   const prod = 'https://cloudcode-pa.googleapis.com'
 
-  // 若显式配置了自定义 base url，则只使用该地址（不做 fallback，避免意外路由到别的环境）。
+  // 若显式配置了自定义 base url，则只使用该地址（除非显式开启 fallback）。
   if (process.env.ANTIGRAVITY_API_URL) {
-    return [configured]
+    const allowFallback =
+      process.env.ANTIGRAVITY_API_URL_ALLOW_FALLBACK === 'true' ||
+      process.env.ANTIGRAVITY_API_URL_ALLOW_FALLBACK === '1'
+    if (!allowFallback) {
+      return [configured]
+    }
   }
 
   // [dadongwo] 默认行为：优先 daily，失败时再尝试 prod。
@@ -318,13 +323,22 @@ function getAntigravityHeaders(accessToken, baseUrl) {
     // ignore
   }
 
+  // 🔧 [dadongwo] 对齐上游 Antigravity Headers
+  // 补充缺失的 X-Goog-Api-Client 和 Client-Metadata
   return {
     Host: host,
-    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.11.3 windows/amd64',
+    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.14.2 windows/amd64',
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
     'Accept-Encoding': 'gzip',
-    requestType: 'agent'
+    // [dadongwo] 补充 X-Goog-Api-Client 和 Client-Metadata
+    'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
+    'Client-Metadata': JSON.stringify({
+      ideType: 'IDE_UNSPECIFIED',
+      ideVersion: 'vscode/1.100.0',
+      extensionVersion: '0.1.0',
+      surface: 'vscode'
+    })
   }
 }
 
@@ -1046,31 +1060,4 @@ module.exports = {
   request,
   fetchAvailableModels,
   countTokens
-}
-function getAntigravityHeaders(accessToken, baseUrl) {
-  const resolvedBaseUrl = baseUrl || getAntigravityApiUrl()
-  let host = 'daily-cloudcode-pa.sandbox.googleapis.com'
-  try {
-    host = new URL(resolvedBaseUrl).host || host
-  } catch (e) {
-    // ignore
-  }
-
-  // 🔧 [dadongwo] 对齐上游 Antigravity Headers
-  // 补充缺失的 X-Goog-Api-Client 和 Client-Metadata
-  return {
-    Host: host,
-    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.11.5 windows/amd64',
-    Authorization: `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-    'Accept-Encoding': 'gzip',
-    // [dadongwo] 补充 X-Goog-Api-Client 和 Client-Metadata
-    'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
-    'Client-Metadata': JSON.stringify({
-      ideType: 'IDE_UNSPECIFIED',
-      ideVersion: 'vscode/1.100.0',
-      extensionVersion: '0.1.0',
-      surface: 'vscode'
-    })
-  }
 }

@@ -333,13 +333,17 @@ class AccountBalanceService {
       if (useCache) {
         const cached = await this.redis.getAccountBalance(platform, accountId)
         if (cached && cached.status === 'success') {
+          const quota = this._attachAntigravityModelCooldowns(
+            account,
+            quotaFromLocal.quota || cached.quota || null
+          )
           return this._buildResponse(
             {
               status: cached.status,
               errorMessage: cached.errorMessage,
               balance: quotaFromLocal.balance ?? cached.balance,
               currency: quotaFromLocal.currency || cached.currency || 'USD',
-              quota: quotaFromLocal.quota || cached.quota || null,
+              quota,
               statistics: localStatistics,
               lastRefreshAt: cached.lastRefreshAt
             },
@@ -353,13 +357,14 @@ class AccountBalanceService {
       }
 
       if (effectiveQueryMode === 'local') {
+        const quota = this._attachAntigravityModelCooldowns(account, quotaFromLocal.quota || null)
         return this._buildResponse(
           {
             status: 'success',
             errorMessage: null,
             balance: quotaFromLocal.balance,
             currency: quotaFromLocal.currency || 'USD',
-            quota: quotaFromLocal.quota,
+            quota,
             statistics: localStatistics,
             lastRefreshAt: localBalance.lastCalculated
           },
@@ -414,6 +419,10 @@ class AccountBalanceService {
     }
 
     const source = isRemoteSuccess ? 'api' : 'local'
+    const quota = this._attachAntigravityModelCooldowns(
+      account,
+      quotaFromLocal.quota || providerResult.quota || null
+    )
 
     return this._buildResponse(
       {
@@ -421,7 +430,7 @@ class AccountBalanceService {
         errorMessage: providerResult.errorMessage,
         balance: quotaFromLocal.balance ?? providerResult.balance,
         currency: quotaFromLocal.currency || providerResult.currency || 'USD',
-        quota: quotaFromLocal.quota || providerResult.quota || null,
+        quota,
         statistics: localStatistics,
         lastRefreshAt: providerResult.lastRefreshAt
       },
@@ -726,6 +735,129 @@ class AccountBalanceService {
         ...(extraData && typeof extraData === 'object' ? extraData : {})
       }
     }
+  }
+
+  _attachAntigravityModelCooldowns(account, quota) {
+    if (!account || !quota || typeof quota !== 'object') {
+      return quota
+    }
+    if (account.oauthProvider !== 'antigravity') {
+      return quota
+    }
+    if (quota.type !== 'antigravity' || !Array.isArray(quota.buckets)) {
+      return quota
+    }
+
+    const { modelRateLimits } = account
+    if (!modelRateLimits || typeof modelRateLimits !== 'object') {
+      return quota
+    }
+
+    const now = Date.now()
+
+    const categorize = (modelId) => {
+      const id = String(modelId || '')
+        .trim()
+        .replace(/^models\//i, '')
+        .toLowerCase()
+      if (!id) {
+        return 'Other'
+      }
+
+      if (id.includes('claude') || id.includes('gpt-oss')) {
+        return 'Claude'
+      }
+      if (id.startsWith('imagen-') || id.includes('image')) {
+        return 'Gemini Image'
+      }
+      if (id.startsWith('gemini-')) {
+        if (id.includes('flash')) {
+          return 'Gemini Flash'
+        }
+        if (id.includes('pro')) {
+          return 'Gemini Pro'
+        }
+      }
+      return 'Other'
+    }
+
+    const byCategory = new Map()
+    const limitedModels = []
+    for (const [rawModelId, entry] of Object.entries(modelRateLimits)) {
+      if (!entry || typeof entry !== 'object') {
+        continue
+      }
+      if (entry.status !== 'limited' || !entry.resetAt) {
+        continue
+      }
+      const resetAtMs = new Date(entry.resetAt).getTime()
+      if (!Number.isFinite(resetAtMs) || resetAtMs <= now) {
+        continue
+      }
+      const category = categorize(rawModelId)
+
+      const existing = byCategory.get(category) || { resetAtMs: Infinity, models: [] }
+      existing.resetAtMs = Math.min(existing.resetAtMs, resetAtMs)
+      existing.models.push({
+        modelId: rawModelId,
+        resetAt: entry.resetAt,
+        reason: entry.reason || null
+      })
+      byCategory.set(category, existing)
+
+      limitedModels.push({
+        modelId: rawModelId,
+        category,
+        resetAt: entry.resetAt,
+        reason: entry.reason || null
+      })
+    }
+
+    if (byCategory.size === 0) {
+      return quota
+    }
+
+    const existingCategories = new Set(
+      quota.buckets.map((bucket) => bucket?.category).filter((category) => !!category)
+    )
+
+    const nextBuckets = quota.buckets.map((bucket) => {
+      const category = bucket?.category
+      if (!category || !byCategory.has(category)) {
+        return bucket
+      }
+      const data = byCategory.get(category)
+      return {
+        ...bucket,
+        cooldown: {
+          resetAt: new Date(data.resetAtMs).toISOString(),
+          models: data.models
+        }
+      }
+    })
+
+    for (const [category, data] of byCategory.entries()) {
+      if (existingCategories.has(category)) {
+        continue
+      }
+      nextBuckets.push({
+        category,
+        remaining: null,
+        used: null,
+        percentage: null,
+        resetAt: null,
+        cooldown: {
+          resetAt: new Date(data.resetAtMs).toISOString(),
+          models: data.models
+        }
+      })
+    }
+
+    const sortedCooldowns = limitedModels
+      .slice()
+      .sort((a, b) => new Date(a.resetAt).getTime() - new Date(b.resetAt).getTime())
+
+    return { ...quota, buckets: nextBuckets, modelCooldowns: sortedCooldowns }
   }
 
   _formatCurrency(amount, currency = 'USD') {

@@ -26,7 +26,9 @@ function round2(value) {
 
 function normalizeAntigravityQuotaModelId(modelId) {
   const raw = String(modelId || '').trim()
-  if (!raw) return ''
+  if (!raw) {
+    return ''
+  }
   return raw.replace(/^models\//i, '')
 }
 
@@ -136,13 +138,17 @@ function buildAntigravityQuota(modelsResponse) {
       }
 
       const modelId = normalizeAntigravityQuotaModelId(rawModelId)
-      if (!modelId) continue
+      if (!modelId) {
+        continue
+      }
       if (!matcher(modelId.toLowerCase())) {
         continue
       }
 
       const entry = buildEntry(category, modelId, modelDataRaw)
-      if (!entry) continue
+      if (!entry) {
+        continue
+      }
 
       // 同类若命中多个，取更保守（剩余更低）的那个
       if (!best || (entry.remainingPercent ?? 0) < (best.remainingPercent ?? 0)) {
@@ -158,25 +164,33 @@ function buildAntigravityQuota(modelsResponse) {
     'Gemini Pro',
     (id) => id === 'gemini-3-pro-high' || id.startsWith('gemini-2.5-pro')
   )
-  if (proEntry) categoryMap.set('Gemini Pro', proEntry)
+  if (proEntry) {
+    categoryMap.set('Gemini Pro', proEntry)
+  }
 
   const claudeEntry = pickPreferred(
     'Claude',
     (id) => id === 'claude-sonnet-4-5-thinking' || id.includes('claude')
   )
-  if (claudeEntry) categoryMap.set('Claude', claudeEntry)
+  if (claudeEntry) {
+    categoryMap.set('Claude', claudeEntry)
+  }
 
   const flashEntry = pickPreferred(
     'Gemini Flash',
     (id) => id === 'gemini-3-flash' || id.startsWith('gemini-2.5-flash')
   )
-  if (flashEntry) categoryMap.set('Gemini Flash', flashEntry)
+  if (flashEntry) {
+    categoryMap.set('Gemini Flash', flashEntry)
+  }
 
   const imageEntry = pickPreferred(
     'Gemini Image',
     (id) => id === 'gemini-3-pro-image' || id.startsWith('imagen-')
   )
-  if (imageEntry) categoryMap.set('Gemini Image', imageEntry)
+  if (imageEntry) {
+    categoryMap.set('Gemini Image', imageEntry)
+  }
 
   for (const [modelId, modelDataRaw] of Object.entries(models)) {
     if (!modelDataRaw || typeof modelDataRaw !== 'object') {
