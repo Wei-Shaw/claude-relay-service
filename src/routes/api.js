@@ -377,19 +377,13 @@ async function handleMessagesRequest(req, res) {
         accountId &&
         accountType === 'claude-official'
       ) {
-        // 🚫 检测旧会话（污染的会话）
-        if (isOldSession(req.body)) {
-          const cfg = await claudeRelayConfigService.getConfig()
-          logger.warn(
-            `🚫 Old session rejected: sessionId=${originalSessionIdForBinding}, messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, isOldSession=true`
-          )
-          return res.status(400).json({
-            error: {
-              type: 'session_binding_error',
-              message: cfg.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。'
-            }
-          })
-        }
+        // 🆕 允许新 session ID 创建绑定（支持 Claude Code /clear 等场景）
+        // 信任客户端的 session ID 作为新会话的标识，不再检查请求内容
+        logger.info(
+          `🔗 Creating new session binding: sessionId=${originalSessionIdForBinding}, ` +
+            `messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, ` +
+            `accountId=${accountId}, accountType=${accountType}`
+        )
 
         // 创建绑定
         try {
@@ -944,19 +938,13 @@ async function handleMessagesRequest(req, res) {
         accountId &&
         accountType === 'claude-official'
       ) {
-        // 🚫 检测旧会话（污染的会话）
-        if (isOldSession(req.body)) {
-          const cfg = await claudeRelayConfigService.getConfig()
-          logger.warn(
-            `🚫 Old session rejected (non-stream): sessionId=${originalSessionIdForBindingNonStream}, messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, isOldSession=true`
-          )
-          return res.status(400).json({
-            error: {
-              type: 'session_binding_error',
-              message: cfg.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。'
-            }
-          })
-        }
+        // 🆕 允许新 session ID 创建绑定（支持 Claude Code /clear 等场景）
+        // 信任客户端的 session ID 作为新会话的标识，不再检查请求内容
+        logger.info(
+          `🔗 Creating new session binding (non-stream): sessionId=${originalSessionIdForBindingNonStream}, ` +
+            `messages.length=${req.body?.messages?.length}, tools.length=${req.body?.tools?.length || 0}, ` +
+            `accountId=${accountId}, accountType=${accountType}`
+        )
 
         // 创建绑定
         try {

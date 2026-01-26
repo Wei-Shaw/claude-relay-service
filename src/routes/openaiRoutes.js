@@ -264,8 +264,9 @@ const handleResponses = async (req, res) => {
     const isStream = req.body?.stream !== false // 默认为流式（兼容现有行为）
 
     // 判断是否为 Codex CLI 的请求（基于 User-Agent）
+    // 支持: codex_vscode, codex_cli_rs, codex_exec (非交互式/脚本模式)
     const userAgent = req.headers['user-agent'] || ''
-    const codexCliPattern = /^(codex_vscode|codex_cli_rs)\/[\d.]+/i
+    const codexCliPattern = /^(codex_vscode|codex_cli_rs|codex_exec)\/[\d.]+/i
     const isCodexCLI = codexCliPattern.test(userAgent)
 
     // 如果不是 Codex CLI 请求，则进行适配

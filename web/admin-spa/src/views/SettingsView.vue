@@ -1904,7 +1904,7 @@ const claudeConfig = ref({
   claudeCodeOnlyEnabled: false,
   globalSessionBindingEnabled: false,
   sessionBindingErrorMessage: '你的本地session已污染，请清理后使用。',
-  sessionBindingTtlDays: 30,
+  sessionBindingTtlDays: 1,
   userMessageQueueEnabled: false, // 与后端默认值保持一致
   userMessageQueueDelayMs: 200,
   userMessageQueueTimeoutMs: 5000, // 与后端默认值保持一致（优化后锁持有时间短无需长等待）
@@ -2203,7 +2203,7 @@ const loadClaudeConfig = async () => {
         globalSessionBindingEnabled: response.config?.globalSessionBindingEnabled ?? false,
         sessionBindingErrorMessage:
           response.config?.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。',
-        sessionBindingTtlDays: response.config?.sessionBindingTtlDays ?? 30,
+        sessionBindingTtlDays: response.config?.sessionBindingTtlDays ?? 1,
         userMessageQueueEnabled: response.config?.userMessageQueueEnabled ?? false, // 与后端默认值保持一致
         userMessageQueueDelayMs: response.config?.userMessageQueueDelayMs ?? 200,
         userMessageQueueTimeoutMs: response.config?.userMessageQueueTimeoutMs ?? 5000, // 与后端默认值保持一致
