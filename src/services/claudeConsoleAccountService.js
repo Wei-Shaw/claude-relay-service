@@ -1295,7 +1295,7 @@ class ClaudeConsoleAccountService {
       }
 
       // 检查是否已经因额度停用（避免重复操作）
-      if (!accountData.isActive && accountData.quotaStoppedAt) {
+      if (accountData.quotaStoppedAt) {
         return
       }
 
@@ -1311,21 +1311,14 @@ class ClaudeConsoleAccountService {
           return // 已经被其他进程处理
         }
 
-        // 超过额度，停用账户
+        // 超过额度，停止调度但保持账户状态正常
+        // 不修改 isActive 和 status，只用独立字段标记配额超限
         const updates = {
-          isActive: false,
           quotaStoppedAt: new Date().toISOString(),
           errorMessage: `Daily quota exceeded: $${currentDailyCost.toFixed(2)} / $${dailyQuota.toFixed(2)}`,
           schedulable: false, // 停止调度
           // 使用独立的额度超限自动停止标记
           quotaAutoStopped: 'true'
-        }
-
-        // 只有当前状态是active时才改为quota_exceeded
-        // 如果是rate_limited等其他状态，保持原状态不变
-        const currentStatus = await client.hget(accountKey, 'status')
-        if (currentStatus === 'active') {
-          updates.status = 'quota_exceeded'
         }
 
         await this.updateAccount(accountId, updates)
@@ -1371,15 +1364,10 @@ class ClaudeConsoleAccountService {
         lastResetDate: today
       }
 
-      // 如果账户是因为超额被停用的，恢复账户
-      // 注意：状态可能是 quota_exceeded 或 rate_limited（如果429错误时也超额了）
-      if (
-        accountData.quotaStoppedAt &&
-        accountData.isActive === false &&
-        (accountData.status === 'quota_exceeded' || accountData.status === 'rate_limited')
-      ) {
-        updates.isActive = true
-        updates.status = 'active'
+      // 如果账户因配额超限被停用，恢复账户
+      // 新逻辑：不再依赖 isActive === false 和 status 判断
+      // 只要有 quotaStoppedAt 就说明是因配额超限被停止的
+      if (accountData.quotaStoppedAt) {
         updates.errorMessage = ''
         updates.quotaStoppedAt = ''
 
@@ -1389,16 +1377,7 @@ class ClaudeConsoleAccountService {
           updates.quotaAutoStopped = ''
         }
 
-        // 如果是rate_limited状态，也清除限流相关字段
-        if (accountData.status === 'rate_limited') {
-          const client = redis.getClientSafe()
-          const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
-          await client.hdel(accountKey, 'rateLimitedAt', 'rateLimitStatus', 'rateLimitAutoStopped')
-        }
-
-        logger.info(
-          `✅ Restored account ${accountId} after daily reset (was ${accountData.status})`
-        )
+        logger.info(`✅ Restored account ${accountId} after daily quota reset`)
       }
 
       await this.updateAccount(accountId, updates)
