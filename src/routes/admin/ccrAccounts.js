@@ -426,17 +426,16 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Account not found' })
     }
 
-    // 获取解密后的凭据
-    const credentials = await ccrAccountService.getDecryptedCredentials(accountId)
-    if (!credentials) {
-      return res.status(401).json({ error: 'Credentials not found or decryption failed' })
+    // 验证必要的凭据是否存在
+    if (!account.apiKey) {
+      return res.status(401).json({ error: 'API Key not found' })
     }
 
     // 构造测试请求
     const axios = require('axios')
     const { getProxyAgent } = require('../../utils/proxyHelper')
 
-    const baseUrl = account.baseUrl || 'https://api.anthropic.com'
+    const baseUrl = account.apiUrl || 'https://api.anthropic.com'
     const apiUrl = `${baseUrl}/v1/messages`
     const payload = {
       model,
@@ -447,7 +446,7 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
     const requestConfig = {
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': credentials.apiKey,
+        'x-api-key': account.apiKey,
         'anthropic-version': '2023-06-01'
       },
       timeout: 30000
