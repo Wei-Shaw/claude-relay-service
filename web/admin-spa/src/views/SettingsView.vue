@@ -608,6 +608,30 @@
                         <i class="fas fa-shield-alt mr-2"></i>
                         <span>已启用签名验证</span>
                       </div>
+                      <!-- 通知接收模式 -->
+                      <div
+                        v-if="platform.filterByAccountGroups"
+                        class="flex items-center"
+                        :class="
+                          platform.accountGroupIds && platform.accountGroupIds.length > 0
+                            ? 'text-blue-600 dark:text-blue-400'
+                            : 'text-yellow-600 dark:text-yellow-400'
+                        "
+                      >
+                        <i class="fas fa-user-tag mr-2"></i>
+                        <span class="truncate">
+                          <template
+                            v-if="platform.accountGroupIds && platform.accountGroupIds.length > 0"
+                          >
+                            仅账号通知 · {{ platform.accountGroupIds.length }} 个分组
+                          </template>
+                          <template v-else> 仅账号通知 · 无分组 </template>
+                        </span>
+                      </div>
+                      <div v-else class="flex items-center text-gray-500 dark:text-gray-500">
+                        <i class="fas fa-globe mr-2"></i>
+                        <span>接收所有通知</span>
+                      </div>
                     </div>
                   </div>
                   <div class="ml-4 flex items-center space-x-2">
@@ -1303,6 +1327,119 @@
             />
           </div>
 
+          <!-- 仅接收账号通知 -->
+          <div>
+            <!-- 开关 -->
+            <div class="flex items-center justify-between">
+              <label class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
+                <i class="fas fa-user-tag mr-2 text-gray-400"></i>
+                仅接收账号通知
+              </label>
+              <label class="relative inline-flex cursor-pointer items-center">
+                <input
+                  v-model="platformForm.filterByAccountGroups"
+                  class="peer sr-only"
+                  type="checkbox"
+                />
+                <div
+                  class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:bg-gray-600 dark:peer-focus:ring-blue-800"
+                ></div>
+              </label>
+            </div>
+
+            <!-- 说明文字 -->
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <i class="fas fa-info-circle mr-1"></i>
+              <template v-if="!platformForm.filterByAccountGroups">
+                关闭时接收所有通知（账号异常、限流恢复、配额警告、系统错误等）。
+              </template>
+              <template v-else>
+                开启后仅接收账号维度通知（账号异常、限流恢复），并按所选分组过滤。系统级通知（配额警告、系统错误等）将不会发送到此平台。
+              </template>
+            </p>
+
+            <!-- 分组选择器（仅在开启过滤时显示） -->
+            <div
+              v-if="platformForm.filterByAccountGroups"
+              class="mt-3 rounded-xl border border-gray-300 bg-white p-3 dark:border-gray-600 dark:bg-gray-700"
+            >
+              <!-- 分组多选器 -->
+              <div v-if="accountGroupsLoading" class="py-4 text-center">
+                <i class="fas fa-spinner fa-spin text-blue-500"></i>
+                <span class="ml-2 text-sm text-gray-500">加载分组...</span>
+              </div>
+              <div
+                v-else-if="accountGroups.length === 0"
+                class="py-4 text-center text-sm text-gray-500 dark:text-gray-400"
+              >
+                <i class="fas fa-exclamation-triangle mr-1 text-yellow-500"></i>
+                暂无账户分组，请先在账户管理中创建分组
+              </div>
+              <div v-else class="max-h-48 space-y-2 overflow-y-auto">
+                <!-- 按平台分组显示 -->
+                <div v-for="platform in ['claude', 'gemini', 'openai', 'droid']" :key="platform">
+                  <div v-if="getGroupsByPlatform(platform).length > 0" class="mb-2">
+                    <div
+                      class="mb-1 text-xs font-medium uppercase text-gray-500 dark:text-gray-400"
+                    >
+                      {{ platform }}
+                    </div>
+                    <div class="space-y-1">
+                      <label
+                        v-for="group in getGroupsByPlatform(platform)"
+                        :key="group.id"
+                        class="flex cursor-pointer items-center rounded-lg p-2 hover:bg-gray-50 dark:hover:bg-gray-600"
+                      >
+                        <input
+                          v-model="platformForm.accountGroupIds"
+                          class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-500 dark:bg-gray-600"
+                          type="checkbox"
+                          :value="group.id"
+                        />
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                          {{ group.name }}
+                        </span>
+                        <span class="ml-2 text-xs text-gray-400">
+                          ({{ group.memberCount || 0 }} 个账户)
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 快捷操作 -->
+              <div
+                v-if="accountGroups.length > 0"
+                class="mt-3 flex gap-2 border-t border-gray-200 pt-3 dark:border-gray-600"
+              >
+                <button
+                  class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                  type="button"
+                  @click="platformForm.accountGroupIds = accountGroups.map((g) => g.id)"
+                >
+                  全选
+                </button>
+                <button
+                  class="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400"
+                  type="button"
+                  @click="platformForm.accountGroupIds = []"
+                >
+                  清空
+                </button>
+              </div>
+
+              <!-- 警告：未选择任何分组 -->
+              <div
+                v-if="accountGroups.length > 0 && platformForm.accountGroupIds.length === 0"
+                class="mt-3 rounded-lg bg-yellow-50 p-2 text-xs text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+              >
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                未选择任何分组，此平台将不会接收任何账号维度的通知（如账号异常、限流恢复）。
+              </div>
+            </div>
+          </div>
+
           <!-- Webhook URL (非Bark和SMTP平台) -->
           <div
             v-if="
@@ -1943,6 +2080,9 @@ const platformForm = ref({
   url: '',
   enableSign: false,
   secret: '',
+  // 账户分组过滤
+  filterByAccountGroups: false,
+  accountGroupIds: [],
   // Telegram特有字段
   botToken: '',
   chatId: '',
@@ -1965,6 +2105,10 @@ const platformForm = ref({
   timeout: null,
   ignoreTLS: false
 })
+
+// 账户分组数据
+const accountGroups = ref([])
+const accountGroupsLoading = ref(false)
 
 // 监听activeSection变化，加载对应配置
 const sectionWatcher = watch(activeSection, async (newSection) => {
@@ -2141,11 +2285,16 @@ onBeforeUnmount(() => {
 const loadWebhookConfig = async () => {
   if (!isMounted.value) return
   try {
-    const response = await httpApis.getWebhookConfigApi({
-      signal: abortController.value.signal
-    })
-    if (response.success && isMounted.value) {
-      const config = response.config || {}
+    // 并行加载 webhook 配置和账户分组数据
+    const [webhookResponse] = await Promise.all([
+      httpApis.getWebhookConfigApi({
+        signal: abortController.value.signal
+      }),
+      loadAccountGroups()
+    ])
+
+    if (webhookResponse.success && isMounted.value) {
+      const config = webhookResponse.config || {}
       webhookConfig.value = {
         ...config,
         notificationTypes: {
@@ -2160,6 +2309,33 @@ const loadWebhookConfig = async () => {
     showToast('获取webhook配置失败', 'error')
     console.error(error)
   }
+}
+
+// 加载账户分组列表
+const loadAccountGroups = async () => {
+  if (!isMounted.value) return
+  accountGroupsLoading.value = true
+  try {
+    const response = await httpApis.getAccountGroupsApi({
+      signal: abortController.value.signal
+    })
+    if (response.success && isMounted.value) {
+      accountGroups.value = response.data || []
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return
+    if (!isMounted.value) return
+    console.error('加载账户分组失败:', error)
+  } finally {
+    if (isMounted.value) {
+      accountGroupsLoading.value = false
+    }
+  }
+}
+
+// 按平台筛选分组
+const getGroupsByPlatform = (platform) => {
+  return accountGroups.value.filter((group) => group.platform === platform)
 }
 
 // 保存webhook配置
@@ -2513,6 +2689,9 @@ const editPlatform = (platform) => {
     url: platform.url || '',
     enableSign: platform.enableSign || false,
     secret: platform.secret || '',
+    // 账户分组过滤
+    filterByAccountGroups: platform.filterByAccountGroups || false,
+    accountGroupIds: platform.accountGroupIds || [],
     // Telegram特有字段
     botToken: platform.botToken || '',
     chatId: platform.chatId || '',
@@ -2696,6 +2875,9 @@ const closePlatformModal = () => {
       url: '',
       enableSign: false,
       secret: '',
+      // 账户分组过滤
+      filterByAccountGroups: false,
+      accountGroupIds: [],
       // Telegram特有字段
       botToken: '',
       chatId: '',

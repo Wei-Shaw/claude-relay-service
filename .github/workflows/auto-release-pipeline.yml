@@ -1,10 +1,11 @@
 name: Auto Release Pipeline
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:  # 支持手动触发
+  # 禁用自动触发，fork 仓库不需要自动发版
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch:  # 仅支持手动触发
 
 permissions:
   contents: write
