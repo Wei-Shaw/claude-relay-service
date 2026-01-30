@@ -230,9 +230,12 @@ const antigravityModelCooldowns = computed(() => {
   const items = Array.isArray(list) ? list : []
 
   return items
-    .filter((item) => item && typeof item === 'object' && typeof item.resetAt === 'string' && item.resetAt)
+    .filter(
+      (item) => item && typeof item === 'object' && typeof item.resetAt === 'string' && item.resetAt
+    )
     .map((item) => {
-      const modelIdRaw = typeof item.modelId === 'string' ? item.modelId : String(item.modelId || '')
+      const modelIdRaw =
+        typeof item.modelId === 'string' ? item.modelId : String(item.modelId || '')
       const modelId = modelIdRaw.trim().replace(/^models\//i, '') || 'unknown'
       return {
         modelId,
@@ -287,7 +290,9 @@ const antigravityRows = computed(() => {
     const remainingPercent = toPercent(raw?.remaining)
     const isUnknown = remainingPercent === null
     const cooldownResetAt =
-      typeof raw?.cooldown?.resetAt === 'string' && raw.cooldown.resetAt ? raw.cooldown.resetAt : null
+      typeof raw?.cooldown?.resetAt === 'string' && raw.cooldown.resetAt
+        ? raw.cooldown.resetAt
+        : null
     const cooldownModels = Array.isArray(raw?.cooldown?.models) ? raw.cooldown.models : []
     const cooldownTooltip =
       cooldownModels.length > 0

@@ -44,6 +44,11 @@ function parseGoogleErrorReason(errorBody) {
     if (code === 429 && status === 'RESOURCE_EXHAUSTED') {
       return 'RESOURCE_EXHAUSTED'
     }
+    // [dadongwo] Task A: Support missing details.reason for RESOURCE_EXHAUSTED
+    if (code === 429 && !details && status === 'RESOURCE_EXHAUSTED') {
+      return 'RESOURCE_EXHAUSTED'
+    }
+
     if (
       code === 429 &&
       typeof message === 'string' &&

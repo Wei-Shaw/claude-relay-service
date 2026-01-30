@@ -59,7 +59,7 @@ class ClaudeCodeValidator {
       typeof customThreshold === 'number' && Number.isFinite(customThreshold)
         ? customThreshold
         : SYSTEM_PROMPT_THRESHOLD
-    
+
     for (const entry of systemEntries) {
       const rawText = typeof entry?.text === 'string' ? entry.text : ''
       const { bestScore, templateId, maskedRaw } = bestSimilarityByTemplates(rawText)

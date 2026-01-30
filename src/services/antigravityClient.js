@@ -290,8 +290,9 @@ function normalizeBaseUrl(url) {
 
 function getAntigravityApiUrlCandidates() {
   const configured = normalizeBaseUrl(getAntigravityApiUrl())
-  const daily = 'https://daily-cloudcode-pa.sandbox.googleapis.com'
+  const daily = 'https://daily-cloudcode-pa.googleapis.com'
   const prod = 'https://cloudcode-pa.googleapis.com'
+  const dailySandbox = 'https://daily-cloudcode-pa.sandbox.googleapis.com'
 
   // 若显式配置了自定义 base url，则只使用该地址（除非显式开启 fallback）。
   if (process.env.ANTIGRAVITY_API_URL) {
@@ -303,20 +304,20 @@ function getAntigravityApiUrlCandidates() {
     }
   }
 
-  // [dadongwo] 默认行为：优先 daily，失败时再尝试 prod。
-  if (configured === normalizeBaseUrl(daily)) {
-    return [configured, prod]
-  }
-  if (configured === normalizeBaseUrl(prod)) {
-    return [configured, daily]
+  // [dadongwo] 默认行为：优先 daily，失败时再尝试 prod/dailySandbox。
+  const defaults = [daily, prod, dailySandbox]
+  if (defaults.map(normalizeBaseUrl).includes(configured)) {
+    // 保持 configured 第一
+    const others = defaults.filter((u) => normalizeBaseUrl(u) !== configured)
+    return [configured, ...others]
   }
 
-  return [configured, prod, daily].filter(Boolean)
+  return [configured, ...defaults]
 }
 
 function getAntigravityHeaders(accessToken, baseUrl) {
   const resolvedBaseUrl = baseUrl || getAntigravityApiUrl()
-  let host = 'daily-cloudcode-pa.sandbox.googleapis.com'
+  let host = 'daily-cloudcode-pa.googleapis.com'
   try {
     host = new URL(resolvedBaseUrl).host || host
   } catch (e) {
@@ -335,8 +336,8 @@ function getAntigravityHeaders(accessToken, baseUrl) {
     'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
     'Client-Metadata': JSON.stringify({
       ideType: 'IDE_UNSPECIFIED',
-      ideVersion: 'vscode/1.100.0',
-      extensionVersion: '0.1.0',
+      ideVersion: 'vscode/1.108.0',
+      extensionVersion: '2.37.0',
       surface: 'vscode'
     })
   }
