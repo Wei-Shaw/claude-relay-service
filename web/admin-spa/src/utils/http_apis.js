@@ -113,7 +113,7 @@ export const exchangeClaudeCodeApi = (data) =>
 export const generateClaudeSetupTokenUrlApi = (data) =>
   request({ url: '/admin/claude-accounts/generate-setup-token-url', method: 'POST', data })
 export const exchangeClaudeSetupTokenApi = (data) =>
-  request({ url: '/admin/claude-accounts/exchange-setup-token', method: 'POST', data })
+  request({ url: '/admin/claude-accounts/exchange-setup-token-code', method: 'POST', data })
 export const claudeOAuthWithCookieApi = (data) =>
   request({ url: '/admin/claude-accounts/oauth-with-cookie', method: 'POST', data })
 export const claudeSetupTokenWithCookieApi = (data) =>
