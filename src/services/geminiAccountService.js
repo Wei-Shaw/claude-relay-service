@@ -1102,6 +1102,50 @@ async function refreshAccountToken(accountId) {
   }
 }
 
+// 确保账户 token 有效，如果过期则刷新
+async function ensureValidToken(accountId) {
+  try {
+    const account = await getAccount(accountId)
+    if (!account) {
+      return {
+        success: false,
+        error: 'Account not found'
+      }
+    }
+
+    // 检查 token 是否过期
+    if (isTokenExpired(account)) {
+      logger.info(`Token expired for Gemini account ${accountId}, refreshing...`)
+      await refreshAccountToken(accountId)
+      const refreshedAccount = await getAccount(accountId)
+
+      if (!refreshedAccount || !refreshedAccount.accessToken) {
+        return {
+          success: false,
+          error: 'Failed to refresh token'
+        }
+      }
+
+      return {
+        success: true,
+        accessToken: decrypt(refreshedAccount.accessToken)
+      }
+    }
+
+    // Token 仍然有效
+    return {
+      success: true,
+      accessToken: decrypt(account.accessToken)
+    }
+  } catch (error) {
+    logger.error(`Failed to ensure valid token for account ${accountId}:`, error)
+    return {
+      success: false,
+      error: error.message
+    }
+  }
+}
+
 // 标记账户被使用
 async function markAccountUsed(accountId) {
   await updateAccount(accountId, {
@@ -1878,6 +1922,7 @@ module.exports = {
   getAllAccounts,
   selectAvailableAccount,
   refreshAccountToken,
+  ensureValidToken,
   markAccountUsed,
   setAccountRateLimited,
   getAccountRateLimitInfo,
