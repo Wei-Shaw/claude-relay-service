@@ -61,7 +61,7 @@ function getAntigravityHeaders(accessToken, baseUrl) {
 
   return {
     Host: host,
-    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.11.3 windows/amd64',
+    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.15.8 windows/amd64',
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
     'Accept-Encoding': 'gzip',
