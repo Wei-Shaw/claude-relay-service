@@ -241,6 +241,8 @@ const availableModels = computed(() => {
     ],
     gemini: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
     'openai-responses': ['gpt-4o-mini', 'gpt-4o', 'o3-mini'],
+    openai: ['gpt-5-codex'],
+    'openai-codex-app': ['gpt-5-codex'],
     'azure-openai': [props.account.deploymentName || 'gpt-4o-mini'],
     droid: ['claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022'],
     ccr: ['claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022']
@@ -258,6 +260,8 @@ const defaultModel = computed(() => {
     bedrock: 'claude-sonnet-4-5-20250929',
     gemini: 'gemini-2.5-flash',
     'openai-responses': 'gpt-4o-mini',
+    openai: 'gpt-5-codex',
+    'openai-codex-app': 'gpt-5-codex',
     'azure-openai': props.account.deploymentName || 'gpt-4o-mini',
     droid: 'claude-sonnet-4-20250514',
     ccr: 'claude-sonnet-4-20250514'
@@ -289,6 +293,8 @@ const platformLabel = computed(() => {
     'claude-console': 'Claude Console',
     bedrock: 'AWS Bedrock',
     gemini: 'Gemini',
+    openai: 'Codex CLI',
+    'openai-codex-app': 'Codex App',
     'openai-responses': 'OpenAI Responses',
     'azure-openai': 'Azure OpenAI',
     droid: 'Droid',
@@ -305,6 +311,8 @@ const platformIcon = computed(() => {
     'claude-console': 'fas fa-brain',
     bedrock: 'fab fa-aws',
     gemini: 'fas fa-gem',
+    openai: 'fas fa-terminal',
+    'openai-codex-app': 'fas fa-laptop-code',
     'openai-responses': 'fas fa-code',
     'azure-openai': 'fab fa-microsoft',
     droid: 'fas fa-robot',
@@ -321,6 +329,9 @@ const platformBadgeClass = computed(() => {
     'claude-console': 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300',
     bedrock: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300',
     gemini: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
+    openai: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+    'openai-codex-app':
+      'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
     'openai-responses': 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300',
     'azure-openai': 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300',
     droid: 'bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300',
@@ -474,6 +485,8 @@ function getTestEndpoint() {
     'claude-console': `${APP_CONFIG.apiPrefix}/admin/claude-console-accounts/${props.account.id}/test`,
     bedrock: `${APP_CONFIG.apiPrefix}/admin/bedrock-accounts/${props.account.id}/test`,
     gemini: `${APP_CONFIG.apiPrefix}/admin/gemini-accounts/${props.account.id}/test`,
+    openai: `${APP_CONFIG.apiPrefix}/admin/openai-accounts/${props.account.id}/test`,
+    'openai-codex-app': `${APP_CONFIG.apiPrefix}/admin/openai-accounts/${props.account.id}/test`,
     'openai-responses': `${APP_CONFIG.apiPrefix}/admin/openai-responses-accounts/${props.account.id}/test`,
     'azure-openai': `${APP_CONFIG.apiPrefix}/admin/azure-openai-accounts/${props.account.id}/test`,
     droid: `${APP_CONFIG.apiPrefix}/admin/droid-accounts/${props.account.id}/test`,
@@ -639,7 +652,7 @@ watch(
         }
       } else {
         // 其他平台使用默认模型
-        selectedModel.value = 'claude-sonnet-4-5-20250929'
+        selectedModel.value = defaultModel.value
       }
     }
   }

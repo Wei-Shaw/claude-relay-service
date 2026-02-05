@@ -10,6 +10,7 @@ const PLATFORM_CONFIG = {
   bedrock: { endpoint: 'bedrock-accounts', stateKey: 'bedrockAccounts' },
   gemini: { endpoint: 'gemini-accounts', stateKey: 'geminiAccounts' },
   openai: { endpoint: 'openai-accounts', stateKey: 'openaiAccounts' },
+  'openai-codex-app': { endpoint: 'openai-accounts', stateKey: 'openaiAccounts' },
   azure_openai: { endpoint: 'azure-openai-accounts', stateKey: 'azureOpenaiAccounts' },
   'openai-responses': {
     endpoint: 'openai-responses-accounts',

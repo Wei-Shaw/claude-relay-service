@@ -48,6 +48,9 @@ class AccountBalanceService {
     if (value === 'azure-openai') {
       return 'azure_openai'
     }
+    if (value === 'openai-codex-app') {
+      return 'openai'
+    }
 
     // 保持前端平台键一致
     return value
@@ -204,7 +207,8 @@ class AccountBalanceService {
   }
 
   async getAccount(accountId, platform) {
-    if (!accountId || !platform) {
+    const normalizedPlatform = this.normalizePlatform(platform)
+    if (!accountId || !normalizedPlatform) {
       return null
     }
 
@@ -221,7 +225,7 @@ class AccountBalanceService {
       ccr: require('./ccrAccountService')
     }
 
-    const service = serviceMap[platform]
+    const service = serviceMap[normalizedPlatform]
     if (!service || typeof service.getAccount !== 'function') {
       return null
     }
@@ -238,7 +242,8 @@ class AccountBalanceService {
   }
 
   async getAllAccountsByPlatform(platform) {
-    if (!platform) {
+    const normalizedPlatform = this.normalizePlatform(platform)
+    if (!normalizedPlatform) {
       return []
     }
 
@@ -255,18 +260,18 @@ class AccountBalanceService {
       ccr: require('./ccrAccountService')
     }
 
-    const service = serviceMap[platform]
+    const service = serviceMap[normalizedPlatform]
     if (!service) {
       return []
     }
 
     // Bedrock 特殊：返回 { success, data }
-    if (platform === 'bedrock' && typeof service.getAllAccounts === 'function') {
+    if (normalizedPlatform === 'bedrock' && typeof service.getAllAccounts === 'function') {
       const result = await service.getAllAccounts()
       return result?.success ? result.data || [] : []
     }
 
-    if (platform === 'openai-responses') {
+    if (normalizedPlatform === 'openai-responses') {
       return await service.getAllAccounts(true)
     }
 

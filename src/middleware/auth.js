@@ -10,6 +10,7 @@ const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { calculateWaitTimeStats } = require('../utils/statsHelper')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
+const { getRequestSizeLimitBytes, getRequestSizeLimitMb } = require('../utils/requestSizeLimit')
 
 // 工具函数
 function sleep(ms) {
@@ -2061,16 +2062,18 @@ const globalRateLimit = async (req, res, next) =>
 
 // 📊 请求大小限制中间件
 const requestSizeLimit = (req, res, next) => {
-  const MAX_SIZE_MB = parseInt(process.env.REQUEST_MAX_SIZE_MB || '100', 10)
-  const maxSize = MAX_SIZE_MB * 1024 * 1024
-  const contentLength = parseInt(req.headers['content-length'] || '0')
+  const maxSizeBytes = getRequestSizeLimitBytes()
+  const maxSizeMb = getRequestSizeLimitMb()
+  const contentLength = parseInt(req.headers['content-length'] || '0', 10)
 
-  if (contentLength > maxSize) {
-    logger.security(`🚨 Request too large: ${contentLength} bytes from ${req.ip}`)
+  if (contentLength > maxSizeBytes) {
+    logger.security(
+      `🚨 Request too large: ${contentLength} bytes > ${maxSizeBytes} bytes from ${req.ip}`
+    )
     return res.status(413).json({
       error: 'Payload Too Large',
       message: 'Request body size exceeds limit',
-      limit: `${MAX_SIZE_MB}MB`
+      limit: `${maxSizeMb}MB`
     })
   }
 

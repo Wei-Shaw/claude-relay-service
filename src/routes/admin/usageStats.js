@@ -248,6 +248,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       'claude',
       'claude-console',
       'openai',
+      'openai-codex-app',
       'openai-responses',
       'gemini',
       'gemini-api',
@@ -263,6 +264,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
 
     const accountTypeMap = {
       openai: 'openai',
+      'openai-codex-app': 'openai',
       'openai-responses': 'openai-responses',
       'gemini-api': 'gemini-api',
       droid: 'droid',
@@ -273,6 +275,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       claude: 'claude-3-5-sonnet-20241022',
       'claude-console': 'claude-3-5-sonnet-20241022',
       openai: 'gpt-4o-mini-2024-07-18',
+      'openai-codex-app': 'gpt-4o-mini-2024-07-18',
       'openai-responses': 'gpt-4o-mini-2024-07-18',
       gemini: 'gemini-1.5-flash',
       'gemini-api': 'gemini-2.0-flash',
@@ -293,6 +296,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
           accountData = await claudeConsoleAccountService.getAccount(accountId)
           break
         case 'openai':
+        case 'openai-codex-app':
           accountData = await openaiAccountService.getAccount(accountId)
           break
         case 'openai-responses':

@@ -39,6 +39,7 @@ const {
   requestSizeLimit
 } = require('./middleware/auth')
 const { browserFallbackMiddleware } = require('./middleware/browserFallback')
+const { zstdJsonBodyParser } = require('./middleware/zstdBodyParser')
 
 class Application {
   constructor() {
@@ -230,6 +231,7 @@ class Application {
       }
 
       // 🔧 基础中间件
+      this.app.use(zstdJsonBodyParser)
       this.app.use(
         express.json({
           limit: '100mb',

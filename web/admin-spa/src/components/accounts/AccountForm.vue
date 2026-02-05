@@ -365,13 +365,46 @@
                           ></i>
                           <div>
                             <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Codex Cli</span
+                              >Codex CLI</span
                             >
                             <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
                           </div>
                         </div>
                         <div
                           v-if="form.platform === 'openai'"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </label>
+
+                      <label
+                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
+                        :class="[
+                          form.platform === 'openai-codex-app'
+                            ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-400 dark:bg-emerald-900/30'
+                            : 'border-gray-300 bg-white hover:border-emerald-400 hover:bg-emerald-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-emerald-500 dark:hover:bg-emerald-900/20'
+                        ]"
+                      >
+                        <input
+                          v-model="form.platform"
+                          class="sr-only"
+                          type="radio"
+                          value="openai-codex-app"
+                        />
+                        <div class="flex items-center gap-2">
+                          <i
+                            class="fas fa-laptop-code text-sm text-emerald-600 dark:text-emerald-400"
+                          ></i>
+                          <div>
+                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                              >Codex App</span
+                            >
+                            <span class="text-xs text-gray-500 dark:text-gray-400">桌面端</span>
+                          </div>
+                        </div>
+                        <div
+                          v-if="form.platform === 'openai-codex-app'"
                           class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
@@ -596,9 +629,10 @@
                     value="oauth"
                   />
                   <span class="text-sm text-gray-700 dark:text-gray-300">
-                    OAuth 授权<span v-if="form.platform === 'claude' || form.platform === 'openai'">
-                      (用量可视化)</span
-                    >
+                    OAuth 授权
+                    <span v-if="form.platform === 'claude' || isOpenAIPlatform(form.platform)">
+                      (用量可视化)
+                    </span>
                   </span>
                 </label>
                 <label v-if="form.platform === 'claude'" class="flex cursor-pointer items-center">
@@ -2003,7 +2037,7 @@
                     Token，建议也一并填写以支持自动刷新。
                   </p>
                   <p
-                    v-else-if="form.platform === 'openai'"
+                    v-else-if="isOpenAIPlatform(form.platform)"
                     class="mb-2 text-sm text-blue-800 dark:text-blue-300"
                   >
                     请输入有效的 OpenAI Access Token。如果您有 Refresh
@@ -2045,7 +2079,7 @@
                       文件中的凭证。
                     </p>
                     <p
-                      v-else-if="form.platform === 'openai'"
+                      v-else-if="isOpenAIPlatform(form.platform)"
                       class="text-xs text-blue-800 dark:text-blue-300"
                     >
                       请从已登录 OpenAI 账户的机器上获取认证凭证， 或通过 OAuth 授权流程获取 Access
@@ -2071,7 +2105,7 @@
                 </div>
               </div>
 
-              <div v-if="form.platform === 'openai'">
+              <div v-if="isOpenAIPlatform(form.platform)">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Access Token (可选)</label
                 >
@@ -2104,7 +2138,7 @@
                 </p>
               </div>
 
-              <div v-if="form.platform === 'openai' || form.platform === 'droid'">
+              <div v-if="isOpenAIPlatform(form.platform) || form.platform === 'droid'">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Refresh Token *</label
                 >
@@ -2121,7 +2155,7 @@
                 </p>
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <i class="fas fa-info-circle mr-1" />
-                  <template v-if="form.platform === 'openai'">
+                  <template v-if="isOpenAIPlatform(form.platform)">
                     系统将使用 Refresh Token 自动获取 Access Token 和用户信息
                   </template>
                   <template v-else>
@@ -4069,11 +4103,15 @@ const platformGroup = ref('')
 // API Key 管理模态框
 const showApiKeyManagement = ref(false)
 
+const isOpenAIPlatform = (platform) => platform === 'openai' || platform === 'openai-codex-app'
+
 // 根据现有平台确定分组
 const determinePlatformGroup = (platform) => {
   if (['claude', 'claude-console', 'ccr', 'bedrock'].includes(platform)) {
     return 'claude'
-  } else if (['openai', 'openai-responses', 'azure_openai'].includes(platform)) {
+  } else if (
+    ['openai', 'openai-codex-app', 'openai-responses', 'azure_openai'].includes(platform)
+  ) {
     return 'openai'
   } else if (['gemini', 'gemini-antigravity', 'gemini-api'].includes(platform)) {
     return 'gemini'
@@ -4210,7 +4248,12 @@ const form = ref({
   platform: props.account?.platform || 'claude',
   addType: (() => {
     const platform = props.account?.platform || 'claude'
-    if (platform === 'gemini' || platform === 'gemini-antigravity' || platform === 'openai')
+    if (
+      platform === 'gemini' ||
+      platform === 'gemini-antigravity' ||
+      platform === 'openai' ||
+      platform === 'openai-codex-app'
+    )
       return 'oauth'
     if (platform === 'claude') return 'oauth'
     return 'manual'
@@ -4983,10 +5026,11 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       }
       // 添加 Gemini 优先级
       data.priority = form.value.priority || 50
-    } else if (currentPlatform === 'openai') {
+    } else if (isOpenAIPlatform(currentPlatform)) {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
       data.priority = form.value.priority || 50
+      data.platform = currentPlatform
     } else if (currentPlatform === 'droid') {
       const rawTokens = tokenInfo.tokens || tokenInfo || {}
 
@@ -5058,7 +5102,7 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       result = await accountsStore.createClaudeAccount(data)
     } else if (currentPlatform === 'gemini') {
       result = await accountsStore.createGeminiAccount(data)
-    } else if (currentPlatform === 'openai') {
+    } else if (isOpenAIPlatform(currentPlatform)) {
       result = await accountsStore.createOpenAIAccount(data)
     } else if (currentPlatform === 'droid') {
       result = await accountsStore.createDroidAccount(data)
@@ -5191,7 +5235,7 @@ const createAccount = async () => {
     }
   } else if (form.value.addType === 'manual') {
     // 手动模式验证 - 只有部分平台需要验证 Token
-    if (form.value.platform === 'openai') {
+    if (isOpenAIPlatform(form.value.platform)) {
       // OpenAI 平台必须有 Refresh Token
       if (!form.value.refreshToken || form.value.refreshToken.trim() === '') {
         errors.value.refreshToken = '请填写 Refresh Token'
@@ -5332,7 +5376,7 @@ const createAccount = async () => {
 
       // 添加 Gemini 优先级
       data.priority = form.value.priority || 50
-    } else if (form.value.platform === 'openai') {
+    } else if (isOpenAIPlatform(form.value.platform)) {
       // OpenAI手动模式需要构建openaiOauth对象
       const expiresInMs = form.value.refreshToken
         ? 10 * 60 * 1000 // 10分钟
@@ -5361,6 +5405,7 @@ const createAccount = async () => {
       data.needsImmediateRefresh = true
       data.requireRefreshSuccess = true // 必须刷新成功才能创建账户
       data.priority = form.value.priority || 50
+      data.platform = form.value.platform
     } else if (form.value.platform === 'droid') {
       data.priority = form.value.priority || 50
       data.endpointType = form.value.endpointType || 'anthropic'
@@ -5472,7 +5517,7 @@ const createAccount = async () => {
       result = await accountsStore.createOpenAIResponsesAccount(data)
     } else if (form.value.platform === 'bedrock') {
       result = await accountsStore.createBedrockAccount(data)
-    } else if (form.value.platform === 'openai') {
+    } else if (isOpenAIPlatform(form.value.platform)) {
       result = await accountsStore.createOpenAIAccount(data)
     } else if (form.value.platform === 'azure_openai') {
       result = await accountsStore.createAzureOpenAIAccount(data)
@@ -5617,7 +5662,7 @@ const updateAccount = async () => {
           token_type: 'Bearer',
           expiry_date: Date.now() + expiresInMs
         }
-      } else if (props.account.platform === 'openai') {
+      } else if (isOpenAIPlatform(props.account.platform)) {
         // OpenAI需要构建openaiOauth对象
         const expiresInMs = form.value.refreshToken
           ? 10 * 60 * 1000 // 10分钟
@@ -5721,7 +5766,7 @@ const updateAccount = async () => {
     }
 
     // OpenAI 账号优先级更新
-    if (props.account.platform === 'openai') {
+    if (isOpenAIPlatform(props.account.platform)) {
       data.priority = form.value.priority || 50
     }
 
@@ -5841,7 +5886,7 @@ const updateAccount = async () => {
       await accountsStore.updateOpenAIResponsesAccount(props.account.id, data)
     } else if (props.account.platform === 'bedrock') {
       await accountsStore.updateBedrockAccount(props.account.id, data)
-    } else if (props.account.platform === 'openai') {
+    } else if (isOpenAIPlatform(props.account.platform)) {
       await accountsStore.updateOpenAIAccount(props.account.id, data)
     } else if (props.account.platform === 'azure_openai') {
       await accountsStore.updateAzureOpenAIAccount(props.account.id, data)
@@ -5967,7 +6012,10 @@ const filteredGroups = computed(() => {
     platformFilter = 'claude'
   }
   // OpenAI-Responses 使用 OpenAI 分组
-  else if (form.value.platform === 'openai-responses') {
+  else if (
+    form.value.platform === 'openai-responses' ||
+    form.value.platform === 'openai-codex-app'
+  ) {
     platformFilter = 'openai'
   }
   // Gemini-API 使用 Gemini 分组
@@ -6051,6 +6099,9 @@ watch(
       form.value.addType = 'oauth'
     } else if (newPlatform === 'openai') {
       // 切换到 OpenAI 时，使用 OAuth 作为默认方式
+      form.value.addType = 'oauth'
+    } else if (newPlatform === 'openai-codex-app') {
+      // 切换到 Codex App 时，使用 OAuth 作为默认方式
       form.value.addType = 'oauth'
     } else if (newPlatform === 'gemini-api' || newPlatform === 'azure_openai') {
       // 切换到 Gemini API 或 Azure OpenAI 时，使用 apikey 模式（直接创建，不需要 OAuth 流程）

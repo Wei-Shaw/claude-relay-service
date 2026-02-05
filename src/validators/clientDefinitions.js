@@ -56,6 +56,16 @@ const CLIENT_DEFINITIONS = {
     allowedPathPrefixes: ['/openai/responses', '/openai/v1/responses', '/azure/']
   },
 
+  CODEX_APP: {
+    id: 'codex_app',
+    name: 'Codex App',
+    displayName: 'Codex Desktop App',
+    description: 'OpenAI Codex desktop application',
+    icon: '💻',
+    // Codex App 仅允许访问 OpenAI Responses 和 Azure 端点
+    allowedPathPrefixes: ['/openai/responses', '/openai/v1/responses', '/azure/']
+  },
+
   DROID_CLI: {
     id: 'droid_cli',
     name: 'Droid CLI',
@@ -72,6 +82,7 @@ const CLIENT_IDS = {
   CLAUDE_CODE: 'claude_code',
   GEMINI_CLI: 'gemini_cli',
   CODEX_CLI: 'codex_cli',
+  CODEX_APP: 'codex_app',
   DROID_CLI: 'droid_cli'
 }
 

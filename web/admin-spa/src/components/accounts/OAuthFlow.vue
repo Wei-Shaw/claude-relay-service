@@ -443,7 +443,7 @@
     </div>
 
     <!-- OpenAI OAuth流程 -->
-    <div v-else-if="platform === 'openai'">
+    <div v-else-if="platform === 'openai' || platform === 'openai-codex-app'">
       <div
         class="rounded-lg border border-orange-200 bg-orange-50 p-6 dark:border-orange-700 dark:bg-orange-900/30"
       >
@@ -941,7 +941,8 @@ watch(authCode, (newValue) => {
     } else if (
       props.platform === 'gemini' ||
       props.platform === 'gemini-antigravity' ||
-      props.platform === 'openai'
+      props.platform === 'openai' ||
+      props.platform === 'openai-codex-app'
     ) {
       // Gemini 和 OpenAI 平台可能使用不同的回调URL
       // 尝试从任何URL中提取code参数
@@ -1000,7 +1001,7 @@ const generateAuthUrl = async () => {
       })
       authUrl.value = result.authUrl
       sessionId.value = result.sessionId
-    } else if (props.platform === 'openai') {
+    } else if (props.platform === 'openai' || props.platform === 'openai-codex-app') {
       const result = await accountsStore.generateOpenAIAuthUrl(proxyConfig)
       authUrl.value = result.authUrl
       sessionId.value = result.sessionId
@@ -1112,7 +1113,7 @@ const exchangeCode = async () => {
         sessionId: sessionId.value,
         oauthProvider: geminiOauthProvider.value
       }
-    } else if (props.platform === 'openai') {
+    } else if (props.platform === 'openai' || props.platform === 'openai-codex-app') {
       // OpenAI使用code和sessionId
       data = {
         code: authCode.value.trim(),
@@ -1144,7 +1145,7 @@ const exchangeCode = async () => {
       if (tokenInfo) {
         tokenInfo.oauthProvider = geminiOauthProvider.value
       }
-    } else if (props.platform === 'openai') {
+    } else if (props.platform === 'openai' || props.platform === 'openai-codex-app') {
       tokenInfo = await accountsStore.exchangeOpenAICode(data)
     } else if (props.platform === 'droid') {
       const response = await accountsStore.exchangeDroidCode(data)

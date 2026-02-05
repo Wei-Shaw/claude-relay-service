@@ -26,6 +26,8 @@ const OPENAI_CONFIG = {
   SCOPE: 'openid profile email offline_access'
 }
 
+const DEFAULT_OPENAI_TEST_MODEL = 'gpt-5-codex'
+
 /**
  * 生成 PKCE 参数
  * @returns {Object} 包含 codeVerifier 和 codeChallenge 的对象
@@ -243,9 +245,13 @@ router.get('/', authenticateAdmin, async (req, res) => {
     }
 
     // 根据查询参数进行筛选
-    if (platform && platform !== 'all' && platform !== 'openai') {
-      // 如果指定了其他平台，返回空数组
-      accounts = []
+    if (platform && platform !== 'all') {
+      if (platform === 'openai-codex-app') {
+        accounts = accounts.filter((account) => account.platform === 'openai-codex-app')
+      } else if (platform !== 'openai') {
+        // 如果指定了其他平台，返回空数组
+        accounts = []
+      }
     }
 
     // 如果指定了分组筛选
@@ -322,6 +328,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
     const {
       name,
       description,
+      platform,
       openaiOauth,
       accountInfo,
       proxy,
@@ -340,10 +347,14 @@ router.post('/', authenticateAdmin, async (req, res) => {
       })
     }
 
+    const allowedPlatforms = ['openai', 'openai-codex-app']
+    const normalizedPlatform = platform && allowedPlatforms.includes(platform) ? platform : 'openai'
+
     // 准备账户数据
     const accountData = {
       name,
       description: description || '',
+      platform: normalizedPlatform,
       accountType: accountType || 'shared',
       priority: priority || 50,
       rateLimitDuration:
@@ -474,6 +485,17 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
     const mappedUpdates = mapExpiryField(updates, 'OpenAI', id)
+    const allowedPlatforms = ['openai', 'openai-codex-app']
+    if (
+      mappedUpdates.platform !== undefined &&
+      mappedUpdates.platform !== null &&
+      !allowedPlatforms.includes(mappedUpdates.platform)
+    ) {
+      return res.status(400).json({
+        error: 'Invalid platform',
+        message: 'Platform must be "openai" or "openai-codex-app"'
+      })
+    }
 
     const { needsImmediateRefresh, requireRefreshSuccess } = mappedUpdates
 
@@ -798,6 +820,186 @@ router.put('/:accountId/toggle-schedulable', authenticateAdmin, async (req, res)
       success: false,
       message: '切换调度状态失败',
       error: error.message
+    })
+  }
+})
+
+// 测试 OpenAI (Codex) 账户连通性
+router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+  const { model = DEFAULT_OPENAI_TEST_MODEL } = req.body || {}
+  const startTime = Date.now()
+
+  try {
+    const account = await openaiAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ success: false, error: 'Account not found' })
+    }
+
+    let accessToken = null
+    if (account.accessToken) {
+      accessToken = openaiAccountService.decrypt(account.accessToken)
+    }
+
+    if (!accessToken || openaiAccountService.isTokenExpired(account)) {
+      const refreshed = await openaiAccountService.refreshAccountToken(accountId)
+      accessToken = refreshed?.access_token || null
+    }
+
+    if (!accessToken) {
+      return res.status(401).json({ success: false, error: 'Access token not available' })
+    }
+
+    const payload = {
+      model,
+      instructions: 'You are Codex.',
+      input: [
+        {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: 'hello' }]
+        }
+      ],
+      stream: true,
+      store: false
+    }
+
+    const headers = {
+      authorization: `Bearer ${accessToken}`,
+      'chatgpt-account-id': account.accountId || account.chatgptUserId || accountId,
+      host: 'chatgpt.com',
+      accept: payload.stream ? 'text/event-stream' : 'application/json',
+      'content-type': 'application/json',
+      'user-agent': 'Codex Desktop/0.0',
+      originator: 'Codex Desktop',
+      'x-oai-web-search-eligible': 'true'
+    }
+
+    const axiosConfig = {
+      headers,
+      timeout: 30000,
+      validateStatus: () => true,
+      responseType: 'stream'
+    }
+
+    const proxyAgent = ProxyHelper.createProxyAgent(account.proxy)
+    if (proxyAgent) {
+      axiosConfig.httpAgent = proxyAgent
+      axiosConfig.httpsAgent = proxyAgent
+      axiosConfig.proxy = false
+    }
+
+    const response = await axios.post(
+      'https://chatgpt.com/backend-api/codex/responses',
+      payload,
+      axiosConfig
+    )
+
+    const latency = Date.now() - startTime
+    const status = response.status
+    let responseText = ''
+
+    if (response.data) {
+      await new Promise((resolve) => {
+        const timeoutMs = 3000
+        let buffer = ''
+        let done = false
+        let collectedText = ''
+
+        const cleanup = () => {
+          if (done) return
+          done = true
+          response.data.removeAllListeners('data')
+          response.data.removeAllListeners('end')
+          response.data.removeAllListeners('error')
+          try {
+            response.data.destroy()
+          } catch (e) {
+            // ignore
+          }
+          responseText = collectedText || buffer.trim().slice(0, 200)
+          resolve()
+        }
+
+        const timer = setTimeout(() => {
+          cleanup()
+          clearTimeout(timer)
+        }, timeoutMs)
+
+        const extractText = (obj) => {
+          if (!obj || typeof obj !== 'object') return ''
+          if (typeof obj.delta === 'string') return obj.delta
+          if (typeof obj.text === 'string') return obj.text
+          if (obj.output_text && typeof obj.output_text === 'string') return obj.output_text
+          if (obj.response && typeof obj.response.output_text === 'string') return obj.response.output_text
+          return ''
+        }
+
+        response.data.on('data', (chunk) => {
+          buffer += chunk.toString('utf8')
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue
+            const payloadLine = line.slice(5).trim()
+            if (!payloadLine || payloadLine === '[DONE]') {
+              cleanup()
+              return
+            }
+            try {
+              const obj = JSON.parse(payloadLine)
+              const text = extractText(obj)
+              if (text) {
+                collectedText += text
+                if (collectedText.length >= 200) {
+                  collectedText = collectedText.slice(0, 200)
+                  cleanup()
+                  return
+                }
+              }
+            } catch (e) {
+              // ignore parse errors for non-json lines
+            }
+          }
+        })
+
+        response.data.on('end', cleanup)
+        response.data.on('error', cleanup)
+      })
+    }
+
+    if (status >= 200 && status < 300) {
+      logger.success(
+        `✅ OpenAI account test passed: ${account.name || accountId} (${accountId}), latency: ${latency}ms`
+      )
+      return res.json({
+        success: true,
+        data: {
+          accountId,
+          accountName: account.name,
+          model,
+          latency,
+          responseText
+        }
+      })
+    }
+
+    logger.warn(`❌ OpenAI account test failed: ${accountId} (${status})`)
+    return res.status(500).json({
+      success: false,
+      error: 'Test failed',
+      message: responseText || `Upstream status ${status}`,
+      latency
+    })
+  } catch (error) {
+    const latency = Date.now() - startTime
+    logger.error(`❌ OpenAI account test failed: ${accountId}`, error.message)
+    return res.status(500).json({
+      success: false,
+      error: 'Test failed',
+      message: error.response?.data?.error?.message || error.message,
+      latency
     })
   }
 })

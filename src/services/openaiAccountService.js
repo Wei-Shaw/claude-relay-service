@@ -458,6 +458,7 @@ async function createAccount(accountData) {
     name: accountData.name,
     description: accountData.description || '',
     accountType: accountData.accountType || 'shared',
+    platform: accountData.platform || 'openai',
     groupId: accountData.groupId || null,
     priority: accountData.priority || 50,
     rateLimitDuration:

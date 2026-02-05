@@ -587,8 +587,19 @@
                       v-else-if="account.platform === 'openai'"
                       class="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-100 bg-gradient-to-r from-gray-100 to-gray-100 px-2.5 py-1"
                     >
-                      <div class="fa-openai" />
-                      <span class="text-xs font-semibold text-gray-950">OpenAi</span>
+                      <i class="fas fa-terminal text-xs text-gray-800" />
+                      <span class="text-xs font-semibold text-gray-950">Codex CLI</span>
+                      <span class="mx-1 h-4 w-px bg-gray-400" />
+                      <span class="text-xs font-medium text-gray-950">{{
+                        getOpenAIAuthType()
+                      }}</span>
+                    </div>
+                    <div
+                      v-else-if="account.platform === 'openai-codex-app'"
+                      class="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-100 bg-gradient-to-r from-gray-100 to-gray-100 px-2.5 py-1"
+                    >
+                      <i class="fas fa-laptop-code text-xs text-gray-800" />
+                      <span class="text-xs font-semibold text-gray-950">Codex App</span>
                       <span class="mx-1 h-4 w-px bg-gray-400" />
                       <span class="text-xs font-medium text-gray-950">{{
                         getOpenAIAuthType()
@@ -1092,7 +1103,12 @@
                       </div>
                     </div>
                   </div>
-                  <div v-else-if="account.platform === 'openai'" class="space-y-2">
+                  <div
+                    v-else-if="
+                      account.platform === 'openai' || account.platform === 'openai-codex-app'
+                    "
+                    class="space-y-2"
+                  >
                     <div v-if="account.codexUsage" class="space-y-2">
                       <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                         <div class="flex items-center gap-2">
@@ -1178,6 +1194,7 @@
                       account.platform === 'bedrock' ||
                       account.platform === 'gemini' ||
                       account.platform === 'openai' ||
+                      account.platform === 'openai-codex-app' ||
                       account.platform === 'openai-responses' ||
                       account.platform === 'azure_openai' ||
                       account.platform === 'ccr' ||
@@ -1395,7 +1412,7 @@
                       ? 'bg-gradient-to-br from-orange-500 to-red-600'
                       : account.platform === 'azure_openai'
                         ? 'bg-gradient-to-br from-blue-500 to-cyan-600'
-                        : account.platform === 'openai'
+                        : account.platform === 'openai' || account.platform === 'openai-codex-app'
                           ? 'bg-gradient-to-br from-gray-600 to-gray-700'
                           : account.platform === 'ccr'
                             ? 'bg-gradient-to-br from-teal-500 to-emerald-600'
@@ -1404,24 +1421,7 @@
                               : 'bg-gradient-to-br from-blue-500 to-blue-600'
                 ]"
               >
-                <i
-                  :class="[
-                    'text-sm text-white',
-                    account.platform === 'claude'
-                      ? 'fas fa-brain'
-                      : account.platform === 'bedrock'
-                        ? 'fab fa-aws'
-                        : account.platform === 'azure_openai'
-                          ? 'fab fa-microsoft'
-                          : account.platform === 'openai'
-                            ? 'fas fa-openai'
-                            : account.platform === 'ccr'
-                              ? 'fas fa-code-branch'
-                              : account.platform === 'droid'
-                                ? 'fas fa-robot'
-                                : 'fas fa-robot'
-                  ]"
-                />
+                <i :class="['text-sm text-white', getMobilePlatformIconClass(account.platform)]" />
               </div>
               <div>
                 <h4
@@ -1433,7 +1433,7 @@
                 </h4>
                 <div class="mt-0.5 flex items-center gap-2">
                   <span class="text-xs text-gray-500 dark:text-gray-400">{{
-                    account.platform
+                    getPlatformLabelShort(account.platform)
                   }}</span>
                   <span class="text-xs text-gray-400">|</span>
                   <span class="text-xs text-gray-500 dark:text-gray-400">{{ account.type }}</span>
@@ -1684,7 +1684,10 @@
               </div>
               <div v-else class="text-xs text-gray-400">暂无统计</div>
             </div>
-            <div v-else-if="account.platform === 'openai'" class="space-y-2">
+            <div
+              v-else-if="account.platform === 'openai' || account.platform === 'openai-codex-app'"
+              class="space-y-2"
+            >
               <div v-if="account.codexUsage" class="space-y-2">
                 <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
                   <div class="flex items-center gap-2">
@@ -2248,6 +2251,7 @@ const supportedUsagePlatforms = [
   'claude',
   'claude-console',
   'openai',
+  'openai-codex-app',
   'openai-responses',
   'gemini',
   'droid',
@@ -2312,7 +2316,8 @@ const platformHierarchy = [
     label: 'Codex / OpenAI（全部）',
     icon: 'fa-openai',
     children: [
-      { value: 'openai', label: 'OpenAI 官方', icon: 'fa-openai' },
+      { value: 'openai', label: 'Codex CLI', icon: 'fa-terminal' },
+      { value: 'openai-codex-app', label: 'Codex App', icon: 'fa-laptop-code' },
       { value: 'openai-responses', label: 'OpenAI-Responses (Codex)', icon: 'fa-server' },
       { value: 'azure_openai', label: 'Azure OpenAI', icon: 'fab fa-microsoft' }
     ]
@@ -2337,7 +2342,7 @@ const platformHierarchy = [
 // 平台分组映射
 const platformGroupMap = {
   'group-claude': ['claude', 'claude-console', 'bedrock', 'ccr'],
-  'group-openai': ['openai', 'openai-responses', 'azure_openai'],
+  'group-openai': ['openai', 'openai-codex-app', 'openai-responses', 'azure_openai'],
   'group-gemini': ['gemini', 'gemini-api'],
   'group-droid': ['droid']
 }
@@ -2359,9 +2364,15 @@ const platformRequestHandlers = {
 const allPlatformKeys = Object.keys(platformRequestHandlers)
 
 // 根据过滤器获取需要加载的平台列表
+const mapFetchPlatform = (platform) => (platform === 'openai-codex-app' ? 'openai' : platform)
+
 const getPlatformsForFilter = (filter) => {
   if (filter === 'all') return allPlatformKeys
-  if (platformGroupMap[filter]) return platformGroupMap[filter]
+  if (filter === 'openai-codex-app') return ['openai']
+  if (platformGroupMap[filter]) {
+    const mapped = platformGroupMap[filter].map(mapFetchPlatform)
+    return Array.from(new Set(mapped))
+  }
   if (allPlatformKeys.includes(filter)) return [filter]
   return allPlatformKeys
 }
@@ -2486,6 +2497,7 @@ const showResetButton = (account) => {
     'claude',
     'claude-console',
     'openai',
+    'openai-codex-app',
     'openai-responses',
     'gemini',
     'gemini-api',
@@ -2596,6 +2608,8 @@ const supportedTestPlatforms = [
   'claude-console',
   'bedrock',
   'gemini',
+  'openai',
+  'openai-codex-app',
   'openai-responses',
   'azure-openai',
   'droid',
@@ -2782,7 +2796,8 @@ const accountStats = computed(() => {
     { value: 'claude-console', label: 'Claude Console' },
     { value: 'gemini', label: 'Gemini' },
     { value: 'gemini-api', label: 'Gemini API' },
-    { value: 'openai', label: 'OpenAI' },
+    { value: 'openai', label: 'Codex CLI' },
+    { value: 'openai-codex-app', label: 'Codex App' },
     { value: 'azure_openai', label: 'Azure OpenAI' },
     { value: 'bedrock', label: 'Bedrock' },
     { value: 'openai-responses', label: 'OpenAI-Responses' },
@@ -3147,7 +3162,8 @@ const loadAccounts = async (forceReload = false) => {
     // 构建查询参数（用于其他筛选情况）
     const params = {}
     if (platformFilter.value !== 'all' && !platformGroupMap[platformFilter.value]) {
-      params.platform = platformFilter.value
+      params.platform =
+        platformFilter.value === 'openai-codex-app' ? 'openai' : platformFilter.value
     }
     if (groupFilter.value !== 'all') {
       params.groupId = groupFilter.value
@@ -3219,7 +3235,7 @@ const loadAccounts = async (forceReload = false) => {
         case 'openai': {
           const items = list.map((acc) => {
             const boundApiKeysCount = counts.openaiAccountId?.[acc.id] || 0
-            return { ...acc, platform: 'openai', boundApiKeysCount }
+            return { ...acc, platform: acc.platform || 'openai', boundApiKeysCount }
           })
           allAccounts.push(...items)
           break
@@ -3295,6 +3311,12 @@ const loadAccounts = async (forceReload = false) => {
           return account.groupInfos.some((group) => group.id === groupFilter.value)
         })
       }
+    }
+
+    if (platformFilter.value !== 'all' && !platformGroupMap[platformFilter.value]) {
+      filteredAccounts = filteredAccounts.filter(
+        (account) => account.platform === platformFilter.value
+      )
     }
 
     filteredAccounts = filteredAccounts.map((account) => {
@@ -3684,6 +3706,8 @@ const resolveAccountDeleteEndpoint = (account) => {
       return `/admin/bedrock-accounts/${account.id}`
     case 'openai':
       return `/admin/openai-accounts/${account.id}`
+    case 'openai-codex-app':
+      return `/admin/openai-accounts/${account.id}`
     case 'azure_openai':
       return `/admin/azure-openai-accounts/${account.id}`
     case 'openai-responses':
@@ -3852,7 +3876,7 @@ const resetAccountStatus = async (account) => {
 
     // 根据账户平台选择不同的 API 端点
     let endpoint = ''
-    if (account.platform === 'openai') {
+    if (account.platform === 'openai' || account.platform === 'openai-codex-app') {
       endpoint = `/admin/openai-accounts/${account.id}/reset-status`
     } else if (account.platform === 'openai-responses') {
       endpoint = `/admin/openai-responses-accounts/${account.id}/reset-status`
@@ -3902,7 +3926,7 @@ const toggleSchedulable = async (account) => {
     endpoint = `/admin/bedrock-accounts/${account.id}/toggle-schedulable`
   } else if (account.platform === 'gemini') {
     endpoint = `/admin/gemini-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'openai') {
+  } else if (account.platform === 'openai' || account.platform === 'openai-codex-app') {
     endpoint = `/admin/openai-accounts/${account.id}/toggle-schedulable`
   } else if (account.platform === 'azure_openai') {
     endpoint = `/admin/azure-openai-accounts/${account.id}/toggle-schedulable`
@@ -3967,6 +3991,27 @@ const getGeminiAuthType = () => {
 const getOpenAIAuthType = () => {
   // OpenAI 统一显示 OAuth
   return 'OAuth'
+}
+
+const getPlatformLabelShort = (platform) => {
+  const labels = {
+    openai: 'Codex CLI',
+    'openai-codex-app': 'Codex App',
+    'openai-responses': 'OpenAI-Responses',
+    azure_openai: 'Azure OpenAI'
+  }
+  return labels[platform] || platform
+}
+
+const getMobilePlatformIconClass = (platform) => {
+  if (platform === 'claude') return 'fas fa-brain'
+  if (platform === 'bedrock') return 'fab fa-aws'
+  if (platform === 'azure_openai') return 'fab fa-microsoft'
+  if (platform === 'openai') return 'fas fa-terminal'
+  if (platform === 'openai-codex-app') return 'fas fa-laptop-code'
+  if (platform === 'ccr') return 'fas fa-code-branch'
+  if (platform === 'droid') return 'fas fa-robot'
+  return 'fas fa-robot'
 }
 
 // 获取 Droid 账号的认证方式
@@ -4167,7 +4212,7 @@ const getSchedulableReason = (account) => {
   }
 
   // OpenAI 账户的错误状态
-  if (account.platform === 'openai') {
+  if (account.platform === 'openai' || account.platform === 'openai-codex-app') {
     if (account.status === 'unauthorized') {
       return '认证失败（401错误）'
     }
