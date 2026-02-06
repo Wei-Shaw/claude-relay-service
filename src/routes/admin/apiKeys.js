@@ -1029,8 +1029,13 @@ router.post('/api-keys/batch-stats', authenticateAdmin, async (req, res) => {
             cost: 0,
             formattedCost: '$0.00',
             dailyCost: 0,
+            weeklyOpusCost: 0,
             currentWindowCost: 0,
+            currentWindowRequests: 0,
+            currentWindowTokens: 0,
             windowRemainingSeconds: null,
+            windowStartTime: null,
+            windowEndTime: null,
             allTimeCost: 0,
             error: error.message
           }
@@ -1109,7 +1114,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
 
   // 获取实时限制数据（窗口数据不受时间范围筛选影响，始终获取当前窗口状态）
   let dailyCost = 0
+  let weeklyOpusCost = 0 // 字段名沿用 weeklyOpusCost*，语义为"Claude 周费用"
   let currentWindowCost = 0
+  let currentWindowRequests = 0 // 当前窗口请求次数
+  let currentWindowTokens = 0 // 当前窗口 Token 使用量
   let windowRemainingSeconds = null
   let windowStartTime = null
   let windowEndTime = null
@@ -1121,6 +1129,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     const rateLimitWindow = parseInt(apiKey?.rateLimitWindow) || 0
     const dailyCostLimit = parseFloat(apiKey?.dailyCostLimit) || 0
     const totalCostLimit = parseFloat(apiKey?.totalCostLimit) || 0
+    const weeklyOpusCostLimit = parseFloat(apiKey?.weeklyOpusCostLimit) || 0
 
     // 只在启用了每日费用限制时查询
     if (dailyCostLimit > 0) {
@@ -1131,6 +1140,43 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     if (totalCostLimit > 0) {
       const totalCostKey = `usage:cost:total:${keyId}`
       allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
+    }
+
+    // 只在启用了 Claude 周费用限制时查询（字段名沿用 weeklyOpusCostLimit）
+    if (weeklyOpusCostLimit > 0) {
+      weeklyOpusCost = await redis.getWeeklyOpusCost(keyId)
+    }
+
+    // 只在启用了窗口限制时查询窗口数据（移到早期返回之前，确保窗口数据始终被获取）
+    if (rateLimitWindow > 0) {
+      const requestCountKey = `rate_limit:requests:${keyId}`
+      const tokenCountKey = `rate_limit:tokens:${keyId}`
+      const costCountKey = `rate_limit:cost:${keyId}`
+      const windowStartKey = `rate_limit:window_start:${keyId}`
+
+      currentWindowRequests = parseInt((await client.get(requestCountKey)) || '0')
+      currentWindowTokens = parseInt((await client.get(tokenCountKey)) || '0')
+      currentWindowCost = parseFloat((await client.get(costCountKey)) || '0')
+
+      // 获取窗口开始时间和计算剩余时间
+      const windowStart = await client.get(windowStartKey)
+      if (windowStart) {
+        const now = Date.now()
+        windowStartTime = parseInt(windowStart)
+        const windowDuration = rateLimitWindow * 60 * 1000 // 转换为毫秒
+        windowEndTime = windowStartTime + windowDuration
+
+        // 如果窗口还有效
+        if (now < windowEndTime) {
+          windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
+        } else {
+          // 窗口已过期
+          windowRemainingSeconds = 0
+          currentWindowRequests = 0
+          currentWindowTokens = 0
+          currentWindowCost = 0
+        }
+      }
     }
 
     // 🔧 FIX: 对于 "全部时间" 时间范围，直接使用 allTimeCost
@@ -1149,37 +1195,14 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
         formattedCost: CostCalculator.formatCost(allTimeCost),
         // 实时限制数据（始终返回，不受时间范围影响）
         dailyCost,
+        weeklyOpusCost,
         currentWindowCost,
+        currentWindowRequests,
+        currentWindowTokens,
         windowRemainingSeconds,
         windowStartTime,
         windowEndTime,
         allTimeCost
-      }
-    }
-
-    // 只在启用了窗口限制时查询窗口数据
-    if (rateLimitWindow > 0) {
-      const costCountKey = `rate_limit:cost:${keyId}`
-      const windowStartKey = `rate_limit:window_start:${keyId}`
-
-      currentWindowCost = parseFloat((await client.get(costCountKey)) || '0')
-
-      // 获取窗口开始时间和计算剩余时间
-      const windowStart = await client.get(windowStartKey)
-      if (windowStart) {
-        const now = Date.now()
-        windowStartTime = parseInt(windowStart)
-        const windowDuration = rateLimitWindow * 60 * 1000 // 转换为毫秒
-        windowEndTime = windowStartTime + windowDuration
-
-        // 如果窗口还有效
-        if (now < windowEndTime) {
-          windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
-        } else {
-          // 窗口已过期
-          windowRemainingSeconds = 0
-          currentWindowCost = 0
-        }
       }
     }
   } catch (error) {
@@ -1199,7 +1222,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       formattedCost: '$0.00',
       // 实时限制数据（始终返回，不受时间范围影响）
       dailyCost,
+      weeklyOpusCost,
       currentWindowCost,
+      currentWindowRequests,
+      currentWindowTokens,
       windowRemainingSeconds,
       windowStartTime,
       windowEndTime,
@@ -1317,7 +1343,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     formattedCost: CostCalculator.formatCost(totalCost),
     // 实时限制数据
     dailyCost,
+    weeklyOpusCost,
     currentWindowCost,
+    currentWindowRequests,
+    currentWindowTokens,
     windowRemainingSeconds,
     windowStartTime,
     windowEndTime,
