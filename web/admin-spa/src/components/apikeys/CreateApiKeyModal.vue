@@ -1349,6 +1349,7 @@ const removeRestrictedModel = (index) => {
 
 // 常用模型列表
 const commonModels = ref([
+  'claude-opus-4-6',
   'claude-opus-4-5-20251101',
   'claude-opus-4-1-20250805',
   'claude-opus-4-20250514'
