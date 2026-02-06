@@ -1491,6 +1491,13 @@
                     <button
                       class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
                       type="button"
+                      @click="addPresetMapping('claude-opus-4-6', 'claude-opus-4-6')"
+                    >
+                      + Opus 4.6
+                    </button>
+                    <button
+                      class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                      type="button"
                       @click="
                         addPresetMapping('claude-opus-4-5-20251101', 'claude-opus-4-5-20251101')
                       "
@@ -3244,6 +3251,13 @@
                     "
                   >
                     + Sonnet 4.5
+                  </button>
+                  <button
+                    class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
+                    type="button"
+                    @click="addPresetMapping('claude-opus-4-6', 'claude-opus-4-6')"
+                  >
+                    + Opus 4.6
                   </button>
                   <button
                     class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"

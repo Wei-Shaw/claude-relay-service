@@ -32,7 +32,13 @@ class PricingService {
     // ephemeral_5m 的价格使用 model_pricing.json 中的 cache_creation_input_token_cost
     // ephemeral_1h 的价格需要硬编码
     this.ephemeral1hPricing = {
-      // Opus 系列: $30/MTok
+      // Opus 4.6/4.5 系列: $10/MTok
+      'claude-opus-4-6': 0.00001,
+      'claude-opus-4-6-20260205': 0.00001,
+      'claude-opus-4-5': 0.00001,
+      'claude-opus-4-5-20251101': 0.00001,
+
+      // Opus 4.1/4.0/3 系列: $30/MTok
       'claude-opus-4-1': 0.00003,
       'claude-opus-4-1-20250805': 0.00003,
       'claude-opus-4': 0.00003,
@@ -67,6 +73,15 @@ class PricingService {
     // 硬编码的 1M 上下文模型价格（美元/token）
     // 当总输入 tokens 超过 200k 时使用这些价格
     this.longContextPricing = {
+      // claude-opus-4-6 的 1M 上下文价格
+      'claude-opus-4-6[1m]': {
+        input: 0.00001, // $10/MTok
+        output: 0.0000375 // $37.50/MTok
+      },
+      'claude-opus-4-6-20260205[1m]': {
+        input: 0.00001, // $10/MTok
+        output: 0.0000375 // $37.50/MTok
+      },
       // claude-sonnet-4-20250514[1m] 模型的 1M 上下文价格
       'claude-sonnet-4-20250514[1m]': {
         input: 0.000006, // $6/MTok

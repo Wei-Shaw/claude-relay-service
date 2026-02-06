@@ -30,6 +30,8 @@ class ModelService {
         provider: 'anthropic',
         description: 'Claude models from Anthropic',
         models: [
+          'claude-opus-4-6',
+          'claude-opus-4-6-20260205',
           'claude-opus-4-5-20251101',
           'claude-haiku-4-5-20251001',
           'claude-sonnet-4-5-20250929',
