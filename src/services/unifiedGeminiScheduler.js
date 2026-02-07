@@ -341,7 +341,9 @@ class UnifiedGeminiScheduler {
     // 获取所有Gemini OAuth账户（共享池）
     const geminiAccounts = await geminiAccountService.getAllAccounts()
     for (const account of geminiAccounts) {
+      // 确保只选择真正的 Gemini 账户（排除 CCR 等其他类型账户）
       if (
+        account.platform === 'gemini' &&
         isActive(account.isActive) &&
         account.status !== 'error' &&
         (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
@@ -397,7 +399,9 @@ class UnifiedGeminiScheduler {
     if (allowApiAccounts) {
       const geminiApiAccounts = await geminiApiAccountService.getAllAccounts()
       for (const account of geminiApiAccounts) {
+        // 确保只选择真正的 Gemini API 账户
         if (
+          (account.platform === 'gemini-api' || account.platform === 'gemini') &&
           isActive(account.isActive) &&
           account.status !== 'error' &&
           (account.accountType === 'shared' || !account.accountType) &&

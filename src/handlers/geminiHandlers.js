@@ -162,9 +162,13 @@ function isReadableStream(value) {
 }
 
 /**
- * 清理 contents 中 functionResponse 不被标准 Gemini API 支持的字段
- * 标准 Gemini API (generativelanguage.googleapis.com) 的 functionResponse 只支持 name 和 response 字段，不支持 id 字段
- * 注意：此函数仅用于 API Key 账户，OAuth 账户使用的 Cloud Code Assist API 可能支持额外字段
+ * 清理 functionResponse 和 functionCall 对象，处理标准 Gemini API 的字段要求
+ * 标准 Gemini API (generativelanguage.googleapis.com) 要求：
+ * - functionResponse: name, response
+ * - functionCall: name, args
+ * 
+ * 注意：Gemini 3 Pro 等模型在使用思维链时，functionCall 需要 thought_signature
+ * 参考: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/thought-signatures
  */
 function sanitizeFunctionResponsesForApiKey(contents) {
   if (!contents || !Array.isArray(contents)) {
@@ -178,13 +182,24 @@ function sanitizeFunctionResponsesForApiKey(contents) {
 
     const sanitizedParts = content.parts.map((part) => {
       if (part.functionResponse) {
-        // 只保留标准 Gemini API 支持的字段：name 和 response
+        // 标准 Gemini API 只支持 name 和 response 字段
         const { name, response } = part.functionResponse
         return {
-          functionResponse: {
-            name,
-            response
-          }
+          functionResponse: { name, response }
+        }
+      }
+      if (part.functionCall) {
+        // 标准 Gemini API 支持 name, args，Gemini 3 Pro 还需要 thought_signature
+        const { name, args, thought_signature } = part.functionCall
+        const sanitizedFunctionCall = { name, args }
+        
+        // 如果提供了 thought_signature，保留它（Gemini 3 Pro 需要）
+        if (thought_signature) {
+          sanitizedFunctionCall.thought_signature = thought_signature
+        }
+        
+        return {
+          functionCall: sanitizedFunctionCall
         }
       }
       return part
