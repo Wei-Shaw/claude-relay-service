@@ -530,39 +530,71 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
 
     const { accessToken } = tokenResult
 
-    // 构造测试请求
+    // 构造测试请求 - 使用 Code Assist API 而不是 Generative Language API
+    // 因为 OAuth scopes 配置的是 cloud-platform 权限
     const axios = require('axios')
-    const { createGeminiTestPayload } = require('../../utils/testPayloadHelper')
-    const { getProxyAgent } = require('../../utils/proxyHelper')
+    const ProxyHelper = require('../../utils/proxyHelper')
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-    const payload = createGeminiTestPayload(model)
+    // 使用 OAuth client 进行测试
+    const oauthClient = await geminiAccountService.getOauthClient(
+      accessToken,
+      account.refreshToken,
+      account.proxy,
+      account.oauthProvider
+    )
 
-    const requestConfig = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`
-      },
-      timeout: 30000
-    }
-
-    // 配置代理
-    if (account.proxy) {
-      const agent = getProxyAgent(account.proxy)
-      if (agent) {
-        requestConfig.httpsAgent = agent
-        requestConfig.httpAgent = agent
+    // 调用 generateContent 方法进行测试
+    const requestData = {
+      model: `models/${model}`,
+      request: {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Say "Hello" in one word.' }]
+          }
+        ],
+        generationConfig: {
+          maxOutputTokens: 50,
+          temperature: 0.1
+        }
       }
     }
 
-    const response = await axios.post(apiUrl, payload, requestConfig)
-    const latency = Date.now() - startTime
-
-    // 提取响应文本
+    // 根据账户类型选择合适的 API
+    let response
     let responseText = ''
-    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      responseText = response.data.candidates[0].content.parts[0].text
+
+    if (account.oauthProvider === 'antigravity') {
+      // 使用 Antigravity API
+      response = await geminiAccountService.generateContentAntigravity(
+        oauthClient,
+        requestData,
+        null, // userPromptId
+        account.projectId || account.tempProjectId || null,
+        null, // sessionId
+        account.proxy
+      )
+      // 提取响应文本
+      if (response?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        responseText = response.candidates[0].content.parts[0].text
+      }
+    } else {
+      // 使用 Code Assist API
+      response = await geminiAccountService.generateContent(
+        oauthClient,
+        requestData,
+        null, // userPromptId
+        account.projectId || account.tempProjectId || null,
+        null, // sessionId
+        account.proxy
+      )
+      // 提取响应文本
+      if (response?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        responseText = response.candidates[0].content.parts[0].text
+      }
     }
+
+    const latency = Date.now() - startTime
 
     logger.success(
       `✅ Gemini account test passed: ${account.name} (${accountId}), latency: ${latency}ms`
