@@ -101,7 +101,7 @@ jspm_packages/
 .nuxt
 # Gatsby files
 .cache/
-public
+# Note: Keep web/admin-spa/public for frontend assets
 
 # Vuepress build output
 .vuepress/dist

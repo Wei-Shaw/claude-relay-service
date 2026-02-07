@@ -1,9 +1,9 @@
 # Claude Relay Service
 
 > [!CAUTION]
-> **Security Update**: v1.1.248 and below contain a critical admin authentication bypass vulnerability allowing unauthorized access to the admin panel.
+> **Security Update**: v1.1.240 and below contain a critical admin authentication bypass vulnerability allowing unauthorized access to the admin panel.
 >
-> **Please update to v1.1.249+ immediately**, or migrate to the next-generation project **[CRS 2.0 (sub2api)](https://github.com/Wei-Shaw/sub2api)**
+> **Please update to v1.1.241+ immediately**, or migrate to the next-generation project **[CRS 2.0 (sub2api)](https://github.com/Wei-Shaw/sub2api)**
 
 <div align="center">
 

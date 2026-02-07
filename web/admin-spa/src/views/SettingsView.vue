@@ -99,7 +99,7 @@
                       v-model="oemSettings.siteName"
                       class="form-input w-full max-w-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                       maxlength="100"
-                      placeholder="Claude Relay Service"
+                      placeholder="Whoos Solutions API Hub"
                       type="text"
                     />
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -327,7 +327,7 @@
                 v-model="oemSettings.siteName"
                 class="form-input w-full dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 maxlength="100"
-                placeholder="Claude Relay Service"
+                placeholder="Whoos Solutions API Hub"
                 type="text"
               />
             </div>
