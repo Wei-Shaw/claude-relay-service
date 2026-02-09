@@ -2412,6 +2412,9 @@ function convertAnthropicToolsToGeminiTools(tools, { vendor = null, targetModel 
         `⚠️ [Tool-Conflict] Skipping googleSearch injection due to ${functionDeclarations.length} existing function declarations. Gemini v1internal does not support mixed tool types.`
       )
     }
+    if (isAntigravityGeminiModel) {
+      return functionDeclarations.map((decl) => ({ functionDeclarations: [decl] }))
+    }
     return [{ functionDeclarations }]
   }
 
@@ -2677,6 +2680,7 @@ function convertAnthropicMessagesToGeminiContents(
   toolUseIdToName,
   { vendor = null, stripThinking = false, sessionId = null, targetModel = null } = {}
 ) {
+  const isAntigravityGeminiModel = vendor === 'antigravity' && isGeminiModelId(targetModel)
   const contents = []
   for (const message of messages || []) {
     const role = message?.role === 'assistant' ? 'model' : 'user'
@@ -2790,19 +2794,37 @@ function convertAnthropicMessagesToGeminiContents(
 
             // Antigravity 对历史工具调用的 functionCall 会校验 thoughtSignature；
             // Claude Code 侧的签名存放在 thinking block（part.signature），这里需要回填到 functionCall part 上。
-            // [大东的绝杀补丁] 再次尝试！
+            // [Antigravity] 仅在有有效签名时附带 thoughtSignature（Gemini 路径禁止使用 fallback）
             if (vendor === 'antigravity') {
-              // 如果没有真签名，就用“免检金牌”
-              const effectiveSignature =
-                lastAntigravityThoughtSignature || THOUGHT_SIGNATURE_FALLBACK
-
-              // 必须把这个塞进去
-              // Antigravity 要求：每个包含 thoughtSignature 的 part 都必须有 thought: true
-              parts.push({
-                thought: true,
-                thoughtSignature: effectiveSignature,
-                functionCall
-              })
+              if (isAntigravityGeminiModel) {
+                let effectiveSignature = lastAntigravityThoughtSignature || ''
+                if (!effectiveSignature && toolCallId) {
+                  const cachedSignature = signatureCache.getToolSignature(toolCallId)
+                  if (cachedSignature) {
+                    effectiveSignature = cachedSignature
+                    lastAntigravityThoughtSignature = cachedSignature
+                    logger.debug('[SignatureCache] Restored signature from tool cache for tool_use')
+                  }
+                }
+                if (effectiveSignature) {
+                  parts.push({
+                    thought: true,
+                    thoughtSignature: effectiveSignature,
+                    functionCall
+                  })
+                } else {
+                  parts.push({ functionCall })
+                }
+              } else {
+                const effectiveSignature =
+                  lastAntigravityThoughtSignature || THOUGHT_SIGNATURE_FALLBACK
+                // Antigravity 要求：每个包含 thoughtSignature 的 part 都必须有 thought: true
+                parts.push({
+                  thought: true,
+                  thoughtSignature: effectiveSignature,
+                  functionCall
+                })
+              }
             } else {
               parts.push({ functionCall })
             }
@@ -2976,6 +2998,8 @@ function buildGeminiRequestFromAnthropic(
   // 复制消息列表以避免修改原始数据
   const messages = JSON.parse(JSON.stringify(body.messages || []))
 
+  const isAntigravityGeminiModel = vendor === 'antigravity' && isGeminiModelId(baseModel)
+
   // [FIX #813] 合并连续的同角色消息
   // 确保请求符合 Anthropic 和 Gemini 的角色交替协议
   mergeConsecutiveMessages(messages)
@@ -3002,7 +3026,9 @@ function buildGeminiRequestFromAnthropic(
 
     // [NEW] 工具循环修复
     // 检测并修复断裂的工具循环，避免 "Assistant message must start with thinking" 错误
-    closeToolLoopForThinking(messages)
+    if (!isAntigravityGeminiModel) {
+      closeToolLoopForThinking(messages)
+    }
   }
 
   // 使用预处理后的消息进行后续转换
@@ -3053,15 +3079,22 @@ function buildGeminiRequestFromAnthropic(
   if (typeof body.top_k === 'number') {
     generationConfig.topK = body.top_k
   }
+  if (isAntigravityGeminiModel && Array.isArray(body.stop_sequences)) {
+    const stopSequences = body.stop_sequences.filter((s) => typeof s === 'string' && s)
+    if (stopSequences.length > 0) {
+      generationConfig.stopSequences = stopSequences
+    }
+  }
 
   // 使用前面已经计算好的 canEnableThinking 结果
   if (vendor === 'antigravity' && body?.thinking?.type === 'enabled') {
     const budgetRaw = Number(body.thinking.budget_tokens)
     if (Number.isFinite(budgetRaw)) {
       if (canEnableThinking) {
+        const includeThoughtsKey = isAntigravityGeminiModel ? 'includeThoughts' : 'include_thoughts'
         generationConfig.thinkingConfig = {
           thinkingBudget: Math.trunc(budgetRaw),
-          include_thoughts: true
+          [includeThoughtsKey]: true
         }
       } else {
         logger.warn(
@@ -3079,13 +3112,29 @@ function buildGeminiRequestFromAnthropic(
 
   // antigravity: 前置注入系统提示词
   if (vendor === 'antigravity') {
-    const allParts = [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION_PREFIX }, ...systemParts]
-    geminiRequestBody.systemInstruction = { role: 'user', parts: allParts }
+    if (isAntigravityGeminiModel) {
+      geminiRequestBody.systemInstruction = {
+        role: 'user',
+        parts: [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION_PREFIX }]
+      }
+      if (systemParts.length > 0) {
+        if (
+          contents.length > 0 &&
+          contents[0]?.role === 'user' &&
+          Array.isArray(contents[0].parts)
+        ) {
+          contents[0].parts = [...systemParts, ...contents[0].parts]
+        } else {
+          contents.unshift({ role: 'user', parts: systemParts })
+        }
+      }
+    } else {
+      const allParts = [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION_PREFIX }, ...systemParts]
+      geminiRequestBody.systemInstruction = { role: 'user', parts: allParts }
+    }
   } else if (systemParts.length > 0) {
     geminiRequestBody.systemInstruction = { parts: systemParts }
   }
-
-  const isAntigravityGeminiModel = vendor === 'antigravity' && isGeminiModelId(baseModel)
 
   let effectiveTools = body.tools
   let toolConfigOverride = null
@@ -3115,9 +3164,16 @@ function buildGeminiRequestFromAnthropic(
     geminiRequestBody.toolConfig = toolConfigOverride
   } else if (geminiTools) {
     // Anthropic 的默认语义是 tools 存在且未设置 tool_choice 时为 auto。
-    // Gemini/Antigravity 的 function calling 默认可能不会启用，因此显式设置为 AUTO，避免“永远不产出 tool_use”。
+    // Gemini/Antigravity 的 function calling 默认可能不会启用，因此显式设置，避免“永远不产出 tool_use”。
+    const hasFunctionDeclarations = Array.isArray(geminiTools)
+      ? geminiTools.some(
+          (tool) =>
+            Array.isArray(tool?.functionDeclarations) && tool.functionDeclarations.length > 0
+        )
+      : false
+    const defaultMode = isAntigravityGeminiModel && hasFunctionDeclarations ? 'VALIDATED' : 'AUTO'
     geminiRequestBody.toolConfig = {
-      functionCallingConfig: { mode: isAntigravityGeminiModel ? 'VALIDATED' : 'AUTO' }
+      functionCallingConfig: { mode: defaultMode }
     }
   }
 
@@ -3172,6 +3228,13 @@ function extractGeminiThoughtText(payload) {
     .join('')
 }
 
+function resolveGeminiPartSignature(part) {
+  if (!part) {
+    return ''
+  }
+  return part.thoughtSignature || part.thought_signature || part.signature || ''
+}
+
 /**
  * 从 Gemini 响应中提取 thinking signature
  * 用于在下一轮对话中传回给 Antigravity
@@ -3183,19 +3246,12 @@ function extractGeminiThoughtSignature(payload) {
     return ''
   }
 
-  const resolveSignature = (part) => {
-    if (!part) {
-      return ''
-    }
-    return part.thoughtSignature || part.thought_signature || part.signature || ''
-  }
-
   // 优先：functionCall part 上的 signature（上游可能把签名挂在工具调用 part 上）
   for (const part of parts) {
     if (!part?.functionCall?.name) {
       continue
     }
-    const signature = resolveSignature(part)
+    const signature = resolveGeminiPartSignature(part)
     if (signature) {
       return signature
     }
@@ -3206,12 +3262,57 @@ function extractGeminiThoughtSignature(payload) {
     if (!part?.thought) {
       continue
     }
-    const signature = resolveSignature(part)
+    const signature = resolveGeminiPartSignature(part)
     if (signature) {
       return signature
     }
   }
   return ''
+}
+
+function cacheAntigravityGeminiToolSignaturesFromParts(payload, sessionId, model) {
+  if (!sessionId) {
+    return
+  }
+  const parts = extractGeminiParts(payload)
+  if (parts.length === 0) {
+    return
+  }
+
+  let lastSignature = ''
+  const modelFamily = extractModelFamily(model)
+
+  for (const part of parts) {
+    if (part?.thought) {
+      const sig = sanitizeThoughtSignatureForAntigravity(resolveGeminiPartSignature(part))
+      if (sig) {
+        lastSignature = sig
+        signatureCache.cacheSessionSignature(sessionId, sig)
+        if (modelFamily) {
+          signatureCache.cacheSignatureFamily(sig, modelFamily)
+        }
+      }
+      continue
+    }
+
+    if (part?.functionCall?.name) {
+      const toolId =
+        typeof part.functionCall.id === 'string' && part.functionCall.id ? part.functionCall.id : ''
+      if (!toolId) {
+        continue
+      }
+      const directSig = sanitizeThoughtSignatureForAntigravity(resolveGeminiPartSignature(part))
+      const effectiveSig = directSig || lastSignature
+      if (!effectiveSig) {
+        continue
+      }
+      signatureCache.cacheToolSignature(toolId, effectiveSig)
+      signatureCache.cacheSessionSignature(sessionId, effectiveSig)
+      if (modelFamily) {
+        signatureCache.cacheSignatureFamily(effectiveSig, modelFamily)
+      }
+    }
+  }
 }
 
 /**
@@ -3380,18 +3481,14 @@ function convertGeminiPayloadToAnthropicContent(payload) {
     content.push(block)
   }
 
-  const resolveSignature = (part) => {
-    if (!part) {
-      return ''
-    }
-    return part.thoughtSignature || part.thought_signature || part.signature || ''
-  }
-
   for (const part of parts) {
     const isThought = part?.thought === true
     if (isThought) {
       flushText()
-      pushThinkingBlock(typeof part?.text === 'string' ? part.text : '', resolveSignature(part))
+      pushThinkingBlock(
+        typeof part?.text === 'string' ? part.text : '',
+        resolveGeminiPartSignature(part)
+      )
       continue
     }
 
@@ -3406,7 +3503,7 @@ function convertGeminiPayloadToAnthropicContent(payload) {
 
       // 上游可能把 thought signature 挂在 functionCall part 上：需要原样传回给客户端，
       // 以便下一轮对话能携带 signature。
-      const functionCallSignature = resolveSignature(part)
+      const functionCallSignature = resolveGeminiPartSignature(part)
       if (functionCallSignature) {
         pushThinkingBlock('', functionCallSignature)
       }
@@ -3989,6 +4086,10 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         }
       }
 
+      if (vendor === 'antigravity' && isGeminiModelId(effectiveModel)) {
+        cacheAntigravityGeminiToolSignaturesFromParts(payload, sessionHash, effectiveModel)
+      }
+
       let content = convertGeminiPayloadToAnthropicContent(payload)
 
       // 🔍 调试日志：检查转换后的 Anthropic 内容
@@ -4462,9 +4563,10 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       }
     })
 
+    const thinkingConfig = requestData?.request?.generationConfig?.thinkingConfig
     const wantsThinkingBlockFirst =
       isAntigravityVendor &&
-      requestData?.request?.generationConfig?.thinkingConfig?.include_thoughts === true
+      (thinkingConfig?.includeThoughts === true || thinkingConfig?.include_thoughts === true)
 
     // ========================================================================
     // [大东的 2.0 补丁 - 修复版] 活跃度看门狗 (Watchdog)
@@ -4615,8 +4717,13 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       if (!alias) {
         return null
       }
-      const decls = requestData?.request?.tools?.[0]?.functionDeclarations
-      const names = Array.isArray(decls) ? decls.map((d) => d?.name).filter(Boolean) : []
+      const toolDefs = requestData?.request?.tools
+      const decls = Array.isArray(toolDefs)
+        ? toolDefs.flatMap((tool) =>
+            Array.isArray(tool?.functionDeclarations) ? tool.functionDeclarations : []
+          )
+        : []
+      const names = decls.map((d) => d?.name).filter(Boolean)
       if (names.length === 0) {
         return null
       }
@@ -4777,7 +4884,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       return false
     }
 
-    const emitToolUseBlock = (name, args, id = null) => {
+    const emitToolUseBlock = (name, args, id = null, signatureOverride = '') => {
       // [NEW] 参数重映射：修复 Gemini 返回的工具调用参数
       // 在发出工具调用之前应用修复，确保 Claude Code 能正确处理
       if (args && typeof args === 'object') {
@@ -4786,6 +4893,15 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
 
       const toolUseId = typeof id === 'string' && id ? id : buildToolUseId()
       const jsonArgs = stableJsonStringify(args || {})
+      const toolSignature =
+        signatureOverride ||
+        (typeof emittedThoughtSignature === 'string' ? emittedThoughtSignature : '')
+      if (isAntigravityGeminiModel && toolSignature) {
+        signatureCache.cacheToolSignature(toolUseId, toolSignature)
+        if (sessionHash) {
+          signatureCache.cacheSessionSignature(sessionHash, toolSignature)
+        }
+      }
 
       if (name) {
         emittedToolUseNames.add(name)
@@ -4960,7 +5076,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       return actions
     }
 
-    const flushPendingToolCallById = (id, { force = false } = {}) => {
+    const flushPendingToolCallById = (id, { force = false, signatureOverride = '' } = {}) => {
       const pending = pendingToolCallsById.get(id)
       if (!pending) {
         return
@@ -4997,7 +5113,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         stopCurrentBlock()
       }
       currentBlockType = 'tool_use'
-      emitToolUseBlock(pending.name, pending.args, id)
+      emitToolUseBlock(pending.name, pending.args, id, signatureOverride)
       pendingToolCallsById.delete(id)
     }
 
@@ -5689,7 +5805,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
               stopCurrentBlock()
             }
             currentBlockType = 'tool_use'
-            emitToolUseBlock(functionCall.name, finalArgs, null)
+            emitToolUseBlock(functionCall.name, finalArgs, null, thoughtSignature)
             continue
           }
 
@@ -5710,7 +5826,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
 
           // 能确定“本次已完整”时再 emit；否则继续等待后续 SSE 事件补全 args。
           if (!canContinue) {
-            flushPendingToolCallById(id)
+            flushPendingToolCallById(id, { signatureOverride: thoughtSignature })
           }
         }
 

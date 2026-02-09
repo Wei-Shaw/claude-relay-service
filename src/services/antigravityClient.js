@@ -501,7 +501,12 @@ function normalizeAntigravityEnvelope(envelope) {
   }
 
   // [dadongwo] 有 tools 时默认启用 VALIDATED（除非显式 NONE）
-  if (Array.isArray(requestPayload.tools) && requestPayload.tools.length > 0) {
+  // Antigravity Gemini 路径保持 AUTO（避免过度校验导致 tool_call 异常）
+  if (
+    Array.isArray(requestPayload.tools) &&
+    requestPayload.tools.length > 0 &&
+    !String(model).toLowerCase().startsWith('gemini-')
+  ) {
     const existing = requestPayload?.toolConfig?.functionCallingConfig || null
     if (existing?.mode !== 'NONE') {
       const nextCfg = { ...(existing || {}), mode: 'VALIDATED' }
@@ -717,7 +722,16 @@ async function request({
       try {
         // 🔍 [诊断日志] 详细记录请求信息，用于排查 429 问题
         const envelopeStr = JSON.stringify(envelope)
-        const toolsCount = envelope.request?.tools?.[0]?.functionDeclarations?.length || 0
+        const toolsCount = Array.isArray(envelope.request?.tools)
+          ? envelope.request.tools.reduce((sum, tool) => {
+              const decls = Array.isArray(tool?.functionDeclarations)
+                ? tool.functionDeclarations
+                : Array.isArray(tool?.function_declarations)
+                  ? tool.function_declarations
+                  : []
+              return sum + decls.length
+            }, 0)
+          : 0
         const thinkingConfig = envelope.request?.generationConfig?.thinkingConfig
         const hasThinking = !!thinkingConfig
         const contentsCount = envelope.request?.contents?.length || 0
