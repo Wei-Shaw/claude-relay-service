@@ -4261,7 +4261,10 @@ const showUsageDetails = (apiKey) => {
   const enrichedApiKey = {
     ...apiKey,
     dailyCost: cachedStats?.dailyCost ?? apiKey.dailyCost ?? 0,
+    weeklyOpusCost: cachedStats?.weeklyOpusCost ?? apiKey.weeklyOpusCost ?? 0,
     currentWindowCost: cachedStats?.currentWindowCost ?? apiKey.currentWindowCost ?? 0,
+    currentWindowRequests: cachedStats?.currentWindowRequests ?? apiKey.currentWindowRequests ?? 0,
+    currentWindowTokens: cachedStats?.currentWindowTokens ?? apiKey.currentWindowTokens ?? 0,
     windowRemainingSeconds: cachedStats?.windowRemainingSeconds ?? apiKey.windowRemainingSeconds,
     windowStartTime: cachedStats?.windowStartTime ?? apiKey.windowStartTime ?? null,
     windowEndTime: cachedStats?.windowEndTime ?? apiKey.windowEndTime ?? null,

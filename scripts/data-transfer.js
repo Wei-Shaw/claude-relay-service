@@ -117,7 +117,7 @@ const CSV_FIELD_MAPPING = {
   concurrencyLimit: '并发限制',
   dailyCostLimit: '日费用限制(美元)',
   totalCostLimit: '总费用限制(美元)',
-  weeklyOpusCostLimit: '周Opus费用限制(美元)',
+  weeklyOpusCostLimit: '周Claude费用限制(美元)',
 
   // 账户绑定
   claudeAccountId: 'Claude专属账户',

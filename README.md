@@ -28,7 +28,7 @@
 
 | 平台 | 服务 | 介绍 |
 |:---|:---|:---|
-| **[pincc.ai](https://pincc.ai/)** | <small>✅ Claude Code<br>✅ Codex CLI</small> | 提供稳定的 Codex CLI 拼车服务<br><br> **全新上线 2API 渠道**：接入CC的效果媲美官方 Anthropic Console 账号，暂不支持 Websearch 和 PDF 识别功能（Websearch 后期会支持）<br>💰 单价：0.8元=1美金额度 |
+| **[pincc.ai](https://pincc.ai/)** | <small>✅ Claude Code<br>✅ Codex CLI</small> | 提供稳定的 Codex CLI 拼车服务<br><br> **全新上线 2API 渠道**：接入CC的效果媲美官方 Anthropic Console 账号，暂不支持 PDF 识别功能 <br>💰 单价：0.8元=1美金额度 |
 
 
 </div>
@@ -987,27 +987,6 @@ proxy_request_buffering off;
 - **GitHub Issues**: 提交详细的错误信息
 - **查看文档**: 仔细阅读错误信息和文档
 - **社区讨论**: 看看其他人是否遇到类似问题
-
----
-
-## ❤️ 赞助支持
-
-如果您觉得这个项目对您有帮助，请考虑赞助支持项目的持续开发。您的支持是我们最大的动力！
-
-<div align="center">
-
-<a href="https://afdian.com/a/claude-relay-service" target="_blank">
-  <img src="https://img.shields.io/badge/请我喝杯咖啡-爱发电-946ce6?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white" alt="Sponsor">
-</a>
-
-<table>
-  <tr>
-    <td><img src="docs/sponsoring/wechat.jpg" width="200" alt="wechat" /></td>
-    <td><img src="docs/sponsoring/alipay.jpg" width="200" alt="alipay" /></td>
-  </tr>
-</table>
-
-</div>
 
 ---
 

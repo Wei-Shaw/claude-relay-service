@@ -762,7 +762,7 @@ class ApiKeyService {
       for (const key of apiKeys) {
         key.usage = await redis.getUsageStats(key.id)
         const costStats = await redis.getCostStats(key.id)
-        // Add cost information to usage object for frontend compatibility
+        // 为前端兼容性：把费用信息同步到 usage 对象里
         if (key.usage && costStats) {
           key.usage.total = key.usage.total || {}
           key.usage.total.cost = costStats.total
