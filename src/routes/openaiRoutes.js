@@ -240,11 +240,28 @@ const handleResponses = async (req, res) => {
     }
 
     // 从请求头或请求体中提取会话 ID
+    //
+    // Notes:
+    // - Some clients (e.g. OpenClaw via OpenAI Responses API) may not send a session_id header,
+    //   but do send a stable prompt_cache_key in the JSON body. Falling back to it improves
+    //   sticky routing hit rate without changing upstream request semantics.
+    const asNonEmptyString = (value) => {
+      if (Array.isArray(value)) {
+        value = value.find((v) => typeof v === 'string' && v.trim())
+      }
+      if (typeof value !== 'string') {
+        return null
+      }
+      const trimmed = value.trim()
+      return trimmed ? trimmed : null
+    }
+
     const sessionId =
-      req.headers['session_id'] ||
-      req.headers['x-session-id'] ||
-      req.body?.session_id ||
-      req.body?.conversation_id ||
+      asNonEmptyString(req.headers['session_id']) ||
+      asNonEmptyString(req.headers['x-session-id']) ||
+      asNonEmptyString(req.body?.session_id) ||
+      asNonEmptyString(req.body?.conversation_id) ||
+      asNonEmptyString(req.body?.prompt_cache_key) ||
       null
 
     sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
