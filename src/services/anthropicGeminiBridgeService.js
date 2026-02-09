@@ -1062,10 +1062,12 @@ function convertAnthropicMessagesToGeminiContents(
           }
 
           const thinkingText = extractAnthropicText(part.thinking || part.text || '')
+          const signature = sanitizeThoughtSignatureForAntigravity(part.signature)
+          const hasSignature = Boolean(signature)
+
           if (vendor === 'antigravity') {
             const hasThinkingText = thinkingText && !shouldSkipText(thinkingText)
             // 先尝试使用请求中的签名，如果没有则尝试从缓存恢复
-            let signature = sanitizeThoughtSignatureForAntigravity(part.signature)
             if (!signature && sessionId && hasThinkingText) {
               const cachedSig = signatureCache.getCachedSignature(sessionId, thinkingText)
               if (cachedSig) {
@@ -1073,7 +1075,6 @@ function convertAnthropicMessagesToGeminiContents(
                 logger.debug('[SignatureCache] Restored signature from cache for thinking block')
               }
             }
-            const hasSignature = Boolean(signature)
 
             // Claude Code 有时会发送空的 thinking block（无 thinking / 无 signature）。
             // 传给 Antigravity 会变成仅含 thoughtSignature 的 part，容易触发 INVALID_ARGUMENT。
@@ -1092,6 +1093,11 @@ function convertAnthropicMessagesToGeminiContents(
               thoughtPart.text = thinkingText
             }
             parts.push(thoughtPart)
+          } else if (hasSignature) {
+            lastAntigravityThoughtSignature = signature
+            if (thinkingText && !shouldSkipText(thinkingText)) {
+              parts.push({ text: thinkingText })
+            }
           } else if (thinkingText && !shouldSkipText(thinkingText)) {
             parts.push({ text: thinkingText })
           }
@@ -1125,7 +1131,7 @@ function convertAnthropicMessagesToGeminiContents(
             // Claude Code 侧的签名存放在 thinking block（part.signature），这里需要回填到 functionCall part 上。
             // [大东的绝杀补丁] 再次尝试！
             if (vendor === 'antigravity') {
-              // 如果没有真签名，就用“免检金牌”
+              // 如果没有真签名，就用"免检金牌"
               const effectiveSignature =
                 lastAntigravityThoughtSignature || THOUGHT_SIGNATURE_FALLBACK
 
@@ -1135,6 +1141,15 @@ function convertAnthropicMessagesToGeminiContents(
                 thought: true,
                 thoughtSignature: effectiveSignature,
                 functionCall
+              })
+            } else if (vendor === 'gemini-cli' && lastAntigravityThoughtSignature) {
+              // Gemini 3 Pro 等模型在使用思维链时，functionCall 需要 thought_signature
+              // 参考: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/thought-signatures
+              parts.push({
+                functionCall: {
+                  ...functionCall,
+                  thought_signature: lastAntigravityThoughtSignature
+                }
               })
             } else {
               parts.push({ functionCall })
