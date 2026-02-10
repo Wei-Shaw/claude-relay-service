@@ -166,21 +166,45 @@ function isReadableStream(value) {
  * 标准 Gemini API (generativelanguage.googleapis.com) 要求：
  * - functionResponse: name, response
  * - functionCall: name, args
- * 
+ *
  * 注意：Gemini 3 Pro 等模型在使用思维链时，functionCall 需要 thought_signature
  * 参考: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/thought-signatures
+ *
+ * @param {Array} contents - 消息内容数组
+ * @param {boolean} isOAuthAccount - 是否为 OAuth 账户（Vertex AI 需要 thought_signature）
+ * @param {string} model - 模型名称，用于判断是否需要 thought_signature
+ * @param {string} baseUrl - API 基础 URL，用于判断是否为 Vertex AI 端点
  */
-function sanitizeFunctionResponsesForApiKey(contents) {
+function sanitizeFunctionResponsesForApiKey(
+  contents,
+  isOAuthAccount = false,
+  model = '',
+  baseUrl = ''
+) {
   if (!contents || !Array.isArray(contents)) {
     return contents
   }
 
-  return contents.map((content) => {
+  // 判断是否需要 thought_signature：
+  // 仅当请求中原本就有 thought_signature 或 thoughtSignature 时才保留
+  // 不主动添加，因为不同端点要求不同
+  const isVertexAIEndpoint =
+    baseUrl.toLowerCase().includes('vertex-ai') ||
+    baseUrl.toLowerCase().includes('aiplatform.googleapis.com') ||
+    baseUrl.includes('googleapis.com/v1beta1/projects')
+
+  // 统一使用下划线命名 (thought_signature)，这是 Gemini API 的标准格式
+  const thoughtSignatureField = 'thought_signature'
+
+  // Debug logging
+  const functionCallParts = []
+
+  const result = contents.map((content, contentIdx) => {
     if (!content.parts || !Array.isArray(content.parts)) {
       return content
     }
 
-    const sanitizedParts = content.parts.map((part) => {
+    const sanitizedParts = content.parts.map((part, partIdx) => {
       if (part.functionResponse) {
         // 标准 Gemini API 只支持 name 和 response 字段
         const { name, response } = part.functionResponse
@@ -189,18 +213,34 @@ function sanitizeFunctionResponsesForApiKey(contents) {
         }
       }
       if (part.functionCall) {
-        // 标准 Gemini API 支持 name, args，Gemini 3 Pro 还需要 thought_signature
-        const { name, args, thought_signature } = part.functionCall
+        // 标准 Gemini API 支持 name, args
+        // thoughtSignature 应该是 functionCall 的同级字段，不是内部字段
+        const { name, args } = part.functionCall
         const sanitizedFunctionCall = { name, args }
-        
-        // 如果提供了 thought_signature，保留它（Gemini 3 Pro 需要）
-        if (thought_signature) {
-          sanitizedFunctionCall.thought_signature = thought_signature
+
+        // 构建返回对象，包含 functionCall
+        const result = { functionCall: sanitizedFunctionCall }
+
+        // 如果 part 级别有 thoughtSignature，保留为同级字段
+        if (part.thoughtSignature) {
+          result.thoughtSignature = part.thoughtSignature
+          functionCallParts.push({
+            contentIdx,
+            partIdx,
+            name,
+            action: 'preserve_part_level_signature',
+            field: 'thoughtSignature'
+          })
+        } else {
+          functionCallParts.push({
+            contentIdx,
+            partIdx,
+            name,
+            action: 'no_signature'
+          })
         }
-        
-        return {
-          functionCall: sanitizedFunctionCall
-        }
+
+        return result
       }
       return part
     })
@@ -210,6 +250,17 @@ function sanitizeFunctionResponsesForApiKey(contents) {
       parts: sanitizedParts
     }
   })
+
+  // Debug logging for thought_signature processing
+  if (functionCallParts.length > 0) {
+    logger.info('[sanitizeFunctionResponses] Processing function calls', {
+      isOAuthAccount,
+      functionCallCount: functionCallParts.length,
+      details: functionCallParts
+    })
+  }
+
+  return result
 }
 
 /**
@@ -1073,8 +1124,8 @@ async function handleLoadCodeAssist(req, res) {
       decision: projectId
         ? '使用账户配置'
         : cloudaicompanionProject
-          ? '使用请求参数'
-          : '不使用项目ID'
+        ? '使用请求参数'
+        : '不使用项目ID'
     })
 
     const response = await geminiAccountService.loadCodeAssist(
@@ -1176,8 +1227,8 @@ async function handleOnboardUser(req, res) {
       decision: projectId
         ? '使用账户配置'
         : cloudaicompanionProject
-          ? '使用请求参数'
-          : '不使用项目ID'
+        ? '使用请求参数'
+        : '不使用项目ID'
     })
 
     // 如果提供了 tierId，直接调用 onboardUser
@@ -1584,8 +1635,8 @@ async function handleGenerateContent(req, res) {
       decision: account.projectId
         ? '使用账户配置'
         : account.tempProjectId
-          ? '使用临时项目ID'
-          : '从loadCodeAssist获取'
+        ? '使用临时项目ID'
+        : '从loadCodeAssist获取'
     })
 
     const response =
@@ -1819,8 +1870,8 @@ async function handleStreamGenerateContent(req, res) {
       decision: account.projectId
         ? '使用账户配置'
         : account.tempProjectId
-          ? '使用临时项目ID'
-          : '从loadCodeAssist获取'
+        ? '使用临时项目ID'
+        : '从loadCodeAssist获取'
     })
 
     const streamResponse =
@@ -2120,24 +2171,49 @@ async function handleStandardGenerateContent(req, res) {
     ;({ accountId } = schedulerResult)
     const { accountType } = schedulerResult
 
-    isApiAccount = accountType === 'gemini-api'
     const actualAccountId = accountId
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
 
-    if (isApiAccount) {
+    // 根据调度器的分类尝试获取账户
+    if (accountType === 'gemini-api') {
       account = await geminiApiAccountService.getAccount(actualAccountId)
-      if (!account) {
-        return res.status(404).json({
-          error: {
-            message: 'Gemini API account not found',
-            type: 'account_not_found'
-          }
-        })
-      }
+    }
 
+    // 如果没找到API Key账户，或者调度器分类为OAuth，尝试获取OAuth账户
+    if (!account) {
+      account = await geminiAccountService.getAccount(actualAccountId)
+      isApiAccount = false
+    } else {
+      // 检查实际账户是否有OAuth凭证（accessToken），如果有则视为OAuth账户
+      // 这是为了处理数据不一致的情况：账户被分类为API Key但实际是OAuth
+      if (account.accessToken) {
+        isApiAccount = false
+        logger.info(`Account ${actualAccountId} has accessToken, treating as OAuth account`)
+      } else {
+        isApiAccount = true
+      }
+    }
+
+    if (!account) {
+      return res.status(404).json({
+        error: {
+          message: 'Gemini account not found',
+          type: 'account_not_found'
+        }
+      })
+    }
+
+    if (isApiAccount) {
       // API Key 账户：清理 functionResponse 中标准 Gemini API 不支持的字段（如 id）
-      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(actualRequestData.contents)
+      // 标准 Gemini API 不支持 thought_signature，只保留已存在的，不添加 fallback
+      // 但 Vertex AI 兼容端点需要
+      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(
+        actualRequestData.contents,
+        false,
+        model,
+        account.baseUrl
+      )
 
       logger.info(`Standard Gemini API generateContent request (${version}) - API Key Account`, {
         model,
@@ -2145,7 +2221,13 @@ async function handleStandardGenerateContent(req, res) {
         apiKeyId: req.apiKey?.id || 'unknown'
       })
     } else {
-      account = await geminiAccountService.getAccount(actualAccountId)
+      // OAuth 账户：需要清理 contents，为 Gemini 3 Pro 等模型添加 thought_signature fallback
+      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(
+        actualRequestData.contents,
+        true,
+        model,
+        account.baseUrl || ''
+      )
 
       logger.info(`Standard Gemini API generateContent request (${version}) - OAuth Account`, {
         model,
@@ -2162,6 +2244,15 @@ async function handleStandardGenerateContent(req, res) {
     if (isApiAccount) {
       // Gemini API 账户：直接使用 API Key 请求
       const apiUrl = buildGeminiApiUrl(account.baseUrl, model, 'generateContent', account.apiKey)
+
+      logger.info(`[DEBUG] API Key Account Request (non-stream):`, {
+        baseUrl: account.baseUrl,
+        apiUrl: apiUrl.replace(account.apiKey, '***'),
+        model,
+        hasThoughtSignature: actualRequestData.contents?.some((c) =>
+          c.parts?.some((p) => p.functionCall?.thought_signature)
+        )
+      })
 
       const axiosConfig = {
         method: 'POST',
@@ -2239,8 +2330,8 @@ async function handleStandardGenerateContent(req, res) {
         decision: account.projectId
           ? '使用账户配置'
           : account.tempProjectId
-            ? '使用临时项目ID'
-            : '从loadCodeAssist获取'
+          ? '使用临时项目ID'
+          : '从loadCodeAssist获取'
       })
 
       const userPromptId = `${crypto.randomUUID()}########0`
@@ -2393,24 +2484,67 @@ async function handleStandardStreamGenerateContent(req, res) {
     ;({ accountId } = schedulerResult)
     const { accountType } = schedulerResult
 
-    isApiAccount = accountType === 'gemini-api'
     const actualAccountId = accountId
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
 
-    if (isApiAccount) {
+    // 根据调度器的分类尝试获取账户
+    if (accountType === 'gemini-api') {
       account = await geminiApiAccountService.getAccount(actualAccountId)
-      if (!account) {
-        return res.status(404).json({
-          error: {
-            message: 'Gemini API account not found',
-            type: 'account_not_found'
-          }
-        })
-      }
+      logger.info(
+        `[DEBUG] Scheduler returned accountType=${accountType}, geminiApiAccountService.getAccount result:`,
+        {
+          found: !!account,
+          hasApiKey: !!(account && account.apiKey),
+          hasAccessToken: !!(account && account.accessToken),
+          accountKeys: account ? Object.keys(account) : null
+        }
+      )
+    }
 
+    // 如果没找到API Key账户，或者调度器分类为OAuth，尝试获取OAuth账户
+    if (!account) {
+      account = await geminiAccountService.getAccount(actualAccountId)
+      isApiAccount = false
+      logger.info(`[DEBUG] Fallback to geminiAccountService, found:`, {
+        found: !!account,
+        hasAccessToken: !!(account && account.accessToken),
+        accountKeys: account ? Object.keys(account) : null
+      })
+    } else {
+      // 检查实际账户是否有OAuth凭证（accessToken），如果有则视为OAuth账户
+      // 这是为了处理数据不一致的情况：账户被分类为API Key但实际是OAuth
+      if (account.accessToken) {
+        isApiAccount = false
+        logger.info(`Account ${actualAccountId} has accessToken, treating as OAuth account`)
+      } else {
+        isApiAccount = true
+        logger.info(
+          `[DEBUG] Account ${actualAccountId} has NO accessToken, treating as API Key account. Account keys:`,
+          Object.keys(account)
+        )
+      }
+    }
+
+    if (!account) {
+      return res.status(404).json({
+        error: {
+          message: 'Gemini account not found',
+          type: 'account_not_found'
+        }
+      })
+    }
+
+    if (isApiAccount) {
       // API Key 账户：清理 functionResponse 中标准 Gemini API 不支持的字段（如 id）
-      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(actualRequestData.contents)
+      // 标准 Gemini API 不支持 thought_signature，只保留已存在的，不添加 fallback
+      // 但 Vertex AI 兼容端点需要
+      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(
+        actualRequestData.contents,
+        false,
+        model,
+        account.baseUrl
+      )
 
       logger.info(
         `Standard Gemini API streamGenerateContent request (${version}) - API Key Account`,
@@ -2421,7 +2555,13 @@ async function handleStandardStreamGenerateContent(req, res) {
         }
       )
     } else {
-      account = await geminiAccountService.getAccount(actualAccountId)
+      // OAuth 账户：需要清理 contents，为 Gemini 3 Pro 等模型添加 thought_signature fallback
+      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(
+        actualRequestData.contents,
+        true,
+        model,
+        account.baseUrl || ''
+      )
 
       logger.info(
         `Standard Gemini API streamGenerateContent request (${version}) - OAuth Account`,
@@ -2460,6 +2600,33 @@ async function handleStandardStreamGenerateContent(req, res) {
           stream: true
         }
       )
+
+      // 查找包含 functionCall 的 part 来调试
+      const functionCallDebug = []
+      actualRequestData.contents?.forEach((c, idx) => {
+        c.parts?.forEach((p, pIdx) => {
+          if (p.functionCall) {
+            functionCallDebug.push({
+              contentIdx: idx,
+              partIdx: pIdx,
+              functionCall: p.functionCall
+            })
+          }
+        })
+      })
+
+      logger.info(`[DEBUG] API Key Account Request:`, {
+        baseUrl: account.baseUrl,
+        apiUrl: apiUrl.replace(account.apiKey, '***'),
+        model,
+        hasThoughtSignature_snake: actualRequestData.contents?.some((c) =>
+          c.parts?.some((p) => p.functionCall?.thought_signature)
+        ),
+        hasThoughtSignature_camel: actualRequestData.contents?.some((c) =>
+          c.parts?.some((p) => p.functionCall?.thoughtSignature)
+        ),
+        functionCallDetails: functionCallDebug
+      })
 
       const axiosConfig = {
         method: 'POST',
@@ -2541,8 +2708,8 @@ async function handleStandardStreamGenerateContent(req, res) {
         decision: account.projectId
           ? '使用账户配置'
           : account.tempProjectId
-            ? '使用临时项目ID'
-            : '从loadCodeAssist获取'
+          ? '使用临时项目ID'
+          : '从loadCodeAssist获取'
       })
 
       const userPromptId = `${crypto.randomUUID()}########0`
