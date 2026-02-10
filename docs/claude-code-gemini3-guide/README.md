@@ -59,7 +59,7 @@ ccr -v
     }
   ],
   "Router": {
-    "default": "gemini",
+    "default": "gemini,gemini-2.5-flash",
     "background": "gemini,gemini-3-pro-preview",
     "think": "gemini,gemini-3-pro-preview",
     "longContext": "gemini,gemini-3-pro-preview",
@@ -149,7 +149,7 @@ claude
 |------|-----|
 | 账户名称 | CCR-Gemini3（或自定义名称）|
 | 账户类型 | Claude Console |
-| API 地址 | `http://127.0.0.1:3456`（CCR 服务地址）|
+| API 地址 | `http://127.0.0.1:3456`（CCR 服务地址, 如果用的Docker Desktop运行，如Windows/macOS, 请将127.0.0.1替换为**host.docker.internal**）|
 | API Key | `sk-c0e7fed7b-你的自定义Key`（CCR 配置中的 APIKEY）|
 
 > **注意**：如果 CCR 运行在其他服务器上，请将 `127.0.0.1` 替换为实际的服务器地址，配置文件中需要修改HOST参数为```0.0.0.0```。
@@ -160,9 +160,11 @@ claude
 
 | Claude 模型 | 映射到 Gemini 模型 |
 |-------------|-------------------|
-| `claude-opus-4-1-20250805` | `gemini-3-pro-preview` |
-| `claude-sonnet-4-5-20250929` | `gemini-3-pro-preview` |
-| `claude-haiku-4-5-20251001` | `gemini-2.5-flash` |
+| `claude-opus-4-1-20250805` | `gemini,gemini-3-pro-preview` |
+| `claude-sonnet-4-5-20250929` | `gemini,gemini-3-pro-preview` |
+| `claude-haiku-4-5-20251001` | `gemini,gemini-2.5-flash` |
+
+**注意**：使用CCR转发，模型名需要带provider前缀，如`gemini,gemini-3-pro-preview`。
 
 **配置界面示例：**
 
@@ -219,7 +221,7 @@ curl -X POST http://127.0.0.1:3456/api/v1/messages \
   -H "Content-Type: application/json" \
   -H "x-api-key: sk-c0e7fed7b-你的自定义Key" \
   -d '{
-    "model": "claude-sonnet-4-5-20250929",
+    "model": "gemini,gemini-2.5-flash",
     "max_tokens": 100,
     "messages": [{"role": "user", "content": "Hello"}]
   }'
