@@ -1014,6 +1014,9 @@ class ClaudeRelayService {
       }
     }
 
+    // 移除 x-anthropic-billing-header 系统元素，避免将客户端 billing 标识传递给上游 API
+    this._removeBillingHeaderFromSystem(processedBody)
+
     this._enforceCacheControlLimit(processedBody)
 
     // 处理原有的系统提示（如果配置了）
@@ -1075,6 +1078,39 @@ class ClaudeRelayService {
       // 替换客户端标识部分
       body.metadata.user_id = `user_${unifiedClientId}${match[1]}`
       logger.info(`🔄 Replaced client ID with unified ID: ${body.metadata.user_id}`)
+    }
+  }
+
+  // 🧹 移除 billing header 系统提示元素
+  _removeBillingHeaderFromSystem(processedBody) {
+    if (!processedBody || !processedBody.system) {
+      return
+    }
+
+    if (typeof processedBody.system === 'string') {
+      if (processedBody.system.trim().startsWith('x-anthropic-billing-header')) {
+        logger.debug('🧹 Removed billing header from string system prompt')
+        delete processedBody.system
+      }
+      return
+    }
+
+    if (Array.isArray(processedBody.system)) {
+      const originalLength = processedBody.system.length
+      processedBody.system = processedBody.system.filter(
+        (item) =>
+          !(
+            item &&
+            item.type === 'text' &&
+            typeof item.text === 'string' &&
+            item.text.trim().startsWith('x-anthropic-billing-header')
+          )
+      )
+      if (processedBody.system.length < originalLength) {
+        logger.debug(
+          `🧹 Removed ${originalLength - processedBody.system.length} billing header element(s) from system array`
+        )
+      }
     }
   }
 

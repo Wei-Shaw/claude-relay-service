@@ -490,21 +490,14 @@ name = "crs"
 base_url = "http://127.0.0.1:3000/openai"  # 根据实际填写你服务器的ip地址或者域名
 wire_api = "responses"
 requires_openai_auth = true
-env_key = "CRS_OAI_KEY"
 ```
 
 在 `~/.codex/auth.json` 文件中配置API密钥为 null：
 
 ```json
 {
-    "OPENAI_API_KEY": null  
+    "OPENAI_API_KEY": "后台创建的API密钥"  
 }
-```
-
-环境变量设置：
-
-```bash
-export CRS_OAI_KEY="后台创建的API密钥"
 ```
 
 > ⚠️ 在通过 Nginx 反向代理 CRS 服务并使用 Codex CLI 时，需要在 http 块中添加 underscores_in_headers on;。因为 Nginx 默认会移除带下划线的请求头（如 session_id），一旦该头被丢弃，多账号环境下的粘性会话功能将失效。
