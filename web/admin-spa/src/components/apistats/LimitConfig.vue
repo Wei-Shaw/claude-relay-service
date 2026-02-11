@@ -167,11 +167,11 @@
           </div>
         </div>
 
-        <!-- Claude 模型周费用限制 -->
+        <!-- Opus 模型周费用限制 -->
         <div v-if="statsData.limits.weeklyOpusCostLimit > 0">
           <div class="mb-2 flex items-center justify-between">
             <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
-              >Claude 模型周费用限制</span
+              >Opus 模型周费用限制</span
             >
             <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
               ${{ statsData.limits.weeklyOpusCost.toFixed(4) }} / ${{

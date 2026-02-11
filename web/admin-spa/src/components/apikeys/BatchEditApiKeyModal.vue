@@ -232,10 +232,10 @@
             />
           </div>
 
-          <!-- Claude 模型周费用限制 -->
+          <!-- Opus 模型周费用限制 -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Claude 模型周费用限制 (美元)
+              Opus 模型周费用限制 (美元)
             </label>
             <input
               v-model="form.weeklyOpusCostLimit"
@@ -246,7 +246,7 @@
               type="number"
             />
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              设置 Claude 模型的周费用限制（周一到周日），仅对 Claude 模型请求生效
+              设置 Opus 模型的周费用限制（周一到周日），仅对 Opus 模型请求生效
             </p>
           </div>
 
