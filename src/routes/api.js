@@ -1139,8 +1139,16 @@ async function handleMessagesRequest(req, res) {
       } catch (parseError) {
         logger.warn('⚠️ Failed to parse Claude API response as JSON:', parseError.message)
         logger.info('📄 Raw response body:', response.body)
-        // 使用 Express 内建的 res.send() 发送响应（简单可靠）
-        res.send(response.body)
+
+        // 清理 sticky session，避免下次请求继续使用同一账户
+        if (sessionHash) {
+          await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch((err) => {
+            logger.error('Failed to clear session mapping:', err)
+          })
+        }
+
+        // 保持原有响应格式，避免破坏客户端兼容性
+        res.status(500).send(response.body)
       }
 
       // 如果没有记录usage，只记录警告，不进行估算
