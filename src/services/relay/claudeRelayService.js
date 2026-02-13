@@ -1682,7 +1682,7 @@ class ClaudeRelayService {
         } else if (error.code === 'ETIMEDOUT') {
           errorMessage = 'Connection timed out to Claude API server'
 
-          await this._handleServerError(accountId, 504, null, 'Network')
+          await this._handleServerError(accountId, 504, sessionHash, 'Network')
         }
 
         reject(new Error(errorMessage))
@@ -1692,7 +1692,7 @@ class ClaudeRelayService {
         req.destroy()
         logger.error(`❌ Claude API request timeout (Account: ${accountId})`)
 
-        await this._handleServerError(accountId, 504, null, 'Request')
+        await this._handleServerError(accountId, 504, sessionHash, 'Request')
 
         reject(new Error('Request timeout'))
       })
@@ -2771,6 +2771,9 @@ class ClaudeRelayService {
       req.on('timeout', async () => {
         req.destroy()
         logger.error(`❌ Claude stream request timeout | Account: ${account?.name || accountId}`)
+
+        // 调用 _handleServerError 清理 session
+        await this._handleServerError(accountId, 504, sessionHash, '[Stream] Request')
 
         if (!responseStream.headersSent) {
           const existingConnection = responseStream.getHeader
