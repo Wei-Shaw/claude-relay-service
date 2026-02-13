@@ -2,6 +2,9 @@ const logger = require('./logger')
 
 const TEMP_UNAVAILABLE_PREFIX = 'temp_unavailable'
 
+// 默认限流错误码列表（用于非 Claude Console 账户）
+const DEFAULT_RATE_LIMIT_STATUS_CODES = [429]
+
 // 默认 TTL（秒）
 const DEFAULT_TTL = {
   server_error: 300, // 5xx: 5分钟
@@ -31,8 +34,13 @@ const getTtlConfig = () => {
     overload: config.upstreamError?.overloadTtlSeconds ?? DEFAULT_TTL.overload,
     auth_error: config.upstreamError?.authErrorTtlSeconds ?? DEFAULT_TTL.auth_error,
     timeout: config.upstreamError?.timeoutTtlSeconds ?? DEFAULT_TTL.timeout,
-    rate_limit: DEFAULT_TTL.rate_limit
+    rate_limit: config.upstreamError?.rateLimitTtlSeconds ?? DEFAULT_TTL.rate_limit
   }
+}
+
+// 获取默认的限流错误码列表（用于非 Claude Console 账户）
+const getDefaultRateLimitStatusCodes = () => {
+  return DEFAULT_RATE_LIMIT_STATUS_CODES
 }
 
 // 延迟加载 redis，避免循环依赖
@@ -55,13 +63,22 @@ const classifyError = (statusCode) => {
   if (statusCode === 401 || statusCode === 403) {
     return 'auth_error'
   }
-  if (statusCode === 429) {
+  // 使用默认的限流错误码列表
+  const rateLimitCodes = getDefaultRateLimitStatusCodes()
+  if (rateLimitCodes.includes(statusCode)) {
     return 'rate_limit'
   }
   if (statusCode >= 500) {
     return 'server_error'
   }
   return null
+}
+
+// 判断状态码是否为限流错误（用于替代硬编码的 402/429 判断）
+// accountRateLimitCodes: 账户级别的限流错误码配置（可选），如果提供则优先使用
+const isRateLimitError = (statusCode, accountRateLimitCodes = null) => {
+  const rateLimitCodes = accountRateLimitCodes || getDefaultRateLimitStatusCodes()
+  return rateLimitCodes.includes(statusCode)
 }
 
 // 解析 429 响应头中的重置时间（返回秒数）
@@ -251,5 +268,6 @@ module.exports = {
   classifyError,
   parseRetryAfter,
   sanitizeErrorForClient,
+  isRateLimitError,
   TEMP_UNAVAILABLE_PREFIX
 }

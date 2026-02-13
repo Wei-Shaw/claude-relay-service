@@ -62,6 +62,7 @@ class ClaudeConsoleAccountService {
       supportedModels = [], // 支持的模型列表或映射表，空数组/对象表示支持所有
       userAgent = 'claude-cli/1.0.69 (external, cli)',
       rateLimitDuration = 60, // 限流时间（分钟）
+      rateLimitStatusCodes = null, // 限流触发的HTTP状态码列表，null表示使用全局配置
       proxy = null,
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
@@ -94,6 +95,7 @@ class ClaudeConsoleAccountService {
       supportedModels: JSON.stringify(processedModels),
       userAgent,
       rateLimitDuration: rateLimitDuration.toString(),
+      rateLimitStatusCodes: rateLimitStatusCodes ? JSON.stringify(rateLimitStatusCodes) : '', // 账户级别的限流错误码配置
       proxy: proxy ? JSON.stringify(proxy) : '',
       isActive: isActive.toString(),
       accountType,
@@ -206,6 +208,9 @@ class ClaudeConsoleAccountService {
             rateLimitDuration: Number.isNaN(parseInt(accountData.rateLimitDuration))
               ? 60
               : parseInt(accountData.rateLimitDuration),
+            rateLimitStatusCodes: accountData.rateLimitStatusCodes
+              ? JSON.parse(accountData.rateLimitStatusCodes)
+              : null,
             isActive: accountData.isActive === 'true',
             proxy: accountData.proxy ? JSON.parse(accountData.proxy) : null,
             accountType: accountData.accountType || 'shared',
@@ -275,6 +280,9 @@ class ClaudeConsoleAccountService {
       const _parsedDuration = parseInt(accountData.rateLimitDuration)
       accountData.rateLimitDuration = Number.isNaN(_parsedDuration) ? 60 : _parsedDuration
     }
+    accountData.rateLimitStatusCodes = accountData.rateLimitStatusCodes
+      ? JSON.parse(accountData.rateLimitStatusCodes)
+      : null
     accountData.isActive = accountData.isActive === 'true'
     accountData.schedulable = accountData.schedulable !== 'false' // 默认为true
     accountData.disableAutoProtection = accountData.disableAutoProtection === 'true'
@@ -340,6 +348,11 @@ class ClaudeConsoleAccountService {
       }
       if (updates.rateLimitDuration !== undefined) {
         updatedData.rateLimitDuration = updates.rateLimitDuration.toString()
+      }
+      if (updates.rateLimitStatusCodes !== undefined) {
+        updatedData.rateLimitStatusCodes = updates.rateLimitStatusCodes
+          ? JSON.stringify(updates.rateLimitStatusCodes)
+          : ''
       }
       if (updates.proxy !== undefined) {
         updatedData.proxy = updates.proxy ? JSON.stringify(updates.proxy) : ''

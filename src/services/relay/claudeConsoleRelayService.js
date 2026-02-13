@@ -103,6 +103,11 @@ class ClaudeConsoleRelayService {
 
       const autoProtectionDisabled = account.disableAutoProtection === true
 
+      // 解析账户级别的限流错误码配置（优先使用账户配置，否则使用全局配置）
+      const accountRateLimitCodes = account.rateLimitStatusCodes
+        ? account.rateLimitStatusCodes
+        : [429]
+
       logger.info(
         `📤 Processing Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId}), request: ${requestId}`
       )
@@ -349,24 +354,23 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markConsoleAccountBlocked(accountId, errorDetails)
         }
-      } else if (response.status === 429) {
+      } else if (upstreamErrorHelper.isRateLimitError(response.status, accountRateLimitCodes)) {
         logger.warn(
-          `🚫 Rate limit detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+          `🚫 Rate limit error (${response.status}) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
         )
-        // 收到429先检查是否因为超过了手动配置的每日额度
+        // 收到限流错误先检查是否因为超过了手动配置的每日额度
         await claudeConsoleAccountService.checkQuotaUsage(accountId).catch((err) => {
-          logger.error('❌ Failed to check quota after 429 error:', err)
+          logger.error('❌ Failed to check quota after rate limit error:', err)
         })
 
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markAccountRateLimited(accountId)
+          // 使用账户配置的限流时长（分钟转秒），如果没有配置则尝试从响应头解析
+          const accountTtl = account.rateLimitDuration ? account.rateLimitDuration * 60 : null
+          const headerTtl = upstreamErrorHelper.parseRetryAfter(response.headers)
+          const customTtl = accountTtl || headerTtl
           await upstreamErrorHelper
-            .markTempUnavailable(
-              accountId,
-              'claude-console',
-              429,
-              upstreamErrorHelper.parseRetryAfter(response.headers)
-            )
+            .markTempUnavailable(accountId, 'claude-console', response.status, customTtl)
             .catch(() => {})
         }
       } else if (response.status === 529) {
@@ -756,6 +760,12 @@ class ClaudeConsoleRelayService {
     return new Promise((resolve, reject) => {
       let aborted = false
 
+      // 解析账户级别的配置
+      const accountRateLimitCodes = account.rateLimitStatusCodes
+        ? account.rateLimitStatusCodes
+        : [429]
+      const autoProtectionDisabled = account.disableAutoProtection === true
+
       // 构建完整的API URL
       const cleanUrl = account.apiUrl.replace(/\/$/, '') // 移除末尾斜杠
       const apiEndpoint = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
@@ -837,7 +847,6 @@ class ClaudeConsoleRelayService {
             })
 
             response.data.on('end', async () => {
-              const autoProtectionDisabled = account.disableAutoProtection === true
               // 记录原始错误消息到日志（方便调试，包含供应商信息）
               logger.error(
                 `📝 [Stream] Upstream error response from ${account?.name || accountId}: ${errorDataForCheck.substring(0, 500)}`
@@ -869,23 +878,26 @@ class ClaudeConsoleRelayService {
                     errorDataForCheck
                   )
                 }
-              } else if (response.status === 429) {
+              } else if (
+                upstreamErrorHelper.isRateLimitError(response.status, accountRateLimitCodes)
+              ) {
                 logger.warn(
-                  `🚫 [Stream] Rate limit detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
+                  `🚫 [Stream] Rate limit error (${response.status}) detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
                 )
                 // 检查是否因为超过每日额度
                 claudeConsoleAccountService.checkQuotaUsage(accountId).catch((err) => {
-                  logger.error('❌ Failed to check quota after 429 error:', err)
+                  logger.error('❌ Failed to check quota after rate limit error:', err)
                 })
                 if (!autoProtectionDisabled) {
                   await claudeConsoleAccountService.markAccountRateLimited(accountId)
+                  // 使用账户配置的限流时长（分钟转秒），如果没有配置则尝试从响应头解析
+                  const accountTtl = account.rateLimitDuration
+                    ? account.rateLimitDuration * 60
+                    : null
+                  const headerTtl = upstreamErrorHelper.parseRetryAfter(response.headers)
+                  const customTtl = accountTtl || headerTtl
                   await upstreamErrorHelper
-                    .markTempUnavailable(
-                      accountId,
-                      'claude-console',
-                      429,
-                      upstreamErrorHelper.parseRetryAfter(response.headers)
-                    )
+                    .markTempUnavailable(accountId, 'claude-console', response.status, customTtl)
                     .catch(() => {})
                 }
               } else if (response.status === 529) {
@@ -1291,32 +1303,36 @@ class ClaudeConsoleRelayService {
 
           // 检查错误状态
           if (error.response) {
-            const catchAutoProtectionDisabled =
-              account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
             if (error.response.status === 401) {
-              if (!catchAutoProtectionDisabled) {
+              if (!autoProtectionDisabled) {
                 upstreamErrorHelper
                   .markTempUnavailable(accountId, 'claude-console', 401)
                   .catch(() => {})
               }
-            } else if (error.response.status === 429) {
-              if (!catchAutoProtectionDisabled) {
+            } else if (
+              upstreamErrorHelper.isRateLimitError(error.response.status, accountRateLimitCodes)
+            ) {
+              if (!autoProtectionDisabled) {
                 claudeConsoleAccountService.markAccountRateLimited(accountId)
                 // 检查是否因为超过每日额度
                 claudeConsoleAccountService.checkQuotaUsage(accountId).catch((err) => {
-                  logger.error('❌ Failed to check quota after 429 error:', err)
+                  logger.error('❌ Failed to check quota after rate limit error:', err)
                 })
+                // 使用账户配置的限流时长（分钟转秒），如果没有配置则尝试从响应头解析
+                const accountTtl = account.rateLimitDuration ? account.rateLimitDuration * 60 : null
+                const headerTtl = upstreamErrorHelper.parseRetryAfter(error.response.headers)
+                const customTtl = accountTtl || headerTtl
                 upstreamErrorHelper
                   .markTempUnavailable(
                     accountId,
                     'claude-console',
-                    429,
-                    upstreamErrorHelper.parseRetryAfter(error.response.headers)
+                    error.response.status,
+                    customTtl
                   )
                   .catch(() => {})
               }
             } else if (error.response.status === 529) {
-              if (!catchAutoProtectionDisabled) {
+              if (!autoProtectionDisabled) {
                 claudeConsoleAccountService.markAccountOverloaded(accountId)
                 upstreamErrorHelper
                   .markTempUnavailable(accountId, 'claude-console', 529)
