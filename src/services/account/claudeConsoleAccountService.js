@@ -62,6 +62,7 @@ class ClaudeConsoleAccountService {
       supportedModels = [], // 支持的模型列表或映射表，空数组/对象表示支持所有
       userAgent = 'claude-cli/1.0.69 (external, cli)',
       rateLimitDuration = 60, // 限流时间（分钟）
+      rateLimitStatusCodes = null, // 限流触发的HTTP状态码列表，null表示使用全局配置
       proxy = null,
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
@@ -94,6 +95,7 @@ class ClaudeConsoleAccountService {
       supportedModels: JSON.stringify(processedModels),
       userAgent,
       rateLimitDuration: rateLimitDuration.toString(),
+      rateLimitStatusCodes: rateLimitStatusCodes ? JSON.stringify(rateLimitStatusCodes) : '', // 账户级别的限流错误码配置
       proxy: proxy ? JSON.stringify(proxy) : '',
       isActive: isActive.toString(),
       accountType,
@@ -206,6 +208,9 @@ class ClaudeConsoleAccountService {
             rateLimitDuration: Number.isNaN(parseInt(accountData.rateLimitDuration))
               ? 60
               : parseInt(accountData.rateLimitDuration),
+            rateLimitStatusCodes: accountData.rateLimitStatusCodes
+              ? JSON.parse(accountData.rateLimitStatusCodes)
+              : null,
             isActive: accountData.isActive === 'true',
             proxy: accountData.proxy ? JSON.parse(accountData.proxy) : null,
             accountType: accountData.accountType || 'shared',
@@ -275,6 +280,9 @@ class ClaudeConsoleAccountService {
       const _parsedDuration = parseInt(accountData.rateLimitDuration)
       accountData.rateLimitDuration = Number.isNaN(_parsedDuration) ? 60 : _parsedDuration
     }
+    accountData.rateLimitStatusCodes = accountData.rateLimitStatusCodes
+      ? JSON.parse(accountData.rateLimitStatusCodes)
+      : null
     accountData.isActive = accountData.isActive === 'true'
     accountData.schedulable = accountData.schedulable !== 'false' // 默认为true
     accountData.disableAutoProtection = accountData.disableAutoProtection === 'true'
@@ -340,6 +348,11 @@ class ClaudeConsoleAccountService {
       }
       if (updates.rateLimitDuration !== undefined) {
         updatedData.rateLimitDuration = updates.rateLimitDuration.toString()
+      }
+      if (updates.rateLimitStatusCodes !== undefined) {
+        updatedData.rateLimitStatusCodes = updates.rateLimitStatusCodes
+          ? JSON.stringify(updates.rateLimitStatusCodes)
+          : ''
       }
       if (updates.proxy !== undefined) {
         updatedData.proxy = updates.proxy ? JSON.stringify(updates.proxy) : ''
@@ -598,6 +611,9 @@ class ClaudeConsoleAccountService {
         logger.success(`Rate limit removed for Claude Console account: ${accountId}`)
       }
 
+      // 清除临时不可用状态
+      await upstreamErrorHelper.clearTempUnavailable(accountId, 'claude-console').catch(() => {})
+
       return { success: true }
     } catch (error) {
       logger.error(`❌ Failed to remove rate limit for Claude Console account: ${accountId}`, error)
@@ -621,13 +637,27 @@ class ClaudeConsoleAccountService {
       if (account.rateLimitStatus === 'limited' && account.rateLimitedAt) {
         const rateLimitedAt = new Date(account.rateLimitedAt)
         const now = new Date()
-        const minutesSinceRateLimit = (now - rateLimitedAt) / (1000 * 60)
 
         // 使用账户配置的限流时间
         const rateLimitDuration =
           typeof account.rateLimitDuration === 'number' && !Number.isNaN(account.rateLimitDuration)
             ? account.rateLimitDuration
             : 60
+
+        // 获取限流触发之后的第一个配额重置时间点
+        const nextResetTime = this._getNextResetTimeAfter(account, rateLimitedAt)
+
+        // 🔄 如果当前时间已经过了配额重置时间点，立即解除限流
+        if (now >= nextResetTime) {
+          logger.info(
+            `🔄 Auto-clearing rate limit for account ${accountId} (quota reset time reached)`
+          )
+          await this.removeAccountRateLimit(accountId)
+          return false
+        }
+
+        // 检查限流时长是否已过
+        const minutesSinceRateLimit = (now - rateLimitedAt) / (1000 * 60)
 
         if (minutesSinceRateLimit >= rateLimitDuration) {
           await this.removeAccountRateLimit(accountId)
@@ -685,7 +715,7 @@ class ClaudeConsoleAccountService {
 
   // 🔍 判断是否应该重置账户额度
   _shouldResetQuota(account) {
-    // 与 Redis 统计一致：按配置时区判断“今天”与时间点
+    // 与 Redis 统计一致：按配置时区判断"今天"与时间点
     const tzNow = redis.getDateInTimezone(new Date())
     const today = redis.getDateStringInTimezone(tzNow)
 
@@ -703,6 +733,38 @@ class ClaudeConsoleAccountService {
 
     // 如果当前时间已过重置时间且不是同一天重置的，应该重置
     return currentHour > resetHour || (currentHour === resetHour && currentMinute >= resetMinute)
+  }
+
+  // 🕐 获取指定日期当天的重置时间点
+  _getResetTimeOnDate(account, date) {
+    // 获取配置的重置时间（格式如 "00:00"）
+    const resetTime = account.quotaResetTime || '00:00'
+    const [resetHour, resetMinute] = resetTime.split(':').map((n) => parseInt(n))
+
+    // 将日期转换为配置时区
+    const tzDate = redis.getDateInTimezone(date)
+
+    // 创建该日期当天的重置时间点
+    const resetDateTime = new Date(tzDate)
+    resetDateTime.setUTCHours(resetHour, resetMinute, 0, 0)
+
+    return resetDateTime
+  }
+
+  // 🕐 获取指定时间之后的第一个配额重置时间点
+  _getNextResetTimeAfter(account, afterDate) {
+    // 获取 afterDate 当天的重置时间点
+    const sameDayResetTime = this._getResetTimeOnDate(account, afterDate)
+
+    // 如果 afterDate 已经过了当天的重置时间点，返回第二天的重置时间点
+    if (afterDate > sameDayResetTime) {
+      const nextDay = new Date(afterDate)
+      nextDay.setDate(nextDay.getDate() + 1)
+      return this._getResetTimeOnDate(account, nextDay)
+    }
+
+    // 否则返回当天的重置时间点
+    return sameDayResetTime
   }
 
   // 🚫 标记账号为未授权状态（401错误）
