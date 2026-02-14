@@ -129,6 +129,8 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       if (!account || !account.apiKey) {
         const error = new Error(`OpenAI-Responses account ${result.accountId} has no valid apiKey`)
         error.statusCode = 403 // Forbidden - 账户配置错误
+        error.accountId = result.accountId
+        error.accountType = result.accountType
         throw error
       }
 
@@ -151,6 +153,8 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       if (!account || !account.accessToken) {
         const error = new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
         error.statusCode = 403 // Forbidden - 账户配置错误
+        error.accountId = result.accountId
+        error.accountType = result.accountType
         throw error
       }
 
@@ -167,6 +171,8 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
             logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
             const error = new Error(`Token expired and refresh failed: ${refreshError.message}`)
             error.statusCode = 403 // Forbidden - 认证失败
+            error.accountId = result.accountId
+            error.accountType = result.accountType
             throw error
           }
         } else {
@@ -174,6 +180,8 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
             `Token expired and no refresh token available for account ${account.name}`
           )
           error.statusCode = 403 // Forbidden - 认证失败
+          error.accountId = result.accountId
+          error.accountType = result.accountType
           throw error
         }
       }
@@ -183,6 +191,8 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
       if (!accessToken) {
         const error = new Error('Failed to decrypt OpenAI accessToken')
         error.statusCode = 403 // Forbidden - 配置/权限错误
+        error.accountId = result.accountId
+        error.accountType = result.accountType
         throw error
       }
 
@@ -810,9 +820,11 @@ const handleResponses = async (req, res) => {
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
     const status = error.statusCode || error.response?.status || 500
 
-    if ((status === 401 || status === 402) && accountId) {
-      const statusLabel = status === 401 ? '401错误' : '402错误'
-      const extraHint = status === 402 ? '，可能欠费' : ''
+    if ((status === 401 || status === 402 || status === 403) && (accountId || error.accountId)) {
+      const effectiveAccountId = accountId || error.accountId
+      const effectiveAccountType = accountType || error.accountType || 'openai'
+      const statusLabel = status === 401 ? '401错误' : status === 402 ? '402错误' : '403错误'
+      const extraHint = status === 402 ? '，可能欠费' : status === 403 ? '，Token可能失效' : ''
       let reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）`
       const errorData = error.response?.data
       if (errorData) {
@@ -833,8 +845,8 @@ const handleResponses = async (req, res) => {
 
       try {
         await unifiedOpenAIScheduler.markAccountUnauthorized(
-          accountId,
-          accountType || 'openai',
+          effectiveAccountId,
+          effectiveAccountType,
           sessionHash,
           reason
         )

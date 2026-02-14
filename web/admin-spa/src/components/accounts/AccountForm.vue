@@ -2151,6 +2151,69 @@
                 />
               </div>
 
+              <div
+                v-if="form.platform === 'openai' && !isEdit"
+                class="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-700 dark:bg-emerald-900/20"
+              >
+                <div class="flex items-start gap-2">
+                  <i class="fas fa-file-import mt-1 text-emerald-600 dark:text-emerald-400" />
+                  <div>
+                    <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                      批量导入 OpenAI OAuth 账号
+                    </p>
+                    <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+                      支持上传文件夹（JSON）或直接使用服务器路径导入，账号名称将自动使用 email
+                      字段。
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    服务器文件夹路径
+                  </label>
+                  <div class="flex gap-2">
+                    <input
+                      v-model="openaiBatchImportFolderPath"
+                      class="form-input flex-1 border-gray-300 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                      placeholder="/Users/hobee/Downloads/accounts_json"
+                      type="text"
+                    />
+                    <button
+                      class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                      :disabled="openaiBatchImporting || loading"
+                      type="button"
+                      @click="importOpenAIBatchByPath"
+                    >
+                      {{ openaiBatchImporting ? '导入中...' : '按路径导入' }}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <button
+                    class="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 dark:border-emerald-600 dark:bg-gray-800 dark:text-emerald-300 dark:hover:bg-gray-700"
+                    :disabled="openaiBatchImporting || loading"
+                    type="button"
+                    @click="triggerOpenAIBatchFolderUpload"
+                  >
+                    选择文件夹上传
+                  </button>
+                  <input
+                    ref="openaiBatchFolderInputRef"
+                    class="hidden"
+                    directory
+                    multiple
+                    type="file"
+                    webkitdirectory
+                    @change="handleOpenAIBatchFolderUpload"
+                  />
+                  <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    已选择 {{ openaiBatchSelectedFileCount }} 个 JSON 文件
+                  </p>
+                </div>
+              </div>
+
               <!-- Droid User-Agent 配置 (OAuth/Manual 模式) -->
               <div v-if="form.platform === 'droid'">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -4078,6 +4141,10 @@ const cookieAuthLoading = ref(false)
 const cookieAuthError = ref('')
 const showSessionKeyHelp = ref(false)
 const batchProgress = ref({ current: 0, total: 0 }) // 批量进度
+const openaiBatchFolderInputRef = ref(null)
+const openaiBatchImporting = ref(false)
+const openaiBatchImportFolderPath = ref('/Users/hobee/Downloads/accounts_json')
+const openaiBatchSelectedFileCount = ref(0)
 
 // 解析后的 sessionKey 数量
 const parsedSessionKeyCount = computed(() => {
@@ -4413,6 +4480,128 @@ const parseApiKeysInput = (input) => {
 
   const uniqueKeys = Array.from(new Set(segments))
   return uniqueKeys
+}
+
+const buildOpenAIBatchImportPayload = (extra = {}) => {
+  if (form.value.accountType === 'group') {
+    throw new Error('批量导入暂不支持分组账户，请先切换为共享或独享类型')
+  }
+
+  const proxyPayload = buildProxyPayload(form.value.proxy)
+
+  return {
+    accountType: form.value.accountType === 'dedicated' ? 'dedicated' : 'shared',
+    priority: form.value.priority || 50,
+    rateLimitDuration: form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0,
+    description: form.value.description || '',
+    proxy: proxyPayload,
+    disableAutoProtection: !!form.value.disableAutoProtection,
+    ...extra
+  }
+}
+
+const getOpenAIBatchImportErrorMessage = (result) => {
+  const message = result?.message || '批量导入失败'
+  const failures = Array.isArray(result?.data?.failures) ? result.data.failures : []
+  if (failures.length === 0) {
+    return message
+  }
+
+  const preview = failures
+    .slice(0, 5)
+    .map((item) => `- ${item.fileName}: ${item.reason}`)
+    .join('\n')
+
+  const extraCount = failures.length > 5 ? `\n... 还有 ${failures.length - 5} 条失败记录` : ''
+  return `${message}\n${preview}${extraCount}`
+}
+
+const triggerOpenAIBatchFolderUpload = () => {
+  openaiBatchFolderInputRef.value?.click()
+}
+
+const importOpenAIBatchByPath = async () => {
+  if (openaiBatchImporting.value || loading.value) {
+    return
+  }
+
+  const folderPath = openaiBatchImportFolderPath.value?.trim()
+  if (!folderPath) {
+    showToast('请填写服务器文件夹路径', 'error')
+    return
+  }
+
+  openaiBatchImporting.value = true
+  try {
+    const payload = buildOpenAIBatchImportPayload({
+      folderPath
+    })
+
+    const result = await accountsStore.batchImportOpenAIOAuthAccounts(payload)
+    if (!result.success) {
+      showToast(getOpenAIBatchImportErrorMessage(result), 'error', '', 12000)
+      return
+    }
+
+    const summary = result?.data?.summary || {}
+    showToast(
+      `批量导入完成：成功 ${summary.successCount || 0} 个，失败 ${summary.failedCount || 0} 个`,
+      'success'
+    )
+    emit('success', result)
+  } catch (error) {
+    showToast(error.message || '批量导入失败', 'error')
+  } finally {
+    openaiBatchImporting.value = false
+  }
+}
+
+const handleOpenAIBatchFolderUpload = async (event) => {
+  const selectedFiles = Array.from(event?.target?.files || [])
+  const jsonFiles = selectedFiles.filter((file) => file.name.toLowerCase().endsWith('.json'))
+  openaiBatchSelectedFileCount.value = jsonFiles.length
+
+  if (jsonFiles.length === 0) {
+    showToast('所选文件夹中未找到 JSON 文件', 'error')
+    if (event?.target) {
+      event.target.value = ''
+    }
+    return
+  }
+
+  openaiBatchImporting.value = true
+  try {
+    const filePayload = await Promise.all(
+      jsonFiles.map(async (file) => ({
+        fileName: file.webkitRelativePath || file.name,
+        content: await file.text()
+      }))
+    )
+
+    const payload = buildOpenAIBatchImportPayload({
+      files: filePayload
+    })
+    const result = await accountsStore.batchImportOpenAIOAuthAccounts(payload)
+
+    if (!result.success) {
+      showToast(getOpenAIBatchImportErrorMessage(result), 'error', '', 12000)
+      return
+    }
+
+    const summary = result?.data?.summary || {}
+    showToast(
+      `批量导入完成：成功 ${summary.successCount || 0} 个，失败 ${summary.failedCount || 0} 个`,
+      'success'
+    )
+    emit('success', result)
+  } catch (error) {
+    showToast(error.message || '上传文件夹导入失败', 'error')
+  } finally {
+    openaiBatchImporting.value = false
+    if (event?.target) {
+      event.target.value = ''
+    }
+  }
 }
 
 const apiKeyModeOptions = [

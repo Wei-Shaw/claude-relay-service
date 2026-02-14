@@ -113,6 +113,85 @@ function buildCodexUsageSnapshot(accountData) {
   }
 }
 
+function buildOpenAIAccountRecord(accountId, accountData, now = new Date().toISOString()) {
+  // 处理OAuth数据
+  let oauthData = {}
+  if (accountData.openaiOauth) {
+    oauthData =
+      typeof accountData.openaiOauth === 'string'
+        ? JSON.parse(accountData.openaiOauth)
+        : accountData.openaiOauth
+  }
+
+  // 处理账户信息
+  const accountInfo = accountData.accountInfo || {}
+
+  // 检查邮箱是否已经是加密格式（包含冒号分隔的32位十六进制字符）
+  const isEmailEncrypted =
+    accountInfo.email && accountInfo.email.length >= 33 && accountInfo.email.charAt(32) === ':'
+
+  const account = {
+    id: accountId,
+    name: accountData.name,
+    description: accountData.description || '',
+    accountType: accountData.accountType || 'shared',
+    groupId: accountData.groupId || null,
+    priority: accountData.priority || 50,
+    rateLimitDuration:
+      accountData.rateLimitDuration !== undefined && accountData.rateLimitDuration !== null
+        ? accountData.rateLimitDuration
+        : 60,
+    // OAuth相关字段（加密存储）
+    // ID Token 现在是可选的，如果没有提供会在首次刷新时自动获取
+    idToken: oauthData.idToken && oauthData.idToken.trim() ? encrypt(oauthData.idToken) : '',
+    accessToken:
+      oauthData.accessToken && oauthData.accessToken.trim() ? encrypt(oauthData.accessToken) : '',
+    refreshToken:
+      oauthData.refreshToken && oauthData.refreshToken.trim()
+        ? encrypt(oauthData.refreshToken)
+        : '',
+    openaiOauth: encrypt(JSON.stringify(oauthData)),
+    // 账户信息字段 - 确保所有字段都被保存，即使是空字符串
+    accountId: accountInfo.accountId || '',
+    chatgptUserId: accountInfo.chatgptUserId || '',
+    organizationId: accountInfo.organizationId || '',
+    organizationRole: accountInfo.organizationRole || '',
+    organizationTitle: accountInfo.organizationTitle || '',
+    planType: accountInfo.planType || '',
+    // 邮箱字段：检查是否已经加密，避免双重加密
+    email: isEmailEncrypted ? accountInfo.email : encrypt(accountInfo.email || ''),
+    emailVerified: accountInfo.emailVerified === true ? 'true' : 'false',
+    // 过期时间
+    expiresAt: oauthData.expires_in
+      ? new Date(Date.now() + oauthData.expires_in * 1000).toISOString()
+      : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // OAuth Token 过期时间（技术字段）
+
+    // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
+    subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
+
+    // 状态字段
+    isActive: accountData.isActive !== false ? 'true' : 'false',
+    status: 'active',
+    schedulable: accountData.schedulable !== false ? 'true' : 'false',
+    // 自动防护开关
+    disableAutoProtection:
+      accountData.disableAutoProtection === true || accountData.disableAutoProtection === 'true'
+        ? 'true'
+        : 'false',
+    lastRefresh: now,
+    createdAt: now,
+    updatedAt: now
+  }
+
+  // 代理配置
+  if (accountData.proxy) {
+    account.proxy =
+      typeof accountData.proxy === 'string' ? accountData.proxy : JSON.stringify(accountData.proxy)
+  }
+
+  return account
+}
+
 // 刷新访问令牌
 async function refreshAccessToken(refreshToken, proxy = null) {
   try {
@@ -437,81 +516,7 @@ async function refreshAccountToken(accountId) {
 async function createAccount(accountData) {
   const accountId = uuidv4()
   const now = new Date().toISOString()
-
-  // 处理OAuth数据
-  let oauthData = {}
-  if (accountData.openaiOauth) {
-    oauthData =
-      typeof accountData.openaiOauth === 'string'
-        ? JSON.parse(accountData.openaiOauth)
-        : accountData.openaiOauth
-  }
-
-  // 处理账户信息
-  const accountInfo = accountData.accountInfo || {}
-
-  // 检查邮箱是否已经是加密格式（包含冒号分隔的32位十六进制字符）
-  const isEmailEncrypted =
-    accountInfo.email && accountInfo.email.length >= 33 && accountInfo.email.charAt(32) === ':'
-
-  const account = {
-    id: accountId,
-    name: accountData.name,
-    description: accountData.description || '',
-    accountType: accountData.accountType || 'shared',
-    groupId: accountData.groupId || null,
-    priority: accountData.priority || 50,
-    rateLimitDuration:
-      accountData.rateLimitDuration !== undefined && accountData.rateLimitDuration !== null
-        ? accountData.rateLimitDuration
-        : 60,
-    // OAuth相关字段（加密存储）
-    // ID Token 现在是可选的，如果没有提供会在首次刷新时自动获取
-    idToken: oauthData.idToken && oauthData.idToken.trim() ? encrypt(oauthData.idToken) : '',
-    accessToken:
-      oauthData.accessToken && oauthData.accessToken.trim() ? encrypt(oauthData.accessToken) : '',
-    refreshToken:
-      oauthData.refreshToken && oauthData.refreshToken.trim()
-        ? encrypt(oauthData.refreshToken)
-        : '',
-    openaiOauth: encrypt(JSON.stringify(oauthData)),
-    // 账户信息字段 - 确保所有字段都被保存，即使是空字符串
-    accountId: accountInfo.accountId || '',
-    chatgptUserId: accountInfo.chatgptUserId || '',
-    organizationId: accountInfo.organizationId || '',
-    organizationRole: accountInfo.organizationRole || '',
-    organizationTitle: accountInfo.organizationTitle || '',
-    planType: accountInfo.planType || '',
-    // 邮箱字段：检查是否已经加密，避免双重加密
-    email: isEmailEncrypted ? accountInfo.email : encrypt(accountInfo.email || ''),
-    emailVerified: accountInfo.emailVerified === true ? 'true' : 'false',
-    // 过期时间
-    expiresAt: oauthData.expires_in
-      ? new Date(Date.now() + oauthData.expires_in * 1000).toISOString()
-      : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // OAuth Token 过期时间（技术字段）
-
-    // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
-    subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
-
-    // 状态字段
-    isActive: accountData.isActive !== false ? 'true' : 'false',
-    status: 'active',
-    schedulable: accountData.schedulable !== false ? 'true' : 'false',
-    // 自动防护开关
-    disableAutoProtection:
-      accountData.disableAutoProtection === true || accountData.disableAutoProtection === 'true'
-        ? 'true'
-        : 'false',
-    lastRefresh: now,
-    createdAt: now,
-    updatedAt: now
-  }
-
-  // 代理配置
-  if (accountData.proxy) {
-    account.proxy =
-      typeof accountData.proxy === 'string' ? accountData.proxy : JSON.stringify(accountData.proxy)
-  }
+  const account = buildOpenAIAccountRecord(accountId, accountData, now)
 
   const client = redisClient.getClientSafe()
   await client.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, account)
@@ -524,6 +529,44 @@ async function createAccount(accountData) {
 
   logger.info(`Created OpenAI account: ${accountId}`)
   return account
+}
+
+async function createAccountsAtomic(accountDataList = []) {
+  if (!Array.isArray(accountDataList) || accountDataList.length === 0) {
+    return []
+  }
+
+  const client = redisClient.getClientSafe()
+  const now = new Date().toISOString()
+  const createdAccounts = []
+  const transaction = client.multi()
+
+  for (const accountData of accountDataList) {
+    const accountId = uuidv4()
+    const account = buildOpenAIAccountRecord(accountId, accountData, now)
+    createdAccounts.push(account)
+
+    transaction.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, account)
+    transaction.sadd('openai:account:index', accountId)
+    transaction.del('openai:account:index:empty')
+
+    if (account.accountType === 'shared') {
+      transaction.sadd(SHARED_OPENAI_ACCOUNTS_KEY, accountId)
+    }
+  }
+
+  const results = await transaction.exec()
+  if (!results) {
+    throw new Error('OpenAI 账户批量导入事务执行失败')
+  }
+
+  const failedCommand = results.find(([error]) => !!error)
+  if (failedCommand) {
+    throw failedCommand[0]
+  }
+
+  logger.info(`Created OpenAI accounts in transaction: ${createdAccounts.length}`)
+  return createdAccounts
 }
 
 // 获取账户
@@ -1208,6 +1251,7 @@ async function updateCodexUsageSnapshot(accountId, usageSnapshot) {
 
 module.exports = {
   createAccount,
+  createAccountsAtomic,
   getAccount,
   getAccountOverview,
   updateAccount,

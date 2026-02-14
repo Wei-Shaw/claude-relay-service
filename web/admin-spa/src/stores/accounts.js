@@ -102,6 +102,17 @@ export const useAccountsStore = defineStore('accounts', () => {
     mutateAccount(httpApis.createGeminiAccountApi, fetchGeminiAccounts, data)
   const createOpenAIAccount = (data) =>
     mutateAccount(httpApis.createOpenAIAccountApi, fetchOpenAIAccounts, data)
+  const batchImportOpenAIOAuthAccounts = async (data) => {
+    loading.value = true
+    const res = await httpApis.batchImportOpenAIOAuthAccountsApi(data)
+    if (res.success) {
+      await fetchOpenAIAccounts()
+    } else {
+      error.value = res.message
+    }
+    loading.value = false
+    return res
+  }
   const createDroidAccount = (data) =>
     mutateAccount(httpApis.createDroidAccountApi, fetchDroidAccounts, data)
   const createAzureOpenAIAccount = (data) =>
@@ -304,6 +315,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     createBedrockAccount,
     createGeminiAccount,
     createOpenAIAccount,
+    batchImportOpenAIOAuthAccounts,
     createDroidAccount,
     updateDroidAccount,
     createAzureOpenAIAccount,
