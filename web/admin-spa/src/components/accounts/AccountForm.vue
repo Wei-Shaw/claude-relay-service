@@ -1254,20 +1254,22 @@
                   </p>
                 </div>
 
-                <div v-if="form.enableRateLimit">
-                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                    >限流时间 (分钟)</label
-                  >
-                  <input
-                    v-model.number="form.rateLimitDuration"
-                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                    min="1"
-                    placeholder="默认60分钟"
-                    type="number"
-                  />
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    账号被限流后暂停调度的时间（分钟）
-                  </p>
+                <div v-if="form.enableRateLimit" class="space-y-4">
+                  <div>
+                    <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                      >限流时间 (分钟)</label
+                    >
+                    <input
+                      v-model.number="form.rateLimitDuration"
+                      class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                      min="1"
+                      placeholder="默认60分钟"
+                      type="number"
+                    />
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      账号被限流后暂停调度的时间（分钟）
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1596,20 +1598,37 @@
                   </p>
                 </div>
 
-                <div v-if="form.enableRateLimit">
-                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                    >限流时间 (分钟)</label
-                  >
-                  <input
-                    v-model.number="form.rateLimitDuration"
-                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                    min="1"
-                    placeholder="默认60分钟"
-                    type="number"
-                  />
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    账号被限流后暂停调度的时间（分钟）
-                  </p>
+                <div v-if="form.enableRateLimit" class="space-y-4">
+                  <div>
+                    <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                      >限流时间 (分钟)</label
+                    >
+                    <input
+                      v-model.number="form.rateLimitDuration"
+                      class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                      min="1"
+                      placeholder="默认60分钟"
+                      type="number"
+                    />
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      账号被限流后暂停调度的时间（分钟）
+                    </p>
+                  </div>
+
+                  <div v-if="form.platform === 'claude-console'">
+                    <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                      >限流错误码</label
+                    >
+                    <input
+                      v-model="form.rateLimitStatusCodesInput"
+                      class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                      placeholder="429"
+                      type="text"
+                    />
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      配置哪些 HTTP 状态码会触发限流保护，多个状态码用逗号分隔（如 402,429,503）
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -3360,17 +3379,34 @@
                 </p>
               </div>
 
-              <div v-if="form.enableRateLimit">
-                <label class="mb-3 block text-sm font-semibold text-gray-700"
-                  >限流时间 (分钟)</label
-                >
-                <input
-                  v-model.number="form.rateLimitDuration"
-                  class="form-input w-full"
-                  min="1"
-                  type="number"
-                />
-                <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+              <div v-if="form.enableRateLimit" class="space-y-4">
+                <div>
+                  <label class="mb-3 block text-sm font-semibold text-gray-700"
+                    >限流时间 (分钟)</label
+                  >
+                  <input
+                    v-model.number="form.rateLimitDuration"
+                    class="form-input w-full"
+                    min="1"
+                    type="number"
+                  />
+                  <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+                </div>
+
+                <div v-if="form.platform === 'claude-console'">
+                  <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >限流错误码</label
+                  >
+                  <input
+                    v-model="form.rateLimitStatusCodesInput"
+                    class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    placeholder="429"
+                    type="text"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    配置哪些 HTTP 状态码会触发限流保护，多个状态码用逗号分隔（如 402,429,503）
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -4293,6 +4329,25 @@ const form = ref({
   disableAutoProtection:
     props.account?.disableAutoProtection === true ||
     props.account?.disableAutoProtection === 'true',
+  // Claude Console 限流配置
+  rateLimitStatusCodesInput: (() => {
+    if (props.account?.rateLimitStatusCodes) {
+      let codes = props.account.rateLimitStatusCodes
+      // 兼容处理：后端可能返回数组或 JSON 字符串
+      if (typeof codes === 'string') {
+        try {
+          codes = JSON.parse(codes)
+        } catch {
+          // 如果解析失败，返回默认值
+          return '429'
+        }
+      }
+      if (Array.isArray(codes) && codes.length > 0) {
+        return codes.join(',')
+      }
+    }
+    return '429'
+  })(),
   // 额度管理字段
   dailyQuota: props.account?.dailyQuota || 0,
   dailyUsage: props.account?.dailyUsage || 0,
@@ -5421,6 +5476,16 @@ const createAccount = async () => {
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      // 解析限流错误码
+      if (form.value.platform === 'claude-console' && form.value.rateLimitStatusCodesInput) {
+        const codes = form.value.rateLimitStatusCodesInput
+          .split(',')
+          .map((code) => parseInt(code.trim()))
+          .filter((code) => !isNaN(code) && code >= 400 && code <= 599)
+        data.rateLimitStatusCodes = codes.length > 0 ? codes : [429]
+      } else if (form.value.platform === 'claude-console') {
+        data.rateLimitStatusCodes = [429]
+      }
       if (form.value.platform === 'claude-console') {
         data.interceptWarmup = !!form.value.interceptWarmup
       }
@@ -5489,6 +5554,13 @@ const createAccount = async () => {
     // 支持 disableAutoProtection 的平台才写入
     if (autoProtectionPlatforms.includes(form.value.platform)) {
       data.disableAutoProtection = !!form.value.disableAutoProtection
+    }
+
+    // Claude Console 限流配置
+    if (form.value.platform === 'claude-console') {
+      if (form.value.rateLimitStatusCodes && form.value.rateLimitStatusCodes.length > 0) {
+        data.rateLimitStatusCodes = form.value.rateLimitStatusCodes
+      }
     }
 
     let result
@@ -5768,6 +5840,16 @@ const updateAccount = async () => {
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
+      // 解析限流错误码
+      if (form.value.rateLimitStatusCodesInput) {
+        const codes = form.value.rateLimitStatusCodesInput
+          .split(',')
+          .map((code) => parseInt(code.trim()))
+          .filter((code) => !isNaN(code) && code >= 400 && code <= 599)
+        data.rateLimitStatusCodes = codes.length > 0 ? codes : [429]
+      } else {
+        data.rateLimitStatusCodes = [429]
+      }
       // 拦截预热请求
       data.interceptWarmup = !!form.value.interceptWarmup
       // 额度管理字段
@@ -6393,6 +6475,23 @@ watch(
         enableRateLimit:
           newAccount.rateLimitDuration && newAccount.rateLimitDuration > 0 ? true : false,
         rateLimitDuration: newAccount.rateLimitDuration || 60,
+        rateLimitStatusCodesInput: (() => {
+          if (newAccount.rateLimitStatusCodes) {
+            let codes = newAccount.rateLimitStatusCodes
+            // 兼容处理：后端可能返回数组或 JSON 字符串
+            if (typeof codes === 'string') {
+              try {
+                codes = JSON.parse(codes)
+              } catch {
+                return '429'
+              }
+            }
+            if (Array.isArray(codes) && codes.length > 0) {
+              return codes.join(',')
+            }
+          }
+          return '429'
+        })(),
         // Bedrock 特定字段
         accessKeyId: '', // 编辑模式不显示现有的访问密钥
         secretAccessKey: '', // 编辑模式不显示现有的秘密密钥
