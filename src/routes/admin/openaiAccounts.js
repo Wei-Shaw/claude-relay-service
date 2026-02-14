@@ -7,6 +7,7 @@ const express = require('express')
 const crypto = require('crypto')
 const axios = require('axios')
 const openaiAccountService = require('../../services/account/openaiAccountService')
+const openaiOauthBatchImportService = require('../../services/account/openaiOauthBatchImportService')
 const accountGroupService = require('../../services/accountGroupService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
@@ -470,6 +471,76 @@ router.post('/', authenticateAdmin, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: '创建账户失败',
+      error: error.message
+    })
+  }
+})
+
+// 批量导入 OpenAI OAuth 账号
+router.post('/batch-import-oauth', authenticateAdmin, async (req, res) => {
+  const startedAt = Date.now()
+
+  try {
+    const {
+      folderPath = openaiOauthBatchImportService.DEFAULT_IMPORT_FOLDER_PATH,
+      files = [],
+      accountType = 'shared',
+      priority = 50,
+      rateLimitDuration = 60,
+      description = '',
+      proxy = null,
+      disableAutoProtection = false
+    } = req.body || {}
+
+    const importResult = await openaiOauthBatchImportService.importOpenAIOAuthAccounts({
+      folderPath,
+      files,
+      accountType,
+      priority,
+      rateLimitDuration,
+      description,
+      proxy,
+      disableAutoProtection
+    })
+
+    const report = importResult.report || {}
+    const summary = report.summary || {}
+    const durationMs = Date.now() - startedAt
+
+    logger.audit('OpenAI OAuth 批量导入', {
+      admin: req.admin?.username || 'unknown',
+      sourceType: report.sourceType || 'unknown',
+      sourcePath: report.sourcePath || '',
+      totalFiles: summary.totalFiles || 0,
+      successCount: summary.successCount || 0,
+      failedCount: summary.failedCount || 0,
+      durationMs
+    })
+
+    if (!importResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: importResult.message || '批量导入失败',
+        data: report
+      })
+    }
+
+    return res.json({
+      success: true,
+      message: importResult.message,
+      data: report
+    })
+  } catch (error) {
+    logger.error('OpenAI OAuth 批量导入失败:', error)
+    logger.audit('OpenAI OAuth 批量导入失败', {
+      admin: req.admin?.username || 'unknown',
+      error: error.message,
+      durationMs: Date.now() - startedAt
+    })
+
+    return res.status(500).json({
+      success: false,
+      message: '批量导入失败',
       error: error.message
     })
   }
