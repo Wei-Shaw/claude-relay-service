@@ -15,6 +15,8 @@ const config = {
     jwtSecret: process.env.JWT_SECRET || 'CHANGE-THIS-JWT-SECRET-IN-PRODUCTION',
     adminSessionTimeout: parseInt(process.env.ADMIN_SESSION_TIMEOUT) || 86400000, // 24小时
     apiKeyPrefix: process.env.API_KEY_PREFIX || 'cr_',
+    systemApiKeys: process.env.SYSTEM_API_KEYS ?
+      process.env.SYSTEM_API_KEYS.split(',').map(k => k.trim()).filter(k => k.length > 0) : [],
     encryptionKey: process.env.ENCRYPTION_KEY || 'CHANGE-THIS-32-CHARACTER-KEY-NOW'
   },
 
