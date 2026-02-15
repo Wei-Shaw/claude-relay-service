@@ -14,7 +14,7 @@ const DEFAULT_CONFIG = {
   claudeCodeOnlyEnabled: false,
   globalSessionBindingEnabled: false,
   sessionBindingErrorMessage: '你的本地session已污染，请清理后使用。',
-  sessionBindingTtlDays: 30, // 会话绑定 TTL（天），默认30天
+  sessionBindingTtlDays: 1, // 会话绑定 TTL（天），默认1天（支持 /clear 场景，避免 Redis 累积）
   // 用户消息队列配置
   userMessageQueueEnabled: false, // 是否启用用户消息队列（默认关闭）
   userMessageQueueDelayMs: 200, // 请求间隔（毫秒）
@@ -280,16 +280,16 @@ class ClaudeRelayConfigService {
       let accountService
       switch (accountType) {
         case 'claude-official':
-          accountService = require('./claudeAccountService')
+          accountService = require('./account/claudeAccountService')
           break
         case 'claude-console':
-          accountService = require('./claudeConsoleAccountService')
+          accountService = require('./account/claudeConsoleAccountService')
           break
         case 'bedrock':
-          accountService = require('./bedrockAccountService')
+          accountService = require('./account/bedrockAccountService')
           break
         case 'ccr':
-          accountService = require('./ccrAccountService')
+          accountService = require('./account/ccrAccountService')
           break
         default:
           logger.warn(`Unknown account type for validation: ${accountType}`)

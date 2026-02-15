@@ -3,7 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const axios = require('axios')
 const claudeCodeHeadersService = require('../../services/claudeCodeHeadersService')
-const claudeAccountService = require('../../services/claudeAccountService')
+const claudeAccountService = require('../../services/account/claudeAccountService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
@@ -405,6 +405,49 @@ router.post('/claude-code-version/clear', authenticateAdmin, async (req, res) =>
       message: 'Failed to clear cache',
       error: error.message
     })
+  }
+})
+
+// ==================== 模型价格管理 ====================
+
+const pricingService = require('../../services/pricingService')
+
+// 获取所有模型价格数据
+router.get('/models/pricing', authenticateAdmin, async (req, res) => {
+  try {
+    if (!pricingService.pricingData || Object.keys(pricingService.pricingData).length === 0) {
+      await pricingService.loadPricingData()
+    }
+    const data = pricingService.pricingData
+    res.json({
+      success: true,
+      data: data || {}
+    })
+  } catch (error) {
+    logger.error('Failed to get model pricing:', error)
+    res.status(500).json({ error: 'Failed to get model pricing', message: error.message })
+  }
+})
+
+// 获取价格服务状态
+router.get('/models/pricing/status', authenticateAdmin, async (req, res) => {
+  try {
+    const status = pricingService.getStatus()
+    res.json({ success: true, data: status })
+  } catch (error) {
+    logger.error('Failed to get pricing status:', error)
+    res.status(500).json({ error: 'Failed to get pricing status', message: error.message })
+  }
+})
+
+// 强制刷新价格数据
+router.post('/models/pricing/refresh', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pricingService.forceUpdate()
+    res.json({ success: result.success, message: result.message })
+  } catch (error) {
+    logger.error('Failed to refresh pricing:', error)
+    res.status(500).json({ error: 'Failed to refresh pricing', message: error.message })
   }
 })
 

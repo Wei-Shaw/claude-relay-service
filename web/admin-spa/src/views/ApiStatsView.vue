@@ -468,9 +468,10 @@
     </div>
 
     <!-- API Key 测试弹窗 -->
-    <ApiKeyTestModal
+    <UnifiedTestModal
       :api-key-name="statsData?.name || ''"
       :api-key-value="apiKey"
+      mode="apikey"
       :service-type="testServiceType"
       :show="showTestModal"
       @close="closeTestModal"
@@ -542,7 +543,7 @@ import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import ServiceCostCards from '@/components/apistats/ServiceCostCards.vue'
 import TutorialView from './TutorialView.vue'
-import ApiKeyTestModal from '@/components/apikeys/ApiKeyTestModal.vue'
+import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 
 const route = useRoute()
 const apiStatsStore = useApiStatsStore()

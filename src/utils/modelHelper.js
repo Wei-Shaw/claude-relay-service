@@ -189,6 +189,22 @@ function isOpus45OrNewer(modelName) {
 }
 
 /**
+ * 判断是否为 Opus 模型（任意版本）
+ * 匹配所有包含 "opus" 关键词的 Claude 模型
+ */
+function isOpusModel(modelName) {
+  if (!modelName || typeof modelName !== 'string') {
+    return false
+  }
+  const { baseModel } = parseVendorPrefixedModel(modelName)
+  const m = (baseModel || '').trim().toLowerCase()
+  if (!m) {
+    return false
+  }
+  return m.includes('opus')
+}
+
+/**
  * 判断某个 model 名称是否属于 Anthropic Claude 系列模型。
  *
  * 用于 API Key 维度的限额/统计（Claude 周费用）。这里刻意覆盖以下命名：
@@ -237,5 +253,6 @@ module.exports = {
   getEffectiveModel,
   getVendorType,
   isOpus45OrNewer,
+  isOpusModel,
   isClaudeFamilyModel
 }

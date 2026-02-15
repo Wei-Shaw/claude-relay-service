@@ -751,6 +751,23 @@
                       >
                     </span>
                     <span
+                      v-if="account.tempUnavailable"
+                      class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                    >
+                      <i class="fas fa-clock mr-1" />
+                      临时暂停
+                      <span v-if="account.tempUnavailable.ttl > 0"
+                        >({{ formatTempUnavailableTime(account.tempUnavailable.ttl) }})</span
+                      >
+                      <el-tooltip
+                        :content="`${account.tempUnavailable.errorType} (HTTP ${account.tempUnavailable.statusCode})`"
+                        effect="dark"
+                        placement="top"
+                      >
+                        <i class="fas fa-info-circle ml-1 cursor-help" />
+                      </el-tooltip>
+                    </span>
+                    <span
                       v-if="account.schedulable === false"
                       class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
                     >
@@ -1991,8 +2008,9 @@
     />
 
     <!-- 账户测试弹窗 -->
-    <AccountTestModal
+    <UnifiedTestModal
       :account="testingAccount"
+      mode="account"
       :show="showAccountTestModal"
       @close="closeAccountTestModal"
     />
@@ -2170,7 +2188,7 @@ import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
 import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
-import AccountTestModal from '@/components/accounts/AccountTestModal.vue'
+import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 import AccountScheduledTestModal from '@/components/accounts/AccountScheduledTestModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
@@ -2489,7 +2507,10 @@ const showResetButton = (account) => {
     'openai-responses',
     'gemini',
     'gemini-api',
-    'ccr'
+    'ccr',
+    'droid',
+    'bedrock',
+    'azure-openai'
   ]
   return (
     supportedPlatforms.includes(account.platform) &&
@@ -2497,6 +2518,7 @@ const showResetButton = (account) => {
       account.status !== 'active' ||
       account.rateLimitStatus?.isRateLimited ||
       account.rateLimitStatus === 'limited' ||
+      account.tempUnavailable ||
       !account.isActive)
   )
 }
@@ -2596,6 +2618,7 @@ const supportedTestPlatforms = [
   'claude-console',
   'bedrock',
   'gemini',
+  'gemini-api',
   'openai-responses',
   'azure-openai',
   'droid',
@@ -3305,6 +3328,39 @@ const loadAccounts = async (forceReload = false) => {
       }
     })
 
+    // 获取临时不可用状态并附加到账户数据
+    try {
+      const tempRes = await httpApis.getTempUnavailableApi()
+      if (tempRes?.success && tempRes.data) {
+        const tempStatuses = tempRes.data
+        filteredAccounts = filteredAccounts.map((account) => {
+          // 尝试匹配 accountType:accountId
+          const platformTypeMap = {
+            claude: 'claude-official',
+            'claude-console': 'claude-console',
+            bedrock: 'bedrock',
+            gemini: 'gemini',
+            'gemini-api': 'gemini-api',
+            openai: 'openai',
+            'openai-responses': 'openai-responses',
+            ccr: 'ccr',
+            droid: 'droid',
+            azure_openai: 'azure-openai',
+            'azure-openai': 'azure-openai'
+          }
+          const accountType = platformTypeMap[account.platform] || account.platform
+          const key = `${accountType}:${account.id}`
+          const tempStatus = tempStatuses[key]
+          if (tempStatus) {
+            return { ...account, tempUnavailable: tempStatus }
+          }
+          return account
+        })
+      }
+    } catch {
+      // 忽略错误，不影响账户列表显示
+    }
+
     accounts.value = filteredAccounts
     cleanupSelectedAccounts()
 
@@ -3588,6 +3644,16 @@ const formatRateLimitTime = (minutes) => {
   }
 }
 
+// 格式化临时暂停剩余时间（秒 → 可读格式）
+const formatTempUnavailableTime = (seconds) => {
+  if (!seconds || seconds <= 0) return ''
+  seconds = Math.floor(seconds)
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  if (mins > 0) return `${mins}m${secs > 0 ? secs + 's' : ''}`
+  return `${secs}s`
+}
+
 // 检查账户是否被限流
 const isAccountRateLimited = (account) => {
   if (!account) return false
@@ -3868,6 +3934,10 @@ const resetAccountStatus = async (account) => {
       endpoint = `/admin/gemini-api-accounts/${account.id}/reset-status`
     } else if (account.platform === 'gemini') {
       endpoint = `/admin/gemini-accounts/${account.id}/reset-status`
+    } else if (account.platform === 'bedrock') {
+      endpoint = `/admin/bedrock-accounts/${account.id}/reset-status`
+    } else if (account.platform === 'azure-openai') {
+      endpoint = `/admin/azure-openai-accounts/${account.id}/reset-status`
     } else {
       showToast('不支持的账户类型', 'error')
       account.isResetting = false
@@ -4119,11 +4189,23 @@ const getSchedulableReason = (account) => {
     if (account.status === 'unauthorized') {
       return 'API Key无效或已过期（401错误）'
     }
+    // 检查配额超限状态
+    if (account.status === 'quota_exceeded') {
+      return '余额不足'
+    }
     if (account.overloadStatus === 'overloaded') {
       return '服务过载（529错误）'
     }
     if (account.rateLimitStatus === 'limited') {
       return '触发限流（429错误）'
+    }
+    // 检查配额超限状态（quotaAutoStopped 或 quotaStoppedAt 任一存在即表示配额超限）
+    if (
+      account.quotaAutoStopped === 'true' ||
+      account.quotaAutoStopped === true ||
+      account.quotaStoppedAt
+    ) {
+      return '余额不足'
     }
     if (account.status === 'blocked' && account.errorMessage) {
       return account.errorMessage
@@ -4203,6 +4285,15 @@ const getSchedulableReason = (account) => {
   return '手动停止调度'
 }
 
+// 检查是否是配额超限状态（用于状态显示判断）
+const isQuotaExceeded = (account) => {
+  return (
+    account.quotaAutoStopped === 'true' ||
+    account.quotaAutoStopped === true ||
+    !!account.quotaStoppedAt
+  )
+}
+
 // 获取账户状态文本
 const getAccountStatusText = (account) => {
   // 检查是否被封锁
@@ -4221,9 +4312,9 @@ const getAccountStatusText = (account) => {
   if (account.status === 'temp_error') return '临时异常'
   // 检查是否错误
   if (account.status === 'error' || !account.isActive) return '错误'
-  // 检查是否可调度
-  if (account.schedulable === false) return '已暂停'
-  // 否则正常
+  // 配额超限时显示"正常"（不显示"已暂停"）
+  if (account.schedulable === false && !isQuotaExceeded(account)) return '已暂停'
+  // 否则正常（包括配额超限状态）
   return '正常'
 }
 
@@ -4249,7 +4340,8 @@ const getAccountStatusClass = (account) => {
   if (account.status === 'error' || !account.isActive) {
     return 'bg-red-100 text-red-800'
   }
-  if (account.schedulable === false) {
+  // 配额超限时显示绿色（正常）
+  if (account.schedulable === false && !isQuotaExceeded(account)) {
     return 'bg-gray-100 text-gray-800'
   }
   return 'bg-green-100 text-green-800'
@@ -4277,7 +4369,8 @@ const getAccountStatusDotClass = (account) => {
   if (account.status === 'error' || !account.isActive) {
     return 'bg-red-500'
   }
-  if (account.schedulable === false) {
+  // 配额超限时显示绿色（正常）
+  if (account.schedulable === false && !isQuotaExceeded(account)) {
     return 'bg-gray-500'
   }
   return 'bg-green-500'

@@ -3,10 +3,14 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const apiKeyService = require('../services/apiKeyService')
 const CostCalculator = require('../utils/costCalculator')
-const claudeAccountService = require('../services/claudeAccountService')
-const openaiAccountService = require('../services/openaiAccountService')
+const claudeAccountService = require('../services/account/claudeAccountService')
+const openaiAccountService = require('../services/account/openaiAccountService')
 const serviceRatesService = require('../services/serviceRatesService')
-const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
+const {
+  createClaudeTestPayload,
+  extractErrorMessage,
+  sanitizeErrorMsg
+} = require('../utils/testPayloadHelper')
 const modelsConfig = require('../../config/models')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 
@@ -25,7 +29,7 @@ router.get('/models', (req, res) => {
     })
   }
 
-  // 返回所有模型（按服务分组）
+  // 返回所有模型（按服务分组 + 平台维度）
   res.json({
     success: true,
     data: {
@@ -33,7 +37,8 @@ router.get('/models', (req, res) => {
       gemini: modelsConfig.GEMINI_MODELS,
       openai: modelsConfig.OPENAI_MODELS,
       other: modelsConfig.OTHER_MODELS,
-      all: modelsConfig.getAllModels()
+      all: modelsConfig.getAllModels(),
+      platforms: modelsConfig.PLATFORM_TEST_MODELS
     }
   })
 })
@@ -920,7 +925,8 @@ router.post('/api-key/test', async (req, res) => {
       responseStream: res,
       payload: createClaudeTestPayload(model, { stream: true, prompt, maxTokens }),
       timeout: 60000,
-      extraHeaders: { 'x-api-key': apiKey }
+      extraHeaders: { 'x-api-key': apiKey },
+      sanitize: true
     })
   } catch (error) {
     logger.error('❌ API Key test failed:', error)
@@ -1015,14 +1021,14 @@ router.post('/api-key/test-gemini', async (req, res) => {
           let errorMsg = `API Error: ${response.status}`
           try {
             const json = JSON.parse(errorData)
-            errorMsg = json.message || json.error?.message || json.error || errorMsg
+            errorMsg = extractErrorMessage(json, errorMsg)
           } catch {
             if (errorData.length < 200) {
               errorMsg = errorData || errorMsg
             }
           }
           res.write(
-            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: errorMsg })}\n\n`
+            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: sanitizeErrorMsg(errorMsg) })}\n\n`
           )
           res.end()
         })
@@ -1168,14 +1174,14 @@ router.post('/api-key/test-openai', async (req, res) => {
           let errorMsg = `API Error: ${response.status}`
           try {
             const json = JSON.parse(errorData)
-            errorMsg = json.message || json.error?.message || json.error || errorMsg
+            errorMsg = extractErrorMessage(json, errorMsg)
           } catch {
             if (errorData.length < 200) {
               errorMsg = errorData || errorMsg
             }
           }
           res.write(
-            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: errorMsg })}\n\n`
+            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: sanitizeErrorMsg(errorMsg) })}\n\n`
           )
           res.end()
         })

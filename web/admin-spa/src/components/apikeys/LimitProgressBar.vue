@@ -2,7 +2,7 @@
   <div class="w-full">
     <!-- 检查是否为无限制状态 -->
     <div
-      v-if="!limit || limit <= 0"
+      v-if="!limitValue || limitValue <= 0"
       class="flex items-center justify-center rounded-lg px-3 py-2 text-xs"
     >
       <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
@@ -18,7 +18,7 @@
           <span>{{ label }}</span>
         </div>
         <span class="text-gray-700 dark:text-gray-200"
-          >${{ current.toFixed(2) }} / ${{ limit.toFixed(2) }}</span
+          >${{ currentValue.toFixed(2) }} / ${{ limitValue.toFixed(2) }}</span
         >
       </div>
       <div class="relative h-1.5 overflow-hidden rounded-full bg-gray-200/85 dark:bg-gray-700/70">
@@ -57,7 +57,7 @@
         </div>
         <div class="flex items-center gap-1.5">
           <span class="text-xs font-bold tabular-nums" :class="currentValueClass">
-            ${{ current.toFixed(2) }} / ${{ limit.toFixed(2) }}
+            ${{ currentValue.toFixed(2) }} / ${{ limitValue.toFixed(2) }}
           </span>
         </div>
       </div>
@@ -95,11 +95,11 @@ const props = defineProps({
     required: true
   },
   current: {
-    type: Number,
+    type: [Number, String],
     default: 0
   },
   limit: {
-    type: Number,
+    type: [Number, String],
     required: true
   },
   showShine: {
@@ -109,10 +109,18 @@ const props = defineProps({
 })
 
 const isCompact = computed(() => props.variant === 'compact')
+const currentValue = computed(() => {
+  const n = Number(props.current)
+  return Number.isFinite(n) ? n : 0
+})
+const limitValue = computed(() => {
+  const n = Number(props.limit)
+  return Number.isFinite(n) ? n : 0
+})
 const progress = computed(() => {
   // 无限制时不显示进度条
-  if (!props.limit || props.limit <= 0) return 0
-  const percentage = (props.current / props.limit) * 100
+  if (!limitValue.value || limitValue.value <= 0) return 0
+  const percentage = (currentValue.value / limitValue.value) * 100
   return Math.min(percentage, 100)
 })
 

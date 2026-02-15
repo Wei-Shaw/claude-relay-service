@@ -6,7 +6,7 @@
  */
 
 const redis = require('../src/models/redis')
-const claudeAccountService = require('../src/services/claudeAccountService')
+const claudeAccountService = require('../src/services/account/claudeAccountService')
 const readline = require('readline')
 
 // 创建readline接口

@@ -4,10 +4,10 @@
  */
 
 const logger = require('../utils/logger')
-const openaiAccountService = require('./openaiAccountService')
-const claudeAccountService = require('./claudeAccountService')
-const claudeConsoleAccountService = require('./claudeConsoleAccountService')
-const unifiedOpenAIScheduler = require('./unifiedOpenAIScheduler')
+const openaiAccountService = require('./account/openaiAccountService')
+const claudeAccountService = require('./account/claudeAccountService')
+const claudeConsoleAccountService = require('./account/claudeConsoleAccountService')
+const unifiedOpenAIScheduler = require('./scheduler/unifiedOpenAIScheduler')
 const webhookService = require('./webhookService')
 
 class RateLimitCleanupService {
@@ -73,6 +73,7 @@ class RateLimitCleanupService {
         openai: { checked: 0, cleared: 0, errors: [] },
         claude: { checked: 0, cleared: 0, errors: [] },
         claudeConsole: { checked: 0, cleared: 0, errors: [] },
+        quotaExceeded: { checked: 0, cleared: 0, errors: [] },
         tokenRefresh: { checked: 0, refreshed: 0, errors: [] }
       }
 
@@ -85,13 +86,22 @@ class RateLimitCleanupService {
       // 清理 Claude Console 账号
       await this.cleanupClaudeConsoleAccounts(results.claudeConsole)
 
+      // 清理 Claude Console 配额超限状态
+      await this.cleanupClaudeConsoleQuotaExceeded(results.quotaExceeded)
+
       // 主动刷新等待重置的 Claude 账户 Token（防止 5小时/7天 等待期间 Token 过期）
       await this.proactiveRefreshClaudeTokens(results.tokenRefresh)
 
       const totalChecked =
-        results.openai.checked + results.claude.checked + results.claudeConsole.checked
+        results.openai.checked +
+        results.claude.checked +
+        results.claudeConsole.checked +
+        results.quotaExceeded.checked
       const totalCleared =
-        results.openai.cleared + results.claude.cleared + results.claudeConsole.cleared
+        results.openai.cleared +
+        results.claude.cleared +
+        results.claudeConsole.cleared +
+        results.quotaExceeded.cleared
       const duration = Date.now() - startTime
 
       if (totalCleared > 0 || results.tokenRefresh.refreshed > 0) {
@@ -102,6 +112,9 @@ class RateLimitCleanupService {
         logger.info(`   Claude: ${results.claude.cleared}/${results.claude.checked}`)
         logger.info(
           `   Claude Console: ${results.claudeConsole.cleared}/${results.claudeConsole.checked}`
+        )
+        logger.info(
+          `   Quota Exceeded: ${results.quotaExceeded.cleared}/${results.quotaExceeded.checked}`
         )
         if (results.tokenRefresh.checked > 0 || results.tokenRefresh.refreshed > 0) {
           logger.info(
@@ -124,6 +137,7 @@ class RateLimitCleanupService {
         ...results.openai.errors,
         ...results.claude.errors,
         ...results.claudeConsole.errors,
+        ...results.quotaExceeded.errors,
         ...results.tokenRefresh.errors
       ]
       if (allErrors.length > 0) {
@@ -354,6 +368,54 @@ class RateLimitCleanupService {
       }
     } catch (error) {
       logger.error('Failed to cleanup Claude Console accounts:', error)
+      result.errors.push({ error: error.message })
+    }
+  }
+
+  /**
+   * 检查并恢复 Claude Console 账号的配额超限状态
+   */
+  async cleanupClaudeConsoleQuotaExceeded(result) {
+    try {
+      const accounts = await claudeConsoleAccountService.getAllAccounts()
+
+      for (const account of accounts) {
+        // 检查是否处于配额超限状态
+        if (account.status === 'quota_exceeded' || account.quotaStoppedAt) {
+          result.checked++
+
+          try {
+            // 使用 isAccountQuotaExceeded 方法，它会自动触发恢复
+            const isStillExceeded = await claudeConsoleAccountService.isAccountQuotaExceeded(
+              account.id
+            )
+
+            if (!isStillExceeded) {
+              result.cleared++
+              logger.info(
+                `🧹 Auto-recovered quota exceeded for Claude Console account: ${account.name} (${account.id})`
+              )
+
+              // 记录已恢复的账户信息
+              this.clearedAccounts.push({
+                platform: 'Claude Console',
+                accountId: account.id,
+                accountName: account.name,
+                previousStatus: 'quota_exceeded',
+                currentStatus: 'active'
+              })
+            }
+          } catch (error) {
+            result.errors.push({
+              accountId: account.id,
+              accountName: account.name,
+              error: error.message
+            })
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to cleanup Claude Console quota exceeded accounts:', error)
       result.errors.push({ error: error.message })
     }
   }

@@ -269,7 +269,7 @@ class AccountTestSchedulerService {
    * @private
    */
   async _testClaudeAccount(accountId, model) {
-    const claudeRelayService = require('./claudeRelayService')
+    const claudeRelayService = require('./relay/claudeRelayService')
     return await claudeRelayService.testAccountConnectionSync(accountId, model)
   }
 

@@ -1,13 +1,14 @@
-const droidAccountService = require('./droidAccountService')
-const accountGroupService = require('./accountGroupService')
-const redis = require('../models/redis')
-const logger = require('../utils/logger')
+const droidAccountService = require('../account/droidAccountService')
+const accountGroupService = require('../accountGroupService')
+const redis = require('../../models/redis')
+const logger = require('../../utils/logger')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const {
   isTruthy,
   isAccountHealthy,
   sortAccountsByPriority,
   normalizeEndpointType
-} = require('../utils/commonHelper')
+} = require('../../utils/commonHelper')
 
 class DroidScheduler {
   constructor() {
@@ -57,9 +58,21 @@ class DroidScheduler {
       })
     )
 
-    return accounts.filter(
-      (account) => account && isAccountHealthy(account) && this._isAccountSchedulable(account)
-    )
+    const result = []
+    for (const account of accounts) {
+      if (!account || !isAccountHealthy(account) || !this._isAccountSchedulable(account)) {
+        continue
+      }
+      const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(account.id, 'droid')
+      if (isTempUnavailable) {
+        logger.debug(
+          `⏭️ Skipping Droid group member ${account.name || account.id} - temporarily unavailable`
+        )
+        continue
+      }
+      result.push(account)
+    }
+    return result
   }
 
   async _ensureLastUsedUpdated(accountId) {
@@ -99,8 +112,15 @@ class DroidScheduler {
       } else {
         const account = await droidAccountService.getAccount(binding)
         if (account) {
-          candidates = [account]
-          isDedicatedBinding = true
+          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(account.id, 'droid')
+          if (isTempUnavailable) {
+            logger.warn(
+              `⏱️ Bound Droid account ${account.name || account.id} temporarily unavailable, falling back to pool`
+            )
+          } else {
+            candidates = [account]
+            isDedicatedBinding = true
+          }
         }
       }
     }
@@ -109,13 +129,26 @@ class DroidScheduler {
       candidates = await droidAccountService.getSchedulableAccounts(normalizedEndpoint)
     }
 
-    const filtered = candidates.filter(
+    const syncFiltered = candidates.filter(
       (account) =>
         account &&
         isAccountHealthy(account) &&
         this._isAccountSchedulable(account) &&
         this._matchesEndpoint(account, normalizedEndpoint)
     )
+    const filteredResults = await Promise.all(
+      syncFiltered.map(async (account) => {
+        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(account.id, 'droid')
+        if (isTempUnavailable) {
+          logger.debug(
+            `⏭️ Skipping Droid account ${account.name || account.id} - temporarily unavailable`
+          )
+          return null
+        }
+        return account
+      })
+    )
+    const filtered = filteredResults.filter(Boolean)
 
     if (filtered.length === 0) {
       throw new Error(

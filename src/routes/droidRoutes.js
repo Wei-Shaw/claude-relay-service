@@ -1,7 +1,7 @@
 const crypto = require('crypto')
 const express = require('express')
 const { authenticateApiKey } = require('../middleware/auth')
-const droidRelayService = require('../services/droidRelayService')
+const droidRelayService = require('../services/relay/droidRelayService')
 const sessionHelper = require('../utils/sessionHelper')
 const logger = require('../utils/logger')
 const apiKeyService = require('../services/apiKeyService')

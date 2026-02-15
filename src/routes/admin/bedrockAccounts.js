@@ -5,7 +5,7 @@
 
 const express = require('express')
 const router = express.Router()
-const bedrockAccountService = require('../../services/bedrockAccountService')
+const bedrockAccountService = require('../../services/account/bedrockAccountService')
 const apiKeyService = require('../../services/apiKeyService')
 const accountGroupService = require('../../services/accountGroupService')
 const redis = require('../../models/redis')
@@ -360,6 +360,19 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to test Bedrock account:', error)
     // 错误已在服务层处理，这里仅做日志记录
+  }
+})
+
+// 重置 Bedrock 账户状态
+router.post('/:accountId/reset-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const result = await bedrockAccountService.resetAccountStatus(accountId)
+    logger.success(`Admin reset status for Bedrock account: ${accountId}`)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to reset Bedrock account status:', error)
+    return res.status(500).json({ error: 'Failed to reset status', message: error.message })
   }
 })
 

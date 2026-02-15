@@ -1,7 +1,8 @@
 const axios = require('axios')
-const ProxyHelper = require('../utils/proxyHelper')
-const logger = require('../utils/logger')
-const config = require('../../config/config')
+const ProxyHelper = require('../../utils/proxyHelper')
+const logger = require('../../utils/logger')
+const config = require('../../../config/config')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 // 转换模型名称（去掉 azure/ 前缀）
 function normalizeModelName(model) {
@@ -210,6 +211,16 @@ async function handleAzureOpenAIRequest({
       })
     } else {
       logger.error('Azure OpenAI Request Failed', errorDetails)
+    }
+
+    // 网络错误标记临时不可用
+    const azureAutoProtectionDisabled =
+      account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+    if (account?.id && !azureAutoProtectionDisabled) {
+      const statusCode = error.response?.status || 503
+      await upstreamErrorHelper
+        .markTempUnavailable(account.id, 'azure-openai', statusCode)
+        .catch(() => {})
     }
 
     throw error

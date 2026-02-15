@@ -4,11 +4,24 @@
  */
 
 const logger = require('../utils/logger')
-const { CLIENT_DEFINITIONS, getAllClientDefinitions } = require('./clientDefinitions')
+const {
+  CLIENT_IDS,
+  getAllClientDefinitions,
+  getClientDefinitionById,
+  isPathAllowedForClient
+} = require('./clientDefinitions')
 const ClaudeCodeValidator = require('./clients/claudeCodeValidator')
 const GeminiCliValidator = require('./clients/geminiCliValidator')
 const CodexCliValidator = require('./clients/codexCliValidator')
 const DroidCliValidator = require('./clients/droidCliValidator')
+
+// 客户端ID到验证器的映射表
+const VALIDATOR_MAP = {
+  [CLIENT_IDS.CLAUDE_CODE]: ClaudeCodeValidator,
+  [CLIENT_IDS.GEMINI_CLI]: GeminiCliValidator,
+  [CLIENT_IDS.CODEX_CLI]: CodexCliValidator,
+  [CLIENT_IDS.DROID_CLI]: DroidCliValidator
+}
 
 /**
  * 客户端验证器类
@@ -20,19 +33,12 @@ class ClientValidator {
    * @returns {Object|null} 验证器实例
    */
   static getValidator(clientId) {
-    switch (clientId) {
-      case 'claude_code':
-        return ClaudeCodeValidator
-      case 'gemini_cli':
-        return GeminiCliValidator
-      case 'codex_cli':
-        return CodexCliValidator
-      case 'droid_cli':
-        return DroidCliValidator
-      default:
-        logger.warn(`Unknown client ID: ${clientId}`)
-        return null
+    const validator = VALIDATOR_MAP[clientId]
+    if (!validator) {
+      logger.warn(`Unknown client ID: ${clientId}`)
+      return null
     }
+    return validator
   }
 
   /**
@@ -40,7 +46,7 @@ class ClientValidator {
    * @returns {Array<string>} 客户端ID列表
    */
   static getSupportedClients() {
-    return ['claude_code', 'gemini_cli', 'codex_cli', 'droid_cli']
+    return Object.keys(VALIDATOR_MAP)
   }
 
   /**
@@ -67,6 +73,7 @@ class ClientValidator {
 
   /**
    * 验证请求是否来自允许的客户端列表中的任一客户端
+   * 包含路径白名单检查，防止通过其他兼容端点绕过客户端限制
    * @param {Array<string>} allowedClients - 允许的客户端ID列表
    * @param {Object} req - Express请求对象
    * @returns {Object} 验证结果对象
@@ -74,10 +81,12 @@ class ClientValidator {
   static validateRequest(allowedClients, req) {
     const userAgent = req.headers['user-agent'] || ''
     const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
+    const requestPath = req.originalUrl || req.path || ''
 
     // 记录验证开始
     logger.api(`🔍 Starting client validation for User-Agent: "${userAgent}"`)
     logger.api(`   Allowed clients: ${allowedClients.join(', ')}`)
+    logger.api(`   Request path: ${requestPath}`)
     logger.api(`   Request from IP: ${clientIP}`)
 
     // 遍历所有允许的客户端进行验证
@@ -89,6 +98,12 @@ class ClientValidator {
         continue
       }
 
+      // 路径白名单检查：先检查路径是否允许该客户端访问
+      if (!isPathAllowedForClient(clientId, requestPath)) {
+        logger.debug(`Path "${requestPath}" not allowed for ${validator.getName()}, skipping`)
+        continue
+      }
+
       logger.debug(`Checking against ${validator.getName()}...`)
 
       try {
@@ -96,12 +111,13 @@ class ClientValidator {
           // 验证成功
           logger.api(`✅ Client validated: ${validator.getName()} (${clientId})`)
           logger.api(`   Matched User-Agent: "${userAgent}"`)
+          logger.api(`   Allowed path: "${requestPath}"`)
 
           return {
             allowed: true,
             matchedClient: clientId,
             clientName: validator.getName(),
-            clientInfo: Object.values(CLIENT_DEFINITIONS).find((def) => def.id === clientId)
+            clientInfo: getClientDefinitionById(clientId)
           }
         }
       } catch (error) {
@@ -111,11 +127,15 @@ class ClientValidator {
     }
 
     // 没有匹配的客户端
-    logger.api(`❌ No matching client found for User-Agent: "${userAgent}"`)
+    logger.api(
+      `❌ No matching client found for User-Agent: "${userAgent}" and path: "${requestPath}"`
+    )
     return {
       allowed: false,
       matchedClient: null,
-      reason: 'No matching client found'
+      reason: 'No matching client found or path not allowed',
+      userAgent,
+      requestPath
     }
   }
 

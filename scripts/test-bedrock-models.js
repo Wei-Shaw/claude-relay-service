@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const bedrockRelayService = require('../src/services/bedrockRelayService')
+const bedrockRelayService = require('../src/services/relay/bedrockRelayService')
 
 async function testBedrockModels() {
   try {

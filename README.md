@@ -26,10 +26,9 @@
 
 <div align="center">
 
-| 平台 | 类型 | 服务 | 介绍 |
-|:---|:---|:---|:---|
-| **[pincc.ai](https://pincc.ai/)** | 🏆 **官方运营** | <small>✅ Claude Code<br>✅ Codex CLI</small> | 项目直营，提供稳定的 Claude Code / Codex CLI 拼车服务 |
-| **[ctok.ai](https://ctok.ai/)** | 🤝 合作伙伴 | <small>✅ Claude Code<br>✅ Codex CLI</small> | 社区认证，提供 Claude Code / Codex CLI 拼车 |
+| 平台 | 服务 | 介绍 |
+|:---|:---|:---|
+| **[pincc.ai](https://pincc.ai/)** | <small>✅ Claude Code<br>✅ Codex CLI</small> | 提供稳定的 Codex CLI 拼车服务<br><br> **全新上线 2API 渠道**：接入CC的效果媲美官方 Anthropic Console 账号，暂不支持 PDF 识别功能 <br>💰 单价：0.8元=1美金额度 |
 
 
 </div>
@@ -491,21 +490,14 @@ name = "crs"
 base_url = "http://127.0.0.1:3000/openai"  # 根据实际填写你服务器的ip地址或者域名
 wire_api = "responses"
 requires_openai_auth = true
-env_key = "CRS_OAI_KEY"
 ```
 
 在 `~/.codex/auth.json` 文件中配置API密钥为 null：
 
 ```json
 {
-    "OPENAI_API_KEY": null  
+    "OPENAI_API_KEY": "后台创建的API密钥"  
 }
-```
-
-环境变量设置：
-
-```bash
-export CRS_OAI_KEY="后台创建的API密钥"
 ```
 
 > ⚠️ 在通过 Nginx 反向代理 CRS 服务并使用 Codex CLI 时，需要在 http 块中添加 underscores_in_headers on;。因为 Nginx 默认会移除带下划线的请求头（如 session_id），一旦该头被丢弃，多账号环境下的粘性会话功能将失效。
@@ -988,27 +980,6 @@ proxy_request_buffering off;
 - **GitHub Issues**: 提交详细的错误信息
 - **查看文档**: 仔细阅读错误信息和文档
 - **社区讨论**: 看看其他人是否遇到类似问题
-
----
-
-## ❤️ 赞助支持
-
-如果您觉得这个项目对您有帮助，请考虑赞助支持项目的持续开发。您的支持是我们最大的动力！
-
-<div align="center">
-
-<a href="https://afdian.com/a/claude-relay-service" target="_blank">
-  <img src="https://img.shields.io/badge/请我喝杯咖啡-爱发电-946ce6?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white" alt="Sponsor">
-</a>
-
-<table>
-  <tr>
-    <td><img src="docs/sponsoring/wechat.jpg" width="200" alt="wechat" /></td>
-    <td><img src="docs/sponsoring/alipay.jpg" width="200" alt="alipay" /></td>
-  </tr>
-</table>
-
-</div>
 
 ---
 

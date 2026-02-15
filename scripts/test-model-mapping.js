@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const bedrockRelayService = require('../src/services/bedrockRelayService')
+const bedrockRelayService = require('../src/services/relay/bedrockRelayService')
 
 function testModelMapping() {
   console.log('🧪 测试模型映射功能...')

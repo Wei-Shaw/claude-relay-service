@@ -8,6 +8,7 @@ const UPSTREAM_TO_ALIAS = {
   'claude-sonnet-4-5': 'gemini-claude-sonnet-4-5',
   'claude-sonnet-4-5-thinking': 'gemini-claude-sonnet-4-5-thinking',
   'claude-opus-4-5-thinking': 'gemini-claude-opus-4-5-thinking',
+  'claude-opus-4-6-thinking': 'gemini-claude-opus-4-6-thinking',
   chat_20706: '',
   chat_23310: '',
   'gemini-2.5-flash-thinking': '',
@@ -22,7 +23,8 @@ const ALIAS_TO_UPSTREAM = {
   'gemini-3-flash-preview': 'gemini-3-flash',
   'gemini-claude-sonnet-4-5': 'claude-sonnet-4-5',
   'gemini-claude-sonnet-4-5-thinking': 'claude-sonnet-4-5-thinking',
-  'gemini-claude-opus-4-5-thinking': 'claude-opus-4-5-thinking'
+  'gemini-claude-opus-4-5-thinking': 'claude-opus-4-5-thinking',
+  'gemini-claude-opus-4-6-thinking': 'claude-opus-4-6-thinking'
 }
 
 const ANTIGRAVITY_MODEL_METADATA = {
@@ -74,6 +76,10 @@ const ANTIGRAVITY_MODEL_METADATA = {
   'gemini-claude-opus-4-5-thinking': {
     thinking: { min: 1024, max: 200000, zeroAllowed: false, dynamicAllowed: true },
     maxCompletionTokens: 64000
+  },
+  'gemini-claude-opus-4-6-thinking': {
+    thinking: { min: 1024, max: 200000, zeroAllowed: false, dynamicAllowed: true },
+    maxCompletionTokens: 64000
   }
 }
 
@@ -123,6 +129,7 @@ function mapAntigravityUpstreamModel(model) {
   const mapping = {
     // Opus：上游更常见的是 thinking 变体（CLIProxyAPI 也按此处理）
     'claude-opus-4-5': 'claude-opus-4-5-thinking',
+    'claude-opus-4-6': 'claude-opus-4-6-thinking',
     // Gemini thinking 变体回退
     'gemini-2.5-flash-thinking': 'gemini-2.5-flash'
   }

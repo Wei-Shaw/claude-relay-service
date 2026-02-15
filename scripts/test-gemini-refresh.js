@@ -11,7 +11,7 @@ const dotenv = require('dotenv')
 dotenv.config({ path: path.join(__dirname, '..', '.env') })
 
 const redis = require('../src/models/redis')
-const geminiAccountService = require('../src/services/geminiAccountService')
+const geminiAccountService = require('../src/services/account/geminiAccountService')
 const crypto = require('crypto')
 const config = require('../config/config')
 

@@ -1,10 +1,11 @@
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
-const redis = require('../models/redis')
-const logger = require('../utils/logger')
-const config = require('../../config/config')
-const bedrockRelayService = require('./bedrockRelayService')
-const LRUCache = require('../utils/lruCache')
+const redis = require('../../models/redis')
+const logger = require('../../utils/logger')
+const config = require('../../../config/config')
+const bedrockRelayService = require('../relay/bedrockRelayService')
+const LRUCache = require('../../utils/lruCache')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 class BedrockAccountService {
   constructor() {
@@ -41,7 +42,8 @@ class BedrockAccountService {
       accountType = 'shared', // 'dedicated' or 'shared'
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
       schedulable = true, // 是否可被调度
-      credentialType = 'access_key' // 'access_key', 'bearer_token'（默认为 access_key）
+      credentialType = 'access_key', // 'access_key', 'bearer_token'（默认为 access_key）
+      disableAutoProtection = false // 是否关闭自动防护（429/401/400/529 不自动禁用）
     } = options
 
     const accountId = uuidv4()
@@ -64,7 +66,8 @@ class BedrockAccountService {
 
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      type: 'bedrock' // 标识这是Bedrock账户
+      type: 'bedrock', // 标识这是Bedrock账户
+      disableAutoProtection // 关闭自动防护
     }
 
     // 加密存储AWS凭证
@@ -341,6 +344,11 @@ class BedrockAccountService {
       // Bedrock 没有 token 刷新逻辑，不会覆盖此字段
       if (updates.subscriptionExpiresAt !== undefined) {
         account.subscriptionExpiresAt = updates.subscriptionExpiresAt
+      }
+
+      // 自动防护开关
+      if (updates.disableAutoProtection !== undefined) {
+        account.disableAutoProtection = updates.disableAutoProtection
       }
 
       account.updatedAt = new Date().toISOString()
@@ -774,6 +782,66 @@ class BedrockAccountService {
     } catch (error) {
       logger.error('❌ 获取Bedrock账户统计失败', error)
       return { success: false, error: error.message }
+    }
+  }
+
+  // 🔄 重置Bedrock账户所有异常状态
+  async resetAccountStatus(accountId) {
+    try {
+      const accountData = await this.getAccount(accountId)
+      if (!accountData) {
+        throw new Error('Account not found')
+      }
+
+      const client = redis.getClientSafe()
+      const accountKey = `bedrock:account:${accountId}`
+
+      const updates = {
+        status: 'active',
+        errorMessage: '',
+        schedulable: 'true',
+        isActive: 'true'
+      }
+
+      const fieldsToDelete = [
+        'rateLimitedAt',
+        'rateLimitStatus',
+        'unauthorizedAt',
+        'unauthorizedCount',
+        'overloadedAt',
+        'overloadStatus',
+        'blockedAt',
+        'quotaStoppedAt'
+      ]
+
+      await client.hset(accountKey, updates)
+      await client.hdel(accountKey, ...fieldsToDelete)
+
+      logger.success(`Reset all error status for Bedrock account ${accountId}`)
+
+      // 清除临时不可用状态
+      await upstreamErrorHelper.clearTempUnavailable(accountId, 'bedrock').catch(() => {})
+
+      // 异步发送 Webhook 通知（忽略错误）
+      try {
+        const webhookNotifier = require('../../utils/webhookNotifier')
+        await webhookNotifier.sendAccountAnomalyNotification({
+          accountId,
+          accountName: accountData.name || accountId,
+          platform: 'bedrock',
+          status: 'recovered',
+          errorCode: 'STATUS_RESET',
+          reason: 'Account status manually reset',
+          timestamp: new Date().toISOString()
+        })
+      } catch (webhookError) {
+        logger.warn('Failed to send webhook notification for Bedrock status reset:', webhookError)
+      }
+
+      return { success: true, accountId }
+    } catch (error) {
+      logger.error(`❌ Failed to reset Bedrock account status: ${accountId}`, error)
+      throw error
     }
   }
 }

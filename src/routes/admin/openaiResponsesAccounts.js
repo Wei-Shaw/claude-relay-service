@@ -4,7 +4,8 @@
  */
 
 const express = require('express')
-const openaiResponsesAccountService = require('../../services/openaiResponsesAccountService')
+const axios = require('axios')
+const openaiResponsesAccountService = require('../../services/account/openaiResponsesAccountService')
 const apiKeyService = require('../../services/apiKeyService')
 const accountGroupService = require('../../services/accountGroupService')
 const redis = require('../../models/redis')
@@ -12,6 +13,8 @@ const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { createOpenAITestPayload, extractErrorMessage } = require('../../utils/testPayloadHelper')
+const { getProxyAgent } = require('../../utils/proxyHelper')
 
 const router = express.Router()
 
@@ -459,31 +462,25 @@ router.post('/openai-responses-accounts/:accountId/test', authenticateAdmin, asy
   const startTime = Date.now()
 
   try {
-    // 获取账户信息
+    // 获取账户信息（apiKey 已自动解密）
     const account = await openaiResponsesAccountService.getAccount(accountId)
     if (!account) {
       return res.status(404).json({ error: 'Account not found' })
     }
 
-    // 获取解密后的 API Key
-    const apiKey = await openaiResponsesAccountService.getDecryptedApiKey(accountId)
-    if (!apiKey) {
+    if (!account.apiKey) {
       return res.status(401).json({ error: 'API Key not found or decryption failed' })
     }
 
     // 构造测试请求
-    const axios = require('axios')
-    const { createOpenAITestPayload } = require('../../utils/testPayloadHelper')
-    const { getProxyAgent } = require('../../utils/proxyHelper')
-
-    const baseUrl = account.baseUrl || 'https://api.openai.com'
-    const apiUrl = `${baseUrl}/v1/chat/completions`
-    const payload = createOpenAITestPayload(model)
+    const baseUrl = account.baseApi || 'https://api.openai.com'
+    const apiUrl = `${baseUrl}/responses`
+    const payload = createOpenAITestPayload(model, { stream: false })
 
     const requestConfig = {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
+        Authorization: `Bearer ${account.apiKey}`
       },
       timeout: 30000
     }
@@ -500,10 +497,19 @@ router.post('/openai-responses-accounts/:accountId/test', authenticateAdmin, asy
     const response = await axios.post(apiUrl, payload, requestConfig)
     const latency = Date.now() - startTime
 
-    // 提取响应文本
+    // 提取响应文本（Responses API 格式）
     let responseText = ''
-    if (response.data?.choices?.[0]?.message?.content) {
-      responseText = response.data.choices[0].message.content
+    const output = response.data?.output
+    if (Array.isArray(output)) {
+      for (const item of output) {
+        if (item.type === 'message' && Array.isArray(item.content)) {
+          for (const block of item.content) {
+            if (block.type === 'output_text' && block.text) {
+              responseText += block.text
+            }
+          }
+        }
+      }
     }
 
     logger.success(
@@ -527,7 +533,7 @@ router.post('/openai-responses-accounts/:accountId/test', authenticateAdmin, asy
     return res.status(500).json({
       success: false,
       error: 'Test failed',
-      message: error.response?.data?.error?.message || error.message,
+      message: extractErrorMessage(error.response?.data, error.message),
       latency
     })
   }

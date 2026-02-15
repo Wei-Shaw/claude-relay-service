@@ -1,9 +1,10 @@
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
-const redis = require('../models/redis')
-const logger = require('../utils/logger')
-const config = require('../../config/config')
-const LRUCache = require('../utils/lruCache')
+const redis = require('../../models/redis')
+const logger = require('../../utils/logger')
+const config = require('../../../config/config')
+const LRUCache = require('../../utils/lruCache')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 class GeminiApiAccountService {
   constructor() {
@@ -44,7 +45,8 @@ class GeminiApiAccountService {
       accountType = 'shared', // 'dedicated' or 'shared'
       schedulable = true, // 是否可被调度
       supportedModels = [], // 支持的模型列表
-      rateLimitDuration = 60 // 限流时间（分钟）
+      rateLimitDuration = 60, // 限流时间（分钟）
+      disableAutoProtection = false
     } = options
 
     // 验证必填字段
@@ -79,7 +81,11 @@ class GeminiApiAccountService {
       // 限流相关
       rateLimitedAt: '',
       rateLimitStatus: '',
-      rateLimitDuration: rateLimitDuration.toString()
+      rateLimitDuration: rateLimitDuration.toString(),
+
+      // 自动防护开关
+      disableAutoProtection:
+        disableAutoProtection === true || disableAutoProtection === 'true' ? 'true' : 'false'
     }
 
     // 保存到 Redis
@@ -152,6 +158,14 @@ class GeminiApiAccountService {
       updates.baseUrl = updates.baseUrl.endsWith('/')
         ? updates.baseUrl.slice(0, -1)
         : updates.baseUrl
+    }
+
+    // 处理 disableAutoProtection 布尔值转字符串
+    if (updates.disableAutoProtection !== undefined) {
+      updates.disableAutoProtection =
+        updates.disableAutoProtection === true || updates.disableAutoProtection === 'true'
+          ? 'true'
+          : 'false'
     }
 
     // 更新 Redis
@@ -363,7 +377,7 @@ class GeminiApiAccountService {
     )
 
     try {
-      const webhookNotifier = require('../utils/webhookNotifier')
+      const webhookNotifier = require('../../utils/webhookNotifier')
       await webhookNotifier.sendAccountAnomalyNotification({
         accountId,
         accountName: account.name || accountId,
@@ -456,9 +470,12 @@ class GeminiApiAccountService {
     await this.updateAccount(accountId, updates)
     logger.info(`✅ Reset all error status for Gemini-API account ${accountId}`)
 
+    // 清除临时不可用状态
+    await upstreamErrorHelper.clearTempUnavailable(accountId, 'gemini-api').catch(() => {})
+
     // 发送 Webhook 通知
     try {
-      const webhookNotifier = require('../utils/webhookNotifier')
+      const webhookNotifier = require('../../utils/webhookNotifier')
       await webhookNotifier.sendAccountAnomalyNotification({
         accountId,
         accountName: account.name || accountId,

@@ -7,10 +7,10 @@ require('dotenv').config()
 const { v4: uuidv4 } = require('uuid')
 const redis = require('../src/models/redis')
 const accountGroupService = require('../src/services/accountGroupService')
-const claudeAccountService = require('../src/services/claudeAccountService')
-const claudeConsoleAccountService = require('../src/services/claudeConsoleAccountService')
+const claudeAccountService = require('../src/services/account/claudeAccountService')
+const claudeConsoleAccountService = require('../src/services/account/claudeConsoleAccountService')
 const apiKeyService = require('../src/services/apiKeyService')
-const unifiedClaudeScheduler = require('../src/services/unifiedClaudeScheduler')
+const unifiedClaudeScheduler = require('../src/services/scheduler/unifiedClaudeScheduler')
 
 // 测试配置
 const TEST_PREFIX = 'test_group_'

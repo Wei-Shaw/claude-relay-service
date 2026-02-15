@@ -1,10 +1,11 @@
 const axios = require('axios')
-const ccrAccountService = require('./ccrAccountService')
-const logger = require('../utils/logger')
-const config = require('../../config/config')
-const { parseVendorPrefixedModel } = require('../utils/modelHelper')
-const userMessageQueueService = require('./userMessageQueueService')
-const { isStreamWritable } = require('../utils/streamHelper')
+const ccrAccountService = require('../account/ccrAccountService')
+const logger = require('../../utils/logger')
+const config = require('../../../config/config')
+const { parseVendorPrefixedModel } = require('../../utils/modelHelper')
+const userMessageQueueService = require('../userMessageQueueService')
+const { isStreamWritable } = require('../../utils/streamHelper')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 class CcrRelayService {
   constructor() {
@@ -261,7 +262,11 @@ class CcrRelayService {
       // 检查错误状态并相应处理
       if (response.status === 401) {
         logger.warn(`🚫 Unauthorized error detected for CCR account ${accountId}`)
-        await ccrAccountService.markAccountUnauthorized(accountId)
+        const autoProtectionDisabled =
+          account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+        if (!autoProtectionDisabled) {
+          await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 401).catch(() => {})
+        }
       } else if (response.status === 429) {
         logger.warn(`🚫 Rate limit detected for CCR account ${accountId}`)
         // 收到429先检查是否因为超过了手动配置的每日额度
@@ -270,9 +275,35 @@ class CcrRelayService {
         })
 
         await ccrAccountService.markAccountRateLimited(accountId)
+        const autoProtectionDisabled =
+          account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+        if (!autoProtectionDisabled) {
+          await upstreamErrorHelper
+            .markTempUnavailable(
+              accountId,
+              'ccr',
+              429,
+              upstreamErrorHelper.parseRetryAfter(response.headers)
+            )
+            .catch(() => {})
+        }
       } else if (response.status === 529) {
         logger.warn(`🚫 Overload error detected for CCR account ${accountId}`)
         await ccrAccountService.markAccountOverloaded(accountId)
+        const autoProtectionDisabled =
+          account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+        if (!autoProtectionDisabled) {
+          await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 529).catch(() => {})
+        }
+      } else if (response.status >= 500) {
+        logger.warn(`🔥 Server error (${response.status}) detected for CCR account ${accountId}`)
+        const autoProtectionDisabled =
+          account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+        if (!autoProtectionDisabled) {
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, 'ccr', response.status)
+            .catch(() => {})
+        }
       } else if (response.status === 200 || response.status === 201) {
         // 如果请求成功，检查并移除错误状态
         const isRateLimited = await ccrAccountService.isAccountRateLimited(accountId)
@@ -309,6 +340,15 @@ class CcrRelayService {
         `❌ CCR relay request failed (Account: ${account?.name || accountId}):`,
         error.message
       )
+
+      // 网络错误标记临时不可用
+      if (accountId && !error.response) {
+        const autoProtectionDisabled =
+          account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+        if (!autoProtectionDisabled) {
+          await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 503).catch(() => {})
+        }
+      }
 
       throw error
     } finally {
@@ -489,6 +529,14 @@ class CcrRelayService {
         )
       } else {
         logger.error(`❌ CCR stream relay failed (Account: ${account?.name || accountId}):`, error)
+        // 网络错误标记临时不可用
+        if (accountId && !error.response) {
+          const autoProtectionDisabled =
+            account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+          if (!autoProtectionDisabled) {
+            await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 503).catch(() => {})
+          }
+        }
       }
       throw error
     } finally {
@@ -596,16 +644,40 @@ class CcrRelayService {
               `❌ CCR API returned error status: ${response.status} | Account: ${account?.name || accountId}`
             )
 
+            const autoProtectionDisabled =
+              account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+
             if (response.status === 401) {
-              ccrAccountService.markAccountUnauthorized(accountId)
+              if (!autoProtectionDisabled) {
+                upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 401).catch(() => {})
+              }
             } else if (response.status === 429) {
               ccrAccountService.markAccountRateLimited(accountId)
+              if (!autoProtectionDisabled) {
+                upstreamErrorHelper
+                  .markTempUnavailable(
+                    accountId,
+                    'ccr',
+                    429,
+                    upstreamErrorHelper.parseRetryAfter(response.headers)
+                  )
+                  .catch(() => {})
+              }
               // 检查是否因为超过每日额度
               ccrAccountService.checkQuotaUsage(accountId).catch((err) => {
                 logger.error('❌ Failed to check quota after 429 error:', err)
               })
             } else if (response.status === 529) {
               ccrAccountService.markAccountOverloaded(accountId)
+              if (!autoProtectionDisabled) {
+                upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 529).catch(() => {})
+              }
+            } else if (response.status >= 500) {
+              if (!autoProtectionDisabled) {
+                upstreamErrorHelper
+                  .markTempUnavailable(accountId, 'ccr', response.status)
+                  .catch(() => {})
+              }
             }
 
             // 设置错误响应的状态码和响应头
@@ -885,7 +957,7 @@ class CcrRelayService {
   // ⏰ 更新账户最后使用时间
   async _updateLastUsedTime(accountId) {
     try {
-      const redis = require('../models/redis')
+      const redis = require('../../models/redis')
       const client = redis.getClientSafe()
       await client.hset(`ccr_account:${accountId}`, 'lastUsedAt', new Date().toISOString())
     } catch (error) {
