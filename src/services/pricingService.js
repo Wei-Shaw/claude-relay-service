@@ -53,6 +53,9 @@ class PricingService {
       'claude-sonnet-3-7': 0.000006,
       'claude-sonnet-4': 0.000006,
       'claude-sonnet-4-20250514': 0.000006,
+      'claude-sonnet-4-5': 0.000006,
+      'claude-sonnet-4-5-20250929': 0.000006,
+      'claude-sonnet-4-6': 0.000006,
 
       // Haiku 系列: $1.6/MTok
       'claude-3-5-haiku': 0.0000016,
@@ -71,8 +74,12 @@ class PricingService {
       'claude-sonnet-4-20250514[1m]': {
         input: 0.000006, // $6/MTok
         output: 0.0000225 // $22.50/MTok
+      },
+      // claude-sonnet-4-6[1m] 模型的 1M 上下文价格
+      'claude-sonnet-4-6[1m]': {
+        input: 0.000006, // $6/MTok
+        output: 0.0000225 // $22.50/MTok
       }
-      // 未来可以添加更多 1M 模型的价格
     }
   }
 
