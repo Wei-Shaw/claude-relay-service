@@ -4,9 +4,10 @@ const {
   InvokeModelWithResponseStreamCommand
 } = require('@aws-sdk/client-bedrock-runtime')
 const { fromEnv } = require('@aws-sdk/credential-providers')
-const logger = require('../utils/logger')
-const config = require('../../config/config')
-const userMessageQueueService = require('./userMessageQueueService')
+const logger = require('../../utils/logger')
+const config = require('../../../config/config')
+const userMessageQueueService = require('../userMessageQueueService')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 class BedrockRelayService {
   constructor() {
@@ -188,7 +189,7 @@ class BedrockRelayService {
       }
     } catch (error) {
       logger.error('❌ Bedrock非流式请求失败:', error)
-      throw this._handleBedrockError(error)
+      throw this._handleBedrockError(error, accountId, bedrockAccount)
     } finally {
       // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && accountId) {
@@ -376,10 +377,12 @@ class BedrockRelayService {
       }
 
       res.write('event: error\n')
-      res.write(`data: ${JSON.stringify({ error: this._handleBedrockError(error).message })}\n\n`)
+      res.write(
+        `data: ${JSON.stringify({ error: this._handleBedrockError(error, accountId, bedrockAccount).message })}\n\n`
+      )
       res.end()
 
-      throw this._handleBedrockError(error)
+      throw this._handleBedrockError(error, accountId, bedrockAccount)
     } finally {
       // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && accountId) {
@@ -647,7 +650,25 @@ class BedrockRelayService {
   }
 
   // 处理Bedrock错误
-  _handleBedrockError(error) {
+  _handleBedrockError(error, accountId = null, bedrockAccount = null) {
+    const autoProtectionDisabled =
+      bedrockAccount?.disableAutoProtection === true ||
+      bedrockAccount?.disableAutoProtection === 'true'
+    if (accountId && !autoProtectionDisabled) {
+      if (error.name === 'ThrottlingException') {
+        upstreamErrorHelper.markTempUnavailable(accountId, 'bedrock', 429).catch(() => {})
+      } else if (error.name === 'AccessDeniedException') {
+        upstreamErrorHelper.markTempUnavailable(accountId, 'bedrock', 403).catch(() => {})
+      } else if (
+        error.name === 'ServiceUnavailableException' ||
+        error.name === 'InternalServerException'
+      ) {
+        upstreamErrorHelper.markTempUnavailable(accountId, 'bedrock', 500).catch(() => {})
+      } else if (error.name === 'ModelNotReadyException') {
+        upstreamErrorHelper.markTempUnavailable(accountId, 'bedrock', 503).catch(() => {})
+      }
+    }
+
     const errorMessage = error.message || 'Unknown Bedrock error'
 
     if (error.name === 'ValidationException') {

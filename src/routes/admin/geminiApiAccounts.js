@@ -1,5 +1,5 @@
 const express = require('express')
-const geminiApiAccountService = require('../../services/geminiApiAccountService')
+const geminiApiAccountService = require('../../services/account/geminiApiAccountService')
 const apiKeyService = require('../../services/apiKeyService')
 const accountGroupService = require('../../services/accountGroupService')
 const redis = require('../../models/redis')
@@ -449,6 +449,166 @@ router.post('/gemini-api-accounts/:id/reset-status', authenticateAdmin, async (r
   } catch (error) {
     logger.error('❌ Failed to reset Gemini-API account status:', error)
     return res.status(500).json({ error: 'Failed to reset status', message: error.message })
+  }
+})
+
+// 测试 Gemini-API 账户连通性（SSE 流式）
+const ALLOWED_MAX_TOKENS = [100, 500, 1000, 2000, 4096]
+const sanitizeMaxTokens = (value) =>
+  ALLOWED_MAX_TOKENS.includes(Number(value)) ? Number(value) : 500
+
+router.post('/gemini-api-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+  const { model = 'gemini-2.5-flash', prompt = 'hi' } = req.body
+  const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
+  const { createGeminiTestPayload, extractErrorMessage } = require('../../utils/testPayloadHelper')
+  const { buildGeminiApiUrl } = require('../../handlers/geminiHandlers')
+  const ProxyHelper = require('../../utils/proxyHelper')
+  const axios = require('axios')
+
+  const abortController = new AbortController()
+  res.on('close', () => abortController.abort())
+
+  const safeWrite = (data) => {
+    if (!res.writableEnded && !res.destroyed) {
+      res.write(data)
+    }
+  }
+  const safeEnd = () => {
+    if (!res.writableEnded && !res.destroyed) {
+      res.end()
+    }
+  }
+
+  try {
+    const account = await geminiApiAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+    if (!account.apiKey) {
+      return res.status(401).json({ error: 'API Key not found or decryption failed' })
+    }
+
+    const baseUrl = account.baseUrl || 'https://generativelanguage.googleapis.com'
+    const apiUrl = buildGeminiApiUrl(baseUrl, model, 'streamGenerateContent', account.apiKey, {
+      stream: true
+    })
+
+    // 设置 SSE 响应头
+    if (res.writableEnded || res.destroyed) {
+      return
+    }
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    })
+    safeWrite(`data: ${JSON.stringify({ type: 'test_start', message: 'Test started' })}\n\n`)
+
+    const payload = createGeminiTestPayload(model, { prompt, maxTokens })
+    const requestConfig = {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000,
+      responseType: 'stream',
+      validateStatus: () => true,
+      signal: abortController.signal
+    }
+
+    // 配置代理
+    if (account.proxy) {
+      const agent = ProxyHelper.createProxyAgent(account.proxy)
+      if (agent) {
+        requestConfig.httpsAgent = agent
+        requestConfig.httpAgent = agent
+      }
+    }
+
+    try {
+      const response = await axios.post(apiUrl, payload, requestConfig)
+
+      if (response.status !== 200) {
+        const chunks = []
+        response.data.on('data', (chunk) => chunks.push(chunk))
+        response.data.on('end', () => {
+          const errorData = Buffer.concat(chunks).toString()
+          let errorMsg = `API Error: ${response.status}`
+          try {
+            const json = JSON.parse(errorData)
+            errorMsg = extractErrorMessage(json, errorMsg)
+          } catch {
+            if (errorData.length < 500) {
+              errorMsg = errorData || errorMsg
+            }
+          }
+          safeWrite(
+            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: errorMsg })}\n\n`
+          )
+          safeEnd()
+        })
+        response.data.on('error', () => {
+          safeWrite(
+            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: `API Error: ${response.status}` })}\n\n`
+          )
+          safeEnd()
+        })
+        return
+      }
+
+      let buffer = ''
+      response.data.on('data', (chunk) => {
+        buffer += chunk.toString()
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data:')) {
+            continue
+          }
+          const jsonStr = line.substring(5).trim()
+          if (!jsonStr || jsonStr === '[DONE]') {
+            continue
+          }
+
+          try {
+            const data = JSON.parse(jsonStr)
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+            if (text) {
+              safeWrite(`data: ${JSON.stringify({ type: 'content', text })}\n\n`)
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+      })
+
+      response.data.on('end', () => {
+        safeWrite(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
+        safeEnd()
+      })
+
+      response.data.on('error', (err) => {
+        safeWrite(
+          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: err.message })}\n\n`
+        )
+        safeEnd()
+      })
+    } catch (axiosError) {
+      if (axiosError.name === 'CanceledError') {
+        return
+      }
+      safeWrite(
+        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: axiosError.message })}\n\n`
+      )
+      safeEnd()
+    }
+  } catch (error) {
+    logger.error('Gemini-API account test failed:', error)
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Test failed', message: error.message })
+    }
+    safeWrite(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`)
+    safeEnd()
   }
 })
 

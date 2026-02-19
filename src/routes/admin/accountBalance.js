@@ -1,7 +1,7 @@
 const express = require('express')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
-const accountBalanceService = require('../../services/accountBalanceService')
+const accountBalanceService = require('../../services/account/accountBalanceService')
 const balanceScriptService = require('../../services/balanceScriptService')
 const { isBalanceScriptEnabled } = require('../../utils/featureFlags')
 

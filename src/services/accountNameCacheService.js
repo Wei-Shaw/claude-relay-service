@@ -49,26 +49,26 @@ class AccountNameCacheService {
       const newGroupCache = new Map()
 
       // 延迟加载服务，避免循环依赖
-      const claudeAccountService = require('./claudeAccountService')
-      const claudeConsoleAccountService = require('./claudeConsoleAccountService')
-      const geminiAccountService = require('./geminiAccountService')
-      const openaiAccountService = require('./openaiAccountService')
-      const azureOpenaiAccountService = require('./azureOpenaiAccountService')
-      const bedrockAccountService = require('./bedrockAccountService')
-      const droidAccountService = require('./droidAccountService')
-      const ccrAccountService = require('./ccrAccountService')
+      const claudeAccountService = require('./account/claudeAccountService')
+      const claudeConsoleAccountService = require('./account/claudeConsoleAccountService')
+      const geminiAccountService = require('./account/geminiAccountService')
+      const openaiAccountService = require('./account/openaiAccountService')
+      const azureOpenaiAccountService = require('./account/azureOpenaiAccountService')
+      const bedrockAccountService = require('./account/bedrockAccountService')
+      const droidAccountService = require('./account/droidAccountService')
+      const ccrAccountService = require('./account/ccrAccountService')
       const accountGroupService = require('./accountGroupService')
 
       // 可选服务（可能不存在）
       let geminiApiAccountService = null
       let openaiResponsesAccountService = null
       try {
-        geminiApiAccountService = require('./geminiApiAccountService')
+        geminiApiAccountService = require('./account/geminiApiAccountService')
       } catch (e) {
         // 服务不存在，忽略
       }
       try {
-        openaiResponsesAccountService = require('./openaiResponsesAccountService')
+        openaiResponsesAccountService = require('./account/openaiResponsesAccountService')
       } catch (e) {
         // 服务不存在，忽略
       }

@@ -1,5 +1,5 @@
 const express = require('express')
-const geminiAccountService = require('../../services/geminiAccountService')
+const geminiAccountService = require('../../services/account/geminiAccountService')
 const accountGroupService = require('../../services/accountGroupService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
@@ -511,6 +511,7 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
   const { accountId } = req.params
   const { model = 'gemini-2.5-flash' } = req.body
   const startTime = Date.now()
+  const { extractErrorMessage } = require('../../utils/testPayloadHelper')
 
   try {
     // 获取账户信息
@@ -585,7 +586,7 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Test failed',
-      message: error.response?.data?.error?.message || error.message,
+      message: extractErrorMessage(error.response?.data, error.message),
       latency
     })
   }

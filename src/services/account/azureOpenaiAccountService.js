@@ -1,8 +1,9 @@
-const redisClient = require('../models/redis')
+const redisClient = require('../../models/redis')
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
-const config = require('../../config/config')
-const logger = require('../utils/logger')
+const config = require('../../../config/config')
+const logger = require('../../utils/logger')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 // 加密相关常量
 const ALGORITHM = 'aes-256-cbc'
@@ -138,6 +139,10 @@ async function createAccount(accountData) {
     isActive: accountData.isActive !== false ? 'true' : 'false',
     status: 'active',
     schedulable: accountData.schedulable !== false ? 'true' : 'false',
+    disableAutoProtection:
+      accountData.disableAutoProtection === true || accountData.disableAutoProtection === 'true'
+        ? 'true'
+        : 'false', // 关闭自动防护
     createdAt: now,
     updatedAt: now
   }
@@ -230,6 +235,14 @@ async function updateAccount(accountId, updates) {
     // 直接保存，不做任何调整
   }
 
+  // 自动防护开关
+  if (updates.disableAutoProtection !== undefined) {
+    updates.disableAutoProtection =
+      updates.disableAutoProtection === true || updates.disableAutoProtection === 'true'
+        ? 'true'
+        : 'false'
+  }
+
   // 更新账户类型时处理共享账户集合
   const client = redisClient.getClientSafe()
   if (updates.accountType && updates.accountType !== existingAccount.accountType) {
@@ -262,7 +275,7 @@ async function updateAccount(accountId, updates) {
 // 删除账户
 async function deleteAccount(accountId) {
   // 首先从所有分组中移除此账户
-  const accountGroupService = require('./accountGroupService')
+  const accountGroupService = require('../accountGroupService')
   await accountGroupService.removeAccountFromAllGroups(accountId)
 
   const client = redisClient.getClientSafe()
@@ -380,8 +393,14 @@ async function selectAvailableAccount(sessionId = null) {
     if (accountId) {
       const account = await getAccount(accountId)
       if (account && account.isActive === 'true' && account.schedulable === 'true') {
-        logger.debug(`Reusing Azure OpenAI account ${accountId} for session ${sessionId}`)
-        return account
+        const isTempUnavail = await upstreamErrorHelper.isTempUnavailable(accountId, 'azure-openai')
+        if (!isTempUnavail) {
+          logger.debug(`Reusing Azure OpenAI account ${accountId} for session ${sessionId}`)
+          return account
+        }
+        logger.warn(
+          `⏱️ Session-bound Azure OpenAI account ${accountId} temporarily unavailable, falling back to pool`
+        )
       }
     }
   }
@@ -389,18 +408,30 @@ async function selectAvailableAccount(sessionId = null) {
   // 获取所有共享账户
   const sharedAccounts = await getSharedAccounts()
 
-  // 过滤出可用的账户
-  const availableAccounts = sharedAccounts.filter((acc) => {
-    // ✅ 检查账户订阅是否过期
+  // 过滤出可用的账户（异步过滤，包含临时不可用检查）
+  const availableAccounts = []
+  for (const acc of sharedAccounts) {
+    // 检查账户订阅是否过期
     if (isSubscriptionExpired(acc)) {
       logger.debug(
         `⏰ Skipping expired Azure OpenAI account: ${acc.name}, expired at ${acc.subscriptionExpiresAt}`
       )
-      return false
+      continue
     }
 
-    return acc.isActive === 'true' && acc.schedulable === 'true'
-  })
+    if (acc.isActive !== 'true' || acc.schedulable !== 'true') {
+      continue
+    }
+
+    // 检查临时不可用状态
+    const isTempUnavail = await upstreamErrorHelper.isTempUnavailable(acc.id, 'azure-openai')
+    if (isTempUnavail) {
+      logger.debug(`⏱️ Skipping temporarily unavailable Azure OpenAI account: ${acc.name}`)
+      continue
+    }
+
+    availableAccounts.push(acc)
+  }
 
   if (availableAccounts.length === 0) {
     throw new Error('No available Azure OpenAI accounts')
@@ -515,6 +546,69 @@ async function migrateApiKeysForAzureSupport() {
   return migratedCount
 }
 
+// 🔄 重置Azure OpenAI账户所有异常状态
+async function resetAccountStatus(accountId) {
+  try {
+    const accountData = await getAccount(accountId)
+    if (!accountData) {
+      throw new Error('Account not found')
+    }
+
+    const client = redisClient.getClientSafe()
+    const accountKey = `azure_openai:account:${accountId}`
+
+    const updates = {
+      status: 'active',
+      errorMessage: '',
+      schedulable: 'true',
+      isActive: 'true'
+    }
+
+    const fieldsToDelete = [
+      'rateLimitedAt',
+      'rateLimitStatus',
+      'unauthorizedAt',
+      'unauthorizedCount',
+      'overloadedAt',
+      'overloadStatus',
+      'blockedAt',
+      'quotaStoppedAt'
+    ]
+
+    await client.hset(accountKey, updates)
+    await client.hdel(accountKey, ...fieldsToDelete)
+
+    logger.success(`Reset all error status for Azure OpenAI account ${accountId}`)
+
+    // 清除临时不可用状态
+    await upstreamErrorHelper.clearTempUnavailable(accountId, 'azure-openai').catch(() => {})
+
+    // 异步发送 Webhook 通知（忽略错误）
+    try {
+      const webhookNotifier = require('../../utils/webhookNotifier')
+      await webhookNotifier.sendAccountAnomalyNotification({
+        accountId,
+        accountName: accountData.name || accountId,
+        platform: 'azure-openai',
+        status: 'recovered',
+        errorCode: 'STATUS_RESET',
+        reason: 'Account status manually reset',
+        timestamp: new Date().toISOString()
+      })
+    } catch (webhookError) {
+      logger.warn(
+        'Failed to send webhook notification for Azure OpenAI status reset:',
+        webhookError
+      )
+    }
+
+    return { success: true, accountId }
+  } catch (error) {
+    logger.error(`❌ Failed to reset Azure OpenAI account status: ${accountId}`, error)
+    throw error
+  }
+}
+
 module.exports = {
   createAccount,
   getAccount,
@@ -528,6 +622,7 @@ module.exports = {
   performHealthChecks,
   toggleSchedulable,
   migrateApiKeysForAzureSupport,
+  resetAccountStatus,
   encrypt,
   decrypt
 }

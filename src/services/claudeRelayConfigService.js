@@ -280,16 +280,16 @@ class ClaudeRelayConfigService {
       let accountService
       switch (accountType) {
         case 'claude-official':
-          accountService = require('./claudeAccountService')
+          accountService = require('./account/claudeAccountService')
           break
         case 'claude-console':
-          accountService = require('./claudeConsoleAccountService')
+          accountService = require('./account/claudeConsoleAccountService')
           break
         case 'bedrock':
-          accountService = require('./bedrockAccountService')
+          accountService = require('./account/bedrockAccountService')
           break
         case 'ccr':
-          accountService = require('./ccrAccountService')
+          accountService = require('./account/ccrAccountService')
           break
         default:
           logger.warn(`Unknown account type for validation: ${accountType}`)

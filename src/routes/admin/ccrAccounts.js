@@ -1,5 +1,5 @@
 const express = require('express')
-const ccrAccountService = require('../../services/ccrAccountService')
+const ccrAccountService = require('../../services/account/ccrAccountService')
 const accountGroupService = require('../../services/accountGroupService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
@@ -7,6 +7,7 @@ const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { extractErrorMessage } = require('../../utils/testPayloadHelper')
 
 const router = express.Router()
 
@@ -492,7 +493,7 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Test failed',
-      message: error.response?.data?.error?.message || error.message,
+      message: extractErrorMessage(error.response?.data, error.message),
       latency
     })
   }

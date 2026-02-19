@@ -8,10 +8,10 @@ const router = express.Router()
 
 const { authenticateAdmin } = require('../../middleware/auth')
 const redis = require('../../models/redis')
-const claudeAccountService = require('../../services/claudeAccountService')
-const claudeConsoleAccountService = require('../../services/claudeConsoleAccountService')
-const openaiAccountService = require('../../services/openaiAccountService')
-const openaiResponsesAccountService = require('../../services/openaiResponsesAccountService')
+const claudeAccountService = require('../../services/account/claudeAccountService')
+const claudeConsoleAccountService = require('../../services/account/claudeConsoleAccountService')
+const openaiAccountService = require('../../services/account/openaiAccountService')
+const openaiResponsesAccountService = require('../../services/account/openaiResponsesAccountService')
 const logger = require('../../utils/logger')
 
 function toBool(value, defaultValue = false) {

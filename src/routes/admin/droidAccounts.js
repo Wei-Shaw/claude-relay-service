@@ -1,6 +1,6 @@
 const express = require('express')
 const crypto = require('crypto')
-const droidAccountService = require('../../services/droidAccountService')
+const droidAccountService = require('../../services/account/droidAccountService')
 const accountGroupService = require('../../services/accountGroupService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
@@ -13,6 +13,7 @@ const {
 } = require('../../utils/workosOAuthHelper')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { extractErrorMessage } = require('../../utils/testPayloadHelper')
 
 const router = express.Router()
 
@@ -683,9 +684,22 @@ router.post('/droid-accounts/:accountId/test', authenticateAdmin, async (req, re
     return res.status(500).json({
       success: false,
       error: 'Test failed',
-      message: error.response?.data?.error?.message || error.message,
+      message: extractErrorMessage(error.response?.data, error.message),
       latency
     })
+  }
+})
+
+// 重置 Droid 账户状态
+router.post('/:accountId/reset-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const result = await droidAccountService.resetAccountStatus(accountId)
+    logger.success(`Admin reset status for Droid account: ${accountId}`)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to reset Droid account status:', error)
+    return res.status(500).json({ error: 'Failed to reset status', message: error.message })
   }
 })
 

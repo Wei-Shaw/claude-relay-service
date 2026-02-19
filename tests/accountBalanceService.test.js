@@ -6,7 +6,7 @@ jest.mock('../src/utils/logger', () => ({
   error: jest.fn()
 }))
 
-const accountBalanceServiceModule = require('../src/services/accountBalanceService')
+const accountBalanceServiceModule = require('../src/services/account/accountBalanceService')
 
 const { AccountBalanceService } = accountBalanceServiceModule
 

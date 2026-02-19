@@ -11,8 +11,8 @@ const path = require('path')
 
 const redis = require('../src/models/redis')
 const apiKeyService = require('../src/services/apiKeyService')
-const claudeAccountService = require('../src/services/claudeAccountService')
-const bedrockAccountService = require('../src/services/bedrockAccountService')
+const claudeAccountService = require('../src/services/account/claudeAccountService')
+const bedrockAccountService = require('../src/services/account/bedrockAccountService')
 
 const program = new Command()
 

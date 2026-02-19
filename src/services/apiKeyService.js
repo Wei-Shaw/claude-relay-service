@@ -4,7 +4,7 @@ const config = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const serviceRatesService = require('./serviceRatesService')
-const { isClaudeFamilyModel } = require('../utils/modelHelper')
+const { isOpusModel } = require('../utils/modelHelper')
 
 const ACCOUNT_TYPE_CONFIG = {
   claude: { prefix: 'claude:account:' },
@@ -1649,7 +1649,7 @@ class ApiKeyService {
   async recordOpusCost(keyId, ratedCost, realCost, model, accountType) {
     try {
       // 判断是否为 Claude 系列模型（包含 Bedrock 格式等）
-      if (!isClaudeFamilyModel(model)) {
+      if (!isOpusModel(model)) {
         return
       }
 

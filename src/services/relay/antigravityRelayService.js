@@ -1,7 +1,7 @@
-const apiKeyService = require('./apiKeyService')
+const apiKeyService = require('../apiKeyService')
 const { convertMessagesToGemini, convertGeminiResponse } = require('./geminiRelayService')
-const { normalizeAntigravityModelInput } = require('../utils/antigravityModel')
-const antigravityClient = require('./antigravityClient')
+const { normalizeAntigravityModelInput } = require('../../utils/antigravityModel')
+const antigravityClient = require('../antigravityClient')
 
 function buildRequestData({ messages, model, temperature, maxTokens, sessionId }) {
   const requestedModel = normalizeAntigravityModelInput(model)

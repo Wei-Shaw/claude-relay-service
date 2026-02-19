@@ -1,9 +1,10 @@
-const geminiAccountService = require('./geminiAccountService')
-const geminiApiAccountService = require('./geminiApiAccountService')
-const accountGroupService = require('./accountGroupService')
-const redis = require('../models/redis')
-const logger = require('../utils/logger')
-const { isSchedulable, isActive, sortAccountsByPriority } = require('../utils/commonHelper')
+const geminiAccountService = require('../account/geminiAccountService')
+const geminiApiAccountService = require('../account/geminiApiAccountService')
+const accountGroupService = require('../accountGroupService')
+const redis = require('../../models/redis')
+const logger = require('../../utils/logger')
+const { isSchedulable, isActive, sortAccountsByPriority } = require('../../utils/commonHelper')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 const OAUTH_PROVIDER_GEMINI_CLI = 'gemini-cli'
 const OAUTH_PROVIDER_ANTIGRAVITY = 'antigravity'
@@ -241,8 +242,17 @@ class UnifiedGeminiScheduler {
         const accountId = apiKeyData.geminiAccountId.replace('api:', '')
         const boundAccount = await geminiApiAccountService.getAccount(accountId)
         if (boundAccount && isActive(boundAccount.isActive) && boundAccount.status !== 'error') {
+          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+            accountId,
+            'gemini-api'
+          )
+          if (isTempUnavailable) {
+            logger.warn(
+              `⏱️ Bound Gemini-API account ${boundAccount.name} (${accountId}) temporarily unavailable, falling back to pool`
+            )
+          }
           const isRateLimited = await this.isAccountRateLimited(accountId)
-          if (!isRateLimited) {
+          if (!isRateLimited && !isTempUnavailable) {
             // 检查模型支持
             if (
               requestedModel &&
@@ -298,8 +308,17 @@ class UnifiedGeminiScheduler {
           ) {
             return availableAccounts
           }
+          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+            boundAccount.id,
+            'gemini'
+          )
+          if (isTempUnavailable) {
+            logger.warn(
+              `⏱️ Bound Gemini account ${boundAccount.name} (${boundAccount.id}) temporarily unavailable, falling back to pool`
+            )
+          }
           const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
-          if (!isRateLimited) {
+          if (!isRateLimited && !isTempUnavailable) {
             // 检查模型支持
             if (
               requestedModel &&
@@ -364,6 +383,13 @@ class UnifiedGeminiScheduler {
           continue
         }
 
+        // 检查临时不可用
+        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(account.id, 'gemini')
+        if (isTempUnavailable) {
+          logger.debug(`⏭️ Skipping Gemini account ${account.name} - temporarily unavailable`)
+          continue
+        }
+
         // 检查模型支持
         if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
           // 处理可能带有 models/ 前缀的模型名
@@ -417,6 +443,16 @@ class UnifiedGeminiScheduler {
             }
           }
 
+          // 检查临时不可用
+          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+            account.id,
+            'gemini-api'
+          )
+          if (isTempUnavailable) {
+            logger.debug(`⏭️ Skipping Gemini-API account ${account.name} - temporarily unavailable`)
+            continue
+          }
+
           // 检查是否被限流
           const isRateLimited = await this.isAccountRateLimited(account.id)
           if (!isRateLimited) {
@@ -451,6 +487,14 @@ class UnifiedGeminiScheduler {
           logger.info(`🚫 Gemini account ${accountId} is not schedulable`)
           return false
         }
+        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+          accountId,
+          accountType
+        )
+        if (isTempUnavailable) {
+          logger.info(`⏱️ Gemini account ${accountId} is temporarily unavailable`)
+          return false
+        }
         return !(await this.isAccountRateLimited(accountId))
       } else if (accountType === 'gemini-api') {
         const account = await geminiApiAccountService.getAccount(accountId)
@@ -460,6 +504,14 @@ class UnifiedGeminiScheduler {
         // 检查是否可调度
         if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 Gemini-API account ${accountId} is not schedulable`)
+          return false
+        }
+        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+          accountId,
+          accountType
+        )
+        if (isTempUnavailable) {
+          logger.info(`⏱️ Gemini account ${accountId} is temporarily unavailable`)
           return false
         }
         return !(await this.isAccountRateLimited(accountId))
@@ -494,7 +546,7 @@ class UnifiedGeminiScheduler {
     const client = redis.getClientSafe()
     const mappingData = JSON.stringify({ accountId, accountType })
     // 依据配置设置TTL（小时）
-    const appConfig = require('../../config/config')
+    const appConfig = require('../../../config/config')
     const ttlHours = appConfig.session?.stickyTtlHours || 1
     const ttlSeconds = Math.max(1, Math.floor(ttlHours * 60 * 60))
     const key = this._getSessionMappingKey(sessionHash, oauthProvider)
@@ -535,7 +587,7 @@ class UnifiedGeminiScheduler {
         return true
       }
 
-      const appConfig = require('../../config/config')
+      const appConfig = require('../../../config/config')
       const ttlHours = appConfig.session?.stickyTtlHours || 1
       const renewalThresholdMinutes = appConfig.session?.renewalThresholdMinutes || 0
       if (!renewalThresholdMinutes) {
@@ -749,6 +801,14 @@ class UnifiedGeminiScheduler {
           // 检查是否被限流
           const isRateLimited = await this.isAccountRateLimited(account.id, accountType)
           if (!isRateLimited) {
+            const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+              account.id,
+              accountType
+            )
+            if (isTempUnavailable) {
+              logger.debug(`⏭️ Skipping group member ${account.name} - temporarily unavailable`)
+              continue
+            }
             availableAccounts.push({
               ...account,
               accountId: account.id,

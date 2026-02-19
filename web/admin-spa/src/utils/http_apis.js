@@ -3,6 +3,13 @@ import request from '@/utils/request'
 // 模型
 export const getModelsApi = () => request({ url: '/apiStats/models', method: 'GET' })
 
+// 模型价格管理
+export const getModelPricingApi = () => request({ url: '/admin/models/pricing', method: 'GET' })
+export const getModelPricingStatusApi = () =>
+  request({ url: '/admin/models/pricing/status', method: 'GET' })
+export const refreshModelPricingApi = () =>
+  request({ url: '/admin/models/pricing/refresh', method: 'POST' })
+
 // API Stats
 export const getKeyIdApi = (apiKey) =>
   request({ url: '/apiStats/api/get-key-id', method: 'POST', data: { apiKey } })
@@ -37,6 +44,8 @@ export const getRedemptionHistoryByApiIdApi = (apiId, params = {}) =>
 
 // 仪表板
 export const getDashboardApi = () => request({ url: '/admin/dashboard', method: 'GET' })
+export const getTempUnavailableApi = () =>
+  request({ url: '/admin/temp-unavailable', method: 'GET' })
 export const getUsageCostsApi = (period) =>
   request({ url: `/admin/usage-costs?period=${period}`, method: 'GET' })
 export const getUsageStatsApi = (url) => request({ url, method: 'GET' })

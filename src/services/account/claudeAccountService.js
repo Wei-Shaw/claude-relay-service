@@ -1,22 +1,23 @@
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
-const ProxyHelper = require('../utils/proxyHelper')
+const ProxyHelper = require('../../utils/proxyHelper')
 const axios = require('axios')
-const redis = require('../models/redis')
-const config = require('../../config/config')
-const logger = require('../utils/logger')
-const { maskToken } = require('../utils/tokenMask')
+const redis = require('../../models/redis')
+const config = require('../../../config/config')
+const logger = require('../../utils/logger')
+const { maskToken } = require('../../utils/tokenMask')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const {
   logRefreshStart,
   logRefreshSuccess,
   logRefreshError,
   logTokenUsage,
   logRefreshSkipped
-} = require('../utils/tokenRefreshLogger')
-const tokenRefreshService = require('./tokenRefreshService')
-const LRUCache = require('../utils/lruCache')
-const { formatDateWithTimezone, getISOStringWithTimezone } = require('../utils/dateHelper')
-const { isOpus45OrNewer } = require('../utils/modelHelper')
+} = require('../../utils/tokenRefreshLogger')
+const tokenRefreshService = require('../tokenRefreshService')
+const LRUCache = require('../../utils/lruCache')
+const { formatDateWithTimezone, getISOStringWithTimezone } = require('../../utils/dateHelper')
+const { isOpus45OrNewer } = require('../../utils/modelHelper')
 
 /**
  * Check if account is Pro (not Max)
@@ -401,7 +402,7 @@ class ClaudeAccountService {
 
         // 发送Webhook通知
         try {
-          const webhookNotifier = require('../utils/webhookNotifier')
+          const webhookNotifier = require('../../utils/webhookNotifier')
           await webhookNotifier.sendAccountAnomalyNotification({
             accountId,
             accountName: accountData.name,
@@ -787,7 +788,7 @@ class ClaudeAccountService {
       // 检查是否手动禁用了账号，如果是则发送webhook通知
       if (updates.isActive === 'false' && accountData.isActive === 'true') {
         try {
-          const webhookNotifier = require('../utils/webhookNotifier')
+          const webhookNotifier = require('../../utils/webhookNotifier')
           await webhookNotifier.sendAccountAnomalyNotification({
             accountId,
             accountName: updatedData.name || 'Unknown Account',
@@ -831,7 +832,7 @@ class ClaudeAccountService {
   async deleteAccount(accountId) {
     try {
       // 首先从所有分组中移除此账户
-      const accountGroupService = require('./accountGroupService')
+      const accountGroupService = require('../accountGroupService')
       await accountGroupService.removeAccountFromAllGroups(accountId)
 
       const result = await redis.deleteClaudeAccount(accountId)
@@ -1387,7 +1388,7 @@ class ClaudeAccountService {
 
       // 发送Webhook通知
       try {
-        const webhookNotifier = require('../utils/webhookNotifier')
+        const webhookNotifier = require('../../utils/webhookNotifier')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: accountData.name || 'Claude Account',
@@ -1742,7 +1743,7 @@ class ClaudeAccountService {
 
         // 发送Webhook通知
         try {
-          const webhookNotifier = require('../utils/webhookNotifier')
+          const webhookNotifier = require('../../utils/webhookNotifier')
           await webhookNotifier.sendAccountAnomalyNotification({
             accountId,
             accountName: accountData.name || 'Claude Account',
@@ -2386,7 +2387,7 @@ class ClaudeAccountService {
 
       // 发送Webhook通知
       try {
-        const webhookNotifier = require('../utils/webhookNotifier')
+        const webhookNotifier = require('../../utils/webhookNotifier')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: accountData.name,
@@ -2499,6 +2500,13 @@ class ClaudeAccountService {
       // 清除5xx错误计数
       const serverErrorKey = `claude_account:${accountId}:5xx_errors`
       await redis.client.del(serverErrorKey)
+
+      // 清除过载状态
+      const overloadKey = `account:overload:${accountId}`
+      await redis.client.del(overloadKey)
+
+      // 清除临时不可用状态
+      await upstreamErrorHelper.clearTempUnavailable(accountId, 'claude-official').catch(() => {})
 
       logger.info(
         `✅ Successfully reset all error states for account ${accountData.name} (${accountId})`
@@ -2704,7 +2712,7 @@ class ClaudeAccountService {
 
       // 发送Webhook通知
       try {
-        const webhookNotifier = require('../utils/webhookNotifier')
+        const webhookNotifier = require('../../utils/webhookNotifier')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: accountData.name,
@@ -2795,7 +2803,7 @@ class ClaudeAccountService {
           if (canSendWarning) {
             // 发送Webhook通知
             try {
-              const webhookNotifier = require('../utils/webhookNotifier')
+              const webhookNotifier = require('../../utils/webhookNotifier')
               await webhookNotifier.sendAccountAnomalyNotification({
                 accountId,
                 accountName: accountData.name || 'Claude Account',

@@ -3,8 +3,8 @@
  */
 
 const redis = require('../src/models/redis')
-const claudeAccountService = require('../src/services/claudeAccountService')
-const claudeConsoleAccountService = require('../src/services/claudeConsoleAccountService')
+const claudeAccountService = require('../src/services/account/claudeAccountService')
+const claudeConsoleAccountService = require('../src/services/account/claudeConsoleAccountService')
 const accountGroupService = require('../src/services/accountGroupService')
 
 async function testApiResponse() {

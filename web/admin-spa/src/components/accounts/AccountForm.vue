@@ -1614,7 +1614,7 @@
               </div>
 
               <!-- 上游错误处理 -->
-              <div v-if="form.platform === 'claude-console'">
+              <div v-if="autoProtectionPlatforms.includes(form.platform)">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >上游错误处理</label
                 >
@@ -1714,24 +1714,26 @@
                   {{ errors.baseUrl }}
                 </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  填写 API 基础地址，必须以
-                  <code class="rounded bg-gray-100 px-1 dark:bg-gray-600">/models</code>
-                  结尾。系统会自动拼接
+                  支持三种格式，系统自动识别：
+                </p>
+                <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                  以 /models 结尾:
                   <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
-                    >/{model}:generateContent</code
+                    >https://proxy.com/v1beta/models</code
                   >
                 </p>
                 <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                  官方:
+                  模板模式:
                   <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
-                    >https://generativelanguage.googleapis.com/v1beta/models</code
+                    >https://proxy.com/api/{model}:{action}</code
                   >
                 </p>
                 <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                  上游为 CRS:
+                  域名:
                   <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
-                    >https://your-crs.com/gemini/v1beta/models</code
+                    >https://generativelanguage.googleapis.com</code
                   >
+                  (自动拼接 /v1beta/models)
                 </p>
               </div>
 
@@ -3371,26 +3373,24 @@
                 <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
               </div>
             </div>
+          </div>
 
-            <!-- 上游错误处理（编辑模式）-->
-            <div v-if="form.platform === 'claude-console'">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                上游错误处理
-              </label>
-              <label class="inline-flex cursor-pointer items-center">
-                <input
-                  v-model="form.disableAutoProtection"
-                  class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
-                  type="checkbox"
-                />
-                <span class="text-sm text-gray-700 dark:text-gray-300">
-                  上游错误不自动暂停调度
-                </span>
-              </label>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                勾选后遇到 401/400/429/529 等上游错误仅记录日志并透传，不自动禁用或限流
-              </p>
-            </div>
+          <!-- 上游错误处理（编辑模式）-->
+          <div v-if="autoProtectionPlatforms.includes(form.platform)">
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              上游错误处理
+            </label>
+            <label class="inline-flex cursor-pointer items-center">
+              <input
+                v-model="form.disableAutoProtection"
+                class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+              />
+              <span class="text-sm text-gray-700 dark:text-gray-300"> 上游错误不自动暂停调度 </span>
+            </label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              勾选后遇到 401/400/429/529 等上游错误仅记录日志并透传，不自动禁用或限流
+            </p>
           </div>
 
           <!-- OpenAI-Responses 特定字段（编辑模式）-->
@@ -3505,24 +3505,26 @@
                 {{ errors.baseUrl }}
               </p>
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                填写 API 基础地址，必须以
-                <code class="rounded bg-gray-100 px-1 dark:bg-gray-600">/models</code>
-                结尾。系统会自动拼接
+                支持三种格式，系统自动识别：
+              </p>
+              <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                以 /models 结尾:
                 <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
-                  >/{model}:generateContent</code
+                  >https://proxy.com/v1beta/models</code
                 >
               </p>
               <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                官方:
+                模板模式:
                 <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
-                  >https://generativelanguage.googleapis.com/v1beta/models</code
+                  >https://proxy.com/api/{model}:{action}</code
                 >
               </p>
               <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                上游为 CRS:
+                域名:
                 <code class="rounded bg-gray-100 px-1 dark:bg-gray-600"
-                  >https://your-crs.com/gemini/v1beta/models</code
+                  >https://generativelanguage.googleapis.com</code
                 >
+                (自动拼接 /v1beta/models)
               </p>
             </div>
 
@@ -4039,6 +4041,20 @@ const handleCancel = () => {
 const isEdit = computed(() => !!props.account)
 const show = ref(true)
 
+// 支持 disableAutoProtection 的平台白名单
+const autoProtectionPlatforms = [
+  'claude-console',
+  'ccr',
+  'droid',
+  'bedrock',
+  'azure-openai',
+  'azure_openai',
+  'gemini',
+  'gemini-api',
+  'openai',
+  'openai-responses'
+]
+
 // OAuthFlow 组件引用
 const oauthFlowRef = ref(null)
 
@@ -4274,7 +4290,9 @@ const form = ref({
   })(),
   userAgent: props.account?.userAgent || '',
   enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
-  disableAutoProtection: props.account?.disableAutoProtection === true,
+  disableAutoProtection:
+    props.account?.disableAutoProtection === true ||
+    props.account?.disableAutoProtection === 'true',
   // 额度管理字段
   dailyQuota: props.account?.dailyQuota || 0,
   dailyUsage: props.account?.dailyUsage || 0,
@@ -5242,12 +5260,8 @@ const createAccount = async () => {
         errors.value.apiKey = '请填写 API Key'
         hasError = true
       }
-      // 验证 baseUrl 必须以 /models 结尾
       if (!form.value.baseUrl || form.value.baseUrl.trim() === '') {
         errors.value.baseUrl = '请填写 API 基础地址'
-        hasError = true
-      } else if (!form.value.baseUrl.trim().endsWith('/models')) {
-        errors.value.baseUrl = 'API 基础地址必须以 /models 结尾'
         hasError = true
       }
     } else {
@@ -5407,9 +5421,7 @@ const createAccount = async () => {
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
-      // 上游错误处理（仅 Claude Console）
       if (form.value.platform === 'claude-console') {
-        data.disableAutoProtection = !!form.value.disableAutoProtection
         data.interceptWarmup = !!form.value.interceptWarmup
       }
       // 额度管理字段
@@ -5472,6 +5484,11 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
       data.isActive = form.value.isActive !== false
       data.schedulable = form.value.schedulable !== false
+    }
+
+    // 支持 disableAutoProtection 的平台才写入
+    if (autoProtectionPlatforms.includes(form.value.platform)) {
+      data.disableAutoProtection = !!form.value.disableAutoProtection
     }
 
     let result
@@ -5540,15 +5557,11 @@ const updateAccount = async () => {
     return
   }
 
-  // Gemini API 的 baseUrl 验证（必须以 /models 结尾）
+  // Gemini API 的 baseUrl 验证
   if (form.value.platform === 'gemini-api') {
     const baseUrl = form.value.baseUrl?.trim() || ''
     if (!baseUrl) {
       errors.value.baseUrl = '请填写 API 基础地址'
-      return
-    }
-    if (!baseUrl.endsWith('/models')) {
-      errors.value.baseUrl = 'API 基础地址必须以 /models 结尾'
       return
     }
   }
@@ -5755,8 +5768,6 @@ const updateAccount = async () => {
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
-      // 上游错误处理
-      data.disableAutoProtection = !!form.value.disableAutoProtection
       // 拦截预热请求
       data.interceptWarmup = !!form.value.interceptWarmup
       // 额度管理字段
@@ -5845,6 +5856,11 @@ const updateAccount = async () => {
       data.supportedModels = Array.isArray(form.value.supportedModels)
         ? form.value.supportedModels
         : []
+    }
+
+    // 支持 disableAutoProtection 的平台才写入
+    if (autoProtectionPlatforms.includes(props.account.platform)) {
+      data.disableAutoProtection = !!form.value.disableAutoProtection
     }
 
     if (props.account.platform === 'claude') {
@@ -6399,7 +6415,8 @@ watch(
         // 并发控制字段
         maxConcurrentTasks: newAccount.maxConcurrentTasks || 0,
         // 上游错误处理
-        disableAutoProtection: newAccount.disableAutoProtection === true
+        disableAutoProtection:
+          newAccount.disableAutoProtection === true || newAccount.disableAutoProtection === 'true'
       }
 
       // 如果是Claude Console账户，加载实时使用情况

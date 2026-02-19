@@ -35,6 +35,13 @@ const OPENAI_MODELS = [
   { value: 'codex-mini', label: 'Codex Mini' }
 ]
 
+const BEDROCK_MODELS = [
+  { value: 'us.anthropic.claude-opus-4-6-20250610-v1:0', label: 'Claude Opus 4.6' },
+  { value: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Claude Sonnet 4.5' },
+  { value: 'us.anthropic.claude-sonnet-4-20250514-v1:0', label: 'Claude Sonnet 4' },
+  { value: 'us.anthropic.claude-3-5-haiku-20241022-v1:0', label: 'Claude 3.5 Haiku' }
+]
+
 // 其他模型（用于账户编辑的模型映射）
 const OTHER_MODELS = [
   { value: 'deepseek-chat', label: 'DeepSeek Chat' },
@@ -43,11 +50,26 @@ const OTHER_MODELS = [
   { value: 'GLM', label: 'GLM' }
 ]
 
+// 各平台测试可用模型
+const PLATFORM_TEST_MODELS = {
+  claude: CLAUDE_MODELS,
+  'claude-console': CLAUDE_MODELS,
+  bedrock: BEDROCK_MODELS,
+  gemini: GEMINI_MODELS,
+  'gemini-api': GEMINI_MODELS,
+  'openai-responses': OPENAI_MODELS,
+  'azure-openai': [],
+  droid: CLAUDE_MODELS,
+  ccr: CLAUDE_MODELS
+}
+
 module.exports = {
   CLAUDE_MODELS,
   GEMINI_MODELS,
   OPENAI_MODELS,
+  BEDROCK_MODELS,
   OTHER_MODELS,
+  PLATFORM_TEST_MODELS,
   // 按服务分组
   getModelsByService: (service) => {
     switch (service) {

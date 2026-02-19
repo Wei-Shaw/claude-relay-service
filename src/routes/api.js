@@ -1,10 +1,10 @@
 const express = require('express')
-const claudeRelayService = require('../services/claudeRelayService')
-const claudeConsoleRelayService = require('../services/claudeConsoleRelayService')
-const bedrockRelayService = require('../services/bedrockRelayService')
-const ccrRelayService = require('../services/ccrRelayService')
-const bedrockAccountService = require('../services/bedrockAccountService')
-const unifiedClaudeScheduler = require('../services/unifiedClaudeScheduler')
+const claudeRelayService = require('../services/relay/claudeRelayService')
+const claudeConsoleRelayService = require('../services/relay/claudeConsoleRelayService')
+const bedrockRelayService = require('../services/relay/bedrockRelayService')
+const ccrRelayService = require('../services/relay/ccrRelayService')
+const bedrockAccountService = require('../services/account/bedrockAccountService')
+const unifiedClaudeScheduler = require('../services/scheduler/unifiedClaudeScheduler')
 const apiKeyService = require('../services/apiKeyService')
 const { authenticateApiKey } = require('../middleware/auth')
 const logger = require('../utils/logger')
@@ -12,8 +12,8 @@ const { getEffectiveModel, parseVendorPrefixedModel } = require('../utils/modelH
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
-const claudeAccountService = require('../services/claudeAccountService')
-const claudeConsoleAccountService = require('../services/claudeConsoleAccountService')
+const claudeAccountService = require('../services/account/claudeAccountService')
+const claudeConsoleAccountService = require('../services/account/claudeConsoleAccountService')
 const {
   isWarmupRequest,
   buildMockWarmupResponse,
@@ -1289,8 +1289,8 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
         })
       }
 
-      const unifiedGeminiScheduler = require('../services/unifiedGeminiScheduler')
-      const geminiAccountService = require('../services/geminiAccountService')
+      const unifiedGeminiScheduler = require('../services/scheduler/unifiedGeminiScheduler')
+      const geminiAccountService = require('../services/account/geminiAccountService')
 
       let accountSelection
       try {

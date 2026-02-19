@@ -1,8 +1,8 @@
 const axios = require('axios')
-const ProxyHelper = require('../utils/proxyHelper')
-const logger = require('../utils/logger')
-const config = require('../../config/config')
-const apiKeyService = require('./apiKeyService')
+const ProxyHelper = require('../../utils/proxyHelper')
+const logger = require('../../utils/logger')
+const config = require('../../../config/config')
+const apiKeyService = require('../apiKeyService')
 
 // Gemini API 配置
 const GEMINI_API_BASE = 'https://cloudcode.googleapis.com/v1'

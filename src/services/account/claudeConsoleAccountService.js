@@ -1,10 +1,11 @@
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
-const ProxyHelper = require('../utils/proxyHelper')
-const redis = require('../models/redis')
-const logger = require('../utils/logger')
-const config = require('../../config/config')
-const LRUCache = require('../utils/lruCache')
+const ProxyHelper = require('../../utils/proxyHelper')
+const redis = require('../../models/redis')
+const logger = require('../../utils/logger')
+const config = require('../../../config/config')
+const LRUCache = require('../../utils/lruCache')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 class ClaudeConsoleAccountService {
   constructor() {
@@ -414,7 +415,7 @@ class ClaudeConsoleAccountService {
       // 检查是否手动禁用了账号，如果是则发送webhook通知
       if (updates.isActive === false && existingAccount.isActive === true) {
         try {
-          const webhookNotifier = require('../utils/webhookNotifier')
+          const webhookNotifier = require('../../utils/webhookNotifier')
           await webhookNotifier.sendAccountAnomalyNotification({
             accountId,
             accountName: updatedData.name || existingAccount.name || 'Unknown Account',
@@ -512,8 +513,8 @@ class ClaudeConsoleAccountService {
 
       // 发送Webhook通知
       try {
-        const webhookNotifier = require('../utils/webhookNotifier')
-        const { getISOStringWithTimezone } = require('../utils/dateHelper')
+        const webhookNotifier = require('../../utils/webhookNotifier')
+        const { getISOStringWithTimezone } = require('../../utils/dateHelper')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: account.name || 'Claude Console Account',
@@ -726,7 +727,7 @@ class ClaudeConsoleAccountService {
 
       // 发送Webhook通知
       try {
-        const webhookNotifier = require('../utils/webhookNotifier')
+        const webhookNotifier = require('../../utils/webhookNotifier')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: account.name || 'Claude Console Account',
@@ -793,7 +794,7 @@ class ClaudeConsoleAccountService {
 
       // 发送Webhook通知，包含完整错误详情
       try {
-        const webhookNotifier = require('../utils/webhookNotifier')
+        const webhookNotifier = require('../../utils/webhookNotifier')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: account.name || 'Claude Console Account',
@@ -947,7 +948,7 @@ class ClaudeConsoleAccountService {
 
       // 发送Webhook通知
       try {
-        const webhookNotifier = require('../utils/webhookNotifier')
+        const webhookNotifier = require('../../utils/webhookNotifier')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: account.name || 'Claude Console Account',
@@ -1040,7 +1041,7 @@ class ClaudeConsoleAccountService {
       // 发送Webhook通知
       if (accountData && Object.keys(accountData).length > 0) {
         try {
-          const webhookNotifier = require('../utils/webhookNotifier')
+          const webhookNotifier = require('../../utils/webhookNotifier')
           await webhookNotifier.sendAccountAnomalyNotification({
             accountId,
             accountName: accountData.name || 'Unknown Account',
@@ -1329,7 +1330,7 @@ class ClaudeConsoleAccountService {
 
         // 发送webhook通知
         try {
-          const webhookNotifier = require('../utils/webhookNotifier')
+          const webhookNotifier = require('../../utils/webhookNotifier')
           await webhookNotifier.sendAccountAnomalyNotification({
             accountId,
             accountName: accountData.name || 'Unknown Account',
@@ -1479,9 +1480,12 @@ class ClaudeConsoleAccountService {
 
       logger.success(`Reset all error status for Claude Console account ${accountId}`)
 
+      // 清除临时不可用状态
+      await upstreamErrorHelper.clearTempUnavailable(accountId, 'claude-console').catch(() => {})
+
       // 发送 Webhook 通知
       try {
-        const webhookNotifier = require('../utils/webhookNotifier')
+        const webhookNotifier = require('../../utils/webhookNotifier')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
           accountName: accountData.name || accountId,

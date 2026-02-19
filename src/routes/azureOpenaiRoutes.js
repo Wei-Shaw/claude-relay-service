@@ -2,10 +2,11 @@ const express = require('express')
 const router = express.Router()
 const logger = require('../utils/logger')
 const { authenticateApiKey } = require('../middleware/auth')
-const azureOpenaiAccountService = require('../services/azureOpenaiAccountService')
-const azureOpenaiRelayService = require('../services/azureOpenaiRelayService')
+const azureOpenaiAccountService = require('../services/account/azureOpenaiAccountService')
+const azureOpenaiRelayService = require('../services/relay/azureOpenaiRelayService')
 const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
+const upstreamErrorHelper = require('../utils/upstreamErrorHelper')
 
 // 支持的模型列表 - 基于真实的 Azure OpenAI 模型
 const ALLOWED_MODELS = {
@@ -163,6 +164,16 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
     let account = null
     if (req.apiKey?.azureOpenaiAccountId) {
       account = await azureOpenaiAccountService.getAccount(req.apiKey.azureOpenaiAccountId)
+      if (account) {
+        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+          account.id,
+          'azure-openai'
+        )
+        if (isTempUnavailable) {
+          logger.warn(`⏱️ Bound Azure OpenAI account temporarily unavailable, falling back to pool`)
+          account = null
+        }
+      }
       if (!account) {
         logger.warn(`Bound Azure OpenAI account not found: ${req.apiKey.azureOpenaiAccountId}`)
       }
@@ -181,6 +192,24 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
       isStream: req.body.stream || false,
       endpoint: 'chat/completions'
     })
+
+    // 检查上游响应状态码（仅对认证/限流/服务端错误暂停，不对 400/404 等客户端错误暂停）
+    const azureAutoProtectionDisabled =
+      account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+    const shouldPause =
+      account?.id &&
+      !azureAutoProtectionDisabled &&
+      (response.status === 401 ||
+        response.status === 403 ||
+        response.status === 429 ||
+        response.status >= 500)
+    if (shouldPause) {
+      const customTtl =
+        response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
+      await upstreamErrorHelper
+        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .catch(() => {})
+    }
 
     // 处理流式响应
     if (req.body.stream) {
@@ -256,6 +285,16 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     let account = null
     if (req.apiKey?.azureOpenaiAccountId) {
       account = await azureOpenaiAccountService.getAccount(req.apiKey.azureOpenaiAccountId)
+      if (account) {
+        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+          account.id,
+          'azure-openai'
+        )
+        if (isTempUnavailable) {
+          logger.warn(`⏱️ Bound Azure OpenAI account temporarily unavailable, falling back to pool`)
+          account = null
+        }
+      }
       if (!account) {
         logger.warn(`Bound Azure OpenAI account not found: ${req.apiKey.azureOpenaiAccountId}`)
       }
@@ -274,6 +313,24 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
       isStream: req.body.stream || false,
       endpoint: 'responses'
     })
+
+    // 检查上游响应状态码（仅对认证/限流/服务端错误暂停，不对 400/404 等客户端错误暂停）
+    const azureAutoProtectionDisabled =
+      account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+    const shouldPause =
+      account?.id &&
+      !azureAutoProtectionDisabled &&
+      (response.status === 401 ||
+        response.status === 403 ||
+        response.status === 429 ||
+        response.status >= 500)
+    if (shouldPause) {
+      const customTtl =
+        response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
+      await upstreamErrorHelper
+        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .catch(() => {})
+    }
 
     // 处理流式响应
     if (req.body.stream) {
@@ -348,6 +405,16 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
     let account = null
     if (req.apiKey?.azureOpenaiAccountId) {
       account = await azureOpenaiAccountService.getAccount(req.apiKey.azureOpenaiAccountId)
+      if (account) {
+        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+          account.id,
+          'azure-openai'
+        )
+        if (isTempUnavailable) {
+          logger.warn(`⏱️ Bound Azure OpenAI account temporarily unavailable, falling back to pool`)
+          account = null
+        }
+      }
       if (!account) {
         logger.warn(`Bound Azure OpenAI account not found: ${req.apiKey.azureOpenaiAccountId}`)
       }
@@ -366,6 +433,24 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
       isStream: false,
       endpoint: 'embeddings'
     })
+
+    // 检查上游响应状态码（仅对认证/限流/服务端错误暂停，不对 400/404 等客户端错误暂停）
+    const azureAutoProtectionDisabled =
+      account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+    const shouldPause =
+      account?.id &&
+      !azureAutoProtectionDisabled &&
+      (response.status === 401 ||
+        response.status === 403 ||
+        response.status === 429 ||
+        response.status >= 500)
+    if (shouldPause) {
+      const customTtl =
+        response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
+      await upstreamErrorHelper
+        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .catch(() => {})
+    }
 
     // 处理响应
     const { usageData, actualModel } = azureOpenaiRelayService.handleNonStreamResponse(

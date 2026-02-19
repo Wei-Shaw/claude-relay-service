@@ -111,30 +111,12 @@
               <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 测试模型
               </label>
-              <input
+              <ModelSelector
                 v-model="config.model"
-                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder-gray-500"
                 :disabled="!config.enabled"
-                placeholder="claude-sonnet-4-5-20250929"
-                type="text"
+                :models="modelOptions"
+                placeholder="输入模型 ID..."
               />
-              <div class="mt-2 flex flex-wrap gap-2">
-                <button
-                  v-for="modelOption in modelOptions"
-                  :key="modelOption.value"
-                  :class="[
-                    'rounded-lg border px-3 py-1.5 text-xs font-medium transition',
-                    config.model === modelOption.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/30 dark:text-blue-300'
-                      : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700',
-                    !config.enabled && 'cursor-not-allowed opacity-50'
-                  ]"
-                  :disabled="!config.enabled"
-                  @click="config.model = modelOption.value"
-                >
-                  {{ modelOption.label }}
-                </button>
-              </div>
             </div>
 
             <!-- 测试历史 -->
@@ -219,9 +201,11 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { APP_CONFIG } from '@/utils/tools'
 import { showToast } from '@/utils/tools'
+import { getModelsApi } from '@/utils/http_apis'
+import ModelSelector from '@/components/common/ModelSelector.vue'
 
 const props = defineProps({
   show: {
@@ -256,12 +240,18 @@ const cronPresets = [
   { label: '工作日 9:00', value: '0 9 * * 1-5' }
 ]
 
-// 模型选项
-const modelOptions = [
-  { label: 'Claude Sonnet 4.5', value: 'claude-sonnet-4-5-20250929' },
-  { label: 'Claude Haiku 4.5', value: 'claude-haiku-4-5-20251001' },
-  { label: 'Claude Opus 4.5', value: 'claude-opus-4-5-20251101' }
-]
+// 模型选项（从 API 动态获取）
+const modelOptions = ref([])
+
+const loadModels = async () => {
+  const result = await getModelsApi()
+  if (result.success && result.data) {
+    const platform = props.account?.platform
+    modelOptions.value = result.data.platforms?.[platform] || result.data.claude || []
+  }
+}
+
+onMounted(loadModels)
 
 // 格式化时间戳
 function formatTimestamp(timestamp) {

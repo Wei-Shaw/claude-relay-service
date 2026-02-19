@@ -1,13 +1,14 @@
 const https = require('https')
 const axios = require('axios')
-const ProxyHelper = require('../utils/proxyHelper')
-const droidScheduler = require('./droidScheduler')
-const droidAccountService = require('./droidAccountService')
-const apiKeyService = require('./apiKeyService')
-const redis = require('../models/redis')
-const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
-const logger = require('../utils/logger')
-const runtimeAddon = require('../utils/runtimeAddon')
+const ProxyHelper = require('../../utils/proxyHelper')
+const droidScheduler = require('../scheduler/droidScheduler')
+const droidAccountService = require('../account/droidAccountService')
+const apiKeyService = require('../apiKeyService')
+const redis = require('../../models/redis')
+const { updateRateLimitCounters } = require('../../utils/rateLimitHelper')
+const logger = require('../../utils/logger')
+const runtimeAddon = require('../../utils/runtimeAddon')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 const SYSTEM_PROMPT = 'You are Droid, an AI software engineering agent built by Factory.'
 const RUNTIME_EVENT_FMT_PAYLOAD = 'fmtPayload'
@@ -346,6 +347,21 @@ class DroidRelayService {
       }
 
       const status = error?.response?.status
+      const droidAutoProtectionDisabled =
+        account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+      // 5xx 错误
+      if (status >= 500 && account?.id && !droidAutoProtectionDisabled) {
+        await upstreamErrorHelper.markTempUnavailable(account.id, 'droid', status).catch(() => {})
+      } else if (
+        !status &&
+        account?.id &&
+        error.message !== 'Client disconnected' &&
+        !droidAutoProtectionDisabled
+      ) {
+        // 网络错误（非客户端断开），临时不可用
+        await upstreamErrorHelper.markTempUnavailable(account.id, 'droid', 503).catch(() => {})
+      }
+
       if (status >= 400 && status < 500) {
         try {
           await this._handleUpstreamClientError(status, {
@@ -518,6 +534,15 @@ class DroidRelayService {
             logger.info('✅ res.end() reached')
             const body = Buffer.concat(chunks).toString()
             logger.error(`❌ Factory.ai error response body: ${body || '(empty)'}`)
+            if (res.statusCode >= 500) {
+              const streamAutoProtectionDisabled =
+                account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+              if (!streamAutoProtectionDisabled) {
+                upstreamErrorHelper
+                  .markTempUnavailable(account.id, 'droid', res.statusCode)
+                  .catch(() => {})
+              }
+            }
             if (res.statusCode >= 400 && res.statusCode < 500) {
               this._handleUpstreamClientError(res.statusCode, {
                 account,
@@ -1380,7 +1405,11 @@ class DroidRelayService {
       return
     }
 
-    await this._stopDroidAccountScheduling(accountId, statusCode, '凭证不可用')
+    const clientErrorAutoProtectionDisabled =
+      account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+    if (!clientErrorAutoProtectionDisabled) {
+      await upstreamErrorHelper.markTempUnavailable(accountId, 'droid', statusCode)
+    }
     await this._clearAccountStickyMapping(normalizedEndpoint, sessionHash, clientApiKeyId)
   }
 

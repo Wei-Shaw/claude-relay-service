@@ -87,7 +87,7 @@ class Application {
 
       // 💳 初始化账户余额查询服务（Provider 注册）
       try {
-        const accountBalanceService = require('./services/accountBalanceService')
+        const accountBalanceService = require('./services/account/accountBalanceService')
         const { registerAllProviders } = require('./services/balanceProviders')
         registerAllProviders(accountBalanceService)
         logger.info('✅ 账户余额查询服务已初始化')
@@ -138,7 +138,7 @@ class Application {
 
       // 🕐 初始化Claude账户会话窗口
       logger.info('🕐 Initializing Claude account session windows...')
-      const claudeAccountService = require('./services/claudeAccountService')
+      const claudeAccountService = require('./services/account/claudeAccountService')
       await claudeAccountService.initializeSessionWindows()
 
       // 📊 初始化费用排序索引服务
@@ -641,9 +641,12 @@ class Application {
 
       // 注册各个服务的缓存实例
       const services = [
-        { name: 'claudeAccount', service: require('./services/claudeAccountService') },
-        { name: 'claudeConsole', service: require('./services/claudeConsoleAccountService') },
-        { name: 'bedrockAccount', service: require('./services/bedrockAccountService') }
+        { name: 'claudeAccount', service: require('./services/account/claudeAccountService') },
+        {
+          name: 'claudeConsole',
+          service: require('./services/account/claudeConsoleAccountService')
+        },
+        { name: 'bedrockAccount', service: require('./services/account/bedrockAccountService') }
       ]
 
       // 注册已加载的服务缓存
@@ -675,7 +678,7 @@ class Application {
         logger.info('🧹 Starting scheduled cleanup...')
 
         const apiKeyService = require('./services/apiKeyService')
-        const claudeAccountService = require('./services/claudeAccountService')
+        const claudeAccountService = require('./services/account/claudeAccountService')
 
         const [expiredKeys, errorAccounts] = await Promise.all([
           apiKeyService.cleanupExpiredKeys(),

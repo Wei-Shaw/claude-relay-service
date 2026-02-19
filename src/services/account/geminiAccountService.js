@@ -1,21 +1,22 @@
-const redisClient = require('../models/redis')
+const redisClient = require('../../models/redis')
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
 const https = require('https')
-const logger = require('../utils/logger')
+const logger = require('../../utils/logger')
 const { OAuth2Client } = require('google-auth-library')
-const { maskToken } = require('../utils/tokenMask')
-const ProxyHelper = require('../utils/proxyHelper')
+const { maskToken } = require('../../utils/tokenMask')
+const ProxyHelper = require('../../utils/proxyHelper')
+const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const {
   logRefreshStart,
   logRefreshSuccess,
   logRefreshError,
   logTokenUsage,
   logRefreshSkipped
-} = require('../utils/tokenRefreshLogger')
-const tokenRefreshService = require('./tokenRefreshService')
-const { createEncryptor } = require('../utils/commonHelper')
-const antigravityClient = require('./antigravityClient')
+} = require('../../utils/tokenRefreshLogger')
+const tokenRefreshService = require('../tokenRefreshService')
+const { createEncryptor } = require('../../utils/commonHelper')
+const antigravityClient = require('../antigravityClient')
 
 // Gemini 账户键前缀
 const GEMINI_ACCOUNT_KEY_PREFIX = 'gemini_account:'
@@ -134,7 +135,7 @@ async function fetchAvailableModelsAntigravity(
       getAntigravityModelAlias,
       getAntigravityModelMetadata,
       normalizeAntigravityModelInput
-    } = require('../utils/antigravityModel')
+    } = require('../../utils/antigravityModel')
 
     const pushModel = (modelId) => {
       if (!modelId || seen.has(modelId)) {
@@ -523,6 +524,12 @@ async function createAccount(accountData) {
     // 支持的模型列表（可选）
     supportedModels: accountData.supportedModels || [], // 空数组表示支持所有模型
 
+    // 自动防护开关
+    disableAutoProtection:
+      accountData.disableAutoProtection === true || accountData.disableAutoProtection === 'true'
+        ? 'true'
+        : 'false',
+
     // 时间戳
     createdAt: now,
     updatedAt: now,
@@ -666,6 +673,14 @@ async function updateAccount(accountId, updates) {
     // 直接保存，不做任何调整
   }
 
+  // 自动防护开关
+  if (updates.disableAutoProtection !== undefined) {
+    updates.disableAutoProtection =
+      updates.disableAutoProtection === true || updates.disableAutoProtection === 'true'
+        ? 'true'
+        : 'false'
+  }
+
   // 如果通过 geminiOauth 更新，也要检查是否新增了 refresh token
   if (updates.geminiOauth && !oldRefreshToken) {
     const oauthData =
@@ -692,7 +707,7 @@ async function updateAccount(accountId, updates) {
   // 检查是否手动禁用了账号，如果是则发送webhook通知
   if (updates.isActive === 'false' && existingAccount.isActive !== 'false') {
     try {
-      const webhookNotifier = require('../utils/webhookNotifier')
+      const webhookNotifier = require('../../utils/webhookNotifier')
       await webhookNotifier.sendAccountAnomalyNotification({
         accountId,
         accountName: updates.name || existingAccount.name || 'Unknown Account',
@@ -1076,7 +1091,7 @@ async function refreshAccountToken(accountId) {
 
         // 发送Webhook通知
         try {
-          const webhookNotifier = require('../utils/webhookNotifier')
+          const webhookNotifier = require('../../utils/webhookNotifier')
           await webhookNotifier.sendAccountAnomalyNotification({
             accountId,
             accountName: account.name,
@@ -1843,9 +1858,12 @@ async function resetAccountStatus(accountId) {
   await updateAccount(accountId, updates)
   logger.info(`✅ Reset all error status for Gemini account ${accountId}`)
 
+  // 清除临时不可用状态
+  await upstreamErrorHelper.clearTempUnavailable(accountId, 'gemini').catch(() => {})
+
   // 发送 Webhook 通知
   try {
-    const webhookNotifier = require('../utils/webhookNotifier')
+    const webhookNotifier = require('../../utils/webhookNotifier')
     await webhookNotifier.sendAccountAnomalyNotification({
       accountId,
       accountName: account.name || accountId,
