@@ -30,6 +30,8 @@ class ModelService {
         provider: 'anthropic',
         description: 'Claude models from Anthropic',
         models: [
+          'claude-opus-4-6',
+          'claude-sonnet-4-6',
           'claude-opus-4-5-20251101',
           'claude-haiku-4-5-20251001',
           'claude-sonnet-4-5-20250929',
@@ -47,6 +49,9 @@ class ModelService {
         provider: 'openai',
         description: 'OpenAI GPT models',
         models: [
+          'gpt-5.3-codex',
+          'gpt-5.2',
+          'gpt-5.2-codex',
           'gpt-5.1-2025-11-13',
           'gpt-5.1-codex-mini',
           'gpt-5.1-codex',
