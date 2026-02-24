@@ -411,9 +411,43 @@
                 type="number"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置 Claude 模型的周费用限制（周一到周日），仅对 Claude 模型请求生效，0
-                或留空表示无限制
+                设置 Claude 模型的周费用限制，仅对 Claude 模型请求生效，0 或留空表示无限制
               </p>
+              <div
+                v-if="form.weeklyOpusCostLimit && Number(form.weeklyOpusCostLimit) > 0"
+                class="mt-3 flex gap-3"
+              >
+                <div class="flex-1">
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >重置日</label
+                  >
+                  <select
+                    v-model="form.weeklyResetDay"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  >
+                    <option :value="1">周一</option>
+                    <option :value="2">周二</option>
+                    <option :value="3">周三</option>
+                    <option :value="4">周四</option>
+                    <option :value="5">周五</option>
+                    <option :value="6">周六</option>
+                    <option :value="7">周日</option>
+                  </select>
+                </div>
+                <div class="flex-1">
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >重置时间 (UTC+8)</label
+                  >
+                  <select
+                    v-model="form.weeklyResetHour"
+                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  >
+                    <option v-for="h in 24" :key="h - 1" :value="h - 1">
+                      {{ String(h - 1).padStart(2, '0') }}:00
+                    </option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -901,6 +935,8 @@ const form = reactive({
   dailyCostLimit: '',
   totalCostLimit: '',
   weeklyOpusCostLimit: '',
+  weeklyResetDay: 1,
+  weeklyResetHour: 0,
   permissions: [], // 数组格式，空数组表示全部服务
   claudeAccountId: '',
   geminiAccountId: '',
@@ -1033,6 +1069,8 @@ const updateApiKey = async () => {
         form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null
           ? parseFloat(form.weeklyOpusCostLimit)
           : 0,
+      weeklyResetDay: form.weeklyResetDay,
+      weeklyResetHour: form.weeklyResetHour,
       permissions: form.permissions,
       tags: form.tags
     }
@@ -1355,6 +1393,8 @@ onMounted(async () => {
   form.dailyCostLimit = props.apiKey.dailyCostLimit || ''
   form.totalCostLimit = props.apiKey.totalCostLimit || ''
   form.weeklyOpusCostLimit = props.apiKey.weeklyOpusCostLimit || ''
+  form.weeklyResetDay = props.apiKey.weeklyResetDay || 1
+  form.weeklyResetHour = props.apiKey.weeklyResetHour || 0
   // 处理权限数据，兼容旧格式（字符串）和新格式（数组）
   // 有效的权限值
   const VALID_PERMS = ['claude', 'gemini', 'openai', 'droid']

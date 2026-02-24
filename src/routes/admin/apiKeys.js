@@ -1144,7 +1144,9 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
 
     // 只在启用了 Claude 周费用限制时查询（字段名沿用 weeklyOpusCostLimit）
     if (weeklyOpusCostLimit > 0) {
-      weeklyOpusCost = await redis.getWeeklyOpusCost(keyId)
+      const resetDay = parseInt(apiKey?.weeklyResetDay || 1)
+      const resetHour = parseInt(apiKey?.weeklyResetHour || 0)
+      weeklyOpusCost = await redis.getWeeklyOpusCost(keyId, resetDay, resetHour)
     }
 
     // 只在启用了窗口限制时查询窗口数据（移到早期返回之前，确保窗口数据始终被获取）
@@ -1289,6 +1291,8 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
         outputTokens: 0,
         cacheCreateTokens: 0,
         cacheReadTokens: 0,
+        ephemeral5mTokens: 0,
+        ephemeral1hTokens: 0,
         requests: 0
       })
     }
@@ -1300,6 +1304,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       parseInt(data.totalCacheCreateTokens) || parseInt(data.cacheCreateTokens) || 0
     stats.cacheReadTokens +=
       parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0
+    stats.ephemeral5mTokens +=
+      parseInt(data.totalEphemeral5mTokens) || parseInt(data.ephemeral5mTokens) || 0
+    stats.ephemeral1hTokens +=
+      parseInt(data.totalEphemeral1hTokens) || parseInt(data.ephemeral1hTokens) || 0
     stats.requests += parseInt(data.totalRequests) || parseInt(data.requests) || 0
 
     totalRequests += parseInt(data.totalRequests) || parseInt(data.requests) || 0
@@ -1318,15 +1326,22 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     cacheCreateTokens += stats.cacheCreateTokens
     cacheReadTokens += stats.cacheReadTokens
 
-    const costResult = CostCalculator.calculateCost(
-      {
-        input_tokens: stats.inputTokens,
-        output_tokens: stats.outputTokens,
-        cache_creation_input_tokens: stats.cacheCreateTokens,
-        cache_read_input_tokens: stats.cacheReadTokens
-      },
-      model
-    )
+    const costUsage = {
+      input_tokens: stats.inputTokens,
+      output_tokens: stats.outputTokens,
+      cache_creation_input_tokens: stats.cacheCreateTokens,
+      cache_read_input_tokens: stats.cacheReadTokens
+    }
+
+    // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
+    if (stats.ephemeral5mTokens > 0 || stats.ephemeral1hTokens > 0) {
+      costUsage.cache_creation = {
+        ephemeral_5m_input_tokens: stats.ephemeral5mTokens,
+        ephemeral_1h_input_tokens: stats.ephemeral1hTokens
+      }
+    }
+
+    const costResult = CostCalculator.calculateCost(costUsage, model)
     totalCost += costResult.costs.total
   }
 
@@ -1479,7 +1494,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       activationUnit, // 新增：激活时间单位 (hours/days)
       expirationMode, // 新增：过期模式
       icon, // 新增：图标
-      serviceRates // API Key 级别服务倍率
+      serviceRates, // API Key 级别服务倍率
+      weeklyResetDay, // 周费用重置日 (1-7)
+      weeklyResetHour // 周费用重置时 (0-23)
     } = req.body
 
     // 输入验证
@@ -1612,6 +1629,22 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: serviceRatesError })
     }
 
+    // 验证周费用重置配置
+    if (weeklyResetDay !== undefined && weeklyResetDay !== null && weeklyResetDay !== '') {
+      const day = Number(weeklyResetDay)
+      if (!Number.isInteger(day) || day < 1 || day > 7) {
+        return res
+          .status(400)
+          .json({ error: 'Weekly reset day must be an integer from 1 (Mon) to 7 (Sun)' })
+      }
+    }
+    if (weeklyResetHour !== undefined && weeklyResetHour !== null && weeklyResetHour !== '') {
+      const hour = Number(weeklyResetHour)
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+        return res.status(400).json({ error: 'Weekly reset hour must be an integer from 0 to 23' })
+      }
+    }
+
     const newKey = await apiKeyService.generateApiKey({
       name,
       description,
@@ -1640,7 +1673,15 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       activationUnit,
       expirationMode,
       icon,
-      serviceRates
+      serviceRates,
+      weeklyResetDay:
+        weeklyResetDay !== undefined && weeklyResetDay !== null && weeklyResetDay !== ''
+          ? Number(weeklyResetDay)
+          : 1,
+      weeklyResetHour:
+        weeklyResetHour !== undefined && weeklyResetHour !== null && weeklyResetHour !== ''
+          ? Number(weeklyResetHour)
+          : 0
     })
 
     logger.success(`🔑 Admin created new API key: ${name}`)
@@ -1901,6 +1942,18 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         if (updates.serviceRates !== undefined) {
           finalUpdates.serviceRates = updates.serviceRates
         }
+        if (updates.weeklyResetDay !== undefined) {
+          const day = Number(updates.weeklyResetDay)
+          if (Number.isInteger(day) && day >= 1 && day <= 7) {
+            finalUpdates.weeklyResetDay = day
+          }
+        }
+        if (updates.weeklyResetHour !== undefined) {
+          const hour = Number(updates.weeklyResetHour)
+          if (Number.isInteger(hour) && hour >= 0 && hour <= 23) {
+            finalUpdates.weeklyResetHour = hour
+          }
+        }
 
         // 处理账户绑定
         if (updates.claudeAccountId !== undefined) {
@@ -1956,6 +2009,22 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
 
         // 执行更新
         await apiKeyService.updateApiKey(keyId, finalUpdates)
+
+        // 重置配置变更后触发单 Key 回填
+        if (
+          finalUpdates.weeklyResetDay !== undefined ||
+          finalUpdates.weeklyResetHour !== undefined
+        ) {
+          setImmediate(async () => {
+            try {
+              const weeklyInitService = require('../../services/weeklyClaudeCostInitService')
+              await weeklyInitService.backfillSingleKey(keyId)
+            } catch (err) {
+              logger.error(`❌ 批量编辑回填单 Key 周费用失败 (${keyId})：`, err)
+            }
+          })
+        }
+
         results.successCount++
         logger.success(`Batch edit: API key ${keyId} updated successfully`)
       } catch (error) {
@@ -2019,7 +2088,9 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       weeklyOpusCostLimit,
       tags,
       ownerId, // 新增：所有者ID字段
-      serviceRates // API Key 级别服务倍率
+      serviceRates, // API Key 级别服务倍率
+      weeklyResetDay, // 周费用重置日 (1-7)
+      weeklyResetHour // 周费用重置时 (0-23)
     } = req.body
 
     // 只允许更新指定字段
@@ -2214,6 +2285,27 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       updates.serviceRates = serviceRates
     }
 
+    // 处理周费用重置配置
+    let resetConfigChanged = false
+    if (weeklyResetDay !== undefined && weeklyResetDay !== null && weeklyResetDay !== '') {
+      const day = Number(weeklyResetDay)
+      if (!Number.isInteger(day) || day < 1 || day > 7) {
+        return res
+          .status(400)
+          .json({ error: 'Weekly reset day must be an integer from 1 (Mon) to 7 (Sun)' })
+      }
+      updates.weeklyResetDay = day
+      resetConfigChanged = true
+    }
+    if (weeklyResetHour !== undefined && weeklyResetHour !== null && weeklyResetHour !== '') {
+      const hour = Number(weeklyResetHour)
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+        return res.status(400).json({ error: 'Weekly reset hour must be an integer from 0 to 23' })
+      }
+      updates.weeklyResetHour = hour
+      resetConfigChanged = true
+    }
+
     // 处理活跃/禁用状态状态, 放在过期处理后，以确保后续增加禁用key功能
     if (isActive !== undefined) {
       if (typeof isActive !== 'boolean') {
@@ -2262,6 +2354,18 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     }
 
     await apiKeyService.updateApiKey(keyId, updates)
+
+    // 重置配置变更后触发单 Key 回填
+    if (resetConfigChanged) {
+      setImmediate(async () => {
+        try {
+          const weeklyInitService = require('../../services/weeklyClaudeCostInitService')
+          await weeklyInitService.backfillSingleKey(keyId)
+        } catch (err) {
+          logger.error(`❌ 回填单 Key 周费用失败 (${keyId})：`, err)
+        }
+      })
+    }
 
     logger.success(`📝 Admin updated API key: ${keyId}`)
     return res.json({ success: true, message: 'API key updated successfully' })

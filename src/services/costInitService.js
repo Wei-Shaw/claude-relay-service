@@ -201,6 +201,16 @@ class CostInitService {
           parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0
       }
 
+      // 添加 cache_creation 子对象以支持精确 ephemeral 定价
+      const eph5m = parseInt(data.ephemeral5mTokens) || 0
+      const eph1h = parseInt(data.ephemeral1hTokens) || 0
+      if (eph5m > 0 || eph1h > 0) {
+        usage.cache_creation = {
+          ephemeral_5m_input_tokens: eph5m,
+          ephemeral_1h_input_tokens: eph1h
+        }
+      }
+
       const costResult = CostCalculator.calculateCost(usage, model)
       const cost = costResult.costs.total
 

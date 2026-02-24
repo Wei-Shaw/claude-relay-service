@@ -58,7 +58,12 @@ class ModelService {
       gemini: {
         provider: 'google',
         description: 'Google Gemini models',
-        models: ['gemini-2.5-pro', 'gemini-3-pro-preview', 'gemini-2.5-flash']
+        models: [
+          'gemini-2.5-pro',
+          'gemini-3-pro-preview',
+          'gemini-3.1-pro-preview',
+          'gemini-2.5-flash'
+        ]
       }
     }
   }

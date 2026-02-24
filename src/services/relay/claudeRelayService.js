@@ -132,16 +132,23 @@ class ClaudeRelayService {
     return ''
   }
 
-  // 🚫 检查是否为组织被禁用错误
+  // 🚫 检查是否为组织被禁用/封禁错误
+  // 支持两种场景：
+  //   1. HTTP 400 + "this organization has been disabled"（原有）
+  //   2. HTTP 403 + "OAuth authentication is currently not allowed for this organization"（封禁后新返回格式）
   _isOrganizationDisabledError(statusCode, body) {
-    if (statusCode !== 400) {
+    if (statusCode !== 400 && statusCode !== 403) {
       return false
     }
     const message = this._extractErrorMessage(body)
     if (!message) {
       return false
     }
-    return message.toLowerCase().includes('this organization has been disabled')
+    const lowerMessage = message.toLowerCase()
+    return (
+      lowerMessage.includes('this organization has been disabled') ||
+      lowerMessage.includes('oauth authentication is currently not allowed')
+    )
   }
 
   // 🔍 判断是否是真实的 Claude Code 请求
@@ -703,7 +710,15 @@ class ClaudeRelayService {
             await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch(() => {})
           }
         }
-        // 检查是否为403状态码（禁止访问）
+        // 检查是否为组织被禁用/封禁错误（400 或 403）
+        // 必须在通用 403 处理之前检测，否则会被截断
+        else if (organizationDisabledError) {
+          logger.error(
+            `🚫 Organization disabled/banned error (${response.statusCode}) detected for account ${accountId}, marking as blocked`
+          )
+          await unifiedClaudeScheduler.markAccountBlocked(accountId, accountType, sessionHash)
+        }
+        // 检查是否为403状态码（禁止访问，非封禁类）
         // 注意：如果进行了重试，retryCount > 0；这里的 403 是重试后最终的结果
         else if (response.statusCode === 403) {
           logger.error(
@@ -714,13 +729,6 @@ class ClaudeRelayService {
           if (sessionHash) {
             await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch(() => {})
           }
-        }
-        // 检查是否返回组织被禁用错误（400状态码）
-        else if (organizationDisabledError) {
-          logger.error(
-            `🚫 Organization disabled error (400) detected for account ${accountId}, marking as blocked`
-          )
-          await unifiedClaudeScheduler.markAccountBlocked(accountId, accountType, sessionHash)
         }
         // 检查是否为529状态码（服务过载）
         else if (response.statusCode === 529) {
@@ -2186,14 +2194,28 @@ class ClaudeRelayService {
                 await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch(() => {})
               }
             } else if (res.statusCode === 403) {
-              // 403 处理：走到这里说明重试已用尽或不适用重试，直接标记 blocked
+              // 403 处理：先检查是否为封禁性质的 403（组织被禁用/OAuth 被禁止）
               // 注意：重试逻辑已在 handleErrorResponse 外部提前处理
-              logger.error(
-                `🚫 [Stream] Forbidden error (403) detected for account ${accountId}${retryCount > 0 ? ` after ${retryCount} retries` : ''}, temporarily pausing`
-              )
-              await upstreamErrorHelper
-                .markTempUnavailable(accountId, accountType, 403)
-                .catch(() => {})
+              if (this._isOrganizationDisabledError(res.statusCode, errorData)) {
+                logger.error(
+                  `🚫 [Stream] Organization disabled/banned error (403) detected for account ${accountId}, marking as blocked`
+                )
+                await unifiedClaudeScheduler
+                  .markAccountBlocked(accountId, accountType, sessionHash)
+                  .catch((markError) => {
+                    logger.error(
+                      `❌ [Stream] Failed to mark account ${accountId} as blocked:`,
+                      markError
+                    )
+                  })
+              } else {
+                logger.error(
+                  `🚫 [Stream] Forbidden error (403) detected for account ${accountId}${retryCount > 0 ? ` after ${retryCount} retries` : ''}, temporarily pausing`
+                )
+                await upstreamErrorHelper
+                  .markTempUnavailable(accountId, accountType, 403)
+                  .catch(() => {})
+              }
               // 清除粘性会话，让后续请求路由到其他账户
               if (sessionHash) {
                 await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch(() => {})

@@ -417,6 +417,14 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
                 cache_read_input_tokens: usage.cacheReadTokens
               }
 
+              // 添加 cache_creation 子对象以支持精确 ephemeral 定价
+              if (usage.ephemeral5mTokens > 0 || usage.ephemeral1hTokens > 0) {
+                usageData.cache_creation = {
+                  ephemeral_5m_input_tokens: usage.ephemeral5mTokens,
+                  ephemeral_1h_input_tokens: usage.ephemeral1hTokens
+                }
+              }
+
               logger.debug(`💰 Calculating cost for model ${modelName}:`, JSON.stringify(usageData))
               const costResult = CostCalculator.calculateCost(usageData, modelName)
               logger.debug(`💰 Cost result for ${modelName}: total=${costResult.costs.total}`)

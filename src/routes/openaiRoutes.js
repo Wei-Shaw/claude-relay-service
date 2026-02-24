@@ -240,11 +240,13 @@ const handleResponses = async (req, res) => {
     }
 
     // 从请求头或请求体中提取会话 ID
+    // NOTE: For some clients, prompt_cache_key is the only stable per-session key.
     const sessionId =
       req.headers['session_id'] ||
       req.headers['x-session-id'] ||
       req.body?.session_id ||
       req.body?.conversation_id ||
+      req.body?.prompt_cache_key ||
       null
 
     sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null

@@ -82,7 +82,7 @@ const PROMPT_DEFINITIONS = {
   claudeOtherSystemPrompt5: {
     category: 'system',
     title: 'Claude CLI Billing Header',
-    text: 'x-anthropic-billing-header: cc_version=2.1.15.c5a; cc_entrypoint=cli'
+    text: 'x-anthropic-billing-header: __PLACEHOLDER__'
   },
   claudeOtherSystemPromptCompact: {
     category: 'system',

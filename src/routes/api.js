@@ -468,6 +468,19 @@ async function handleMessagesRequest(req, res) {
                 cache_creation_input_tokens: cacheCreateTokens,
                 cache_read_input_tokens: cacheReadTokens
               }
+              const requestBetaHeader =
+                _headers['anthropic-beta'] ||
+                _headers['Anthropic-Beta'] ||
+                _headers['ANTHROPIC-BETA']
+              if (requestBetaHeader) {
+                usageObject.request_anthropic_beta = requestBetaHeader
+              }
+              if (typeof _requestBody?.speed === 'string' && _requestBody.speed.trim()) {
+                usageObject.request_speed = _requestBody.speed.trim().toLowerCase()
+              }
+              if (typeof usageData.speed === 'string' && usageData.speed.trim()) {
+                usageObject.speed = usageData.speed.trim().toLowerCase()
+              }
 
               // 如果有详细的缓存创建数据，添加到 usage 对象中
               if (ephemeral5mTokens > 0 || ephemeral1hTokens > 0) {
@@ -561,6 +574,22 @@ async function handleMessagesRequest(req, res) {
                 output_tokens: outputTokens,
                 cache_creation_input_tokens: cacheCreateTokens,
                 cache_read_input_tokens: cacheReadTokens
+              }
+              const requestBetaHeader =
+                _headersConsole['anthropic-beta'] ||
+                _headersConsole['Anthropic-Beta'] ||
+                _headersConsole['ANTHROPIC-BETA']
+              if (requestBetaHeader) {
+                usageObject.request_anthropic_beta = requestBetaHeader
+              }
+              if (
+                typeof _requestBodyConsole?.speed === 'string' &&
+                _requestBodyConsole.speed.trim()
+              ) {
+                usageObject.request_speed = _requestBodyConsole.speed.trim().toLowerCase()
+              }
+              if (typeof usageData.speed === 'string' && usageData.speed.trim()) {
+                usageObject.speed = usageData.speed.trim().toLowerCase()
               }
 
               // 如果有详细的缓存创建数据，添加到 usage 对象中
@@ -727,6 +756,19 @@ async function handleMessagesRequest(req, res) {
                 output_tokens: outputTokens,
                 cache_creation_input_tokens: cacheCreateTokens,
                 cache_read_input_tokens: cacheReadTokens
+              }
+              const requestBetaHeader =
+                _headersCcr['anthropic-beta'] ||
+                _headersCcr['Anthropic-Beta'] ||
+                _headersCcr['ANTHROPIC-BETA']
+              if (requestBetaHeader) {
+                usageObject.request_anthropic_beta = requestBetaHeader
+              }
+              if (typeof _requestBodyCcr?.speed === 'string' && _requestBodyCcr.speed.trim()) {
+                usageObject.request_speed = _requestBodyCcr.speed.trim().toLowerCase()
+              }
+              if (typeof usageData.speed === 'string' && usageData.speed.trim()) {
+                usageObject.speed = usageData.speed.trim().toLowerCase()
               }
 
               // 如果有详细的缓存创建数据，添加到 usage 对象中

@@ -56,7 +56,7 @@ const ERROR_MATCHERS = [
   { pattern: /model.*not.*found|model.*unavailable|unsupported.*model/i, code: 'E006' },
 
   // 请求错误
-  { pattern: /bad.*request|invalid.*request|malformed/i, code: 'E005' },
+  { pattern: /bad.*request|invalid.*request|invalid.*argument|malformed/i, code: 'E005' },
   { pattern: /not.*found|404/i, code: 'E010' },
 
   // 上游错误
@@ -157,6 +157,9 @@ function extractOriginalMessage(error) {
   }
   if (error.message) {
     return error.message
+  }
+  if (error.error?.message) {
+    return error.error.message
   }
   if (error.response?.data?.error?.message) {
     return error.response.data.error.message

@@ -1300,6 +1300,8 @@ class DroidRelayService {
           usageObject.output_tokens || 0,
           usageObject.cache_creation_input_tokens || 0,
           usageObject.cache_read_input_tokens || 0,
+          0, // ephemeral5mTokens - Droid 不含详细缓存数据
+          0, // ephemeral1hTokens - Droid 不含详细缓存数据
           model,
           false
         )
