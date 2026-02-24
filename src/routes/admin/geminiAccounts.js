@@ -536,13 +536,25 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
     const { createGeminiTestPayload } = require('../../utils/testPayloadHelper')
     const { getProxyAgent } = require('../../utils/proxyHelper')
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-    const payload = createGeminiTestPayload(model)
+    const projectId = account.projectId || account.tempProjectId
+    const apiUrl = 'https://cloudcode-pa.googleapis.com/v1internal:generateContent'
+    const testPayload = createGeminiTestPayload(model)
+    // cloudcode-pa v1internal 要求 contents/generationConfig 包裹在 request 对象内
+    const payload = {
+      model: model.startsWith('models/') ? model.slice(7) : model,
+      project: projectId || '',
+      request: testPayload
+    }
 
     const requestConfig = {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`
+        Authorization: `Bearer ${accessToken}`,
+        'User-Agent': 'google-api-nodejs-client/9.15.1',
+        'X-Goog-Api-Client': 'gl-node/22.17.0',
+        'Client-Metadata':
+          'ideType=IDE_UNSPECIFIED,platform=PLATFORM_UNSPECIFIED,pluginType=GEMINI',
+        Accept: 'application/json'
       },
       timeout: 30000
     }
@@ -559,10 +571,11 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
     const response = await axios.post(apiUrl, payload, requestConfig)
     const latency = Date.now() - startTime
 
-    // 提取响应文本
+    // 提取响应文本（兼容 cloudcode-pa 可能的嵌套响应结构）
     let responseText = ''
-    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      responseText = response.data.candidates[0].content.parts[0].text
+    const candidates = response.data?.candidates || response.data?.response?.candidates
+    if (candidates?.[0]?.content?.parts?.[0]?.text) {
+      responseText = candidates[0].content.parts[0].text
     }
 
     logger.success(
