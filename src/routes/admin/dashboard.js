@@ -506,11 +506,21 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
     const modelStats = []
 
     for (const [model, stats] of modelStatsMap) {
+      // 构造 cache_creation 对象以支持区分 5m 和 1h 缓存
+      let cacheCreation = null
+      if (stats.ephemeral5mTokens > 0 || stats.ephemeral1hTokens > 0) {
+        cacheCreation = {
+          ephemeral_5m_input_tokens: stats.ephemeral5mTokens,
+          ephemeral_1h_input_tokens: stats.ephemeral1hTokens
+        }
+      }
+
       const usage = {
         input_tokens: stats.inputTokens,
         output_tokens: stats.outputTokens,
         cache_creation_input_tokens: stats.cacheCreateTokens,
-        cache_read_input_tokens: stats.cacheReadTokens
+        cache_read_input_tokens: stats.cacheReadTokens,
+        cache_creation: cacheCreation
       }
 
       // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费

@@ -1624,7 +1624,9 @@ class ApiKeyService {
             0, // ephemeral5mTokens - recordUsage 不含详细缓存数据
             0, // ephemeral1hTokens - recordUsage 不含详细缓存数据
             model,
-            isLongContextRequest
+            isLongContextRequest,
+            0, // ephemeral5mTokens - legacy function不支持
+            0 // ephemeral1hTokens - legacy function不支持
           )
           logger.database(
             `📊 Recorded account usage: ${accountId} - ${totalTokens} tokens (API Key: ${keyId})`
@@ -1866,7 +1868,9 @@ class ApiKeyService {
             ephemeral5mTokens,
             ephemeral1hTokens,
             model,
-            costInfo.isLongContextRequest || false
+            costInfo.isLongContextRequest || false,
+            ephemeral5mTokens,
+            ephemeral1hTokens
           )
           logger.database(
             `📊 Recorded account usage: ${accountId} - ${totalTokens} tokens (API Key: ${keyId})`

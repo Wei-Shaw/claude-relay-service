@@ -1177,7 +1177,12 @@ async function handleMessagesRequest(req, res) {
         }
 
         // 使用 Express 内建的 res.json() 发送响应（简单可靠）
-        res.json(jsonData)
+        // 对错误响应进行清理，隐藏上游服务的敏感信息
+        if (response.statusCode >= 400) {
+          res.json(sanitizeUpstreamError(jsonData))
+        } else {
+          res.json(jsonData)
+        }
       } catch (parseError) {
         logger.warn('⚠️ Failed to parse Claude API response as JSON:', parseError.message)
         logger.info('📄 Raw response body:', response.body)

@@ -1476,7 +1476,8 @@ class ClaudeConsoleRelayService {
         authorization: `Bearer ${account.apiKey}`,
         responseStream,
         proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
-        extraHeaders: account.userAgent ? { 'User-Agent': account.userAgent } : {}
+        extraHeaders: account.userAgent ? { 'User-Agent': account.userAgent } : {},
+        sanitizeErrors: false // Admin测试显示完整错误信息
       })
     } catch (error) {
       logger.error(`❌ Test account connection failed:`, error)

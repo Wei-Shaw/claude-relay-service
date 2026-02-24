@@ -1365,7 +1365,9 @@ class RedisClient {
     ephemeral5mTokens = 0,
     ephemeral1hTokens = 0,
     model = 'unknown',
-    isLongContextRequest = false
+    isLongContextRequest = false,
+    ephemeral5mTokens = 0,
+    ephemeral1hTokens = 0
   ) {
     const now = new Date()
     const today = getDateStringInTimezone(now)
@@ -1413,6 +1415,8 @@ class RedisClient {
       this.client.hincrby(accountKey, 'totalEphemeral1hTokens', finalEphemeral1hTokens),
       this.client.hincrby(accountKey, 'totalAllTokens', actualTotalTokens),
       this.client.hincrby(accountKey, 'totalRequests', 1),
+      this.client.hincrby(accountKey, 'totalEphemeral5mTokens', ephemeral5mTokens),
+      this.client.hincrby(accountKey, 'totalEphemeral1hTokens', ephemeral1hTokens),
 
       // 账户每日统计
       this.client.hincrby(accountDaily, 'tokens', coreTokens),
@@ -1424,6 +1428,8 @@ class RedisClient {
       this.client.hincrby(accountDaily, 'ephemeral1hTokens', finalEphemeral1hTokens),
       this.client.hincrby(accountDaily, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountDaily, 'requests', 1),
+      this.client.hincrby(accountDaily, 'ephemeral5mTokens', ephemeral5mTokens),
+      this.client.hincrby(accountDaily, 'ephemeral1hTokens', ephemeral1hTokens),
 
       // 账户每月统计
       this.client.hincrby(accountMonthly, 'tokens', coreTokens),
@@ -1435,6 +1441,8 @@ class RedisClient {
       this.client.hincrby(accountMonthly, 'ephemeral1hTokens', finalEphemeral1hTokens),
       this.client.hincrby(accountMonthly, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountMonthly, 'requests', 1),
+      this.client.hincrby(accountMonthly, 'ephemeral5mTokens', ephemeral5mTokens),
+      this.client.hincrby(accountMonthly, 'ephemeral1hTokens', ephemeral1hTokens),
 
       // 账户每小时统计
       this.client.hincrby(accountHourly, 'tokens', coreTokens),
@@ -1446,6 +1454,8 @@ class RedisClient {
       this.client.hincrby(accountHourly, 'ephemeral1hTokens', finalEphemeral1hTokens),
       this.client.hincrby(accountHourly, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountHourly, 'requests', 1),
+      this.client.hincrby(accountHourly, 'ephemeral5mTokens', ephemeral5mTokens),
+      this.client.hincrby(accountHourly, 'ephemeral1hTokens', ephemeral1hTokens),
 
       // 添加模型级别的数据到hourly键中，以支持会话窗口的统计
       this.client.hincrby(accountHourly, `model:${normalizedModel}:inputTokens`, finalInputTokens),
@@ -1486,6 +1496,8 @@ class RedisClient {
       this.client.hincrby(accountModelDaily, 'ephemeral1hTokens', finalEphemeral1hTokens),
       this.client.hincrby(accountModelDaily, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountModelDaily, 'requests', 1),
+      this.client.hincrby(accountModelDaily, 'ephemeral5mTokens', ephemeral5mTokens),
+      this.client.hincrby(accountModelDaily, 'ephemeral1hTokens', ephemeral1hTokens),
 
       // 账户按模型统计 - 每月
       this.client.hincrby(accountModelMonthly, 'inputTokens', finalInputTokens),
@@ -1496,6 +1508,8 @@ class RedisClient {
       this.client.hincrby(accountModelMonthly, 'ephemeral1hTokens', finalEphemeral1hTokens),
       this.client.hincrby(accountModelMonthly, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountModelMonthly, 'requests', 1),
+      this.client.hincrby(accountModelMonthly, 'ephemeral5mTokens', ephemeral5mTokens),
+      this.client.hincrby(accountModelMonthly, 'ephemeral1hTokens', ephemeral1hTokens),
 
       // 账户按模型统计 - 每小时
       this.client.hincrby(accountModelHourly, 'inputTokens', finalInputTokens),
@@ -1506,6 +1520,8 @@ class RedisClient {
       this.client.hincrby(accountModelHourly, 'ephemeral1hTokens', finalEphemeral1hTokens),
       this.client.hincrby(accountModelHourly, 'allTokens', actualTotalTokens),
       this.client.hincrby(accountModelHourly, 'requests', 1),
+      this.client.hincrby(accountModelHourly, 'ephemeral5mTokens', ephemeral5mTokens),
+      this.client.hincrby(accountModelHourly, 'ephemeral1hTokens', ephemeral1hTokens),
 
       // 设置过期时间
       this.client.expire(accountDaily, 86400 * 32), // 32天过期
