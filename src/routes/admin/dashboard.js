@@ -484,7 +484,9 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
           outputTokens: 0,
           cacheCreateTokens: 0,
           cacheReadTokens: 0,
-          allTokens: 0
+          allTokens: 0,
+          ephemeral5mTokens: 0,
+          ephemeral1hTokens: 0
         }
 
         stats.requests += parseInt(data.requests) || 0
@@ -493,6 +495,8 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
         stats.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0
         stats.cacheReadTokens += parseInt(data.cacheReadTokens) || 0
         stats.allTokens += parseInt(data.allTokens) || 0
+        stats.ephemeral5mTokens += parseInt(data.ephemeral5mTokens) || 0
+        stats.ephemeral1hTokens += parseInt(data.ephemeral1hTokens) || 0
 
         modelStatsMap.set(normalizedModel, stats)
       }
@@ -507,6 +511,14 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
         output_tokens: stats.outputTokens,
         cache_creation_input_tokens: stats.cacheCreateTokens,
         cache_read_input_tokens: stats.cacheReadTokens
+      }
+
+      // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
+      if (stats.ephemeral5mTokens > 0 || stats.ephemeral1hTokens > 0) {
+        usage.cache_creation = {
+          ephemeral_5m_input_tokens: stats.ephemeral5mTokens,
+          ephemeral_1h_input_tokens: stats.ephemeral1hTokens
+        }
       }
 
       // 计算费用

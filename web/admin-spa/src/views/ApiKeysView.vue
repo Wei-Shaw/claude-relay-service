@@ -646,7 +646,8 @@
                           <template
                             v-if="
                               isStatsLoading(key.id) &&
-                              (key.dailyCostLimit > 0 ||
+                              (key.weeklyOpusCostLimit > 0 ||
+                                key.dailyCostLimit > 0 ||
                                 key.totalCostLimit > 0 ||
                                 (key.rateLimitWindow > 0 && key.rateLimitCost > 0))
                             "
@@ -662,6 +663,16 @@
                           </template>
                           <!-- 已加载状态 -->
                           <template v-else>
+                            <!-- Claude 周额度限制 - 独立显示 -->
+                            <LimitProgressBar
+                              v-if="key.weeklyOpusCostLimit > 0"
+                              :current="getCachedStats(key.id)?.weeklyOpusCost || 0"
+                              label="Claude 周限制"
+                              :limit="key.weeklyOpusCostLimit"
+                              type="opus"
+                              variant="compact"
+                            />
+
                             <!-- 每日费用限制进度条 -->
                             <LimitProgressBar
                               v-if="key.dailyCostLimit > 0"
@@ -727,7 +738,12 @@
 
                             <!-- 如果没有任何限制 -->
                             <div
-                              v-else
+                              v-if="
+                                !(key.weeklyOpusCostLimit > 0) &&
+                                !(key.dailyCostLimit > 0) &&
+                                !(key.totalCostLimit > 0) &&
+                                !(key.rateLimitWindow > 0 && key.rateLimitCost > 0)
+                              "
                               class="flex items-center justify-center gap-1.5 py-2 text-gray-500 dark:text-gray-400"
                             >
                               <i class="fas fa-infinity text-base" />

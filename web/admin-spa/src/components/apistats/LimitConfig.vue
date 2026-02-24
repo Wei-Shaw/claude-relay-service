@@ -186,6 +186,17 @@
               :style="{ width: getOpusWeeklyCostProgress() + '%' }"
             />
           </div>
+          <p
+            v-if="statsData.limits.weeklyResetDay"
+            class="mt-1 text-xs text-gray-400 dark:text-gray-500"
+          >
+            每{{
+              ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][
+                statsData.limits.weeklyResetDay || 1
+              ]
+            }}
+            {{ String(statsData.limits.weeklyResetHour || 0).padStart(2, '0') }}:00 (UTC+8) 重置
+          </p>
         </div>
 
         <!-- 时间窗口限制 -->

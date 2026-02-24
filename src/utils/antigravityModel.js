@@ -4,6 +4,7 @@ const UPSTREAM_TO_ALIAS = {
   'rev19-uic3-1p': 'gemini-2.5-computer-use-preview-10-2025',
   'gemini-3-pro-image': 'gemini-3-pro-image-preview',
   'gemini-3-pro-high': 'gemini-3-pro-preview',
+  'gemini-3.1-pro-high': 'gemini-3.1-pro-preview',
   'gemini-3-flash': 'gemini-3-flash-preview',
   'claude-sonnet-4-5': 'gemini-claude-sonnet-4-5',
   'claude-sonnet-4-5-thinking': 'gemini-claude-sonnet-4-5-thinking',
@@ -13,6 +14,7 @@ const UPSTREAM_TO_ALIAS = {
   chat_23310: '',
   'gemini-2.5-flash-thinking': '',
   'gemini-3-pro-low': '',
+  'gemini-3.1-pro-low': '',
   'gemini-2.5-pro': ''
 }
 
@@ -20,6 +22,7 @@ const ALIAS_TO_UPSTREAM = {
   'gemini-2.5-computer-use-preview-10-2025': 'rev19-uic3-1p',
   'gemini-3-pro-image-preview': 'gemini-3-pro-image',
   'gemini-3-pro-preview': 'gemini-3-pro-high',
+  'gemini-3.1-pro-preview': 'gemini-3.1-pro-high',
   'gemini-3-flash-preview': 'gemini-3-flash',
   'gemini-claude-sonnet-4-5': 'claude-sonnet-4-5',
   'gemini-claude-sonnet-4-5-thinking': 'claude-sonnet-4-5-thinking',
@@ -58,6 +61,16 @@ const ANTIGRAVITY_MODEL_METADATA = {
       levels: ['low', 'high']
     },
     name: 'models/gemini-3-pro-image-preview'
+  },
+  'gemini-3.1-pro-preview': {
+    thinking: {
+      min: 128,
+      max: 32768,
+      zeroAllowed: false,
+      dynamicAllowed: true,
+      levels: ['low', 'high']
+    },
+    name: 'models/gemini-3.1-pro-preview'
   },
   'gemini-3-flash-preview': {
     thinking: {

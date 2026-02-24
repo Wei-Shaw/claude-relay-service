@@ -9,7 +9,7 @@ const ClientValidator = require('../validators/clientValidator')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { calculateWaitTimeStats } = require('../utils/statsHelper')
-const { isOpusModel } = require('../utils/modelHelper')
+const { isClaudeFamilyModel } = require('../utils/modelHelper')
 
 // 工具函数
 function sleep(ms) {
@@ -1256,7 +1256,7 @@ const authenticateApiKey = async (req, res, next) => {
       const model = requestBody.model || ''
 
       // 判断是否为 Claude 模型
-      if (isOpusModel(model)) {
+      if (isClaudeFamilyModel(model)) {
         const weeklyOpusCost = validation.keyData.weeklyOpusCost || 0
 
         if (weeklyOpusCost >= weeklyOpusCostLimit) {
@@ -1266,19 +1266,16 @@ const authenticateApiKey = async (req, res, next) => {
             }), cost: $${weeklyOpusCost.toFixed(2)}/$${weeklyOpusCostLimit}`
           )
 
-          // 计算下周一的重置时间
-          const now = new Date()
-          const dayOfWeek = now.getDay()
-          const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7
-          const resetDate = new Date(now)
-          resetDate.setDate(now.getDate() + daysUntilMonday)
-          resetDate.setHours(0, 0, 0, 0)
+          // 计算下次重置时间（基于 API Key 配置的重置日/时）
+          const resetDay = validation.keyData.weeklyResetDay || 1
+          const resetHour = validation.keyData.weeklyResetHour || 0
+          const resetDate = redis.getNextResetTime(resetDay, resetHour)
 
           // 使用 402 Payment Required 而非 429，避免客户端自动重试
           return res.status(402).json({
             error: {
               type: 'insufficient_quota',
-              message: `已达到 Opus 模型周费用限制 ($${weeklyOpusCostLimit})`,
+              message: `已达到 Claude 模型周费用限制 ($${weeklyOpusCostLimit})`,
               code: 'weekly_opus_cost_limit_exceeded'
             },
             currentCost: weeklyOpusCost,

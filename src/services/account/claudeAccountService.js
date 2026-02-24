@@ -2119,14 +2119,21 @@ class ClaudeAccountService {
           organizationType: profileData.organization?.organization_type
         })
 
+        const organizationType = String(
+          profileData.organization?.organization_type || ''
+        ).toLowerCase()
+        const isEnterpriseOrg = organizationType === 'claude_enterprise'
+        const hasClaudeMax = profileData.account?.has_claude_max === true || isEnterpriseOrg
+        const hasClaudePro = profileData.account?.has_claude_pro === true && !hasClaudeMax
+
         // 构建订阅信息
         const subscriptionInfo = {
           // 账号信息
           email: profileData.account?.email,
           fullName: profileData.account?.full_name,
           displayName: profileData.account?.display_name,
-          hasClaudeMax: profileData.account?.has_claude_max || false,
-          hasClaudePro: profileData.account?.has_claude_pro || false,
+          hasClaudeMax,
+          hasClaudePro,
           accountUuid: profileData.account?.uuid,
 
           // 组织信息
@@ -2136,13 +2143,8 @@ class ClaudeAccountService {
           rateLimitTier: profileData.organization?.rate_limit_tier,
           organizationType: profileData.organization?.organization_type,
 
-          // 账号类型（基于 has_claude_max 和 has_claude_pro 判断）
-          accountType:
-            profileData.account?.has_claude_max === true
-              ? 'claude_max'
-              : profileData.account?.has_claude_pro === true
-                ? 'claude_pro'
-                : 'free',
+          // 账号类型：Enterprise 组织按 Max 能力处理，确保可调度 Opus
+          accountType: hasClaudeMax ? 'claude_max' : hasClaudePro ? 'claude_pro' : 'free',
 
           // 更新时间
           profileFetchedAt: new Date().toISOString()
