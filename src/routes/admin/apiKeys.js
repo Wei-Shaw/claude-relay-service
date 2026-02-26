@@ -1093,9 +1093,8 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
     searchPatterns.push(`usage:${keyId}:model:monthly:*:${currentMonth}`)
   } else {
-    // all - 获取所有数据（日和月数据都查）
-    searchPatterns.push(`usage:${keyId}:model:daily:*`)
-    searchPatterns.push(`usage:${keyId}:model:monthly:*`)
+    // all - 使用 alltime key（无 TTL，数据完整），避免 daily/monthly 键过期导致数据丢失
+    searchPatterns.push(`usage:${keyId}:model:alltime:*`)
   }
 
   // 使用 SCAN 收集所有匹配的 keys
@@ -1109,7 +1108,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     } while (cursor !== '0')
   }
 
-  // 去重（避免日数据和月数据重复计算）
+  // 去重
   const uniqueKeys = [...new Set(allKeys)]
 
   // 获取实时限制数据（窗口数据不受时间范围筛选影响，始终获取当前窗口状态）
@@ -1128,7 +1127,6 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     const apiKey = await redis.getApiKey(keyId)
     const rateLimitWindow = parseInt(apiKey?.rateLimitWindow) || 0
     const dailyCostLimit = parseFloat(apiKey?.dailyCostLimit) || 0
-    const totalCostLimit = parseFloat(apiKey?.totalCostLimit) || 0
     const weeklyOpusCostLimit = parseFloat(apiKey?.weeklyOpusCostLimit) || 0
 
     // 只在启用了每日费用限制时查询
@@ -1136,11 +1134,9 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       dailyCost = await redis.getDailyCost(keyId)
     }
 
-    // 只在启用了总费用限制时查询
-    if (totalCostLimit > 0) {
-      const totalCostKey = `usage:cost:total:${keyId}`
-      allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
-    }
+    // 始终查询 allTimeCost（用于展示和限额校验）
+    const totalCostKey = `usage:cost:total:${keyId}`
+    allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
 
     // 只在启用了 Claude 周费用限制时查询（字段名沿用 weeklyOpusCostLimit）
     if (weeklyOpusCostLimit > 0) {
@@ -1149,7 +1145,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       weeklyOpusCost = await redis.getWeeklyOpusCost(keyId, resetDay, resetHour)
     }
 
-    // 只在启用了窗口限制时查询窗口数据（移到早期返回之前，确保窗口数据始终被获取）
+    // 只在启用了窗口限制时查询窗口数据
     if (rateLimitWindow > 0) {
       const requestCountKey = `rate_limit:requests:${keyId}`
       const tokenCountKey = `rate_limit:tokens:${keyId}`
@@ -1180,35 +1176,21 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
         }
       }
     }
-
-    // 🔧 FIX: 对于 "全部时间" 时间范围，直接使用 allTimeCost
-    // 因为 usage:*:model:daily:* 键有 30 天 TTL，旧数据已经过期
-    if (timeRange === 'all' && allTimeCost > 0) {
-      logger.debug(`📊 使用 allTimeCost 计算 timeRange='all': ${allTimeCost}`)
-
-      return {
-        requests: 0, // 旧数据详情不可用
-        tokens: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreateTokens: 0,
-        cacheReadTokens: 0,
-        cost: allTimeCost,
-        formattedCost: CostCalculator.formatCost(allTimeCost),
-        // 实时限制数据（始终返回，不受时间范围影响）
-        dailyCost,
-        weeklyOpusCost,
-        currentWindowCost,
-        currentWindowRequests,
-        currentWindowTokens,
-        windowRemainingSeconds,
-        windowStartTime,
-        windowEndTime,
-        allTimeCost
-      }
-    }
   } catch (error) {
     logger.warn(`⚠️ 获取实时限制数据失败 (key: ${keyId}):`, error.message)
+  }
+
+  // 构建实时限制数据对象（各分支复用）
+  const limitData = {
+    dailyCost,
+    weeklyOpusCost,
+    currentWindowCost,
+    currentWindowRequests,
+    currentWindowTokens,
+    windowRemainingSeconds,
+    windowStartTime,
+    windowEndTime,
+    allTimeCost
   }
 
   // 如果没有使用数据，返回零值但包含窗口数据
@@ -1221,17 +1203,9 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       cacheCreateTokens: 0,
       cacheReadTokens: 0,
       cost: 0,
+      realCost: 0,
       formattedCost: '$0.00',
-      // 实时限制数据（始终返回，不受时间范围影响）
-      dailyCost,
-      weeklyOpusCost,
-      currentWindowCost,
-      currentWindowRequests,
-      currentWindowTokens,
-      windowRemainingSeconds,
-      windowStartTime,
-      windowEndTime,
-      allTimeCost
+      ...limitData
     }
   }
 
@@ -1246,10 +1220,13 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   const modelStatsMap = new Map()
   let totalRequests = 0
 
+  // alltime key 的模式：usage:{keyId}:model:alltime:{model}
+  const alltimeKeyPattern = /usage:.+:model:alltime:(.+)$/
   // 用于去重：先统计月数据，避免与日数据重复
   const dailyKeyPattern = /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
   const monthlyKeyPattern = /usage:.+:model:monthly:(.+):\d{4}-\d{2}$/
   const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+  const isAlltimeQuery = timeRange === 'all'
 
   for (let i = 0; i < results.length; i++) {
     const [err, data] = results[i]
@@ -1262,27 +1239,37 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     let isMonthly = false
 
     // 提取模型名称
-    const dailyMatch = key.match(dailyKeyPattern)
-    const monthlyMatch = key.match(monthlyKeyPattern)
+    if (isAlltimeQuery) {
+      const alltimeMatch = key.match(alltimeKeyPattern)
+      if (alltimeMatch) {
+        model = alltimeMatch[1]
+      }
+    } else {
+      const dailyMatch = key.match(dailyKeyPattern)
+      const monthlyMatch = key.match(monthlyKeyPattern)
 
-    if (dailyMatch) {
-      model = dailyMatch[1]
-    } else if (monthlyMatch) {
-      model = monthlyMatch[1]
-      isMonthly = true
+      if (dailyMatch) {
+        model = dailyMatch[1]
+      } else if (monthlyMatch) {
+        model = monthlyMatch[1]
+        isMonthly = true
+      }
     }
 
     if (!model) {
       continue
     }
 
-    // 跳过当前月的月数据
-    if (isMonthly && key.includes(`:${currentMonth}`)) {
-      continue
-    }
-    // 跳过非当前月的日数据
-    if (!isMonthly && !key.includes(`:${currentMonth}-`)) {
-      continue
+    // 日/月去重逻辑（alltime 不需要去重）
+    if (!isAlltimeQuery) {
+      // 跳过当前月的月数据（当前月用日数据更精确）
+      if (isMonthly && key.includes(`:${currentMonth}`)) {
+        continue
+      }
+      // 跳过非当前月的日数据（非当前月用月数据）
+      if (!isMonthly && !key.includes(`:${currentMonth}-`)) {
+        continue
+      }
     }
 
     if (!modelStatsMap.has(model)) {
@@ -1293,7 +1280,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
         cacheReadTokens: 0,
         ephemeral5mTokens: 0,
         ephemeral1hTokens: 0,
-        requests: 0
+        requests: 0,
+        realCostMicro: 0,
+        ratedCostMicro: 0,
+        hasStoredCost: false
       })
     }
 
@@ -1310,11 +1300,19 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       parseInt(data.totalEphemeral1hTokens) || parseInt(data.ephemeral1hTokens) || 0
     stats.requests += parseInt(data.totalRequests) || parseInt(data.requests) || 0
 
+    // 累加已存储的费用（微美元）
+    if ('realCostMicro' in data || 'ratedCostMicro' in data) {
+      stats.realCostMicro += parseInt(data.realCostMicro) || 0
+      stats.ratedCostMicro += parseInt(data.ratedCostMicro) || 0
+      stats.hasStoredCost = true
+    }
+
     totalRequests += parseInt(data.totalRequests) || parseInt(data.requests) || 0
   }
 
-  // 计算费用
-  let totalCost = 0
+  // 汇总费用：优先使用已存储的费用，仅对无存储费用的旧数据 fallback 到 token 重算
+  let totalRatedCost = 0
+  let totalRealCost = 0
   let inputTokens = 0
   let outputTokens = 0
   let cacheCreateTokens = 0
@@ -1326,23 +1324,30 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     cacheCreateTokens += stats.cacheCreateTokens
     cacheReadTokens += stats.cacheReadTokens
 
-    const costUsage = {
-      input_tokens: stats.inputTokens,
-      output_tokens: stats.outputTokens,
-      cache_creation_input_tokens: stats.cacheCreateTokens,
-      cache_read_input_tokens: stats.cacheReadTokens
-    }
-
-    // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
-    if (stats.ephemeral5mTokens > 0 || stats.ephemeral1hTokens > 0) {
-      costUsage.cache_creation = {
-        ephemeral_5m_input_tokens: stats.ephemeral5mTokens,
-        ephemeral_1h_input_tokens: stats.ephemeral1hTokens
+    if (stats.hasStoredCost) {
+      // 使用请求时已计算并存储的费用（精确，包含 1M 上下文、特殊计费等）
+      totalRatedCost += stats.ratedCostMicro / 1000000
+      totalRealCost += stats.realCostMicro / 1000000
+    } else {
+      // Legacy fallback：旧数据没有存储费用，从 token 重算（不精确但聊胜于无）
+      const costUsage = {
+        input_tokens: stats.inputTokens,
+        output_tokens: stats.outputTokens,
+        cache_creation_input_tokens: stats.cacheCreateTokens,
+        cache_read_input_tokens: stats.cacheReadTokens
       }
-    }
 
-    const costResult = CostCalculator.calculateCost(costUsage, model)
-    totalCost += costResult.costs.total
+      if (stats.ephemeral5mTokens > 0 || stats.ephemeral1hTokens > 0) {
+        costUsage.cache_creation = {
+          ephemeral_5m_input_tokens: stats.ephemeral5mTokens,
+          ephemeral_1h_input_tokens: stats.ephemeral1hTokens
+        }
+      }
+
+      const costResult = CostCalculator.calculateCost(costUsage, model)
+      totalRatedCost += costResult.costs.total
+      totalRealCost += costResult.costs.total
+    }
   }
 
   const tokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
@@ -1354,18 +1359,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     outputTokens,
     cacheCreateTokens,
     cacheReadTokens,
-    cost: totalCost,
-    formattedCost: CostCalculator.formatCost(totalCost),
-    // 实时限制数据
-    dailyCost,
-    weeklyOpusCost,
-    currentWindowCost,
-    currentWindowRequests,
-    currentWindowTokens,
-    windowRemainingSeconds,
-    windowStartTime,
-    windowEndTime,
-    allTimeCost // 历史总费用（用于总费用限制）
+    cost: totalRatedCost,
+    realCost: totalRealCost,
+    formattedCost: CostCalculator.formatCost(totalRatedCost),
+    ...limitData
   }
 }
 

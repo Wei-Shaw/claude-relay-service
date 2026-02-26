@@ -1805,7 +1805,8 @@ async function applyRateLimitTracking(
   usageSummary,
   model,
   context = '',
-  keyId = null
+  keyId = null,
+  preCalculatedCost = null
 ) {
   if (!rateLimitInfo) {
     return
@@ -1819,7 +1820,8 @@ async function applyRateLimitTracking(
       usageSummary,
       model,
       keyId,
-      'gemini'
+      'gemini',
+      preCalculatedCost
     )
     if (totalTokens > 0) {
       logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
@@ -2135,7 +2137,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
         : mapGeminiFinishReasonToAnthropicStopReason(finishReason)
 
       if (req.apiKey?.id && (inputTokens > 0 || outputTokens > 0)) {
-        await apiKeyService.recordUsage(
+        const bridgeCosts = await apiKeyService.recordUsage(
           req.apiKey.id,
           inputTokens,
           outputTokens,
@@ -2150,7 +2152,8 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           { inputTokens, outputTokens, cacheCreateTokens: 0, cacheReadTokens: 0 },
           effectiveModel,
           'anthropic-messages',
-          req.apiKey?.id
+          req.apiKey?.id,
+          bridgeCosts
         )
       }
 
@@ -2675,7 +2678,7 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
       }
 
       if (req.apiKey?.id && (inputTokens > 0 || outputTokens > 0)) {
-        await apiKeyService.recordUsage(
+        const bridgeStreamCosts = await apiKeyService.recordUsage(
           req.apiKey.id,
           inputTokens,
           outputTokens,
@@ -2689,7 +2692,9 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           req.rateLimitInfo,
           { inputTokens, outputTokens, cacheCreateTokens: 0, cacheReadTokens: 0 },
           effectiveModel,
-          'anthropic-messages-stream'
+          'anthropic-messages-stream',
+          req.apiKey?.id,
+          bridgeStreamCosts
         )
       }
     }

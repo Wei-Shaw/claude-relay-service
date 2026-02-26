@@ -33,7 +33,8 @@ function queueRateLimitUpdate(
   model,
   context = '',
   keyId = null,
-  accountType = null
+  accountType = null,
+  preCalculatedCost = null
 ) {
   if (!rateLimitInfo) {
     return Promise.resolve({ totalTokens: 0, totalCost: 0 })
@@ -41,7 +42,14 @@ function queueRateLimitUpdate(
 
   const label = context ? ` (${context})` : ''
 
-  return updateRateLimitCounters(rateLimitInfo, usageSummary, model, keyId, accountType)
+  return updateRateLimitCounters(
+    rateLimitInfo,
+    usageSummary,
+    model,
+    keyId,
+    accountType,
+    preCalculatedCost
+  )
     .then(({ totalTokens, totalCost }) => {
       if (totalTokens > 0) {
         logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
@@ -187,6 +195,17 @@ async function handleMessagesRequest(req, res) {
           }
         })
       }
+    }
+
+    // 拦截 1M 上下文窗口请求（anthropic-beta 包含 context-1m）
+    const betaHeader = (req.headers['anthropic-beta'] || '').toLowerCase()
+    if (betaHeader.includes('context-1m')) {
+      return res.status(403).json({
+        error: {
+          type: 'forbidden',
+          message: '暂不支持 1M 上下文窗口，请切换为非 [1m] 模型'
+        }
+      })
     }
 
     logger.api('📥 /v1/messages request received', {
@@ -492,23 +511,39 @@ async function handleMessagesRequest(req, res) {
 
               apiKeyService
                 .recordUsageWithDetails(_apiKeyId, usageObject, model, usageAccountId, accountType)
+                .then((costs) => {
+                  queueRateLimitUpdate(
+                    _rateLimitInfo,
+                    {
+                      inputTokens,
+                      outputTokens,
+                      cacheCreateTokens,
+                      cacheReadTokens
+                    },
+                    model,
+                    'claude-stream',
+                    _apiKeyId,
+                    accountType,
+                    costs
+                  )
+                })
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
+                  // Fallback: 仍然更新限流计数（使用 legacy 计算）
+                  queueRateLimitUpdate(
+                    _rateLimitInfo,
+                    {
+                      inputTokens,
+                      outputTokens,
+                      cacheCreateTokens,
+                      cacheReadTokens
+                    },
+                    model,
+                    'claude-stream',
+                    _apiKeyId,
+                    accountType
+                  )
                 })
-
-              queueRateLimitUpdate(
-                _rateLimitInfo,
-                {
-                  inputTokens,
-                  outputTokens,
-                  cacheCreateTokens,
-                  cacheReadTokens
-                },
-                model,
-                'claude-stream',
-                _apiKeyId,
-                accountType
-              )
 
               usageDataCaptured = true
               logger.api(
@@ -608,23 +643,38 @@ async function handleMessagesRequest(req, res) {
                   usageAccountId,
                   'claude-console'
                 )
+                .then((costs) => {
+                  queueRateLimitUpdate(
+                    _rateLimitInfoConsole,
+                    {
+                      inputTokens,
+                      outputTokens,
+                      cacheCreateTokens,
+                      cacheReadTokens
+                    },
+                    model,
+                    'claude-console-stream',
+                    _apiKeyIdConsole,
+                    accountType,
+                    costs
+                  )
+                })
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
+                  queueRateLimitUpdate(
+                    _rateLimitInfoConsole,
+                    {
+                      inputTokens,
+                      outputTokens,
+                      cacheCreateTokens,
+                      cacheReadTokens
+                    },
+                    model,
+                    'claude-console-stream',
+                    _apiKeyIdConsole,
+                    accountType
+                  )
                 })
-
-              queueRateLimitUpdate(
-                _rateLimitInfoConsole,
-                {
-                  inputTokens,
-                  outputTokens,
-                  cacheCreateTokens,
-                  cacheReadTokens
-                },
-                model,
-                'claude-console-stream',
-                _apiKeyIdConsole,
-                accountType
-              )
 
               usageDataCaptured = true
               logger.api(
@@ -674,23 +724,38 @@ async function handleMessagesRequest(req, res) {
                 accountId,
                 'bedrock'
               )
+              .then((costs) => {
+                queueRateLimitUpdate(
+                  _rateLimitInfoBedrock,
+                  {
+                    inputTokens,
+                    outputTokens,
+                    cacheCreateTokens: 0,
+                    cacheReadTokens: 0
+                  },
+                  result.model,
+                  'bedrock-stream',
+                  _apiKeyIdBedrock,
+                  'bedrock',
+                  costs
+                )
+              })
               .catch((error) => {
                 logger.error('❌ Failed to record Bedrock stream usage:', error)
+                queueRateLimitUpdate(
+                  _rateLimitInfoBedrock,
+                  {
+                    inputTokens,
+                    outputTokens,
+                    cacheCreateTokens: 0,
+                    cacheReadTokens: 0
+                  },
+                  result.model,
+                  'bedrock-stream',
+                  _apiKeyIdBedrock,
+                  'bedrock'
+                )
               })
-
-            queueRateLimitUpdate(
-              _rateLimitInfoBedrock,
-              {
-                inputTokens,
-                outputTokens,
-                cacheCreateTokens: 0,
-                cacheReadTokens: 0
-              },
-              result.model,
-              'bedrock-stream',
-              _apiKeyIdBedrock,
-              'bedrock'
-            )
 
             usageDataCaptured = true
             logger.api(
@@ -781,23 +846,38 @@ async function handleMessagesRequest(req, res) {
 
               apiKeyService
                 .recordUsageWithDetails(_apiKeyIdCcr, usageObject, model, usageAccountId, 'ccr')
+                .then((costs) => {
+                  queueRateLimitUpdate(
+                    _rateLimitInfoCcr,
+                    {
+                      inputTokens,
+                      outputTokens,
+                      cacheCreateTokens,
+                      cacheReadTokens
+                    },
+                    model,
+                    'ccr-stream',
+                    _apiKeyIdCcr,
+                    'ccr',
+                    costs
+                  )
+                })
                 .catch((error) => {
                   logger.error('❌ Failed to record CCR stream usage:', error)
+                  queueRateLimitUpdate(
+                    _rateLimitInfoCcr,
+                    {
+                      inputTokens,
+                      outputTokens,
+                      cacheCreateTokens,
+                      cacheReadTokens
+                    },
+                    model,
+                    'ccr-stream',
+                    _apiKeyIdCcr,
+                    'ccr'
+                  )
                 })
-
-              queueRateLimitUpdate(
-                _rateLimitInfoCcr,
-                {
-                  inputTokens,
-                  outputTokens,
-                  cacheCreateTokens,
-                  cacheReadTokens
-                },
-                model,
-                'ccr-stream',
-                _apiKeyIdCcr,
-                'ccr'
-              )
 
               usageDataCaptured = true
               logger.api(
@@ -1143,7 +1223,7 @@ async function handleMessagesRequest(req, res) {
 
           // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
           const { accountId: responseAccountId } = response
-          await apiKeyService.recordUsage(
+          const nonStreamCosts = await apiKeyService.recordUsage(
             _apiKeyIdNonStream,
             inputTokens,
             outputTokens,
@@ -1165,7 +1245,8 @@ async function handleMessagesRequest(req, res) {
             model,
             'claude-non-stream',
             _apiKeyIdNonStream,
-            accountType
+            accountType,
+            nonStreamCosts
           )
 
           usageRecorded = true

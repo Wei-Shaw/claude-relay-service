@@ -1011,7 +1011,10 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
               cacheReadTokens: 0,
               ephemeral5mTokens: 0,
               ephemeral1hTokens: 0,
-              allTokens: 0
+              allTokens: 0,
+              realCostMicro: 0,
+              ratedCostMicro: 0,
+              hasStoredCost: false
             })
           }
           const stats = modelStatsMap.get(model)
@@ -1023,6 +1026,11 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
           stats.ephemeral5mTokens += parseInt(data.ephemeral5mTokens) || 0
           stats.ephemeral1hTokens += parseInt(data.ephemeral1hTokens) || 0
           stats.allTokens += parseInt(data.allTokens) || 0
+          if ('realCostMicro' in data || 'ratedCostMicro' in data) {
+            stats.realCostMicro += parseInt(data.realCostMicro) || 0
+            stats.ratedCostMicro += parseInt(data.ratedCostMicro) || 0
+            stats.hasStoredCost = true
+          }
         }
       }
     } else {
@@ -1059,7 +1067,10 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
             cacheReadTokens: 0,
             ephemeral5mTokens: 0,
             ephemeral1hTokens: 0,
-            allTokens: 0
+            allTokens: 0,
+            realCostMicro: 0,
+            ratedCostMicro: 0,
+            hasStoredCost: false
           })
         }
         const stats = modelStatsMap.get(model)
@@ -1071,6 +1082,11 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
         stats.ephemeral5mTokens += parseInt(data.ephemeral5mTokens) || 0
         stats.ephemeral1hTokens += parseInt(data.ephemeral1hTokens) || 0
         stats.allTokens += parseInt(data.allTokens) || 0
+        if ('realCostMicro' in data || 'ratedCostMicro' in data) {
+          stats.realCostMicro += parseInt(data.realCostMicro) || 0
+          stats.ratedCostMicro += parseInt(data.ratedCostMicro) || 0
+          stats.hasStoredCost = true
+        }
       }
     }
 
@@ -1078,23 +1094,36 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
     for (const [model, stats] of modelStatsMap) {
       logger.info(`📊 Model ${model} aggregated data:`, stats)
 
-      const usage = {
-        input_tokens: stats.inputTokens,
-        output_tokens: stats.outputTokens,
-        cache_creation_input_tokens: stats.cacheCreateTokens,
-        cache_read_input_tokens: stats.cacheReadTokens
-      }
-
-      // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
-      if (stats.ephemeral5mTokens > 0 || stats.ephemeral1hTokens > 0) {
-        usage.cache_creation = {
-          ephemeral_5m_input_tokens: stats.ephemeral5mTokens,
-          ephemeral_1h_input_tokens: stats.ephemeral1hTokens
+      let costData
+      if (stats.hasStoredCost) {
+        // 使用请求时已计算并存储的费用（精确，包含 1M 上下文、Fast Mode 等特殊计费）
+        const ratedCost = stats.ratedCostMicro / 1000000
+        const realCost = stats.realCostMicro / 1000000
+        costData = {
+          costs: { total: ratedCost, real: realCost },
+          formatted: { total: CostCalculator.formatCost(ratedCost) },
+          pricing: null,
+          usingDynamicPricing: false,
+          usingStoredCost: true
         }
-      }
+      } else {
+        // Legacy fallback：旧数据没有存储费用，从 token 重算
+        const usage = {
+          input_tokens: stats.inputTokens,
+          output_tokens: stats.outputTokens,
+          cache_creation_input_tokens: stats.cacheCreateTokens,
+          cache_read_input_tokens: stats.cacheReadTokens
+        }
 
-      // 使用CostCalculator计算费用
-      const costData = CostCalculator.calculateCost(usage, model)
+        if (stats.ephemeral5mTokens > 0 || stats.ephemeral1hTokens > 0) {
+          usage.cache_creation = {
+            ephemeral_5m_input_tokens: stats.ephemeral5mTokens,
+            ephemeral_1h_input_tokens: stats.ephemeral1hTokens
+          }
+        }
+
+        costData = CostCalculator.calculateCost(usage, model)
+      }
 
       modelStats.push({
         model,
@@ -1933,26 +1962,37 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             continue
           }
 
-          const usage = {
-            input_tokens: parseInt(modelData.inputTokens) || 0,
-            output_tokens: parseInt(modelData.outputTokens) || 0,
-            cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
-            cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
-          }
+          // 优先使用已存储的费用
+          const hasStoredCost = 'realCostMicro' in modelData || 'ratedCostMicro' in modelData
+          let modelCost = 0
 
-          // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
-          const eph5m = parseInt(modelData.ephemeral5mTokens) || 0
-          const eph1h = parseInt(modelData.ephemeral1hTokens) || 0
-          if (eph5m > 0 || eph1h > 0) {
-            usage.cache_creation = {
-              ephemeral_5m_input_tokens: eph5m,
-              ephemeral_1h_input_tokens: eph1h
+          if (hasStoredCost) {
+            modelCost = (parseInt(modelData.ratedCostMicro) || 0) / 1000000
+          } else {
+            // Legacy fallback：旧数据没有存储费用，从 token 重算
+            const usage = {
+              input_tokens: parseInt(modelData.inputTokens) || 0,
+              output_tokens: parseInt(modelData.outputTokens) || 0,
+              cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
+              cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
             }
+
+            // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
+            const eph5m = parseInt(modelData.ephemeral5mTokens) || 0
+            const eph1h = parseInt(modelData.ephemeral1hTokens) || 0
+            if (eph5m > 0 || eph1h > 0) {
+              usage.cache_creation = {
+                ephemeral_5m_input_tokens: eph5m,
+                ephemeral_1h_input_tokens: eph1h
+              }
+            }
+
+            const costResult = CostCalculator.calculateCost(usage, model)
+            modelCost = costResult.costs.total
           }
 
-          const costResult = CostCalculator.calculateCost(usage, model)
           const currentCost = apiKeyCostMap.get(apiKeyId) || 0
-          apiKeyCostMap.set(apiKeyId, currentCost + costResult.costs.total)
+          apiKeyCostMap.set(apiKeyId, currentCost + modelCost)
         }
 
         // 组合数据
@@ -2111,26 +2151,37 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
             continue
           }
 
-          const usage = {
-            input_tokens: parseInt(modelData.inputTokens) || 0,
-            output_tokens: parseInt(modelData.outputTokens) || 0,
-            cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
-            cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
-          }
+          // 优先使用已存储的费用
+          const hasStoredCost = 'realCostMicro' in modelData || 'ratedCostMicro' in modelData
+          let modelCost = 0
 
-          // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
-          const eph5m = parseInt(modelData.ephemeral5mTokens) || 0
-          const eph1h = parseInt(modelData.ephemeral1hTokens) || 0
-          if (eph5m > 0 || eph1h > 0) {
-            usage.cache_creation = {
-              ephemeral_5m_input_tokens: eph5m,
-              ephemeral_1h_input_tokens: eph1h
+          if (hasStoredCost) {
+            modelCost = (parseInt(modelData.ratedCostMicro) || 0) / 1000000
+          } else {
+            // Legacy fallback：旧数据没有存储费用，从 token 重算
+            const usage = {
+              input_tokens: parseInt(modelData.inputTokens) || 0,
+              output_tokens: parseInt(modelData.outputTokens) || 0,
+              cache_creation_input_tokens: parseInt(modelData.cacheCreateTokens) || 0,
+              cache_read_input_tokens: parseInt(modelData.cacheReadTokens) || 0
             }
+
+            // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
+            const eph5m = parseInt(modelData.ephemeral5mTokens) || 0
+            const eph1h = parseInt(modelData.ephemeral1hTokens) || 0
+            if (eph5m > 0 || eph1h > 0) {
+              usage.cache_creation = {
+                ephemeral_5m_input_tokens: eph5m,
+                ephemeral_1h_input_tokens: eph1h
+              }
+            }
+
+            const costResult = CostCalculator.calculateCost(usage, model)
+            modelCost = costResult.costs.total
           }
 
-          const costResult = CostCalculator.calculateCost(usage, model)
           const currentCost = apiKeyCostMap.get(apiKeyId) || 0
-          apiKeyCostMap.set(apiKeyId, currentCost + costResult.costs.total)
+          apiKeyCostMap.set(apiKeyId, currentCost + modelCost)
         }
 
         // 组合数据
@@ -2628,7 +2679,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
   }
 })
 
-// 获取 API Key 的请求记录时间线
+// 获取 API Key 的请求记��时间线
 router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params
