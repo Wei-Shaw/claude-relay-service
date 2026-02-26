@@ -21,14 +21,31 @@
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-300'
               ]"
-              @click="activeTab = 'active'"
+              @click="switchToActiveTab"
             >
-              活跃 API Keys
+              活跃 Keys
               <span
-                v-if="apiKeys.length > 0"
-                class="ml-2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:bg-gray-700 dark:text-gray-100"
+                v-if="activeKeyCount > 0"
+                class="ml-2 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
               >
-                {{ apiKeys.length }}
+                {{ activeKeyCount }}
+              </span>
+            </button>
+            <button
+              :class="[
+                'whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium',
+                activeTab === 'inactive'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-300'
+              ]"
+              @click="switchToInactiveTab"
+            >
+              过期/禁用
+              <span
+                v-if="inactiveKeyCount > 0"
+                class="ml-2 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-300"
+              >
+                {{ inactiveKeyCount }}
               </span>
             </button>
             <button
@@ -40,7 +57,7 @@
               ]"
               @click="loadDeletedApiKeys"
             >
-              已删除 API Keys
+              已删除
               <span
                 v-if="deletedApiKeys.length > 0"
                 class="ml-2 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:bg-gray-700 dark:text-gray-100"
@@ -52,8 +69,8 @@
         </div>
 
         <!-- Tab Content -->
-        <!-- 活跃 API Keys Tab Panel -->
-        <div v-if="activeTab === 'active'" class="tab-panel">
+        <!-- 活跃/过期/禁用 API Keys Tab Panel -->
+        <div v-if="activeTab === 'active' || activeTab === 'inactive'" class="tab-panel">
           <!-- 工具栏区域 - 添加 mb-4 增加与表格的间距 -->
           <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <!-- 左侧：查询筛选器组 -->
@@ -2241,8 +2258,10 @@ const timeRangeDropdownOptions = computed(() => [
 const activeTab = ref('active')
 const deletedApiKeys = ref([])
 const deletedApiKeysLoading = ref(false)
-const apiKeysSortBy = ref('createdAt') // 默认排序为创建时间
-const apiKeysSortOrder = ref('desc')
+const activeKeyCount = ref(0) // 活跃 key 数量
+const inactiveKeyCount = ref(0) // 过期/禁用 key 数量
+const apiKeysSortBy = ref('lastUsedAt') // 默认排序为最后使用时间
+const apiKeysSortOrder = ref('desc') // 倒序（最近使用的在前）
 const expandedApiKeys = ref({})
 
 // 费用排序相关状态
@@ -2637,6 +2656,13 @@ const loadApiKeys = async (clearStatsCache = true) => {
       params.set('models', selectedModels.value.join(','))
     }
 
+    // 状态筛选参数（活跃/过期禁用 Tab）
+    if (activeTab.value === 'active') {
+      params.set('statusFilter', 'active')
+    } else if (activeTab.value === 'inactive') {
+      params.set('statusFilter', 'inactive')
+    }
+
     // 排序参数（支持费用排序）
     const validSortFields = [
       'name',
@@ -2704,6 +2730,12 @@ const loadApiKeys = async (clearStatsCache = true) => {
       // 更新可用标签列表
       if (data.data?.availableTags) {
         availableTags.value = data.data.availableTags
+      }
+
+      // 更新状态计数
+      if (data.data?.statusCounts) {
+        activeKeyCount.value = data.data.statusCounts.active || 0
+        inactiveKeyCount.value = data.data.statusCounts.inactive || 0
       }
 
       // 异步加载当前页的统计数据（不等待，让页面先显示基础数据）
@@ -2843,6 +2875,28 @@ const getCachedLastUsage = (keyId) => {
 // 检查是否正在加载最后使用账号
 const isLastUsageLoading = (keyId) => {
   return lastUsageLoading.value.has(keyId)
+}
+
+// 切换到活跃 Tab
+const switchToActiveTab = () => {
+  if (activeTab.value === 'active') return
+  activeTab.value = 'active'
+  // 恢复活跃 Tab 的默认排序
+  apiKeysSortBy.value = 'lastUsedAt'
+  apiKeysSortOrder.value = 'desc'
+  currentPage.value = 1
+  loadApiKeys()
+}
+
+// 切换到过期/禁用 Tab
+const switchToInactiveTab = () => {
+  if (activeTab.value === 'inactive') return
+  activeTab.value = 'inactive'
+  // 切换到过期/禁用 Tab 的默认排序
+  apiKeysSortBy.value = 'expiresAt'
+  apiKeysSortOrder.value = 'asc'
+  currentPage.value = 1
+  loadApiKeys()
 }
 
 // 加载已删除的API Keys
