@@ -2576,6 +2576,8 @@ class ClaudeAccountService {
       delete updatedAccountData.rateLimitedAt
       delete updatedAccountData.rateLimitStatus
       delete updatedAccountData.rateLimitEndAt
+      delete updatedAccountData.opusRateLimitedAt
+      delete updatedAccountData.opusRateLimitEndAt
       delete updatedAccountData.tempErrorAt
       delete updatedAccountData.sessionWindowStart
       delete updatedAccountData.sessionWindowEnd
@@ -2591,6 +2593,8 @@ class ClaudeAccountService {
         'rateLimitedAt',
         'rateLimitStatus',
         'rateLimitEndAt',
+        'opusRateLimitedAt',
+        'opusRateLimitEndAt',
         'tempErrorAt',
         'sessionWindowStart',
         'sessionWindowEnd',

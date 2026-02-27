@@ -463,9 +463,6 @@ class ClaudeRelayService {
         requestedModel: requestBody.model
       })
 
-      const isOpusModelRequest =
-        typeof requestBody?.model === 'string' && requestBody.model.toLowerCase().includes('opus')
-
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody)
 
@@ -572,41 +569,14 @@ class ClaudeRelayService {
       }
 
       // 获取账户信息
-      let account = await claudeAccountService.getAccount(accountId)
-
-      if (isOpusModelRequest) {
-        await claudeAccountService.clearExpiredOpusRateLimit(accountId)
-        account = await claudeAccountService.getAccount(accountId)
-      }
+      const account = await claudeAccountService.getAccount(accountId)
 
       const isDedicatedOfficialAccount =
         accountType === 'claude-official' &&
         apiKeyData.claudeAccountId &&
         !apiKeyData.claudeAccountId.startsWith('group:') &&
         apiKeyData.claudeAccountId === accountId
-
-      let opusRateLimitActive = false
-      let opusRateLimitEndAt = null
-      if (isOpusModelRequest) {
-        opusRateLimitActive = await claudeAccountService.isAccountOpusRateLimited(accountId)
-        opusRateLimitEndAt = account?.opusRateLimitEndAt || null
-      }
-
-      if (isOpusModelRequest && isDedicatedOfficialAccount && opusRateLimitActive) {
-        const limitMessage = this._buildOpusLimitMessage(opusRateLimitEndAt)
-        logger.warn(
-          `🚫 Dedicated account ${account?.name || accountId} is under Opus weekly limit until ${opusRateLimitEndAt}`
-        )
-        return {
-          statusCode: 403,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            error: 'opus_weekly_limit',
-            message: limitMessage
-          }),
-          accountId
-        }
-      }
+      // NOTE: Opus 周限流状态已弃用，当前统一按通用限流处理（429）。
 
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
@@ -811,50 +781,18 @@ class ClaudeRelayService {
         // 检查是否为429状态码
         else if (response.statusCode === 429) {
           const parsedResetTimestamp = this._parseRateLimitResetTimestamp(response.headers)
-          const isOpusWeeklyLimit =
-            isOpusModelRequest && this._isOpusWeeklyLimitError(response.body)
-
-          if (isOpusWeeklyLimit) {
-            await claudeAccountService.markAccountOpusRateLimited(
-              accountId,
-              parsedResetTimestamp || null
+          // NOTE: Opus 周限流判定逻辑已停用，429 一律按通用限流处理。
+          isRateLimited = true
+          if (parsedResetTimestamp) {
+            rateLimitResetTimestamp = parsedResetTimestamp
+            logger.info(
+              `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
             )
-
-            if (parsedResetTimestamp) {
-              logger.warn(
-                `🚫 Account ${accountId} hit Opus weekly limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
-              )
-            } else {
-              logger.warn(
-                `🚫 Account ${accountId} hit Opus weekly limit, but no reset timestamp found`
-              )
-            }
-
-            if (isDedicatedOfficialAccount) {
-              const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
-              return {
-                statusCode: 403,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  error: 'opus_weekly_limit',
-                  message: limitMessage
-                }),
-                accountId
-              }
-            }
-          } else {
-            isRateLimited = true
-            if (parsedResetTimestamp) {
-              rateLimitResetTimestamp = parsedResetTimestamp
-              logger.info(
-                `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
-              )
-            }
-            if (isDedicatedOfficialAccount) {
-              dedicatedRateLimitMessage = this._buildStandardRateLimitMessage(
-                rateLimitResetTimestamp || account?.rateLimitEndAt
-              )
-            }
+          }
+          if (isDedicatedOfficialAccount) {
+            dedicatedRateLimitMessage = this._buildStandardRateLimitMessage(
+              rateLimitResetTimestamp || account?.rateLimitEndAt
+            )
           }
         } else {
           // 检查响应体中的错误信息
@@ -1799,9 +1737,6 @@ class ClaudeRelayService {
         requestedModel: requestBody.model
       })
 
-      const isOpusModelRequest =
-        typeof requestBody?.model === 'string' && requestBody.model.toLowerCase().includes('opus')
-
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody)
 
@@ -1916,39 +1851,14 @@ class ClaudeRelayService {
       )
 
       // 获取账户信息
-      let account = await claudeAccountService.getAccount(accountId)
-
-      if (isOpusModelRequest) {
-        await claudeAccountService.clearExpiredOpusRateLimit(accountId)
-        account = await claudeAccountService.getAccount(accountId)
-      }
+      const account = await claudeAccountService.getAccount(accountId)
 
       const isDedicatedOfficialAccount =
         accountType === 'claude-official' &&
         apiKeyData.claudeAccountId &&
         !apiKeyData.claudeAccountId.startsWith('group:') &&
         apiKeyData.claudeAccountId === accountId
-
-      let opusRateLimitActive = false
-      if (isOpusModelRequest) {
-        opusRateLimitActive = await claudeAccountService.isAccountOpusRateLimited(accountId)
-      }
-
-      if (isOpusModelRequest && isDedicatedOfficialAccount && opusRateLimitActive) {
-        const limitMessage = this._buildOpusLimitMessage(account?.opusRateLimitEndAt)
-        if (!responseStream.headersSent) {
-          responseStream.status(403)
-          responseStream.setHeader('Content-Type', 'application/json')
-        }
-        responseStream.write(
-          JSON.stringify({
-            error: 'opus_weekly_limit',
-            message: limitMessage
-          })
-        )
-        responseStream.end()
-        return
-      }
+      // NOTE: Opus 周限流状态已弃用，当前统一按通用限流处理（429）。
 
       // 获取有效的访问token
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
@@ -2050,9 +1960,6 @@ class ClaudeRelayService {
     const maxRetries = 2 // 最大重试次数
     // 获取账户信息用于统一 User-Agent
     const account = await claudeAccountService.getAccount(accountId)
-
-    const isOpusModelRequest =
-      typeof body?.model === 'string' && body.model.toLowerCase().includes('opus')
 
     // 使用公共方法准备请求头和 payload
     const prepared = await this._prepareRequestHeadersAndPayload(
@@ -2405,7 +2312,6 @@ class ClaudeRelayService {
         const allUsageData = [] // 收集所有的usage事件
         let currentUsageData = {} // 当前正在收集的usage数据
         let rateLimitDetected = false // 限流检测标志
-        let opusWeeklyLimitDetected = false
 
         // 监听数据块，解析SSE并寻找usage信息
         // 🧹 内存优化：在闭包创建前提取需要的值，避免闭包捕获 body 和 requestOptions
@@ -2558,16 +2464,7 @@ class ClaudeRelayService {
                     logger.warn(`🚫 Rate limit detected in stream for account ${accountId}`)
                   }
 
-                  if (
-                    isOpusModelRequest &&
-                    data.type === 'error' &&
-                    data.error &&
-                    typeof data.error.message === 'string' &&
-                    this._isOpusWeeklyLimitText(data.error.message)
-                  ) {
-                    opusWeeklyLimitDetected = true
-                    logger.warn(`🚫 Opus weekly limit detected in stream for account ${accountId}`)
-                  }
+                  // NOTE: Opus 周限流判定逻辑已停用，流式错误中的 429 统一按通用限流处理。
                 } catch (parseError) {
                   // 忽略JSON解析错误，继续处理
                   logger.debug('🔍 SSE line not JSON or no usage data:', line.slice(0, 100))
@@ -2715,46 +2612,29 @@ class ClaudeRelayService {
           // 处理限流状态
           if (rateLimitDetected || res.statusCode === 429) {
             const parsedResetTimestamp = this._parseRateLimitResetTimestamp(res.headers)
+            // NOTE: Opus 周限流判定逻辑已停用，流式场景统一按通用限流处理。
+            const rateLimitResetTimestamp = parsedResetTimestamp || null
 
-            if (isOpusModelRequest && opusWeeklyLimitDetected) {
-              await claudeAccountService.markAccountOpusRateLimited(
-                accountId,
-                parsedResetTimestamp || null
+            if (parsedResetTimestamp) {
+              logger.info(
+                `🕐 Extracted rate limit reset timestamp from stream: ${parsedResetTimestamp} (${new Date(parsedResetTimestamp * 1000).toISOString()})`
               )
+            }
 
-              if (parsedResetTimestamp) {
-                logger.warn(
-                  `🚫 [Stream] Account ${accountId} hit Opus weekly limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
-                )
-              } else {
-                logger.warn(
-                  `🚫 [Stream] Account ${accountId} hit Opus weekly limit, but no reset timestamp found`
-                )
-              }
-            } else {
-              const rateLimitResetTimestamp = parsedResetTimestamp || null
-
-              if (parsedResetTimestamp) {
-                logger.info(
-                  `🕐 Extracted rate limit reset timestamp from stream: ${parsedResetTimestamp} (${new Date(parsedResetTimestamp * 1000).toISOString()})`
-                )
-              }
-
-              await unifiedClaudeScheduler.markAccountRateLimited(
+            await unifiedClaudeScheduler.markAccountRateLimited(
+              accountId,
+              accountType,
+              sessionHash,
+              rateLimitResetTimestamp
+            )
+            await upstreamErrorHelper
+              .markTempUnavailable(
                 accountId,
                 accountType,
-                sessionHash,
-                rateLimitResetTimestamp
+                429,
+                upstreamErrorHelper.parseRetryAfter(res.headers)
               )
-              await upstreamErrorHelper
-                .markTempUnavailable(
-                  accountId,
-                  accountType,
-                  429,
-                  upstreamErrorHelper.parseRetryAfter(res.headers)
-                )
-                .catch(() => {})
-            }
+              .catch(() => {})
           } else if (res.statusCode === 200) {
             // 请求成功，清除401和500错误计数
             await this.clearUnauthorizedErrors(accountId)
