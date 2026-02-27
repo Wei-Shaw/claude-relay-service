@@ -213,6 +213,13 @@
         </div>
       </div>
 
+      <div
+        v-if="tempUnavailableLoadError"
+        class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300"
+      >
+        临时暂停状态接口加载失败，当前列表可能缺失部分上游拦截/限流信息。
+      </div>
+
       <div v-if="accountsLoading" class="py-12 text-center">
         <div class="loading-spinner mx-auto mb-4" />
         <p class="text-gray-500 dark:text-gray-400">正在加载账户...</p>
@@ -695,99 +702,30 @@
                     <span
                       :class="[
                         'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
-                        account.status === 'blocked'
-                          ? 'bg-orange-100 text-orange-800'
-                          : account.status === 'unauthorized'
-                            ? 'bg-red-100 text-red-800'
-                            : account.status === 'temp_error'
-                              ? 'bg-orange-100 text-orange-800'
-                              : account.isActive
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
+                        getAccountStatusClass(account)
                       ]"
                     >
                       <div
-                        :class="[
-                          'mr-2 h-2 w-2 rounded-full',
-                          account.status === 'blocked'
-                            ? 'bg-orange-500'
-                            : account.status === 'unauthorized'
-                              ? 'bg-red-500'
-                              : account.status === 'temp_error'
-                                ? 'bg-orange-500'
-                                : account.isActive
-                                  ? 'bg-green-500'
-                                  : 'bg-red-500'
-                        ]"
+                        :class="['mr-2 h-2 w-2 rounded-full', getAccountStatusDotClass(account)]"
                       />
-                      {{
-                        account.status === 'blocked'
-                          ? '已封锁'
-                          : account.status === 'unauthorized'
-                            ? '异常'
-                            : account.status === 'temp_error'
-                              ? '临时异常'
-                              : account.isActive
-                                ? '正常'
-                                : '异常'
-                      }}
+                      {{ getAccountStatusText(account) }}
                     </span>
                     <span
-                      v-if="
-                        (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
-                        account.rateLimitStatus === 'limited'
-                      "
-                      class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800"
+                      v-for="reason in getAccountBlockingReasons(account)"
+                      :key="`desktop-${account.id}-${reason.key}`"
+                      :class="getBlockingReasonClass(reason)"
                     >
-                      <i class="fas fa-exclamation-triangle mr-1" />
-                      限流中
-                      <span
-                        v-if="
-                          account.rateLimitStatus &&
-                          typeof account.rateLimitStatus === 'object' &&
-                          account.rateLimitStatus.minutesRemaining > 0
-                        "
-                        >({{ formatRateLimitTime(account.rateLimitStatus.minutesRemaining) }})</span
-                      >
-                    </span>
-                    <span
-                      v-if="account.tempUnavailable"
-                      class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                    >
-                      <i class="fas fa-clock mr-1" />
-                      临时暂停
-                      <span v-if="account.tempUnavailable.ttl > 0"
-                        >({{ formatTempUnavailableTime(account.tempUnavailable.ttl) }})</span
-                      >
+                      <i :class="['fas mr-1', reason.icon]" />
+                      {{ reason.label }}
+                      <span v-if="reason.extraText">({{ reason.extraText }})</span>
                       <el-tooltip
-                        :content="`${account.tempUnavailable.errorType} (HTTP ${account.tempUnavailable.statusCode})`"
+                        v-if="reason.detail"
+                        :content="reason.detail"
                         effect="dark"
                         placement="top"
                       >
                         <i class="fas fa-info-circle ml-1 cursor-help" />
                       </el-tooltip>
-                    </span>
-                    <span
-                      v-if="account.schedulable === false"
-                      class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
-                    >
-                      <i class="fas fa-pause-circle mr-1" />
-                      不可调度
-                      <el-tooltip
-                        v-if="getSchedulableReason(account)"
-                        :content="getSchedulableReason(account)"
-                        effect="dark"
-                        placement="top"
-                      >
-                        <i class="fas fa-question-circle ml-1 cursor-help text-gray-500" />
-                      </el-tooltip>
-                    </span>
-                    <span
-                      v-if="account.status === 'blocked' && account.errorMessage"
-                      class="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400"
-                      :title="account.errorMessage"
-                    >
-                      {{ account.errorMessage }}
                     </span>
                     <span
                       v-if="account.accountType === 'dedicated'"
@@ -1475,6 +1413,28 @@
                 :class="['mr-1.5 h-1.5 w-1.5 rounded-full', getAccountStatusDotClass(account)]"
               />
               {{ getAccountStatusText(account) }}
+            </span>
+          </div>
+          <div
+            v-if="getAccountBlockingReasons(account).length > 0"
+            class="mb-3 flex flex-wrap gap-1.5"
+          >
+            <span
+              v-for="reason in getAccountBlockingReasons(account)"
+              :key="`mobile-${account.id}-${reason.key}`"
+              :class="getBlockingReasonClass(reason)"
+            >
+              <i :class="['fas mr-1', reason.icon]" />
+              {{ reason.label }}
+              <span v-if="reason.extraText">({{ reason.extraText }})</span>
+              <el-tooltip
+                v-if="reason.detail"
+                :content="reason.detail"
+                effect="dark"
+                placement="top"
+              >
+                <i class="fas fa-info-circle ml-1 cursor-help" />
+              </el-tooltip>
             </span>
           </div>
 
@@ -2247,6 +2207,7 @@ const handleCancel = () => {
 // 数据状态
 const accounts = ref([])
 const accountsLoading = ref(false)
+const tempUnavailableLoadError = ref(false)
 const refreshingBalances = ref(false)
 const accountsSortBy = ref('name')
 const accountsSortOrder = ref('asc')
@@ -2344,6 +2305,7 @@ const bindingCountsLoaded = ref(false) // 轻量级绑定计数缓存
 const groupsLoaded = ref(false)
 const groupMembersLoaded = ref(false)
 const accountGroupMap = ref(new Map()) // Map<accountId, Array<groupInfo>>
+let hasWarnedTempUnavailableLoadError = false
 
 // 下拉选项数据
 const sortOptions = ref([
@@ -2553,17 +2515,10 @@ const showResetButton = (account) => {
     'ccr',
     'droid',
     'bedrock',
-    'azure-openai'
+    'azure-openai',
+    'azure_openai'
   ]
-  return (
-    supportedPlatforms.includes(account.platform) &&
-    (account.status === 'unauthorized' ||
-      account.status !== 'active' ||
-      account.rateLimitStatus?.isRateLimited ||
-      account.rateLimitStatus === 'limited' ||
-      account.tempUnavailable ||
-      !account.isActive)
-  )
+  return supportedPlatforms.includes(account.platform)
 }
 
 // 获取账户操作菜单项（用于小屏下拉菜单）
@@ -3381,6 +3336,7 @@ const loadAccounts = async (forceReload = false) => {
     })
 
     // 获取临时不可用状态并附加到账户数据
+    tempUnavailableLoadError.value = false
     try {
       const tempRes = await httpApis.getTempUnavailableApi()
       if (tempRes?.success && tempRes.data) {
@@ -3408,9 +3364,16 @@ const loadAccounts = async (forceReload = false) => {
           }
           return account
         })
+      } else {
+        throw new Error('temp-unavailable response missing success/data')
       }
-    } catch {
-      // 忽略错误，不影响账户列表显示
+    } catch (error) {
+      tempUnavailableLoadError.value = true
+      if (!hasWarnedTempUnavailableLoadError) {
+        showToast('临时暂停状态加载失败，部分拦截原因可能缺失', 'warning')
+        hasWarnedTempUnavailableLoadError = true
+      }
+      console.debug('Failed to load temp unavailable statuses:', error)
     }
 
     accounts.value = filteredAccounts
@@ -3706,28 +3669,25 @@ const formatTempUnavailableTime = (seconds) => {
   return `${secs}s`
 }
 
-// 检查账户是否被限流
-const isAccountRateLimited = (account) => {
-  if (!account) return false
-
-  // 检查 rateLimitStatus
-  if (account.rateLimitStatus) {
-    if (typeof account.rateLimitStatus === 'string' && account.rateLimitStatus === 'limited') {
-      return true
-    }
-    if (
-      typeof account.rateLimitStatus === 'object' &&
-      account.rateLimitStatus.isRateLimited === true
-    ) {
-      return true
-    }
-  }
-
-  return false
+const parseDateToMs = (value) => {
+  if (!value) return null
+  const ts = new Date(value).getTime()
+  return Number.isFinite(ts) ? ts : null
 }
 
-// 获取限流剩余时间（分钟）
-const getRateLimitRemainingMinutes = (account) => {
+const isGeneralRateLimited = (account) => {
+  if (!account) return false
+  if (typeof account.rateLimitStatus === 'string') {
+    return account.rateLimitStatus === 'limited'
+  }
+  return (
+    !!account.rateLimitStatus &&
+    typeof account.rateLimitStatus === 'object' &&
+    account.rateLimitStatus.isRateLimited === true
+  )
+}
+
+const getGeneralRateLimitRemainingMinutes = (account) => {
   if (!account || !account.rateLimitStatus) return 0
 
   if (typeof account.rateLimitStatus === 'object') {
@@ -3741,21 +3701,266 @@ const getRateLimitRemainingMinutes = (account) => {
     if (Number.isFinite(status.remainingSeconds)) {
       return Math.max(0, Math.ceil(status.remainingSeconds / 60))
     }
+    if (status.rateLimitEndAt) {
+      const diffMs = parseDateToMs(status.rateLimitEndAt) - Date.now()
+      return diffMs > 0 ? Math.ceil(diffMs / 60000) : 0
+    }
     if (status.rateLimitResetAt) {
-      const diffMs = new Date(status.rateLimitResetAt).getTime() - Date.now()
+      const diffMs = parseDateToMs(status.rateLimitResetAt) - Date.now()
       return diffMs > 0 ? Math.ceil(diffMs / 60000) : 0
     }
   }
 
-  // 如果有 rateLimitUntil 字段，计算剩余时间
   if (account.rateLimitUntil) {
-    const now = new Date().getTime()
-    const untilTime = new Date(account.rateLimitUntil).getTime()
-    const diff = untilTime - now
-    return diff > 0 ? Math.ceil(diff / 60000) : 0
+    const diffMs = parseDateToMs(account.rateLimitUntil) - Date.now()
+    return diffMs > 0 ? Math.ceil(diffMs / 60000) : 0
   }
 
   return 0
+}
+
+const getOpusRateLimitRemainingMinutes = (account) => {
+  if (!account) return 0
+
+  if (account.opusRateLimitStatus && typeof account.opusRateLimitStatus === 'object') {
+    const status = account.opusRateLimitStatus
+    if (status.isRateLimited === false) {
+      return 0
+    }
+    if (Number.isFinite(status.minutesRemaining)) {
+      return Math.max(0, Math.ceil(status.minutesRemaining))
+    }
+    if (status.rateLimitEndAt) {
+      const diffMs = parseDateToMs(status.rateLimitEndAt) - Date.now()
+      return diffMs > 0 ? Math.ceil(diffMs / 60000) : 0
+    }
+  }
+
+  if (account.opusRateLimitEndAt) {
+    const diffMs = parseDateToMs(account.opusRateLimitEndAt) - Date.now()
+    return diffMs > 0 ? Math.ceil(diffMs / 60000) : 0
+  }
+
+  return 0
+}
+
+const isAccountOpusRateLimited = (account) => getOpusRateLimitRemainingMinutes(account) > 0
+
+// 检查账户是否被限流（包含通用限流与 Opus 专属周限）
+const isAccountRateLimited = (account) => {
+  if (!account) return false
+  return isGeneralRateLimited(account) || isAccountOpusRateLimited(account)
+}
+
+// 获取限流剩余时间（分钟）
+const getRateLimitRemainingMinutes = (account) => {
+  const general = getGeneralRateLimitRemainingMinutes(account)
+  const opus = getOpusRateLimitRemainingMinutes(account)
+
+  if (general > 0 && opus > 0) {
+    return Math.min(general, opus)
+  }
+
+  return Math.max(general, opus)
+}
+
+const getClaudeOpusCapabilityHint = (account) => {
+  if (!account || account.platform !== 'claude' || !account.subscriptionInfo) {
+    return null
+  }
+
+  try {
+    const info =
+      typeof account.subscriptionInfo === 'string'
+        ? JSON.parse(account.subscriptionInfo)
+        : account.subscriptionInfo
+
+    const normalizedAccountType =
+      typeof info.accountType === 'string' ? info.accountType.toLowerCase() : ''
+    const isMax = info.hasClaudeMax === true || normalizedAccountType === 'claude_max'
+    if (isMax) {
+      return null
+    }
+
+    const isPro = info.hasClaudePro === true || normalizedAccountType === 'claude_pro'
+    if (isPro) {
+      return {
+        key: 'opus-plan-pro',
+        level: 'info',
+        icon: 'fa-gem',
+        label: 'Opus能力: Pro仅4.5+',
+        detail: 'Claude Pro 仅支持 Opus 4.5+，旧版 Opus 会被调度器跳过。'
+      }
+    }
+
+    if (normalizedAccountType === 'free') {
+      return {
+        key: 'opus-plan-free',
+        level: 'info',
+        icon: 'fa-gem',
+        label: 'Opus能力: Free不可用',
+        detail: 'Claude Free 不支持 Opus 模型。'
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+const getAccountBlockingReasons = (account) => {
+  if (!account) return []
+
+  const reasons = []
+  const pushReason = (reason) => {
+    if (!reason?.key || reasons.some((item) => item.key === reason.key)) return
+    reasons.push(reason)
+  }
+
+  const status = typeof account.status === 'string' ? account.status : ''
+
+  if (!account.isActive) {
+    pushReason({
+      key: 'inactive',
+      level: 'danger',
+      icon: 'fa-power-off',
+      label: '账户停用',
+      detail: 'isActive=false'
+    })
+  }
+
+  if (status === 'blocked') {
+    pushReason({
+      key: 'status-blocked',
+      level: 'danger',
+      icon: 'fa-ban',
+      label: '状态 blocked',
+      detail: account.errorMessage || '账户被上游封禁或拒绝。'
+    })
+  } else if (status === 'unauthorized') {
+    pushReason({
+      key: 'status-unauthorized',
+      level: 'danger',
+      icon: 'fa-key',
+      label: '状态 unauthorized',
+      detail: account.errorMessage || '认证失败（401/403）。'
+    })
+  } else if (status === 'temp_error') {
+    pushReason({
+      key: 'status-temp-error',
+      level: 'warning',
+      icon: 'fa-triangle-exclamation',
+      label: '状态 temp_error',
+      detail: account.errorMessage || '上游临时异常。'
+    })
+  } else if (status === 'error') {
+    pushReason({
+      key: 'status-error',
+      level: 'danger',
+      icon: 'fa-circle-xmark',
+      label: '状态 error',
+      detail: account.errorMessage || '账户处于错误状态。'
+    })
+  } else if (status === 'rate_limited') {
+    pushReason({
+      key: 'status-rate-limited',
+      level: 'warning',
+      icon: 'fa-gauge-high',
+      label: '状态 rate_limited'
+    })
+  } else if (status && !['active', 'created', 'resumed'].includes(status)) {
+    pushReason({
+      key: `status-${status}`,
+      level: 'warning',
+      icon: 'fa-circle-info',
+      label: `状态 ${status}`
+    })
+  }
+
+  if (isGeneralRateLimited(account)) {
+    const minutes = getGeneralRateLimitRemainingMinutes(account)
+    pushReason({
+      key: 'general-rate-limit',
+      level: 'warning',
+      icon: 'fa-gauge-high',
+      label: '429限流',
+      extraText: minutes > 0 ? formatRateLimitTime(minutes) : '',
+      detail:
+        account.rateLimitStatus && typeof account.rateLimitStatus === 'object'
+          ? account.rateLimitStatus.rateLimitEndAt
+            ? `重置时间: ${account.rateLimitStatus.rateLimitEndAt}`
+            : '限流状态来自 rateLimitStatus。'
+          : '限流状态来自 rateLimitStatus。'
+    })
+  }
+
+  if (isAccountOpusRateLimited(account)) {
+    const minutes = getOpusRateLimitRemainingMinutes(account)
+    const endAt = account.opusRateLimitStatus?.rateLimitEndAt || account.opusRateLimitEndAt || null
+    pushReason({
+      key: 'opus-rate-limit',
+      level: 'opus',
+      icon: 'fa-gem',
+      label: 'Opus周限流',
+      extraText: minutes > 0 ? formatRateLimitTime(minutes) : '',
+      detail: endAt ? `重置时间: ${endAt}` : '仅影响 Opus 模型请求。'
+    })
+  }
+
+  if (account.tempUnavailable) {
+    const detailParts = []
+    if (account.tempUnavailable.errorType) {
+      detailParts.push(account.tempUnavailable.errorType)
+    }
+    if (account.tempUnavailable.statusCode) {
+      detailParts.push(`HTTP ${account.tempUnavailable.statusCode}`)
+    }
+    pushReason({
+      key: 'temp-unavailable',
+      level: 'warning',
+      icon: 'fa-clock',
+      label: '临时暂停',
+      extraText: account.tempUnavailable.ttl
+        ? formatTempUnavailableTime(account.tempUnavailable.ttl)
+        : '',
+      detail: detailParts.join(' / ') || '被标记为临时不可用。'
+    })
+  }
+
+  if (account.schedulable === false) {
+    pushReason({
+      key: 'schedulable-false',
+      level: 'neutral',
+      icon: 'fa-pause-circle',
+      label: 'schedulable=false',
+      detail: getSchedulableReason(account) || '当前账户不可参与调度。'
+    })
+  }
+
+  const opusCapabilityHint = getClaudeOpusCapabilityHint(account)
+  if (opusCapabilityHint) {
+    pushReason(opusCapabilityHint)
+  }
+
+  return reasons
+}
+
+const getBlockingReasonClass = (reason) => {
+  const base = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold'
+  if (reason?.level === 'danger') {
+    return `${base} bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300`
+  }
+  if (reason?.level === 'warning') {
+    return `${base} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300`
+  }
+  if (reason?.level === 'opus') {
+    return `${base} bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300`
+  }
+  if (reason?.level === 'info') {
+    return `${base} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300`
+  }
+  return `${base} bg-gray-100 text-gray-700 dark:bg-gray-700/60 dark:text-gray-300`
 }
 
 // 打开创建账户模态框
@@ -4248,7 +4453,7 @@ const getSchedulableReason = (account) => {
     if (account.overloadStatus === 'overloaded') {
       return '服务过载（529错误）'
     }
-    if (account.rateLimitStatus === 'limited') {
+    if (isAccountRateLimited(account)) {
       return '触发限流（429错误）'
     }
     // 检查配额超限状态（quotaAutoStopped 或 quotaStoppedAt 任一存在即表示配额超限）
@@ -4275,7 +4480,7 @@ const getSchedulableReason = (account) => {
     if (account.status === 'error' && account.errorMessage) {
       return account.errorMessage
     }
-    if (account.isRateLimited) {
+    if (isAccountRateLimited(account)) {
       return '触发限流（429错误）'
     }
     // 自动停止调度的原因
@@ -4294,10 +4499,7 @@ const getSchedulableReason = (account) => {
       return '认证失败（401错误）'
     }
     // 检查限流状态 - 兼容嵌套的 rateLimitStatus 对象
-    if (
-      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
-      account.isRateLimited
-    ) {
+    if (isAccountRateLimited(account)) {
       return '触发限流（429错误）'
     }
     if (account.status === 'error' && account.errorMessage) {
@@ -4311,10 +4513,7 @@ const getSchedulableReason = (account) => {
       return '认证失败（401错误）'
     }
     // 检查限流状态 - 兼容嵌套的 rateLimitStatus 对象
-    if (
-      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
-      account.isRateLimited
-    ) {
+    if (isAccountRateLimited(account)) {
       return '触发限流（429错误）'
     }
     if (account.status === 'error' && account.errorMessage) {
@@ -4352,14 +4551,10 @@ const getAccountStatusText = (account) => {
   if (account.status === 'blocked') return '已封锁'
   // 检查是否未授权（401错误）
   if (account.status === 'unauthorized') return '异常'
-  // 检查是否限流
-  if (
-    account.isRateLimited ||
-    account.status === 'rate_limited' ||
-    (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
-    account.rateLimitStatus === 'limited'
-  )
-    return '限流中'
+  // 检查是否通用限流
+  if (isGeneralRateLimited(account) || account.status === 'rate_limited') return '限流中'
+  // 检查是否 Opus 专属限流
+  if (isAccountOpusRateLimited(account)) return 'Opus限流'
   // 检查是否临时错误
   if (account.status === 'temp_error') return '临时异常'
   // 检查是否错误
@@ -4378,13 +4573,11 @@ const getAccountStatusClass = (account) => {
   if (account.status === 'unauthorized') {
     return 'bg-red-100 text-red-800'
   }
-  if (
-    account.isRateLimited ||
-    account.status === 'rate_limited' ||
-    (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
-    account.rateLimitStatus === 'limited'
-  ) {
+  if (isGeneralRateLimited(account) || account.status === 'rate_limited') {
     return 'bg-orange-100 text-orange-800'
+  }
+  if (isAccountOpusRateLimited(account)) {
+    return 'bg-purple-100 text-purple-800'
   }
   if (account.status === 'temp_error') {
     return 'bg-orange-100 text-orange-800'
@@ -4407,13 +4600,11 @@ const getAccountStatusDotClass = (account) => {
   if (account.status === 'unauthorized') {
     return 'bg-red-500'
   }
-  if (
-    account.isRateLimited ||
-    account.status === 'rate_limited' ||
-    (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
-    account.rateLimitStatus === 'limited'
-  ) {
+  if (isGeneralRateLimited(account) || account.status === 'rate_limited') {
     return 'bg-orange-500'
+  }
+  if (isAccountOpusRateLimited(account)) {
+    return 'bg-purple-500'
   }
   if (account.status === 'temp_error') {
     return 'bg-orange-500'
@@ -4447,12 +4638,7 @@ const getSessionProgressBarClass = (status, account = null) => {
   }
 
   // 检查账号是否处于限流状态
-  const isRateLimited =
-    account &&
-    (account.isRateLimited ||
-      account.status === 'rate_limited' ||
-      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
-      account.rateLimitStatus === 'limited')
+  const isRateLimited = account && isAccountRateLimited(account)
 
   // 如果账号处于限流状态，显示红色
   if (isRateLimited) {

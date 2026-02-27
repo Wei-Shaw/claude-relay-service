@@ -229,10 +229,6 @@ class UnifiedClaudeScheduler {
       logger.debug(
         `🔍 Model parsing - Original: ${requestedModel}, Vendor: ${vendor}, Effective: ${effectiveModel}`
       )
-      const isOpusRequest =
-        effectiveModel && typeof effectiveModel === 'string'
-          ? effectiveModel.toLowerCase().includes('opus')
-          : false
 
       // 如果是 CCR 前缀，只在 CCR 账户池中选择
       if (vendor === 'ccr') {
@@ -283,9 +279,6 @@ class UnifiedClaudeScheduler {
                 `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not schedulable (schedulable: ${boundAccount?.schedulable}), falling back to pool`
               )
             } else {
-              if (isOpusRequest) {
-                await claudeAccountService.clearExpiredOpusRateLimit(boundAccount.id)
-              }
               logger.info(
                 `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
               )
@@ -462,10 +455,6 @@ class UnifiedClaudeScheduler {
   // 📋 获取所有可用账户（合并官方和Console）
   async _getAllAvailableAccounts(apiKeyData, requestedModel = null, includeCcr = false) {
     const availableAccounts = []
-    const isOpusRequest =
-      requestedModel && typeof requestedModel === 'string'
-        ? requestedModel.toLowerCase().includes('opus')
-        : false
 
     // 如果API Key绑定了专属账户，优先返回
     // 1. 检查Claude OAuth账户绑定
@@ -647,16 +636,7 @@ class UnifiedClaudeScheduler {
         if (isRateLimited) {
           continue
         }
-
-        if (isOpusRequest) {
-          const isOpusRateLimited = await claudeAccountService.isAccountOpusRateLimited(account.id)
-          if (isOpusRateLimited) {
-            logger.info(
-              `🚫 Skipping account ${account.name} (${account.id}) due to active Opus limit`
-            )
-            continue
-          }
-        }
+        // NOTE: Opus 周限流判定逻辑已停用，Opus 请求同样仅使用通用限流状态。
 
         availableAccounts.push({
           ...account,
@@ -1021,17 +1001,7 @@ class UnifiedClaudeScheduler {
           return false
         }
 
-        if (
-          requestedModel &&
-          typeof requestedModel === 'string' &&
-          requestedModel.toLowerCase().includes('opus')
-        ) {
-          const isOpusRateLimited = await claudeAccountService.isAccountOpusRateLimited(accountId)
-          if (isOpusRateLimited) {
-            logger.info(`🚫 Account ${accountId} skipped due to active Opus limit (session check)`)
-            return false
-          }
-        }
+        // NOTE: Opus 周限流判定逻辑已停用，session check 不再额外检查 Opus 专属限流。
 
         return true
       } else if (accountType === 'claude-console') {
@@ -1511,10 +1481,6 @@ class UnifiedClaudeScheduler {
       }
 
       const availableAccounts = []
-      const isOpusRequest =
-        requestedModel && typeof requestedModel === 'string'
-          ? requestedModel.toLowerCase().includes('opus')
-          : false
 
       // 获取所有成员账户的详细信息
       for (const memberId of memberIds) {
@@ -1582,18 +1548,7 @@ class UnifiedClaudeScheduler {
           if (isRateLimited) {
             continue
           }
-
-          if (accountType === 'claude-official' && isOpusRequest) {
-            const isOpusRateLimited = await claudeAccountService.isAccountOpusRateLimited(
-              account.id
-            )
-            if (isOpusRateLimited) {
-              logger.info(
-                `🚫 Skipping group member ${account.name} (${account.id}) due to active Opus limit`
-              )
-              continue
-            }
-          }
+          // NOTE: Opus 周限流判定逻辑已停用，分组调度仅使用通用限流状态。
 
           // 🔒 检查 Claude Console 账户的并发限制
           if (accountType === 'claude-console' && account.maxConcurrentTasks > 0) {

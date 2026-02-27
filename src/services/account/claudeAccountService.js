@@ -525,6 +525,7 @@ class ClaudeAccountService {
         accounts.map(async (account) => {
           // 获取限流状态信息
           const rateLimitInfo = await this.getAccountRateLimitInfo(account.id)
+          const opusRateLimitInfo = await this.getAccountOpusRateLimitInfo(account.id)
 
           // 获取会话窗口信息
           const sessionWindowInfo = await this.getSessionWindowInfo(account.id)
@@ -573,9 +574,21 @@ class ClaudeAccountService {
               ? {
                   isRateLimited: rateLimitInfo.isRateLimited,
                   rateLimitedAt: rateLimitInfo.rateLimitedAt,
-                  minutesRemaining: rateLimitInfo.minutesRemaining
+                  minutesRemaining: rateLimitInfo.minutesRemaining,
+                  rateLimitEndAt: rateLimitInfo.rateLimitEndAt || null
                 }
               : null,
+            // 添加 Opus 限流状态信息（仅影响 Opus 模型调度）
+            opusRateLimitStatus: opusRateLimitInfo
+              ? {
+                  isRateLimited: opusRateLimitInfo.isRateLimited,
+                  rateLimitedAt: opusRateLimitInfo.rateLimitedAt,
+                  minutesRemaining: opusRateLimitInfo.minutesRemaining,
+                  rateLimitEndAt: opusRateLimitInfo.rateLimitEndAt || null
+                }
+              : null,
+            opusRateLimitedAt: opusRateLimitInfo?.rateLimitedAt || null,
+            opusRateLimitEndAt: opusRateLimitInfo?.rateLimitEndAt || null,
             // 添加会话窗口信息
             sessionWindow: sessionWindowInfo || {
               hasActiveWindow: false,
@@ -627,9 +640,10 @@ class ClaudeAccountService {
         return null
       }
 
-      const [sessionWindowInfo, rateLimitInfo] = await Promise.all([
+      const [sessionWindowInfo, rateLimitInfo, opusRateLimitInfo] = await Promise.all([
         this.getSessionWindowInfo(accountId),
-        this.getAccountRateLimitInfo(accountId)
+        this.getAccountRateLimitInfo(accountId),
+        this.getAccountOpusRateLimitInfo(accountId)
       ])
 
       const sessionWindow = sessionWindowInfo || {
@@ -656,6 +670,20 @@ class ClaudeAccountService {
             rateLimitEndAt: null
           }
 
+      const opusRateLimitStatus = opusRateLimitInfo
+        ? {
+            isRateLimited: !!opusRateLimitInfo.isRateLimited,
+            rateLimitedAt: opusRateLimitInfo.rateLimitedAt || null,
+            minutesRemaining: opusRateLimitInfo.minutesRemaining || 0,
+            rateLimitEndAt: opusRateLimitInfo.rateLimitEndAt || null
+          }
+        : {
+            isRateLimited: false,
+            rateLimitedAt: null,
+            minutesRemaining: 0,
+            rateLimitEndAt: null
+          }
+
       return {
         id: accountData.id,
         accountType: accountData.accountType || 'shared',
@@ -663,7 +691,8 @@ class ClaudeAccountService {
         isActive: accountData.isActive === 'true',
         schedulable: accountData.schedulable !== 'false',
         sessionWindow,
-        rateLimitStatus
+        rateLimitStatus,
+        opusRateLimitStatus
       }
     } catch (error) {
       logger.error(`❌ Failed to build Claude account overview for ${accountId}:`, error)
@@ -1551,6 +1580,49 @@ class ClaudeAccountService {
     } catch (error) {
       logger.error(`❌ Failed to clear expired Opus rate limit for account: ${accountId}`, error)
       throw error
+    }
+  }
+
+  // 📊 获取账号的 Opus 限流信息（自动清理过期标记）
+  async getAccountOpusRateLimitInfo(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return null
+      }
+
+      if (!accountData.opusRateLimitEndAt) {
+        return {
+          isRateLimited: false,
+          rateLimitedAt: null,
+          minutesRemaining: 0,
+          rateLimitEndAt: null
+        }
+      }
+
+      const now = new Date()
+      const endTime = new Date(accountData.opusRateLimitEndAt)
+
+      if (Number.isNaN(endTime.getTime()) || now >= endTime) {
+        await this.clearAccountOpusRateLimit(accountId)
+        return {
+          isRateLimited: false,
+          rateLimitedAt: null,
+          minutesRemaining: 0,
+          rateLimitEndAt: null
+        }
+      }
+
+      const minutesRemaining = Math.max(0, Math.ceil((endTime - now) / (1000 * 60)))
+      return {
+        isRateLimited: minutesRemaining > 0,
+        rateLimitedAt: accountData.opusRateLimitedAt || null,
+        minutesRemaining,
+        rateLimitEndAt: accountData.opusRateLimitEndAt || null
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to get Opus rate limit info for account: ${accountId}`, error)
+      return null
     }
   }
 
@@ -2504,6 +2576,8 @@ class ClaudeAccountService {
       delete updatedAccountData.rateLimitedAt
       delete updatedAccountData.rateLimitStatus
       delete updatedAccountData.rateLimitEndAt
+      delete updatedAccountData.opusRateLimitedAt
+      delete updatedAccountData.opusRateLimitEndAt
       delete updatedAccountData.tempErrorAt
       delete updatedAccountData.sessionWindowStart
       delete updatedAccountData.sessionWindowEnd
@@ -2519,6 +2593,8 @@ class ClaudeAccountService {
         'rateLimitedAt',
         'rateLimitStatus',
         'rateLimitEndAt',
+        'opusRateLimitedAt',
+        'opusRateLimitEndAt',
         'tempErrorAt',
         'sessionWindowStart',
         'sessionWindowEnd',
