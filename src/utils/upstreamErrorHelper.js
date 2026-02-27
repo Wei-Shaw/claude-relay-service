@@ -1,6 +1,9 @@
 const logger = require('./logger')
 
 const TEMP_UNAVAILABLE_PREFIX = 'temp_unavailable'
+const ERROR_HISTORY_PREFIX = 'error_history'
+const ERROR_HISTORY_MAX = 5000
+const ERROR_HISTORY_TTL = 3 * 24 * 60 * 60 // 3天
 
 // 默认 TTL（秒）
 const DEFAULT_TTL = {
@@ -110,8 +113,90 @@ const parseRetryAfter = (headers) => {
   return null
 }
 
+// 记录错误历史到 Redis List
+const recordErrorHistory = async (
+  accountId,
+  accountType,
+  statusCode,
+  errorType,
+  context = null
+) => {
+  try {
+    const redis = getRedis()
+    const client = redis.getClientSafe()
+    const redisKey = `${ERROR_HISTORY_PREFIX}:${accountType}:${accountId}`
+
+    const entry = JSON.stringify({
+      time: new Date().toISOString(),
+      status: statusCode,
+      errorType,
+      context: context
+        ? {
+            ...context,
+            errorBody:
+              typeof context.errorBody === 'string'
+                ? context.errorBody.slice(0, 2000)
+                : context.errorBody
+                  ? JSON.stringify(context.errorBody).slice(0, 2000)
+                  : undefined
+          }
+        : null
+    })
+
+    const pipeline = client.pipeline()
+    pipeline.lpush(redisKey, entry)
+    pipeline.ltrim(redisKey, 0, ERROR_HISTORY_MAX - 1)
+    pipeline.expire(redisKey, ERROR_HISTORY_TTL)
+    await pipeline.exec()
+  } catch (err) {
+    logger.warn(`⚠️ [ErrorHistory] Failed to record error history for ${accountId}: ${err.message}`)
+  }
+}
+
+// 查询错误历史（分页）
+const getErrorHistory = async (accountType, accountId, offset = 0, limit = 50) => {
+  try {
+    const redis = getRedis()
+    const client = redis.getClientSafe()
+    const o = Math.max(0, Math.floor(offset))
+    const l = Math.min(500, Math.max(1, Math.floor(limit)))
+    const redisKey = `${ERROR_HISTORY_PREFIX}:${accountType}:${accountId}`
+    const list = await client.lrange(redisKey, o, o + l - 1)
+    return list
+      .map((item) => {
+        try {
+          return JSON.parse(item)
+        } catch {
+          return null
+        }
+      })
+      .filter((item) => item?.time)
+  } catch (error) {
+    logger.error(`❌ [ErrorHistory] Failed to get error history for ${accountId}:`, error)
+    return []
+  }
+}
+
+// 清除错误历史
+const clearErrorHistory = async (accountType, accountId) => {
+  try {
+    const redis = getRedis()
+    const client = redis.getClientSafe()
+    const redisKey = `${ERROR_HISTORY_PREFIX}:${accountType}:${accountId}`
+    await client.del(redisKey)
+  } catch (error) {
+    logger.error(`❌ [ErrorHistory] Failed to clear error history for ${accountId}:`, error)
+  }
+}
+
 // 标记账户为临时不可用
-const markTempUnavailable = async (accountId, accountType, statusCode, customTtl = null) => {
+const markTempUnavailable = async (
+  accountId,
+  accountType,
+  statusCode,
+  customTtl = null,
+  context = null
+) => {
   try {
     const errorType = classifyError(statusCode)
     if (!errorType) {
@@ -137,6 +222,9 @@ const markTempUnavailable = async (accountId, accountType, statusCode, customTtl
     logger.warn(
       `⏱️ [UpstreamError] Account ${accountId} (${accountType}) marked temporarily unavailable for ${ttlSeconds}s (${statusCode} ${errorType})`
     )
+
+    // 异步记录错误历史，不阻塞主流程
+    recordErrorHistory(accountId, accountType, statusCode, errorType, context).catch(() => {})
 
     return { success: true, ttlSeconds, errorType }
   } catch (error) {
@@ -251,5 +339,9 @@ module.exports = {
   classifyError,
   parseRetryAfter,
   sanitizeErrorForClient,
-  TEMP_UNAVAILABLE_PREFIX
+  recordErrorHistory,
+  getErrorHistory,
+  clearErrorHistory,
+  TEMP_UNAVAILABLE_PREFIX,
+  ERROR_HISTORY_PREFIX
 }

@@ -275,6 +275,17 @@ class OpenAIResponsesAccountService {
       return
     }
 
+    // disableAutoProtection 检查
+    if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+      logger.info(
+        `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountRateLimited`
+      )
+      upstreamErrorHelper
+        .recordErrorHistory(accountId, 'openai-responses', 429, 'rate_limit')
+        .catch(() => {})
+      return
+    }
+
     const rateLimitDuration = duration || parseInt(account.rateLimitDuration) || 60
     const now = new Date()
     const resetAt = new Date(now.getTime() + rateLimitDuration * 60000)
@@ -298,6 +309,17 @@ class OpenAIResponsesAccountService {
   async markAccountUnauthorized(accountId, reason = 'OpenAI Responses账号认证失败（401错误）') {
     const account = await this.getAccount(accountId)
     if (!account) {
+      return
+    }
+
+    // disableAutoProtection 检查
+    if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+      logger.info(
+        `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
+      )
+      upstreamErrorHelper
+        .recordErrorHistory(accountId, 'openai-responses', 401, 'auth_error')
+        .catch(() => {})
       return
     }
 

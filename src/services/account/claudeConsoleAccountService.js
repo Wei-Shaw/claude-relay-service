@@ -484,6 +484,17 @@ class ClaudeConsoleAccountService {
         throw new Error('Account not found')
       }
 
+      // disableAutoProtection 检查
+      if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+        logger.info(
+          `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountRateLimited`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-console', 429, 'rate_limit')
+          .catch(() => {})
+        return { success: true, skipped: true }
+      }
+
       // 如果限流时间设置为 0，表示不启用限流机制，直接返回
       if (account.rateLimitDuration === 0) {
         logger.info(
@@ -715,6 +726,17 @@ class ClaudeConsoleAccountService {
         throw new Error('Account not found')
       }
 
+      // disableAutoProtection 检查
+      if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+        logger.info(
+          `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-console', 401, 'auth_error')
+          .catch(() => {})
+        return { success: true, skipped: true }
+      }
+
       const updates = {
         schedulable: 'false',
         status: 'unauthorized',
@@ -759,6 +781,17 @@ class ClaudeConsoleAccountService {
 
       if (!account) {
         throw new Error('Account not found')
+      }
+
+      // disableAutoProtection 检查
+      if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+        logger.info(
+          `🛡️ Account ${accountId} has auto-protection disabled, skipping markConsoleAccountBlocked`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-console', 403, 'server_error')
+          .catch(() => {})
+        return { success: true, skipped: true }
       }
 
       const blockedMinutes = this._getBlockedHandlingMinutes()
@@ -936,6 +969,17 @@ class ClaudeConsoleAccountService {
 
       if (!account) {
         throw new Error('Account not found')
+      }
+
+      // disableAutoProtection 检查
+      if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+        logger.info(
+          `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountOverloaded`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-console', 529, 'overload')
+          .catch(() => {})
+        return { success: true, skipped: true }
       }
 
       const updates = {

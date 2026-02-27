@@ -266,6 +266,12 @@ export const updateQuotaCardLimitsApi = (data) =>
 // 账户余额
 export const getAccountBalanceApi = (id, params) =>
   request({ url: `/admin/accounts/${id}/balance`, method: 'GET', params })
+
+// 账户错误历史
+export const getAccountErrorHistoryApi = (accountType, accountId, params) =>
+  request({ url: `/admin/accounts/${accountType}/${accountId}/error-history`, params })
+export const clearAccountErrorHistoryApi = (accountType, accountId) =>
+  request({ url: `/admin/accounts/${accountType}/${accountId}/error-history`, method: 'DELETE' })
 export const refreshAccountBalanceApi = (id, data) =>
   request({ url: `/admin/accounts/${id}/balance/refresh`, method: 'POST', data })
 export const getBalanceSummaryApi = () =>
