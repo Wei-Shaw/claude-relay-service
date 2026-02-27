@@ -132,6 +132,60 @@ class ClaudeRelayService {
     return ''
   }
 
+  _parseRateLimitResetTimestamp(headers) {
+    const raw = this._getHeaderValueCaseInsensitive(headers, 'anthropic-ratelimit-unified-reset')
+    if (raw === undefined || raw === null) {
+      return null
+    }
+
+    const normalized = Array.isArray(raw) ? raw[0] : raw
+    const text = String(normalized).trim()
+    if (!text) {
+      return null
+    }
+
+    if (/^\d+(\.\d+)?$/.test(text)) {
+      let value = Math.floor(Number(text))
+      if (!Number.isFinite(value) || value <= 0) {
+        return null
+      }
+      // 兼容上游返回毫秒时间戳
+      if (value > 9999999999) {
+        value = Math.floor(value / 1000)
+      }
+      return value
+    }
+
+    const parsedMs = Date.parse(text)
+    if (Number.isNaN(parsedMs)) {
+      return null
+    }
+    return Math.floor(parsedMs / 1000)
+  }
+
+  _isOpusWeeklyLimitText(message) {
+    if (!message || typeof message !== 'string') {
+      return false
+    }
+    const lower = message.toLowerCase()
+    if (!lower.includes('opus')) {
+      return false
+    }
+    return (
+      lower.includes('weekly') ||
+      lower.includes('7 day') ||
+      lower.includes('7-day') ||
+      lower.includes('seven day') ||
+      lower.includes('seven-day') ||
+      lower.includes('week')
+    )
+  }
+
+  _isOpusWeeklyLimitError(body) {
+    const message = this._extractErrorMessage(body)
+    return this._isOpusWeeklyLimitText(message)
+  }
+
   // 🚫 检查是否为组织被禁用/封禁错误
   // 支持两种场景：
   //   1. HTTP 400 + "this organization has been disabled"（原有）
@@ -756,16 +810,25 @@ class ClaudeRelayService {
         }
         // 检查是否为429状态码
         else if (response.statusCode === 429) {
-          const resetHeader = response.headers
-            ? response.headers['anthropic-ratelimit-unified-reset']
-            : null
-          const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
+          const parsedResetTimestamp = this._parseRateLimitResetTimestamp(response.headers)
+          const isOpusWeeklyLimit =
+            isOpusModelRequest && this._isOpusWeeklyLimitError(response.body)
 
-          if (isOpusModelRequest && !Number.isNaN(parsedResetTimestamp)) {
-            await claudeAccountService.markAccountOpusRateLimited(accountId, parsedResetTimestamp)
-            logger.warn(
-              `🚫 Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+          if (isOpusWeeklyLimit) {
+            await claudeAccountService.markAccountOpusRateLimited(
+              accountId,
+              parsedResetTimestamp || null
             )
+
+            if (parsedResetTimestamp) {
+              logger.warn(
+                `🚫 Account ${accountId} hit Opus weekly limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+              )
+            } else {
+              logger.warn(
+                `🚫 Account ${accountId} hit Opus weekly limit, but no reset timestamp found`
+              )
+            }
 
             if (isDedicatedOfficialAccount) {
               const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
@@ -781,7 +844,7 @@ class ClaudeRelayService {
             }
           } else {
             isRateLimited = true
-            if (!Number.isNaN(parsedResetTimestamp)) {
+            if (parsedResetTimestamp) {
               rateLimitResetTimestamp = parsedResetTimestamp
               logger.info(
                 `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
@@ -2035,78 +2098,41 @@ class ClaudeRelayService {
         // 错误响应处理
         if (res.statusCode !== 200) {
           if (res.statusCode === 429) {
-            const resetHeader = res.headers
-              ? res.headers['anthropic-ratelimit-unified-reset']
-              : null
-            const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
-
-            if (isOpusModelRequest) {
-              if (!Number.isNaN(parsedResetTimestamp)) {
-                await claudeAccountService.markAccountOpusRateLimited(
-                  accountId,
-                  parsedResetTimestamp
-                )
-                logger.warn(
-                  `🚫 [Stream] Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
-                )
-              }
-
-              if (isDedicatedOfficialAccount) {
-                const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
-                if (!responseStream.headersSent) {
-                  responseStream.status(403)
-                  responseStream.setHeader('Content-Type', 'application/json')
-                }
-                responseStream.write(
-                  JSON.stringify({
-                    error: 'opus_weekly_limit',
-                    message: limitMessage
-                  })
-                )
-                responseStream.end()
-                res.resume()
-                resolve()
-                return
-              }
-            } else {
-              const rateLimitResetTimestamp = Number.isNaN(parsedResetTimestamp)
-                ? null
-                : parsedResetTimestamp
-              await unifiedClaudeScheduler.markAccountRateLimited(
+            const rateLimitResetTimestamp = this._parseRateLimitResetTimestamp(res.headers)
+            await unifiedClaudeScheduler.markAccountRateLimited(
+              accountId,
+              accountType,
+              sessionHash,
+              rateLimitResetTimestamp
+            )
+            await upstreamErrorHelper
+              .markTempUnavailable(
                 accountId,
                 accountType,
-                sessionHash,
-                rateLimitResetTimestamp
+                429,
+                upstreamErrorHelper.parseRetryAfter(res.headers)
               )
-              await upstreamErrorHelper
-                .markTempUnavailable(
-                  accountId,
-                  accountType,
-                  429,
-                  upstreamErrorHelper.parseRetryAfter(res.headers)
-                )
-                .catch(() => {})
-              logger.warn(`🚫 [Stream] Rate limit detected for account ${accountId}, status 429`)
+              .catch(() => {})
+            logger.warn(`🚫 [Stream] Rate limit detected for account ${accountId}, status 429`)
 
-              if (isDedicatedOfficialAccount) {
-                const limitMessage = this._buildStandardRateLimitMessage(
-                  rateLimitResetTimestamp || account?.rateLimitEndAt
-                )
-                if (!responseStream.headersSent) {
-                  responseStream.status(403)
-                  responseStream.setHeader('Content-Type', 'application/json')
-                }
-                responseStream.write(
-                  JSON.stringify({
-                    error: 'upstream_rate_limited',
-                    message: limitMessage
-                  })
-                )
-                responseStream.end()
-                res.resume()
-                resolve()
-                return
+            if (isDedicatedOfficialAccount) {
+              const limitMessage = this._buildStandardRateLimitMessage(
+                rateLimitResetTimestamp || account?.rateLimitEndAt
+              )
+              if (!responseStream.headersSent) {
+                responseStream.status(403)
+                responseStream.setHeader('Content-Type', 'application/json')
               }
+              responseStream.write(
+                JSON.stringify({
+                  error: 'upstream_rate_limited',
+                  message: limitMessage
+                })
+              )
+              responseStream.end()
+              res.resume()
+              resolve()
+              return
             }
           }
 
@@ -2379,6 +2405,7 @@ class ClaudeRelayService {
         const allUsageData = [] // 收集所有的usage事件
         let currentUsageData = {} // 当前正在收集的usage数据
         let rateLimitDetected = false // 限流检测标志
+        let opusWeeklyLimitDetected = false
 
         // 监听数据块，解析SSE并寻找usage信息
         // 🧹 内存优化：在闭包创建前提取需要的值，避免闭包捕获 body 和 requestOptions
@@ -2530,6 +2557,17 @@ class ClaudeRelayService {
                     rateLimitDetected = true
                     logger.warn(`🚫 Rate limit detected in stream for account ${accountId}`)
                   }
+
+                  if (
+                    isOpusModelRequest &&
+                    data.type === 'error' &&
+                    data.error &&
+                    typeof data.error.message === 'string' &&
+                    this._isOpusWeeklyLimitText(data.error.message)
+                  ) {
+                    opusWeeklyLimitDetected = true
+                    logger.warn(`🚫 Opus weekly limit detected in stream for account ${accountId}`)
+                  }
                 } catch (parseError) {
                   // 忽略JSON解析错误，继续处理
                   logger.debug('🔍 SSE line not JSON or no usage data:', line.slice(0, 100))
@@ -2676,22 +2714,27 @@ class ClaudeRelayService {
 
           // 处理限流状态
           if (rateLimitDetected || res.statusCode === 429) {
-            const resetHeader = res.headers
-              ? res.headers['anthropic-ratelimit-unified-reset']
-              : null
-            const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
+            const parsedResetTimestamp = this._parseRateLimitResetTimestamp(res.headers)
 
-            if (isOpusModelRequest && !Number.isNaN(parsedResetTimestamp)) {
-              await claudeAccountService.markAccountOpusRateLimited(accountId, parsedResetTimestamp)
-              logger.warn(
-                `🚫 [Stream] Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+            if (isOpusModelRequest && opusWeeklyLimitDetected) {
+              await claudeAccountService.markAccountOpusRateLimited(
+                accountId,
+                parsedResetTimestamp || null
               )
-            } else {
-              const rateLimitResetTimestamp = Number.isNaN(parsedResetTimestamp)
-                ? null
-                : parsedResetTimestamp
 
-              if (!Number.isNaN(parsedResetTimestamp)) {
+              if (parsedResetTimestamp) {
+                logger.warn(
+                  `🚫 [Stream] Account ${accountId} hit Opus weekly limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+                )
+              } else {
+                logger.warn(
+                  `🚫 [Stream] Account ${accountId} hit Opus weekly limit, but no reset timestamp found`
+                )
+              }
+            } else {
+              const rateLimitResetTimestamp = parsedResetTimestamp || null
+
+              if (parsedResetTimestamp) {
                 logger.info(
                   `🕐 Extracted rate limit reset timestamp from stream: ${parsedResetTimestamp} (${new Date(parsedResetTimestamp * 1000).toISOString()})`
                 )
