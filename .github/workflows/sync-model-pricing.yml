@@ -21,7 +21,7 @@ jobs:
         id: fetch
         run: |
           set -euo pipefail
-          curl -fsSL https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json \
+          curl -fsSL https://github.com/Wei-Shaw/model-price-repo/raw/refs/heads/main/model_prices_and_context_window.json \
             -o model_prices_and_context_window.json.new
 
           NEW_HASH=$(sha256sum model_prices_and_context_window.json.new | awk '{print $1}')

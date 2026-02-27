@@ -396,9 +396,25 @@ class ClaudeAccountService {
       const accountData = await redis.getClaudeAccount(accountId)
       if (accountData) {
         logRefreshError(accountId, accountData.name, 'claude', error)
-        accountData.status = 'error'
-        accountData.errorMessage = error.message
-        await redis.setClaudeAccount(accountId, accountData)
+
+        // disableAutoProtection 检查：跳过状态修改，仅记录日志和错误历史
+        if (
+          accountData.disableAutoProtection === true ||
+          accountData.disableAutoProtection === 'true'
+        ) {
+          logger.info(
+            `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping error status on token refresh failure`
+          )
+          upstreamErrorHelper
+            .recordErrorHistory(accountId, 'claude-official', 0, 'token_refresh_failed', {
+              errorBody: error.message
+            })
+            .catch(() => {})
+        } else {
+          accountData.status = 'error'
+          accountData.errorMessage = error.message
+          await redis.setClaudeAccount(accountId, accountData)
+        }
 
         // 发送Webhook通知
         try {
@@ -1327,6 +1343,20 @@ class ClaudeAccountService {
       const accountData = await redis.getClaudeAccount(accountId)
       if (!accountData || Object.keys(accountData).length === 0) {
         throw new Error('Account not found')
+      }
+
+      // disableAutoProtection 检查：跳过自动禁用，仅记录错误历史
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(
+          `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping rate limit marking`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-official', 429, 'rate_limit')
+          .catch(() => {})
+        return { success: true, skipped: true }
       }
 
       // 设置限流状态和时间
@@ -2367,6 +2397,21 @@ class ClaudeAccountService {
         throw new Error('Account not found')
       }
 
+      // disableAutoProtection 检查：跳过自动禁用，仅记录错误历史
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(
+          `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping ${errorType} marking`
+        )
+        const statusCode = errorType === 'unauthorized' ? 401 : 403
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-official', statusCode, errorType)
+          .catch(() => {})
+        return { success: true, skipped: true }
+      }
+
       // 更新账户状态
       const updatedAccountData = { ...accountData }
       updatedAccountData.status = errorConfig.status
@@ -2639,6 +2684,20 @@ class ClaudeAccountService {
         throw new Error('Account not found')
       }
 
+      // disableAutoProtection 检查：跳过自动禁用，仅记录错误历史
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(
+          `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping temp error marking`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-official', 500, 'server_error')
+          .catch(() => {})
+        return { success: true, skipped: true }
+      }
+
       // 更新账户状态
       const updatedAccountData = { ...accountData }
       updatedAccountData.status = 'temp_error' // 新增的临时错误状态
@@ -2846,6 +2905,20 @@ class ClaudeAccountService {
       const accountData = await redis.getClaudeAccount(accountId)
       if (!accountData) {
         throw new Error('Account not found')
+      }
+
+      // disableAutoProtection 检查：跳过过载标记，仅记录错误历史
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(
+          `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping overload marking`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-official', 529, 'overload')
+          .catch(() => {})
+        return { success: true, skipped: true }
       }
 
       // 获取配置的过载处理时间（分钟）

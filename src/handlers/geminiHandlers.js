@@ -209,7 +209,13 @@ function ensureGeminiPermissionMiddleware(req, res, next) {
 /**
  * 应用速率限制跟踪
  */
-async function applyRateLimitTracking(req, usageSummary, model, context = '') {
+async function applyRateLimitTracking(
+  req,
+  usageSummary,
+  model,
+  context = '',
+  preCalculatedCost = null
+) {
   if (!req.rateLimitInfo) {
     return
   }
@@ -222,7 +228,8 @@ async function applyRateLimitTracking(req, usageSummary, model, context = '') {
       usageSummary,
       model,
       req.apiKey?.id,
-      'gemini'
+      'gemini',
+      preCalculatedCost
     )
 
     if (totalTokens > 0) {
@@ -1705,7 +1712,7 @@ async function handleGenerateContent(req, res) {
     if (response?.response?.usageMetadata) {
       try {
         const usage = response.response.usageMetadata
-        await apiKeyService.recordUsage(
+        const geminiNonStreamCosts = await apiKeyService.recordUsage(
           req.apiKey.id,
           usage.promptTokenCount || 0,
           usage.candidatesTokenCount || 0,
@@ -1728,7 +1735,8 @@ async function handleGenerateContent(req, res) {
             cacheReadTokens: 0
           },
           model,
-          'gemini-non-stream'
+          'gemini-non-stream',
+          geminiNonStreamCosts
         )
       } catch (error) {
         logger.error('Failed to record Gemini usage:', error)
@@ -2053,8 +2061,8 @@ async function handleStreamGenerateContent(req, res) {
 
       // 异步记录使用统计
       if (!usageReported && totalUsage.totalTokenCount > 0) {
-        Promise.all([
-          apiKeyService.recordUsage(
+        apiKeyService
+          .recordUsage(
             req.apiKey.id,
             totalUsage.promptTokenCount || 0,
             totalUsage.candidatesTokenCount || 0,
@@ -2063,19 +2071,21 @@ async function handleStreamGenerateContent(req, res) {
             model,
             account.id,
             'gemini'
-          ),
-          applyRateLimitTracking(
-            req,
-            {
-              inputTokens: totalUsage.promptTokenCount || 0,
-              outputTokens: totalUsage.candidatesTokenCount || 0,
-              cacheCreateTokens: 0,
-              cacheReadTokens: 0
-            },
-            model,
-            'gemini-stream'
           )
-        ])
+          .then((costs) =>
+            applyRateLimitTracking(
+              req,
+              {
+                inputTokens: totalUsage.promptTokenCount || 0,
+                outputTokens: totalUsage.candidatesTokenCount || 0,
+                cacheCreateTokens: 0,
+                cacheReadTokens: 0
+              },
+              model,
+              'gemini-stream',
+              costs
+            )
+          )
           .then(() => {
             logger.info(
               `📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`

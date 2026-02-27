@@ -39,49 +39,27 @@ jest.mock('fs', () => {
 describe('PricingService - 200K+ Long Context Pricing', () => {
   let pricingService
   const fs = require('fs')
+  const path = require('path')
 
-  // 模拟 claude-sonnet-4-20250514 的完整价格数据（来自 model_pricing.json）
-  const mockPricingData = {
-    'claude-sonnet-4-20250514': {
-      input_cost_per_token: 0.000003, // $3/MTok
-      output_cost_per_token: 0.000015, // $15/MTok
-      cache_creation_input_token_cost: 0.00000375, // $3.75/MTok
-      cache_read_input_token_cost: 0.0000003, // $0.30/MTok
-      max_input_tokens: 1000000,
-      // 200K+ 高档价格
-      input_cost_per_token_above_200k_tokens: 0.000006, // $6/MTok (2x)
-      output_cost_per_token_above_200k_tokens: 0.0000225, // $22.50/MTok (1.5x)
-      cache_creation_input_token_cost_above_200k_tokens: 0.0000075, // $7.50/MTok (2x)
-      cache_read_input_token_cost_above_200k_tokens: 0.0000006, // $0.60/MTok (2x)
-      // 1小时缓存价格
-      cache_creation_input_token_cost_above_1hr: 0.0000075,
-      cache_creation_input_token_cost_above_1hr_above_200k_tokens: 0.000015
-    },
-    // 没有 above_200k 字段的模型
-    'claude-3-haiku-20240307': {
-      input_cost_per_token: 0.00000025,
-      output_cost_per_token: 0.00000125,
-      cache_creation_input_token_cost: 0.0000003,
-      cache_read_input_token_cost: 0.00000003
-    },
-    // Fast Mode 适配测试模型（Opus 4.6）
-    'claude-opus-4-6': {
-      input_cost_per_token: 0.000005,
-      output_cost_per_token: 0.000025,
-      cache_creation_input_token_cost: 0.00000625,
-      cache_read_input_token_cost: 0.0000005,
-      input_cost_per_token_above_200k_tokens: 0.00001,
-      output_cost_per_token_above_200k_tokens: 0.0000375
-    }
-  }
+  // 使用真实的 model_pricing.json 数据（优先 data/，fallback 到 resources/）
+  const realFs = jest.requireActual('fs')
+  const primaryPath = path.join(process.cwd(), 'data', 'model_pricing.json')
+  const fallbackPath = path.join(
+    process.cwd(),
+    'resources',
+    'model-pricing',
+    'model_prices_and_context_window.json'
+  )
+  const pricingFilePath = realFs.existsSync(primaryPath) ? primaryPath : fallbackPath
+  const pricingData = JSON.parse(realFs.readFileSync(pricingFilePath, 'utf8'))
 
   beforeEach(() => {
     // 清除缓存的模块
     jest.resetModules()
 
-    // 配置 fs mock
+    // 配置 fs mock（防止 pricingService 初始化时的文件副作用）
     fs.existsSync.mockReturnValue(true)
-    fs.readFileSync.mockReturnValue(JSON.stringify(mockPricingData))
+    fs.readFileSync.mockReturnValue(JSON.stringify(pricingData))
     fs.statSync.mockReturnValue({ mtime: new Date(), mtimeMs: Date.now() })
     fs.watchFile.mockImplementation(() => {})
     fs.unwatchFile.mockImplementation(() => {})
@@ -89,8 +67,8 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
     // 重新加载 pricingService
     pricingService = require('../src/services/pricingService')
 
-    // 直接设置价格数据（绕过初始化）
-    pricingService.pricingData = mockPricingData
+    // 直接设置真实价格数据（绕过网络初始化）
+    pricingService.pricingData = pricingData
     pricingService.lastUpdated = new Date()
   })
 

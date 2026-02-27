@@ -277,7 +277,10 @@ router.post('/api/user-stats', async (req, res) => {
                 cacheCreateTokens: 0,
                 cacheReadTokens: 0,
                 ephemeral5mTokens: 0,
-                ephemeral1hTokens: 0
+                ephemeral1hTokens: 0,
+                realCostMicro: 0,
+                ratedCostMicro: 0,
+                hasStoredCost: false
               })
             }
 
@@ -288,28 +291,39 @@ router.post('/api/user-stats', async (req, res) => {
             modelUsage.cacheReadTokens += parseInt(data.cacheReadTokens) || 0
             modelUsage.ephemeral5mTokens += parseInt(data.ephemeral5mTokens) || 0
             modelUsage.ephemeral1hTokens += parseInt(data.ephemeral1hTokens) || 0
+            if ('realCostMicro' in data || 'ratedCostMicro' in data) {
+              modelUsage.realCostMicro += parseInt(data.realCostMicro) || 0
+              modelUsage.ratedCostMicro += parseInt(data.ratedCostMicro) || 0
+              modelUsage.hasStoredCost = true
+            }
           }
         }
 
         // 按模型计算费用并汇总
         for (const [model, usage] of modelUsageMap) {
-          const usageData = {
-            input_tokens: usage.inputTokens,
-            output_tokens: usage.outputTokens,
-            cache_creation_input_tokens: usage.cacheCreateTokens,
-            cache_read_input_tokens: usage.cacheReadTokens
-          }
-
-          // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
-          if (usage.ephemeral5mTokens > 0 || usage.ephemeral1hTokens > 0) {
-            usageData.cache_creation = {
-              ephemeral_5m_input_tokens: usage.ephemeral5mTokens,
-              ephemeral_1h_input_tokens: usage.ephemeral1hTokens
+          if (usage.hasStoredCost) {
+            // 使用请求时已存储的费用（精确）
+            totalCost += usage.ratedCostMicro / 1000000
+          } else {
+            // Legacy fallback：旧数据没有存储费用，从 token 重算
+            const usageData = {
+              input_tokens: usage.inputTokens,
+              output_tokens: usage.outputTokens,
+              cache_creation_input_tokens: usage.cacheCreateTokens,
+              cache_read_input_tokens: usage.cacheReadTokens
             }
-          }
 
-          const costResult = CostCalculator.calculateCost(usageData, model)
-          totalCost += costResult.costs.total
+            // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
+            if (usage.ephemeral5mTokens > 0 || usage.ephemeral1hTokens > 0) {
+              usageData.cache_creation = {
+                ephemeral_5m_input_tokens: usage.ephemeral5mTokens,
+                ephemeral_1h_input_tokens: usage.ephemeral1hTokens
+              }
+            }
+
+            const costResult = CostCalculator.calculateCost(usageData, model)
+            totalCost += costResult.costs.total
+          }
         }
 
         // 如果没有模型级别的详细数据，回退到总体数据计算

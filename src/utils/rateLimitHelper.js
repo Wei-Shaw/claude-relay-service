@@ -8,12 +8,14 @@ function toNumber(value) {
 }
 
 // keyId 和 accountType 用于计算倍率成本
+// preCalculatedCost: 可选的 { realCost, ratedCost }，由调用方提供以避免重复计算
 async function updateRateLimitCounters(
   rateLimitInfo,
   usageSummary,
   model,
   keyId = null,
-  accountType = null
+  accountType = null,
+  preCalculatedCost = null
 ) {
   if (!rateLimitInfo) {
     return { totalTokens: 0, totalCost: 0, ratedCost: 0 }
@@ -36,47 +38,68 @@ async function updateRateLimitCounters(
   }
 
   let totalCost = 0
-  const usagePayload = {
-    input_tokens: inputTokens,
-    output_tokens: outputTokens,
-    cache_creation_input_tokens: cacheCreateTokens,
-    cache_read_input_tokens: cacheReadTokens
-  }
+  let ratedCost = 0
 
-  try {
-    const costInfo = pricingService.calculateCost(usagePayload, model)
-    const { totalCost: calculatedCost } = costInfo || {}
-    if (typeof calculatedCost === 'number') {
-      totalCost = calculatedCost
+  if (
+    preCalculatedCost &&
+    typeof preCalculatedCost.ratedCost === 'number' &&
+    preCalculatedCost.ratedCost > 0
+  ) {
+    // 使用调用方已计算好的费用（避免重复计算，且能正确处理 1h 缓存、Fast Mode 等特殊计费）
+    // eslint-disable-next-line prefer-destructuring
+    ratedCost = preCalculatedCost.ratedCost
+    totalCost = preCalculatedCost.realCost || 0
+  } else if (
+    preCalculatedCost &&
+    typeof preCalculatedCost.realCost === 'number' &&
+    preCalculatedCost.realCost > 0
+  ) {
+    // 有 realCost 但 ratedCost 为 0 或缺失，使用 realCost
+    totalCost = preCalculatedCost.realCost
+    ratedCost = preCalculatedCost.realCost
+  } else {
+    // Legacy fallback：调用方未提供费用时自行计算（不支持 1h 缓存等特殊计费）
+    const usagePayload = {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cache_creation_input_tokens: cacheCreateTokens,
+      cache_read_input_tokens: cacheReadTokens
     }
-  } catch (error) {
-    // 忽略此处错误，后续使用备用计算
-    totalCost = 0
-  }
 
-  if (totalCost === 0) {
     try {
-      const fallback = CostCalculator.calculateCost(usagePayload, model)
-      const { costs } = fallback || {}
-      if (costs && typeof costs.total === 'number') {
-        totalCost = costs.total
+      const costInfo = pricingService.calculateCost(usagePayload, model)
+      const { totalCost: calculatedCost } = costInfo || {}
+      if (typeof calculatedCost === 'number') {
+        totalCost = calculatedCost
       }
     } catch (error) {
+      // 忽略此处错误，后续使用备用计算
       totalCost = 0
     }
-  }
 
-  // 计算倍率成本（用于限流计数）
-  let ratedCost = totalCost
-  if (totalCost > 0 && keyId) {
-    try {
-      const apiKeyService = require('../services/apiKeyService')
-      const serviceRatesService = require('../services/serviceRatesService')
-      const service = serviceRatesService.getService(accountType, model)
-      ratedCost = await apiKeyService.calculateRatedCost(keyId, service, totalCost)
-    } catch (error) {
-      // 倍率计算失败时使用真实成本
-      ratedCost = totalCost
+    if (totalCost === 0) {
+      try {
+        const fallback = CostCalculator.calculateCost(usagePayload, model)
+        const { costs } = fallback || {}
+        if (costs && typeof costs.total === 'number') {
+          totalCost = costs.total
+        }
+      } catch (error) {
+        totalCost = 0
+      }
+    }
+
+    // 计算倍率成本（用于限流计数）
+    ratedCost = totalCost
+    if (totalCost > 0 && keyId) {
+      try {
+        const apiKeyService = require('../services/apiKeyService')
+        const serviceRatesService = require('../services/serviceRatesService')
+        const service = serviceRatesService.getService(accountType, model)
+        ratedCost = await apiKeyService.calculateRatedCost(keyId, service, totalCost)
+      } catch (error) {
+        ratedCost = totalCost
+      }
     }
   }
 

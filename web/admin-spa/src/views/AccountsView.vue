@@ -1316,6 +1316,14 @@
                       <span class="ml-1">详情</span>
                     </button>
                     <button
+                      class="rounded bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-800/50"
+                      title="查看错误历史"
+                      @click="openErrorHistory(account)"
+                    >
+                      <i class="fas fa-exclamation-triangle" />
+                      <span class="ml-1">错误</span>
+                    </button>
+                    <button
                       v-if="canTestAccount(account)"
                       class="rounded bg-cyan-100 px-2.5 py-1 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/50"
                       title="测试账户连通性"
@@ -1824,6 +1832,13 @@
               详情
             </button>
             <button
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-800/50"
+              @click="openErrorHistory(account)"
+            >
+              <i class="fas fa-exclamation-triangle" />
+              错误
+            </button>
+            <button
               v-if="canTestAccount(account)"
               class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-cyan-50 px-3 py-2 text-xs text-cyan-600 transition-colors hover:bg-cyan-100 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/50"
               @click="openAccountTestModal(account)"
@@ -1996,6 +2011,15 @@
       :show="showAccountUsageModal"
       :summary="accountUsageSummary"
       @close="closeAccountUsageModal"
+    />
+
+    <!-- 错误历史弹窗 -->
+    <AccountErrorHistoryModal
+      :account-id="errorHistoryTarget.accountId"
+      :account-name="errorHistoryTarget.accountName"
+      :account-type="errorHistoryTarget.accountType"
+      :show="showErrorHistoryModal"
+      @close="showErrorHistoryModal = false"
     />
 
     <!-- 账户过期时间编辑弹窗 -->
@@ -2187,6 +2211,7 @@ import * as httpApis from '@/utils/http_apis'
 import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
+import AccountErrorHistoryModal from '@/components/accounts/AccountErrorHistoryModal.vue'
 import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
 import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 import AccountScheduledTestModal from '@/components/accounts/AccountScheduledTestModal.vue'
@@ -2252,6 +2277,24 @@ const selectedAccounts = ref([])
 const selectAllChecked = ref(false)
 const isIndeterminate = ref(false)
 const showCheckboxes = ref(false)
+
+// 错误历史弹窗状态
+const showErrorHistoryModal = ref(false)
+const errorHistoryTarget = ref({ accountType: '', accountId: '', accountName: '' })
+// 前端 platform → 后端 error_history key 的 accountType 映射
+const platformToAccountType = (platform) => {
+  if (platform === 'claude' || platform === 'claude-oauth') return 'claude-official'
+  if (platform === 'azure_openai') return 'azure-openai'
+  return platform
+}
+const openErrorHistory = (account) => {
+  errorHistoryTarget.value = {
+    accountType: platformToAccountType(account.platform),
+    accountId: account.id,
+    accountName: account.name || account.email || account.id
+  }
+  showErrorHistoryModal.value = true
+}
 
 // 账号使用详情弹窗状态
 const showAccountUsageModal = ref(false)
@@ -2548,6 +2591,15 @@ const getAccountActions = (account) => {
       handler: () => openAccountUsageModal(account)
     })
   }
+
+  // 错误历史
+  actions.push({
+    key: 'error-history',
+    label: '错误历史',
+    icon: 'fa-exclamation-triangle',
+    color: 'red',
+    handler: () => openErrorHistory(account)
+  })
 
   // 测试账户
   if (canTestAccount(account)) {
