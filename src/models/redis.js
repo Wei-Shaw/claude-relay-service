@@ -838,6 +838,7 @@ class RedisClient {
       search = '',
       tag = '',
       isActive = '',
+      statusFilter = '', // 状态筛选 ('active' | 'inactive')
       sortBy = 'createdAt',
       sortOrder = 'desc',
       excludeDeleted = true, // 默认排除已删除的 API Keys
@@ -853,12 +854,14 @@ class RedisClient {
     // - 非 bindingAccount 搜索模式（索引不支持）
     // - 非 status/expiresAt 排序（索引不支持）
     // - 无搜索关键词（索引只搜 name，旧逻辑搜 name+owner，不一致）
+    // - 无 statusFilter（索引不支持）
     const canUseIndex =
       indexReady &&
       modelFilter.length === 0 &&
       searchMode !== 'bindingAccount' &&
       !['status', 'expiresAt'].includes(sortBy) &&
-      !search
+      !search &&
+      !statusFilter
 
     if (canUseIndex) {
       // 使用索引查询
@@ -931,6 +934,46 @@ class RedisClient {
       filteredKeys = filteredKeys.filter((k) => keyIdsWithModels.has(k.id))
     }
 
+    // 计算状态计数（在 statusFilter 之前，用于前端 Tab 角标）
+    const now = Date.now()
+    let activeCount = 0
+    let inactiveCount = 0
+    for (const k of filteredKeys) {
+      const isExpired = k.expiresAt && new Date(k.expiresAt).getTime() <= now
+      if (k.isActive && !isExpired) {
+        activeCount++
+      } else {
+        inactiveCount++
+      }
+    }
+
+    // 状态组合筛选（active: 活跃且未过期, inactive: 禁用或已过期）
+    if (statusFilter) {
+      if (statusFilter === 'active') {
+        // 活跃：isActive=true 且未过期（无过期时间或过期时间大于当前时间）
+        filteredKeys = filteredKeys.filter((k) => {
+          if (!k.isActive) {
+            return false
+          }
+          if (!k.expiresAt) {
+            return true
+          }
+          return new Date(k.expiresAt).getTime() > now
+        })
+      } else if (statusFilter === 'inactive') {
+        // 非活跃：isActive=false 或已过期
+        filteredKeys = filteredKeys.filter((k) => {
+          if (!k.isActive) {
+            return true
+          }
+          if (k.expiresAt && new Date(k.expiresAt).getTime() <= now) {
+            return true
+          }
+          return false
+        })
+      }
+    }
+
     // 4. 排序
     filteredKeys.sort((a, b) => {
       // status 排序实际上使用 isActive 字段（API Key 没有 status 字段）
@@ -988,7 +1031,11 @@ class RedisClient {
         total,
         totalPages
       },
-      availableTags
+      availableTags,
+      statusCounts: {
+        active: activeCount,
+        inactive: inactiveCount
+      }
     }
   }
 
