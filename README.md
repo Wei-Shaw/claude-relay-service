@@ -621,6 +621,7 @@ gpt-5                      # Codex使用固定模型ID
 - `/droid/claude/` - 使用Droid类型Claude账号池（只建议api调用或Droid Cli中使用）
 - `/gemini/` - 使用Gemini账号池
 - `/openai/` - 使用Codex账号（只支持Openai-Response格式）
+- `/api/v1/messages` + `gpt-*` 模型 - 可选桥接到 OpenAI Responses（需设置 `ANTHROPIC_OPENAI_BRIDGE_ENABLED=true`）
 - `/droid/openai/` - 使用Droid类型OpenAI兼容账号池（只建议api调用或Droid Cli中使用）
 - 支持所有标准API端点（messages、models等）
 

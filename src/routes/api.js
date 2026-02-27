@@ -25,6 +25,10 @@ const {
   handleAnthropicMessagesToGemini,
   handleAnthropicCountTokensToGemini
 } = require('../services/anthropicGeminiBridgeService')
+const {
+  handleAnthropicMessagesToOpenAI,
+  handleAnthropicCountTokensToOpenAI
+} = require('../services/anthropicOpenAIBridgeService')
 const router = express.Router()
 
 function queueRateLimitUpdate(
@@ -132,26 +136,24 @@ function isOldSession(body) {
   return false
 }
 
+function detectAnthropicBackend(model) {
+  const normalizedModel = String(getEffectiveModel(model || ''))
+    .trim()
+    .toLowerCase()
+
+  if (normalizedModel.startsWith('gpt-')) {
+    return 'openai'
+  }
+
+  return 'claude'
+}
+
 // 🔧 共享的消息处理函数
 async function handleMessagesRequest(req, res) {
   try {
     const startTime = Date.now()
 
     const forcedVendor = req._anthropicVendor || null
-    const requiredService =
-      forcedVendor === 'gemini-cli' || forcedVendor === 'antigravity' ? 'gemini' : 'claude'
-
-    if (!apiKeyService.hasPermission(req.apiKey?.permissions, requiredService)) {
-      return res.status(403).json({
-        error: {
-          type: 'permission_error',
-          message:
-            requiredService === 'gemini'
-              ? '此 API Key 无权访问 Gemini 服务'
-              : '此 API Key 无权访问 Claude 服务'
-        }
-      })
-    }
 
     // 🔄 并发满额重试标志：最多重试一次（使用req对象存储状态）
     if (req._concurrencyRetryAttempted === undefined) {
@@ -177,6 +179,27 @@ async function handleMessagesRequest(req, res) {
       return res.status(400).json({
         error: 'Invalid request',
         message: 'Messages array cannot be empty'
+      })
+    }
+
+    const backend =
+      forcedVendor === 'gemini-cli' || forcedVendor === 'antigravity'
+        ? 'gemini'
+        : detectAnthropicBackend(req.body.model)
+    const requiredService =
+      backend === 'gemini' ? 'gemini' : backend === 'openai' ? 'openai' : 'claude'
+
+    if (!apiKeyService.hasPermission(req.apiKey?.permissions, requiredService)) {
+      return res.status(403).json({
+        error: {
+          type: 'permission_error',
+          message:
+            requiredService === 'gemini'
+              ? '此 API Key 无权访问 Gemini 服务'
+              : requiredService === 'openai'
+                ? '此 API Key 无权访问 OpenAI 服务'
+                : '此 API Key 无权访问 Claude 服务'
+        }
       })
     }
 
@@ -210,6 +233,7 @@ async function handleMessagesRequest(req, res) {
 
     logger.api('📥 /v1/messages request received', {
       model: req.body.model || null,
+      backend,
       forcedVendor,
       stream: req.body.stream === true
     })
@@ -225,6 +249,18 @@ async function handleMessagesRequest(req, res) {
     if (forcedVendor === 'gemini-cli' || forcedVendor === 'antigravity') {
       const baseModel = (req.body.model || '').trim()
       return await handleAnthropicMessagesToGemini(req, res, { vendor: forcedVendor, baseModel })
+    }
+
+    if (backend === 'openai') {
+      if (process.env.ANTHROPIC_OPENAI_BRIDGE_ENABLED === 'false') {
+        return res.status(501).json({
+          error: {
+            type: 'not_supported',
+            message: 'Anthropic to OpenAI bridge is disabled'
+          }
+        })
+      }
+      return await handleAnthropicMessagesToOpenAI(req, res)
     }
 
     // 检查是否为流式请求
@@ -1596,8 +1632,12 @@ router.get('/v1/organizations/:org_id/usage', authenticateApiKey, async (req, re
 router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) => {
   // 按路径强制分流到 Gemini OAuth 账户（避免 model 前缀混乱）
   const forcedVendor = req._anthropicVendor || null
+  const backend =
+    forcedVendor === 'gemini-cli' || forcedVendor === 'antigravity'
+      ? 'gemini'
+      : detectAnthropicBackend(req.body?.model)
   const requiredService =
-    forcedVendor === 'gemini-cli' || forcedVendor === 'antigravity' ? 'gemini' : 'claude'
+    backend === 'gemini' ? 'gemini' : backend === 'openai' ? 'openai' : 'claude'
 
   if (!apiKeyService.hasPermission(req.apiKey?.permissions, requiredService)) {
     return res.status(403).json({
@@ -1606,13 +1646,27 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
         message:
           requiredService === 'gemini'
             ? 'This API key does not have permission to access Gemini'
-            : 'This API key does not have permission to access Claude'
+            : requiredService === 'openai'
+              ? 'This API key does not have permission to access OpenAI'
+              : 'This API key does not have permission to access Claude'
       }
     })
   }
 
-  if (requiredService === 'gemini') {
+  if (backend === 'gemini') {
     return await handleAnthropicCountTokensToGemini(req, res, { vendor: forcedVendor })
+  }
+
+  if (backend === 'openai') {
+    if (process.env.ANTHROPIC_OPENAI_BRIDGE_ENABLED === 'false') {
+      return res.status(501).json({
+        error: {
+          type: 'not_supported',
+          message: 'Anthropic to OpenAI bridge is disabled'
+        }
+      })
+    }
+    return await handleAnthropicCountTokensToOpenAI(req, res)
   }
 
   // 🔗 会话绑定验证（与 messages 端点保持一致）
