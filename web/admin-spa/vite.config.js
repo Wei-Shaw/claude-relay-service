@@ -13,7 +13,10 @@ export default defineConfig(({ mode }) => {
   const httpProxy = env.VITE_HTTP_PROXY || env.HTTP_PROXY || env.http_proxy
   // 使用环境变量配置基础路径，如果未设置则使用默认值
   const basePath = env.VITE_APP_BASE_URL || (mode === 'development' ? '/admin/' : '/admin-next/')
-
+  // 支持配置静态资源为对象存储路径
+  const assetHost = env.VITE_ASSET_BASE_URL
+  const assetPath = assetHost && mode !== 'development' ? new URL(basePath, assetHost).toString() : basePath
+  
   // 创建代理配置
   const proxyConfig = {
     target: apiTarget,
@@ -31,11 +34,11 @@ export default defineConfig(({ mode }) => {
   }
 
   console.log(
-    `${mode === 'development' ? 'Starting dev server' : 'Building'} with base path: ${basePath}`
+    `${mode === 'development' ? 'Starting dev server' : 'Building'} with base path: ${basePath} and assets path: ${assetPath}`
   )
 
   return {
-    base: basePath,
+    base: assetPath,
     plugins: [
       vue(),
       checker({
