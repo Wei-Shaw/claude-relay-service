@@ -940,6 +940,21 @@ function isRateLimited(account) {
 
 // 设置账户限流状态
 async function setAccountRateLimited(accountId, isLimited, resetsInSeconds = null) {
+  // disableAutoProtection 检查（仅在设置限流时）
+  if (isLimited) {
+    const account = await getAccount(accountId)
+    if (
+      account &&
+      (account.disableAutoProtection === true || account.disableAutoProtection === 'true')
+    ) {
+      logger.info(
+        `🛡️ Account ${accountId} has auto-protection disabled, skipping setAccountRateLimited`
+      )
+      upstreamErrorHelper.recordErrorHistory(accountId, 'openai', 429, 'rate_limit').catch(() => {})
+      return
+    }
+  }
+
   const updates = {
     rateLimitStatus: isLimited ? 'limited' : 'normal',
     rateLimitedAt: isLimited ? new Date().toISOString() : null,
@@ -999,6 +1014,15 @@ async function markAccountUnauthorized(accountId, reason = 'OpenAI账号认证�
   const account = await getAccount(accountId)
   if (!account) {
     throw new Error('Account not found')
+  }
+
+  // disableAutoProtection 检查
+  if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+    logger.info(
+      `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
+    )
+    upstreamErrorHelper.recordErrorHistory(accountId, 'openai', 401, 'auth_error').catch(() => {})
+    return
   }
 
   const now = new Date().toISOString()

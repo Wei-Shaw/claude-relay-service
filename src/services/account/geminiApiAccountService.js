@@ -321,6 +321,17 @@ class GeminiApiAccountService {
     }
 
     if (isLimited) {
+      // disableAutoProtection 检查（仅在设置限流时）
+      if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+        logger.info(
+          `🛡️ Account ${accountId} has auto-protection disabled, skipping setAccountRateLimited`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'gemini-api', 429, 'rate_limit')
+          .catch(() => {})
+        return
+      }
+
       const rateLimitDuration = duration || parseInt(account.rateLimitDuration) || 60
       const now = new Date()
       const resetAt = new Date(now.getTime() + rateLimitDuration * 60000)
@@ -357,6 +368,17 @@ class GeminiApiAccountService {
   async markAccountUnauthorized(accountId, reason = 'Gemini API账号认证失败（401错误）') {
     const account = await this.getAccount(accountId)
     if (!account) {
+      return
+    }
+
+    // disableAutoProtection 检查
+    if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+      logger.info(
+        `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
+      )
+      upstreamErrorHelper
+        .recordErrorHistory(accountId, 'gemini-api', 401, 'auth_error')
+        .catch(() => {})
       return
     }
 
