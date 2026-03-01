@@ -241,9 +241,16 @@ class ClaudeRelayService {
       return transformed
     }
 
+    // Server-side tools (memory, code_execution, etc.) have fixed names
+    // that Anthropic validates literally — skip name transformation for them.
+    const SERVER_TOOL_TYPES = new Set([
+      'memory_20250818',
+      'code_execution_20250825',
+    ])
+
     if (Array.isArray(body.tools)) {
       body.tools.forEach((tool) => {
-        if (tool && typeof tool.name === 'string') {
+        if (tool && typeof tool.name === 'string' && !SERVER_TOOL_TYPES.has(tool.type)) {
           tool.name = transformName(tool.name)
         }
       })
