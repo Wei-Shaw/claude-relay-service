@@ -602,6 +602,16 @@ gpt-5                      # Codex使用固定模型ID
 - API Key填入：后台创建的API密钥（cr_开头）
 - **重要**：Codex只支持Openai-Response标准
 
+**4. Novita（OpenAI 兼容）接入：**
+
+如果你希望通过 Novita 使用 DeepSeek / Qwen 等 OpenAI 兼容模型：
+
+- 在后台新增 `OpenAI-Responses` 账号
+- `Base API` 填入：`https://api.novita.ai/openai`
+- `API Key` 填入你的 Novita Key
+- 通过统一 OpenAI 入口调用：`http://你的服务器:3000/openai/v1/chat/completions`
+- 模型示例：`deepseek/deepseek-v3`、`qwen/qwen3-32b`
+
 
 **Cherry Studio 地址格式重要说明：**
 

@@ -12,35 +12,9 @@ const { CODEX_CLI_INSTRUCTIONS } = require('./openaiRoutes')
 const apiKeyService = require('../services/apiKeyService')
 const GeminiToOpenAIConverter = require('../services/geminiToOpenAI')
 const CodexToOpenAIConverter = require('../services/codexToOpenAI')
+const { detectBackendFromModel } = require('../utils/modelBackendDetector')
 
 const router = express.Router()
-
-// 🔍 根据模型名称检测后端类型
-function detectBackendFromModel(modelName) {
-  if (!modelName) {
-    return 'claude' // 默认 Claude
-  }
-
-  const model = modelName.toLowerCase()
-
-  // Claude 模型
-  if (model.startsWith('claude-')) {
-    return 'claude'
-  }
-
-  // Gemini 模型
-  if (model.startsWith('gemini-')) {
-    return 'gemini'
-  }
-
-  // OpenAI 模型
-  if (model.startsWith('gpt-')) {
-    return 'openai'
-  }
-
-  // 默认使用 Claude
-  return 'claude'
-}
 
 // 🚀 智能后端路由处理器
 async function routeToBackend(req, res, requestedModel) {
