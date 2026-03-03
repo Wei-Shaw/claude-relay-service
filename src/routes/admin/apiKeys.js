@@ -186,6 +186,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       tag = '',
       isActive = '',
       models = '', // 模型筛选（逗号分隔）
+      statusFilter = '', // 状态筛选 ('active' | 'inactive')
       // 排序参数
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -291,6 +292,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           searchMode,
           tag,
           isActive,
+          statusFilter,
           modelFilter
         })
 
@@ -325,6 +327,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           searchMode,
           tag,
           isActive,
+          statusFilter,
           modelFilter
         })
 
@@ -339,6 +342,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         search,
         tag,
         isActive,
+        statusFilter,
         sortBy: validSortBy,
         sortOrder: validSortOrder,
         modelFilter
@@ -415,6 +419,7 @@ async function getApiKeysSortedByCostPrecomputed(options) {
     searchMode,
     tag,
     isActive,
+    statusFilter,
     modelFilter = []
   } = options
   const costRankService = require('../../services/costRankService')
@@ -426,7 +431,8 @@ async function getApiKeysSortedByCostPrecomputed(options) {
     return {
       items: [],
       pagination: { page: 1, pageSize, total: 0, totalPages: 1 },
-      availableTags: []
+      availableTags: [],
+      statusCounts: { active: 0, inactive: 0 }
     }
   }
 
@@ -472,6 +478,36 @@ async function getApiKeysSortedByCostPrecomputed(options) {
     orderedKeys = orderedKeys.filter((k) => keyIdsWithModels.has(k.id))
   }
 
+  // 计算状态计数（在 statusFilter 之前）
+  const now = Date.now()
+  let activeCount = 0
+  let inactiveCount = 0
+  for (const k of orderedKeys) {
+    const isExpired = k.expiresAt && new Date(k.expiresAt).getTime() <= now
+    if (k.isActive && !isExpired) {
+      activeCount++
+    } else {
+      inactiveCount++
+    }
+  }
+
+  // 状态组合筛选
+  if (statusFilter) {
+    if (statusFilter === 'active') {
+      orderedKeys = orderedKeys.filter((k) => {
+        if (!k.isActive) return false
+        if (!k.expiresAt) return true
+        return new Date(k.expiresAt).getTime() > now
+      })
+    } else if (statusFilter === 'inactive') {
+      orderedKeys = orderedKeys.filter((k) => {
+        if (!k.isActive) return true
+        if (k.expiresAt && new Date(k.expiresAt).getTime() <= now) return true
+        return false
+      })
+    }
+  }
+
   // 5. 收集所有可用标签
   const allTags = new Set()
   for (const key of allKeys) {
@@ -506,7 +542,11 @@ async function getApiKeysSortedByCostPrecomputed(options) {
       total,
       totalPages
     },
-    availableTags
+    availableTags,
+    statusCounts: {
+      active: activeCount,
+      inactive: inactiveCount
+    }
   }
 }
 
@@ -524,6 +564,7 @@ async function getApiKeysSortedByCostCustom(options) {
     searchMode,
     tag,
     isActive,
+    statusFilter,
     modelFilter = []
   } = options
   const costRankService = require('../../services/costRankService')
@@ -535,7 +576,8 @@ async function getApiKeysSortedByCostCustom(options) {
     return {
       items: [],
       pagination: { page: 1, pageSize, total: 0, totalPages: 1 },
-      availableTags: []
+      availableTags: [],
+      statusCounts: { active: 0, inactive: 0 }
     }
   }
 
@@ -587,6 +629,36 @@ async function getApiKeysSortedByCostCustom(options) {
     orderedKeys = orderedKeys.filter((k) => keyIdsWithModels.has(k.id))
   }
 
+  // 计算状态计数（在 statusFilter 之前）
+  const now = Date.now()
+  let activeCount = 0
+  let inactiveCount = 0
+  for (const k of orderedKeys) {
+    const isExpired = k.expiresAt && new Date(k.expiresAt).getTime() <= now
+    if (k.isActive && !isExpired) {
+      activeCount++
+    } else {
+      inactiveCount++
+    }
+  }
+
+  // 状态组合筛选
+  if (statusFilter) {
+    if (statusFilter === 'active') {
+      orderedKeys = orderedKeys.filter((k) => {
+        if (!k.isActive) return false
+        if (!k.expiresAt) return true
+        return new Date(k.expiresAt).getTime() > now
+      })
+    } else if (statusFilter === 'inactive') {
+      orderedKeys = orderedKeys.filter((k) => {
+        if (!k.isActive) return true
+        if (k.expiresAt && new Date(k.expiresAt).getTime() <= now) return true
+        return false
+      })
+    }
+  }
+
   // 6. 收集所有可用标签
   const allTags = new Set()
   for (const key of allKeys) {
@@ -617,7 +689,11 @@ async function getApiKeysSortedByCostCustom(options) {
       total,
       totalPages
     },
-    availableTags
+    availableTags,
+    statusCounts: {
+      active: activeCount,
+      inactive: inactiveCount
+    }
   }
 }
 
