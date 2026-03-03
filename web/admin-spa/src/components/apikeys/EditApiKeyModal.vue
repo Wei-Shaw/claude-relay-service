@@ -776,6 +776,27 @@
             </div>
           </div>
 
+          <!-- 允许 1M 上下文 -->
+          <div>
+            <div class="mb-2 flex items-center">
+              <input
+                id="editAllow1mContext"
+                v-model="form.allow1mContext"
+                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                type="checkbox"
+              />
+              <label
+                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
+                for="editAllow1mContext"
+              >
+                允许 1M 上下文
+              </label>
+            </div>
+            <p class="ml-6 text-xs text-gray-500 dark:text-gray-400">
+              启用后允许使用 [1m] 模型（需要 Bedrock 账户支持）
+            </p>
+          </div>
+
           <div class="flex gap-3 pt-4">
             <button
               class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -948,6 +969,7 @@ const form = reactive({
   modelInput: '',
   enableClientRestriction: false,
   allowedClients: [],
+  allow1mContext: false,
   tags: [],
   isActive: true,
   ownerId: '' // 新增：所有者ID
@@ -1130,6 +1152,9 @@ const updateApiKey = async () => {
     // 客户端限制 - 始终提交这些字段
     data.enableClientRestriction = form.enableClientRestriction
     data.allowedClients = form.allowedClients
+
+    // 1M 上下文
+    data.allow1mContext = form.allow1mContext
 
     // 活跃状态
     data.isActive = form.isActive
@@ -1448,6 +1473,8 @@ onMounted(async () => {
     props.apiKey.enableModelRestriction === true || props.apiKey.enableModelRestriction === 'true'
   form.enableClientRestriction =
     props.apiKey.enableClientRestriction === true || props.apiKey.enableClientRestriction === 'true'
+  form.allow1mContext =
+    props.apiKey.allow1mContext === true || props.apiKey.allow1mContext === 'true'
   // 初始化活跃状态，默认为 true（强制转换为布尔值，因为Redis返回字符串）
   form.isActive =
     props.apiKey.isActive === undefined ||

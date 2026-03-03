@@ -227,6 +227,31 @@ This step is quite important, requires OAuth authorization:
 
 **Note**: If you're in China, this step may require VPN.
 
+### 2.1 Temporary Pause (503/5xx) and Account-Level TTL Overrides
+
+When upstream errors happen, the router can temporarily pause an account. Global defaults are controlled by `.env.example`:
+
+- `UPSTREAM_ERROR_503_TTL_SECONDS`
+- `UPSTREAM_ERROR_5XX_TTL_SECONDS`
+- `UPSTREAM_ERROR_OVERLOAD_TTL_SECONDS`
+- `UPSTREAM_ERROR_AUTH_TTL_SECONDS`
+- `UPSTREAM_ERROR_TIMEOUT_TTL_SECONDS`
+
+For **Claude official OAuth accounts**, you can override policy per account in Admin UI:
+
+- `Disable temporary cooldown for this account`: skip 503/5xx temp pause for this account
+- `503 cooldown seconds`: empty = follow global default, `0` = disable 503 cooldown for this account
+- `5xx cooldown seconds`: empty = follow global default, `0` = disable 5xx cooldown for this account
+
+Priority order (high to low):
+
+1. Account-level "disable temporary cooldown"
+2. Account-level 503/5xx cooldown override
+3. Call-site custom TTL (if provided)
+4. Global env default TTL
+
+In Accounts view, "Routing blocked reason" shows error type, HTTP status, total cooldown, remaining time, and recovery time. Use `Reset Status` to clear abnormal state and restore routing eligibility.
+
 ### 3. Create API Key
 
 Assign a key to each user:

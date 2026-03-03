@@ -197,13 +197,14 @@ async function handleMessagesRequest(req, res) {
       }
     }
 
-    // 拦截 1M 上下文窗口请求（anthropic-beta 包含 context-1m）
+    // 检测 1M 上下文窗口请求（anthropic-beta 包含 context-1m）
     const betaHeader = (req.headers['anthropic-beta'] || '').toLowerCase()
-    if (betaHeader.includes('context-1m')) {
+    const is1mContextRequest = betaHeader.includes('context-1m')
+    if (is1mContextRequest && !req.apiKey.allow1mContext) {
       return res.status(403).json({
         error: {
           type: 'forbidden',
-          message: '暂不支持 1M 上下文窗口，请切换为非 [1m] 模型'
+          message: '该 API Key 未启用 1M 上下文窗口，请联系管理员开启或切换为非 [1m] 模型'
         }
       })
     }
@@ -386,6 +387,13 @@ async function handleMessagesRequest(req, res) {
           return
         }
         throw error
+      }
+
+      // 1M 上下文窗口：记录日志（admin 已通过 allow1mContext 授权，信任其决定）
+      if (is1mContextRequest) {
+        logger.api(
+          `📐 1M context request allowed for key: ${req.apiKey.name}, accountType: ${accountType}`
+        )
       }
 
       // 🔗 在成功调度后建立会话绑定（仅 claude-official 类型）
@@ -1214,21 +1222,61 @@ async function handleMessagesRequest(req, res) {
         ) {
           const inputTokens = jsonData.usage.input_tokens || 0
           const outputTokens = jsonData.usage.output_tokens || 0
-          const cacheCreateTokens = jsonData.usage.cache_creation_input_tokens || 0
+          let cacheCreateTokens = jsonData.usage.cache_creation_input_tokens || 0
+          let ephemeral5mTokens = 0
+          let ephemeral1hTokens = 0
+
+          if (jsonData.usage.cache_creation && typeof jsonData.usage.cache_creation === 'object') {
+            ephemeral5mTokens = jsonData.usage.cache_creation.ephemeral_5m_input_tokens || 0
+            ephemeral1hTokens = jsonData.usage.cache_creation.ephemeral_1h_input_tokens || 0
+            cacheCreateTokens = ephemeral5mTokens + ephemeral1hTokens
+          }
+
           const cacheReadTokens = jsonData.usage.cache_read_input_tokens || 0
           // Parse the model to remove vendor prefix if present (e.g., "ccr,gemini-2.5-pro" -> "gemini-2.5-pro")
           const rawModel = jsonData.model || _requestBodyNonStream.model || 'unknown'
           const { baseModel: usageBaseModel } = parseVendorPrefixedModel(rawModel)
           const model = usageBaseModel || rawModel
 
+          // 构建 usage 对象以传递给 recordUsageWithDetails
+          const usageObject = {
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            cache_creation_input_tokens: cacheCreateTokens,
+            cache_read_input_tokens: cacheReadTokens
+          }
+
+          // 添加请求元信息
+          const requestBetaHeader =
+            _headersNonStream['anthropic-beta'] ||
+            _headersNonStream['Anthropic-Beta'] ||
+            _headersNonStream['ANTHROPIC-BETA']
+          if (requestBetaHeader) {
+            usageObject.request_anthropic_beta = requestBetaHeader
+          }
+          if (
+            typeof _requestBodyNonStream?.speed === 'string' &&
+            _requestBodyNonStream.speed.trim()
+          ) {
+            usageObject.request_speed = _requestBodyNonStream.speed.trim().toLowerCase()
+          }
+          if (typeof jsonData.usage.speed === 'string' && jsonData.usage.speed.trim()) {
+            usageObject.speed = jsonData.usage.speed.trim().toLowerCase()
+          }
+
+          // 添加 cache_creation 子对象
+          if (ephemeral5mTokens > 0 || ephemeral1hTokens > 0) {
+            usageObject.cache_creation = {
+              ephemeral_5m_input_tokens: ephemeral5mTokens,
+              ephemeral_1h_input_tokens: ephemeral1hTokens
+            }
+          }
+
           // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
           const { accountId: responseAccountId } = response
-          const nonStreamCosts = await apiKeyService.recordUsage(
+          const nonStreamCosts = await apiKeyService.recordUsageWithDetails(
             _apiKeyIdNonStream,
-            inputTokens,
-            outputTokens,
-            cacheCreateTokens,
-            cacheReadTokens,
+            usageObject,
             model,
             responseAccountId,
             accountType
@@ -1251,7 +1299,7 @@ async function handleMessagesRequest(req, res) {
 
           usageRecorded = true
           logger.api(
-            `📊 Non-stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
+            `📊 Non-stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens} (5m: ${ephemeral5mTokens}, 1h: ${ephemeral1hTokens}), Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
           )
         } else {
           logger.warn('⚠️ No usage data found in Claude API JSON response')

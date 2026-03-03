@@ -11,7 +11,11 @@ const USAGE_FIELDS = [
   'totalCacheCreateTokens',
   'cacheCreateTokens',
   'totalCacheReadTokens',
-  'cacheReadTokens'
+  'cacheReadTokens',
+  'ephemeral5mTokens',
+  'ephemeral1hTokens',
+  'totalEphemeral5mTokens',
+  'totalEphemeral1hTokens'
 ]
 
 class CostInitService {
@@ -202,8 +206,8 @@ class CostInitService {
       }
 
       // 添加 cache_creation 子对象以支持精确 ephemeral 定价
-      const eph5m = parseInt(data.ephemeral5mTokens) || 0
-      const eph1h = parseInt(data.ephemeral1hTokens) || 0
+      const eph5m = parseInt(data.totalEphemeral5mTokens) || parseInt(data.ephemeral5mTokens) || 0
+      const eph1h = parseInt(data.totalEphemeral1hTokens) || parseInt(data.ephemeral1hTokens) || 0
       if (eph5m > 0 || eph1h > 0) {
         usage.cache_creation = {
           ephemeral_5m_input_tokens: eph5m,

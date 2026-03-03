@@ -1455,8 +1455,11 @@ class ClaudeConsoleRelayService {
   }
 
   // 🧪 测试账号连接（供Admin API使用）
-  async testAccountConnection(accountId, responseStream) {
-    const { sendStreamTestRequest } = require('../../utils/testPayloadHelper')
+  async testAccountConnection(accountId, responseStream, model) {
+    const {
+      createClaudeTestPayload,
+      sendStreamTestRequest
+    } = require('../../utils/testPayloadHelper')
 
     try {
       const account = await claudeConsoleAccountService.getAccount(accountId)
@@ -1470,14 +1473,24 @@ class ClaudeConsoleRelayService {
       const apiUrl = cleanUrl.endsWith('/v1/messages')
         ? cleanUrl
         : `${cleanUrl}/v1/messages?beta=true`
+      const payload = createClaudeTestPayload(model, { stream: true })
 
-      await sendStreamTestRequest({
+      const extraHeaders = account.userAgent ? { 'User-Agent': account.userAgent } : {}
+      const requestOptions = {
         apiUrl,
-        authorization: `Bearer ${account.apiKey}`,
         responseStream,
+        payload,
         proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
-        extraHeaders: account.userAgent ? { 'User-Agent': account.userAgent } : {}
-      })
+        extraHeaders
+      }
+
+      if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
+        requestOptions.extraHeaders['x-api-key'] = account.apiKey
+      } else {
+        requestOptions.authorization = `Bearer ${account.apiKey}`
+      }
+
+      await sendStreamTestRequest(requestOptions)
     } catch (error) {
       logger.error(`❌ Test account connection failed:`, error)
       if (!responseStream.headersSent) {

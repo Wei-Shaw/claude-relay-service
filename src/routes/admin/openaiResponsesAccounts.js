@@ -472,9 +472,18 @@ router.post('/openai-responses-accounts/:accountId/test', authenticateAdmin, asy
       return res.status(401).json({ error: 'API Key not found or decryption failed' })
     }
 
-    // 构造测试请求
+    // 构造测试请求（根据 providerEndpoint 和 baseApi 决定端点路径）
     const baseUrl = account.baseApi || 'https://api.openai.com'
-    const apiUrl = `${baseUrl}/responses`
+    const providerEndpoint = account.providerEndpoint || 'responses'
+    let endpointPath = '/responses'
+    if (providerEndpoint === 'auto') {
+      endpointPath = '/responses' // 测试时默认用 responses
+    }
+    // 防止 baseApi 已含 /v1 时路径重复
+    if (!baseUrl.endsWith('/v1')) {
+      endpointPath = `/v1${endpointPath}`
+    }
+    const apiUrl = `${baseUrl}${endpointPath}`
     const payload = createOpenAITestPayload(model, { stream: false })
 
     const requestConfig = {

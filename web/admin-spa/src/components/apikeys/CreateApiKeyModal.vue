@@ -938,6 +938,27 @@
             </div>
           </div>
 
+          <!-- 允许 1M 上下文 -->
+          <div>
+            <div class="mb-2 flex items-center">
+              <input
+                id="allow1mContext"
+                v-model="form.allow1mContext"
+                class="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-blue-500"
+                type="checkbox"
+              />
+              <label
+                class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
+                for="allow1mContext"
+              >
+                允许 1M 上下文
+              </label>
+            </div>
+            <p class="ml-6 text-xs text-gray-500 dark:text-gray-400">
+              启用后允许使用 [1m] 模型（需要 Bedrock 账户支持）
+            </p>
+          </div>
+
           <div class="flex gap-3 pt-2">
             <button
               class="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -1114,6 +1135,7 @@ const form = reactive({
   modelInput: '',
   enableClientRestriction: false,
   allowedClients: [],
+  allow1mContext: false,
   tags: []
 })
 
@@ -1542,7 +1564,8 @@ const createApiKey = async () => {
       enableModelRestriction: form.enableModelRestriction,
       restrictedModels: form.restrictedModels,
       enableClientRestriction: form.enableClientRestriction,
-      allowedClients: form.allowedClients
+      allowedClients: form.allowedClients,
+      allow1mContext: form.allow1mContext
     }
 
     // 处理Claude账户绑定（区分OAuth和Console）
