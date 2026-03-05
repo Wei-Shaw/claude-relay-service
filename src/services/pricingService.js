@@ -388,9 +388,14 @@ class PricingService {
     // 尝试模糊匹配（处理版本号等变化）
     const normalizedModel = modelName.toLowerCase().replace(/[_-]/g, '')
 
+    // 避免过短的模型名产生误匹配（如 "o1" 匹配到含 "o1" 的任意模型）
+    const MIN_FUZZY_LENGTH = 8
     for (const [key, value] of Object.entries(this.pricingData)) {
       const normalizedKey = key.toLowerCase().replace(/[_-]/g, '')
-      if (normalizedKey.includes(normalizedModel) || normalizedModel.includes(normalizedKey)) {
+      if (
+        (normalizedModel.length >= MIN_FUZZY_LENGTH && normalizedKey.includes(normalizedModel)) ||
+        (normalizedKey.length >= MIN_FUZZY_LENGTH && normalizedModel.includes(normalizedKey))
+      ) {
         logger.debug(`💰 Found pricing for ${modelName} using fuzzy match: ${key}`)
         return value
       }
@@ -419,14 +424,16 @@ class PricingService {
       return pricing
     }
 
+    // 返回副本以避免污染共享的 pricingData
+    const result = { ...pricing }
     // 如果缺少缓存价格，根据输入价格计算（缓存创建价格通常是输入价格的1.25倍，缓存读取是0.1倍）
-    if (!pricing.cache_creation_input_token_cost && pricing.input_cost_per_token) {
-      pricing.cache_creation_input_token_cost = pricing.input_cost_per_token * 1.25
+    if (!result.cache_creation_input_token_cost && result.input_cost_per_token) {
+      result.cache_creation_input_token_cost = result.input_cost_per_token * 1.25
     }
-    if (!pricing.cache_read_input_token_cost && pricing.input_cost_per_token) {
-      pricing.cache_read_input_token_cost = pricing.input_cost_per_token * 0.1
+    if (!result.cache_read_input_token_cost && result.input_cost_per_token) {
+      result.cache_read_input_token_cost = result.input_cost_per_token * 0.1
     }
-    return pricing
+    return result
   }
 
   // 从 usage 对象中提取 beta 特性列表（小写）
@@ -524,7 +531,7 @@ class PricingService {
       responseSpeed === this.claudeFeatureFlags.fastModeSpeed ||
       requestSpeed === this.claudeFeatureFlags.fastModeSpeed
     const isFastModeRequest = hasFastModeBeta && hasFastSpeedSignal
-    const standardPricing = this.getModelPricing(modelName)
+    const standardPricing = this.getModelPricing(normalizedModelName)
     const pricing = standardPricing
     const isLongContextModeEnabled = isLongContextModel || hasContext1mBeta
 

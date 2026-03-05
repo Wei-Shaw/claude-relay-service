@@ -83,20 +83,25 @@ class CostCalculator {
    * @returns {Object} 费用详情
    */
   static calculateCost(usage, model = 'unknown') {
+    // 确保 model 是字符串
+    if (!model || typeof model !== 'string') {
+      model = 'unknown'
+    }
     // 如果 usage 包含详细的 cache_creation 对象或是 1M 模型，使用 pricingService 来处理
     if (
       (usage.cache_creation && typeof usage.cache_creation === 'object') ||
-      (model && model.includes('[1m]'))
+      model.includes('[1m]')
     ) {
       const result = pricingService.calculateCost(usage, model)
       // 转换 pricingService 返回的格式到 costCalculator 的格式
+      const resultPricing = result.pricing || {}
       return {
         model,
         pricing: {
-          input: result.pricing.input * 1000000, // 转换为 per 1M tokens
-          output: result.pricing.output * 1000000,
-          cacheWrite: result.pricing.cacheCreate * 1000000,
-          cacheRead: result.pricing.cacheRead * 1000000
+          input: (resultPricing.input || 0) * 1000000, // 转换为 per 1M tokens
+          output: (resultPricing.output || 0) * 1000000,
+          cacheWrite: (resultPricing.cacheCreate || 0) * 1000000,
+          cacheRead: (resultPricing.cacheRead || 0) * 1000000
         },
         usingDynamicPricing: true,
         isLongContextRequest: result.isLongContextRequest || false,
@@ -127,10 +132,10 @@ class CostCalculator {
         },
         debug: {
           isOpenAIModel: model.includes('gpt') || model.includes('o1'),
-          hasCacheCreatePrice: !!result.pricing.cacheCreate,
+          hasCacheCreatePrice: !!resultPricing.cacheCreate,
           cacheCreateTokens: usage.cache_creation_input_tokens || 0,
-          cacheWritePriceUsed: result.pricing.cacheCreate * 1000000,
-          isLongContextModel: model && model.includes('[1m]'),
+          cacheWritePriceUsed: (resultPricing.cacheCreate || 0) * 1000000,
+          isLongContextModel: model.includes('[1m]'),
           isLongContextRequest: result.isLongContextRequest || false
         }
       }
@@ -142,8 +147,9 @@ class CostCalculator {
     const cacheCreateTokens = usage.cache_creation_input_tokens || 0
     const cacheReadTokens = usage.cache_read_input_tokens || 0
 
-    // 优先使用动态价格服务
-    const pricingData = pricingService.getModelPricing(model)
+    // 优先使用动态价格服务（去掉 [1m] 后缀以匹配定价表）
+    const lookupModel = model ? model.replace(/\[1m\]/gi, '').trim() : model
+    const pricingData = pricingService.getModelPricing(lookupModel)
     let pricing
     let usingDynamicPricing = false
 
@@ -176,7 +182,7 @@ class CostCalculator {
       usingDynamicPricing = true
     } else {
       // 回退到静态价格
-      pricing = MODEL_PRICING[model] || MODEL_PRICING['unknown']
+      pricing = MODEL_PRICING[lookupModel] || MODEL_PRICING[model] || MODEL_PRICING['unknown']
     }
 
     // 计算各类型token的费用 (USD)
