@@ -1310,17 +1310,39 @@ class DroidRelayService {
           'droid'
         )
       } else if (accountId) {
+        const CostCalculator = require('../../utils/costCalculator')
+        const costResult = CostCalculator.calculateCost(usageObject, model)
+        const droidCost = costResult?.costs?.total || 0
+
+        // 提取详细的缓存创建数据
+        let eph5m = usageObject.cache_creation_input_tokens || 0
+        let eph1h = 0
+        if (usageObject.cache_creation && typeof usageObject.cache_creation === 'object') {
+          eph5m = usageObject.cache_creation.ephemeral_5m_input_tokens || 0
+          eph1h = usageObject.cache_creation.ephemeral_1h_input_tokens || 0
+        }
+
+        // 检测长上下文请求
+        const inputTokens = usageObject.input_tokens || 0
+        const cacheCreateTokens = usageObject.cache_creation_input_tokens || 0
+        const cacheReadTokens = usageObject.cache_read_input_tokens || 0
+        const isLongCtx =
+          model &&
+          model.includes('[1m]') &&
+          inputTokens + cacheCreateTokens + cacheReadTokens > 200000
+
         await redis.incrementAccountUsage(
           accountId,
           totalTokens,
-          usageObject.input_tokens || 0,
+          inputTokens,
           usageObject.output_tokens || 0,
-          usageObject.cache_creation_input_tokens || 0,
-          usageObject.cache_read_input_tokens || 0,
-          0, // ephemeral5mTokens - Droid 不含详细缓存数据
-          0, // ephemeral1hTokens - Droid 不含详细缓存数据
+          cacheCreateTokens,
+          cacheReadTokens,
+          eph5m,
+          eph1h,
           model,
-          false
+          isLongCtx,
+          droidCost
         )
       } else {
         logger.warn('⚠️ 无法记录 Droid usage：缺少 API Key 和账户标识')
