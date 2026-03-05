@@ -1064,6 +1064,7 @@ router.post('/api-keys/batch-stats', authenticateAdmin, async (req, res) => {
  */
 async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   const client = redis.getClientSafe()
+  const now = new Date()
   const tzDate = redis.getDateInTimezone()
   const today = redis.getDateStringInTimezone()
 
@@ -1071,20 +1072,23 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   const searchPatterns = []
 
   if (timeRange === 'custom' && startDate && endDate) {
-    // 自定义日期范围
-    const start = new Date(startDate)
-    const end = new Date(endDate)
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = redis.getDateStringInTimezone(d)
+    // 自定义日期范围：startDate/endDate 是用户输入的本地日期字符串（YYYY-MM-DD）
+    // 直接按天枚举，避免 new Date(dateStr) 被解析为 UTC 导致时区偏移
+    const [sy, sm, sd] = startDate.split('-').map(Number)
+    const [ey, em, ed] = endDate.split('-').map(Number)
+    const startTs = Date.UTC(sy, sm - 1, sd)
+    const endTs = Date.UTC(ey, em - 1, ed)
+    for (let ts = startTs; ts <= endTs; ts += 86400000) {
+      const d = new Date(ts)
+      const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
       searchPatterns.push(`usage:${keyId}:model:daily:*:${dateStr}`)
     }
   } else if (timeRange === 'today') {
     searchPatterns.push(`usage:${keyId}:model:daily:*:${today}`)
   } else if (timeRange === '7days') {
-    // 最近7天
+    // 最近7天：从真实当前时间往前推，让 getDateStringInTimezone 处理时区转换
     for (let i = 0; i < 7; i++) {
-      const d = new Date(tzDate)
-      d.setDate(d.getDate() - i)
+      const d = new Date(now.getTime() - i * 86400000)
       const dateStr = redis.getDateStringInTimezone(d)
       searchPatterns.push(`usage:${keyId}:model:daily:*:${dateStr}`)
     }
