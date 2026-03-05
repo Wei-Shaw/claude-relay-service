@@ -1039,12 +1039,8 @@ class UnifiedClaudeScheduler {
         if (!account || !account.isActive) {
           return false
         }
-        // 检查账户状态
-        if (
-          account.status !== 'active' &&
-          account.status !== 'unauthorized' &&
-          account.status !== 'overloaded'
-        ) {
+        // 检查账户状态（unauthorized 在后续单独检查）
+        if (account.status !== 'active' && account.status !== 'overloaded') {
           return false
         }
         // 检查是否可调度
@@ -1090,10 +1086,6 @@ class UnifiedClaudeScheduler {
         if (await claudeConsoleAccountService.isAccountQuotaExceeded(accountId)) {
           return false
         }
-        // 检查是否未授权（401错误）
-        if (account.status === 'unauthorized') {
-          return false
-        }
         // 检查是否过载（529错误）
         if (await claudeConsoleAccountService.isAccountOverloaded(accountId)) {
           return false
@@ -1133,12 +1125,8 @@ class UnifiedClaudeScheduler {
         if (!account || !account.isActive) {
           return false
         }
-        // 检查账户状态
-        if (
-          account.status !== 'active' &&
-          account.status !== 'unauthorized' &&
-          account.status !== 'overloaded'
-        ) {
+        // 检查账户状态（unauthorized 在后续单独检查）
+        if (account.status !== 'active' && account.status !== 'overloaded') {
           return false
         }
         // 检查是否可调度
@@ -1175,10 +1163,6 @@ class UnifiedClaudeScheduler {
           return false
         }
         if (await ccrAccountService.isAccountQuotaExceeded(accountId)) {
-          return false
-        }
-        // 检查是否未授权（401错误）
-        if (account.status === 'unauthorized') {
           return false
         }
         // 检查是否过载（529错误）
