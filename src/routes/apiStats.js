@@ -986,20 +986,25 @@ router.post('/api-key/test', async (req, res) => {
       responseStream: res,
       payload: createClaudeTestPayload(model, { stream: true, prompt, maxTokens }),
       timeout: 60000,
-      extraHeaders: { 'x-api-key': apiKey },
-      sanitize: true
+      extraHeaders: {
+        'x-api-key': apiKey,
+        'x-app': 'claude-code',
+        'anthropic-beta': 'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14'
+      },
+      sanitize: false
     })
   } catch (error) {
     logger.error('❌ API Key test failed:', error)
 
+    const errorMsg = error.message || 'An unexpected error occurred'
     if (!res.headersSent) {
       return res.status(500).json({
         error: 'Test failed',
-        message: getSafeMessage(error)
+        message: errorMsg
       })
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'error', error: getSafeMessage(error) })}\n\n`)
+    res.write(`data: ${JSON.stringify({ type: 'error', error: errorMsg })}\n\n`)
     res.end()
   }
 })

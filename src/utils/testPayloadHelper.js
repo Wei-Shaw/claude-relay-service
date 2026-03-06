@@ -146,7 +146,7 @@ async function sendStreamTestRequest(options) {
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
       'User-Agent': 'claude-cli/2.0.52 (external, cli)',
-      authorization,
+      ...(authorization ? { authorization } : {}),
       ...extraHeaders
     },
     timeout,

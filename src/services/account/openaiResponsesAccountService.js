@@ -51,12 +51,21 @@ class OpenAIResponsesAccountService {
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
       rateLimitDuration = 60, // 限流时间（分钟）
-      disableAutoProtection = false // 是否关闭自动防护（429/401/400/529 不自动禁用）
+      disableAutoProtection = false, // 是否关闭自动防护（429/401/400/529 不自动禁用）
+      providerEndpoint = 'responses' // Provider 端点类型：responses | auto
     } = options
 
     // 验证必填字段
     if (!baseApi || !apiKey) {
       throw new Error('Base API URL and API Key are required for OpenAI-Responses account')
+    }
+
+    // 验证 providerEndpoint 枚举值
+    const validEndpoints = ['responses', 'auto']
+    if (!validEndpoints.includes(providerEndpoint)) {
+      throw new Error(
+        `Invalid providerEndpoint: ${providerEndpoint}. Must be one of: ${validEndpoints.join(', ')}`
+      )
     }
 
     // 规范化 baseApi（确保不以 / 结尾）
@@ -96,7 +105,8 @@ class OpenAIResponsesAccountService {
       lastResetDate: redis.getDateStringInTimezone(),
       quotaResetTime,
       quotaStoppedAt: '',
-      disableAutoProtection: disableAutoProtection.toString() // 关闭自动防护
+      disableAutoProtection: disableAutoProtection.toString(), // 关闭自动防护
+      providerEndpoint // Provider 端点类型：responses(默认) | auto
     }
 
     // 保存到 Redis
@@ -163,6 +173,16 @@ class OpenAIResponsesAccountService {
     // OpenAI-Responses 使用 API Key，没有 token 刷新逻辑，不会覆盖此字段
     if (updates.subscriptionExpiresAt !== undefined) {
       // 直接保存，不做任何调整
+    }
+
+    // 验证 providerEndpoint 枚举值
+    if (updates.providerEndpoint !== undefined) {
+      const validEndpoints = ['responses', 'auto']
+      if (!validEndpoints.includes(updates.providerEndpoint)) {
+        throw new Error(
+          `Invalid providerEndpoint: ${updates.providerEndpoint}. Must be one of: ${validEndpoints.join(', ')}`
+        )
+      }
     }
 
     // 自动防护开关
@@ -275,6 +295,17 @@ class OpenAIResponsesAccountService {
       return
     }
 
+    // disableAutoProtection 检查
+    if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+      logger.info(
+        `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountRateLimited`
+      )
+      upstreamErrorHelper
+        .recordErrorHistory(accountId, 'openai-responses', 429, 'rate_limit')
+        .catch(() => {})
+      return
+    }
+
     const rateLimitDuration = duration || parseInt(account.rateLimitDuration) || 60
     const now = new Date()
     const resetAt = new Date(now.getTime() + rateLimitDuration * 60000)
@@ -298,6 +329,17 @@ class OpenAIResponsesAccountService {
   async markAccountUnauthorized(accountId, reason = 'OpenAI Responses账号认证失败（401错误）') {
     const account = await this.getAccount(accountId)
     if (!account) {
+      return
+    }
+
+    // disableAutoProtection 检查
+    if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+      logger.info(
+        `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
+      )
+      upstreamErrorHelper
+        .recordErrorHistory(accountId, 'openai-responses', 401, 'auth_error')
+        .catch(() => {})
       return
     }
 

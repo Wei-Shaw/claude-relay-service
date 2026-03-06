@@ -239,6 +239,16 @@ class CostCalculator {
         aggregatedUsage.cacheReadTokens || aggregatedUsage.totalCacheReadTokens || 0
     }
 
+    // 如果有 ephemeral 拆分数据，构建 cache_creation 子对象
+    const eph5m = aggregatedUsage.ephemeral5mTokens || aggregatedUsage.totalEphemeral5mTokens || 0
+    const eph1h = aggregatedUsage.ephemeral1hTokens || aggregatedUsage.totalEphemeral1hTokens || 0
+    if (eph5m > 0 || eph1h > 0) {
+      usage.cache_creation = {
+        ephemeral_5m_input_tokens: eph5m,
+        ephemeral_1h_input_tokens: eph1h
+      }
+    }
+
     return this.calculateCost(usage, model)
   }
 

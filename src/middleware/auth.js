@@ -1313,6 +1313,7 @@ const authenticateApiKey = async (req, res, next) => {
       restrictedModels: validation.keyData.restrictedModels,
       enableClientRestriction: validation.keyData.enableClientRestriction,
       allowedClients: validation.keyData.allowedClients,
+      allow1mContext: validation.keyData.allow1mContext,
       dailyCostLimit: validation.keyData.dailyCostLimit,
       dailyCost: validation.keyData.dailyCost,
       totalCostLimit: validation.keyData.totalCostLimit,

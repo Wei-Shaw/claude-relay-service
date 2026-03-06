@@ -373,6 +373,31 @@ docker-compose.yml 已包含：
 
 **注意**: 如果你在国内，这一步可能需要科学上网。
 
+### 2.1 临时暂停（503/5xx）与账号级 TTL 覆盖
+
+系统会在上游异常时临时暂停账号路由，默认由全局配置控制（见 `.env.example`）：
+
+- `UPSTREAM_ERROR_503_TTL_SECONDS`
+- `UPSTREAM_ERROR_5XX_TTL_SECONDS`
+- `UPSTREAM_ERROR_OVERLOAD_TTL_SECONDS`
+- `UPSTREAM_ERROR_AUTH_TTL_SECONDS`
+- `UPSTREAM_ERROR_TIMEOUT_TTL_SECONDS`
+
+在管理后台编辑 **Claude 官方 OAuth 账号** 时，可做账号级覆盖：
+
+- `禁用该账号临时冷却`：该账号不再因 503/5xx 进入临时暂停
+- `503 冷却秒数`：留空=跟随全局，`0`=关闭该账号 503 冷却
+- `5xx 冷却秒数`：留空=跟随全局，`0`=关闭该账号 5xx 冷却
+
+优先级从高到低：
+
+1. 账号级“禁用临时冷却”
+2. 账号级 503/5xx 冷却秒数
+3. 代码调用时传入的自定义 TTL（若有）
+4. 全局环境变量默认值
+
+账户列表会显示“不可路由原因”，包含错误类型、HTTP 状态码、内部冷却总时长、剩余时间和预计恢复时间；点击 `重置状态` 可清除异常状态并恢复参与路由。
+
 ### 3. 创建API Key
 
 给每个使用者分配一个Key：

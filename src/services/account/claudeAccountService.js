@@ -18,6 +18,11 @@ const tokenRefreshService = require('../tokenRefreshService')
 const LRUCache = require('../../utils/lruCache')
 const { formatDateWithTimezone, getISOStringWithTimezone } = require('../../utils/dateHelper')
 const { isOpus45OrNewer } = require('../../utils/modelHelper')
+const {
+  parseBooleanLike,
+  normalizeOptionalNonNegativeInteger,
+  normalizeTempUnavailablePolicyInput
+} = require('../../utils/tempUnavailablePolicy')
 
 /**
  * Check if account is Pro (not Max)
@@ -94,10 +99,20 @@ class ClaudeAccountService {
       expiresAt = null, // 账户订阅到期时间
       extInfo = null, // 额外扩展信息
       maxConcurrency = 0, // 账户级用户消息串行队列：0=使用全局配置，>0=强制启用串行
-      interceptWarmup = false // 拦截预热请求（标题生成、Warmup等）
+      interceptWarmup = false, // 拦截预热请求（标题生成、Warmup等）
+      disableTempUnavailable = false, // 是否禁用账号级临时冷却（temp_unavailable）
+      tempUnavailable503TtlSeconds = null, // 账号级 503 冷却秒数（null 跟随全局）
+      tempUnavailable5xxTtlSeconds = null // 账号级 5xx 冷却秒数（null 跟随全局）
     } = options
 
     const accountId = uuidv4()
+    const normalizedTempUnavailablePolicy = normalizeTempUnavailablePolicyInput({
+      disableTempUnavailable,
+      tempUnavailable503TtlSeconds,
+      tempUnavailable5xxTtlSeconds
+    })
+    const normalized503Ttl = normalizedTempUnavailablePolicy.tempUnavailable503TtlSeconds
+    const normalized5xxTtl = normalizedTempUnavailablePolicy.tempUnavailable5xxTtlSeconds
 
     let accountData
     const normalizedExtInfo = this._normalizeExtInfo(extInfo, claudeAiOauth)
@@ -143,7 +158,11 @@ class ClaudeAccountService {
         // 账户级用户消息串行队列限制
         maxConcurrency: maxConcurrency.toString(),
         // 拦截预热请求
-        interceptWarmup: interceptWarmup.toString()
+        interceptWarmup: interceptWarmup.toString(),
+        // 账号级临时冷却覆盖（空字符串表示跟随全局配置）
+        disableTempUnavailable: normalizedTempUnavailablePolicy.disableTempUnavailable.toString(),
+        tempUnavailable503TtlSeconds: normalized503Ttl !== null ? normalized503Ttl.toString() : '',
+        tempUnavailable5xxTtlSeconds: normalized5xxTtl !== null ? normalized5xxTtl.toString() : ''
       }
     } else {
       // 兼容旧格式
@@ -179,7 +198,11 @@ class ClaudeAccountService {
         // 账户级用户消息串行队列限制
         maxConcurrency: maxConcurrency.toString(),
         // 拦截预热请求
-        interceptWarmup: interceptWarmup.toString()
+        interceptWarmup: interceptWarmup.toString(),
+        // 账号级临时冷却覆盖（空字符串表示跟随全局配置）
+        disableTempUnavailable: normalizedTempUnavailablePolicy.disableTempUnavailable.toString(),
+        tempUnavailable503TtlSeconds: normalized503Ttl !== null ? normalized503Ttl.toString() : '',
+        tempUnavailable5xxTtlSeconds: normalized5xxTtl !== null ? normalized5xxTtl.toString() : ''
       }
     }
 
@@ -228,7 +251,10 @@ class ClaudeAccountService {
       useUnifiedClientId,
       unifiedClientId,
       extInfo: normalizedExtInfo,
-      interceptWarmup
+      interceptWarmup,
+      disableTempUnavailable: normalizedTempUnavailablePolicy.disableTempUnavailable,
+      tempUnavailable503TtlSeconds: normalized503Ttl,
+      tempUnavailable5xxTtlSeconds: normalized5xxTtl
     }
   }
 
@@ -396,9 +422,25 @@ class ClaudeAccountService {
       const accountData = await redis.getClaudeAccount(accountId)
       if (accountData) {
         logRefreshError(accountId, accountData.name, 'claude', error)
-        accountData.status = 'error'
-        accountData.errorMessage = error.message
-        await redis.setClaudeAccount(accountId, accountData)
+
+        // disableAutoProtection 检查：跳过状态修改，仅记录日志和错误历史
+        if (
+          accountData.disableAutoProtection === true ||
+          accountData.disableAutoProtection === 'true'
+        ) {
+          logger.info(
+            `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping error status on token refresh failure`
+          )
+          upstreamErrorHelper
+            .recordErrorHistory(accountId, 'claude-official', 0, 'token_refresh_failed', {
+              errorBody: error.message
+            })
+            .catch(() => {})
+        } else {
+          accountData.status = 'error'
+          accountData.errorMessage = error.message
+          await redis.setClaudeAccount(accountId, accountData)
+        }
 
         // 发送Webhook通知
         try {
@@ -507,11 +549,13 @@ class ClaudeAccountService {
       // 处理返回数据，移除敏感信息并添加限流状态和会话窗口信息
       const processedAccounts = await Promise.all(
         accounts.map(async (account) => {
-          // 获取限流状态信息
-          const rateLimitInfo = await this.getAccountRateLimitInfo(account.id)
-
-          // 获取会话窗口信息
-          const sessionWindowInfo = await this.getSessionWindowInfo(account.id)
+          const [rateLimitInfo, sessionWindowInfo, opusRateLimitStatus, isOverloaded] =
+            await Promise.all([
+              this.getAccountRateLimitInfo(account.id),
+              this.getSessionWindowInfo(account.id),
+              this.getAccountOpusRateLimitInfo(account.id, account),
+              this.isAccountOverloaded(account.id)
+            ])
 
           // 构建 Claude Usage 快照（从 Redis 读取）
           const claudeUsage = this.buildClaudeUsageSnapshot(account)
@@ -521,6 +565,17 @@ class ClaudeAccountService {
           const isOAuth = scopes.includes('user:profile') && scopes.includes('user:inference')
           const authType = isOAuth ? 'oauth' : 'setup-token'
           const parsedExtInfo = this._safeParseJson(account.extInfo)
+          const parsedProxy = this._safeParseAccountFieldJson(account.proxy, 'proxy', account.id)
+          const parsedSubscriptionInfo = this._safeParseAccountFieldJson(
+            account.subscriptionInfo,
+            'subscriptionInfo',
+            account.id
+          )
+          const normalizedTempUnavailablePolicy = normalizeTempUnavailablePolicyInput({
+            disableTempUnavailable: account.disableTempUnavailable,
+            tempUnavailable503TtlSeconds: account.tempUnavailable503TtlSeconds,
+            tempUnavailable5xxTtlSeconds: account.tempUnavailable5xxTtlSeconds
+          })
 
           return {
             id: account.id,
@@ -528,7 +583,7 @@ class ClaudeAccountService {
             description: account.description,
             email: account.email ? this._maskEmail(this._decryptSensitiveData(account.email)) : '',
             isActive: account.isActive === 'true',
-            proxy: account.proxy ? JSON.parse(account.proxy) : null,
+            proxy: parsedProxy,
             status: account.status,
             errorMessage: account.errorMessage,
             accountType: account.accountType || 'shared', // 兼容旧数据，默认为共享
@@ -549,9 +604,7 @@ class ClaudeAccountService {
             // 添加 refreshToken 是否存在的标记（不返回实际值）
             hasRefreshToken: !!account.refreshToken,
             // 添加套餐信息（如果存在）
-            subscriptionInfo: account.subscriptionInfo
-              ? JSON.parse(account.subscriptionInfo)
-              : null,
+            subscriptionInfo: parsedSubscriptionInfo,
             // 添加限流状态信息
             rateLimitStatus: rateLimitInfo
               ? {
@@ -560,6 +613,13 @@ class ClaudeAccountService {
                   minutesRemaining: rateLimitInfo.minutesRemaining
                 }
               : null,
+            // Opus 专属限流状态（仅影响 Opus 模型路由）
+            opusRateLimitStatus,
+            // 过载状态（429/529 自动保护）
+            overloadStatus: {
+              isOverloaded,
+              lastOverloadAt: account.lastOverloadAt || null
+            },
             // 添加会话窗口信息
             sessionWindow: sessionWindowInfo || {
               hasActiveWindow: false,
@@ -590,7 +650,13 @@ class ClaudeAccountService {
             // 账户级用户消息串行队列限制
             maxConcurrency: parseInt(account.maxConcurrency || '0', 10),
             // 拦截预热请求
-            interceptWarmup: account.interceptWarmup === 'true'
+            interceptWarmup: account.interceptWarmup === 'true',
+            // 账号级临时冷却覆盖
+            disableTempUnavailable: normalizedTempUnavailablePolicy.disableTempUnavailable,
+            tempUnavailable503TtlSeconds:
+              normalizedTempUnavailablePolicy.tempUnavailable503TtlSeconds,
+            tempUnavailable5xxTtlSeconds:
+              normalizedTempUnavailablePolicy.tempUnavailable5xxTtlSeconds
           }
         })
       )
@@ -684,7 +750,10 @@ class ClaudeAccountService {
         'subscriptionExpiresAt',
         'extInfo',
         'maxConcurrency',
-        'interceptWarmup'
+        'interceptWarmup',
+        'disableTempUnavailable',
+        'tempUnavailable503TtlSeconds',
+        'tempUnavailable5xxTtlSeconds'
       ]
       const updatedData = { ...accountData }
       let shouldClearAutoStopFields = false
@@ -701,6 +770,14 @@ class ClaudeAccountService {
             updatedData[field] = value ? JSON.stringify(value) : ''
           } else if (field === 'priority' || field === 'maxConcurrency') {
             updatedData[field] = value.toString()
+          } else if (field === 'disableTempUnavailable') {
+            updatedData[field] = parseBooleanLike(value) ? 'true' : 'false'
+          } else if (
+            field === 'tempUnavailable503TtlSeconds' ||
+            field === 'tempUnavailable5xxTtlSeconds'
+          ) {
+            const normalizedTtl = normalizeOptionalNonNegativeInteger(value)
+            updatedData[field] = normalizedTtl !== null ? normalizedTtl.toString() : ''
           } else if (field === 'subscriptionInfo') {
             // 处理订阅信息更新
             updatedData[field] = typeof value === 'string' ? value : JSON.stringify(value)
@@ -1329,6 +1406,20 @@ class ClaudeAccountService {
         throw new Error('Account not found')
       }
 
+      // disableAutoProtection 检查：跳过自动禁用，仅记录错误历史
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(
+          `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping rate limit marking`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-official', 429, 'rate_limit')
+          .catch(() => {})
+        return { success: true, skipped: true }
+      }
+
       // 设置限流状态和时间
       const updatedAccountData = { ...accountData }
       updatedAccountData.rateLimitedAt = new Date().toISOString()
@@ -1466,6 +1557,58 @@ class ClaudeAccountService {
     } catch (error) {
       logger.error(`❌ Failed to clear Opus rate limit for account: ${accountId}`, error)
       throw error
+    }
+  }
+
+  // 📊 获取账号 Opus 限流信息（自动清理过期状态）
+  async getAccountOpusRateLimitInfo(accountId, accountData = null) {
+    try {
+      const data = accountData || (await redis.getClaudeAccount(accountId))
+      if (!data || Object.keys(data).length === 0 || !data.opusRateLimitEndAt) {
+        return {
+          isRateLimited: false,
+          rateLimitedAt: null,
+          resetAt: null,
+          minutesRemaining: 0
+        }
+      }
+
+      const resetAtMs = Date.parse(data.opusRateLimitEndAt)
+      if (Number.isNaN(resetAtMs)) {
+        return {
+          isRateLimited: false,
+          rateLimitedAt: data.opusRateLimitedAt || null,
+          resetAt: null,
+          minutesRemaining: 0
+        }
+      }
+
+      const nowMs = Date.now()
+      if (nowMs >= resetAtMs) {
+        // 自动清理过期标记，避免前端持续显示陈旧状态
+        await this.clearAccountOpusRateLimit(accountId).catch(() => {})
+        return {
+          isRateLimited: false,
+          rateLimitedAt: data.opusRateLimitedAt || null,
+          resetAt: data.opusRateLimitEndAt,
+          minutesRemaining: 0
+        }
+      }
+
+      return {
+        isRateLimited: true,
+        rateLimitedAt: data.opusRateLimitedAt || null,
+        resetAt: data.opusRateLimitEndAt,
+        minutesRemaining: Math.max(0, Math.ceil((resetAtMs - nowMs) / (1000 * 60)))
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to get Opus rate limit info for account: ${accountId}`, error)
+      return {
+        isRateLimited: false,
+        rateLimitedAt: null,
+        resetAt: null,
+        minutesRemaining: 0
+      }
     }
   }
 
@@ -2144,7 +2287,7 @@ class ClaudeAccountService {
           organizationType: profileData.organization?.organization_type,
 
           // 账号类型：Enterprise 组织按 Max 能力处理，确保可调度 Opus
-          accountType: hasClaudeMax ? 'claude_max' : hasClaudePro ? 'claude_pro' : 'free',
+          accountType: hasClaudeMax ? 'claude_max' : hasClaudePro ? 'claude_pro' : 'claude_max',
 
           // 更新时间
           profileFetchedAt: new Date().toISOString()
@@ -2367,6 +2510,21 @@ class ClaudeAccountService {
         throw new Error('Account not found')
       }
 
+      // disableAutoProtection 检查：跳过自动禁用，仅记录错误历史
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(
+          `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping ${errorType} marking`
+        )
+        const statusCode = errorType === 'unauthorized' ? 401 : 403
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-official', statusCode, errorType)
+          .catch(() => {})
+        return { success: true, skipped: true }
+      }
+
       // 更新账户状态
       const updatedAccountData = { ...accountData }
       updatedAccountData.status = errorConfig.status
@@ -2462,6 +2620,9 @@ class ClaudeAccountService {
       delete updatedAccountData.tempErrorAt
       delete updatedAccountData.sessionWindowStart
       delete updatedAccountData.sessionWindowEnd
+      delete updatedAccountData.opusRateLimitedAt
+      delete updatedAccountData.opusRateLimitEndAt
+      delete updatedAccountData.lastOverloadAt
 
       // 保存更新后的账户数据
       await redis.setClaudeAccount(accountId, updatedAccountData)
@@ -2477,6 +2638,9 @@ class ClaudeAccountService {
         'tempErrorAt',
         'sessionWindowStart',
         'sessionWindowEnd',
+        'opusRateLimitedAt',
+        'opusRateLimitEndAt',
+        'lastOverloadAt',
         // 新的独立标记
         'rateLimitAutoStopped',
         'fiveHourAutoStopped',
@@ -2508,7 +2672,10 @@ class ClaudeAccountService {
       await redis.client.del(overloadKey)
 
       // 清除临时不可用状态
-      await upstreamErrorHelper.clearTempUnavailable(accountId, 'claude-official').catch(() => {})
+      await Promise.all([
+        upstreamErrorHelper.clearTempUnavailable(accountId, 'claude-official').catch(() => {}),
+        upstreamErrorHelper.clearTempUnavailable(accountId, 'claude').catch(() => {})
+      ])
 
       logger.info(
         `✅ Successfully reset all error states for account ${accountData.name} (${accountId})`
@@ -2637,6 +2804,20 @@ class ClaudeAccountService {
       const accountData = await redis.getClaudeAccount(accountId)
       if (!accountData || Object.keys(accountData).length === 0) {
         throw new Error('Account not found')
+      }
+
+      // disableAutoProtection 检查：跳过自动禁用，仅记录错误历史
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(
+          `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping temp error marking`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-official', 500, 'server_error')
+          .catch(() => {})
+        return { success: true, skipped: true }
       }
 
       // 更新账户状态
@@ -2846,6 +3027,20 @@ class ClaudeAccountService {
       const accountData = await redis.getClaudeAccount(accountId)
       if (!accountData) {
         throw new Error('Account not found')
+      }
+
+      // disableAutoProtection 检查：跳过过载标记，仅记录错误历史
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(
+          `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping overload marking`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-official', 529, 'overload')
+          .catch(() => {})
+        return { success: true, skipped: true }
       }
 
       // 获取配置的过载处理时间（分钟）
@@ -3205,6 +3400,28 @@ class ClaudeAccountService {
       return parsed && typeof parsed === 'object' ? parsed : null
     } catch (error) {
       logger.warn('⚠️ 解析扩展信息失败，已忽略：', error.message)
+      return null
+    }
+  }
+
+  _safeParseAccountFieldJson(value, fieldName, accountId = '') {
+    if (!value) {
+      return null
+    }
+    if (typeof value === 'object') {
+      return value
+    }
+    if (typeof value !== 'string') {
+      return null
+    }
+
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' ? parsed : null
+    } catch (error) {
+      logger.warn(
+        `⚠️ Failed to parse ${fieldName} for Claude account ${accountId || 'unknown'}, ignored: ${error.message}`
+      )
       return null
     }
   }

@@ -756,11 +756,23 @@
                     >
                       <i class="fas fa-clock mr-1" />
                       临时暂停
-                      <span v-if="account.tempUnavailable.ttl > 0"
-                        >({{ formatTempUnavailableTime(account.tempUnavailable.ttl) }})</span
-                      >
+                      <span v-if="getTempUnavailableRemainingSeconds(account.tempUnavailable) > 0">
+                        ({{
+                          formatTempUnavailableTime(
+                            getTempUnavailableRemainingSeconds(account.tempUnavailable)
+                          )
+                        }}
+                        <span v-if="getTempUnavailableCooldownSeconds(account.tempUnavailable) > 0"
+                          >/
+                          {{
+                            formatTempUnavailableTime(
+                              getTempUnavailableCooldownSeconds(account.tempUnavailable)
+                            )
+                          }}</span
+                        >)
+                      </span>
                       <el-tooltip
-                        :content="`${account.tempUnavailable.errorType} (HTTP ${account.tempUnavailable.statusCode})`"
+                        :content="getTempUnavailableTooltipContent(account.tempUnavailable)"
                         effect="dark"
                         placement="top"
                       >
@@ -783,11 +795,35 @@
                       </el-tooltip>
                     </span>
                     <span
+                      v-if="
+                        account.opusRateLimitStatus && account.opusRateLimitStatus.isRateLimited
+                      "
+                      class="inline-flex items-center rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800"
+                    >
+                      <i class="fas fa-hourglass-half mr-1" />
+                      Opus限流
+                      <span
+                        v-if="
+                          Number.isFinite(account.opusRateLimitStatus.minutesRemaining) &&
+                          account.opusRateLimitStatus.minutesRemaining > 0
+                        "
+                      >
+                        ({{ formatRateLimitTime(account.opusRateLimitStatus.minutesRemaining) }})
+                      </span>
+                    </span>
+                    <span
                       v-if="account.status === 'blocked' && account.errorMessage"
                       class="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400"
                       :title="account.errorMessage"
                     >
                       {{ account.errorMessage }}
+                    </span>
+                    <span
+                      v-if="isAccountRoutingBlocked(account)"
+                      class="mt-1 block max-w-xl truncate text-xs font-medium text-red-600 dark:text-red-300"
+                      :title="`不可路由：${getRoutingBlockReasonSummary(account)}`"
+                    >
+                      不可路由：{{ getRoutingBlockReasonSummary(account) }}
                     </span>
                     <span
                       v-if="account.accountType === 'dedicated'"
@@ -1316,6 +1352,14 @@
                       <span class="ml-1">详情</span>
                     </button>
                     <button
+                      class="rounded bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-800/50"
+                      title="查看错误历史"
+                      @click="openErrorHistory(account)"
+                    >
+                      <i class="fas fa-exclamation-triangle" />
+                      <span class="ml-1">错误</span>
+                    </button>
+                    <button
                       v-if="canTestAccount(account)"
                       class="rounded bg-cyan-100 px-2.5 py-1 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:hover:bg-cyan-800/50"
                       title="测试账户连通性"
@@ -1799,8 +1843,25 @@
             </div>
           </div>
 
+          <div
+            v-if="isAccountRoutingBlocked(account)"
+            class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800/70 dark:bg-red-900/30 dark:text-red-300"
+          >
+            <div class="font-semibold">不可路由原因</div>
+            <div class="mt-1 break-all">{{ getRoutingBlockReasonSummary(account) }}</div>
+          </div>
+
           <!-- 操作按钮 -->
           <div class="mt-3 flex gap-2 border-t border-gray-100 pt-3">
+            <button
+              v-if="showResetButton(account)"
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-800/50"
+              :disabled="account.isResetting"
+              @click="resetAccountStatus(account)"
+            >
+              <i :class="['fas fa-redo', account.isResetting ? 'animate-spin' : '']" />
+              重置
+            </button>
             <button
               class="flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors"
               :class="
@@ -1822,6 +1883,13 @@
             >
               <i class="fas fa-chart-line" />
               详情
+            </button>
+            <button
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-800/50"
+              @click="openErrorHistory(account)"
+            >
+              <i class="fas fa-exclamation-triangle" />
+              错误
             </button>
             <button
               v-if="canTestAccount(account)"
@@ -1996,6 +2064,15 @@
       :show="showAccountUsageModal"
       :summary="accountUsageSummary"
       @close="closeAccountUsageModal"
+    />
+
+    <!-- 错误历史弹窗 -->
+    <AccountErrorHistoryModal
+      :account-id="errorHistoryTarget.accountId"
+      :account-name="errorHistoryTarget.accountName"
+      :account-type="errorHistoryTarget.accountType"
+      :show="showErrorHistoryModal"
+      @close="showErrorHistoryModal = false"
     />
 
     <!-- 账户过期时间编辑弹窗 -->
@@ -2187,6 +2264,7 @@ import * as httpApis from '@/utils/http_apis'
 import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
+import AccountErrorHistoryModal from '@/components/accounts/AccountErrorHistoryModal.vue'
 import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
 import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 import AccountScheduledTestModal from '@/components/accounts/AccountScheduledTestModal.vue'
@@ -2223,6 +2301,7 @@ const handleCancel = () => {
 const accounts = ref([])
 const accountsLoading = ref(false)
 const refreshingBalances = ref(false)
+const tempUnavailableNowTs = ref(Date.now())
 const accountsSortBy = ref('name')
 const accountsSortOrder = ref('asc')
 const apiKeys = ref([]) // 保留用于其他功能（如删除账户时显示绑定信息）
@@ -2252,6 +2331,56 @@ const selectedAccounts = ref([])
 const selectAllChecked = ref(false)
 const isIndeterminate = ref(false)
 const showCheckboxes = ref(false)
+
+// 错误历史弹窗状态
+const showErrorHistoryModal = ref(false)
+const errorHistoryTarget = ref({ accountType: '', accountId: '', accountName: '' })
+// 前端 platform → 后端 error_history key 的 accountType 映射
+const platformToAccountType = (platform) => {
+  if (platform === 'claude' || platform === 'claude-oauth') return 'claude-official'
+  if (platform === 'azure_openai') return 'azure-openai'
+  return platform
+}
+
+const TEMP_UNAVAILABLE_ACCOUNT_TYPE_ALIASES = {
+  claude: ['claude-official', 'claude'],
+  'claude-console': ['claude-console'],
+  bedrock: ['bedrock'],
+  gemini: ['gemini'],
+  'gemini-api': ['gemini-api'],
+  openai: ['openai'],
+  'openai-responses': ['openai-responses'],
+  ccr: ['ccr'],
+  droid: ['droid'],
+  azure_openai: ['azure-openai'],
+  'azure-openai': ['azure-openai']
+}
+
+const resolveTempUnavailableStatusForAccount = (tempStatuses, account) => {
+  if (!tempStatuses || !account) return null
+
+  const accountTypeAliases = TEMP_UNAVAILABLE_ACCOUNT_TYPE_ALIASES[account.platform] || [
+    account.platform
+  ]
+
+  for (const accountType of accountTypeAliases) {
+    const key = `${accountType}:${account.id}`
+    if (tempStatuses[key]) {
+      return tempStatuses[key]
+    }
+  }
+
+  return null
+}
+
+const openErrorHistory = (account) => {
+  errorHistoryTarget.value = {
+    accountType: platformToAccountType(account.platform),
+    accountId: account.id,
+    accountName: account.name || account.email || account.id
+  }
+  showErrorHistoryModal.value = true
+}
 
 // 账号使用详情弹窗状态
 const showAccountUsageModal = ref(false)
@@ -2510,17 +2639,10 @@ const showResetButton = (account) => {
     'ccr',
     'droid',
     'bedrock',
-    'azure-openai'
+    'azure-openai',
+    'azure_openai'
   ]
-  return (
-    supportedPlatforms.includes(account.platform) &&
-    (account.status === 'unauthorized' ||
-      account.status !== 'active' ||
-      account.rateLimitStatus?.isRateLimited ||
-      account.rateLimitStatus === 'limited' ||
-      account.tempUnavailable ||
-      !account.isActive)
-  )
+  return supportedPlatforms.includes(account.platform) && isAccountRoutingBlocked(account)
 }
 
 // 获取账户操作菜单项（用于小屏下拉菜单）
@@ -2548,6 +2670,15 @@ const getAccountActions = (account) => {
       handler: () => openAccountUsageModal(account)
     })
   }
+
+  // 错误历史
+  actions.push({
+    key: 'error-history',
+    label: '错误历史',
+    icon: 'fa-exclamation-triangle',
+    color: 'red',
+    handler: () => openErrorHistory(account)
+  })
 
   // 测试账户
   if (canTestAccount(account)) {
@@ -3188,18 +3319,35 @@ const loadAccounts = async (forceReload = false) => {
       platformsToFetch.map(async (platform) => {
         const handler = platformRequestHandlers[platform]
         if (!handler) {
-          return { platform, success: true, data: [] }
+          return { platform, success: true, data: [], message: '' }
         }
 
         try {
           const res = await handler(params)
-          return { platform, success: res?.success, data: res?.data }
+          return {
+            platform,
+            success: !!res?.success,
+            data: res?.data,
+            message: res?.message || ''
+          }
         } catch (error) {
           console.debug(`Failed to load ${platform} accounts:`, error)
-          return { platform, success: false, data: [] }
+          return { platform, success: false, data: [], message: error?.message || '' }
         }
       })
     )
+
+    const failedPlatforms = platformResults.filter((item) => !item.success)
+    if (failedPlatforms.length > 0) {
+      const failedLabels = failedPlatforms.map((item) => item.platform).join(', ')
+      const firstErrorMessage =
+        failedPlatforms.find((item) => typeof item.message === 'string' && item.message.trim())
+          ?.message || ''
+      showToast(
+        `以下平台账户加载失败：${failedLabels}${firstErrorMessage ? `（${firstErrorMessage}）` : ''}`,
+        'warning'
+      )
+    }
 
     const allAccounts = []
     const counts = bindingCounts.value || {}
@@ -3334,23 +3482,7 @@ const loadAccounts = async (forceReload = false) => {
       if (tempRes?.success && tempRes.data) {
         const tempStatuses = tempRes.data
         filteredAccounts = filteredAccounts.map((account) => {
-          // 尝试匹配 accountType:accountId
-          const platformTypeMap = {
-            claude: 'claude-official',
-            'claude-console': 'claude-console',
-            bedrock: 'bedrock',
-            gemini: 'gemini',
-            'gemini-api': 'gemini-api',
-            openai: 'openai',
-            'openai-responses': 'openai-responses',
-            ccr: 'ccr',
-            droid: 'droid',
-            azure_openai: 'azure-openai',
-            'azure-openai': 'azure-openai'
-          }
-          const accountType = platformTypeMap[account.platform] || account.platform
-          const key = `${accountType}:${account.id}`
-          const tempStatus = tempStatuses[key]
+          const tempStatus = resolveTempUnavailableStatusForAccount(tempStatuses, account)
           if (tempStatus) {
             return { ...account, tempUnavailable: tempStatus }
           }
@@ -3654,6 +3786,105 @@ const formatTempUnavailableTime = (seconds) => {
   return `${secs}s`
 }
 
+const toPositiveInteger = (value) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0
+}
+
+const getTempUnavailableRemainingSeconds = (tempUnavailable) => {
+  if (!tempUnavailable) return 0
+  const serverRemainingSeconds = toPositiveInteger(
+    tempUnavailable.remainingSeconds || tempUnavailable.ttl
+  )
+
+  const recoveryAt = getTempUnavailableRecoveryAt(tempUnavailable)
+  if (!recoveryAt) {
+    return serverRemainingSeconds
+  }
+
+  const recoveryAtTimestamp = new Date(recoveryAt).getTime()
+  if (Number.isNaN(recoveryAtTimestamp)) {
+    return serverRemainingSeconds
+  }
+
+  const liveRemainingSeconds = Math.max(
+    0,
+    Math.ceil((recoveryAtTimestamp - tempUnavailableNowTs.value) / 1000)
+  )
+
+  if (serverRemainingSeconds <= 0) {
+    return liveRemainingSeconds
+  }
+  return Math.min(serverRemainingSeconds, liveRemainingSeconds)
+}
+
+const getTempUnavailableCooldownSeconds = (tempUnavailable) => {
+  if (!tempUnavailable) return 0
+  return toPositiveInteger(tempUnavailable.cooldownSeconds)
+}
+
+const getTempUnavailableRecoveryAt = (tempUnavailable) => {
+  if (!tempUnavailable) return ''
+
+  if (tempUnavailable.expiresAt) {
+    const expiresAt = new Date(tempUnavailable.expiresAt)
+    if (!Number.isNaN(expiresAt.getTime())) {
+      return tempUnavailable.expiresAt
+    }
+  }
+
+  if (tempUnavailable.markedAt) {
+    const markedAt = new Date(tempUnavailable.markedAt)
+    const cooldownSeconds = getTempUnavailableCooldownSeconds(tempUnavailable)
+    if (!Number.isNaN(markedAt.getTime()) && cooldownSeconds > 0) {
+      return new Date(markedAt.getTime() + cooldownSeconds * 1000).toISOString()
+    }
+  }
+
+  return ''
+}
+
+const formatTempUnavailableRecoveryAt = (tempUnavailable) => {
+  const recoveryAt = getTempUnavailableRecoveryAt(tempUnavailable)
+  if (!recoveryAt) return ''
+
+  const recoveryDate = new Date(recoveryAt)
+  if (Number.isNaN(recoveryDate.getTime())) return ''
+
+  const month = `${recoveryDate.getMonth() + 1}`.padStart(2, '0')
+  const day = `${recoveryDate.getDate()}`.padStart(2, '0')
+  const hours = `${recoveryDate.getHours()}`.padStart(2, '0')
+  const minutes = `${recoveryDate.getMinutes()}`.padStart(2, '0')
+  const seconds = `${recoveryDate.getSeconds()}`.padStart(2, '0')
+  return `${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+const getTempUnavailableTooltipContent = (tempUnavailable) => {
+  if (!tempUnavailable) return ''
+
+  const details = []
+  const statusCodeText = tempUnavailable.statusCode ? `HTTP ${tempUnavailable.statusCode}` : ''
+  const errorTypeText = tempUnavailable.errorType || 'upstream_error'
+  details.push(`${errorTypeText}${statusCodeText ? ` (${statusCodeText})` : ''}`)
+
+  const cooldownSeconds = getTempUnavailableCooldownSeconds(tempUnavailable)
+  if (cooldownSeconds > 0) {
+    details.push(`内部冷却 ${formatTempUnavailableTime(cooldownSeconds)}`)
+  }
+
+  const remainingSeconds = getTempUnavailableRemainingSeconds(tempUnavailable)
+  if (remainingSeconds > 0) {
+    details.push(`剩余 ${formatTempUnavailableTime(remainingSeconds)}`)
+  }
+
+  const recoveryAtText = formatTempUnavailableRecoveryAt(tempUnavailable)
+  if (recoveryAtText) {
+    details.push(`预计恢复 ${recoveryAtText}`)
+  }
+
+  return details.join('，')
+}
+
 // 检查账户是否被限流
 const isAccountRateLimited = (account) => {
   if (!account) return false
@@ -3899,6 +4130,39 @@ const batchDeleteAccounts = async () => {
   updateSelectAllState()
 }
 
+const RESET_STATUS_ENDPOINT_MAP = {
+  openai: (id) => `/admin/openai-accounts/${id}/reset-status`,
+  'openai-responses': (id) => `/admin/openai-responses-accounts/${id}/reset-status`,
+  claude: (id) => `/admin/claude-accounts/${id}/reset-status`,
+  'claude-console': (id) => `/admin/claude-console-accounts/${id}/reset-status`,
+  ccr: (id) => `/admin/ccr-accounts/${id}/reset-status`,
+  droid: (id) => `/admin/droid-accounts/${id}/reset-status`,
+  'gemini-api': (id) => `/admin/gemini-api-accounts/${id}/reset-status`,
+  gemini: (id) => `/admin/gemini-accounts/${id}/reset-status`,
+  bedrock: (id) => `/admin/bedrock-accounts/${id}/reset-status`,
+  'azure-openai': (id) => `/admin/azure-openai-accounts/${id}/reset-status`,
+  azure_openai: (id) => `/admin/azure-openai-accounts/${id}/reset-status`
+}
+
+const TOGGLE_SCHEDULABLE_ENDPOINT_MAP = {
+  claude: (id) => `/admin/claude-accounts/${id}/toggle-schedulable`,
+  'claude-console': (id) => `/admin/claude-console-accounts/${id}/toggle-schedulable`,
+  bedrock: (id) => `/admin/bedrock-accounts/${id}/toggle-schedulable`,
+  gemini: (id) => `/admin/gemini-accounts/${id}/toggle-schedulable`,
+  openai: (id) => `/admin/openai-accounts/${id}/toggle-schedulable`,
+  azure_openai: (id) => `/admin/azure-openai-accounts/${id}/toggle-schedulable`,
+  'azure-openai': (id) => `/admin/azure-openai-accounts/${id}/toggle-schedulable`,
+  'openai-responses': (id) => `/admin/openai-responses-accounts/${id}/toggle-schedulable`,
+  ccr: (id) => `/admin/ccr-accounts/${id}/toggle-schedulable`,
+  droid: (id) => `/admin/droid-accounts/${id}/toggle-schedulable`,
+  'gemini-api': (id) => `/admin/gemini-api-accounts/${id}/toggle-schedulable`
+}
+
+const resolveEndpointByPlatform = (mapping, platform, id) => {
+  const builder = mapping[platform]
+  return typeof builder === 'function' ? builder(id) : ''
+}
+
 // 重置账户状态
 const resetAccountStatus = async (account) => {
   if (account.isResetting) return
@@ -3916,29 +4180,12 @@ const resetAccountStatus = async (account) => {
   try {
     account.isResetting = true
 
-    // 根据账户平台选择不同的 API 端点
-    let endpoint = ''
-    if (account.platform === 'openai') {
-      endpoint = `/admin/openai-accounts/${account.id}/reset-status`
-    } else if (account.platform === 'openai-responses') {
-      endpoint = `/admin/openai-responses-accounts/${account.id}/reset-status`
-    } else if (account.platform === 'claude') {
-      endpoint = `/admin/claude-accounts/${account.id}/reset-status`
-    } else if (account.platform === 'claude-console') {
-      endpoint = `/admin/claude-console-accounts/${account.id}/reset-status`
-    } else if (account.platform === 'ccr') {
-      endpoint = `/admin/ccr-accounts/${account.id}/reset-status`
-    } else if (account.platform === 'droid') {
-      endpoint = `/admin/droid-accounts/${account.id}/reset-status`
-    } else if (account.platform === 'gemini-api') {
-      endpoint = `/admin/gemini-api-accounts/${account.id}/reset-status`
-    } else if (account.platform === 'gemini') {
-      endpoint = `/admin/gemini-accounts/${account.id}/reset-status`
-    } else if (account.platform === 'bedrock') {
-      endpoint = `/admin/bedrock-accounts/${account.id}/reset-status`
-    } else if (account.platform === 'azure-openai') {
-      endpoint = `/admin/azure-openai-accounts/${account.id}/reset-status`
-    } else {
+    const endpoint = resolveEndpointByPlatform(
+      RESET_STATUS_ENDPOINT_MAP,
+      account.platform,
+      account.id
+    )
+    if (!endpoint) {
       showToast('不支持的账户类型', 'error')
       account.isResetting = false
       return
@@ -3963,28 +4210,12 @@ const toggleSchedulable = async (account) => {
   if (account.isTogglingSchedulable) return
   account.isTogglingSchedulable = true
 
-  let endpoint
-  if (account.platform === 'claude') {
-    endpoint = `/admin/claude-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'claude-console') {
-    endpoint = `/admin/claude-console-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'bedrock') {
-    endpoint = `/admin/bedrock-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'gemini') {
-    endpoint = `/admin/gemini-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'openai') {
-    endpoint = `/admin/openai-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'azure_openai') {
-    endpoint = `/admin/azure-openai-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'openai-responses') {
-    endpoint = `/admin/openai-responses-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'ccr') {
-    endpoint = `/admin/ccr-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'droid') {
-    endpoint = `/admin/droid-accounts/${account.id}/toggle-schedulable`
-  } else if (account.platform === 'gemini-api') {
-    endpoint = `/admin/gemini-api-accounts/${account.id}/toggle-schedulable`
-  } else {
+  const endpoint = resolveEndpointByPlatform(
+    TOGGLE_SCHEDULABLE_ENDPOINT_MAP,
+    account.platform,
+    account.id
+  )
+  if (!endpoint) {
     showToast('该账户类型暂不支持调度控制', 'warning')
     account.isTogglingSchedulable = false
     return
@@ -4193,7 +4424,7 @@ const getSchedulableReason = (account) => {
     if (account.status === 'quota_exceeded') {
       return '余额不足'
     }
-    if (account.overloadStatus === 'overloaded') {
+    if (account.overloadStatus === 'overloaded' || account.overloadStatus?.isOverloaded) {
       return '服务过载（529错误）'
     }
     if (account.rateLimitStatus === 'limited') {
@@ -4285,6 +4516,160 @@ const getSchedulableReason = (account) => {
   return '手动停止调度'
 }
 
+const normalizeReasonText = (reason) => {
+  if (typeof reason !== 'string') return ''
+  return reason.trim()
+}
+
+const dedupeRoutingReasons = (reasons) => {
+  const normalized = reasons.map(normalizeReasonText).filter(Boolean)
+  return Array.from(new Set(normalized))
+}
+
+const isAccountExpiredForRouting = (account) => {
+  if (!account || !account.expiresAt) return false
+  if (account.platform !== 'claude-console' && account.platform !== 'bedrock') return false
+  return isExpired(account.expiresAt)
+}
+
+const isAccountRoutingBlocked = (account) => {
+  if (!account) return false
+
+  if (account.isActive === false || account.schedulable === false) {
+    return true
+  }
+
+  if (
+    [
+      'blocked',
+      'unauthorized',
+      'temp_error',
+      'error',
+      'quota_exceeded',
+      'account_blocked'
+    ].includes(account.status)
+  ) {
+    return true
+  }
+
+  if (isAccountRateLimited(account) || account.tempUnavailable) {
+    return true
+  }
+
+  if (account.overloadStatus?.isOverloaded) {
+    return true
+  }
+
+  if (account.opusRateLimitStatus?.isRateLimited) {
+    return true
+  }
+
+  if (isAccountExpiredForRouting(account)) {
+    return true
+  }
+
+  return false
+}
+
+const getRoutingBlockReasons = (account) => {
+  if (!account) return []
+
+  const reasons = []
+
+  if (account.isActive === false) {
+    reasons.push('账号已禁用')
+  }
+
+  if (account.status === 'blocked') {
+    reasons.push(account.errorMessage || '账号已封锁（403）')
+  }
+
+  if (account.status === 'unauthorized') {
+    reasons.push(account.errorMessage || '认证失败（401）')
+  }
+
+  if (account.status === 'temp_error') {
+    reasons.push(account.errorMessage || '临时异常（上游错误）')
+  }
+
+  if (account.status === 'error') {
+    reasons.push(account.errorMessage || '账号状态异常')
+  }
+
+  if (account.status === 'quota_exceeded') {
+    reasons.push('余额/配额不足')
+  }
+
+  if (account.status === 'account_blocked') {
+    reasons.push(account.errorMessage || '账号被上游封禁')
+  }
+
+  if (account.schedulable === false) {
+    reasons.push(getSchedulableReason(account) || '已暂停调度')
+  }
+
+  if (isAccountRateLimited(account)) {
+    const minutes = getRateLimitRemainingMinutes(account)
+    reasons.push(
+      minutes > 0 ? `触发限流（约 ${formatRateLimitTime(minutes)} 后恢复）` : '触发限流（429）'
+    )
+  }
+
+  if (account.tempUnavailable) {
+    const cooldownSeconds = getTempUnavailableCooldownSeconds(account.tempUnavailable)
+    const remainingSeconds = getTempUnavailableRemainingSeconds(account.tempUnavailable)
+    const recoveryAtText = formatTempUnavailableRecoveryAt(account.tempUnavailable)
+
+    const detailParts = []
+    if (cooldownSeconds > 0) {
+      detailParts.push(`内部冷却 ${formatTempUnavailableTime(cooldownSeconds)}`)
+    }
+    if (remainingSeconds > 0) {
+      detailParts.push(`剩余 ${formatTempUnavailableTime(remainingSeconds)}`)
+    }
+    if (recoveryAtText) {
+      detailParts.push(`预计恢复 ${recoveryAtText}`)
+    }
+
+    const detailText = detailParts.length > 0 ? `，${detailParts.join('，')}` : ''
+    const tempReason = account.tempUnavailable.errorType
+      ? `临时暂停（${account.tempUnavailable.errorType}${account.tempUnavailable.statusCode ? ` / HTTP ${account.tempUnavailable.statusCode}` : ''}${detailText}）`
+      : `临时暂停${detailParts.length > 0 ? `（${detailParts.join('，')}）` : ''}`
+    reasons.push(tempReason)
+  }
+
+  if (account.opusRateLimitStatus?.isRateLimited) {
+    const opusMinutes = Number.isFinite(account.opusRateLimitStatus.minutesRemaining)
+      ? Math.max(0, Math.ceil(account.opusRateLimitStatus.minutesRemaining))
+      : 0
+    reasons.push(
+      opusMinutes > 0
+        ? `Opus 模型限流中（约 ${formatRateLimitTime(opusMinutes)} 后恢复）`
+        : 'Opus 模型限流中'
+    )
+  }
+
+  if (account.overloadStatus?.isOverloaded) {
+    reasons.push('上游过载保护中（529）')
+  }
+
+  if (isAccountExpiredForRouting(account)) {
+    reasons.push('订阅已过期')
+  }
+
+  const deduped = dedupeRoutingReasons(reasons)
+  if (deduped.length === 0 && isAccountRoutingBlocked(account)) {
+    return ['调度器判定不可路由（无详细原因）']
+  }
+
+  return deduped
+}
+
+const getRoutingBlockReasonSummary = (account) => {
+  const reasons = getRoutingBlockReasons(account)
+  return reasons.length > 0 ? reasons.join('；') : '无'
+}
+
 // 检查是否是配额超限状态（用于状态显示判断）
 const isQuotaExceeded = (account) => {
   return (
@@ -4308,6 +4693,8 @@ const getAccountStatusText = (account) => {
     account.rateLimitStatus === 'limited'
   )
     return '限流中'
+  if (account.tempUnavailable) return '临时暂停'
+  if (account.overloadStatus?.isOverloaded) return '过载保护中'
   // 检查是否临时错误
   if (account.status === 'temp_error') return '临时异常'
   // 检查是否错误
@@ -4332,6 +4719,9 @@ const getAccountStatusClass = (account) => {
     (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
     account.rateLimitStatus === 'limited'
   ) {
+    return 'bg-orange-100 text-orange-800'
+  }
+  if (account.tempUnavailable || account.overloadStatus?.isOverloaded) {
     return 'bg-orange-100 text-orange-800'
   }
   if (account.status === 'temp_error') {
@@ -4361,6 +4751,9 @@ const getAccountStatusDotClass = (account) => {
     (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
     account.rateLimitStatus === 'limited'
   ) {
+    return 'bg-orange-500'
+  }
+  if (account.tempUnavailable || account.overloadStatus?.isOverloaded) {
     return 'bg-orange-500'
   }
   if (account.status === 'temp_error') {
@@ -4842,10 +5235,16 @@ const checkHorizontalScroll = () => {
 
 // 窗口大小变化时重新检测
 let resizeObserver = null
+let tempUnavailableCountdownTimer = null
 
 onMounted(() => {
   // 首次加载时强制刷新所有数据
   loadAccounts(true)
+
+  // 让临时不可用剩余时间在页面停留时也可见地递减
+  tempUnavailableCountdownTimer = setInterval(() => {
+    tempUnavailableNowTs.value = Date.now()
+  }, 1000)
 
   // 设置ResizeObserver监听表格容器大小变化
   nextTick(() => {
@@ -4865,6 +5264,10 @@ onMounted(() => {
 onUnmounted(() => {
   if (resizeObserver) {
     resizeObserver.disconnect()
+  }
+  if (tempUnavailableCountdownTimer) {
+    clearInterval(tempUnavailableCountdownTimer)
+    tempUnavailableCountdownTimer = null
   }
   window.removeEventListener('resize', checkHorizontalScroll)
 })
