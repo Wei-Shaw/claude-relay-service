@@ -5295,12 +5295,12 @@
     "supports_vision": true
   },
   "gpt-5.4": {
-    "cache_read_input_token_cost": 6.25e-07,
-    "cache_read_input_token_cost_priority": 1.25e-06,
+    "cache_read_input_token_cost": 2.5e-07,
+    "cache_read_input_token_cost_priority": 5e-07,
     "input_cost_per_token": 2.5e-06,
     "input_cost_per_token_priority": 5e-06,
     "litellm_provider": "openai",
-    "max_input_tokens": 1048576,
+    "max_input_tokens": 922000,
     "max_output_tokens": 128000,
     "max_tokens": 128000,
     "mode": "responses",
@@ -5325,15 +5325,14 @@
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_tool_choice": true,
-    "supports_vision": true
+    "supports_vision": true,
+    "supports_web_search": true
   },
   "gpt-5.4-pro": {
-    "cache_read_input_token_cost": 7.5e-06,
-    "cache_read_input_token_cost_priority": 1.5e-05,
     "input_cost_per_token": 3e-05,
     "input_cost_per_token_priority": 6e-05,
     "litellm_provider": "openai",
-    "max_input_tokens": 1048576,
+    "max_input_tokens": 922000,
     "max_output_tokens": 128000,
     "max_tokens": 128000,
     "mode": "responses",
@@ -5353,12 +5352,13 @@
     "supports_native_streaming": true,
     "supports_parallel_function_calling": true,
     "supports_pdf_input": true,
-    "supports_prompt_caching": true,
+    "supports_prompt_caching": false,
     "supports_reasoning": true,
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_tool_choice": true,
-    "supports_vision": true
+    "supports_vision": true,
+    "supports_web_search": true
   },
   "gpt-5.3-codex-spark": {
     "cache_read_input_token_cost": 1.75e-07,
