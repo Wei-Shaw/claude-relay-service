@@ -50,6 +50,9 @@ class ModelService {
           'gpt-5.3-codex',
           'gpt-5.3-codex-high',
           'gpt-5.3-codex-xhigh',
+          'gpt-5.3-codex',
+          'gpt-5.3-codex-high',
+          'gpt-5.3-codex-xhigh',
           'gpt-5.1-2025-11-13',
           'gpt-5.1-codex-mini',
           'gpt-5.1-codex',
@@ -58,6 +61,8 @@ class ModelService {
           'gpt-5-codex',
           'gpt-5.3-codex-spark',
           'gpt-5.4',
+          'gpt-5.4-high',
+          'gpt-5.4-xhigh',
           'gpt-5.4-pro'
         ]
       },

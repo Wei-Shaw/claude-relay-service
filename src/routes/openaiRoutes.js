@@ -153,6 +153,18 @@ function resolveCodexReasoningAlias(model) {
       effort: 'xhigh'
     }
   }
+  if (normalized === 'gpt-5.4-high') {
+    return {
+      normalizedModel: 'gpt-5.4',
+      effort: 'high'
+    }
+  }
+  if (normalized === 'gpt-5.4-xhigh') {
+    return {
+      normalizedModel: 'gpt-5.4',
+      effort: 'xhigh'
+    }
+  }
 
   return null
 }
