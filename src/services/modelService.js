@@ -54,7 +54,9 @@ class ModelService {
           'gpt-5-2025-08-07',
           'gpt-5-codex',
           'gpt-5.3-codex',
-          'gpt-5.3-codex-spark'
+          'gpt-5.3-codex-spark',
+          'gpt-5.4',
+          'gpt-5.4-pro'
         ]
       },
       gemini: {
