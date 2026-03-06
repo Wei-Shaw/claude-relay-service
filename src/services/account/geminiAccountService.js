@@ -992,6 +992,37 @@ function isRateLimited(account) {
   return false
 }
 
+// 确保账户 token 有效（未过期直接返回，过期则刷新）
+async function ensureValidToken(accountId) {
+  try {
+    let account = await getAccount(accountId)
+    if (!account) {
+      return { success: false, error: 'Account not found' }
+    }
+
+    // 快速路径：token 存在且未过期，直接返回
+    if (account.accessToken && !isTokenExpired(account)) {
+      return { success: true, accessToken: account.accessToken }
+    }
+
+    // 需要刷新：此时必须有 refreshToken
+    if (!account.refreshToken) {
+      return { success: false, error: 'Token expired and no refresh token available' }
+    }
+
+    await refreshAccountToken(accountId)
+    account = await getAccount(accountId)
+
+    if (!account.accessToken) {
+      return { success: false, error: 'Token refresh failed - no valid access token' }
+    }
+
+    return { success: true, accessToken: account.accessToken }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+
 // 刷新账户 token
 async function refreshAccountToken(accountId) {
   let lockAcquired = false
@@ -1895,6 +1926,7 @@ module.exports = {
   deleteAccount,
   getAllAccounts,
   selectAvailableAccount,
+  ensureValidToken,
   refreshAccountToken,
   markAccountUsed,
   setAccountRateLimited,
