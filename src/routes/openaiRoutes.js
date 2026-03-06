@@ -15,6 +15,10 @@ const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { IncrementalSSEParser } = require('../utils/sseParser')
 const { getSafeMessage } = require('../utils/errorSanitizer')
+const {
+  OpenAIResponsesToAnthropicConverter,
+  parseSSEFromChunk
+} = require('../services/openaiResponsesToAnthropic')
 
 // Codex CLI 系统提示词（非 Codex CLI 客户端请求时注入，统一端点也使用）
 const CODEX_CLI_INSTRUCTIONS =
@@ -72,6 +76,97 @@ function extractCodexUsageHeaders(headers) {
 
   const hasData = Object.values(snapshot).some((value) => value !== null)
   return hasData ? snapshot : null
+}
+
+function toAnthropicErrorPayload(message, type = 'api_error') {
+  return {
+    type: 'error',
+    error: {
+      type,
+      message: message || 'Upstream error'
+    }
+  }
+}
+
+function normalizeErrorForAnthropic(errorBody) {
+  if (!errorBody) {
+    return toAnthropicErrorPayload('Upstream error')
+  }
+
+  if (errorBody.type === 'error' && errorBody.error?.message) {
+    return errorBody
+  }
+
+  if (typeof errorBody.error?.message === 'string') {
+    return toAnthropicErrorPayload(errorBody.error.message, errorBody.error.type || 'api_error')
+  }
+
+  if (typeof errorBody.message === 'string') {
+    return toAnthropicErrorPayload(errorBody.message)
+  }
+
+  if (typeof errorBody.detail === 'string') {
+    return toAnthropicErrorPayload(errorBody.detail)
+  }
+
+  if (typeof errorBody === 'string' && errorBody.trim()) {
+    return toAnthropicErrorPayload(errorBody.trim())
+  }
+
+  return toAnthropicErrorPayload('Upstream error')
+}
+
+function writeAnthropicSSEEvent(res, event, payload) {
+  if (res.destroyed) {
+    return
+  }
+  res.write(`event: ${event}\n`)
+  res.write(`data: ${JSON.stringify(payload)}\n\n`)
+}
+
+function sendAnthropicStreamError(res, status, errorBody) {
+  const normalized = normalizeErrorForAnthropic(errorBody)
+  res.status(status)
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  writeAnthropicSSEEvent(res, 'error', normalized)
+  res.end()
+}
+
+function resolveCodexReasoningAlias(model) {
+  if (typeof model !== 'string') {
+    return null
+  }
+
+  const normalized = model.trim().toLowerCase()
+  if (normalized === 'gpt-5.3-codex-high') {
+    return {
+      normalizedModel: 'gpt-5.3-codex',
+      effort: 'high'
+    }
+  }
+  if (normalized === 'gpt-5.3-codex-xhigh') {
+    return {
+      normalizedModel: 'gpt-5.3-codex',
+      effort: 'xhigh'
+    }
+  }
+  if (normalized === 'gpt-5.4-high') {
+    return {
+      normalizedModel: 'gpt-5.4',
+      effort: 'high'
+    }
+  }
+  if (normalized === 'gpt-5.4-xhigh') {
+    return {
+      normalizedModel: 'gpt-5.4',
+      effort: 'xhigh'
+    }
+  }
+
+  return null
 }
 
 async function applyRateLimitTracking(
@@ -233,6 +328,9 @@ const handleResponses = async (req, res) => {
   let account = null
   let proxy = null
   let accessToken = null
+  const isAnthropicBridge = req._anthropicBridge === true
+  let anthropicBridgeModel = req._anthropicBridgeRequestedModel || req.body?.model || null
+  let shouldEmitStreamToClient = false
 
   try {
     // 从中间件获取 API Key 数据
@@ -265,6 +363,15 @@ const handleResponses = async (req, res) => {
 
     // 从请求体中提取模型和流式标志
     let requestedModel = req.body?.model || null
+    const codexReasoningAlias = resolveCodexReasoningAlias(requestedModel)
+    if (codexReasoningAlias) {
+      requestedModel = codexReasoningAlias.normalizedModel
+      req.body.model = codexReasoningAlias.normalizedModel
+      req.body.reasoning = {
+        ...(req.body.reasoning && typeof req.body.reasoning === 'object' ? req.body.reasoning : {}),
+        effort: codexReasoningAlias.effort
+      }
+    }
     const isCodexModel =
       typeof requestedModel === 'string' && requestedModel.toLowerCase().includes('codex')
 
@@ -276,6 +383,9 @@ const handleResponses = async (req, res) => {
     }
 
     const isStream = req.body?.stream !== false // 默认为流式（兼容现有行为）
+    shouldEmitStreamToClient = isAnthropicBridge
+      ? req._anthropicBridgeClientStream === true
+      : isStream
 
     // 判断是否为 Codex CLI 的请求（基于 User-Agent）
     // 支持: codex_vscode, codex_cli_rs, codex_exec (非交互式/脚本模式)
@@ -322,6 +432,17 @@ const handleResponses = async (req, res) => {
       logger.info(`🔀 Using OpenAI-Responses relay service for account: ${account.name}`)
       return await openaiResponsesRelayService.handleRequest(req, res, account, apiKeyData)
     }
+
+    // Codex upstream 对部分参数不兼容（如 temperature），统一在转发前移除
+    if (req.body && typeof req.body === 'object') {
+      const codexUnsupportedFields = ['temperature']
+      for (const field of codexUnsupportedFields) {
+        if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+          delete req.body[field]
+        }
+      }
+    }
+
     // 基于白名单构造上游所需的请求头，确保键为小写且值受控
     const incoming = req.headers || {}
 
@@ -463,15 +584,27 @@ const handleResponses = async (req, res) => {
       }
 
       if (isStream) {
-        // 流式响应也需要设置正确的状态码
-        res.status(429)
-        res.setHeader('Content-Type', 'text/event-stream')
-        res.setHeader('Cache-Control', 'no-cache')
-        res.setHeader('Connection', 'keep-alive')
-        res.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
-        res.end()
+        if (isAnthropicBridge && shouldEmitStreamToClient) {
+          sendAnthropicStreamError(res, 429, errorResponse)
+        } else {
+          if (shouldEmitStreamToClient) {
+            // 流式响应也需要设置正确的状态码
+            res.status(429)
+            res.setHeader('Content-Type', 'text/event-stream')
+            res.setHeader('Cache-Control', 'no-cache')
+            res.setHeader('Connection', 'keep-alive')
+            res.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
+            res.end()
+          } else {
+            res
+              .status(429)
+              .json(isAnthropicBridge ? normalizeErrorForAnthropic(errorResponse) : errorResponse)
+          }
+        }
       } else {
-        res.status(429).json(errorResponse)
+        res
+          .status(429)
+          .json(isAnthropicBridge ? normalizeErrorForAnthropic(errorResponse) : errorResponse)
       }
 
       return
@@ -553,7 +686,65 @@ const handleResponses = async (req, res) => {
         }
       }
 
-      res.status(unauthorizedStatus).json(errorResponse)
+      if (isStream && isAnthropicBridge && shouldEmitStreamToClient) {
+        sendAnthropicStreamError(res, unauthorizedStatus, errorResponse)
+      } else {
+        res
+          .status(unauthorizedStatus)
+          .json(isAnthropicBridge ? normalizeErrorForAnthropic(errorResponse) : errorResponse)
+      }
+      return
+    } else if (upstream.status >= 400) {
+      let errorResponse = {
+        error: {
+          message: `Request failed with status ${upstream.status}`,
+          type: 'api_error'
+        }
+      }
+
+      try {
+        if (isStream && upstream.data && typeof upstream.data.on === 'function') {
+          const chunks = []
+          await new Promise((resolve, reject) => {
+            upstream.data.on('data', (chunk) => chunks.push(chunk))
+            upstream.data.on('end', resolve)
+            upstream.data.on('error', reject)
+            setTimeout(resolve, 5000)
+          })
+
+          const fullResponse = Buffer.concat(chunks).toString()
+          if (fullResponse.trim()) {
+            try {
+              errorResponse = JSON.parse(fullResponse)
+            } catch (_) {
+              errorResponse = {
+                error: {
+                  message: fullResponse,
+                  type: 'api_error'
+                }
+              }
+            }
+          }
+        } else if (upstream.data) {
+          errorResponse = upstream.data
+        }
+      } catch (_) {
+      }
+
+      if (isAnthropicBridge) {
+        return res.status(upstream.status).json(normalizeErrorForAnthropic(errorResponse))
+      }
+
+      if (isStream) {
+        res.status(upstream.status)
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader('Connection', 'keep-alive')
+        res.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
+        res.end()
+      } else {
+        res.status(upstream.status).json(errorResponse)
+      }
       return
     } else if (upstream.status === 200 || upstream.status === 201) {
       // 请求成功，检查并移除限流状态
@@ -568,7 +759,7 @@ const handleResponses = async (req, res) => {
 
     res.status(upstream.status)
 
-    if (isStream) {
+    if (shouldEmitStreamToClient) {
       // 流式响应头
       res.setHeader('Content-Type', 'text/event-stream')
       res.setHeader('Cache-Control', 'no-cache')
@@ -588,7 +779,7 @@ const handleResponses = async (req, res) => {
       }
     }
 
-    if (isStream) {
+    if (shouldEmitStreamToClient) {
       // 立即刷新响应头，开始 SSE
       if (typeof res.flushHeaders === 'function') {
         res.flushHeaders()
@@ -609,6 +800,13 @@ const handleResponses = async (req, res) => {
 
         // 直接获取完整响应
         const responseData = upstream.data
+
+        if (upstream.status >= 400) {
+          res
+            .status(upstream.status)
+            .json(isAnthropicBridge ? normalizeErrorForAnthropic(responseData) : responseData)
+          return
+        }
 
         // 从响应中获取实际的 model 和 usage
         actualModel = responseData.model || requestedModel || 'gpt-4'
@@ -655,19 +853,33 @@ const handleResponses = async (req, res) => {
         }
 
         // 返回响应
-        res.json(responseData)
+        if (isAnthropicBridge) {
+          const converter = new OpenAIResponsesToAnthropicConverter()
+          const converted = converter.convertResponse(responseData, anthropicBridgeModel)
+          res.json(converted)
+        } else {
+          res.json(responseData)
+        }
         return
       } catch (error) {
         logger.error('Failed to process non-stream response:', error)
         if (!res.headersSent) {
-          res.status(500).json({ error: { message: 'Failed to process response' } })
+          const payload = { error: { message: 'Failed to process response' } }
+          res
+            .status(500)
+            .json(isAnthropicBridge ? normalizeErrorForAnthropic(payload) : payload)
         }
         return
       }
     }
 
-    // 使用增量 SSE 解析器
-    const sseParser = new IncrementalSSEParser()
+    // 使用增量 SSE 解析器（Anthropic bridge 模式改用专用转换器）
+    const sseParser = isAnthropicBridge ? null : new IncrementalSSEParser()
+    const anthropicConverter = isAnthropicBridge ? new OpenAIResponsesToAnthropicConverter() : null
+    const anthropicStreamState = anthropicConverter ? anthropicConverter.createStreamState() : null
+    const anthropicBufferState = isAnthropicBridge ? { buffer: '' } : null
+    let anthropicTerminalEvent = null
+    let anthropicStreamError = null
 
     // 处理解析出的事件
     const processSSEEvent = (eventData) => {
@@ -700,16 +912,40 @@ const handleResponses = async (req, res) => {
 
     upstream.data.on('data', (chunk) => {
       try {
-        // 转发数据给客户端
-        if (!res.destroyed) {
-          res.write(chunk)
-        }
+        if (isAnthropicBridge) {
+          const events = parseSSEFromChunk(chunk.toString(), anthropicBufferState)
+          for (const eventData of events) {
+            processSSEEvent(eventData)
+            if (eventData.type === 'response.completed' || eventData.type === 'response.incomplete') {
+              anthropicTerminalEvent = eventData
+            }
+            if (eventData.type === 'response.failed' || eventData.type === 'error') {
+              anthropicStreamError =
+                eventData?.response?.error || { message: eventData.message || 'Upstream error' }
+            }
+            const mapped = anthropicConverter.convertStreamEvent(
+              eventData,
+              anthropicBridgeModel,
+              anthropicStreamState
+            )
+            if (shouldEmitStreamToClient) {
+              for (const event of mapped) {
+                writeAnthropicSSEEvent(res, event.event, event.data)
+              }
+            }
+          }
+        } else {
+          // 转发数据给客户端
+          if (!res.destroyed) {
+            res.write(chunk)
+          }
 
-        // 使用增量解析器处理数据
-        const events = sseParser.feed(chunk.toString())
-        for (const event of events) {
-          if (event.type === 'data' && event.data) {
-            processSSEEvent(event.data)
+          // 使用增量解析器处理数据
+          const events = sseParser.feed(chunk.toString())
+          for (const event of events) {
+            if (event.type === 'data' && event.data) {
+              processSSEEvent(event.data)
+            }
           }
         }
       } catch (error) {
@@ -719,12 +955,36 @@ const handleResponses = async (req, res) => {
 
     upstream.data.on('end', async () => {
       // 处理剩余的 buffer
-      const remaining = sseParser.getRemaining()
-      if (remaining.trim()) {
-        const events = sseParser.feed('\n\n') // 强制刷新剩余内容
-        for (const event of events) {
-          if (event.type === 'data' && event.data) {
-            processSSEEvent(event.data)
+      if (isAnthropicBridge) {
+        const events = parseSSEFromChunk('\n\n', anthropicBufferState)
+        for (const eventData of events) {
+          processSSEEvent(eventData)
+          if (eventData.type === 'response.completed' || eventData.type === 'response.incomplete') {
+            anthropicTerminalEvent = eventData
+          }
+          if (eventData.type === 'response.failed' || eventData.type === 'error') {
+            anthropicStreamError =
+              eventData?.response?.error || { message: eventData.message || 'Upstream error' }
+          }
+          const mapped = anthropicConverter.convertStreamEvent(
+            eventData,
+            anthropicBridgeModel,
+            anthropicStreamState
+          )
+          if (shouldEmitStreamToClient) {
+            for (const event of mapped) {
+              writeAnthropicSSEEvent(res, event.event, event.data)
+            }
+          }
+        }
+      } else {
+        const remaining = sseParser.getRemaining()
+        if (remaining.trim()) {
+          const events = sseParser.feed('\n\n') // 强制刷新剩余内容
+          for (const event of events) {
+            if (event.type === 'data' && event.data) {
+              processSSEEvent(event.data)
+            }
           }
         }
       }
@@ -795,14 +1055,48 @@ const handleResponses = async (req, res) => {
         }
       }
 
+      if (isAnthropicBridge && !shouldEmitStreamToClient) {
+        if (anthropicTerminalEvent) {
+          const converted = anthropicConverter.convertResponse(
+            anthropicTerminalEvent,
+            anthropicBridgeModel
+          )
+          if (converted.type === 'error') {
+            return res
+              .status(upstream.status >= 400 ? upstream.status : 500)
+              .json(normalizeErrorForAnthropic(converted))
+          }
+          return res.status(200).json(converted)
+        }
+
+        if (anthropicStreamError) {
+          return res
+            .status(upstream.status >= 400 ? upstream.status : 500)
+            .json(normalizeErrorForAnthropic(anthropicStreamError))
+        }
+
+        return res
+          .status(upstream.status >= 400 ? upstream.status : 502)
+          .json(normalizeErrorForAnthropic(upstream.data))
+      }
+
       res.end()
     })
 
     upstream.data.on('error', (err) => {
       logger.error('Upstream stream error:', err)
       if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
+        if (isAnthropicBridge && shouldEmitStreamToClient) {
+          sendAnthropicStreamError(res, 502, { error: { message: 'Upstream stream error' } })
+        } else if (isAnthropicBridge) {
+          res.status(502).json(normalizeErrorForAnthropic({ error: { message: 'Upstream stream error' } }))
+        } else {
+          res.status(502).json({ error: { message: 'Upstream stream error' } })
+        }
       } else {
+        if (isAnthropicBridge && shouldEmitStreamToClient) {
+          writeAnthropicSSEEvent(res, 'error', toAnthropicErrorPayload('Upstream stream error'))
+        }
         res.end()
       }
     })
@@ -870,7 +1164,13 @@ const handleResponses = async (req, res) => {
     }
 
     if (!res.headersSent) {
-      res.status(status).json(responsePayload)
+      if (isAnthropicBridge) {
+        res.status(status).json(normalizeErrorForAnthropic(responsePayload))
+      } else if (req.body?.stream && shouldEmitStreamToClient) {
+        sendAnthropicStreamError(res, status, responsePayload)
+      } else {
+        res.status(status).json(responsePayload)
+      }
     }
   }
 }

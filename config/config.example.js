@@ -56,6 +56,11 @@ const config = {
     }
   },
 
+  // 🔀 协议桥接配置
+  bridge: {
+    anthropicOpenaiEnabled: process.env.ANTHROPIC_OPENAI_BRIDGE_ENABLED !== 'false'
+  },
+
   // ☁️ Bedrock API配置
   bedrock: {
     enabled: process.env.CLAUDE_CODE_USE_BEDROCK === '1',

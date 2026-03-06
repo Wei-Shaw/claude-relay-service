@@ -9,6 +9,10 @@ const config = require('../../../config/config')
 const crypto = require('crypto')
 const LRUCache = require('../../utils/lruCache')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const {
+  OpenAIResponsesToAnthropicConverter,
+  parseSSEFromChunk
+} = require('../openaiResponsesToAnthropic')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
@@ -40,6 +44,62 @@ function extractCacheCreationTokens(usageData) {
   return 0
 }
 
+function toAnthropicErrorPayload(message, type = 'api_error') {
+  return {
+    type: 'error',
+    error: {
+      type,
+      message: message || 'Upstream error'
+    }
+  }
+}
+
+function normalizeErrorForAnthropic(errorBody) {
+  if (!errorBody) {
+    return toAnthropicErrorPayload('Upstream error')
+  }
+
+  if (errorBody.type === 'error' && errorBody.error?.message) {
+    return errorBody
+  }
+
+  if (typeof errorBody.error?.message === 'string') {
+    return toAnthropicErrorPayload(errorBody.error.message, errorBody.error.type || 'api_error')
+  }
+
+  if (typeof errorBody.message === 'string') {
+    return toAnthropicErrorPayload(errorBody.message)
+  }
+
+  if (typeof errorBody.detail === 'string') {
+    return toAnthropicErrorPayload(errorBody.detail)
+  }
+
+  if (typeof errorBody === 'string' && errorBody.trim()) {
+    return toAnthropicErrorPayload(errorBody.trim())
+  }
+
+  return toAnthropicErrorPayload('Upstream error')
+}
+
+function writeAnthropicSSEEvent(res, event, payload) {
+  if (res.destroyed) {
+    return
+  }
+  res.write(`event: ${event}\n`)
+  res.write(`data: ${JSON.stringify(payload)}\n\n`)
+}
+
+function sendAnthropicStreamError(res, status, errorBody) {
+  res.status(status)
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  writeAnthropicSSEEvent(res, 'error', normalizeErrorForAnthropic(errorBody))
+  res.end()
+}
+
 class OpenAIResponsesRelayService {
   constructor() {
     this.defaultTimeout = config.requestTimeout || 600000
@@ -68,6 +128,11 @@ class OpenAIResponsesRelayService {
     const sessionHash = sessionId
       ? crypto.createHash('sha256').update(sessionId).digest('hex')
       : null
+    const isAnthropicBridge = req._anthropicBridge === true
+    const anthropicBridgeModel = req._anthropicBridgeRequestedModel || req.body?.model || null
+    const shouldEmitStreamToClient = isAnthropicBridge
+      ? req._anthropicBridgeClientStream === true
+      : req.body?.stream === true
 
     try {
       // 获取完整的账户信息（包含解密的 API Key）
@@ -205,6 +270,9 @@ class OpenAIResponsesRelayService {
             resets_in_seconds: resetsInSeconds
           }
         }
+        if (isAnthropicBridge) {
+          return res.status(429).json(normalizeErrorForAnthropic(errorResponse))
+        }
         return res.status(429).json(errorResponse)
       }
 
@@ -297,6 +365,9 @@ class OpenAIResponsesRelayService {
           req.removeListener('close', handleClientDisconnect)
           res.removeListener('close', handleClientDisconnect)
 
+          if (isAnthropicBridge) {
+            return res.status(401).json(normalizeErrorForAnthropic(unauthorizedResponse))
+          }
           return res.status(401).json(unauthorizedResponse)
         }
 
@@ -327,9 +398,11 @@ class OpenAIResponsesRelayService {
         req.removeListener('close', handleClientDisconnect)
         res.removeListener('close', handleClientDisconnect)
 
-        return res
-          .status(response.status)
-          .json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        const sanitizedError = upstreamErrorHelper.sanitizeErrorForClient(errorData)
+        if (isAnthropicBridge) {
+          return res.status(response.status).json(normalizeErrorForAnthropic(sanitizedError))
+        }
+        return res.status(response.status).json(sanitizedError)
       }
 
       // 更新最后使用时间（节流）
@@ -344,12 +417,23 @@ class OpenAIResponsesRelayService {
           apiKeyData,
           req.body?.model,
           handleClientDisconnect,
-          req
+          req,
+          isAnthropicBridge,
+          anthropicBridgeModel,
+          shouldEmitStreamToClient
         )
       }
 
       // 处理非流式响应
-      return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model)
+      return this._handleNormalResponse(
+        response,
+        res,
+        account,
+        apiKeyData,
+        req.body?.model,
+        isAnthropicBridge,
+        anthropicBridgeModel
+      )
     } catch (error) {
       // 清理 AbortController
       if (abortController && !abortController.signal.aborted) {
@@ -451,20 +535,31 @@ class OpenAIResponsesRelayService {
             }
           }
 
+          if (isAnthropicBridge) {
+            return res.status(401).json(normalizeErrorForAnthropic(unauthorizedResponse))
+          }
           return res.status(401).json(unauthorizedResponse)
         }
 
-        return res.status(status).json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        const sanitizedError = upstreamErrorHelper.sanitizeErrorForClient(errorData)
+        if (isAnthropicBridge) {
+          return res.status(status).json(normalizeErrorForAnthropic(sanitizedError))
+        }
+        return res.status(status).json(sanitizedError)
       }
 
       // 其他错误
-      return res.status(500).json({
+      const internalError = {
         error: {
           message: 'Internal server error',
           type: 'internal_error',
           details: error.message
         }
-      })
+      }
+      if (isAnthropicBridge) {
+        return res.status(500).json(normalizeErrorForAnthropic(internalError))
+      }
+      return res.status(500).json(internalError)
     }
   }
 
@@ -476,13 +571,20 @@ class OpenAIResponsesRelayService {
     apiKeyData,
     requestedModel,
     handleClientDisconnect,
-    req
+    req,
+    isAnthropicBridge = false,
+    anthropicBridgeModel = null,
+    shouldEmitStreamToClient = true
   ) {
-    // 设置 SSE 响应头
-    res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
-    res.setHeader('Connection', 'keep-alive')
-    res.setHeader('X-Accel-Buffering', 'no')
+    // 设置响应头（桥接非流式场景返回 JSON）
+    if (shouldEmitStreamToClient) {
+      res.setHeader('Content-Type', 'text/event-stream')
+      res.setHeader('Cache-Control', 'no-cache')
+      res.setHeader('Connection', 'keep-alive')
+      res.setHeader('X-Accel-Buffering', 'no')
+    } else {
+      res.setHeader('Content-Type', 'application/json')
+    }
 
     let usageData = null
     let actualModel = null
@@ -490,60 +592,66 @@ class OpenAIResponsesRelayService {
     let rateLimitDetected = false
     let rateLimitResetsInSeconds = null
     let streamEnded = false
+    const converter = isAnthropicBridge ? new OpenAIResponsesToAnthropicConverter() : null
+    const streamState = converter ? converter.createStreamState() : null
+    const anthropicBufferState = isAnthropicBridge ? { buffer: '' } : null
+    let anthropicTerminalEvent = null
+    let anthropicStreamError = null
 
-    // 解析 SSE 事件以捕获 usage 数据和 model
+    const applyUsageFromEvent = (eventData) => {
+      // 检查是否是 response.completed 事件（OpenAI-Responses 格式）
+      if (eventData.type === 'response.completed' && eventData.response) {
+        // 从响应中获取真实的 model
+        if (eventData.response.model) {
+          actualModel = eventData.response.model
+          logger.debug(`📊 Captured actual model from response.completed: ${actualModel}`)
+        }
+
+        // 获取 usage 数据 - OpenAI-Responses 格式在 response.usage 下
+        if (eventData.response.usage) {
+          usageData = eventData.response.usage
+          logger.info('📊 Successfully captured usage data from OpenAI-Responses:', {
+            input_tokens: usageData.input_tokens,
+            output_tokens: usageData.output_tokens,
+            total_tokens: usageData.total_tokens
+          })
+        }
+      }
+
+      // 检查是否有限流错误
+      if (eventData.error) {
+        // 检查多种可能的限流错误类型
+        if (
+          eventData.error.type === 'rate_limit_error' ||
+          eventData.error.type === 'usage_limit_reached' ||
+          eventData.error.type === 'rate_limit_exceeded'
+        ) {
+          rateLimitDetected = true
+          if (eventData.error.resets_in_seconds) {
+            rateLimitResetsInSeconds = eventData.error.resets_in_seconds
+            logger.warn(
+              `🚫 Rate limit detected in stream, resets in ${rateLimitResetsInSeconds} seconds (${Math.ceil(rateLimitResetsInSeconds / 60)} minutes)`
+            )
+          }
+        }
+      }
+    }
+
+    // 解析 SSE 文本事件以捕获 usage 数据和 model（非 bridge 透传场景）
     const parseSSEForUsage = (data) => {
       const lines = data.split('\n')
-
       for (const line of lines) {
-        if (line.startsWith('data:')) {
-          try {
-            const jsonStr = line.slice(5).trim()
-            if (jsonStr === '[DONE]') {
-              continue
-            }
-
-            const eventData = JSON.parse(jsonStr)
-
-            // 检查是否是 response.completed 事件（OpenAI-Responses 格式）
-            if (eventData.type === 'response.completed' && eventData.response) {
-              // 从响应中获取真实的 model
-              if (eventData.response.model) {
-                actualModel = eventData.response.model
-                logger.debug(`📊 Captured actual model from response.completed: ${actualModel}`)
-              }
-
-              // 获取 usage 数据 - OpenAI-Responses 格式在 response.usage 下
-              if (eventData.response.usage) {
-                usageData = eventData.response.usage
-                logger.info('📊 Successfully captured usage data from OpenAI-Responses:', {
-                  input_tokens: usageData.input_tokens,
-                  output_tokens: usageData.output_tokens,
-                  total_tokens: usageData.total_tokens
-                })
-              }
-            }
-
-            // 检查是否有限流错误
-            if (eventData.error) {
-              // 检查多种可能的限流错误类型
-              if (
-                eventData.error.type === 'rate_limit_error' ||
-                eventData.error.type === 'usage_limit_reached' ||
-                eventData.error.type === 'rate_limit_exceeded'
-              ) {
-                rateLimitDetected = true
-                if (eventData.error.resets_in_seconds) {
-                  rateLimitResetsInSeconds = eventData.error.resets_in_seconds
-                  logger.warn(
-                    `🚫 Rate limit detected in stream, resets in ${rateLimitResetsInSeconds} seconds (${Math.ceil(rateLimitResetsInSeconds / 60)} minutes)`
-                  )
-                }
-              }
-            }
-          } catch (e) {
-            // 忽略解析错误
+        if (!line.startsWith('data:')) {
+          continue
+        }
+        try {
+          const jsonStr = line.slice(5).trim()
+          if (!jsonStr || jsonStr === '[DONE]') {
+            continue
           }
+          applyUsageFromEvent(JSON.parse(jsonStr))
+        } catch (_) {
+          // ignore parse error
         }
       }
     }
@@ -552,6 +660,31 @@ class OpenAIResponsesRelayService {
     response.data.on('data', (chunk) => {
       try {
         const chunkStr = chunk.toString()
+
+        if (isAnthropicBridge) {
+          const events = parseSSEFromChunk(chunkStr, anthropicBufferState)
+          for (const eventData of events) {
+            applyUsageFromEvent(eventData)
+            if (eventData.type === 'response.completed' || eventData.type === 'response.incomplete') {
+              anthropicTerminalEvent = eventData
+            }
+            if (eventData.type === 'response.failed' || eventData.type === 'error') {
+              anthropicStreamError =
+                eventData?.response?.error || { message: eventData.message || 'Upstream error' }
+            }
+            const mapped = converter.convertStreamEvent(
+              eventData,
+              anthropicBridgeModel || requestedModel,
+              streamState
+            )
+            if (shouldEmitStreamToClient) {
+              for (const event of mapped) {
+                writeAnthropicSSEEvent(res, event.event, event.data)
+              }
+            }
+          }
+          return
+        }
 
         // 转发数据给客户端
         if (!res.destroyed && !streamEnded) {
@@ -581,7 +714,29 @@ class OpenAIResponsesRelayService {
       streamEnded = true
 
       // 处理剩余的 buffer
-      if (buffer.trim()) {
+      if (isAnthropicBridge) {
+        const events = parseSSEFromChunk('\n\n', anthropicBufferState)
+        for (const eventData of events) {
+          applyUsageFromEvent(eventData)
+          if (eventData.type === 'response.completed' || eventData.type === 'response.incomplete') {
+            anthropicTerminalEvent = eventData
+          }
+          if (eventData.type === 'response.failed' || eventData.type === 'error') {
+            anthropicStreamError =
+              eventData?.response?.error || { message: eventData.message || 'Upstream error' }
+          }
+          const mapped = converter.convertStreamEvent(
+            eventData,
+            anthropicBridgeModel || requestedModel,
+            streamState
+          )
+          if (shouldEmitStreamToClient) {
+            for (const event of mapped) {
+              writeAnthropicSSEEvent(res, event.event, event.data)
+            }
+          }
+        }
+      } else if (buffer.trim()) {
         parseSSEForUsage(buffer)
       }
 
@@ -664,6 +819,31 @@ class OpenAIResponsesRelayService {
       req.removeListener('close', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
 
+      if (isAnthropicBridge && !shouldEmitStreamToClient) {
+        if (anthropicTerminalEvent) {
+          const converted = converter.convertResponse(
+            anthropicTerminalEvent,
+            anthropicBridgeModel || requestedModel
+          )
+          if (converted.type === 'error') {
+            return res
+              .status(response.status >= 400 ? response.status : 500)
+              .json(normalizeErrorForAnthropic(converted))
+          }
+          return res.status(200).json(converted)
+        }
+
+        if (anthropicStreamError) {
+          return res
+            .status(response.status >= 400 ? response.status : 500)
+            .json(normalizeErrorForAnthropic(anthropicStreamError))
+        }
+
+        return res
+          .status(response.status >= 400 ? response.status : 502)
+          .json(normalizeErrorForAnthropic({ message: 'Upstream stream ended unexpectedly' }))
+      }
+
       if (!res.destroyed) {
         res.end()
       }
@@ -684,8 +864,17 @@ class OpenAIResponsesRelayService {
       res.removeListener('close', handleClientDisconnect)
 
       if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
+        if (isAnthropicBridge && shouldEmitStreamToClient) {
+          sendAnthropicStreamError(res, 502, { error: { message: 'Upstream stream error' } })
+        } else if (isAnthropicBridge) {
+          res.status(502).json(normalizeErrorForAnthropic({ error: { message: 'Upstream stream error' } }))
+        } else {
+          res.status(502).json({ error: { message: 'Upstream stream error' } })
+        }
       } else if (!res.destroyed) {
+        if (isAnthropicBridge && shouldEmitStreamToClient) {
+          writeAnthropicSSEEvent(res, 'error', toAnthropicErrorPayload('Upstream stream error'))
+        }
         res.end()
       }
     })
@@ -706,7 +895,15 @@ class OpenAIResponsesRelayService {
   }
 
   // 处理非流式响应
-  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel) {
+  async _handleNormalResponse(
+    response,
+    res,
+    account,
+    apiKeyData,
+    requestedModel,
+    isAnthropicBridge = false,
+    anthropicBridgeModel = null
+  ) {
     const responseData = response.data
 
     // 提取 usage 数据和实际 model
@@ -770,7 +967,16 @@ class OpenAIResponsesRelayService {
     }
 
     // 返回响应
-    res.status(response.status).json(responseData)
+    if (isAnthropicBridge) {
+      const converter = new OpenAIResponsesToAnthropicConverter()
+      const converted = converter.convertResponse(
+        responseData,
+        anthropicBridgeModel || requestedModel
+      )
+      res.status(response.status).json(converted)
+    } else {
+      res.status(response.status).json(responseData)
+    }
 
     logger.info('Normal response completed', {
       accountId: account.id,
