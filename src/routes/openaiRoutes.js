@@ -15,6 +15,11 @@ const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { IncrementalSSEParser } = require('../utils/sseParser')
 const { getSafeMessage } = require('../utils/errorSanitizer')
+const {
+  applyOpenAIStorePolicy,
+  ensureOpenAISessionHeader,
+  getOpenAIContinuity
+} = require('../utils/openaiContinuity')
 
 // Codex CLI 系统提示词（非 Codex CLI 客户端请求时注入，统一端点也使用）
 const CODEX_CLI_INSTRUCTIONS =
@@ -251,17 +256,9 @@ const handleResponses = async (req, res) => {
       })
     }
 
-    // 从请求头或请求体中提取会话 ID
-    // NOTE: For some clients, prompt_cache_key is the only stable per-session key.
-    const sessionId =
-      req.headers['session_id'] ||
-      req.headers['x-session-id'] ||
-      req.body?.session_id ||
-      req.body?.conversation_id ||
-      req.body?.prompt_cache_key ||
-      null
+    const { continuityKey: sessionId, sessionHash: derivedSessionHash } = getOpenAIContinuity(req)
 
-    sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
+    sessionHash = derivedSessionHash
 
     // 从请求体中提取模型和流式标志
     let requestedModel = req.body?.model || null
@@ -327,12 +324,13 @@ const handleResponses = async (req, res) => {
 
     const allowedKeys = ['version', 'openai-beta', 'session_id']
 
-    const headers = {}
+    let headers = {}
     for (const key of allowedKeys) {
       if (incoming[key] !== undefined) {
         headers[key] = incoming[key]
       }
     }
+    headers = ensureOpenAISessionHeader(headers, sessionId)
 
     // 判断是否访问 compact 端点
     const isCompactRoute =
@@ -346,11 +344,10 @@ const handleResponses = async (req, res) => {
     headers['host'] = 'chatgpt.com'
     headers['accept'] = isStream ? 'text/event-stream' : 'application/json'
     headers['content-type'] = 'application/json'
-    if (!isCompactRoute) {
-      req.body['store'] = false
-    } else if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'store')) {
-      delete req.body['store']
-    }
+    applyOpenAIStorePolicy(req.body, {
+      isCompactRoute,
+      continuityKey: sessionId
+    })
 
     // 创建代理 agent
     const proxyAgent = createProxyAgent(proxy)

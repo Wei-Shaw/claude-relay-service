@@ -470,7 +470,9 @@ class CodexToOpenAIConverter {
     // 固定值
     result.parallel_tool_calls = true
     result.include = ['reasoning.encrypted_content']
-    result.store = false
+    if (chatBody.store !== undefined) {
+      result.store = chatBody.store
+    }
 
     // 收集所有工具名（tools + assistant.tool_calls），统一构建缩短映射
     const allToolNames = new Set()
@@ -527,6 +529,9 @@ class CodexToOpenAIConverter {
     }
     if (chatBody.prompt_cache_key) {
       result.prompt_cache_key = chatBody.prompt_cache_key
+    }
+    if (chatBody.previous_response_id !== undefined) {
+      result.previous_response_id = chatBody.previous_response_id
     }
 
     return result

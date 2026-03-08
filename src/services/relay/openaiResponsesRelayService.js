@@ -6,8 +6,12 @@ const openaiResponsesAccountService = require('../account/openaiResponsesAccount
 const apiKeyService = require('../apiKeyService')
 const unifiedOpenAIScheduler = require('../scheduler/unifiedOpenAIScheduler')
 const config = require('../../../config/config')
-const crypto = require('crypto')
 const LRUCache = require('../../utils/lruCache')
+const {
+  ensureOpenAISessionHeader,
+  ensureResponsesPromptCacheKey,
+  getOpenAIContinuity
+} = require('../../utils/openaiContinuity')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
@@ -63,11 +67,7 @@ class OpenAIResponsesRelayService {
   // 处理请求转发
   async handleRequest(req, res, account, apiKeyData) {
     let abortController = null
-    // 获取会话哈希（如果有的话）
-    const sessionId = req.headers['session_id'] || req.body?.session_id
-    const sessionHash = sessionId
-      ? crypto.createHash('sha256').update(sessionId).digest('hex')
-      : null
+    const { continuityKey, sessionHash, source: continuitySource } = getOpenAIContinuity(req)
 
     try {
       // 获取完整的账户信息（包含解密的 API Key）
@@ -117,12 +117,17 @@ class OpenAIResponsesRelayService {
       const targetUrl = `${baseApi}${targetPath}`
       logger.info(`🎯 Forwarding to: ${targetUrl}`)
 
+      req.body = ensureResponsesPromptCacheKey(req.body, continuityKey)
+
       // 构建请求头 - 使用统一的 headerFilter 移除 CDN headers
-      const headers = {
-        ...filterForOpenAI(req.headers),
-        Authorization: `Bearer ${fullAccount.apiKey}`,
-        'Content-Type': 'application/json'
-      }
+      const headers = ensureOpenAISessionHeader(
+        {
+          ...filterForOpenAI(req.headers),
+          Authorization: `Bearer ${fullAccount.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        continuityKey
+      )
 
       // 处理 User-Agent
       if (fullAccount.userAgent) {
@@ -168,7 +173,11 @@ class OpenAIResponsesRelayService {
         method: req.method,
         stream: req.body?.stream || false,
         model: req.body?.model || 'unknown',
-        userAgent: headers['User-Agent'] || 'not set'
+        userAgent: headers['User-Agent'] || 'not set',
+        continuitySource: continuitySource || 'none',
+        continuityKeyPresent: !!continuityKey,
+        promptCacheKeyPresent: !!req.body?.prompt_cache_key,
+        previousResponseIdPresent: !!req.body?.previous_response_id
       })
 
       // 发送请求
@@ -344,7 +353,8 @@ class OpenAIResponsesRelayService {
           apiKeyData,
           req.body?.model,
           handleClientDisconnect,
-          req
+          req,
+          sessionHash
         )
       }
 
@@ -476,7 +486,8 @@ class OpenAIResponsesRelayService {
     apiKeyData,
     requestedModel,
     handleClientDisconnect,
-    req
+    req,
+    sessionHash = null
   ) {
     // 设置 SSE 响应头
     res.setHeader('Content-Type', 'text/event-stream')
@@ -643,11 +654,6 @@ class OpenAIResponsesRelayService {
       // 如果在流式响应中检测到限流
       if (rateLimitDetected) {
         // 使用统一调度器处理限流（与非流式响应保持一致）
-        const sessionId = req.headers['session_id'] || req.body?.session_id
-        const sessionHash = sessionId
-          ? crypto.createHash('sha256').update(sessionId).digest('hex')
-          : null
-
         await unifiedOpenAIScheduler.markAccountRateLimited(
           account.id,
           'openai-responses',
