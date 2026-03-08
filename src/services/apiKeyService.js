@@ -1451,8 +1451,9 @@ class ApiKeyService {
       }
 
       // 删除所有相关的使用统计数据
-      const today = new Date().toISOString().split('T')[0]
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+      const today = redis.getDateStringInTimezone()
+      const yesterdayDate = new Date(Date.now() - 86400000)
+      const yesterday = redis.getDateStringInTimezone(yesterdayDate)
 
       // 删除每日统计
       await redis.client.del(`usage:daily:${today}:${keyId}`)
