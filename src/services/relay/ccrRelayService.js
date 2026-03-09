@@ -854,11 +854,13 @@ class CcrRelayService {
             if (response.data && typeof response.data.destroy === 'function') {
               response.data.destroy()
             }
+            reject(new Error('Client disconnected'))
           })
 
           responseStream.on('error', (err) => {
             logger.error('❌ Response stream error:', err)
             aborted = true
+            reject(err)
           })
         })
         .catch((error) => {
