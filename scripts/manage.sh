@@ -868,11 +868,16 @@ start_service() {
     
     # 检查pm2是否可用并且不是从package.json脚本调用的
     if command_exists pm2 && [ "$1" != "--no-pm2" ]; then
-        print_info "使用 pm2 启动服务..."
-        # 直接使用pm2启动，避免循环调用
-        pm2 start "$APP_DIR/src/app.js" --name "claude-relay" --log "$APP_DIR/logs/pm2.log" 2>/dev/null
+        # 优先使用 ecosystem.config.js 配置文件启动
+        if [ -f "$APP_DIR/ecosystem.config.js" ]; then
+            print_info "使用 pm2 + ecosystem.config.js 启动服务..."
+            cd "$APP_DIR" && pm2 start ecosystem.config.js 2>/dev/null
+        else
+            print_info "使用 pm2 启动服务..."
+            pm2 start "$APP_DIR/src/app.js" --name "claude-relay" --log "$APP_DIR/logs/pm2.log" 2>/dev/null
+        fi
         sleep 2
-        
+
         # 检查是否启动成功
         if pm2 list 2>/dev/null | grep -q "claude-relay"; then
             print_success "服务已通过 pm2 启动"
