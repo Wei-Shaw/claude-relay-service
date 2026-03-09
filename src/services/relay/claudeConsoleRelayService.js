@@ -755,6 +755,13 @@ class ClaudeConsoleRelayService {
   ) {
     return new Promise((resolve, reject) => {
       let aborted = false
+      let settled = false
+      const settleOnce = (fn) => {
+        if (settled) return
+        settled = true
+        fn()
+      }
+      const abortController = new AbortController()
 
       // 构建完整的API URL
       const cleanUrl = account.apiUrl.replace(/\/$/, '') // 移除末尾斜杠
@@ -786,7 +793,8 @@ class ClaudeConsoleRelayService {
         },
         timeout: config.requestTimeout || 600000,
         responseType: 'stream',
-        validateStatus: () => true // 接受所有状态码
+        validateStatus: () => true, // 接受所有状态码
+        signal: abortController.signal
       }
 
       if (proxyAgent) {
@@ -1254,6 +1262,10 @@ class ClaudeConsoleRelayService {
           })
 
           response.data.on('error', (error) => {
+            if (aborted) {
+              settleOnce(() => resolve())
+              return
+            }
             logger.error(
               `❌ Claude Console stream error (Account: ${account?.name || accountId}):`,
               error
@@ -1281,6 +1293,7 @@ class ClaudeConsoleRelayService {
         })
         .catch((error) => {
           if (aborted) {
+            settleOnce(() => resolve())
             return
           }
 
@@ -1363,6 +1376,7 @@ class ClaudeConsoleRelayService {
       responseStream.on('close', () => {
         logger.debug('🔌 Client disconnected, cleaning up Claude Console stream')
         aborted = true
+        abortController.abort()
       })
     })
   }
