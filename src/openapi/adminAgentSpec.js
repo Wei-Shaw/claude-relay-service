@@ -161,17 +161,95 @@ const adminAgentOpenApiSpec = {
         operationId: 'listApiKeys',
         parameters: [
           ...paginationQueryParams,
-          { name: 'searchMode', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'search', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'tag', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'isActive', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'models', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'sortBy', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'sortOrder', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'costTimeRange', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'costStartDate', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'costEndDate', in: 'query', schema: { type: 'string' }, required: false },
-          { name: 'timeRange', in: 'query', schema: { type: 'string' }, required: false }
+          {
+            name: 'searchMode',
+            in: 'query',
+            required: false,
+            schema: {
+              type: 'string',
+              enum: ['apiKey', 'name', 'owner', 'bindingAccount'],
+              default: 'apiKey'
+            },
+            description: 'Search mode. Use with `search`.'
+          },
+          {
+            name: 'search',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Keyword for fuzzy search.'
+          },
+          {
+            name: 'tag',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Filter by tag name.'
+          },
+          {
+            name: 'isActive',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['', 'true', 'false'] },
+            description: 'Filter by active status.'
+          },
+          {
+            name: 'models',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Comma-separated model IDs for model restriction filter.'
+          },
+          {
+            name: 'sortBy',
+            in: 'query',
+            required: false,
+            schema: {
+              type: 'string',
+              enum: ['name', 'createdAt', 'expiresAt', 'lastUsedAt', 'isActive', 'status', 'cost'],
+              default: 'createdAt'
+            },
+            description: 'Sort field.'
+          },
+          {
+            name: 'sortOrder',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['asc', 'desc'], default: 'desc' },
+            description: 'Sort direction.'
+          },
+          {
+            name: 'costTimeRange',
+            in: 'query',
+            required: false,
+            schema: {
+              type: 'string',
+              enum: ['today', '7days', '30days', 'all', 'custom'],
+              default: '7days'
+            },
+            description: 'Cost time range, only used when `sortBy=cost`.'
+          },
+          {
+            name: 'costStartDate',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Custom cost sort start date, required when `costTimeRange=custom`.'
+          },
+          {
+            name: 'costEndDate',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Custom cost sort end date, required when `costTimeRange=custom`.'
+          },
+          {
+            name: 'timeRange',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', default: 'all' },
+            description: 'Legacy compatibility field.'
+          }
         ],
         responses: {
           '200': successEnvelopeResponse('API key list'),

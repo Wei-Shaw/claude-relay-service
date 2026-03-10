@@ -1,4 +1,0 @@
-interface:
-  display_name: "CRS Admin OpenAPI"
-  short_description: "管理 API Key 与使用统计"
-  default_prompt: "使用 CRS 管理 OpenAPI 先登录获取 admin token，再执行 API Key 管理或 usage 统计查询；写操作前先做只读确认并复述将要修改的 keyId。"
