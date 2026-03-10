@@ -28,6 +28,7 @@ const droidRoutes = require('./routes/droidRoutes')
 const userRoutes = require('./routes/userRoutes')
 const azureOpenaiRoutes = require('./routes/azureOpenaiRoutes')
 const webhookRoutes = require('./routes/webhook')
+const openapiRoutes = require('./routes/openapi')
 
 // Import middleware
 const {
@@ -351,6 +352,7 @@ class Application {
         apiRoutes
       )
       this.app.use('/admin', adminRoutes)
+      this.app.use('/openapi', openapiRoutes)
       this.app.use('/users', userRoutes)
       // 使用 web 路由（包含 auth 和页面重定向）
       this.app.use('/web', webRoutes)
