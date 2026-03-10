@@ -1,0 +1,125 @@
+# ============================================================================
+# Clash 代理配置模板 - config.yaml.example
+# ============================================================================
+# 使用方法：
+#   1. 复制本文件为 config.yaml：cp config.yaml.example config.yaml
+#   2. 在 proxies 部分填写您的机场节点信息（或使用下方自动订阅方式）
+#   3. 启动服务：docker-compose -f docker-compose.prod.yml up -d
+#
+# 如需使用订阅链接自动更新，运行：
+#   ./update_subscription.sh （或 deploy/update.py）
+# ============================================================================
+
+# 混合端口（HTTP + SOCKS5）
+mixed-port: 7890
+
+# 允许局域网连接（Docker 网络内容器可互访必须开启）
+allow-lan: true
+bind-address: '*'
+
+# 运行模式：rule（规则）/ global（全局）/ direct（直连）
+mode: rule
+
+# 日志级别：silent / error / warning / info / debug
+log-level: info
+
+# RESTful API 控制端口（ClashProxyManager 通过此端口管理节点）
+external-controller: 0.0.0.0:9090
+
+# DNS 配置
+dns:
+  enable: true
+  ipv6: false
+  default-nameserver:
+    - 223.5.5.5
+    - 114.114.114.114
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+  fallback:
+    - tls://8.8.8.8:853
+    - tls://1.1.1.1:853
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '*.lan'
+    - localhost.ptlogin2.qq.com
+
+# ============================================================================
+# 代理节点（填写您的机场节点，或使用订阅方式自动获取）
+# ============================================================================
+proxies:
+  # 示例 - VMess 节点（请替换为您的真实节点信息）
+  # - name: "节点示例-香港1"
+  #   type: vmess
+  #   server: hk1.your-provider.com
+  #   port: 443
+  #   uuid: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  #   alterId: 0
+  #   cipher: auto
+  #   tls: true
+  #   skip-cert-verify: false
+  #   servername: hk1.your-provider.com
+
+  # 示例 - Shadowsocks 节点
+  # - name: "节点示例-日本1"
+  #   type: ss
+  #   server: jp1.your-provider.com
+  #   port: 8388
+  #   cipher: chacha20-ietf-poly1305
+  #   password: "your-ss-password"
+
+  # 示例 - Trojan 节点
+  # - name: "节点示例-美国1"
+  #   type: trojan
+  #   server: us1.your-provider.com
+  #   port: 443
+  #   password: "your-trojan-password"
+  #   skip-cert-verify: false
+
+# ============================================================================
+# 代理组（CLASH_PROXY_GROUP 对应此处的 name）
+# ============================================================================
+proxy-groups:
+  # 自动选择：url-test 会自动测速并选最快节点（推荐）
+  # ClashProxyManager 默认管理名为 "自动选择" 的代理组
+  - name: "自动选择"
+    type: url-test
+    proxies:
+      - DIRECT
+      # 在此列出您的节点名称，例如：
+      # - 节点示例-香港1
+      # - 节点示例-日本1
+      # - 节点示例-美国1
+    url: 'http://www.gstatic.com/generate_204'
+    interval: 300
+    tolerance: 50
+
+  # 手动选择备用组
+  - name: "手动选择"
+    type: select
+    proxies:
+      - DIRECT
+      - 自动选择
+      # - 节点示例-香港1
+
+# ============================================================================
+# 规则（Rules）
+# ============================================================================
+rules:
+  # Claude API 走代理
+  - DOMAIN-SUFFIX,anthropic.com,自动选择
+  - DOMAIN-SUFFIX,claude.ai,自动选择
+  # Google API（Antigravity）走代理
+  - DOMAIN-SUFFIX,googleapis.com,自动选择
+  - DOMAIN-SUFFIX,google.com,自动选择
+  # OpenAI 相关
+  - DOMAIN-SUFFIX,openai.com,自动选择
+  - DOMAIN-SUFFIX,auth0.com,自动选择
+  # 国内流量直连
+  - GEOIP,CN,DIRECT
+  - IP-CIDR,127.0.0.0/8,DIRECT
+  - IP-CIDR,192.168.0.0/16,DIRECT
+  - IP-CIDR,10.0.0.0/8,DIRECT
+  # 其余流量走代理
+  - MATCH,自动选择

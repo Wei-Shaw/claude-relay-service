@@ -7,6 +7,7 @@ const apiKeyService = require('./apiKeyService')
 const unifiedOpenAIScheduler = require('./unifiedOpenAIScheduler')
 const config = require('../../config/config')
 const crypto = require('crypto')
+const clashProxyManager = require('./clashProxyManager')
 
 // 抽取缓存写入 token，兼容多种字段命名
 function extractCacheCreationTokens(usageData) {
@@ -299,6 +300,14 @@ class OpenAIResponsesRelayService {
         await openaiResponsesAccountService.updateAccount(account.id, {
           status: 'error',
           errorMessage: `Connection error: ${error.code}`
+        })
+      }
+
+      // 代理相关错误上报 Clash 智能管理器
+      if (clashProxyManager.isProxyRelatedError(error)) {
+        clashProxyManager.reportProxyError(error, {
+          service: 'openai-responses',
+          accountId: account?.id
         })
       }
 

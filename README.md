@@ -1,1027 +1,458 @@
-# Claude Relay Service
+# Claude Relay Service (Antigravity Edition)
 
-> [!CAUTION]
-> **安全更新通知**：v1.1.248 及以下版本存在严重的管理员认证绕过漏洞，攻击者可未授权访问管理面板。
+> **二开维护：dadongwo**
 >
-> **请立即更新到 v1.1.249+ 版本**，或迁移到新一代项目 **[CRS 2.0 (sub2api)](https://github.com/Wei-Shaw/sub2api)**
+> 目标：让 `claude`（Claude Code CLI）与 Antigravity / Gemini 账户体系无缝对接，并提供可观测、可运维的稳定转发服务。
 
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![Redis](https://img.shields.io/badge/Redis-6+-red.svg)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
-[![Docker Build](https://github.com/Wei-Shaw/claude-relay-service/actions/workflows/auto-release-pipeline.yml/badge.svg)](https://github.com/Wei-Shaw/claude-relay-service/actions/workflows/auto-release-pipeline.yml)
-[![Docker Pulls](https://img.shields.io/docker/pulls/weishaw/claude-relay-service)](https://hub.docker.com/r/weishaw/claude-relay-service)
+[![GitHub](https://img.shields.io/badge/GitHub-dadongwo-181717?logo=github)](https://github.com/dadongwo)
+[![Repo](https://img.shields.io/badge/Repo-claude--relay--service-blue?logo=github)](https://github.com/dadongwo/claude-relay-service)
 
-**🔐 自行搭建Claude API中转服务，支持多账户管理**
-
-[English](README_EN.md) • [快速开始](https://pincc.ai/) • [演示站点](https://demo.pincc.ai/admin-next/login) • [公告频道](https://t.me/claude_relay_service)
+**🔐 Claude Code 原生适配 · Antigravity 生态 · 多账户管理 · OpenAI 格式兼容**
 
 </div>
 
 ---
 
-## 💎 Claude/Codex 拼车服务推荐
+## 🚀 3分钟极速上手
 
-<div align="center">
+无需复杂的配置，通过自动化脚本一键部署到你的服务器。
 
-| 平台 | 类型 | 服务 | 介绍 |
-|:---|:---|:---|:---|
-| **[pincc.ai](https://pincc.ai/)** | 🏆 **官方运营** | <small>✅ Claude Code<br>✅ Codex CLI</small> | 项目直营，提供稳定的 Claude Code / Codex CLI 拼车服务 |
-| **[ctok.ai](https://ctok.ai/)** | 🤝 合作伙伴 | <small>✅ Claude Code<br>✅ Codex CLI</small> | 社区认证，提供 Claude Code / Codex CLI 拼车 |
-
-
-</div>
-
----
-
-## ⚠️ 重要提醒
-
-**使用本项目前请仔细阅读：**
-
-🚨 **服务条款风险**: 使用本项目可能违反Anthropic的服务条款。请在使用前仔细阅读Anthropic的用户协议，使用本项目的一切风险由用户自行承担。
-
-📖 **免责声明**: 本项目仅供技术学习和研究使用，作者不对因使用本项目导致的账户封禁、服务中断或其他损失承担任何责任。
-
-
-## 🤔 这个项目适合你吗？
-
-- 🌍 **地区限制**: 所在地区无法直接访问Claude Code服务？
-- 🔒 **隐私担忧**: 担心第三方镜像服务会记录或泄露你的对话内容？
-- 👥 **成本分摊**: 想和朋友一起分摊Claude Code Max订阅费用？
-- ⚡ **稳定性**: 第三方镜像站经常故障不稳定，影响效率 ？
-
-如果有以上困惑，那这个项目可能适合你。
-
-### 适合的场景
-
-✅ **找朋友拼车**: 三五好友一起分摊Claude Code Max订阅  
-✅ **隐私敏感**: 不想让第三方镜像看到你的对话内容  
-✅ **技术折腾**: 有基本的技术基础，愿意自己搭建和维护  
-✅ **稳定需求**: 需要长期稳定的Claude访问，不想受制于镜像站  
-✅ **地区受限**: 无法直接访问Claude官方服务
-
----
-
-## 💭 为什么要自己搭？
-
-### 现有镜像站可能的问题
-
-- 🕵️ **隐私风险**: 你的对话内容都被人家看得一清二楚，商业机密什么的就别想了
-- 🐌 **性能不稳**: 用的人多了就慢，高峰期经常卡死
-- 💰 **价格不透明**: 不知道实际成本
-
-### 自建的好处
-
-- 🔐 **数据安全**: 所有接口请求都只经过你自己的服务器，直连Anthropic API
-- ⚡ **性能可控**: 就你们几个人用，Max 200刀套餐基本上可以爽用Opus
-- 💰 **成本透明**: 用了多少token一目了然，按官方价格换算了具体费用
-- 📊 **监控完整**: 使用情况、成本分析、性能监控全都有
-
----
-
-## 🚀 核心功能
-
-### 基础功能
-
-- ✅ **多账户管理**: 可以添加多个Claude账户自动轮换
-- ✅ **自定义API Key**: 给每个人分配独立的Key
-- ✅ **使用统计**: 详细记录每个人用了多少token
-
-### 高级功能
-
-- 🔄 **智能切换**: 账户出问题自动换下一个
-- 🚀 **性能优化**: 连接池、缓存，减少延迟
-- 📊 **监控面板**: Web界面查看所有数据
-- 🛡️ **安全控制**: 访问限制、速率控制、客户端限制
-- 🌐 **代理支持**: 支持HTTP/SOCKS5代理
-
----
-
-## 📋 部署要求
-
-### 硬件要求（最低配置）
-
-- **CPU**: 1核心就够了
-- **内存**: 512MB（建议1GB）
-- **硬盘**: 30GB可用空间
-- **网络**: 能访问到Anthropic API（建议使用US地区的机器）
-- **建议**: 2核4G的基本够了，网络尽量选回国线路快一点的（为了提高速度，建议不要开代理或者设置服务器的IP直连）
-- **经验**: 阿里云、腾讯云的海外主机经测试会被Cloudflare拦截，无法直接访问claude api
-
-### 软件要求
-
-- **Node.js** 18或更高版本
-- **Redis** 6或更高版本
-- **操作系统**: 建议Linux
-
-### 费用估算
-
-- **服务器**: 轻量云服务器，一个月30-60块
-- **Claude订阅**: 看你怎么分摊了
-- **其他**: 域名（可选）
-
----
-
-## 🚀 脚本部署（推荐）
-
-推荐使用管理脚本进行一键部署，简单快捷，自动处理所有依赖和配置。
-
-### 快速安装
-
+### 1️⃣ 下载代码
 ```bash
-curl -fsSL https://pincc.ai/manage.sh -o manage.sh && chmod +x manage.sh && ./manage.sh install
-```
-
-### 脚本功能
-
-- ✅ **一键安装**: 自动检测系统环境，安装 Node.js 18+、Redis 等依赖
-- ✅ **交互式配置**: 友好的配置向导，设置端口、Redis 连接等
-- ✅ **自动启动**: 安装完成后自动启动服务并显示访问地址
-- ✅ **便捷管理**: 通过 `crs` 命令随时管理服务状态
-
-### 管理命令
-
-```bash
-crs install   # 安装服务
-crs start     # 启动服务
-crs stop      # 停止服务
-crs restart   # 重启服务
-crs status    # 查看状态
-crs update    # 更新服务
-crs uninstall # 卸载服务
-```
-
-### 安装示例
-
-```bash
-$ crs install
-
-# 会依次询问：
-安装目录 (默认: ~/claude-relay-service):
-服务端口 (默认: 3000): 8080
-Redis 地址 (默认: localhost):
-Redis 端口 (默认: 6379):
-Redis 密码 (默认: 无密码):
-
-# 安装完成后自动启动并显示：
-服务已成功安装并启动！
-
-访问地址：
-  本地 Web: http://localhost:8080/web
-  公网 Web: http://YOUR_IP:8080/web
-
-管理员账号信息已保存到: data/init.json
-```
-
-### 系统要求
-
-- 支持系统: Ubuntu/Debian、CentOS/RedHat、Arch Linux、macOS
-- 自动安装 Node.js 18+ 和 Redis
-- Redis 使用系统默认位置，数据独立于应用
-
----
-
-## 📦 手动部署
-
-### 第一步：环境准备
-
-**Ubuntu/Debian用户：**
-
-```bash
-# 安装Node.js
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# 安装Redis
-sudo apt update
-sudo apt install redis-server
-sudo systemctl start redis-server
-```
-
-**CentOS/RHEL用户：**
-
-```bash
-# 安装Node.js
-curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
-sudo yum install -y nodejs
-
-# 安装Redis
-sudo yum install redis
-sudo systemctl start redis
-```
-
-### 第二步：下载和配置
-
-```bash
-# 下载项目
-git clone https://github.com/Wei-Shaw//claude-relay-service.git
+git clone https://github.com/dadongwo/claude-relay-service.git
 cd claude-relay-service
-
-# 安装依赖
-npm install
-
-# 复制配置文件（重要！）
-cp config/config.example.js config/config.js
-cp .env.example .env
 ```
 
-### 第三步：配置文件设置
-
-**编辑 `.env` 文件：**
-
+### 2️⃣ 基础配置 (必做)
 ```bash
-# 这两个密钥随便生成，但要记住
-JWT_SECRET=你的超级秘密密钥
-ENCRYPTION_KEY=32位的加密密钥随便写
+# 复制环境变量模板
+cp deploy/.env.example deploy/.env
+# ⚠️ 重要: 编辑 deploy/.env，修改 JWT_SECRET 和 ENCRYPTION_KEY 为随机字符串
 
-# Redis配置
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-
+# 复制 Clash 代理配置
+cp deploy/clash/config.yaml.example deploy/clash/config.yaml
+# ⚠️ 重要: 编辑 deploy/clash/config.yaml，填入你的机场订阅地址 url: "..."
 ```
 
-**编辑 `config/config.js` 文件：**
+### 3️⃣ 一键部署
 
-```javascript
-module.exports = {
-  server: {
-    port: 3000, // 服务端口，可以改
-    host: '0.0.0.0' // 不用改
-  },
-  redis: {
-    host: '127.0.0.1', // Redis地址
-    port: 6379 // Redis端口
-  }
-  // 其他配置保持默认就行
-}
-```
-
-### 第四步：安装前端依赖并构建
-
+**方式一: 使用默认别名 (cloud-server)**
+需在 `~/.ssh/config` 配置好 Host。
 ```bash
-# 安装前端依赖
-npm run install:web
-
-# 构建前端（生成 dist 目录）
-npm run build:web
+# Windows
+.\deploy\deploy.ps1
+# Mac/Linux
+./deploy/deploy.sh
 ```
 
-### 第五步：启动服务
-
+**方式二: 直接指定服务器 (推荐)**
 ```bash
-# 初始化
-npm run setup # 会随机生成后台账号密码信息，存储在 data/init.json
-# 或者通过环境变量预设管理员凭据：
-# export ADMIN_USERNAME=cr_admin_custom
-# export ADMIN_PASSWORD=your-secure-password
+# Windows
+.\deploy\deploy.ps1 -TargetServer "root@你的服务器IP"
 
-# 启动服务
-npm run service:start:daemon   # 后台运行
-
-# 查看状态
-npm run service:status
+# Mac/Linux
+./deploy/deploy.sh "root@你的服务器IP"
 ```
 
 ---
 
-## 🐳 Docker 部署
+## 🌟 核心亮点
 
-### Docker compose
+这是一个二开项目：在原版 CRS 基础上补齐 Claude Code 协议层兼容、完善 Antigravity OAuth 与路径分流，并增强稳定性与可观测性。
 
-#### 第一步：下载构建docker-compose.yml文件的脚本并执行
-```bash
-curl -fsSL https://pincc.ai/crs-compose.sh -o crs-compose.sh && chmod +x crs-compose.sh && ./crs-compose.sh
-```
+### 1. 🚀 Claude Code 原生级兼容 (Killer Feature)
+无需任何魔法，让你的 `claude` 命令行工具像连接官方一样连接到本服务。
 
-#### 第二步：启动
-```bash
-docker-compose up -d
-```
+- **Thinking Signature 伪造/缓存/恢复**：解决 Claude Code 3.7+ 对 `thoughtSignature` 的强校验，支持兜底签名策略与签名缓存。
+- **Tool Result 透传**：兼容 Base64 图片等复杂结构，避免转发丢失/格式错误。
+- **消息并发治理**：拆分 Claude Code 混合发送的 `tool_result + user_text`，按协议顺序转发。
+- **僵尸流看门狗**：SSE 连接 45 秒无有效数据自动断开，避免"假活着"导致会话/额度被占用。
 
-### Docker Compose 配置
+### 2. 🛡️ Antigravity & Gemini 深度集成
+- **Antigravity OAuth 支持**：新增 `gemini-antigravity` 账户类型，支持 OAuth 授权与权限校验。
+- **路径即路由 (Path-Based Routing)**:
+  - `/antigravity/api` -> 自动路由到 Antigravity 账户池
+  - `/gemini-cli/api` -> 自动路由到 Gemini 账户池
+  - 告别在模型名前加前缀（如 `gemini/claude-3-5`）的混乱做法，Client 端只需改 Base URL 即可。
+- **额度与模型动态列表适配**：针对 Antigravity 的 `fetchAvailableModels` 做标准化展示（管理后台）与透传（接口）。
+- **OpenCode & Oh My OpenCode 原生支持**：完美兼容 Antigravity 账户体系下的 OpenCode 配置，支持通过 `gemini-antigravity` 账户直接驱动 OpenCode 插件。
 
-docker-compose.yml 已包含：
+### 3. ⚙️ 企业级稳定性
+- **智能风控对齐**：自动注入 `requestType: 'agent'` 并优化 System Prompt 插入策略，降低被上游风控拦截的概率。
+- **智能重试与切换账号**：针对 Antigravity `429 Resource Exhausted` 深度解析（区分 Quota/RateLimit/Capacity），自动清理会话并切换账号重试。
+- **模型级智能冷却**：支持对 Claude/Opus/Flash 等不同模型分别计算冷却时间，避免因单一模型限流影响整个账号使用。
+  <br/><img src="assets/image.png" width="400" alt="Model-level Smart Cooling" />
+- **日志安全与轮转**：避免循环引用导致的进程崩溃，并对 Dump 文件进行大小控制与轮转。
+- **调试利器**：支持请求/响应/工具定义/上游请求与上游 SSE 响应的 JSONL 转储，便于复现与定位问题。
 
-- ✅ 自动初始化管理员账号
-- ✅ 数据持久化（logs和data目录自动挂载）
-- ✅ Redis数据库
-- ✅ 健康检查
-- ✅ 自动重启
+### 4. 🔌 Clash 智能代理管理器 (2026-03 新增)
+- **网络错误自动感知**：当 API 请求遇到 502/503/504 等代理错误时自动检测
+- **智能测速切换**：触发 Clash 节点测速，自动切换到最快可用节点，减少手动运维
+- **防抖 + 冷却双重保护**：短时间内大量错误只触发一次测速，30 秒冷却期防止频繁切换
+- **管理后台可视化**：通过 `/admin/clash-proxy` 接口查看当前节点状态、错误计数和手动切换
+- **环境变量全配置**：通过 `CLASH_*` 系列环境变量控制，不使用 Clash 时自动禁用
+- **订阅自动更新**：支持多源订阅合并、节点过滤与排序，定时 cron 自动更新
 
-### 环境变量说明
+### 5. 🔥 流式响应弹性恢复架构 (2026-01 新增)
+- **三级降级恢复机制**：当上游异常中断（无 `finishReason`）时自动救援
+  - Level 1: 非流式重试 → 提取 tool_use
+  - Level 2: 强制工具调用 → 基于 TodoWrite 推断
+  - Level 3: 兜底文本注入 → 避免客户端卡死
+- **智能限流处理引擎**：精确解析 Google API 延迟指令（`RetryInfo`/`quotaResetDelay`）
+- **非流式转流式协议适配器**：内部使用 SSE 流式传输，合并分片响应，10 分钟超时兜底
 
-#### 必填项
+### 6. 🛠️ MCP 工具兼容性增强 (2026-01 新增)
+- **浏览器工具调用稳定性**：加强 `browser_*` 系列工具兼容
+- **工具输出语义压缩引擎**：智能压缩大体积工具输出（浏览器快照、大文件提示等）
+- **工具输入规范化处理**：自动修复上游返回的非标准 args 格式
 
-- `JWT_SECRET`: JWT密钥，至少32个字符
-- `ENCRYPTION_KEY`: 加密密钥，必须是32个字符
+### 7. 🌐 OpenAI 格式兼容 (多路由支持)
+支持使用 OpenAI `/v1/chat/completions` 格式调用后端模型，方便第三方客户端接入。
 
-#### 可选项
+| 路由 | 说明 |
+|------|------|
+| `/openai/gemini/v1/chat/completions` | OpenAI 格式 → Gemini/Antigravity 账户池 |
+| `/openai/claude/v1/chat/completions` | OpenAI 格式 → Claude 账户池 |
+| `/openai/v1/chat/completions` | OpenAI 格式 → OpenAI 账户池 |
 
-- `ADMIN_USERNAME`: 管理员用户名（不设置则自动生成）
-- `ADMIN_PASSWORD`: 管理员密码（不设置则自动生成）
-- `LOG_LEVEL`: 日志级别（默认：info）
-- 更多配置项请参考 `.env.example` 文件
-
-### 管理员凭据获取方式
-
-1. **查看容器日志**
-
-   ```bash
-   docker logs claude-relay-service
-   ```
-
-2. **查看挂载的文件**
-
-   ```bash
-   cat ./data/init.json
-   ```
-
-3. **使用环境变量预设**
-   ```bash
-   # 在 .env 文件中设置
-   ADMIN_USERNAME=cr_admin_custom
-   ADMIN_PASSWORD=your-secure-password
-   ```
+**特性**：
+- 自动格式转换（messages ↔ contents）
+- 流式/非流式均支持
+- 支持 Antigravity 账户（自动路由到 `gemini-antigravity`）
 
 ---
 
-## 🎮 开始使用
+## 📊 额度与模型查询 (Antigravity 专属)
 
-### 1. 打开管理界面
+### 查看账户额度 / Quota
+本服务深度适配了 Antigravity 的实时配额查询接口 (v1internal:fetchAvailableModels)。
 
-浏览器访问：`http://你的服务器IP:3000/web`
+1. 进入管理后台 -> **账号管理 (Claude 账户)**。
+2. 找到您的 `gemini-antigravity` 类型账户。
+3. 点击卡片右上角的 **"测试/刷新"** 按钮。
+4. 系统会自动拉取上游最新的配额信息（支持 Gemini Pro / Flash / Image 等不同分类），并将其标准化展示为百分比与重置时间。
+   > **Note**: 若某个模型触发了限流，此处还会显示该模型的 **冷却倒计时 (Cooling Down)**，方便您了解何时可以恢复使用。
 
-管理员账号：
+### 获取动态模型列表
+由于 Antigravity 的模型 ID 是动态更新的（如 `gemini-2.0-flash-exp`），本服务提供了透传查询接口。
 
-- 自动生成：查看 data/init.json
-- 环境变量预设：通过 ADMIN_USERNAME 和 ADMIN_PASSWORD 设置
-- Docker 部署：查看容器日志 `docker logs claude-relay-service`
+- **接口地址（Anthropic/Claude Code 路由）**: `GET /antigravity/api/v1/models`
+- **接口地址（OpenAI 兼容路由）**: `GET /openai/gemini/models`（或 `GET /openai/gemini/v1/models`）
+- **说明**: `/antigravity/api/v1/models` 会实时透传 Antigravity 上游 `fetchAvailableModels` 结果，确保看到当前账户可用的最新模型列表。
 
-### 2. 添加Claude账户
+---
 
-这一步比较关键，需要OAuth授权：
+## 🎮 快速开始指南
 
-1. 点击「Claude账户」标签
-2. 如果你担心多个账号共用1个IP怕被封禁，可以选择设置静态代理IP（可选）
-3. 点击「添加账户」
-4. 点击「生成授权链接」，会打开一个新页面
-5. 在新页面完成Claude登录和授权
-6. 复制返回的Authorization Code
-7. 粘贴到页面完成添加
+### 0. 环境要求
+- Node.js 18+（或使用 Docker）
+- Redis 6+/7+
 
-**注意**: 如果你在国内，这一步可能需要科学上网。
+### 1. Claude Code (CLI) 配置
 
-### 3. 创建API Key
+无需修改代码，只需设置环境变量即可无缝切换后端。
 
-给每个使用者分配一个Key：
-
-1. 点击「API Keys」标签
-2. 点击「创建新Key」
-3. 给Key起个名字，比如「张三的Key」
-4. 设置使用限制（可选）：
-   - **速率限制**: 限制每个时间窗口的请求次数和Token使用量
-   - **并发限制**: 限制同时处理的请求数
-   - **模型限制**: 限制可访问的模型列表
-   - **客户端限制**: 限制只允许特定客户端使用（如ClaudeCode、Gemini-CLI等）
-5. 保存，记下生成的Key
-
-### 4. 开始使用 Claude Code 和 Gemini CLI
-
-现在你可以用自己的服务替换官方API了：
-
-**Claude Code 设置环境变量：**
-
-
-**使用标准 Claude 账号池**
-
-默认使用标准 Claude 账号池：
-
-```bash
-export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/api/" # 根据实际填写你服务器的ip地址或者域名
-export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
-```
-
-**使用 Antigravity 账户池**
-
-适用于通过 Antigravity 渠道使用 Claude 模型（如 `claude-opus-4-5` 等）。
+#### 方案 A: 使用 Antigravity 账户池 (推荐)
+适用于通过 Antigravity 渠道使用 Claude 模型 (如 `claude-opus-4-5` 等)。
 
 ```bash
 # 1. 设置 Base URL 为 Antigravity 专用路径
-export ANTHROPIC_BASE_URL="http://127.0.0.1:3000/antigravity/api/"
+export ANTHROPIC_BASE_URL="http://你的服务器IP:3000/antigravity/api/"
 
-# 2. 设置 API Key（在后台创建，权限需包含 'all' 或 'gemini'）
-export ANTHROPIC_AUTH_TOKEN="后台创建的API密钥"
+# 2. 设置 API Key (在后台创建，权限需包含 'all' 或 'gemini')
+export ANTHROPIC_AUTH_TOKEN="cr_xxxxxxxxxxxx"
 
-# 3. 指定模型名称（直接使用短名，无需前缀！）
+# 3. 指定模型名称 (直接使用短名，无需前缀！)
 export ANTHROPIC_MODEL="claude-opus-4-5"
 
 # 4. 启动
 claude
 ```
 
-**VSCode Claude 插件配置：**
-
-如果使用 VSCode 的 Claude 插件，需要在 `~/.claude/config.json` 文件中配置：
-
-```json
-{
-    "primaryApiKey": "crs"
-}
-```
-
-如果该文件不存在，请手动创建。Windows 用户路径为 `C:\Users\你的用户名\.claude\config.json`。
-
-> 💡 **IntelliJ IDEA 用户推荐**：[Claude Code Plus](https://github.com/touwaeriol/claude-code-plus) - 将 Claude Code 直接集成到 IDE，支持代码理解、文件读写、命令执行。插件市场搜索 `Claude Code Plus` 即可安装。
-
-**Gemini CLI 设置环境变量：**
-
-**方式一（推荐）：通过 Gemini Assist API 方式访问**
+#### 方案 B: 使用 Gemini 账户池 (Gemini Models)
+适用于直接调用 Google Gemini 模型 (如 `gemini-2.5-pro`)。
 
 ```bash
-CODE_ASSIST_ENDPOINT="http://127.0.0.1:3000/gemini"  # 根据实际填写你服务器的ip地址或者域名
-GOOGLE_CLOUD_ACCESS_TOKEN="后台创建的API密钥"
-GOOGLE_GENAI_USE_GCA="true"
-GEMINI_MODEL="gemini-2.5-pro" # 如果你有gemini3权限可以填： gemini-3-pro-preview
-```
-
-> **认证**：只能选 ```Login with Google``` 进行认证，如果跳 Google请删除 ```~/.gemini/settings.json``` 后再尝试启动```gemini```。  
-> **注意**：gemini-cli 控制台会提示 `Failed to fetch user info: 401 Unauthorized`，但使用不受任何影响。  
-
-**方式二：通过 Gemini API 方式访问**
-
-
-```bash
-GOOGLE_GEMINI_BASE_URL="http://127.0.0.1:3000/gemini"  # 根据实际填写你服务器的ip地址或者域名
-GEMINI_API_KEY="后台创建的API密钥"
-GEMINI_MODEL="gemini-2.5-pro" # 如果你有gemini3权限可以填： gemini-3-pro-preview
-```
-
-> **认证**：只能选 ```Use Gemini API Key``` 进行认证，如果提示 ```Enter Gemini API Key``` 请直接留空按回车。如果一打开就跳 Google请删除 ```~/.gemini/settings.json``` 后再尝试启动```gemini```。
-
-> 💡 **进阶用法**：想在 Claude Code 中直接使用 Gemini 3 模型？请参考 [Claude Code 调用 Gemini 3 模型指南](docs/claude-code-gemini3-guide/README.md)
-
-**使用 Claude Code：**
-
-```bash
+export ANTHROPIC_BASE_URL="http://你的服务器IP:3000/gemini-cli/api/"
+export ANTHROPIC_AUTH_TOKEN="cr_xxxxxxxxxxxx"
+export ANTHROPIC_MODEL="gemini-2.5-pro"
 claude
 ```
 
-**使用 Gemini CLI：**
+#### 方案 C: 标准 Claude 账户池
+适用于原版 Claude / Console / Bedrock 渠道。
 
 ```bash
-gemini  # 或其他 Gemini CLI 命令
+export ANTHROPIC_BASE_URL="http://你的服务器IP:3000/api/"
+export ANTHROPIC_AUTH_TOKEN="cr_xxxxxxxxxxxx"
+claude
 ```
-
-**Codex 配置：**
-
-在 `~/.codex/config.toml` 文件**开头**添加以下配置：
-
-```toml
-model_provider = "crs"
-model = "gpt-5.1-codex-max"
-model_reasoning_effort = "high"
-disable_response_storage = true
-preferred_auth_method = "apikey"
-
-[model_providers.crs]
-name = "crs"
-base_url = "http://127.0.0.1:3000/openai"  # 根据实际填写你服务器的ip地址或者域名
-wire_api = "responses"
-requires_openai_auth = true
-env_key = "CRS_OAI_KEY"
-```
-
-在 `~/.codex/auth.json` 文件中配置API密钥为 null：
-
-```json
-{
-    "OPENAI_API_KEY": null  
-}
-```
-
-环境变量设置：
-
-```bash
-export CRS_OAI_KEY="后台创建的API密钥"
-```
-
-> ⚠️ 在通过 Nginx 反向代理 CRS 服务并使用 Codex CLI 时，需要在 http 块中添加 underscores_in_headers on;。因为 Nginx 默认会移除带下划线的请求头（如 session_id），一旦该头被丢弃，多账号环境下的粘性会话功能将失效。
-
-**Droid CLI 配置：**
-
-Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义模型以指向本服务的新端点：
-
-```json
-{
-  "custom_models": [
-    {
-      "model_display_name": "Opus 4.5 [crs]",
-      "model": "claude-opus-4-5-20251101",
-      "base_url": "http://127.0.0.1:3000/droid/claude",
-      "api_key": "后台创建的API密钥",
-      "provider": "anthropic",
-      "max_tokens": 64000
-    },
-    {
-      "model_display_name": "GPT5-Codex [crs]",
-      "model": "gpt-5-codex",
-      "base_url": "http://127.0.0.1:3000/droid/openai",
-      "api_key": "后台创建的API密钥",
-      "provider": "openai",
-      "max_tokens": 16384
-    },
-    {
-      "model_display_name": "Gemini-3-Pro [crs]",
-      "model": "gemini-3-pro-preview",
-      "base_url": "http://127.0.0.1:3000/droid/comm/v1/",
-      "api_key": "后台创建的API密钥",
-      "provider": "generic-chat-completion-api",
-      "max_tokens": 65535
-    },
-    {
-      "model_display_name": "GLM-4.6 [crs]",
-      "model": "glm-4.6",
-      "base_url": "http://127.0.0.1:3000/droid/comm/v1/",
-      "api_key": "后台创建的API密钥",
-      "provider": "generic-chat-completion-api",
-      "max_tokens": 202800
-    }
-  ]
-}
-```
-
-> 💡 将示例中的 `http://127.0.0.1:3000` 替换为你的服务域名或公网地址，并写入后台生成的 API 密钥（cr_ 开头）。
-
-### 5. 第三方工具API接入
-
-本服务支持多种API端点格式，方便接入不同的第三方工具（如Cherry Studio等）。
-
-#### Cherry Studio 接入示例
-
-Cherry Studio支持多种AI服务的接入，下面是不同账号类型的详细配置：
-
-**1. Claude账号接入：**
-
-```
-# API地址
-http://你的服务器:3000/claude
-
-# 模型ID示例
-claude-sonnet-4-5-20250929 # Claude Sonnet 4.5
-claude-opus-4-20250514     # Claude Opus 4
-```
-
-配置步骤：
-- 供应商类型选择"Anthropic"
-- API地址填入：`http://你的服务器:3000/claude`
-- API Key填入：后台创建的API密钥（cr_开头）
-
-**2. Gemini账号接入：**
-
-```
-# API地址
-http://你的服务器:3000/gemini
-
-# 模型ID示例
-gemini-2.5-pro             # Gemini 2.5 Pro
-```
-
-配置步骤：
-- 供应商类型选择"Gemini"
-- API地址填入：`http://你的服务器:3000/gemini`
-- API Key填入：后台创建的API密钥（cr_开头）
-
-**3. Codex接入：**
-
-```
-# API地址
-http://你的服务器:3000/openai
-
-# 模型ID（固定）
-gpt-5                      # Codex使用固定模型ID
-```
-
-配置步骤：
-- 供应商类型选择"Openai-Response"
-- API地址填入：`http://你的服务器:3000/openai`
-- API Key填入：后台创建的API密钥（cr_开头）
-- **重要**：Codex只支持Openai-Response标准
-
-
-**Cherry Studio 地址格式重要说明：**
-
-- ✅ **推荐格式**：`http://你的服务器:3000/claude`（不加结尾 `/`，让 Cherry Studio 自动加上 v1）
-- ✅ **等效格式**：`http://你的服务器:3000/claude/v1/`（手动指定 v1 并加结尾 `/`）
-- 💡 **说明**：这两种格式在 Cherry Studio 中是完全等效的
-- ❌ **错误格式**：`http://你的服务器:3000/claude/`（单独的 `/` 结尾会被 Cherry Studio 忽略 v1 版本）
-
-#### 其他第三方工具接入
-
-**接入要点：**
-
-- 所有账号类型都使用相同的API密钥（在后台统一创建）
-- 根据不同的路由前缀自动识别账号类型
-- `/claude/` - 使用Claude账号池
-- `/antigravity/api/` - 使用Antigravity账号池（推荐用于Claude Code）
-- `/droid/claude/` - 使用Droid类型Claude账号池（只建议api调用或Droid Cli中使用）
-- `/gemini/` - 使用Gemini账号池
-- `/openai/` - 使用Codex账号（只支持Openai-Response格式）
-- `/droid/openai/` - 使用Droid类型OpenAI兼容账号池（只建议api调用或Droid Cli中使用）
-- 支持所有标准API端点（messages、models等）
-
-**重要说明：**
-
-- 确保在后台已添加对应类型的账号（Claude/Gemini/Codex）
-- API密钥可以通用，系统会根据路由自动选择账号类型
-- 建议为不同用户创建不同的API密钥便于使用统计
 
 ---
 
-## 🔧 日常维护
+### 4. 🔌 OpenCode 集成配置
+ 
+ 在用户目录下的 `.config\opencode\opencode.json` 文件中配置 `provider`：
+ 
+ ```json
+ // antigravity 配置示例
+ "antigravity": {
+   "npm": "@ai-sdk/anthropic",
+   "name": "Antigravity",
+   "options": {
+     "baseURL": "http://localhost:3000/antigravity/api/v1",
+     "apiKey": "cr_XXXXXXXXX"
+   },
+   "models": {
+     "claude-opus-4-5-thinking": {
+       "name": "Claude Opus 4.5 Thinking",
+       "thinking": true,
+       "limit": {
+         "context": 200000,
+         "output": 8192
+       },
+       "modalities": {
+         "input": ["text", "image"],
+         "output": ["text"]
+       }
+     },
+     "claude-sonnet-4-5-thinking": {
+       "name": "Claude Sonnet 4.5 Thinking",
+       "thinking": true,
+       "limit": {
+         "context": 200000,
+         "output": 8192
+       },
+       "modalities": {
+         "input": ["text", "image"],
+         "output": ["text"]
+       }
+     },
+     "gemini-3-flash-preview": {
+       "name": "Gemini 3 Flash Preview",
+       "attachment": true,
+       "limit": {
+         "context": 1000000,
+         "output": 8192
+       },
+       "modalities": {
+         "input": ["text", "image", "pdf"],
+         "output": ["text"]
+       }
+     },
+     "gemini-3-pro-preview": {
+       "name": "Gemini 3 Pro Preview",
+       "thinking": true,
+       "attachment": true,
+       "limit": {
+         "context": 1000000,
+         "output": 8192
+       },
+       "modalities": {
+         "input": ["text", "image", "pdf"],
+         "output": ["text"]
+       }
+     }
+   }
+ },
+ 
+ // codex cli 接入账户示例
+ "openai-custom": {
+   "npm": "@ai-sdk/openai",
+   "name": "OpenAI Custom",
+   "options": {
+     "baseURL": "http://localhost:3200/openai",
+     "apiKey": "cr_xxxxxxxxxxxxxxxx"
+   },
+   "models": {
+     "gpt-5.2": {
+       "name": "GPT 5.2 (Custom)",
+       "limit": {
+         "context": 272000,
+         "output": 128000
+       },
+       "modalities": {
+         "input": ["text", "image"],
+         "output": ["text"]
+       },
+       "variants": {
+         "none": { "reasoningEffort": "none", "reasoningSummary": "auto", "textVerbosity": "medium" },
+         "low": { "reasoningEffort": "low", "reasoningSummary": "auto", "textVerbosity": "medium" },
+         "medium": { "reasoningEffort": "medium", "reasoningSummary": "auto", "textVerbosity": "medium" },
+         "high": { "reasoningEffort": "high", "reasoningSummary": "detailed", "textVerbosity": "medium" },
+         "xhigh": { "reasoningEffort": "xhigh", "reasoningSummary": "detailed", "textVerbosity": "medium" }
+       }
+     },
+     "gpt-5.2-codex": {
+       "name": "GPT 5.2 Codex (Custom)",
+       "limit": {
+         "context": 272000,
+         "output": 128000
+       },
+       "modalities": {
+         "input": ["text", "image"],
+         "output": ["text"]
+       },
+       "variants": {
+         "low": { "reasoningEffort": "low", "reasoningSummary": "auto", "textVerbosity": "medium" },
+         "medium": { "reasoningEffort": "medium", "reasoningSummary": "auto", "textVerbosity": "medium" },
+         "high": { "reasoningEffort": "high", "reasoningSummary": "detailed", "textVerbosity": "medium" },
+         "xhigh": { "reasoningEffort": "xhigh", "reasoningSummary": "detailed", "textVerbosity": "medium" }
+       }
+     },
+     "gpt-5.1-codex-max": {
+       "name": "GPT 5.1 Codex Max (Custom)",
+       "limit": {
+         "context": 272000,
+         "output": 128000
+       },
+       "modalities": {
+         "input": ["text", "image"],
+         "output": ["text"]
+       },
+       "variants": {
+         "low": { "reasoningEffort": "low", "reasoningSummary": "detailed", "textVerbosity": "medium" },
+         "medium": { "reasoningEffort": "medium", "reasoningSummary": "detailed", "textVerbosity": "medium" },
+         "high": { "reasoningEffort": "high", "reasoningSummary": "detailed", "textVerbosity": "medium" },
+         "xhigh": { "reasoningEffort": "xhigh", "reasoningSummary": "detailed", "textVerbosity": "medium" }
+       }
+     }
+   }
+ }
+ ```
+ 
+ #### `oh-my-opencode.json` 配置文件示例:
+ 
+ ```json
+ {
+   "$schema": "XXXXXXXXX",
+   "google_auth": false,
+   "agents": {
+     "sisyphus": {
+       "model": "antigravity/claude-opus-4-5-thinking"
+     },
+     "oracle": {
+       "model": "openai-custom/gpt-5.2"
+     },
+     "librarian": {
+       "model": "opencode/glm-4.7-free"
+     },
+     "explore": {
+       "model": "antigravity/gemini-3-flash-preview"
+     },
+     "frontend-ui-ux-engineer": {
+       "model": "antigravity/gemini-3-pro-preview"
+     },
+     "document-writer": {
+       "model": "antigravity/gemini-3-flash-preview"
+     },
+     "multimodal-looker": {
+       "model": "antigravity/gemini-3-flash-preview"
+     }
+   }
+ }
+ ```
+ 
+ ---
 
-### 服务管理
+支持任何兼容 OpenAI API 的客户端（如 ChatBox、LobeChat、自定义应用等）。
+
+#### 使用 Gemini/Antigravity 后端
 
 ```bash
-# 查看服务状态
-npm run service:status
+# Base URL
+http://你的服务器IP:3000/openai/gemini/v1
 
-# 查看日志
-npm run service:logs
+# API Key
+cr_xxxxxxxxxxxx
 
-# 重启服务
-npm run service:restart:daemon
-
-# 停止服务
-npm run service:stop
+# Model
+gemini-2.5-pro  # 或 claude-opus-4-5（Antigravity 账户）
 ```
 
-### 监控使用情况
-
-- **Web界面**: `http://你的域名:3000/web` - 查看使用统计
-- **健康检查**: `http://你的域名:3000/health` - 确认服务正常
-- **日志文件**: `logs/` 目录下的各种日志文件
-
-### 升级指南
-
-当有新版本发布时，按照以下步骤升级服务：
+#### 使用 Claude 后端
 
 ```bash
-# 1. 进入项目目录
-cd claude-relay-service
+# Base URL
+http://你的服务器IP:3000/openai/claude/v1
 
-# 2. 拉取最新代码
-git pull origin main
+# API Key
+cr_xxxxxxxxxxxx
 
-# 如果遇到 package-lock.json 冲突，使用远程版本
-git checkout --theirs package-lock.json
-git add package-lock.json
+# Model
+claude-3-5-sonnet
+```
 
-# 3. 安装新的依赖（如果有）
+---
+
+### 3. Gemini CLI 配置
+
+支持通过 Gemini 协议直接访问。
+
+**方式一：通过 Gemini Assist API (推荐)**
+
+```bash
+export CODE_ASSIST_ENDPOINT="http://你的服务器IP:3000/gemini"
+export GOOGLE_CLOUD_ACCESS_TOKEN="cr_xxxxxxxxxxxx" # 使用 CRS 的 API Key
+export GOOGLE_GENAI_USE_GCA="true"
+export GEMINI_MODEL="gemini-2.5-pro"
+gemini
+```
+
+---
+
+## 📦 部署说明
+
+### Docker Compose (推荐)
+
+```bash
+# 1. 初始化配置
+cp .env.example .env
+cp config/config.example.js config/config.js
+
+# 2. 编辑 .env（至少设置这两个）
+# JWT_SECRET=...（随机字符串）
+# ENCRYPTION_KEY=...（32位随机字符串）
+
+# 3. 启动
+docker-compose up -d
+```
+
+### Node 方式（不使用 Docker）
+
+```bash
 npm install
-
-# 4. 安装并构建前端
-npm run install:web
-npm run build:web
-
-# 5. 重启服务
-npm run service:restart:daemon
-
-# 6. 检查服务状态
-npm run service:status
+cp .env.example .env
+cp config/config.example.js config/config.js
+npm run setup
+npm run service:start:daemon
 ```
 
-**注意事项：**
+### 管理面板
 
-- 升级前建议备份重要配置文件（.env, config/config.js）
-- 查看更新日志了解是否有破坏性变更
-- 如果有数据库结构变更，会自动迁移
+- 地址: `http://IP:3000/web`
+- 初始账号/密码：`npm run setup` 生成并写入 `data/init.json`（Docker 部署可通过容器日志定位）。
 
 ---
 
-## 🔒 客户端限制功能
+## 🔧 调试与排障（可选）
 
-### 功能说明
+Dump 开关在 `.env.example` 中有完整说明。常用项：
 
-客户端限制功能允许你控制每个API Key可以被哪些客户端使用，通过User-Agent识别客户端，提高API的安全性。
-
-### 使用方法
-
-1. **在创建或编辑API Key时启用客户端限制**：
-   - 勾选"启用客户端限制"
-   - 选择允许的客户端（支持多选）
-
-2. **预定义客户端**：
-   - **ClaudeCode**: 官方Claude CLI（匹配 `claude-cli/x.x.x (external, cli)` 格式）
-   - **Gemini-CLI**: Gemini命令行工具（匹配 `GeminiCLI/vx.x.x (platform; arch)` 格式）
-
-3. **调试和诊断**：
-   - 系统会在日志中记录所有请求的User-Agent
-   - 客户端验证失败时会返回403错误并记录详细信息
-   - 通过日志可以查看实际的User-Agent格式，方便配置自定义客户端
-
-
-### 日志示例
-
-认证成功时的日志：
-
-```
-🔓 Authenticated request from key: 测试Key (key-id) in 5ms
-   User-Agent: "claude-cli/1.0.58 (external, cli)"
-```
-
-客户端限制检查日志：
-
-```
-🔍 Checking client restriction for key: key-id (测试Key)
-   User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-   Allowed clients: claude_code, gemini_cli
-🚫 Client restriction failed for key: key-id (测试Key) from 127.0.0.1, User-Agent: Mozilla/5.0...
-```
-
-### 常见问题处理
-
-**Redis连不上？**
-
-```bash
-# 检查Redis是否启动
-redis-cli ping
-
-# 应该返回 PONG
-```
-
-**OAuth授权失败？**
-
-- 检查代理设置是否正确
-- 确保能正常访问 claude.ai
-- 清除浏览器缓存重试
-
-**API请求失败？**
-
-- 检查API Key是否正确
-- 查看日志文件找错误信息
-- 确认Claude账户状态正常
+- `ANTHROPIC_DEBUG_REQUEST_DUMP=true`
+- `ANTHROPIC_DEBUG_RESPONSE_DUMP=true`
+- `ANTIGRAVITY_DEBUG_UPSTREAM_REQUEST_DUMP=true`
+- `ANTIGRAVITY_DEBUG_UPSTREAM_RESPONSE_DUMP=true`
+- `DUMP_MAX_FILE_SIZE_BYTES=10485760`
 
 ---
 
-## 🛠️ 进阶
+## 🤝 维护与致谢
 
-### 反向代理部署指南
-
-在生产环境中，建议通过反向代理进行连接，以便使用自动 HTTPS、安全头部和性能优化。下面提供两种常用方案： **Caddy** 和 **Nginx Proxy Manager (NPM)**。
-
----
-
-## Caddy 方案
-
-Caddy 是一款自动管理 HTTPS 证书的 Web 服务器，配置简单、性能优秀，很适合不需要 Docker 环境的部署方案。
-
-**1. 安装 Caddy**
-
-```bash
-# Ubuntu/Debian
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update
-sudo apt install caddy
-
-# CentOS/RHEL/Fedora
-sudo yum install yum-plugin-copr
-sudo yum copr enable @caddy/caddy
-sudo yum install caddy
-```
-
-**2. Caddy 配置**
-
-编辑 `/etc/caddy/Caddyfile` ：
-
-```caddy
-your-domain.com {
-    # 反向代理到本地服务
-    reverse_proxy 127.0.0.1:3000 {
-        # 支持流式响应或 SSE
-        flush_interval -1
-
-        # 传递真实 IP
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-
-        # 长读/写超时配置
-        transport http {
-            read_timeout 300s
-            write_timeout 300s
-            dial_timeout 30s
-        }
-    }
-
-    # 安全头部
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        X-Frame-Options "DENY"
-        X-Content-Type-Options "nosniff"
-        -Server
-    }
-}
-```
-
-**3. 启动 Caddy**
-
-```bash
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl start caddy
-sudo systemctl enable caddy
-sudo systemctl status caddy
-```
-
-**4. 服务配置**
-
-Caddy 会自动管理 HTTPS，因此可以将服务限制在本地进行监听：
-
-```javascript
-// config/config.js
-module.exports = {
-  server: {
-    port: 3000,
-    host: '127.0.0.1' // 只监听本地
-  }
-}
-```
-
-**Caddy 特点**
-
-* 🔒 自动 HTTPS，零配置证书管理
-* 🛡️ 安全默认配置，启用现代 TLS 套件
-* ⚡ HTTP/2 和流式传输支持
-* 🔧 配置文件简洁，易于维护
-
----
-
-## Nginx Proxy Manager (NPM) 方案
-
-Nginx Proxy Manager 通过图形化界面管理反向代理和 HTTPS 证书，並以 Docker 容器部署。
-
-**1. 在 NPM 创建新的 Proxy Host**
-
-Details 配置如下：
-
-| 项目                    | 设置                      |
-| --------------------- | ----------------------- |
-| Domain Names          | relay.example.com       |
-| Scheme                | http                    |
-| Forward Hostname / IP | 192.168.0.1 (docker 机器 IP) |
-| Forward Port          | 3000                    |
-| Block Common Exploits | ☑️                      |
-| Websockets Support    | ❌ **关闭**                |
-| Cache Assets          | ❌ **关闭**                |
-| Access List           | Publicly Accessible     |
-
-> 注意：
-> - 请确保 Claude Relay Service **监听 host 为 `0.0.0.0` 、容器 IP 或本机 IP**，以便 NPM 实现内网连接。
-> - **Websockets Support 和 Cache Assets 必须关闭**，否则会导致 SSE / 流式响应失败。
-
-**2. Custom locations**
-
-無需添加任何内容，保持为空。
-
-**3. SSL 设置**
-
-* **SSL Certificate**: Request a new SSL Certificate (Let's Encrypt) 或已有证书
-* ☑️ **Force SSL**
-* ☑️ **HTTP/2 Support**
-* ☑️ **HSTS Enabled**
-* ☑️ **HSTS Subdomains**
-
-**4. Advanced 配置**
-
-Custom Nginx Configuration 中添加以下内容：
-
-```nginx
-# 传递真实用户 IP
-proxy_set_header X-Real-IP $remote_addr;
-proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-proxy_set_header X-Forwarded-Proto $scheme;
-
-# 支持 WebSocket / SSE 等流式通信
-proxy_http_version 1.1;
-proxy_set_header Upgrade $http_upgrade;
-proxy_set_header Connection "upgrade";
-proxy_buffering off;
-
-# 长连接 / 超时设置（适合 AI 聊天流式传输）
-proxy_read_timeout 300s;
-proxy_send_timeout 300s;
-proxy_connect_timeout 30s;
-
-# ---- 安全性设置 ----
-# 严格 HTTPS 策略 (HSTS)
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-# 阻挡点击劫持与内容嗅探
-add_header X-Frame-Options "DENY" always;
-add_header X-Content-Type-Options "nosniff" always;
-
-# Referrer / Permissions 限制策略
-add_header Referrer-Policy "no-referrer-when-downgrade" always;
-add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-
-# 隐藏服务器信息（等效于 Caddy 的 `-Server`）
-proxy_hide_header Server;
-
-# ---- 性能微调 ----
-# 关闭代理端缓存，确保即时响应（SSE / Streaming）
-proxy_cache_bypass $http_upgrade;
-proxy_no_cache $http_upgrade;
-proxy_request_buffering off;
-```
-
-**4. 启动和验证**
-
-* 保存后等待 NPM 自动申请 Let's Encrypt 证书（如果有）。
-* Dashboard 中查看 Proxy Host 状态，确保显示为 "Online"。
-* 访问 `https://relay.example.com`，如果显示绿色锁图标即表示 HTTPS 正常。
-
-**NPM 特点**
-
-* 🔒 自动申请和续期证书
-* 🔧 图形化界面，方便管理多服务
-* ⚡ 原生支持 HTTP/2 / HTTPS
-* 🚀 适合 Docker 容器部署
-
----
-
-上述两种方案均可用于生产部署。
-
----
-
-## 💡 使用建议
-
-### 账户管理
-
-- **定期检查**: 每周看看账户状态，及时处理异常
-- **合理分配**: 可以给不同的人分配不同的apikey，可以根据不同的apikey来分析用量
-
-### 安全建议
-
-- **使用HTTPS**: 强烈建议使用Caddy反向代理（自动HTTPS），确保数据传输安全
-- **定期备份**: 重要配置和数据要备份
-- **监控日志**: 定期查看异常日志
-- **更新密钥**: 定期更换JWT和加密密钥
-- **防火墙设置**: 只开放必要的端口（80, 443），隐藏直接服务端口
-
----
-
-## 🆘 遇到问题怎么办？
-
-### 自助排查
-
-1. **查看日志**: `logs/` 目录下的日志文件
-2. **检查配置**: 确认配置文件设置正确
-3. **测试连通性**: 用 curl 测试API是否正常
-4. **重启服务**: 有时候重启一下就好了
-
-### 寻求帮助
-
-- **GitHub Issues**: 提交详细的错误信息
-- **查看文档**: 仔细阅读错误信息和文档
-- **社区讨论**: 看看其他人是否遇到类似问题
-
----
-
-## ❤️ 赞助支持
-
-如果您觉得这个项目对您有帮助，请考虑赞助支持项目的持续开发。您的支持是我们最大的动力！
-
-<div align="center">
-
-<a href="https://afdian.com/a/claude-relay-service" target="_blank">
-  <img src="https://img.shields.io/badge/请我喝杯咖啡-爱发电-946ce6?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white" alt="Sponsor">
-</a>
-
-<table>
-  <tr>
-    <td><img src="docs/sponsoring/wechat.jpg" width="200" alt="wechat" /></td>
-    <td><img src="docs/sponsoring/alipay.jpg" width="200" alt="alipay" /></td>
-  </tr>
-</table>
-
-</div>
-
----
-
-## 📄 许可证
-
-本项目采用 [MIT许可证](LICENSE)。
-
----
-
-<div align="center">
-
-**⭐ 觉得有用的话给个Star呗，这是对作者最大的鼓励！**
-
-**🤝 有问题欢迎提Issue，有改进建议欢迎PR**
-
-</div>
+- **维护者**：dadongwo
+- **Upstream**：Claude Relay Service（原版项目，已在本分支移除与功能无关的广告信息并专注于功能增强）

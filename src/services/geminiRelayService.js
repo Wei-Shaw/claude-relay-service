@@ -3,6 +3,7 @@ const ProxyHelper = require('../utils/proxyHelper')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const apiKeyService = require('./apiKeyService')
+const clashProxyManager = require('./clashProxyManager')
 
 // Gemini API 配置
 const GEMINI_API_BASE = 'https://cloudcode.googleapis.com/v1'
@@ -353,6 +354,14 @@ async function sendGeminiRequest({
         code: geminiError?.code
       }
       throw err
+    }
+
+    // 代理相关错误上报 Clash 智能管理器
+    if (clashProxyManager.isProxyRelatedError(error)) {
+      clashProxyManager.reportProxyError(error, {
+        service: 'gemini',
+        accountId
+      })
     }
 
     const err = new Error(error.message)

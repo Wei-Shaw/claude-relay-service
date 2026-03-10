@@ -280,7 +280,7 @@ const ANTIGRAVITY_MIN_SYSTEM_PROMPT_MARKER =
   'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.'
 
 function getAntigravityApiUrl() {
-  return process.env.ANTIGRAVITY_API_URL || 'https://daily-cloudcode-pa.googleapis.com'
+  return process.env.ANTIGRAVITY_API_URL || 'https://cloudcode-pa.googleapis.com'
 }
 
 function normalizeBaseUrl(url) {
@@ -304,8 +304,8 @@ function getAntigravityApiUrlCandidates() {
     }
   }
 
-  // [dadongwo] 默认行为：优先 daily，失败时再尝试 prod/dailySandbox。
-  const defaults = [daily, prod, dailySandbox]
+  // [dadongwo] 默认行为：优先 prod，失败时再尝试 daily/dailySandbox。
+  const defaults = [prod, daily, dailySandbox]
   if (defaults.map(normalizeBaseUrl).includes(configured)) {
     // 保持 configured 第一
     const others = defaults.filter((u) => normalizeBaseUrl(u) !== configured)
@@ -328,7 +328,7 @@ function getAntigravityHeaders(accessToken, baseUrl) {
   // 补充缺失的 X-Goog-Api-Client 和 Client-Metadata
   return {
     Host: host,
-    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.14.2 windows/amd64',
+    'User-Agent': process.env.ANTIGRAVITY_USER_AGENT || 'antigravity/1.16.5 windows/amd64',
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
     'Accept-Encoding': 'gzip',
@@ -336,8 +336,8 @@ function getAntigravityHeaders(accessToken, baseUrl) {
     'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
     'Client-Metadata': JSON.stringify({
       ideType: 'IDE_UNSPECIFIED',
-      ideVersion: 'vscode/1.108.0',
-      extensionVersion: '2.37.0',
+      ideVersion: 'vscode/1.107.0',
+      extensionVersion: '1.16.5',
       surface: 'vscode'
     })
   }
@@ -640,8 +640,22 @@ async function request({
       return true
     }
 
+    // ✅ 仅在显式允许 fallback 时，才放宽 endpoint 级 404
+    const allowFallback =
+      process.env.ANTIGRAVITY_API_URL_ALLOW_FALLBACK === 'true' ||
+      process.env.ANTIGRAVITY_API_URL_ALLOW_FALLBACK === '1'
+
     // 400/404 的 “model unavailable / not found” 在不同环境间可能表现不同，允许 fallback。
     if (status === 400 || status === 404) {
+      // ✅ 关键：v1internal endpoint 404（比如 API 版本/路径失效）时，直接允许 fallback
+      // 不改 400 的严格逻辑，避免影响正常参数错误等其它功能
+      if (allowFallback && status === 404) {
+        const reqUrl = String(error?.config?.url || '')
+        if (reqUrl.includes('/v1internal:')) {
+          return true
+        }
+      }
+
       const data = error?.response?.data
       const safeToString = (value) => {
         if (typeof value === 'string') {

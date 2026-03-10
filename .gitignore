@@ -199,9 +199,22 @@ coverage/
 docs/build/
 docs/dist/
 
-# Deployment files
-deploy/
-.deploy/
+# Deployment files (but ignore sensitive ones)
+deploy/.env
+deploy/.env.bak*
+deploy/clash/raw_sub.yaml
+deploy/clash/config.yaml
+# Clash 配置备份文件（含真实节点信息，禁止提交）
+deploy/clash/*.bak*
+deploy/clash/*.bak
+deploy/clash/static_proxies.yaml
+deploy/clash/proxies/
+# update_subscription.sh 含真实订阅 Token，禁止提交
+deploy/update_subscription.sh
+deploy/update_subscription.sh.bak*
+deploy/update.py.bak*
+# 空标记文件
+deploy/[claude-relay]
 
 # Package lock files (choose one)
 # Uncomment the one you DON'T want to track
@@ -247,3 +260,9 @@ web/apiStats/
 
 # Admin SPA build files
 web/admin-spa/dist/
+
+*.jsonl
+.cunzhi-memory/
+AGENTS.md
+
+Zachaong/

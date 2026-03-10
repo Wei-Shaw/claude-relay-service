@@ -1,0 +1,34 @@
+#!/bin/bash
+
+  # ================= 配置区域 =================
+  # 请替换为你的机场订阅地址
+  SUB_URL="https://your-airport-url/api/v1/client/subscribe?token=your-token"
+  FILTER_KEYWORDS=("20倍" "按量" "剩余流量" "到期" "官网")
+  # ===========================================
+
+  WORKDIR="/www/wwwroot/claude-relay-service/deploy"
+  cd "$WORKDIR"
+
+  echo "📥 正在下载最新订阅..."
+  curl -L -A "clash" -s "$SUB_URL" -o "clash/raw_sub.yaml"
+
+  if [ ! -s "clash/raw_sub.yaml" ]; then
+      echo "❌ 下载失败或文件为空！"
+      exit 1
+  fi
+
+  echo "🧹 正在处理配置..."
+  # 调用刚才创建的 python 脚本
+  python3 update.py "${FILTER_KEYWORDS[@]}"
+
+  if [ $? -eq 0 ]; then
+      echo "🔄 正在重启 Clash..."
+      docker-compose -f docker-compose.prod.yml restart clash
+
+      # 清理临时文件
+      rm -f "clash/raw_sub.yaml"
+
+      echo "🎉 更新成功！已过滤高倍率节点并启用自动测速。"
+  else
+      echo "❌ 更新失败！"
+  fi

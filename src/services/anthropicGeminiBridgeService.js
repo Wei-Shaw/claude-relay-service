@@ -101,18 +101,76 @@ const antigravityQuotaStrikesByAccountId = new Map()
 // 辅助函数：基础工具
 // ============================================================================
 
+function normalizeAntigravityProjectId(projectId) {
+  if (typeof projectId === 'string') {
+    const trimmed = projectId.trim()
+    return trimmed || null
+  }
+  if (projectId && typeof projectId === 'object') {
+    if (typeof projectId.id === 'string') {
+      return normalizeAntigravityProjectId(projectId.id)
+    }
+    if (typeof projectId.projectId === 'string') {
+      return normalizeAntigravityProjectId(projectId.projectId)
+    }
+  }
+  return null
+}
+
+function isSyntheticAntigravityProjectId(projectId) {
+  return /^ag-[0-9a-f]{16}$/i.test(String(projectId || ''))
+}
+
 /**
- * 确保 Antigravity 请求有有效的 projectId
- * 如果账户没有配置 projectId，则生成一个临时 ID
+ * 对 Antigravity 账号解析可用 projectId：
+ * 1) 优先固定 projectId
+ * 2) 其次缓存 tempProjectId
+ * 3) 缺失或疑似随机 ID 时，通过 loadCodeAssist 刷新并缓存
  */
-function ensureAntigravityProjectId(account) {
-  if (account.projectId) {
-    return account.projectId
+async function resolveAntigravityProjectIdForAccount(
+  account,
+  { client = null, proxyConfig = null, forceRefresh = false } = {}
+) {
+  const fixedProjectId = normalizeAntigravityProjectId(account?.projectId)
+  if (fixedProjectId) {
+    return fixedProjectId
   }
-  if (account.tempProjectId) {
-    return account.tempProjectId
+
+  const cachedTempProjectId = normalizeAntigravityProjectId(account?.tempProjectId)
+  const shouldRefresh =
+    forceRefresh || !cachedTempProjectId || isSyntheticAntigravityProjectId(cachedTempProjectId)
+
+  if (!shouldRefresh) {
+    return cachedTempProjectId
   }
-  return `ag-${crypto.randomBytes(8).toString('hex')}`
+  if (!client || !account?.id) {
+    return cachedTempProjectId || null
+  }
+
+  try {
+    const loadRes = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
+    const fetchedProjectId = normalizeAntigravityProjectId(
+      loadRes?.cloudaicompanionProject?.id || loadRes?.cloudaicompanionProject
+    )
+    if (!fetchedProjectId) {
+      logger.warn('⚠️ loadCodeAssist returned no cloudaicompanionProject', {
+        accountId: account.id
+      })
+      return cachedTempProjectId || null
+    }
+
+    if (account.tempProjectId !== fetchedProjectId) {
+      await geminiAccountService.updateTempProjectId(account.id, fetchedProjectId)
+      account.tempProjectId = fetchedProjectId
+    }
+    return fetchedProjectId
+  } catch (error) {
+    logger.warn('⚠️ Failed to refresh Antigravity projectId via loadCodeAssist', {
+      accountId: account.id,
+      message: error?.message || String(error)
+    })
+    return cachedTempProjectId || null
+  }
 }
 
 /**
@@ -2806,15 +2864,16 @@ function convertAnthropicMessagesToGeminiContents(
                     logger.debug('[SignatureCache] Restored signature from tool cache for tool_use')
                   }
                 }
-                if (effectiveSignature) {
-                  parts.push({
-                    thought: true,
-                    thoughtSignature: effectiveSignature,
-                    functionCall
-                  })
-                } else {
-                  parts.push({ functionCall })
+                // [FIX] Gemini 模型也需要 THOUGHT_SIGNATURE_FALLBACK 兜底
+                // Antigravity Gemini 端点现在要求 functionCall 必须包含 thoughtSignature
+                if (!effectiveSignature) {
+                  effectiveSignature = THOUGHT_SIGNATURE_FALLBACK
                 }
+                parts.push({
+                  thought: true,
+                  thoughtSignature: effectiveSignature,
+                  functionCall
+                })
               } else {
                 const effectiveSignature =
                   lastAntigravityThoughtSignature || THOUGHT_SIGNATURE_FALLBACK
@@ -3565,6 +3624,23 @@ function shouldRetryWithoutTools(sanitizedError) {
   )
 }
 
+function isAntigravityProjectNotFoundError(sanitizedError) {
+  const statusCode = sanitizedError?.statusCode
+  if (statusCode && statusCode !== 404) {
+    return false
+  }
+  const message = String(
+    sanitizedError?.upstreamMessage || sanitizedError?.message || ''
+  ).toLowerCase()
+  if (!message) {
+    return false
+  }
+  return (
+    (message.includes('resource projects/') && message.includes('could not be found')) ||
+    message.includes('invalid project resource name projects/')
+  )
+}
+
 /**
  * 从请求中移除工具定义（用于重试）
  */
@@ -3818,11 +3894,13 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
   )
 
   let { projectId } = account
+  let antigravityProjectRecoveryAttempted = false
   if (vendor === 'antigravity') {
-    projectId = ensureAntigravityProjectId(account)
-    if (!account.projectId && account.tempProjectId !== projectId) {
-      await geminiAccountService.updateTempProjectId(account.id, projectId)
-      account.tempProjectId = projectId
+    projectId = await resolveAntigravityProjectIdForAccount(account, { client, proxyConfig })
+    if (!projectId) {
+      return res
+        .status(503)
+        .json(buildAnthropicError('No valid Antigravity project ID for selected account'))
     }
   }
 
@@ -3908,6 +3986,34 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
             accountId
           })
           rawResponse = await attemptRequest(stripToolsFromRequest(requestData))
+        } else if (
+          vendor === 'antigravity' &&
+          !antigravityProjectRecoveryAttempted &&
+          isAntigravityProjectNotFoundError(sanitized)
+        ) {
+          antigravityProjectRecoveryAttempted = true
+          logger.warn('⚠️ Antigravity project not found, refreshing projectId and retrying', {
+            accountId,
+            projectId
+          })
+          try {
+            const refreshedProjectId = await resolveAntigravityProjectIdForAccount(account, {
+              client,
+              proxyConfig,
+              forceRefresh: true
+            })
+            if (!refreshedProjectId || refreshedProjectId === projectId) {
+              throw error
+            }
+            projectId = refreshedProjectId
+            rawResponse = await attemptRequest(requestData)
+          } catch (projectRetryError) {
+            logger.error(
+              '❌ Failed to retry non-stream after refreshing projectId:',
+              projectRetryError
+            )
+            throw error
+          }
         } else if (vendor === 'antigravity' && sanitized.statusCode === 429) {
           const { reason, retryDelayMs } = parseAntigravity429Meta(error)
           const resetsInSeconds = resolveAntigravityAccountRateLimitSeconds({
@@ -3986,7 +4092,15 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
 
             let newProjectId = newAccount.projectId
             if (vendor === 'antigravity') {
-              newProjectId = ensureAntigravityProjectId(newAccount)
+              newProjectId = await resolveAntigravityProjectIdForAccount(newAccount, {
+                client: newClient,
+                proxyConfig: newProxyConfig
+              })
+              if (!newProjectId) {
+                throw new Error(
+                  `No valid Antigravity project ID for retry account: ${newAccountId}`
+                )
+              }
             }
 
             logger.info(
@@ -4256,6 +4370,35 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           })
           return await startStream(stripToolsFromRequest(payload))
         }
+        if (
+          vendor === 'antigravity' &&
+          !antigravityProjectRecoveryAttempted &&
+          isAntigravityProjectNotFoundError(sanitized)
+        ) {
+          antigravityProjectRecoveryAttempted = true
+          logger.warn(
+            '⚠️ Antigravity project not found (stream), refreshing projectId and retrying',
+            {
+              accountId,
+              projectId
+            }
+          )
+          try {
+            const refreshedProjectId = await resolveAntigravityProjectIdForAccount(account, {
+              client,
+              proxyConfig,
+              forceRefresh: true
+            })
+            if (!refreshedProjectId || refreshedProjectId === projectId) {
+              throw error
+            }
+            projectId = refreshedProjectId
+            return await startStream(payload)
+          } catch (projectRetryError) {
+            logger.error('❌ Failed to retry stream after refreshing projectId:', projectRetryError)
+            throw error
+          }
+        }
         if (vendor === 'antigravity' && sanitized.statusCode === 429) {
           const { reason, retryDelayMs } = parseAntigravity429Meta(error)
           const resetsInSeconds = resolveAntigravityAccountRateLimitSeconds({
@@ -4331,7 +4474,15 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
 
             let newProjectId = newAccount.projectId
             if (vendor === 'antigravity') {
-              newProjectId = ensureAntigravityProjectId(newAccount)
+              newProjectId = await resolveAntigravityProjectIdForAccount(newAccount, {
+                client: newClient,
+                proxyConfig: newProxyConfig
+              })
+              if (!newProjectId) {
+                throw new Error(
+                  `No valid Antigravity project ID for retry account: ${newAccountId}`
+                )
+              }
             }
 
             logger.info(`🔄 Retrying with new account: ${newAccountId} (was: ${accountId})`)

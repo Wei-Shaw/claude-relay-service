@@ -3,15 +3,27 @@ version: '3.8'
 # Claude Relay Service Docker Compose 配置
 # 所有配置通过环境变量设置，无需映射 .env 文件
 
+x-default-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   # 🚀 Claude Relay Service
   claude-relay:
-    build: .
-    image: weishaw/claude-relay-service:latest
+    build:
+      context: .
+      args:
+        - HTTP_PROXY=http://host.docker.internal:10808
+        - HTTPS_PROXY=http://host.docker.internal:10808
+        - NO_PROXY=localhost,127.0.0.1
+    image: claude-relay-service:latest
     restart: unless-stopped
+    logging: *default-logging
     ports:
       # 绑定地址：生产环境建议使用反向代理，设置 BIND_HOST=127.0.0.1
-      - "${BIND_HOST:-0.0.0.0}:${PORT:-3000}:3000"
+      - "3200:3000"
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
@@ -45,6 +57,11 @@ services:
       - CLAUDE_API_URL=${CLAUDE_API_URL:-https://api.anthropic.com/v1/messages}
       - CLAUDE_API_VERSION=${CLAUDE_API_VERSION:-2023-06-01}
       - CLAUDE_BETA_HEADER=${CLAUDE_BETA_HEADER:-claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14}
+      
+      # 🤖 Antigravity 配置
+      - ANTIGRAVITY_API_URL=${ANTIGRAVITY_API_URL:-https://cloudcode-pa.googleapis.com}
+      - ANTIGRAVITY_USER_AGENT=${ANTIGRAVITY_USER_AGENT:-antigravity/1.16.5 windows/amd64}
+      - ANTIGRAVITY_API_URL_ALLOW_FALLBACK=${ANTIGRAVITY_API_URL_ALLOW_FALLBACK:-true}
       
       # 🌐 代理配置
       - DEFAULT_PROXY_TIMEOUT=${DEFAULT_PROXY_TIMEOUT:-60000}
@@ -91,6 +108,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *default-logging
     # 仅在容器网络内部暴露端口，不映射到主机
     expose:
       - "6379"
@@ -112,6 +130,7 @@ services:
   redis-commander:
     image: rediscommander/redis-commander:latest
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "127.0.0.1:${REDIS_WEB_PORT:-8081}:8081"
     environment:
@@ -127,6 +146,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
     volumes:
@@ -147,6 +167,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
     environment:

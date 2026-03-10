@@ -17,6 +17,7 @@ const requestIdentityService = require('./requestIdentityService')
 const { createClaudeTestPayload } = require('../utils/testPayloadHelper')
 const userMessageQueueService = require('./userMessageQueueService')
 const { isStreamWritable } = require('../utils/streamHelper')
+const clashProxyManager = require('./clashProxyManager')
 
 class ClaudeRelayService {
   constructor() {
@@ -1539,6 +1540,14 @@ class ClaudeRelayService {
           await this._handleServerError(accountId, 504, null, 'Network')
         }
 
+        // 代理相关错误上报 Clash 智能管理器
+        if (clashProxyManager.isProxyRelatedError(error)) {
+          clashProxyManager.reportProxyError(error, {
+            service: 'claude',
+            accountId
+          })
+        }
+
         reject(new Error(errorMessage))
       })
 
@@ -2563,6 +2572,14 @@ class ClaudeRelayService {
         } else if (error.code === 'ETIMEDOUT') {
           errorMessage = 'Connection timed out to Claude API server'
           statusCode = 504
+        }
+
+        // 代理相关错误上报 Clash 智能管理器
+        if (clashProxyManager.isProxyRelatedError(error)) {
+          clashProxyManager.reportProxyError(error, {
+            service: 'claude-stream',
+            accountId
+          })
         }
 
         if (!responseStream.headersSent) {

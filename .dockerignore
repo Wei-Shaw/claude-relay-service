@@ -7,6 +7,7 @@ yarn-error.log*
 # Environment files
 .env.local
 .env.*.local
+# 保留根目录的 .env 和前端的 .env.production 用于 Docker 构建
 
 # Logs
 logs/
@@ -19,18 +20,14 @@ redis_data/
 
 # Git
 .git/
-.gitignore
 .gitattributes
 
 # GitHub
 .github/
 
-# Documentation
-README.md
-README_EN.md
+# Documentation (keep files explicitly copied in Dockerfile)
 CHANGELOG.md
 docs/
-*.md
 
 # Development files
 .vscode/
@@ -40,11 +37,9 @@ docs/
 *~
 .DS_Store
 
-# Docker files
+# Docker files (keep Dockerfile for reference)
 docker-compose.yml
 docker-compose.*.yml
-Dockerfile
-.dockerignore
 
 # Test files
 test/
@@ -62,9 +57,6 @@ build/
 *.seed
 *.pid.lock
 
-# 但可以忽略本地已构建的 dist 目录
-web/admin-spa/dist/
-
 # CI/CD
 .travis.yml
 .gitlab-ci.yml
@@ -73,7 +65,4 @@ azure-pipelines.yml
 # Package manager files
 # package-lock.json  # 需要保留此文件以支持 npm ci
 yarn.lock
-pnpm-lock.yaml
-
-# CLI
-cli/
+# pnpm-lock.yaml  # 保留以支持 pnpm 依赖锁定
