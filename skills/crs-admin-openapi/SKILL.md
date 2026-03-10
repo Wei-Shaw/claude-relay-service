@@ -44,6 +44,45 @@ CRS_BASE_URL=http://127.0.0.1:3000
 列表 API Keys 时应主动使用排序和筛选参数，而不是只发默认请求。
 `GET /admin/api-keys` 的响应 `data.items[]` 应视为完整列表行数据，不只包含 `id` 和 `name`，还包括绑定账户、权限、限流、标签、owner、usage、成本排序附加列等字段。
 
+主要字段含义：
+
+- `id`: API Key 记录 ID，不是明文 key。
+- `name`: API Key 名称，用于列表展示和搜索。
+- `description`: API Key 描述。
+- `createdAt`: 创建时间。
+- `lastUsedAt`: 最近使用时间；为空通常表示尚未使用。
+- `expiresAt`: 过期时间；为空通常表示未设置固定过期时间。
+- `createdBy`: 创建者标识，可能是 `admin` 或用户名。
+- `userId`: 归属用户 ID；为空通常表示归属于管理员。
+- `userUsername`: 归属用户名。
+- `ownerDisplayName`: 后端补充的归属人展示名，适合直接展示。
+- `isActive`: 当前是否启用。
+- `isDeleted`: 是否已软删除。
+- `deletedAt` / `deletedBy` / `deletedByType`: 软删除元数据。
+- `permissions`: 允许访问的服务列表；空数组通常表示全部服务。
+- `claudeAccountId` / `claudeConsoleAccountId` / `geminiAccountId` / `openaiAccountId` / `azureOpenaiAccountId` / `bedrockAccountId` / `droidAccountId`: 绑定的上游账户 ID；为空表示未绑定该类账户。
+- `enableModelRestriction`: 是否启用模型限制。
+- `restrictedModels`: 允许的模型列表；通常与 `enableModelRestriction` 联动理解。
+- `enableClientRestriction`: 是否启用客户端限制。
+- `allowedClients`: 允许的客户端列表；通常与 `enableClientRestriction` 联动理解。
+- `allow1mContext`: 是否允许 1M 上下文相关能力。
+- `tokenLimit`: token 限额配置。
+- `concurrencyLimit`: 并发限制。
+- `rateLimitWindow`: 限流时间窗口，单位通常为分钟。
+- `rateLimitRequests`: 窗口内允许的请求数。
+- `rateLimitCost`: 窗口内允许的费用额度。
+- `dailyCostLimit`: 每日费用限制。
+- `totalCostLimit`: 累计总费用限制。
+- `weeklyOpusCostLimit`: 周费用限制字段，当前实现语义更接近 Claude 周费用限制。
+- `weeklyResetDay` / `weeklyResetHour`: 周费用统计窗口的重置日与小时。
+- `tags`: 标签数组。
+- `serviceRates`: 服务倍率配置对象。
+- `activationDays` / `activationUnit` / `expirationMode`: 激活后过期策略相关配置。
+- `isActivated`: 是否已激活；激活模式下特别重要。
+- `activatedAt`: 激活时间。
+- `usage`: 列表中的聚合使用信息；当前至少可依赖 `usage.total.requests`、`usage.total.tokens`、`usage.total.cost`、`usage.total.formattedCost`。
+- `_cost`: 当按费用排序时，后端附加的当前排序费用值；仅在部分排序场景下出现。
+
 常用查询参数：
 
 - `page` / `pageSize`: 分页。
