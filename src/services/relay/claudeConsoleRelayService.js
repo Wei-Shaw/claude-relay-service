@@ -1281,6 +1281,7 @@ class ClaudeConsoleRelayService {
         })
         .catch((error) => {
           if (aborted) {
+            reject(error)
             return
           }
 
@@ -1363,6 +1364,7 @@ class ClaudeConsoleRelayService {
       responseStream.on('close', () => {
         logger.debug('🔌 Client disconnected, cleaning up Claude Console stream')
         aborted = true
+        reject(new Error('Client disconnected'))
       })
     })
   }
