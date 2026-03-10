@@ -2287,7 +2287,7 @@ class ClaudeAccountService {
           organizationType: profileData.organization?.organization_type,
 
           // 账号类型：Enterprise 组织按 Max 能力处理，确保可调度 Opus
-          accountType: hasClaudeMax ? 'claude_max' : hasClaudePro ? 'claude_pro' : 'free',
+          accountType: hasClaudeMax ? 'claude_max' : hasClaudePro ? 'claude_pro' : 'claude_max',
 
           // 更新时间
           profileFetchedAt: new Date().toISOString()

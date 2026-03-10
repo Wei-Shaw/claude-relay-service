@@ -1,6 +1,6 @@
-# CLAUDE.md <260209.0>
+# CLAUDE.md
 
-This file provides guidance to Claude Code when working with this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 项目概述
 
@@ -83,11 +83,13 @@ data/init.json            # 管理员凭据
 
 ## 开发规范
 
-### 代码格式化
+### 代码风格
 
+- **无分号**、**单引号**、**100字符行宽**、**尾逗号 none**、**箭头函数始终加括号**
+- 强制 `const`（`no-var`、`prefer-const`），严格相等（`eqeqeq`）
+- 下划线前缀变量 `_var` 可豁免 unused 检查
 - **必须使用 Prettier**: `npx prettier --write <file>`
 - 前端额外安装了 `prettier-plugin-tailwindcss`
-- 提交前检查：`npx prettier --check <file>`
 
 ### 开发工作流
 
@@ -98,8 +100,15 @@ data/init.json            # 管理员凭据
 5. **测试** → `npm test`
 6. **验证** → `npm run cli status` 确认服务正常
 
+### 测试规范
+
+- 测试文件在 `tests/` 目录，命名 `*.test.js` 或 `*.spec.js`
+- 使用 `jest.mock()` 模拟依赖（logger、redis、services）
+- `beforeEach` 中 `jest.resetModules()`，`afterEach` 中 `jest.clearAllMocks()`
+
 ### 前端要求
 
+- 技术栈：Vue 3 Composition API + Pinia + Element Plus + Tailwind CSS
 - 响应式设计：Tailwind CSS 响应式前缀（sm:、md:、lg:、xl:）
 - 暗黑模式：所有组件必须兼容，使用 `dark:` 前缀
 - 主题切换：`web/admin-spa/src/stores/theme.js` 的 `useThemeStore()`
@@ -124,14 +133,26 @@ data/init.json            # 管理员凭据
 
 ```bash
 npm install && npm run setup    # 初始化
-npm run dev                     # 开发模式（热重载）
-npm start                       # 生产模式
-npm run lint                    # ESLint 检查
-npm test                        # Jest + SuperTest
-docker-compose up -d            # Docker 部署
+npm run dev                     # 开发模式（nodemon 热重载，自动 lint）
+npm start                       # 生产模式（先 lint 再启动）
+npm run lint                    # ESLint 检查并自动修复
+npm run lint:check              # ESLint 仅检查不修复
+npm run format                  # Prettier 格式化所有后端文件
+npm run format:check            # Prettier 仅检查格式
+npm test                        # Jest 运行所有测试（tests/ 目录）
+npm test -- <文件名>             # 运行单个测试，如: npm test -- pricingService
+npm test -- --coverage          # 运行测试并生成覆盖率报告
 npm run cli status              # 系统状态
 npm run data:export             # 导出 Redis 数据
 npm run data:debug              # 调试 Redis 键
+```
+
+### 前端命令
+
+```bash
+npm run install:web             # 安装前端依赖
+npm run build:web               # 构建前端（生成 dist）
+cd web/admin-spa && npm run dev # 前端开发模式（Vite HMR）
 ```
 
 ## 环境变量（必须）

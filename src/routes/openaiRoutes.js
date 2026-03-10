@@ -283,6 +283,9 @@ const handleResponses = async (req, res) => {
     const codexCliPattern = /^(codex_vscode|codex_cli_rs|codex_exec)\/[\d.]+/i
     const isCodexCLI = codexCliPattern.test(userAgent)
 
+    // 提取 service_tier 用于后续费用计算（在字段被移除前保存）
+    req._serviceTier = req.body?.service_tier || null
+
     // 如果不是 Codex CLI 请求且不是来自 unified 端点（已完成格式转换），则进行适配
     if (!isCodexCLI && !req._fromUnifiedEndpoint) {
       // 移除不需要的请求体字段
@@ -632,7 +635,8 @@ const handleResponses = async (req, res) => {
             cacheReadTokens,
             actualModel,
             accountId,
-            'openai'
+            'openai',
+            req._serviceTier
           )
 
           logger.info(
@@ -749,7 +753,8 @@ const handleResponses = async (req, res) => {
             cacheReadTokens,
             modelToRecord,
             accountId,
-            'openai'
+            'openai',
+            req._serviceTier
           )
 
           logger.info(
