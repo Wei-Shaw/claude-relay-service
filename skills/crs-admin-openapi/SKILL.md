@@ -42,6 +42,7 @@ CRS_BASE_URL=http://127.0.0.1:3000
 - 成本汇总: `GET /admin/usage-costs`
 
 列表 API Keys 时应主动使用排序和筛选参数，而不是只发默认请求。
+`GET /admin/api-keys` 的响应 `data.items[]` 应视为完整列表行数据，不只包含 `id` 和 `name`，还包括绑定账户、权限、限流、标签、owner、usage、成本排序附加列等字段。
 
 常用查询参数：
 

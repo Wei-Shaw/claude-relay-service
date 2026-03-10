@@ -252,7 +252,14 @@ const adminAgentOpenApiSpec = {
           }
         ],
         responses: {
-          '200': successEnvelopeResponse('API key list'),
+          '200': {
+            description: 'API key list with full columns',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ApiKeyListResponse' }
+              }
+            }
+          },
           ...genericResponses
         }
       },
@@ -856,6 +863,109 @@ const adminAgentOpenApiSpec = {
           endDate: { type: 'string' }
         },
         required: ['keyIds']
+      },
+      ApiKeyUsageSummary: {
+        type: 'object',
+        properties: {
+          total: {
+            type: 'object',
+            properties: {
+              requests: { type: 'number' },
+              tokens: { type: 'number' },
+              cost: { type: 'number' },
+              formattedCost: { type: 'string' }
+            },
+            additionalProperties: true
+          }
+        },
+        additionalProperties: true
+      },
+      ApiKeyListItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          description: { type: 'string' },
+          createdAt: { type: 'string' },
+          lastUsedAt: { type: 'string' },
+          expiresAt: { type: 'string' },
+          createdBy: { type: 'string' },
+          userId: { type: 'string' },
+          userUsername: { type: 'string' },
+          ownerDisplayName: { type: 'string' },
+          isActive: { type: 'boolean' },
+          isDeleted: { type: 'boolean' },
+          deletedAt: { type: 'string' },
+          deletedBy: { type: 'string' },
+          deletedByType: { type: 'string' },
+          tokenLimit: { type: 'number' },
+          concurrencyLimit: { type: 'number' },
+          rateLimitWindow: { type: 'number' },
+          rateLimitRequests: { type: 'number' },
+          rateLimitCost: { type: 'number' },
+          claudeAccountId: { type: 'string' },
+          claudeConsoleAccountId: { type: 'string' },
+          geminiAccountId: { type: 'string' },
+          openaiAccountId: { type: 'string' },
+          azureOpenaiAccountId: { type: 'string' },
+          bedrockAccountId: { type: 'string' },
+          droidAccountId: { type: 'string' },
+          permissions: arrayOfStringsSchema,
+          enableModelRestriction: { type: 'boolean' },
+          restrictedModels: arrayOfStringsSchema,
+          enableClientRestriction: { type: 'boolean' },
+          allowedClients: arrayOfStringsSchema,
+          allow1mContext: { type: 'boolean' },
+          dailyCostLimit: { type: 'number' },
+          totalCostLimit: { type: 'number' },
+          weeklyOpusCostLimit: { type: 'number' },
+          weeklyResetDay: { type: 'number' },
+          weeklyResetHour: { type: 'number' },
+          tags: arrayOfStringsSchema,
+          activationDays: { type: 'number' },
+          activationUnit: { type: 'string' },
+          expirationMode: { type: 'string' },
+          isActivated: { type: ['boolean', 'string'] },
+          activatedAt: { type: 'string' },
+          icon: { type: 'string' },
+          serviceRates: objectSchema,
+          usage: { $ref: '#/components/schemas/ApiKeyUsageSummary' },
+          _cost: { type: 'number' }
+        },
+        additionalProperties: true
+      },
+      PaginationMeta: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer' },
+          pageSize: { type: 'integer' },
+          total: { type: 'integer' },
+          totalPages: { type: 'integer' }
+        },
+        additionalProperties: true
+      },
+      ApiKeyListData: {
+        type: 'object',
+        properties: {
+          items: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ApiKeyListItem' }
+          },
+          pagination: { $ref: '#/components/schemas/PaginationMeta' },
+          availableTags: arrayOfStringsSchema,
+          costSortStatus: objectSchema
+        },
+        additionalProperties: true
+      },
+      ApiKeyListResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          data: { $ref: '#/components/schemas/ApiKeyListData' },
+          timeRange: { type: 'string' }
+        },
+        required: ['success', 'data'],
+        additionalProperties: true
       },
       ApiKeyCreateRequest: {
         type: 'object',
