@@ -771,6 +771,17 @@ class Application {
     } else {
       logger.info('🧪 Account test scheduler service disabled')
     }
+
+    // 🔌 启动 Clash 智能代理管理器
+    // 检测代理相关的网络错误时，自动触发测速并切换到最快节点
+    try {
+      const clashProxyManager = require('./services/clashProxyManager')
+      clashProxyManager.initialize().catch((error) => {
+        logger.warn('⚠️ Clash proxy manager initialization failed:', error.message)
+      })
+    } catch (error) {
+      logger.warn('⚠️ Clash proxy manager initialization skipped:', error.message)
+    }
   }
 
   setupGracefulShutdown() {

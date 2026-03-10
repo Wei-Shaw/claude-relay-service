@@ -1,0 +1,53 @@
+#!/bin/bash
+# ================= 配置区域 =================
+# 请替换为你的机场订阅地址（支持两个订阅合并）
+SUB_URL_1=""
+SUB_URL_2=""
+# 过滤掉倍率太高或不稳定的节点关键词
+FILTER_KEYWORDS=("20倍" "按量" "剩余流量" "到期" "官网")
+# ===========================================
+
+WORKDIR="/www/wwwroot/claude-relay-service/deploy"
+cd "$WORKDIR"
+
+raw1="clash/sub1.yaml"
+raw2="clash/sub2.yaml"
+mkdir -p clash
+
+# 使用模拟 User-Agent 绕过 Cloudflare 拦截
+UA="ClashForAndroid/2.5.12"
+
+echo "📥 正在下载订阅 1 ..."
+curl -L -A "$UA" -s --connect-timeout 10 --max-time 30 "$SUB_URL_1" -o "$raw1"
+
+if [ -n "$SUB_URL_2" ]; then
+    echo "📥 正在下载订阅 2 ..."
+    curl -L -A "$UA" -s --connect-timeout 10 --max-time 30 "$SUB_URL_2" -o "$raw2"
+fi
+
+if [ ! -s "$raw1" ]; then
+    echo "❌ 订阅 1 下载失败或文件为空！请检查链接是否正确且未被拦截。"
+    exit 1
+fi
+
+echo "🧹 正在处理配置..."
+cmd=(python3 update.py --input "$raw1")
+[ -s "$raw2" ] && cmd+=(--input "$raw2")
+
+for kw in "${FILTER_KEYWORDS[@]}"; do
+    cmd+=(--filter "$kw")
+done
+
+# 执行 Python 处理逻辑
+"${cmd[@]}"
+
+if [ $? -eq 0 ]; then
+    echo "🔄 正在重启 Clash..."
+    docker-compose -f docker-compose.prod.yml restart clash
+    
+    # 清理临时原始文件
+    rm -f "$raw1" "$raw2"
+    echo "🎉 更新成功！已过滤高倍率节点并重新加载配置。"
+else
+    echo "❌ 更新失败！"
+fi

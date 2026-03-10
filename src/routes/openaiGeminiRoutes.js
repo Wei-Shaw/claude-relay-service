@@ -20,14 +20,127 @@ function generateSessionHash(req) {
   return crypto.createHash('sha256').update(sessionData).digest('hex')
 }
 
-function ensureAntigravityProjectId(account) {
-  if (account.projectId) {
-    return account.projectId
+function normalizeAntigravityProjectId(projectId) {
+  if (typeof projectId === 'string') {
+    const trimmed = projectId.trim()
+    return trimmed || null
   }
-  if (account.tempProjectId) {
-    return account.tempProjectId
+  if (projectId && typeof projectId === 'object') {
+    if (typeof projectId.id === 'string') {
+      return normalizeAntigravityProjectId(projectId.id)
+    }
+    if (typeof projectId.projectId === 'string') {
+      return normalizeAntigravityProjectId(projectId.projectId)
+    }
   }
-  return `ag-${crypto.randomBytes(8).toString('hex')}`
+  return null
+}
+
+function isSyntheticAntigravityProjectId(projectId) {
+  return /^ag-[0-9a-f]{16}$/i.test(String(projectId || ''))
+}
+
+async function resolveAntigravityProjectIdForAccount(
+  account,
+  { client = null, proxyConfig = null, forceRefresh = false } = {}
+) {
+  const fixedProjectId = normalizeAntigravityProjectId(account?.projectId)
+  if (fixedProjectId && !forceRefresh) {
+    return fixedProjectId
+  }
+
+  const cachedTempProjectId = normalizeAntigravityProjectId(account?.tempProjectId)
+  const fallbackProjectId = fixedProjectId || cachedTempProjectId
+  const shouldRefresh =
+    forceRefresh || !fallbackProjectId || isSyntheticAntigravityProjectId(fallbackProjectId)
+
+  if (!shouldRefresh) {
+    return fallbackProjectId
+  }
+  if (!client || !account?.id) {
+    return fallbackProjectId || null
+  }
+
+  try {
+    const loadRes = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
+    const fetchedProjectId = normalizeAntigravityProjectId(
+      loadRes?.cloudaicompanionProject?.id || loadRes?.cloudaicompanionProject
+    )
+    if (!fetchedProjectId) {
+      logger.warn('⚠️ loadCodeAssist returned no cloudaicompanionProject', {
+        accountId: account.id
+      })
+      return fallbackProjectId || null
+    }
+
+    if (account.tempProjectId !== fetchedProjectId) {
+      await geminiAccountService.updateTempProjectId(account.id, fetchedProjectId)
+      account.tempProjectId = fetchedProjectId
+    }
+    return fetchedProjectId
+  } catch (error) {
+    logger.warn('⚠️ Failed to refresh Antigravity projectId via loadCodeAssist', {
+      accountId: account.id,
+      message: error?.message || String(error)
+    })
+    return fallbackProjectId || null
+  }
+}
+
+function extractUpstreamErrorMessage(error) {
+  const responseData = error?.response?.data
+
+  if (typeof responseData === 'string') {
+    const trimmed = responseData.trim()
+    if (trimmed) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        const parsedMessage =
+          parsed?.error?.message || parsed?.message || parsed?.error_description || null
+        if (typeof parsedMessage === 'string' && parsedMessage.trim()) {
+          return parsedMessage
+        }
+      } catch (_) {
+        // ignore non-JSON upstream payload
+      }
+      return trimmed
+    }
+  }
+
+  const upstreamMessage =
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.message ||
+    error?.response?.data?.error_description
+
+  if (typeof upstreamMessage === 'string') {
+    return upstreamMessage
+  }
+  if (upstreamMessage && typeof upstreamMessage === 'object') {
+    try {
+      return JSON.stringify(upstreamMessage)
+    } catch (_) {
+      return String(upstreamMessage)
+    }
+  }
+  if (typeof error?.message === 'string') {
+    return error.message
+  }
+  return String(error || '')
+}
+
+function isAntigravityProjectNotFoundError(error) {
+  const statusCode = error?.status || error?.response?.status
+  if (statusCode && statusCode !== 404) {
+    return false
+  }
+  const message = extractUpstreamErrorMessage(error).toLowerCase()
+  if (!message) {
+    return false
+  }
+  return (
+    (message.includes('resource projects/') && message.includes('could not be found')) ||
+    message.includes('invalid project resource name projects/')
+  )
 }
 
 // 检查 API Key 权限
@@ -348,45 +461,93 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       proxyConfig,
       account.oauthProvider
     )
+
+    const oauthProvider = account.oauthProvider || 'gemini-cli'
+    let { projectId } = account
+
+    if (oauthProvider === 'antigravity') {
+      projectId = await resolveAntigravityProjectIdForAccount(account, { client, proxyConfig })
+      if (!projectId) {
+        return res.status(503).json({
+          error: {
+            message: 'No valid Antigravity project ID for selected account',
+            type: 'service_unavailable',
+            code: 'service_unavailable'
+          }
+        })
+      }
+    }
+
     if (actualStream) {
       // 流式响应
-      const oauthProvider = account.oauthProvider || 'gemini-cli'
-      let { projectId } = account
-
-      if (oauthProvider === 'antigravity') {
-        projectId = ensureAntigravityProjectId(account)
-        if (!account.projectId && account.tempProjectId !== projectId) {
-          await geminiAccountService.updateTempProjectId(account.id, projectId)
-          account.tempProjectId = projectId
-        }
-      }
-
       logger.info('StreamGenerateContent request', {
         model,
         projectId,
         apiKeyId: apiKeyData.id
       })
 
-      const streamResponse =
-        oauthProvider === 'antigravity'
-          ? await geminiAccountService.generateContentStreamAntigravity(
+      let streamResponse
+      if (oauthProvider === 'antigravity') {
+        try {
+          streamResponse = await geminiAccountService.generateContentStreamAntigravity(
+            client,
+            { model, request: geminiRequestBody },
+            null, // user_prompt_id
+            projectId,
+            apiKeyData.id, // 使用 API Key ID 作为 session ID
+            abortController.signal, // 传递中止信号
+            proxyConfig // 传递代理配置
+          )
+        } catch (error) {
+          if (!isAntigravityProjectNotFoundError(error)) {
+            throw error
+          }
+
+          logger.warn(
+            '⚠️ Antigravity project not found (openai stream), refreshing projectId and retrying',
+            {
+              accountId: account.id,
+              projectId
+            }
+          )
+          try {
+            const refreshedProjectId = await resolveAntigravityProjectIdForAccount(account, {
+              client,
+              proxyConfig,
+              forceRefresh: true
+            })
+            if (!refreshedProjectId || refreshedProjectId === projectId) {
+              throw error
+            }
+            projectId = refreshedProjectId
+            streamResponse = await geminiAccountService.generateContentStreamAntigravity(
               client,
               { model, request: geminiRequestBody },
-              null, // user_prompt_id
+              null,
               projectId,
-              apiKeyData.id, // 使用 API Key ID 作为 session ID
-              abortController.signal, // 传递中止信号
-              proxyConfig // 传递代理配置
+              apiKeyData.id,
+              abortController.signal,
+              proxyConfig
             )
-          : await geminiAccountService.generateContentStream(
-              client,
-              { model, request: geminiRequestBody },
-              null, // user_prompt_id
-              projectId, // 使用有权限的项目ID
-              apiKeyData.id, // 使用 API Key ID 作为 session ID
-              abortController.signal, // 传递中止信号
-              proxyConfig // 传递代理配置
+          } catch (projectRetryError) {
+            logger.error(
+              '❌ Failed to retry OpenAI stream after refreshing Antigravity projectId:',
+              projectRetryError
             )
+            throw error
+          }
+        }
+      } else {
+        streamResponse = await geminiAccountService.generateContentStream(
+          client,
+          { model, request: geminiRequestBody },
+          null, // user_prompt_id
+          projectId, // 使用有权限的项目ID
+          apiKeyData.id, // 使用 API Key ID 作为 session ID
+          abortController.signal, // 传递中止信号
+          proxyConfig // 传递代理配置
+        )
+      }
 
       // 设置流式响应头
       res.setHeader('Content-Type', 'text/event-stream')
@@ -591,41 +752,71 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       })
     } else {
       // 非流式响应
-      const oauthProvider = account.oauthProvider || 'gemini-cli'
-      let { projectId } = account
-
-      if (oauthProvider === 'antigravity') {
-        projectId = ensureAntigravityProjectId(account)
-        if (!account.projectId && account.tempProjectId !== projectId) {
-          await geminiAccountService.updateTempProjectId(account.id, projectId)
-          account.tempProjectId = projectId
-        }
-      }
-
       logger.info('GenerateContent request', {
         model,
         projectId,
         apiKeyId: apiKeyData.id
       })
 
-      const response =
-        oauthProvider === 'antigravity'
-          ? await geminiAccountService.generateContentAntigravity(
+      let response
+      if (oauthProvider === 'antigravity') {
+        try {
+          response = await geminiAccountService.generateContentAntigravity(
+            client,
+            { model, request: geminiRequestBody },
+            null, // user_prompt_id
+            projectId,
+            apiKeyData.id, // 使用 API Key ID 作为 session ID
+            proxyConfig // 传递代理配置
+          )
+        } catch (error) {
+          if (!isAntigravityProjectNotFoundError(error)) {
+            throw error
+          }
+
+          logger.warn(
+            '⚠️ Antigravity project not found (openai non-stream), refreshing projectId and retrying',
+            {
+              accountId: account.id,
+              projectId
+            }
+          )
+          try {
+            const refreshedProjectId = await resolveAntigravityProjectIdForAccount(account, {
+              client,
+              proxyConfig,
+              forceRefresh: true
+            })
+            if (!refreshedProjectId || refreshedProjectId === projectId) {
+              throw error
+            }
+            projectId = refreshedProjectId
+            response = await geminiAccountService.generateContentAntigravity(
               client,
               { model, request: geminiRequestBody },
-              null, // user_prompt_id
+              null,
               projectId,
-              apiKeyData.id, // 使用 API Key ID 作为 session ID
-              proxyConfig // 传递代理配置
+              apiKeyData.id,
+              proxyConfig
             )
-          : await geminiAccountService.generateContent(
-              client,
-              { model, request: geminiRequestBody },
-              null, // user_prompt_id
-              projectId, // 使用有权限的项目ID
-              apiKeyData.id, // 使用 API Key ID 作为 session ID
-              proxyConfig // 传递代理配置
+          } catch (projectRetryError) {
+            logger.error(
+              '❌ Failed to retry OpenAI non-stream after refreshing Antigravity projectId:',
+              projectRetryError
             )
+            throw error
+          }
+        }
+      } else {
+        response = await geminiAccountService.generateContent(
+          client,
+          { model, request: geminiRequestBody },
+          null, // user_prompt_id
+          projectId, // 使用有权限的项目ID
+          apiKeyData.id, // 使用 API Key ID 作为 session ID
+          proxyConfig // 传递代理配置
+        )
+      }
 
       // 转换为 OpenAI 格式并返回
       const openaiResponse = convertGeminiResponseToOpenAI(response, model, false)

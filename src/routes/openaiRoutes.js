@@ -12,6 +12,7 @@ const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
+const clashProxyManager = require('../services/clashProxyManager')
 
 // 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
@@ -367,6 +368,17 @@ const handleResponses = async (req, res) => {
     } else {
       // 非流式请求
       upstream = await axios.post(codexEndpoint, req.body, axiosConfig)
+    }
+
+    // 502/503/504 往往是代理链路/上游不可达，主动上报以触发自动测速切换
+    if ([502, 503, 504].includes(upstream.status)) {
+      const err = new Error(`Upstream returned ${upstream.status} from Codex endpoint`)
+      err.response = { status: upstream.status }
+      clashProxyManager.reportProxyError(err, {
+        service: 'openai-codex',
+        accountId,
+        httpStatus: upstream.status
+      })
     }
 
     const codexUsageSnapshot = extractCodexUsageHeaders(upstream.headers)
@@ -794,6 +806,13 @@ const handleResponses = async (req, res) => {
 
     upstream.data.on('error', (err) => {
       logger.error('Upstream stream error:', err)
+      if (clashProxyManager.isProxyRelatedError(err, 502)) {
+        clashProxyManager.reportProxyError(err, {
+          service: 'openai-codex-stream',
+          accountId,
+          httpStatus: 502
+        })
+      }
       if (!res.headersSent) {
         res.status(502).json({ error: { message: 'Upstream stream error' } })
       } else {
@@ -816,6 +835,14 @@ const handleResponses = async (req, res) => {
     logger.error('Proxy to ChatGPT codex/responses failed:', error)
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
     const status = error.statusCode || error.response?.status || 500
+
+    if (clashProxyManager.isProxyRelatedError(error, status)) {
+      clashProxyManager.reportProxyError(error, {
+        service: 'openai-codex-catch',
+        accountId,
+        httpStatus: status
+      })
+    }
 
     if ((status === 401 || status === 402) && accountId) {
       const statusLabel = status === 401 ? '401错误' : '402错误'

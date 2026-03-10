@@ -1,0 +1,194 @@
+version: '3.8'
+
+# ============================================================================
+# Claude Relay Service 生产部署配置（含代理支持）
+# ============================================================================
+# 使用方法：
+#   1. 将机场订阅地址填入 clash/config.yaml
+#   2. 复制 .env.example 为 .env 并填写配置
+#   3. docker-compose -f docker-compose.prod.yml up -d
+# ============================================================================
+
+x-default-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  # ============================================================================
+  # 🌐 Clash 代理服务（只给需要的容器用，不影响服务器其他服务）
+  # ============================================================================
+  clash:
+    image: dreamacro/clash:latest
+    container_name: clash-proxy
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./clash/config.yaml:/root/.config/clash/config.yaml:ro
+    # 只在 Docker 网络内暴露，不对外开放
+    expose:
+      - "7890"   # HTTP/HTTPS 代理端口
+      - "7891"   # SOCKS5 代理端口
+    # 如需在宿主机调试，可取��下面注释（生产环境建议注释）
+    # ports:
+    #   - "127.0.0.1:7890:7890"
+    #   - "127.0.0.1:7891:7891"
+    networks:
+      - claude-relay-network
+    # healthcheck 注释掉：Clash 镜像不包含 curl/wget
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "-x", "http://127.0.0.1:7890", "http://www.gstatic.com/generate_204"]
+    #   interval: 60s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 10s
+
+  # ============================================================================
+  # 🚀 Claude Relay Service 主应用
+  # ============================================================================
+  claude-relay:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        # 构建时代理（由于 Clash 容器此时未启动，使用容器名会导致 DNS 错误，故注释掉）
+        # - HTTP_PROXY=http://clash:7890
+        # - HTTPS_PROXY=http://clash:7890
+        - NO_PROXY=localhost,127.0.0.1,redis
+        # 使用国内镜像加速 npm 安装
+        - NPM_MIRROR=https://registry.npmmirror.com
+    image: claude-relay-service:latest
+    container_name: claude-relay-service
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "${BIND_HOST:-0.0.0.0}:${PORT:-3000}:3000"
+    volumes:
+      - ../logs:/app/logs
+      - ../data:/app/data
+    environment:
+      # 🌐 服务器配置
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+
+      # 🔧 请求体大小配置
+      - REQUEST_MAX_SIZE_MB=60
+
+      # ============================================
+      # ���� 运行时代理配置（关键！访问国外 API 用）
+      # ============================================
+      - HTTP_PROXY=http://clash:7890
+      - HTTPS_PROXY=http://clash:7890
+      - NO_PROXY=localhost,127.0.0.1,redis
+
+      # 🔐 安全配置（必填）
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - ADMIN_SESSION_TIMEOUT=${ADMIN_SESSION_TIMEOUT:-86400000}
+      - API_KEY_PREFIX=${API_KEY_PREFIX:-cr_}
+
+      # 👤 管理员凭据（可选）
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+
+      # 📊 Redis 配置
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+
+      # 🎯 Claude API 配置
+      - CLAUDE_API_URL=${CLAUDE_API_URL:-https://api.anthropic.com/v1/messages}
+      - CLAUDE_API_VERSION=${CLAUDE_API_VERSION:-2023-06-01}
+      - CLAUDE_BETA_HEADER=${CLAUDE_BETA_HEADER:-claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14}
+
+      # 🤖 Antigravity 配置
+      - ANTIGRAVITY_API_URL=${ANTIGRAVITY_API_URL:-https://cloudcode-pa.googleapis.com}
+      - ANTIGRAVITY_USER_AGENT=${ANTIGRAVITY_USER_AGENT:-antigravity/1.16.5 windows/amd64}
+      - ANTIGRAVITY_API_URL_ALLOW_FALLBACK=${ANTIGRAVITY_API_URL_ALLOW_FALLBACK:-true}
+
+      # 🚫 错误处理配置
+      - CLAUDE_OVERLOAD_HANDLING_MINUTES=${CLAUDE_OVERLOAD_HANDLING_MINUTES:-0}
+      - CLAUDE_CONSOLE_BLOCKED_HANDLING_MINUTES=${CLAUDE_CONSOLE_BLOCKED_HANDLING_MINUTES:-10}
+
+      # 🔗 会话管理配置
+      - STICKY_SESSION_TTL_HOURS=${STICKY_SESSION_TTL_HOURS:-1}
+      - STICKY_SESSION_RENEWAL_THRESHOLD_MINUTES=${STICKY_SESSION_RENEWAL_THRESHOLD_MINUTES:-15}
+
+      # 🔧 Anthropic 调试与工具配置
+      - ANTHROPIC_TOOL_ERROR_CONTINUE=${ANTHROPIC_TOOL_ERROR_CONTINUE:-true}
+      - ANTHROPIC_DEBUG_REQUEST_DUMP=${ANTHROPIC_DEBUG_REQUEST_DUMP:-false}
+      - ANTHROPIC_DEBUG_RESPONSE_DUMP=${ANTHROPIC_DEBUG_RESPONSE_DUMP:-false}
+      - ANTHROPIC_DEBUG_TOOLS_DUMP=${ANTHROPIC_DEBUG_TOOLS_DUMP:-false}
+      - ANTIGRAVITY_DEBUG_UPSTREAM_REQUEST_DUMP=${ANTIGRAVITY_DEBUG_UPSTREAM_REQUEST_DUMP:-false}
+      - ANTIGRAVITY_DEBUG_UPSTREAM_RESPONSE_DUMP=${ANTIGRAVITY_DEBUG_UPSTREAM_RESPONSE_DUMP:-false}
+
+      # ⏱️ 请求超时配置
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-600000}
+
+      # 🌐 请求代理配置
+      - DEFAULT_PROXY_TIMEOUT=${DEFAULT_PROXY_TIMEOUT:-600000}
+      - MAX_PROXY_RETRIES=${MAX_PROXY_RETRIES:-3}
+      - PROXY_USE_IPV4=${PROXY_USE_IPV4:-true}
+
+      # 📈 使用限制
+      - DEFAULT_TOKEN_LIMIT=${DEFAULT_TOKEN_LIMIT:-1000000}
+
+      # 📝 日志配置
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_MAX_SIZE=${LOG_MAX_SIZE:-10m}
+      - LOG_MAX_FILES=${LOG_MAX_FILES:-5}
+
+      # 🔧 系统配置
+      - CLEANUP_INTERVAL=${CLEANUP_INTERVAL:-3600000}
+      - TOKEN_USAGE_RETENTION=${TOKEN_USAGE_RETENTION:-2592000000}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-60000}
+      - TIMEZONE_OFFSET=${TIMEZONE_OFFSET:-8}
+
+      # 🎨 Web 界面配置
+      - WEB_TITLE=${WEB_TITLE:-Claude Relay Service}
+      - WEB_DESCRIPTION=${WEB_DESCRIPTION:-Multi-account Claude API relay service}
+
+      # 🛠️ 开发配置
+      - DEBUG=${DEBUG:-false}
+      - ENABLE_CORS=${ENABLE_CORS:-true}
+      - TRUST_PROXY=${TRUST_PROXY:-true}
+    depends_on:
+      clash:  # 仅等待启动，不等待健康检查
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - claude-relay-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # 📊 Redis 数据库
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: claude-relay-redis
+    restart: unless-stopped
+    logging: *default-logging
+    expose:
+      - "6379"
+    volumes:
+      - ../redis_data:/data
+    command: redis-server --save 60 1 --appendonly yes --appendfsync everysec
+    networks:
+      - claude-relay-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  claude-relay-network:
+    driver: bridge

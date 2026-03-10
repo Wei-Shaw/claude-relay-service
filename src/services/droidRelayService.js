@@ -8,6 +8,7 @@ const redis = require('../models/redis')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const logger = require('../utils/logger')
 const runtimeAddon = require('../utils/runtimeAddon')
+const clashProxyManager = require('./clashProxyManager')
 
 const SYSTEM_PROMPT = 'You are Droid, an AI software engineering agent built by Factory.'
 const RUNTIME_EVENT_FMT_PAYLOAD = 'fmtPayload'
@@ -370,6 +371,11 @@ class DroidRelayService {
             }
           )
         }
+      }
+
+      // 代理相关错误上报 Clash 智能管理器
+      if (clashProxyManager.isProxyRelatedError(error)) {
+        clashProxyManager.reportProxyError(error, { service: 'droid' })
       }
 
       // 网络错误或其他错误（统一返回 4xx）
