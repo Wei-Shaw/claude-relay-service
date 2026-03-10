@@ -16,7 +16,7 @@ COPY package*.json ./
 ARG NPM_MIRROR
 RUN --mount=type=cache,target=/root/.npm \
     if [ -n "$NPM_MIRROR" ]; then npm config set registry $NPM_MIRROR; fi && \
-    npm ci --only=production
+    npm install --omit=dev --no-audit --no-fund
 
 # 🎯 前端构建阶段 (支持预构建优化)
 FROM node:18-alpine AS frontend-builder
@@ -75,7 +75,7 @@ COPY scripts/ ./scripts/
 COPY cli/ ./cli/
 COPY resources/ ./resources/
 COPY web/ ./web/
-COPY Makefile nodemon.json VERSION README.md README_EN.md AGENTS.md DEPLOY.md .dockerignore .gitignore ./
+COPY Makefile nodemon.json VERSION README.md README_EN.md AGENTS.md DEPLOY.md .dockerignore .gitignore .env.example ./
 
 # 📦 从前端构建阶段复制前端产物 (最后复制,确保不被覆盖)
 COPY --from=frontend-builder /app/web/admin-spa/dist /app/web/admin-spa/dist

@@ -15,8 +15,9 @@ def _load_yaml(path: str) -> Dict[str, Any]:
 
 
 def _collect_proxies(inputs: List[str]) -> List[Dict[str, Any]]:
-    """从多个输入文件中收集所有 proxies"""
+    """从多个输入文件中合并所有 proxies"""
     all_proxies: List[Dict[str, Any]] = []
+    seen_names = set()
     for path in inputs:
         if not os.path.isfile(path):
             print(f'⚠️ 文件不存在，跳过: {path}')
@@ -24,7 +25,11 @@ def _collect_proxies(inputs: List[str]) -> List[Dict[str, Any]]:
         data = _load_yaml(path)
         proxies = data.get('proxies', [])
         print(f'   📄 {os.path.basename(path)}: {len(proxies)} 个节点')
-        all_proxies.extend(proxies)
+        for p in proxies:
+            name = p.get('name', '')
+            if name not in seen_names:
+                seen_names.add(name)
+                all_proxies.append(p)
     return all_proxies
 
 
@@ -32,23 +37,7 @@ def _filter_proxies(proxies: List[Dict[str, Any]], keywords: List[str]) -> List[
     """过滤掉名称中含有关键词的节点"""
     if not keywords:
         return proxies
-    filtered = []
-    for p in proxies:
-        name = str(p.get('name', ''))
-        if not any(kw in name for kw in keywords):
-            filtered.append(p)
-    return filtered
-
-
-def _sort_proxies(proxies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """节点排序：新加坡 > 美国 > 日本 > 其他"""
-    def rank(p):
-        name = p.get('name', '')
-        if '新加坡' in name: return 1
-        if '美国' in name: return 2
-        if '日本' in name: return 3
-        return 99
-    return sorted(proxies, key=rank)
+    return [p for p in proxies if not any(kw in str(p.get('name', '')) for kw in keywords)]
 
 
 def main() -> int:
@@ -58,11 +47,7 @@ def main() -> int:
     parser.add_argument('--output', default=DEFAULT_OUT, help='输出 config.yaml 路径')
     args = parser.parse_args()
 
-    # 兼容旧调用方式: python3 update.py keyword1 keyword2 ...
-    if not args.input and not args.filter:
-        # 旧模式：positional args 作为 filter keywords
-        import sys
-        args.filter = sys.argv[1:] if len(sys.argv) > 1 else []
+    if not args.input:
         default_input = os.path.join(WORKDIR, 'clash', 'raw_sub.yaml')
         if os.path.isfile(default_input):
             args.input = [default_input]
@@ -70,11 +55,11 @@ def main() -> int:
             print('❌ 未指定输入文件且默认 clash/raw_sub.yaml 不存在')
             return 1
 
-    # 1. 收集节点
+    # 1. 收集并去重节点
     all_proxies = _collect_proxies(args.input)
     print(f'   📊 合计原始节点: {len(all_proxies)}')
 
-    # 2. 过滤
+    # 2. 过滤高倍率/无效节点
     filtered = _filter_proxies(all_proxies, args.filter)
     print(f'   🧹 过滤后节点: {len(filtered)}')
 
@@ -82,16 +67,11 @@ def main() -> int:
         print('❌ 过滤后没有剩余节点！请检查过滤条件。')
         return 1
 
-    # 3. 排序
-    filtered = _sort_proxies(filtered)
-
-    # 4. 代理组名（读环境变量或默认"自动选择"）
+    # 3. 代理组名（读环境变量或默认"自动选择"）
     proxy_group_name = os.environ.get('CLASH_PROXY_GROUP', '自动选择')
-
-    # 5. 构建配置
     proxy_names = [p['name'] for p in filtered]
-    out_path = args.output
 
+    # 4. 构建 Clash 配置
     new_config: Dict[str, Any] = {
         'mixed-port': 7890,
         'allow-lan': True,
@@ -115,23 +95,16 @@ def main() -> int:
         'proxy-groups': [
             {
                 'name': proxy_group_name,
-                'type': 'url-test',
+                'type': 'url-test',        # 自动测速，选延迟最低节点
                 'url': 'http://www.gstatic.com/generate_204',
                 'interval': 300,
                 'tolerance': 50,
                 'proxies': proxy_names,
             },
-            {
-                'name': f'{proxy_group_name}-fallback',
-                'type': 'fallback',
-                'url': 'http://www.gstatic.com/generate_204',
-                'interval': 300,
-                'proxies': proxy_names,
-            },
         ],
         'rules': [
-            # 如有需要，可在此添加订阅服务商域名的 DIRECT 规则，例如：
-            # f'DOMAIN,your-airport-domain.com,DIRECT',
+            # 如需将机场域名直连以防止订阅被代理拦截，可取消注释：
+            # 'DOMAIN,your-airport-domain.com,DIRECT',
             f'DOMAIN-SUFFIX,google.com,{proxy_group_name}',
             f'DOMAIN-SUFFIX,anthropic.com,{proxy_group_name}',
             f'DOMAIN-SUFFIX,googleapis.com,{proxy_group_name}',
@@ -139,10 +112,10 @@ def main() -> int:
         ],
     }
 
-    with open(out_path, 'w', encoding='utf-8') as f:
+    with open(args.output, 'w', encoding='utf-8') as f:
         yaml.dump(new_config, f, allow_unicode=True, default_flow_style=False)
 
-    print(f'✅ 已生成: {out_path}')
+    print(f'✅ 已生成: {args.output}')
     return 0
 
 
