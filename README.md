@@ -18,46 +18,16 @@
 
 ---
 
-## 🚀 3分钟极速上手
+## 🚀 3分钟极速上手 (小白保姆级部署)
 
-无需复杂的配置，通过自动化脚本一键部署到你的服务器。
+为了让任何人都能轻松完成部署，我们重写了**全流程的小白部署指南**。
 
-### 1️⃣ 下载代码
-```bash
-git clone https://github.com/dadongwo/claude-relay-service.git
-cd claude-relay-service
-```
+- ❌ 无需手动生成复杂密钥
+- ✅ 全程复制粘贴即可上线
+- 🛡️ 内置绕过代理拦截机制 (Pro 版订阅脚本)
+- 🔌 内置 Clash 智能代理与断线自动切换节点
 
-### 2️⃣ 基础配置 (必做)
-```bash
-# 复制环境变量模板
-cp deploy/.env.example deploy/.env
-# ⚠️ 重要: 编辑 deploy/.env，修改 JWT_SECRET 和 ENCRYPTION_KEY 为随机字符串
-
-# 复制 Clash 代理配置
-cp deploy/clash/config.yaml.example deploy/clash/config.yaml
-# ⚠️ 重要: 编辑 deploy/clash/config.yaml，填入你的机场订阅地址 url: "..."
-```
-
-### 3️⃣ 一键部署
-
-**方式一: 使用默认别名 (cloud-server)**
-需在 `~/.ssh/config` 配置好 Host。
-```bash
-# Windows
-.\deploy\deploy.ps1
-# Mac/Linux
-./deploy/deploy.sh
-```
-
-**方式二: 直接指定服务器 (推荐)**
-```bash
-# Windows
-.\deploy\deploy.ps1 -TargetServer "root@你的服务器IP"
-
-# Mac/Linux
-./deploy/deploy.sh "root@你的服务器IP"
-```
+👉 **[点击这里查看完整部署保姆手册（deploy/README.md）](./deploy/README.md)**
 
 ---
 
