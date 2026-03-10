@@ -529,8 +529,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
     }
 
-    dateFilter.value.customStart = startDate ? startDate.toISOString().split('T')[0] : ''
-    dateFilter.value.customEnd = endDate ? endDate.toISOString().split('T')[0] : ''
+    const formatLocalDate = (d) =>
+      d.getFullYear() +
+      '-' +
+      String(d.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(d.getDate()).padStart(2, '0')
+    dateFilter.value.customStart = startDate ? formatLocalDate(startDate) : ''
+    dateFilter.value.customEnd = endDate ? formatLocalDate(endDate) : ''
     dateFilter.value.customRange =
       startDate && endDate ? [formatDateForDisplay(startDate), formatDateForDisplay(endDate)] : null
 

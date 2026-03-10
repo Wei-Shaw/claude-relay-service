@@ -811,7 +811,7 @@ router.post('/api/batch-model-stats', async (req, res) => {
     const _client = redis.getClientSafe()
     const tzDate = redis.getDateInTimezone()
     const today = redis.getDateStringInTimezone()
-    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
 
     const modelUsageMap = new Map()
 
@@ -1399,7 +1399,7 @@ router.post('/api/user-model-stats', async (req, res) => {
     // 使用与管理页面相同的时区处理逻辑
     const tzDate = redis.getDateInTimezone()
     const today = redis.getDateStringInTimezone()
-    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`
+    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
 
     let pattern
     let matchRegex
