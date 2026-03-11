@@ -66,6 +66,118 @@ function validateServiceRates(serviceRates) {
   return null
 }
 
+async function enrichApiKeysWithRuntimeStats(apiKeys) {
+  if (!Array.isArray(apiKeys) || apiKeys.length === 0) {
+    return
+  }
+
+  const statsMap = await redis.batchGetApiKeyStats(apiKeys.map((key) => key.id))
+
+  for (const apiKey of apiKeys) {
+    const stats = statsMap.get(apiKey.id) || {}
+    const usageTotal = stats.usageTotal || {}
+    const usageDaily = stats.usageDaily || {}
+    const usageMonthly = stats.usageMonthly || {}
+
+    const createdAt = apiKey.createdAt ? new Date(apiKey.createdAt) : new Date()
+    const daysSinceCreated = Math.max(
+      1,
+      Math.ceil((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
+    )
+    const totalMinutes = daysSinceCreated * 24 * 60
+
+    const totalRequests = parseInt(usageTotal.totalRequests || usageTotal.requests) || 0
+    const totalInputTokens = parseInt(usageTotal.totalInputTokens || usageTotal.inputTokens) || 0
+    const totalOutputTokens =
+      parseInt(usageTotal.totalOutputTokens || usageTotal.outputTokens) || 0
+    const totalCacheCreateTokens =
+      parseInt(usageTotal.totalCacheCreateTokens || usageTotal.cacheCreateTokens) || 0
+    const totalCacheReadTokens =
+      parseInt(usageTotal.totalCacheReadTokens || usageTotal.cacheReadTokens) || 0
+    const storedAllTokens = parseInt(usageTotal.totalAllTokens || usageTotal.allTokens) || 0
+    const fallbackTotalTokens = parseInt(usageTotal.totalTokens || usageTotal.tokens) || 0
+    const allTokens =
+      storedAllTokens ||
+      totalInputTokens + totalOutputTokens + totalCacheCreateTokens + totalCacheReadTokens ||
+      fallbackTotalTokens
+
+    apiKey.usage = {
+      total: {
+        requests: totalRequests,
+        tokens: allTokens,
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        cacheCreateTokens: totalCacheCreateTokens,
+        cacheReadTokens: totalCacheReadTokens,
+        allTokens,
+        cost: stats.costStats?.total || 0,
+        formattedCost: CostCalculator.formatCost(stats.costStats?.total || 0)
+      },
+      daily: {
+        requests: parseInt(usageDaily.totalRequests || usageDaily.requests) || 0,
+        tokens:
+          parseInt(usageDaily.totalAllTokens || usageDaily.allTokens || usageDaily.totalTokens) ||
+          parseInt(usageDaily.tokens) ||
+          0
+      },
+      monthly: {
+        requests: parseInt(usageMonthly.totalRequests || usageMonthly.requests) || 0,
+        tokens:
+          parseInt(
+            usageMonthly.totalAllTokens || usageMonthly.allTokens || usageMonthly.totalTokens
+          ) ||
+          parseInt(usageMonthly.tokens) ||
+          0
+      },
+      averages: {
+        rpm: Math.round((totalRequests / totalMinutes) * 100) / 100,
+        tpm: Math.round((allTokens / totalMinutes) * 100) / 100
+      }
+    }
+
+    apiKey.totalCost = stats.costStats?.total || 0
+    apiKey.dailyCost = stats.dailyCost || 0
+    apiKey.weeklyOpusCost = stats.weeklyOpusCost || 0
+    apiKey.currentConcurrency = stats.concurrency || 0
+
+    const rateLimitWindow = parseInt(apiKey.rateLimitWindow) || 0
+    if (rateLimitWindow > 0) {
+      const rateLimit = stats.rateLimit || {}
+      apiKey.currentWindowRequests = rateLimit.requests || 0
+      apiKey.currentWindowTokens = rateLimit.tokens || 0
+      apiKey.currentWindowCost = rateLimit.cost || 0
+
+      if (rateLimit.windowStart) {
+        const now = Date.now()
+        const windowStartTime = rateLimit.windowStart
+        const windowEndTime = windowStartTime + rateLimitWindow * 60 * 1000
+
+        apiKey.windowStartTime = windowStartTime
+        apiKey.windowEndTime = windowEndTime
+        apiKey.windowRemainingSeconds =
+          now < windowEndTime ? Math.max(0, Math.floor((windowEndTime - now) / 1000)) : 0
+
+        if (now >= windowEndTime) {
+          apiKey.currentWindowRequests = 0
+          apiKey.currentWindowTokens = 0
+          apiKey.currentWindowCost = 0
+        }
+      } else {
+        apiKey.windowStartTime = null
+        apiKey.windowEndTime = null
+        apiKey.windowRemainingSeconds = null
+      }
+    } else {
+      apiKey.currentWindowRequests = 0
+      apiKey.currentWindowTokens = 0
+      apiKey.currentWindowCost = 0
+      apiKey.windowStartTime = null
+      apiKey.windowEndTime = null
+      apiKey.windowRemainingSeconds = null
+    }
+  }
+}
+
 // 👥 用户管理 (用于API Key分配)
 
 // 获取所有用户列表（用于API Key分配）
@@ -371,12 +483,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         apiKey.ownerDisplayName =
           apiKey.createdBy === 'admin' ? 'Admin' : apiKey.createdBy || 'Admin'
       }
-
-      // 初始化空的 usage 对象（费用通过 batch-stats 接口获取）
-      if (!apiKey.usage) {
-        apiKey.usage = { total: { requests: 0, tokens: 0, cost: 0, formattedCost: '$0.00' } }
-      }
     }
+
+    await enrichApiKeysWithRuntimeStats(result.items)
 
     // 返回分页数据
     const responseData = {
