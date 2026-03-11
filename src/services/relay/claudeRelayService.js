@@ -2494,6 +2494,21 @@ class ClaudeRelayService {
           }
         }
 
+        // Set SSE response headers before forwarding data.
+        // This ensures the compression middleware sees Content-Type: text/event-stream
+        // and skips gzip compression for the stream.
+        if (!responseStream.headersSent) {
+          const existingConnection = responseStream.getHeader
+            ? responseStream.getHeader('Connection')
+            : null
+          responseStream.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: existingConnection || 'keep-alive',
+            'X-Accel-Buffering': 'no'
+          })
+        }
+
         let buffer = ''
         const allUsageData = [] // 收集所有的usage事件
         let currentUsageData = {} // 当前正在收集的usage数据
