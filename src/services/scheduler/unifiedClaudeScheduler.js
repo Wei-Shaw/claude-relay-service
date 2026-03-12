@@ -8,6 +8,7 @@ const logger = require('../../utils/logger')
 const { parseVendorPrefixedModel, isOpus45OrNewer } = require('../../utils/modelHelper')
 const { isSchedulable, sortAccountsByPriority } = require('../../utils/commonHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const config = require('../../config/config')
 
 /**
  * Check if account is Pro (not Max)
@@ -410,10 +411,11 @@ class UnifiedClaudeScheduler {
       }
 
       // 获取所有可用账户（传递请求的模型进行过滤）
+      const includeCcr = config.scheduler?.includeCcrInDefaultPool || false
       const availableAccounts = await this._getAllAvailableAccounts(
         apiKeyData,
         effectiveModel,
-        false // 仅前缀才走 CCR：默认池不包含 CCR 账户
+        includeCcr // 根据配置决定是否包含 CCR 账户
       )
 
       if (availableAccounts.length === 0) {
