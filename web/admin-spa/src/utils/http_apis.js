@@ -169,6 +169,8 @@ export const createOpenAIAccountApi = (data) =>
   request({ url: '/admin/openai-accounts', method: 'POST', data })
 export const updateOpenAIAccountApi = (id, data) =>
   request({ url: `/admin/openai-accounts/${id}`, method: 'PUT', data })
+export const batchImportOpenAIOAuthAccountsApi = (data) =>
+  request({ url: '/admin/openai-accounts/batch-import-oauth', method: 'POST', data })
 export const generateOpenAIAuthUrlApi = (data) =>
   request({ url: '/admin/openai-accounts/generate-auth-url', method: 'POST', data })
 export const exchangeOpenAICodeApi = (data) =>

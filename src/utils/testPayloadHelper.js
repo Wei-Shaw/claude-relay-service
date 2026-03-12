@@ -1,5 +1,5 @@
 const crypto = require('crypto')
-const { mapToErrorCode } = require('./errorSanitizer')
+const { mapToErrorCode, sanitizeErrorMessage } = require('./errorSanitizer')
 
 // 将原始错误信息映射为安全的标准错误码消息
 const sanitizeErrorMsg = (msg) => {
@@ -86,6 +86,8 @@ function createClaudeTestPayload(model = 'claude-sonnet-4-5-20250929', options =
  * @param {object} [options.proxyAgent] - 代理agent
  * @param {number} [options.timeout] - 超时时间（默认30000）
  * @param {object} [options.extraHeaders] - 额外的请求头
+ * @param {boolean} [options.sanitize] - 旧参数：是否映射为标准错误码消息（默认false）
+ * @param {boolean} [options.sanitizeErrors] - 新参数：是否清理敏感错误信息（优先级更高）
  * @returns {Promise<void>}
  */
 async function sendStreamTestRequest(options) {
@@ -100,8 +102,17 @@ async function sendStreamTestRequest(options) {
     proxyAgent = null,
     timeout = 30000,
     extraHeaders = {},
-    sanitize = false
+    sanitize = false,
+    sanitizeErrors
   } = options
+
+  // 错误消息处理函数：兼容旧参数 sanitize 与新参数 sanitizeErrors
+  const processErrorMessage = (msg) => {
+    if (typeof sanitizeErrors === 'boolean') {
+      return sanitizeErrors ? sanitizeErrorMessage(msg) : msg
+    }
+    return sanitize ? sanitizeErrorMsg(msg) : msg
+  }
 
   const sendSSE = (type, data = {}) => {
     if (!responseStream.destroyed && !responseStream.writableEnded) {
@@ -180,11 +191,11 @@ async function sendStreamTestRequest(options) {
               errorMsg = errorData || errorMsg
             }
           }
-          endTest(false, sanitize ? sanitizeErrorMsg(errorMsg) : errorMsg)
+          endTest(false, processErrorMessage(errorMsg))
           resolve()
         })
         response.data.on('error', (err) => {
-          endTest(false, sanitize ? sanitizeErrorMsg(err.message) : err.message)
+          endTest(false, processErrorMessage(err.message))
           resolve()
         })
       })
@@ -219,7 +230,7 @@ async function sendStreamTestRequest(options) {
             }
             if (data.type === 'error' || data.error) {
               const errMsg = data.error?.message || data.message || data.error || 'Unknown error'
-              sendSSE('error', { error: errMsg })
+              sendSSE('error', { error: processErrorMessage(errMsg) })
             }
           } catch {
             // ignore parse errors
@@ -235,13 +246,13 @@ async function sendStreamTestRequest(options) {
       })
 
       response.data.on('error', (err) => {
-        endTest(false, err.message)
+        endTest(false, processErrorMessage(err.message))
         resolve()
       })
     })
   } catch (error) {
     logger.error('❌ Stream test request failed:', error.message)
-    endTest(false, error.message)
+    endTest(false, processErrorMessage(error.message))
   }
 }
 
