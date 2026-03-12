@@ -8,6 +8,7 @@ const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
 const { extractErrorMessage } = require('../../utils/testPayloadHelper')
+const accountTestSchedulerService = require('../../services/accountTestSchedulerService')
 
 const router = express.Router()
 
@@ -435,7 +436,9 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
     const axios = require('axios')
     const ProxyHelper = require('../../utils/proxyHelper')
 
-    const apiUrl = account.apiUrl
+    // 与 ccrRelayService 保持一致：自动补全 /v1/messages 路径
+    const cleanUrl = account.apiUrl.replace(/\/$/, '')
+    const apiUrl = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
     const payload = {
       model,
       max_tokens: 100,
@@ -492,6 +495,135 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
       error: 'Test failed',
       message: extractErrorMessage(error.response?.data, error.message),
       latency
+    })
+  }
+})
+
+// 获取 CCR 账户定时测试历史
+router.get('/:accountId/test-history', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+
+  try {
+    const history = await redis.getAccountTestHistory(accountId, 'ccr')
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        platform: 'ccr',
+        history
+      }
+    })
+  } catch (error) {
+    logger.error(`❌ Failed to get test history for CCR account ${accountId}:`, error)
+    return res.status(500).json({
+      error: 'Failed to get test history',
+      message: error.message
+    })
+  }
+})
+
+// 获取 CCR 账户定时测试配置
+router.get('/:accountId/test-config', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+
+  try {
+    const testConfig = await redis.getAccountTestConfig(accountId, 'ccr')
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        platform: 'ccr',
+        config: testConfig || {
+          enabled: false,
+          cronExpression: '0 8 * * *',
+          model: 'claude-sonnet-4-6'
+        }
+      }
+    })
+  } catch (error) {
+    logger.error(`❌ Failed to get test config for CCR account ${accountId}:`, error)
+    return res.status(500).json({
+      error: 'Failed to get test config',
+      message: error.message
+    })
+  }
+})
+
+// 设置 CCR 账户定时测试配置
+router.put('/:accountId/test-config', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+  const { enabled, cronExpression, model } = req.body
+
+  try {
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: 'enabled must be a boolean'
+      })
+    }
+
+    if (!cronExpression || typeof cronExpression !== 'string') {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: 'cronExpression is required and must be a string'
+      })
+    }
+
+    const MAX_CRON_LENGTH = 100
+    if (cronExpression.length > MAX_CRON_LENGTH) {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: `cronExpression too long (max ${MAX_CRON_LENGTH} characters)`
+      })
+    }
+
+    if (!accountTestSchedulerService.validateCronExpression(cronExpression)) {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: `Invalid cron expression: ${cronExpression}. Format: "minute hour day month weekday" (e.g., "0 8 * * *" for daily at 8:00)`
+      })
+    }
+
+    const testModel = model || 'claude-sonnet-4-6'
+    if (typeof testModel !== 'string' || testModel.length > 256) {
+      return res.status(400).json({
+        error: 'Invalid parameter',
+        message: 'model must be a valid string (max 256 characters)'
+      })
+    }
+
+    const account = await ccrAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({
+        error: 'Account not found',
+        message: `CCR account ${accountId} not found`
+      })
+    }
+
+    await redis.saveAccountTestConfig(accountId, 'ccr', {
+      enabled,
+      cronExpression,
+      model: testModel
+    })
+
+    logger.success(
+      `📝 Updated test config for CCR account ${accountId}: enabled=${enabled}, cronExpression=${cronExpression}, model=${testModel}`
+    )
+
+    return res.json({
+      success: true,
+      message: 'Test config updated successfully',
+      data: {
+        accountId,
+        platform: 'ccr',
+        config: { enabled, cronExpression, model: testModel }
+      }
+    })
+  } catch (error) {
+    logger.error(`❌ Failed to update test config for CCR account ${accountId}:`, error)
+    return res.status(500).json({
+      error: 'Failed to update test config',
+      message: error.message
     })
   }
 })
