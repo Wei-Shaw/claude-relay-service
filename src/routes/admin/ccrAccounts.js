@@ -433,7 +433,7 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
 
     // 构造测试请求
     const axios = require('axios')
-    const { getProxyAgent } = require('../../utils/proxyHelper')
+    const ProxyHelper = require('../../utils/proxyHelper')
 
     const apiUrl = account.apiUrl
     const payload = {
@@ -453,7 +453,7 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
 
     // 配置代理
     if (account.proxy) {
-      const agent = getProxyAgent(account.proxy)
+      const agent = ProxyHelper.createProxyAgent(account.proxy)
       if (agent) {
         requestConfig.httpsAgent = agent
         requestConfig.httpAgent = agent
