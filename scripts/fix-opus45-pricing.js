@@ -32,7 +32,9 @@ const OPUS_45_PRICING = {
 
 // 检查是否是 Opus 4.5 模型
 function isOpus45Model(model) {
-  if (!model) return false
+  if (!model) {
+    return false
+  }
   const modelLower = model.toLowerCase()
   return modelLower.includes('opus-4-5') || modelLower.includes('opus-4.5')
 }
@@ -277,7 +279,9 @@ async function recalculateCostAggregates(redis, isDryRun) {
 
       console.log(`\n  [${keyId}]`)
       console.log(`       Opus 4.5 成本差异: $${totalCostDiff.toFixed(6)}`)
-      console.log(`       当前总成本: $${currentTotal.toFixed(6)} -> 修正后: $${newTotal.toFixed(6)}`)
+      console.log(
+        `       当前总成本: $${currentTotal.toFixed(6)} -> 修正后: $${newTotal.toFixed(6)}`
+      )
 
       if (!isDryRun) {
         const multi = redis.multi()
