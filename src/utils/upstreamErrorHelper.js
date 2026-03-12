@@ -13,7 +13,8 @@ const DEFAULT_TTL = {
   overload: 600, // 529: 10分钟
   auth_error: 1800, // 401/403: 30分钟
   timeout: 300, // 504/网络超时: 5分钟
-  rate_limit: 300 // 429: 5分钟（优先使用响应头解析值）
+  rate_limit: 300, // 429: 5分钟（优先使用响应头解析值）
+  client_error: 180 // 其他4xx客户端错误：3分钟
 }
 
 // 上游 retry-after 派生 TTL 的上限（秒）。
@@ -52,6 +53,7 @@ const getTtlConfig = () => {
     auth_error: config.upstreamError?.authErrorTtlSeconds ?? DEFAULT_TTL.auth_error,
     timeout: config.upstreamError?.timeoutTtlSeconds ?? DEFAULT_TTL.timeout,
     rate_limit: DEFAULT_TTL.rate_limit,
+    client_error: DEFAULT_TTL.client_error,
     max_custom:
       config.upstreamError?.maxCustomTtlSeconds ??
       parseEnvPositiveInt('UPSTREAM_ERROR_MAX_CUSTOM_TTL_SECONDS') ??
@@ -303,7 +305,14 @@ const markTempUnavailable = async (
   context = null
 ) => {
   try {
-    const errorType = classifyError(statusCode)
+    const errorTypeOverride =
+      context &&
+      typeof context === 'object' &&
+      typeof context.errorTypeOverride === 'string' &&
+      context.errorTypeOverride.trim()
+        ? context.errorTypeOverride.trim()
+        : null
+    const errorType = errorTypeOverride || classifyError(statusCode)
     if (!errorType) {
       return { success: false, reason: 'not_a_pausable_error' }
     }
