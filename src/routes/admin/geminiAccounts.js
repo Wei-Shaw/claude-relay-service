@@ -506,6 +506,41 @@ router.post('/:id/reset-status', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 触发 setupUser（onboard 到正确层级）
+router.post('/:accountId/setup', authenticateAdmin, async (req, res) => {
+  const { accountId } = req.params
+  try {
+    const account = await geminiAccountService.getAccount(accountId)
+    if (!account) return res.status(404).json({ error: 'Account not found' })
+
+    const client = await geminiAccountService.getOauthClient(
+      account.accessToken,
+      account.refreshToken,
+      account.proxy,
+      account.oauthProvider
+    )
+
+    const result = await geminiAccountService.setupUser(client, account.projectId || null, null, account.proxy)
+
+    // 把 onboard 后拿到的 projectId 存回账号
+    if (result.projectId && result.projectId !== account.tempProjectId) {
+      await geminiAccountService.updateTempProjectId(accountId, result.projectId)
+    }
+
+    return res.json({
+      success: true,
+      projectId: result.projectId,
+      userTier: result.userTier,
+      currentTier: result.loadRes?.currentTier,
+      allowedTiers: result.loadRes?.allowedTiers,
+      onboardRes: result.onboardRes
+    })
+  } catch (error) {
+    logger.error(`❌ setupUser failed for account: ${accountId}`, error.message)
+    return res.status(500).json({ success: false, error: error.message })
+  }
+})
+
 // 测试 Gemini 账户连通性
 router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
   const { accountId } = req.params
@@ -520,50 +555,46 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Account not found' })
     }
 
-    // 确保 token 有效
-    const tokenResult = await geminiAccountService.ensureValidToken(accountId)
-    if (!tokenResult.success) {
-      return res.status(401).json({
-        error: 'Token refresh failed',
-        message: tokenResult.error
-      })
-    }
+    // 获取 OAuth 客户端
+    const client = await geminiAccountService.getOauthClient(
+      account.accessToken,
+      account.refreshToken,
+      account.proxy,
+      account.oauthProvider
+    )
 
-    const { accessToken } = tokenResult
+    // 使用与生产流量一致的 cloudcode-pa.googleapis.com 端点测试
+    let projectId = account.projectId || account.tempProjectId || null
 
-    // 构造测试请求
-    const axios = require('axios')
-    const { createGeminiTestPayload } = require('../../utils/testPayloadHelper')
-    const { getProxyAgent } = require('../../utils/proxyHelper')
-
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-    const payload = createGeminiTestPayload(model)
-
-    const requestConfig = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`
-      },
-      timeout: 30000
-    }
-
-    // 配置代理
-    if (account.proxy) {
-      const agent = getProxyAgent(account.proxy)
-      if (agent) {
-        requestConfig.httpsAgent = agent
-        requestConfig.httpAgent = agent
+    // 若无 projectId，先调 loadCodeAssist 获取（与生产流量逻辑一致）
+    if (!projectId) {
+      const loadRes = await geminiAccountService.loadCodeAssist(client, null, account.proxy)
+      if (loadRes.cloudaicompanionProject) {
+        projectId = loadRes.cloudaicompanionProject
+        await geminiAccountService.updateTempProjectId(accountId, projectId)
       }
     }
 
-    const response = await axios.post(apiUrl, payload, requestConfig)
+    const requestData = {
+      model,
+      request: {
+        contents: [{ role: 'user', parts: [{ text: 'Hi' }] }]
+      }
+    }
+
+    const response = await geminiAccountService.generateContent(
+      client,
+      requestData,
+      null,
+      projectId,
+      null,
+      account.proxy
+    )
     const latency = Date.now() - startTime
 
-    // 提取响应文本
-    let responseText = ''
-    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      responseText = response.data.candidates[0].content.parts[0].text
-    }
+    // 提取响应文本（Code Assist API 响应包在 response 字段里）
+    const candidates = response?.response?.candidates || response?.candidates || []
+    const responseText = candidates?.[0]?.content?.parts?.[0]?.text || ''
 
     logger.success(
       `✅ Gemini account test passed: ${account.name} (${accountId}), latency: ${latency}ms`
