@@ -274,6 +274,29 @@ router.post('/', authenticateAdmin, async (req, res) => {
 
     const newAccount = await geminiAccountService.createAccount(accountData)
 
+    // OAuth 账户创建后自动执行 setupUser（onboard 到正确层级）
+    if (newAccount.id && accountData.refreshToken) {
+      setImmediate(async () => {
+        try {
+          const account = await geminiAccountService.getAccount(newAccount.id)
+          if (!account?.refreshToken) return
+          const client = await geminiAccountService.getOauthClient(
+            account.accessToken,
+            account.refreshToken,
+            account.proxy,
+            account.oauthProvider
+          )
+          const result = await geminiAccountService.setupUser(client, account.projectId || null, null, account.proxy)
+          if (result.projectId) {
+            await geminiAccountService.updateTempProjectId(newAccount.id, result.projectId)
+          }
+          logger.info(`✅ Auto setupUser completed for new account: ${account.name} (${newAccount.id}), tier: ${result.userTier}`)
+        } catch (err) {
+          logger.warn(`⚠️ Auto setupUser failed for account ${newAccount.id}: ${err.message}`)
+        }
+      })
+    }
+
     // 如果是分组类型，处理分组绑定
     if (accountData.accountType === 'group') {
       if (accountData.groupIds && accountData.groupIds.length > 0) {
@@ -356,6 +379,29 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
     }
 
     const updatedAccount = await geminiAccountService.updateAccount(accountId, mappedUpdates)
+
+    // 如果更新了 token，自动执行 setupUser
+    if (updates.refreshToken || updates.accessToken) {
+      setImmediate(async () => {
+        try {
+          const account = await geminiAccountService.getAccount(accountId)
+          if (!account?.refreshToken) return
+          const client = await geminiAccountService.getOauthClient(
+            account.accessToken,
+            account.refreshToken,
+            account.proxy,
+            account.oauthProvider
+          )
+          const result = await geminiAccountService.setupUser(client, account.projectId || null, null, account.proxy)
+          if (result.projectId) {
+            await geminiAccountService.updateTempProjectId(accountId, result.projectId)
+          }
+          logger.info(`✅ Auto setupUser completed on token update: ${account.name} (${accountId}), tier: ${result.userTier}`)
+        } catch (err) {
+          logger.warn(`⚠️ Auto setupUser failed for account ${accountId}: ${err.message}`)
+        }
+      })
+    }
 
     logger.success(`📝 Admin updated Gemini account: ${accountId}`)
     return res.json({ success: true, data: updatedAccount })
