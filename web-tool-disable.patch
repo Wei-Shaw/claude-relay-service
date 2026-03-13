@@ -1,0 +1,166 @@
+--- crs/claude-relay-service-main/src/routes/api.js	2026-03-10 01:56:40.000000000 +0000
++++ crs-work/src/routes/api.js	2026-03-13 05:32:34.702009335 +0000
+@@ -27,6 +27,132 @@
+ } = require('../services/anthropicGeminiBridgeService')
+ const router = express.Router()
+ 
++// ============================================================================
++// 🚫 Web 工具禁用策略（web_search / web_fetch）
++// 环境变量 DISABLE_WEB_TOOLS=true 时生效
++// 策略：从请求体中静默移除 server tool 定义，不整单拒绝
++// ============================================================================
++
++const WEB_TOOLS_DISABLED = (process.env.DISABLE_WEB_TOOLS || '').toLowerCase() === 'true'
++
++const WEB_TOOL_DISABLED_NOTICE =
++  '[System Notice] Web search and web fetch tools are disabled on this relay deployment. ' +
++  'If the user requests web search or URL fetching, inform them that these capabilities ' +
++  'are not available in the current environment. Continue to assist using your built-in knowledge.'
++
++/**
++ * 判断 tool 定义是否为需要禁用的 web 工具（server tool 格式）
++ * Anthropic server tool 的特征：type 字段带日期后缀，如 "web_search_20250305"
++ * 同时也兼容未来可能变化的版本后缀
++ */
++function isDisabledWebTool(tool) {
++  if (!tool || typeof tool !== 'object') return false
++
++  const toolType = (tool.type || '').toLowerCase()
++  const toolName = (tool.name || '').toLowerCase()
++
++  // 检查 type 字段（server tool 的主要标识）
++  if (toolType.startsWith('web_search') || toolType.startsWith('web_fetch')) {
++    return true
++  }
++
++  // 兼容检查 name 字段（以防客户端用其他方式传递）
++  if (toolName === 'web_search' || toolName === 'web_fetch') {
++    // 排除用户自定义的同名工具（自定义工具 type 为 "custom"）
++    if (toolType === 'custom') return false
++    return true
++  }
++
++  // 检查 function.name（OpenAI 兼容格式中可能存在）
++  const fnName = (tool.function?.name || '').toLowerCase()
++  if (fnName === 'web_search' || fnName === 'web_fetch') {
++    return true
++  }
++
++  return false
++}
++
++/**
++ * 判断 tool_choice 是否强制指向被禁用的 web 工具
++ */
++function isDisabledWebToolChoice(toolChoice) {
++  if (!toolChoice || typeof toolChoice !== 'object') return false
++  // 只有 type === "tool" 时 name 才有意义（指定调用某个工具）
++  if (toolChoice.type !== 'tool') return false
++  const name = (toolChoice.name || '').toLowerCase()
++  return name === 'web_search' || name === 'web_fetch'
++}
++
++/**
++ * 向 system 字段注入禁用说明（兼容字符串和数组两种格式）
++ * 避免重复注入
++ */
++function ensureWebToolDisabledNotice(body) {
++  if (!body) return
++
++  const notice = WEB_TOOL_DISABLED_NOTICE
++
++  if (typeof body.system === 'string') {
++    if (!body.system.includes(notice)) {
++      body.system = body.system + '\n\n' + notice
++    }
++  } else if (Array.isArray(body.system)) {
++    const alreadyInjected = body.system.some(
++      (item) => item && item.type === 'text' && item.text && item.text.includes(notice)
++    )
++    if (!alreadyInjected) {
++      body.system.push({ type: 'text', text: notice })
++    }
++  } else {
++    // system 不存在或为其他类型，创建新的
++    body.system = notice
++  }
++}
++
++/**
++ * 主入口：应用 web 工具禁用策略
++ * @param {Object} body - req.body（会被就地修改）
++ * @returns {boolean} 是否有工具被移除
++ */
++function applyWebToolDisablePolicy(body) {
++  if (!WEB_TOOLS_DISABLED) return false
++  if (!body || typeof body !== 'object') return false
++
++  let removed = false
++
++  // 1. 从 tools 数组中移除 web 工具
++  if (Array.isArray(body.tools)) {
++    const originalLength = body.tools.length
++    body.tools = body.tools.filter((tool) => !isDisabledWebTool(tool))
++
++    if (body.tools.length < originalLength) {
++      removed = true
++      logger.api(
++        `🚫 Web tools removed from request: ${originalLength - body.tools.length} tool(s) filtered`
++      )
++    }
++
++    // 如果过滤后 tools 为空数组，删除整个字段以避免上游报错
++    if (body.tools.length === 0) {
++      delete body.tools
++    }
++  }
++
++  // 2. 如果 tool_choice 指向被禁用的工具，删除它
++  if (isDisabledWebToolChoice(body.tool_choice)) {
++    logger.api(`🚫 Web tool_choice removed: ${body.tool_choice.name}`)
++    delete body.tool_choice
++    removed = true
++  }
++
++  // 3. 注入系统提示，告知模型 web 工具不可用
++  if (removed) {
++    ensureWebToolDisabledNotice(body)
++  }
++
++  return removed
++}
++
+ function queueRateLimitUpdate(
+   rateLimitInfo,
+   usageSummary,
+@@ -228,6 +354,9 @@
+       return await handleAnthropicMessagesToGemini(req, res, { vendor: forcedVendor, baseModel })
+     }
+ 
++    // 🚫 Web 工具禁用策略：在转发前从请求体中移除 web_search / web_fetch
++    applyWebToolDisablePolicy(req.body)
++
+     // 检查是否为流式请求
+     const isStream = req.body.stream === true
+ 
+@@ -1663,6 +1792,9 @@
+     return await handleAnthropicCountTokensToGemini(req, res, { vendor: forcedVendor })
+   }
+ 
++  // 🚫 Web 工具禁用策略：count_tokens 也需要移除 web 工具以保持一致
++  applyWebToolDisablePolicy(req.body)
++
+   // 🔗 会话绑定验证（与 messages 端点保持一致）
+   const originalSessionId = claudeRelayConfigService.extractOriginalSessionId(req.body)
+   const sessionValidation = await claudeRelayConfigService.validateNewSession(
+@@ -1907,3 +2039,10 @@
+ 
+ module.exports = router
+ module.exports.handleMessagesRequest = handleMessagesRequest
++// 导出 web tool 策略函数（用于测试）
++module.exports._webToolPolicy = {
++  isDisabledWebTool,
++  isDisabledWebToolChoice,
++  ensureWebToolDisabledNotice,
++  applyWebToolDisablePolicy
++}
