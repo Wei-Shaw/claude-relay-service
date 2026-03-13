@@ -1365,7 +1365,8 @@ class RedisClient {
     ephemeral5mTokens = 0,
     ephemeral1hTokens = 0,
     model = 'unknown',
-    isLongContextRequest = false
+    isLongContextRequest = false,
+    preComputedCost = 0
   ) {
     const now = new Date()
     const today = getDateStringInTimezone(now)
@@ -1505,8 +1506,20 @@ class RedisClient {
       this.client.hincrby(accountModelHourly, 'ephemeral5mTokens', finalEphemeral5mTokens),
       this.client.hincrby(accountModelHourly, 'ephemeral1hTokens', finalEphemeral1hTokens),
       this.client.hincrby(accountModelHourly, 'allTokens', actualTotalTokens),
-      this.client.hincrby(accountModelHourly, 'requests', 1),
+      this.client.hincrby(accountModelHourly, 'requests', 1)
+    ]
 
+    // 累加预计算的费用（原子操作，避免重算导致的偏差）
+    // 始终写入（包括 0），确保 key 存在以表明预计算路径已启用
+    if (preComputedCost >= 0) {
+      const accountDailyCostKey = `account_usage:cost:daily:${accountId}:${today}`
+      operations.push(
+        this.client.incrbyfloat(accountDailyCostKey, preComputedCost),
+        this.client.expire(accountDailyCostKey, 86400 * 32)
+      )
+    }
+
+    operations.push(
       // 设置过期时间
       this.client.expire(accountDaily, 86400 * 32), // 32天过期
       this.client.expire(accountMonthly, 86400 * 365), // 1年过期
@@ -1536,7 +1549,7 @@ class RedisClient {
       this.client.del(`account_usage:model:hourly:index:${currentHour}:empty`),
       this.client.del(`account_usage:daily:index:${today}:empty`),
       this.client.del(`account_usage:model:daily:index:${today}:empty`)
-    ]
+    )
 
     // 如果是 1M 上下文请求，添加额外的统计
     if (isLongContextRequest) {
@@ -1799,9 +1812,10 @@ class RedisClient {
 
   // 💰 获取当日费用
   async getDailyCost(keyId) {
+    const client = this.getClientSafe()
     const today = getDateStringInTimezone()
     const costKey = `usage:cost:daily:${keyId}:${today}`
-    const cost = await this.client.get(costKey)
+    const cost = await client.get(costKey)
     const result = parseFloat(cost || 0)
     logger.debug(
       `💰 Getting daily cost for ${keyId}, date: ${today}, key: ${costKey}, value: ${cost}, result: ${result}`
@@ -1937,6 +1951,17 @@ class RedisClient {
     const CostCalculator = require('../utils/costCalculator')
     const today = getDateStringInTimezone()
 
+    // 优先使用预计算的费用（原子累加，包含 Fast Mode 等运行时信息）
+    // key 存在即表明预计算路径已启用，信任其值（含 0）
+    const preComputedCostKey = `account_usage:cost:daily:${accountId}:${today}`
+    const preComputedCost = await this.client.get(preComputedCostKey)
+    if (preComputedCost !== null) {
+      const cost = parseFloat(preComputedCost)
+      logger.debug(`💰 Account ${accountId} daily cost (pre-computed): $${cost}`)
+      return cost
+    }
+
+    // 回退：从 token 数据重新计算（兼容历史数据）
     // 使用索引集合替代 KEYS 命令
     const indexKey = `account_usage:model:daily:index:${today}`
     const allEntries = await this.client.smembers(indexKey)
@@ -2002,13 +2027,40 @@ class RedisClient {
 
     const CostCalculator = require('../utils/costCalculator')
     const today = getDateStringInTimezone()
+    const costMap = new Map(accountIds.map((id) => [id, 0]))
 
+    // 优先批量读取预计算的费用
+    const preComputedPipeline = this.client.pipeline()
+    for (const accountId of accountIds) {
+      preComputedPipeline.get(`account_usage:cost:daily:${accountId}:${today}`)
+    }
+    const preComputedResults = await preComputedPipeline.exec()
+
+    const missingAccountIds = []
+    for (let i = 0; i < accountIds.length; i++) {
+      const [err, value] = preComputedResults[i]
+      if (!err && value !== null) {
+        const cost = parseFloat(value)
+        if (cost > 0) {
+          costMap.set(accountIds[i], cost)
+          continue
+        }
+      }
+      missingAccountIds.push(accountIds[i])
+    }
+
+    // 所有账户都有预计算值，直接返回
+    if (missingAccountIds.length === 0) {
+      return costMap
+    }
+
+    // 回退：从 token 数据重新计算（兼容历史数据）
     // 一次获取索引
     const indexKey = `account_usage:model:daily:index:${today}`
     const allEntries = await this.client.smembers(indexKey)
 
-    // 按 accountId 分组
-    const accountIdSet = new Set(accountIds)
+    // 按 accountId 分组（只处理缺失的账户）
+    const missingSet = new Set(missingAccountIds)
     const entriesByAccount = new Map()
     for (const entry of allEntries) {
       const colonIndex = entry.indexOf(':')
@@ -2017,7 +2069,7 @@ class RedisClient {
       }
       const accountId = entry.substring(0, colonIndex)
       const model = entry.substring(colonIndex + 1)
-      if (accountIdSet.has(accountId)) {
+      if (missingSet.has(accountId)) {
         if (!entriesByAccount.has(accountId)) {
           entriesByAccount.set(accountId, [])
         }
@@ -2025,12 +2077,10 @@ class RedisClient {
       }
     }
 
-    const costMap = new Map(accountIds.map((id) => [id, 0]))
-
     // 如果索引为空，回退到 KEYS 命令（兼容旧数据）
     if (allEntries.length === 0) {
       logger.debug('💰 Daily cost index empty, falling back to KEYS for batch cost calculation')
-      for (const accountId of accountIds) {
+      for (const accountId of missingAccountIds) {
         try {
           const cost = await this.getAccountDailyCostFallback(accountId, today, CostCalculator)
           costMap.set(accountId, cost)
@@ -2110,8 +2160,11 @@ class RedisClient {
         continue
       }
 
-      const parts = key.split(':')
-      const model = parts[4]
+      // Key format: account_usage:model:daily:{accountId}:{model}:{today}
+      // Model name may contain ':', so extract between accountId and date
+      const prefix = `account_usage:model:daily:${accountId}:`
+      const suffix = `:${today}`
+      const model = key.slice(prefix.length, key.length - suffix.length)
 
       if (modelUsage.inputTokens || modelUsage.outputTokens) {
         const usage = {

@@ -1451,8 +1451,9 @@ class ApiKeyService {
       }
 
       // 删除所有相关的使用统计数据
-      const today = new Date().toISOString().split('T')[0]
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+      const today = redis.getDateStringInTimezone()
+      const yesterdayDate = new Date(Date.now() - 86400000)
+      const yesterday = redis.getDateStringInTimezone(yesterdayDate)
 
       // 删除每日统计
       await redis.client.del(`usage:daily:${today}:${keyId}`)
@@ -1582,8 +1583,8 @@ class ApiKeyService {
         cacheCreateTokens,
         cacheReadTokens,
         model,
-        0, // ephemeral5mTokens - 暂时为0，后续处理
-        0, // ephemeral1hTokens - 暂时为0，后续处理
+        cacheCreateTokens, // ephemeral5mTokens - 旧路径无详细拆分，全部归为5m
+        0, // ephemeral1hTokens
         isLongContextRequest,
         realCost,
         ratedCost
@@ -1627,10 +1628,11 @@ class ApiKeyService {
             outputTokens,
             cacheCreateTokens,
             cacheReadTokens,
-            0, // ephemeral5mTokens - recordUsage 不含详细缓存数据
-            0, // ephemeral1hTokens - recordUsage 不含详细缓存数据
+            cacheCreateTokens, // ephemeral5mTokens - 旧路径无详细拆分，全部归为5m
+            0, // ephemeral1hTokens
             model,
-            isLongContextRequest
+            isLongContextRequest,
+            realCost
           )
           logger.database(
             `📊 Recorded account usage: ${accountId} - ${totalTokens} tokens (API Key: ${keyId})`
@@ -1875,7 +1877,8 @@ class ApiKeyService {
             ephemeral5mTokens,
             ephemeral1hTokens,
             model,
-            costInfo.isLongContextRequest || false
+            costInfo.isLongContextRequest || false,
+            realCostWithDetails
           )
           logger.database(
             `📊 Recorded account usage: ${accountId} - ${totalTokens} tokens (API Key: ${keyId})`
