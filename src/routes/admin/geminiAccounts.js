@@ -275,7 +275,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
     const newAccount = await geminiAccountService.createAccount(accountData)
 
     // OAuth 账户创建后自动执行 setupUser（onboard 到正确层级）
-    if (newAccount.id && accountData.refreshToken) {
+    const hasOAuthToken = accountData.refreshToken || accountData.geminiOauth?.refresh_token
+    if (newAccount.id && hasOAuthToken) {
       setImmediate(async () => {
         try {
           const account = await geminiAccountService.getAccount(newAccount.id)
