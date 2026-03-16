@@ -670,8 +670,15 @@ class PricingService {
       // 1小时缓存使用 ephemeral_1h 价格
       ephemeral1hCost = ephemeral1hTokens * actualEphemeral1hPrice
 
+      // 加上非 ephemeral 的 cache creation tokens
+      const remainingCacheTokens = Math.max(
+        0,
+        cacheCreationTokens - ephemeral5mTokens - ephemeral1hTokens
+      )
+      const remainingCacheCost = remainingCacheTokens * actualCacheCreatePrice
+
       // 总的缓存创建费用
-      cacheCreateCost = ephemeral5mCost + ephemeral1hCost
+      cacheCreateCost = ephemeral5mCost + ephemeral1hCost + remainingCacheCost
     } else if (cacheCreationTokens) {
       // 旧格式，所有缓存创建 tokens 都按 5 分钟价格计算（向后兼容）
       cacheCreateCost = cacheCreationTokens * actualCacheCreatePrice
