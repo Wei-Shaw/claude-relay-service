@@ -1,48 +1,76 @@
---- crs/claude-relay-service-main/src/routes/api.js	2026-03-10 01:56:40.000000000 +0000
-+++ crs-work/src/routes/api.js	2026-03-13 05:32:34.702009335 +0000
-@@ -27,6 +27,132 @@
+diff --git a/src/routes/api.js b/src/routes/api.js
+index b018590..9036555 100644
+--- a/src/routes/api.js
++++ b/src/routes/api.js
+@@ -27,6 +27,165 @@ const {
  } = require('../services/anthropicGeminiBridgeService')
  const router = express.Router()
  
 +// ============================================================================
-+// 🚫 Web 工具禁用策略（web_search / web_fetch）
++// 🚫 Web 工具禁用策略（web_search / web_fetch / WebSearch / WebFetch）
 +// 环境变量 DISABLE_WEB_TOOLS=true 时生效
-+// 策略：从请求体中静默移除 server tool 定义，不整单拒绝
++// 策略：从请求体中静默移除所有联网工具定义，不整单拒绝
++//
++// Claude Code 的联网工具有两种存在形式：
++// 1. Anthropic Server Tool: { type: "web_search_20250305", name: "web_search" }
++// 2. Claude Code 内置自定义工具: { type: "custom", name: "WebFetch" }
++//    这类工具在 Claude Code 客户端中表现为 Fetch(url) 调用
++// 两种都需要拦截
 +// ============================================================================
 +
 +const WEB_TOOLS_DISABLED = (process.env.DISABLE_WEB_TOOLS || '').toLowerCase() === 'true'
 +
 +const WEB_TOOL_DISABLED_NOTICE =
 +  '[System Notice] Web search and web fetch tools are disabled on this relay deployment. ' +
-+  'If the user requests web search or URL fetching, inform them that these capabilities ' +
-+  'are not available in the current environment. Continue to assist using your built-in knowledge.'
++  'If the user requests web search, URL fetching, or any internet access, inform them that ' +
++  'these capabilities are not available in the current environment. Do NOT attempt to use ' +
++  'WebFetch, WebSearch, web_search, web_fetch, or any similar tools. ' +
++  'Continue to assist using your built-in knowledge only.'
 +
 +/**
-+ * 判断 tool 定义是否为需要禁用的 web 工具（server tool 格式）
-+ * Anthropic server tool 的特征：type 字段带日期后缀，如 "web_search_20250305"
-+ * 同时也兼容未来可能变化的版本后缀
++ * 归一化工具名称用于匹配
++ * WebFetch -> webfetch, web_fetch -> webfetch, Web_Search -> websearch
++ */
++function normalizeToolName(name) {
++  if (!name || typeof name !== 'string') return ''
++  return name.toLowerCase().replace(/[_\-\s]/g, '')
++}
++
++// 需要禁用的工具名称（归一化后）
++const DISABLED_TOOL_NAMES = new Set([
++  'websearch',   // WebSearch, web_search, Web_Search 等
++  'webfetch',    // WebFetch, web_fetch, Web_Fetch 等
++])
++
++/**
++ * 判断 tool 定义是否为需要禁用的 web 工具
++ *
++ * 覆盖两种格式：
++ * 1. Anthropic Server Tool: type 以 "web_search" 或 "web_fetch" 开头
++ *    如 { type: "web_search_20250305", name: "web_search" }
++ * 2. Claude Code 自定义工具: type 为 "custom"，name 为 "WebFetch" / "WebSearch"
++ *    如 { type: "custom", name: "WebFetch", input_schema: {...} }
 + */
 +function isDisabledWebTool(tool) {
 +  if (!tool || typeof tool !== 'object') return false
 +
 +  const toolType = (tool.type || '').toLowerCase()
-+  const toolName = (tool.name || '').toLowerCase()
++  const normalizedName = normalizeToolName(tool.name)
 +
-+  // 检查 type 字段（server tool 的主要标识）
++  // 检查 type 前缀（Anthropic server tool 格式）
++  // web_search_20250305, web_fetch_20250305 等
 +  if (toolType.startsWith('web_search') || toolType.startsWith('web_fetch')) {
 +    return true
 +  }
 +
-+  // 兼容检查 name 字段（以防客户端用其他方式传递）
-+  if (toolName === 'web_search' || toolName === 'web_fetch') {
-+    // 排除用户自定义的同名工具（自定义工具 type 为 "custom"）
-+    if (toolType === 'custom') return false
++  // 检查归一化后的 name（覆盖所有命名风格）
++  if (DISABLED_TOOL_NAMES.has(normalizedName)) {
 +    return true
 +  }
 +
-+  // 检查 function.name（OpenAI 兼容格式中可能存在）
-+  const fnName = (tool.function?.name || '').toLowerCase()
-+  if (fnName === 'web_search' || fnName === 'web_fetch') {
++  // 检查 function.name（OpenAI 兼容格式）
++  const normalizedFnName = normalizeToolName(tool.function?.name)
++  if (DISABLED_TOOL_NAMES.has(normalizedFnName)) {
 +    return true
 +  }
 +
@@ -56,8 +84,7 @@
 +  if (!toolChoice || typeof toolChoice !== 'object') return false
 +  // 只有 type === "tool" 时 name 才有意义（指定调用某个工具）
 +  if (toolChoice.type !== 'tool') return false
-+  const name = (toolChoice.name || '').toLowerCase()
-+  return name === 'web_search' || name === 'web_fetch'
++  return DISABLED_TOOL_NAMES.has(normalizeToolName(toolChoice.name))
 +}
 +
 +/**
@@ -95,17 +122,25 @@
 +  if (!WEB_TOOLS_DISABLED) return false
 +  if (!body || typeof body !== 'object') return false
 +
++
 +  let removed = false
++  const removedNames = []
 +
 +  // 1. 从 tools 数组中移除 web 工具
 +  if (Array.isArray(body.tools)) {
 +    const originalLength = body.tools.length
-+    body.tools = body.tools.filter((tool) => !isDisabledWebTool(tool))
++    body.tools = body.tools.filter((tool) => {
++      if (isDisabledWebTool(tool)) {
++        removedNames.push(tool.name || tool.type || 'unknown')
++        return false
++      }
++      return true
++    })
 +
 +    if (body.tools.length < originalLength) {
 +      removed = true
 +      logger.api(
-+        `🚫 Web tools removed from request: ${originalLength - body.tools.length} tool(s) filtered`
++        `🚫 Web tools removed from request: [${removedNames.join(', ')}] (${originalLength - body.tools.length} tool(s) filtered)`
 +      )
 +    }
 +
@@ -133,7 +168,7 @@
  function queueRateLimitUpdate(
    rateLimitInfo,
    usageSummary,
-@@ -228,6 +354,9 @@
+@@ -228,6 +387,9 @@ async function handleMessagesRequest(req, res) {
        return await handleAnthropicMessagesToGemini(req, res, { vendor: forcedVendor, baseModel })
      }
  
@@ -143,7 +178,7 @@
      // 检查是否为流式请求
      const isStream = req.body.stream === true
  
-@@ -1663,6 +1792,9 @@
+@@ -1663,6 +1825,9 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
      return await handleAnthropicCountTokensToGemini(req, res, { vendor: forcedVendor })
    }
  
@@ -153,12 +188,13 @@
    // 🔗 会话绑定验证（与 messages 端点保持一致）
    const originalSessionId = claudeRelayConfigService.extractOriginalSessionId(req.body)
    const sessionValidation = await claudeRelayConfigService.validateNewSession(
-@@ -1907,3 +2039,10 @@
+@@ -1907,3 +2072,11 @@ router.post('/api/event_logging/batch', (req, res) => {
  
  module.exports = router
  module.exports.handleMessagesRequest = handleMessagesRequest
 +// 导出 web tool 策略函数（用于测试）
 +module.exports._webToolPolicy = {
++  normalizeToolName,
 +  isDisabledWebTool,
 +  isDisabledWebToolChoice,
 +  ensureWebToolDisabledNotice,
