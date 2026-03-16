@@ -143,6 +143,7 @@ function applyWebToolDisablePolicy(body) {
   if (!WEB_TOOLS_DISABLED) return false
   if (!body || typeof body !== 'object') return false
 
+
   let removed = false
   const removedNames = []
 

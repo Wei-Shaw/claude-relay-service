@@ -1,47 +1,175 @@
+version: '3.8'
+
+# Claude Relay Service Docker Compose 配置
+# 所有配置通过环境变量设置，无需映射 .env 文件
+
 services:
+  # 🚀 Claude Relay Service
   claude-relay:
-    image: weishaw/claude-relay-service:latest
-    container_name: claude-relay-service
+    build: .
+    image: weishaw/claude-relay-service:v1.1.291
     restart: unless-stopped
     ports:
-      - "3000:3000"
-    environment:
-      - PORT=${PORT:-3000}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - JWT_SECRET=${JWT_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
-      - CLAUDE_BETA_HEADER=${CLAUDE_BETA_HEADER:-claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14}
-      - DISABLE_WEB_TOOLS=true
+      # 绑定地址：生产环境建议使用反向代理，设置 BIND_HOST=127.0.0.1
+      - "${BIND_HOST:-0.0.0.0}:${PORT:-3000}:3000"
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
       - ./custom/api.js:/app/src/routes/api.js:ro
+    environment:
+      # 🌐 服务器配置
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      
+      - DISABLE_WEB_TOOLS=true
+
+      # 🔧 请求体大小配置
+      - REQUEST_MAX_SIZE_MB=60
+      
+      # 🔐 安全配置（必填）
+      - JWT_SECRET=${JWT_SECRET}  # 必填：至少32字符的随机字符串
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}  # 必填：32字符的加密密钥
+      - ADMIN_SESSION_TIMEOUT=${ADMIN_SESSION_TIMEOUT:-86400000}
+      - API_KEY_PREFIX=${API_KEY_PREFIX:-cr_}
+      
+      # 👤 管理员凭据（可选）
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      
+      # 📊 Redis 配置
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_ENABLE_TLS=${REDIS_ENABLE_TLS:-}
+      
+      # 🎯 Claude API 配置
+      - CLAUDE_API_URL=${CLAUDE_API_URL:-https://api.anthropic.com/v1/messages}
+      - CLAUDE_API_VERSION=${CLAUDE_API_VERSION:-2023-06-01}
+      - CLAUDE_BETA_HEADER=${CLAUDE_BETA_HEADER:-claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14}
+      
+      # 🌐 代理配置
+      - DEFAULT_PROXY_TIMEOUT=${DEFAULT_PROXY_TIMEOUT:-60000}
+      - MAX_PROXY_RETRIES=${MAX_PROXY_RETRIES:-3}
+      - PROXY_USE_IPV4=${PROXY_USE_IPV4:-true}
+      - PROXY_KEEP_ALIVE=${PROXY_KEEP_ALIVE:-}
+      - PROXY_MAX_SOCKETS=${PROXY_MAX_SOCKETS:-}
+      - PROXY_MAX_FREE_SOCKETS=${PROXY_MAX_FREE_SOCKETS:-}
+      
+      # 📈 使用限制
+      - DEFAULT_TOKEN_LIMIT=${DEFAULT_TOKEN_LIMIT:-1000000}
+      
+      # 📝 日志配置
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_MAX_SIZE=${LOG_MAX_SIZE:-10m}
+      - LOG_MAX_FILES=${LOG_MAX_FILES:-5}
+      
+      # 🔧 系统配置
+      - CLEANUP_INTERVAL=${CLEANUP_INTERVAL:-3600000}
+      - TOKEN_USAGE_RETENTION=${TOKEN_USAGE_RETENTION:-2592000000}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-60000}
+      - TIMEZONE_OFFSET=${TIMEZONE_OFFSET:-8}
+      
+      # 🎨 Web 界面配置
+      - WEB_TITLE=${WEB_TITLE:-Claude Relay Service}
+      - WEB_DESCRIPTION=${WEB_DESCRIPTION:-Multi-account Claude API relay service}
+      - WEB_LOGO_URL=${WEB_LOGO_URL:-/assets/logo.png}
+      
+      # 🛠️ 开发配置
+      - DEBUG=${DEBUG:-false}
+      - ENABLE_CORS=${ENABLE_CORS:-true}
+      - TRUST_PROXY=${TRUST_PROXY:-true}
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
+    networks:
+      - claude-relay-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
 
+  # 📊 Redis Database
   redis:
     image: redis:7-alpine
-    container_name: claude-relay-redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 3s
-      timeout: 2s
-      retries: 30
+    # 仅在容器网络内部暴露端口，不映射到主机
+    expose:
+      - "6379"
+    # 注意：如需本地调试访问，可取消下行注释（生产环境禁用）
+    # ports:
+    #   - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
-      - redis_data:/data
+      - ./redis_data:/data
+    command: redis-server --save 60 1 --appendonly yes --appendfsync everysec
+    networks:
+      - claude-relay-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 📈 Redis Monitoring (Optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_WEB_PORT:-8081}:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - claude-relay-network
+    profiles:
+      - monitoring
+
+  # 📊 Application Monitoring (Optional)
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - claude-relay-network
+    profiles:
+      - monitoring
+
+  # 📈 Grafana Dashboard (Optional)
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - claude-relay-network
+    profiles:
+      - monitoring
 
 volumes:
-  redis_data:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  claude-relay-network:
+    driver: bridge
