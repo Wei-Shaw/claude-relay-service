@@ -43,8 +43,8 @@ class ClaudeCodeHeadersService {
       'x-app',
       'user-agent',
       'accept-language',
-      'sec-fetch-mode',
-      'accept-encoding'
+      'sec-fetch-mode'
+      // 注意：不捕获 accept-encoding，避免存储客户端的 zstd 等不支持的编码
     ]
 
     // Headers 缓存 TTL（60秒）

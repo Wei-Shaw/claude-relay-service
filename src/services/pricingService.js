@@ -28,43 +28,7 @@ class PricingService {
     this.updateTimer = null // 定时更新任务句柄
     this.hashSyncInProgress = false // 哈希同步状态
 
-    // 硬编码的 1 小时缓存价格（美元/百万 token）
-    // ephemeral_5m 的价格使用 model_pricing.json 中的 cache_creation_input_token_cost
-    // ephemeral_1h 的价格需要硬编码
-    this.ephemeral1hPricing = {
-      // Opus 系列: $30/MTok
-      'claude-opus-4-1': 0.00003,
-      'claude-opus-4-1-20250805': 0.00003,
-      'claude-opus-4': 0.00003,
-      'claude-opus-4-20250514': 0.00003,
-      'claude-3-opus': 0.00003,
-      'claude-3-opus-latest': 0.00003,
-      'claude-3-opus-20240229': 0.00003,
-
-      // Sonnet 系列: $6/MTok
-      'claude-3-5-sonnet': 0.000006,
-      'claude-3-5-sonnet-latest': 0.000006,
-      'claude-3-5-sonnet-20241022': 0.000006,
-      'claude-3-5-sonnet-20240620': 0.000006,
-      'claude-3-sonnet': 0.000006,
-      'claude-3-sonnet-20240307': 0.000006,
-      'claude-sonnet-3': 0.000006,
-      'claude-sonnet-3-5': 0.000006,
-      'claude-sonnet-3-7': 0.000006,
-      'claude-sonnet-4': 0.000006,
-      'claude-sonnet-4-20250514': 0.000006,
-
-      // Haiku 系列: $1.6/MTok
-      'claude-3-5-haiku': 0.0000016,
-      'claude-3-5-haiku-latest': 0.0000016,
-      'claude-3-5-haiku-20241022': 0.0000016,
-      'claude-3-haiku': 0.0000016,
-      'claude-3-haiku-20240307': 0.0000016,
-      'claude-haiku-3': 0.0000016,
-      'claude-haiku-3-5': 0.0000016
-    }
-
-    // Claude Prompt Caching 官方倍率（基于输入价格）
+    // Claude Prompt Caching 官方倍率（基于输入价格）— 仅作为 model_pricing.json 缺失字段时的兜底
     this.claudeCacheMultipliers = {
       write5m: 1.25,
       write1h: 2,
@@ -536,50 +500,6 @@ class PricingService {
     return modelName.replace(/\[1m\]/gi, '').trim()
   }
 
-  // 获取 1 小时缓存价格（优先使用 model_pricing.json 中的模型字段）
-  getEphemeral1hPricing(modelName, pricing = null) {
-    if (
-      pricing?.cache_creation_input_token_cost_above_1hr !== null &&
-      pricing?.cache_creation_input_token_cost_above_1hr !== undefined
-    ) {
-      return pricing.cache_creation_input_token_cost_above_1hr
-    }
-
-    if (!modelName) {
-      return 0
-    }
-
-    // 尝试直接匹配
-    if (
-      this.ephemeral1hPricing[modelName] !== null &&
-      this.ephemeral1hPricing[modelName] !== undefined
-    ) {
-      return this.ephemeral1hPricing[modelName]
-    }
-
-    // 处理各种模型名称变体
-    const modelLower = modelName.toLowerCase()
-
-    // 检查是否是 Opus 系列
-    if (modelLower.includes('opus')) {
-      return 0.00001 // $10/MTok
-    }
-
-    // 检查是否是 Sonnet 系列
-    if (modelLower.includes('sonnet')) {
-      return 0.000006 // $6/MTok
-    }
-
-    // 检查是否是 Haiku 系列
-    if (modelLower.includes('haiku')) {
-      return 0.000002 // $2/MTok
-    }
-
-    // 默认返回 0（未知模型）
-    logger.debug(`💰 No 1h cache pricing found for model: ${modelName}`)
-    return 0
-  }
-
   // 计算使用费用
   calculateCost(usage, modelName) {
     const normalizedModelName = this.stripLongContextSuffix(modelName)
@@ -675,43 +595,58 @@ class PricingService {
         : baseOutputPrice
       : baseOutputPrice
 
-    // 应用 Fast Mode 倍率（在 200K+ 价格之上叠加）
-    if (fastMultiplier > 1) {
-      actualInputPrice *= fastMultiplier
-      actualOutputPrice *= fastMultiplier
-    }
-
+    // 缓存价格：优先从 model_pricing.json 取，Claude 缺失时用倍率兜底
     let actualCacheCreatePrice = 0
     let actualCacheReadPrice = 0
     let actualEphemeral1hPrice = 0
 
-    if (isClaudeModel) {
-      // Claude 模型缓存价格统一按输入价格倍率推导，避免来源字段不一致导致计费偏差
-      actualCacheCreatePrice = actualInputPrice * this.claudeCacheMultipliers.write5m
-      actualCacheReadPrice = actualInputPrice * this.claudeCacheMultipliers.read
-      actualEphemeral1hPrice = actualInputPrice * this.claudeCacheMultipliers.write1h
-    } else {
-      actualCacheCreatePrice = useLongContextPricing
-        ? pricing.cache_creation_input_token_cost_above_200k_tokens ||
+    if (useLongContextPricing) {
+      // 200K+：Claude 仅用 above_200k 专用字段，缺失留 0 让下方兜底从 actualInputPrice 推导
+      actualCacheCreatePrice = isClaudeModel
+        ? pricing.cache_creation_input_token_cost_above_200k_tokens || 0
+        : pricing.cache_creation_input_token_cost_above_200k_tokens ||
           pricing.cache_creation_input_token_cost ||
           0
-        : pricing.cache_creation_input_token_cost || 0
-
-      actualCacheReadPrice = useLongContextPricing
-        ? pricing.cache_read_input_token_cost_above_200k_tokens ||
+      actualCacheReadPrice = isClaudeModel
+        ? pricing.cache_read_input_token_cost_above_200k_tokens || 0
+        : pricing.cache_read_input_token_cost_above_200k_tokens ||
           pricing.cache_read_input_token_cost ||
           0
-        : pricing.cache_read_input_token_cost || 0
+      const has1h200k =
+        pricing.cache_creation_input_token_cost_above_1hr_above_200k_tokens !== null &&
+        pricing.cache_creation_input_token_cost_above_1hr_above_200k_tokens !== undefined
+      actualEphemeral1hPrice = has1h200k
+        ? pricing.cache_creation_input_token_cost_above_1hr_above_200k_tokens
+        : isClaudeModel
+          ? 0
+          : pricing.cache_creation_input_token_cost_above_1hr || 0
+    } else {
+      actualCacheCreatePrice = pricing.cache_creation_input_token_cost || 0
+      actualCacheReadPrice = pricing.cache_read_input_token_cost || 0
+      actualEphemeral1hPrice = pricing.cache_creation_input_token_cost_above_1hr || 0
+    }
 
-      const defaultEphemeral1hPrice = this.getEphemeral1hPricing(modelName, pricing)
+    // Claude 兜底：pricing 字段缺失时用倍率从 actualInputPrice 推导
+    // 此时 actualInputPrice 尚未含 fastMultiplier，下方统一应用
+    if (isClaudeModel) {
+      if (!actualCacheCreatePrice) {
+        actualCacheCreatePrice = actualInputPrice * this.claudeCacheMultipliers.write5m
+      }
+      if (!actualCacheReadPrice) {
+        actualCacheReadPrice = actualInputPrice * this.claudeCacheMultipliers.read
+      }
+      if (!actualEphemeral1hPrice) {
+        actualEphemeral1hPrice = actualInputPrice * this.claudeCacheMultipliers.write1h
+      }
+    }
 
-      // 非 Claude 模型维持原有字段优先级
-      actualEphemeral1hPrice = useLongContextPricing
-        ? pricing.cache_creation_input_token_cost_above_1hr_above_200k_tokens !== null &&
-          pricing.cache_creation_input_token_cost_above_1hr_above_200k_tokens !== undefined
-          ? pricing.cache_creation_input_token_cost_above_1hr_above_200k_tokens
-          : defaultEphemeral1hPrice
-        : defaultEphemeral1hPrice
+    // Fast Mode 倍率：统一一次性应用于所有价格
+    if (fastMultiplier > 1) {
+      actualInputPrice *= fastMultiplier
+      actualOutputPrice *= fastMultiplier
+      actualCacheCreatePrice *= fastMultiplier
+      actualCacheReadPrice *= fastMultiplier
+      actualEphemeral1hPrice *= fastMultiplier
     }
 
     // 计算各项费用

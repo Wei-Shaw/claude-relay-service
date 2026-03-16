@@ -17,7 +17,38 @@ const logger = require('../../utils/logger')
 const oauthHelper = require('../../utils/oauthHelper')
 const CostCalculator = require('../../utils/costCalculator')
 const webhookNotifier = require('../../utils/webhookNotifier')
+const {
+  isEmptyValue,
+  parseBooleanLike,
+  normalizeOptionalNonNegativeInteger
+} = require('../../utils/tempUnavailablePolicy')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+
+const TEMP_UNAVAILABLE_TTL_FIELDS = ['tempUnavailable503TtlSeconds', 'tempUnavailable5xxTtlSeconds']
+
+const normalizeTempUnavailablePolicyPayload = (payload, options = {}) => {
+  const { partial = false } = options
+  const normalized = {}
+
+  for (const field of TEMP_UNAVAILABLE_TTL_FIELDS) {
+    if (partial && !Object.prototype.hasOwnProperty.call(payload, field)) {
+      continue
+    }
+
+    const rawValue = payload[field]
+    const parsedValue = normalizeOptionalNonNegativeInteger(rawValue)
+    if (!isEmptyValue(rawValue) && parsedValue === null) {
+      return { error: `${field} must be a non-negative integer` }
+    }
+    normalized[field] = parsedValue
+  }
+
+  if (!partial || Object.prototype.hasOwnProperty.call(payload, 'disableTempUnavailable')) {
+    normalized.disableTempUnavailable = parseBooleanLike(payload.disableTempUnavailable)
+  }
+
+  return { normalized }
+}
 
 // 生成OAuth授权URL
 router.post('/claude-accounts/generate-auth-url', authenticateAdmin, async (req, res) => {
@@ -594,7 +625,10 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       expiresAt,
       extInfo,
       maxConcurrency,
-      interceptWarmup
+      interceptWarmup,
+      disableTempUnavailable,
+      tempUnavailable503TtlSeconds,
+      tempUnavailable5xxTtlSeconds
     } = req.body
 
     if (!name) {
@@ -623,6 +657,16 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Priority must be a number between 1 and 100' })
     }
 
+    const { normalized: normalizedTempUnavailablePolicy, error: tempUnavailablePolicyError } =
+      normalizeTempUnavailablePolicyPayload({
+        disableTempUnavailable,
+        tempUnavailable503TtlSeconds,
+        tempUnavailable5xxTtlSeconds
+      })
+    if (tempUnavailablePolicyError) {
+      return res.status(400).json({ error: tempUnavailablePolicyError })
+    }
+
     const newAccount = await claudeAccountService.createAccount({
       name,
       description,
@@ -641,7 +685,10 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       expiresAt: expiresAt || null, // 账户订阅到期时间
       extInfo: extInfo || null,
       maxConcurrency: maxConcurrency || 0, // 账户级串行队列：0=使用全局配置，>0=强制启用
-      interceptWarmup: interceptWarmup === true // 拦截预热请求：默认为false
+      interceptWarmup: interceptWarmup === true, // 拦截预热请求：默认为false
+      disableTempUnavailable: normalizedTempUnavailablePolicy.disableTempUnavailable,
+      tempUnavailable503TtlSeconds: normalizedTempUnavailablePolicy.tempUnavailable503TtlSeconds,
+      tempUnavailable5xxTtlSeconds: normalizedTempUnavailablePolicy.tempUnavailable5xxTtlSeconds
     })
 
     // 如果是分组类型，将账户添加到分组
@@ -684,6 +731,13 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     ) {
       return res.status(400).json({ error: 'Priority must be a number between 1 and 100' })
     }
+
+    const { normalized: normalizedTempUnavailablePolicy, error: tempUnavailablePolicyError } =
+      normalizeTempUnavailablePolicyPayload(mappedUpdates, { partial: true })
+    if (tempUnavailablePolicyError) {
+      return res.status(400).json({ error: tempUnavailablePolicyError })
+    }
+    Object.assign(mappedUpdates, normalizedTempUnavailablePolicy)
 
     // 验证accountType的有效性
     if (
