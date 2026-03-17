@@ -572,6 +572,116 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
 
 > 💡 将示例中的 `http://127.0.0.1:3000` 替换为你的服务域名或公网地址，并写入后台生成的 API 密钥（cr_ 开头）。
 
+### 4.1 管理 MCP（mcporter）安装教程
+
+如果你希望让 Agent、Codex 或其他支持 MCP 的工具直接调用 CRS 管理接口，推荐使用服务端内嵌的远程 MCP 入口：
+
+```bash
+POST /admin/mcp
+```
+
+> 作用范围：API Key 管理、usage/cost 统计、标签管理、批量操作等后台管理能力。  
+> 运行方式：客户端通过 `mcporter` 连接远程 Streamable HTTP MCP。客户端机器不需要本仓库源码，也不需要执行本仓库的 `npm install`。
+
+**第 1 步：安装 mcporter CLI**
+
+任选一种方式：
+
+```bash
+# 全局安装（推荐）
+npm install -g mcporter
+
+# 或者使用 npx 临时执行
+npx -y mcporter --help
+```
+
+**第 2 步：准备服务地址和管理员 token**
+
+`crs-admin` MCP 复用现有后台管理员认证，客户端需要准备：
+
+- 远程 MCP 地址：`https://你的域名/admin/mcp`
+- 管理员 Bearer Token
+
+如果你已经知道后台账号密码，可以直接调用登录接口获取 token：
+
+```bash
+export CRS_BASE_URL="https://你的域名"   # 按实际地址修改
+
+export CRS_ADMIN_TOKEN="$(
+  curl -s "${CRS_BASE_URL}/web/auth/login" \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"你的管理员用户名","password":"你的管理员密码"}' \
+  | jq -r '.token'
+)"
+```
+
+如果没有 `jq`，也可以先执行登录请求，再从返回 JSON 中手动复制 `token` 字段。
+
+> 管理员账号密码来源：
+>
+> - 手动部署：`data/init.json`
+> - Docker 部署：`docker logs claude-relay-service`
+> - 预设环境变量：`ADMIN_USERNAME` / `ADMIN_PASSWORD`
+
+**第 3 步：一次性配置远程 MCP server**
+
+推荐使用带固定请求头的 server 配置，而不是每次直接写裸 URL：
+
+```bash
+export CRS_MCP_URL="${CRS_BASE_URL}/admin/mcp"
+
+mcporter config add crs-admin \
+  --url "${CRS_MCP_URL}" \
+  --header "Authorization=Bearer ${CRS_ADMIN_TOKEN}"
+```
+
+执行后，后续可直接通过 `crs-admin` 这个 server 名称调用。
+
+> 如果你希望写入其它配置文件位置，可额外加 `--config <path>`。
+
+**第 4 步：检查远程 MCP 服务是否可用**
+
+```bash
+mcporter list crs-admin --schema
+```
+
+如果一切正常，你会看到 `crs-admin` 暴露的管理 tools。
+
+**第 5 步：执行一次最小调用**
+
+例如查询最近创建的 API Keys：
+
+```bash
+mcporter call crs-admin.listApiKeys \
+  --args '{"query":{"page":1,"pageSize":20,"sortBy":"createdAt","sortOrder":"desc"}}'
+```
+
+例如查询费用汇总：
+
+```bash
+mcporter call crs-admin.getUsageCosts \
+  --args '{"query":{"timeRange":"7days"}}'
+```
+
+**仓库开发者本地自测**
+
+仓库中的 [config/mcporter.json](/Users/t3ls/workspace/claude-relay-service/config/mcporter.json) 仍保留了本地 stdio `crs-admin` 配置，仅用于开发和调试。
+
+- 这种模式需要本仓库代码和本地依赖，因此仍要在仓库目录执行 `npm install`
+- 这种模式依赖 `CRS_ADMIN_TOKEN`，并可选使用 `CRS_BASE_URL`
+- 面向普通客户端接入时，优先使用上面的远程 `/admin/mcp`
+
+**常见问题**
+
+- 返回 `Invalid admin token` 或 `Session expired`
+  - 说明远程 MCP 请求头里的管理员 token 无效或已过期，需要重新登录获取 token
+- `mcporter list crs-admin --schema` 失败
+  - 先执行一次 `mcporter config add crs-admin --url ... --header ...`，并确认地址是 `/admin/mcp`
+- 返回连接错误或 `Service temporarily unavailable`
+  - 检查服务公网地址、反向代理和 CRS 服务本身是否已经启动
+- 想看兼容文档
+  - 仍可访问 `/openapi/admin-agent.json` 和 `/openapi/admin-agent.yaml`，但 MCP 是推荐调用方式
+
 ### 5. 第三方工具API接入
 
 本服务支持多种API端点格式，方便接入不同的第三方工具（如Cherry Studio等）。
