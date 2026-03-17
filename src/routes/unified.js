@@ -77,10 +77,12 @@ async function routeToBackend(req, res, requestedModel) {
     // 响应格式拦截：Codex/Responses → OpenAI Chat Completions
     const codexConverter = new CodexToOpenAIConverter()
     const originalJson = res.json.bind(res)
+    const originalStream = req.body?.stream
+    const shouldStream = originalStream === true
 
     // 流式：patch res.write/res.end 拦截 SSE 事件
-    // 与 openaiRoutes 保持一致：stream 缺省时视为流式（stream !== false）
-    if (req.body.stream !== false) {
+    // Chat Completions 兼容入口遵循 OpenAI 语义：仅明确 stream=true 时启用 SSE
+    if (shouldStream) {
       const streamState = codexConverter.createStreamState()
       const sseBuffer = { data: '' }
       const originalWrite = res.write.bind(res)
@@ -208,6 +210,8 @@ async function routeToBackend(req, res, requestedModel) {
 
     // 输入转换：Chat Completions → Responses API 格式
     req.body = codexConverter.buildRequestFromOpenAI(req.body)
+    // 显式写入布尔值，避免下游 Responses 路由继续沿用其默认流式兼容逻辑
+    req.body.stream = shouldStream
     // 注入 Codex CLI 系统提示词（与 handleResponses 非 Codex CLI 适配一致）
     req.body.instructions = CODEX_CLI_INSTRUCTIONS
     req._fromUnifiedEndpoint = true

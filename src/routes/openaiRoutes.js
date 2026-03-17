@@ -275,7 +275,9 @@ const handleResponses = async (req, res) => {
       req.body.model = 'gpt-5' // 同时更新请求体中的模型
     }
 
-    const isStream = req.body?.stream !== false // 默认为流式（兼容现有行为）
+    // 原生 Responses 入口保持现有兼容行为：仅明确 stream=false 时走非流式。
+    // 来自 unified Chat Completions 入口的请求会在上游显式写入布尔值。
+    const isStream = req.body?.stream !== false
 
     // 判断是否为 Codex CLI 的请求（基于 User-Agent）
     // 支持: codex_vscode, codex_cli_rs, codex_exec (非交互式/脚本模式)
