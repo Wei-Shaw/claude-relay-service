@@ -110,6 +110,13 @@ mcporter call crs-admin.listApiKeys \
   --args '{"query":{"page":1,"pageSize":20,"sortBy":"cost","sortOrder":"desc","costTimeRange":"7days"}}'
 ```
 
+### 查询今日API-KEY用量排行
+
+```bash
+mcporter call crs-admin.listApiKeys \
+  --args '{"query":{"page":1,"pageSize":100,"searchMode":"apiKey","sortBy":"cost","sortOrder":"desc","costTimeRange":"today","timeRange":"today"}}'
+```
+
 ### 更新指定 API Key
 
 ```bash
