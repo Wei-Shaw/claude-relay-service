@@ -191,6 +191,18 @@
             <!-- 批量删除按钮 -->
             <button
               v-if="selectedAccounts.length > 0"
+              class="group relative flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 sm:w-auto"
+              @click="openBatchPriorityModal"
+            >
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <i class="fas fa-sort-numeric-down relative text-blue-600 dark:text-blue-400" />
+              <span class="relative">修改优先级 ({{ selectedAccounts.length }})</span>
+            </button>
+
+            <button
+              v-if="selectedAccounts.length > 0"
               class="group relative flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md dark:border-red-700 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:w-auto"
               @click="batchDeleteAccounts"
             >
@@ -2043,6 +2055,13 @@
       @success="handleEditSuccess"
     />
 
+    <BatchPriorityModal
+      v-if="showBatchPriorityModal"
+      :accounts="selectedAccountRecords"
+      @close="showBatchPriorityModal = false"
+      @success="handleBatchPrioritySuccess"
+    />
+
     <!-- 确认弹窗 -->
     <ConfirmModal
       :cancel-text="confirmOptions.cancelText"
@@ -2274,6 +2293,7 @@ import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import GroupManagementModal from '@/components/accounts/GroupManagementModal.vue'
 import BalanceDisplay from '@/components/accounts/BalanceDisplay.vue'
 import AccountBalanceScriptModal from '@/components/accounts/AccountBalanceScriptModal.vue'
+import BatchPriorityModal from '@/components/accounts/BatchPriorityModal.vue'
 
 // 确认弹窗状态
 const showConfirmModal = ref(false)
@@ -2331,6 +2351,7 @@ const selectedAccounts = ref([])
 const selectAllChecked = ref(false)
 const isIndeterminate = ref(false)
 const showCheckboxes = ref(false)
+const showBatchPriorityModal = ref(false)
 
 // 错误历史弹窗状态
 const showErrorHistoryModal = ref(false)
@@ -2558,6 +2579,10 @@ const groupOptions = computed(() => {
 })
 
 const shouldShowCheckboxes = computed(() => showCheckboxes.value)
+const selectedAccountRecords = computed(() => {
+  const accountMap = new Map(accounts.value.map((account) => [account.id, account]))
+  return selectedAccounts.value.map((id) => accountMap.get(id)).filter((account) => !!account)
+})
 
 // 模态框状态
 const showCreateAccountModal = ref(false)
@@ -4044,6 +4069,64 @@ const deleteAccount = async (account) => {
   } else {
     showToast(result.message || '删除失败', 'error')
   }
+}
+
+const openBatchPriorityModal = () => {
+  if (selectedAccountRecords.value.length === 0) {
+    showToast('请先选择要修改优先级的账户', 'warning')
+    return
+  }
+
+  showBatchPriorityModal.value = true
+}
+
+const handleBatchPrioritySuccess = async (result) => {
+  const successCount = Number(result?.successCount || 0)
+  const skippedCount = Number(result?.skippedCount || 0)
+  const failedCount = Number(result?.failedCount || 0)
+  const resultItems = Array.isArray(result?.results) ? result.results : []
+  const failedItems = resultItems.filter((item) => !item.success)
+
+  showBatchPriorityModal.value = false
+
+  if (failedItems.length > 0) {
+    selectedAccounts.value = failedItems.map((item) => item.accountId).filter(Boolean)
+  } else {
+    selectedAccounts.value = []
+  }
+
+  selectAllChecked.value = false
+  isIndeterminate.value = false
+
+  await loadAccounts(true)
+  cleanupSelectedAccounts()
+
+  if (failedCount > 0) {
+    const failureSummary = failedItems
+      .slice(0, 5)
+      .map((item) => `${item.accountName || item.accountId}: ${item.message || '更新失败'}`)
+      .join('\n')
+
+    showToast(
+      `优先级批量修改完成：成功 ${successCount} 个，跳过 ${skippedCount} 个，失败 ${failedCount} 个${
+        failureSummary ? `\n${failureSummary}${failedCount > 5 ? '\n...' : ''}` : ''
+      }`,
+      successCount > 0 || skippedCount > 0 ? 'warning' : 'error',
+      '',
+      8000
+    )
+    return
+  }
+
+  if (successCount === 0 && skippedCount > 0) {
+    showToast(`所选 ${skippedCount} 个账户优先级已是目标值，无需更新`, 'success')
+    return
+  }
+
+  showToast(
+    `成功更新 ${successCount} 个账户优先级${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`,
+    'success'
+  )
 }
 
 // 批量删除账户
