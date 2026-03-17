@@ -226,6 +226,8 @@ export const deleteAccountByEndpointApi = (endpoint) => request({ url: endpoint,
 export const testAccountByEndpointApi = (endpoint) => request({ url: endpoint, method: 'POST' })
 export const updateAccountByEndpointApi = (endpoint, data) =>
   request({ url: endpoint, method: 'PUT', data })
+export const batchUpdateAccountsPriorityApi = (data) =>
+  request({ url: '/admin/accounts/batch-priority', method: 'PUT', data })
 
 // 账户使用统计
 export const getClaudeAccountsUsageApi = () =>
