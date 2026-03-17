@@ -74,6 +74,93 @@ function extractCodexUsageHeaders(headers) {
   return hasData ? snapshot : null
 }
 
+async function collectResponsesApiStream(stream) {
+  const sseParser = new IncrementalSSEParser()
+  let lastResponse = null
+  let finalResponse = null
+  let streamError = null
+  let rateLimitError = null
+
+  const processEvents = (events) => {
+    for (const event of events) {
+      if (event.type !== 'data' || !event.data) {
+        continue
+      }
+
+      const eventData = event.data
+
+      if (eventData.response && typeof eventData.response === 'object') {
+        lastResponse = eventData.response
+      }
+
+      if (
+        (eventData.type === 'response.completed' ||
+          eventData.type === 'response.failed' ||
+          eventData.type === 'response.incomplete') &&
+        eventData.response
+      ) {
+        finalResponse = eventData.response
+      }
+
+      if (eventData.error) {
+        streamError = eventData.error
+        if (
+          eventData.error.type === 'usage_limit_reached' ||
+          eventData.error.type === 'rate_limit_error' ||
+          eventData.error.type === 'rate_limit_exceeded'
+        ) {
+          rateLimitError = eventData.error
+        }
+      }
+    }
+  }
+
+  await new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => {
+      processEvents(sseParser.feed(chunk.toString()))
+    })
+
+    stream.on('end', () => {
+      try {
+        if (sseParser.getRemaining().trim()) {
+          processEvents(sseParser.feed('\n\n'))
+        }
+        resolve()
+      } catch (error) {
+        reject(error)
+      }
+    })
+
+    stream.on('error', reject)
+  })
+
+  return {
+    responseData: finalResponse || lastResponse,
+    streamError,
+    rateLimitError
+  }
+}
+
+function mapResponsesStreamErrorStatus(error, fallbackStatus = 502) {
+  if (!error || typeof error !== 'object') {
+    return fallbackStatus
+  }
+
+  if (
+    error.type === 'usage_limit_reached' ||
+    error.type === 'rate_limit_error' ||
+    error.type === 'rate_limit_exceeded'
+  ) {
+    return 429
+  }
+
+  if (error.type === 'unauthorized' || error.code === 'unauthorized') {
+    return 401
+  }
+
+  return fallbackStatus
+}
+
 async function applyRateLimitTracking(
   req,
   usageSummary,
@@ -349,7 +436,8 @@ const handleResponses = async (req, res) => {
     headers['authorization'] = `Bearer ${accessToken}`
     headers['chatgpt-account-id'] = account.accountId || account.chatgptUserId || accountId
     headers['host'] = 'chatgpt.com'
-    headers['accept'] = isStream ? 'text/event-stream' : 'application/json'
+    const useStreamingUpstream = true
+    headers['accept'] = useStreamingUpstream ? 'text/event-stream' : 'application/json'
     headers['content-type'] = 'application/json'
     if (!isCompactRoute) {
       req.body['store'] = false
@@ -380,18 +468,12 @@ const handleResponses = async (req, res) => {
     const codexEndpoint = isCompactRoute
       ? 'https://chatgpt.com/backend-api/codex/responses/compact'
       : 'https://chatgpt.com/backend-api/codex/responses'
+    const upstreamRequestBody = useStreamingUpstream ? { ...req.body, stream: true } : req.body
 
-    // 根据 stream 参数决定请求类型
-    if (isStream) {
-      // 流式请求
-      upstream = await axios.post(codexEndpoint, req.body, {
-        ...axiosConfig,
-        responseType: 'stream'
-      })
-    } else {
-      // 非流式请求
-      upstream = await axios.post(codexEndpoint, req.body, axiosConfig)
-    }
+    upstream = await axios.post(codexEndpoint, upstreamRequestBody, {
+      ...axiosConfig,
+      responseType: 'stream'
+    })
 
     const codexUsageSnapshot = extractCodexUsageHeaders(upstream.headers)
     if (codexUsageSnapshot) {
@@ -411,8 +493,8 @@ const handleResponses = async (req, res) => {
       let errorData = null
 
       try {
-        // 对于429错误，无论是否是流式请求，响应都会是完整的JSON错误对象
-        if (isStream && upstream.data) {
+        // responseType=stream 时，错误响应体同样需要先收集再解析
+        if (upstream.data && typeof upstream.data.on === 'function') {
           // 流式响应需要先收集数据
           const chunks = []
           await new Promise((resolve, reject) => {
@@ -490,7 +572,7 @@ const handleResponses = async (req, res) => {
       let errorData = null
 
       try {
-        if (isStream && upstream.data && typeof upstream.data.on === 'function') {
+        if (upstream.data && typeof upstream.data.on === 'function') {
           const chunks = []
           await new Promise((resolve, reject) => {
             upstream.data.on('data', (chunk) => chunks.push(chunk))
@@ -612,8 +694,35 @@ const handleResponses = async (req, res) => {
       try {
         logger.info(`📄 Processing OpenAI non-stream response for model: ${requestedModel}`)
 
-        // 直接获取完整响应
-        const responseData = upstream.data
+        const { responseData, streamError, rateLimitError } = await collectResponsesApiStream(
+          upstream.data
+        )
+
+        if (!responseData) {
+          if (rateLimitError) {
+            logger.warn(
+              `🚫 Rate limit detected for OpenAI account ${accountId} from non-stream aggregation`
+            )
+            await unifiedOpenAIScheduler.markAccountRateLimited(
+              accountId,
+              'openai',
+              sessionHash,
+              rateLimitError.resets_in_seconds || null
+            )
+          }
+
+          const errorStatus = mapResponsesStreamErrorStatus(
+            streamError,
+            upstream.status >= 400 ? upstream.status : 502
+          )
+          return res.status(errorStatus).json({
+            error: {
+              message: streamError?.message || 'Invalid response from upstream stream',
+              type: streamError?.type || 'api_error',
+              code: streamError?.code || null
+            }
+          })
+        }
 
         // 从响应中获取实际的 model 和 usage
         actualModel = responseData.model || requestedModel || 'gpt-4'
