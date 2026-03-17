@@ -349,3 +349,7 @@ export const getClaudeCodeVersionApi = () =>
   request({ url: '/admin/claude-code-version', method: 'GET' })
 export const clearClaudeCodeVersionApi = () =>
   request({ url: '/admin/claude-code-version/clear', method: 'POST' })
+
+// 配额监控
+export const getQuotaMonitoringApi = () =>
+  request({ url: '/admin/quota-monitoring', method: 'GET' })

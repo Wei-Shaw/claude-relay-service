@@ -1837,23 +1837,21 @@
               </label>
             </div>
 
-            <!-- Claude 账户级串行队列开关 -->
+            <!-- Claude 账户最大并发数 -->
             <div v-if="form.platform === 'claude'" class="mt-4">
-              <label class="flex items-start">
-                <input
-                  v-model="form.serialQueueEnabled"
-                  class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="checkbox"
-                />
-                <div class="ml-3">
-                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    启用账户级串行队列
-                  </span>
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    开启后强制该账户的用户消息串行处理，忽略全局串行队列设置。适用于并发限制较低的账户。
-                  </p>
-                </div>
+              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                最大并发数
               </label>
+              <input
+                v-model.number="form.maxConcurrency"
+                class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                min="0"
+                placeholder="0"
+                type="number"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                0 = 使用全局配置，&gt;0 = 该账户最大允许并发请求数（同时启用串行队列）
+              </p>
             </div>
 
             <!-- 拦截预热请求开关（Claude 和 Claude Console） -->
@@ -2863,23 +2861,21 @@
             </label>
           </div>
 
-          <!-- Claude 账户级串行队列开关（编辑模式） -->
+          <!-- Claude 账户最大并发数（编辑模式） -->
           <div v-if="form.platform === 'claude'" class="mt-4">
-            <label class="flex items-start">
-              <input
-                v-model="form.serialQueueEnabled"
-                class="mt-1 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                type="checkbox"
-              />
-              <div class="ml-3">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  启用账户级串行队列
-                </span>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  开启后强制该账户的用户消息串行处理，忽略全局串行队列设置。适用于并发限制较低的账户。
-                </p>
-              </div>
+            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              最大并发数
             </label>
+            <input
+              v-model.number="form.maxConcurrency"
+              class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              min="0"
+              placeholder="0"
+              type="number"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              0 = 使用全局配置，&gt;0 = 该账户最大允许并发请求数（同时启用串行队列）
+            </p>
           </div>
 
           <!-- 拦截预热请求开关（Claude 和 Claude Console 编辑模式） -->
@@ -4325,7 +4321,7 @@ const form = ref({
   useUnifiedUserAgent: props.account?.useUnifiedUserAgent || false, // 使用统一Claude Code版本
   useUnifiedClientId: props.account?.useUnifiedClientId || false, // 使用统一的客户端标识
   unifiedClientId: props.account?.unifiedClientId || '', // 统一的客户端标识
-  serialQueueEnabled: (props.account?.maxConcurrency || 0) > 0, // 账户级串行队列开关
+  maxConcurrency: parseInt(props.account?.maxConcurrency || 0), // 账户级最大并发数：0=全局配置
   interceptWarmup:
     props.account?.interceptWarmup === true || props.account?.interceptWarmup === 'true', // 拦截预热请求
   groupId: '',
@@ -5081,7 +5077,7 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
-      data.maxConcurrency = form.value.serialQueueEnabled ? 1 : 0
+      data.maxConcurrency = parseInt(form.value.maxConcurrency) || 0
       Object.assign(data, buildClaudeTempUnavailablePolicyPayload())
       // 添加订阅类型信息
       data.subscriptionInfo = {
@@ -5420,7 +5416,7 @@ const createAccount = async () => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
-      data.maxConcurrency = form.value.serialQueueEnabled ? 1 : 0
+      data.maxConcurrency = parseInt(form.value.maxConcurrency) || 0
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
@@ -5826,7 +5822,7 @@ const updateAccount = async () => {
       data.useUnifiedUserAgent = form.value.useUnifiedUserAgent || false
       data.useUnifiedClientId = form.value.useUnifiedClientId || false
       data.unifiedClientId = form.value.unifiedClientId || ''
-      data.maxConcurrency = form.value.serialQueueEnabled ? 1 : 0
+      data.maxConcurrency = parseInt(form.value.maxConcurrency) || 0
       Object.assign(data, buildClaudeTempUnavailablePolicyPayload())
       // 更新订阅类型信息
       data.subscriptionInfo = {
