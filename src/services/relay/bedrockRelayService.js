@@ -50,8 +50,14 @@ class BedrockRelayService {
         sessionToken: bedrockAccount.awsCredentials.sessionToken
       }
     } else if (bedrockAccount?.bearerToken) {
-      // Bearer Token 模式：AWS SDK >= 3.400.0 会自动检测环境变量
-      clientConfig.token = { token: bedrockAccount.bearerToken }
+      // Bedrock API Key (ABSK) 模式：需要通过 middleware 注入 Bearer Token，
+      // 因为 BedrockRuntimeClient 默认使用 SigV4 签名，不支持 token 配置
+      // 使用占位凭证防止 "Could not load credentials" 错误
+      // SigV4 签名会生成 Authorization header，但随后被 middleware 替换为 Bearer Token
+      clientConfig.credentials = {
+        accessKeyId: 'BEDROCK_API_KEY_PLACEHOLDER',
+        secretAccessKey: 'BEDROCK_API_KEY_PLACEHOLDER'
+      }
       logger.debug(`🔑 使用 Bearer Token 认证 - 账户: ${bedrockAccount.name || 'unknown'}`)
     } else {
       // 检查是否有环境变量凭证
@@ -59,12 +65,35 @@ class BedrockRelayService {
         clientConfig.credentials = fromEnv()
       } else {
         throw new Error(
-          'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥或Bearer Token，或设置环境变量AWS_ACCESS_KEY_ID和AWS_SECRET_ACCESS_KEY'
+          'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥或Bearer Token，或设置环境变量AWS_ACCESS_KEY_ID、AWS_SECRET_ACCESS_KEY 或 AWS_BEARER_TOKEN_BEDROCK'
         )
       }
     }
 
     const client = new BedrockRuntimeClient(clientConfig)
+
+    // Bedrock API Key (ABSK) 模式：注入 Bearer Token 到 Authorization header
+    if (bedrockAccount?.bearerToken) {
+      const { bearerToken } = bedrockAccount
+      client.middlewareStack.add(
+        (next) => async (args) => {
+          // 清除 SigV4 签名产生的所有 authorization header（大小写均删除）
+          for (const key of Object.keys(args.request.headers)) {
+            if (key.toLowerCase() === 'authorization') {
+              delete args.request.headers[key]
+            }
+          }
+          args.request.headers['Authorization'] = `Bearer ${bearerToken}`
+          delete args.request.headers['x-amz-date']
+          delete args.request.headers['x-amz-security-token']
+          delete args.request.headers['x-amz-content-sha256']
+          return next(args)
+        },
+        { step: 'finalizeRequest', name: 'bedrockBearerTokenAuth', override: true, priority: 'low' }
+      )
+      logger.debug(`🔑 Bearer Token middleware 已注入 - 账户: ${bedrockAccount.name || 'unknown'}`)
+    }
+
     this.clients.set(clientKey, client)
 
     logger.debug(
@@ -445,6 +474,9 @@ class BedrockRelayService {
       // Claude Opus 4.6
       'claude-opus-4-6': 'global.anthropic.claude-opus-4-6-v1',
 
+      // Claude Sonnet 4.6 — Bedrock 暂未上线，回退到 Sonnet 4.5
+      'claude-sonnet-4-6': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+
       // Claude 4.5 Opus
       'claude-opus-4-5': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
       'claude-opus-4-5-20251101': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
@@ -465,6 +497,8 @@ class BedrockRelayService {
       'claude-opus-4': 'us.anthropic.claude-opus-4-1-20250805-v1:0',
       'claude-opus-4-1': 'us.anthropic.claude-opus-4-1-20250805-v1:0',
       'claude-opus-4-1-20250805': 'us.anthropic.claude-opus-4-1-20250805-v1:0',
+      // Claude Opus 4
+      'claude-opus-4-20250514': 'us.anthropic.claude-opus-4-20250514-v1:0',
 
       // Claude 3.7 Sonnet
       'claude-3-7-sonnet': 'us.anthropic.claude-3-7-sonnet-20250219-v1:0',
@@ -484,7 +518,11 @@ class BedrockRelayService {
 
       // Claude 3 Haiku
       'claude-3-haiku': 'us.anthropic.claude-3-haiku-20240307-v1:0',
-      'claude-3-haiku-20240307': 'us.anthropic.claude-3-haiku-20240307-v1:0'
+      'claude-3-haiku-20240307': 'us.anthropic.claude-3-haiku-20240307-v1:0',
+
+      // Claude 3 Opus
+      'claude-3-opus': 'us.anthropic.claude-3-opus-20240229-v1:0',
+      'claude-3-opus-20240229': 'us.anthropic.claude-3-opus-20240229-v1:0'
     }
 
     // 如果已经是Bedrock格式，直接返回

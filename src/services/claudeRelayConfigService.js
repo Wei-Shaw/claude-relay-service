@@ -5,6 +5,7 @@
 
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const metadataUserIdHelper = require('../utils/metadataUserIdHelper')
 
 const CONFIG_KEY = 'claude_relay_config'
 const SESSION_BINDING_PREFIX = 'original_session_binding:'
@@ -41,7 +42,6 @@ const CONFIG_CACHE_TTL = 60000 // 1分钟缓存
 class ClaudeRelayConfigService {
   /**
    * 从 metadata.user_id 中提取原始 sessionId
-   * 格式: user_{64位十六进制}_account__session_{uuid}
    * @param {Object} requestBody - 请求体
    * @returns {string|null} 原始 sessionId 或 null
    */
@@ -49,10 +49,7 @@ class ClaudeRelayConfigService {
     if (!requestBody?.metadata?.user_id) {
       return null
     }
-
-    const userId = requestBody.metadata.user_id
-    const match = userId.match(/session_([a-f0-9-]{36})$/i)
-    return match ? match[1] : null
+    return metadataUserIdHelper.extractSessionId(requestBody.metadata.user_id)
   }
 
   /**
