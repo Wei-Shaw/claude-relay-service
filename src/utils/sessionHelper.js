@@ -1,5 +1,6 @@
 const crypto = require('crypto')
 const logger = require('./logger')
+const metadataUserIdHelper = require('./metadataUserIdHelper')
 
 class SessionHelper {
   /**
@@ -15,12 +16,8 @@ class SessionHelper {
 
     // 1. 最高优先级：使用metadata中的session ID（直接使用，无需hash）
     if (requestBody.metadata && requestBody.metadata.user_id) {
-      // 提取 session_xxx 部分
-      const userIdString = requestBody.metadata.user_id
-      const sessionMatch = userIdString.match(/session_([a-f0-9-]{36})/)
-      if (sessionMatch && sessionMatch[1]) {
-        const sessionId = sessionMatch[1]
-        // 直接返回session ID
+      const sessionId = metadataUserIdHelper.extractSessionId(requestBody.metadata.user_id)
+      if (sessionId) {
         logger.debug(`📋 Session ID extracted from metadata.user_id: ${sessionId}`)
         return sessionId
       }

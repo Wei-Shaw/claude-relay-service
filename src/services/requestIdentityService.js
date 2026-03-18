@@ -9,9 +9,7 @@
 const crypto = require('crypto')
 const logger = require('../utils/logger')
 const redisService = require('../models/redis')
-
-const SESSION_PREFIX = 'session_'
-const ACCOUNT_MARKER = '_account_'
+const metadataUserIdHelper = require('../utils/metadataUserIdHelper')
 const STAINLESS_HEADER_KEYS = [
   'x-stainless-retry-count',
   'x-stainless-timeout',
@@ -317,66 +315,35 @@ function rewriteUserId(body, accountId, accountUuid) {
     return { nextBody: body, changed: false }
   }
 
-  const pivot = userId.lastIndexOf(SESSION_PREFIX)
-  if (pivot === -1) {
+  const parsed = metadataUserIdHelper.parse(userId)
+  if (!parsed) {
     return { nextBody: body, changed: false }
   }
 
-  const prefixBeforeSession = userId.slice(0, pivot)
-  const sessionTail = userId.slice(pivot + SESSION_PREFIX.length)
-
-  const seedTail = sessionTail || 'default'
+  // 哈希 session（与原逻辑一致）
+  const seedTail = parsed.sessionId || 'default'
   const effectiveScheduler = accountId ? String(accountId) : 'unknown-scheduler'
-  const hashed = formatUuidFromSeed(`${effectiveScheduler}::${seedTail}`)
+  const hashedSession = formatUuidFromSeed(`${effectiveScheduler}::${seedTail}`)
 
-  let normalizedPrefix = prefixBeforeSession
+  // 注入真实 accountUuid
+  const effectiveUuid = normalizeAccountUuid(accountUuid) || parsed.accountUuid || ''
 
-  if (accountUuid) {
-    const trimmedUuid = normalizeAccountUuid(accountUuid)
-    if (trimmedUuid) {
-      const accountIndex = normalizedPrefix.indexOf(ACCOUNT_MARKER)
-
-      if (accountIndex === -1) {
-        const base = normalizedPrefix.replace(/_+$/, '')
-        const baseWithMarker = /_account$/.test(base) ? base : `${base}_account`
-        normalizedPrefix = `${baseWithMarker}_${trimmedUuid}_`
-      } else {
-        const valueStart = accountIndex + ACCOUNT_MARKER.length
-        let separatorIndex = normalizedPrefix.indexOf('_', valueStart)
-        if (separatorIndex === -1) {
-          separatorIndex = normalizedPrefix.length
-        }
-
-        const head = normalizedPrefix.slice(0, valueStart)
-        let tail = '_'
-
-        if (separatorIndex < normalizedPrefix.length) {
-          tail = normalizedPrefix.slice(separatorIndex)
-          if (/^_+$/.test(tail)) {
-            tail = '_'
-          }
-        }
-
-        normalizedPrefix = `${head}${trimmedUuid}${tail}`
-      }
-    }
-  }
-
-  const nextUserId = `${normalizedPrefix}${SESSION_PREFIX}${hashed}`
+  // 以原格式重建
+  const nextUserId = metadataUserIdHelper.build({
+    deviceId: parsed.deviceId,
+    accountUuid: effectiveUuid,
+    sessionId: hashedSession,
+    isJsonFormat: parsed.isJsonFormat
+  })
 
   if (nextUserId === userId) {
     return { nextBody: body, changed: false }
   }
 
-  const nextBody = {
-    ...body,
-    metadata: {
-      ...metadata,
-      user_id: nextUserId
-    }
+  return {
+    nextBody: { ...body, metadata: { ...metadata, user_id: nextUserId } },
+    changed: true
   }
-
-  return { nextBody, changed: true }
 }
 
 /**
