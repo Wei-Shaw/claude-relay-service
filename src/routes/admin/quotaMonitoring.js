@@ -10,6 +10,19 @@ const apiKeyService = require('../../services/apiKeyService')
 const logger = require('../../utils/logger')
 const { authenticateAdmin } = require('../../middleware/auth')
 
+const getQuotaMonitoringStatus = (account) => {
+  if (account.fiveHourAutoStopped || account.rateLimitStatus?.isRateLimited) {
+    return 'rejected'
+  }
+  if (account.overloadStatus?.isOverloaded) {
+    return 'warning'
+  }
+  if (account.isActive) {
+    return 'allowed'
+  }
+  return null
+}
+
 // GET /admin/quota-monitoring
 router.get('/quota-monitoring', authenticateAdmin, async (req, res) => {
   try {
@@ -49,13 +62,10 @@ router.get('/quota-monitoring', authenticateAdmin, async (req, res) => {
 
     // 统计池子概况
     const statusCounts = { allowed: 0, warning: 0, rejected: 0 }
-    processedAccounts.forEach((a) => {
-      if (a.fiveHourAutoStopped || a.rateLimitStatus?.isRateLimited) {
-        statusCounts.rejected++
-      } else if (a.overloadStatus?.isOverloaded || a.autoStopOnWarning) {
-        statusCounts.warning++
-      } else if (a.isActive) {
-        statusCounts.allowed++
+    processedAccounts.forEach((account) => {
+      const status = getQuotaMonitoringStatus(account)
+      if (status) {
+        statusCounts[status]++
       }
     })
 
@@ -72,6 +82,7 @@ router.get('/quota-monitoring', authenticateAdmin, async (req, res) => {
         totalCost: key.totalCost || 0,
         dailyCost: key.dailyCost || 0,
         tokensUsed: key.usage?.total?.tokens || 0,
+        dailyTokens: key.usage?.daily?.tokens || 0,
         lastUsedAt: key.lastUsedAt || null,
         createdAt: key.createdAt || null,
         tags: key.tags || []
@@ -81,6 +92,7 @@ router.get('/quota-monitoring', authenticateAdmin, async (req, res) => {
     let todayTotalTokens = 0
     let todayTotalCost = 0
     processedApiKeys.forEach((k) => {
+      todayTotalTokens += parseInt(k.dailyTokens || 0) || 0
       todayTotalCost += parseFloat(k.dailyCost) || 0
     })
 

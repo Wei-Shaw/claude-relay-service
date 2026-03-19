@@ -4939,7 +4939,7 @@ const buildClaudeAccountData = (tokenInfo, accountName, clientId) => {
     useUnifiedUserAgent: form.value.useUnifiedUserAgent || false,
     useUnifiedClientId: form.value.useUnifiedClientId || false,
     unifiedClientId: clientId,
-    maxConcurrency: form.value.serialQueueEnabled ? 1 : 0,
+    maxConcurrency: parseInt(form.value.maxConcurrency) || 0,
     subscriptionInfo: {
       accountType: form.value.subscriptionType || 'claude_max',
       hasClaudeMax: form.value.subscriptionType === 'claude_max',
@@ -6449,7 +6449,7 @@ watch(
         useUnifiedUserAgent: newAccount.useUnifiedUserAgent || false,
         useUnifiedClientId: newAccount.useUnifiedClientId || false,
         unifiedClientId: newAccount.unifiedClientId || '',
-        serialQueueEnabled: (newAccount.maxConcurrency || 0) > 0,
+        maxConcurrency: parseInt(newAccount.maxConcurrency || 0),
         groupId: groupId,
         groupIds: [],
         projectId: newAccount.projectId || '',
