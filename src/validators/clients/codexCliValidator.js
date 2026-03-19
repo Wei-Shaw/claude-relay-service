@@ -1,4 +1,9 @@
 const logger = require('../../utils/logger')
+const {
+  parseCodexClientUserAgent,
+  codexOriginatorsMatch,
+  extractCodexSessionId
+} = require('../../utils/codexClientHeaders')
 const { CLIENT_DEFINITIONS } = require('../clientDefinitions')
 
 /**
@@ -36,17 +41,18 @@ class CodexCliValidator {
     try {
       const userAgent = req.headers['user-agent'] || ''
       const originator = req.headers['originator'] || ''
-      const sessionId = req.headers['session_id']
+      const sessionId = extractCodexSessionId(req.headers, req.body)
 
       // 1. 基础 User-Agent 检查
       // Codex CLI 的 UA 格式:
       // - codex_vscode/0.35.0 (Windows 10.0.26100; x86_64) unknown (Cursor; 0.4.10)
       // - codex_cli_rs/0.38.0 (Ubuntu 22.4.0; x86_64) WindowsTerminal
       // - codex_exec/0.89.0 (Mac OS 26.2.0; arm64) xterm-256color (非交互式/脚本模式)
-      const codexCliPattern = /^(codex_vscode|codex_cli_rs|codex_exec)\/[\d.]+/i
-      const uaMatch = userAgent.match(codexCliPattern)
+      // - codex-tui/0.115.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9 (codex-tui; 0.115.0)
+      // - Codex Desktop/0.116.0-alpha.1 (Mac OS 26.3.1; arm64) unknown (Codex Desktop; 26.317.21539)
+      const parsedUserAgent = parseCodexClientUserAgent(userAgent)
 
-      if (!uaMatch) {
+      if (!parsedUserAgent) {
         logger.debug(`Codex CLI validation failed - UA mismatch: ${userAgent}`)
         return false
       }
@@ -64,8 +70,8 @@ class CodexCliValidator {
       }
 
       // 3. 验证 originator 头必须与 UA 中的客户端类型匹配
-      const clientType = uaMatch[1].toLowerCase()
-      if (originator.toLowerCase() !== clientType) {
+      const clientType = parsedUserAgent.originator
+      if (!codexOriginatorsMatch(clientType, originator)) {
         logger.debug(
           `Codex CLI validation failed - originator mismatch. UA: ${clientType}, originator: ${originator}`
         )
@@ -88,11 +94,9 @@ class CodexCliValidator {
           return false
         }
 
-        const expectedPrefix =
-          'You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI'
-        if (!req.body.instructions.startsWith(expectedPrefix)) {
+        if (!req.body.instructions.startsWith('You are Codex')) {
           logger.debug(`Codex CLI validation failed - invalid instructions prefix for ${req.path}`)
-          logger.debug(`Expected: "${expectedPrefix}..."`)
+          logger.debug('Expected instructions prefix: "You are Codex..."')
           logger.debug(`Received: "${req.body.instructions.substring(0, 100)}..."`)
           return false
         }
