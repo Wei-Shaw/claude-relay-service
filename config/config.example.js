@@ -214,6 +214,19 @@ const config = {
     enableBalanceScript: process.env.BALANCE_SCRIPT_ENABLED !== 'false'
   },
 
+  // 🧼 供应商上游错误对外脱敏配置
+  // 说明：用于控制内部供应商账号（如 OpenAI-Responses / Gemini API / CCR / Droid）
+  // 的上游错误是否直接暴露给终端客户。默认开启脱敏，避免泄露供应商和网关细节。
+  vendorErrorSanitization: {
+    enabled: process.env.VENDOR_ERROR_SANITIZATION_ENABLED !== 'false',
+    providers: {
+      openaiResponses: process.env.OPENAI_RESPONSES_ERROR_SANITIZATION_ENABLED !== 'false',
+      geminiApi: process.env.GEMINI_API_ERROR_SANITIZATION_ENABLED !== 'false',
+      ccr: process.env.CCR_ERROR_SANITIZATION_ENABLED !== 'false',
+      droid: process.env.DROID_ERROR_SANITIZATION_ENABLED !== 'false'
+    }
+  },
+
   // 📬 用户消息队列配置
   // 优化说明：锁在请求发送成功后立即释放（而非请求完成后），因为 Claude API 限流基于请求发送时刻计算
   userMessageQueue: {
