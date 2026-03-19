@@ -13,6 +13,10 @@ const {
   createRequestDetailMeta,
   extractOpenAICacheReadTokens
 } = require('../../utils/requestDetailHelper')
+const {
+  buildOpenAIResponsesClientError,
+  sanitizeOpenAIResponsesStreamEvent
+} = require('../../utils/openaiResponsesErrorAdapter')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
@@ -71,11 +75,7 @@ class OpenAIResponsesRelayService {
 
   _shouldTempPauseOther4xx(status) {
     return (
-      Number.isInteger(status) &&
-      status >= 400 &&
-      status < 500 &&
-      status !== 401 &&
-      status !== 429
+      Number.isInteger(status) && status >= 400 && status < 500 && status !== 401 && status !== 429
     )
   }
 
@@ -253,16 +253,18 @@ class OpenAIResponsesRelayService {
             .catch(() => {})
         }
 
-        // 返回错误响应（使用处理后的数据，避免循环引用）
-        const errorResponse = errorData || {
-          error: {
-            message: 'Rate limit exceeded',
-            type: 'rate_limit_error',
-            code: 'rate_limit_exceeded',
-            resets_in_seconds: resetsInSeconds
-          }
+        const safeErrorResponse = buildOpenAIResponsesClientError(429, errorData, {
+          headers: response.headers
+        })
+        if (
+          resetsInSeconds !== null &&
+          safeErrorResponse?.body?.error &&
+          safeErrorResponse.body.error.resets_in_seconds === undefined
+        ) {
+          safeErrorResponse.body.error.resets_in_seconds = resetsInSeconds
         }
-        return res.status(429).json(errorResponse)
+
+        return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       }
 
       // 处理其他错误状态码
@@ -328,29 +330,15 @@ class OpenAIResponsesRelayService {
             )
           }
 
-          let unauthorizedResponse = errorData
-          if (
-            !unauthorizedResponse ||
-            typeof unauthorizedResponse !== 'object' ||
-            unauthorizedResponse.pipe ||
-            Buffer.isBuffer(unauthorizedResponse)
-          ) {
-            const fallbackMessage =
-              typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
-            unauthorizedResponse = {
-              error: {
-                message: fallbackMessage,
-                type: 'unauthorized',
-                code: 'unauthorized'
-              }
-            }
-          }
+          const unauthorizedResponse = buildOpenAIResponsesClientError(401, errorData, {
+            headers: response.headers
+          })
 
           // 清理监听器
           req.removeListener('close', handleClientDisconnect)
           res.removeListener('close', handleClientDisconnect)
 
-          return res.status(401).json(unauthorizedResponse)
+          return res.status(unauthorizedResponse.status).json(unauthorizedResponse.body)
         }
 
         // 处理其他 4xx 上游错误：统一软暂停 3 分钟
@@ -388,9 +376,10 @@ class OpenAIResponsesRelayService {
         req.removeListener('close', handleClientDisconnect)
         res.removeListener('close', handleClientDisconnect)
 
-        return res
-          .status(response.status)
-          .json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        const safeErrorResponse = buildOpenAIResponsesClientError(response.status, errorData, {
+          headers: response.headers
+        })
+        return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       }
 
       // 更新最后使用时间（节流）
@@ -488,25 +477,10 @@ class OpenAIResponsesRelayService {
             )
           }
 
-          let unauthorizedResponse = errorData
-          if (
-            !unauthorizedResponse ||
-            typeof unauthorizedResponse !== 'object' ||
-            unauthorizedResponse.pipe ||
-            Buffer.isBuffer(unauthorizedResponse)
-          ) {
-            const fallbackMessage =
-              typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
-            unauthorizedResponse = {
-              error: {
-                message: fallbackMessage,
-                type: 'unauthorized',
-                code: 'unauthorized'
-              }
-            }
-          }
-
-          return res.status(401).json(unauthorizedResponse)
+          const unauthorizedResponse = buildOpenAIResponsesClientError(401, errorData, {
+            headers: error.response.headers
+          })
+          return res.status(unauthorizedResponse.status).json(unauthorizedResponse.body)
         }
 
         if (this._shouldTempPauseOther4xx(status) && account?.id) {
@@ -520,17 +494,17 @@ class OpenAIResponsesRelayService {
           }
         }
 
-        return res.status(status).json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        const safeErrorResponse = buildOpenAIResponsesClientError(status, errorData, {
+          headers: error.response.headers
+        })
+        return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       }
 
       // 其他错误
-      return res.status(500).json({
-        error: {
-          message: 'Internal server error',
-          type: 'internal_error',
-          details: error.message
-        }
+      const safeErrorResponse = buildOpenAIResponsesClientError(null, error, {
+        fallbackStatus: 503
       })
+      return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
     }
   }
 
@@ -556,6 +530,19 @@ class OpenAIResponsesRelayService {
     let rateLimitDetected = false
     let rateLimitResetsInSeconds = null
     let streamEnded = false
+
+    const writeEventToClient = (event) => {
+      if (!event.trim()) {
+        return
+      }
+
+      parseSSEForUsage(event)
+
+      const rewritten = this._rewriteStreamEventForClient(event, response.headers)
+      if (!res.destroyed && !streamEnded && rewritten) {
+        res.write(rewritten)
+      }
+    }
 
     // 解析 SSE 事件以捕获 usage 数据和 model
     const parseSSEForUsage = (data) => {
@@ -619,11 +606,6 @@ class OpenAIResponsesRelayService {
       try {
         const chunkStr = chunk.toString()
 
-        // 转发数据给客户端
-        if (!res.destroyed && !streamEnded) {
-          res.write(chunk)
-        }
-
         // 同时解析数据以捕获 usage 信息
         buffer += chunkStr
 
@@ -633,9 +615,7 @@ class OpenAIResponsesRelayService {
           buffer = events.pop() || ''
 
           for (const event of events) {
-            if (event.trim()) {
-              parseSSEForUsage(event)
-            }
+            writeEventToClient(event)
           }
         }
       } catch (error) {
@@ -648,7 +628,7 @@ class OpenAIResponsesRelayService {
 
       // 处理剩余的 buffer
       if (buffer.trim()) {
-        parseSSEForUsage(buffer)
+        writeEventToClient(buffer)
       }
 
       // 记录使用统计
@@ -758,7 +738,10 @@ class OpenAIResponsesRelayService {
       res.removeListener('close', handleClientDisconnect)
 
       if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
+        const safeErrorResponse = buildOpenAIResponsesClientError(502, error, {
+          fallbackStatus: 502
+        })
+        res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       } else if (!res.destroyed) {
         res.end()
       }
@@ -780,7 +763,7 @@ class OpenAIResponsesRelayService {
   }
 
   // 处理非流式响应
-  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel, req) {
+  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel, req = null) {
     const responseData = response.data
 
     // 提取 usage 数据和实际 model
@@ -805,7 +788,7 @@ class OpenAIResponsesRelayService {
         const totalTokens =
           usageData.total_tokens || totalInputTokens + outputTokens + cacheCreateTokens
 
-        const serviceTier = req._serviceTier || null
+        const serviceTier = req?._serviceTier || null
         await apiKeyService.recordUsage(
           apiKeyData.id,
           actualInputTokens, // 传递实际输入（不含缓存）
@@ -860,6 +843,41 @@ class OpenAIResponsesRelayService {
       hasUsage: !!usageData,
       model: actualModel
     })
+  }
+
+  _rewriteStreamEventForClient(event, headers = {}) {
+    const lines = event.split('\n')
+    let changed = false
+
+    const rewrittenLines = lines.map((line) => {
+      if (!line.startsWith('data:')) {
+        return line
+      }
+
+      const jsonStr = line.slice(5).trim()
+      if (!jsonStr || jsonStr === '[DONE]') {
+        return line
+      }
+
+      try {
+        const eventData = JSON.parse(jsonStr)
+        const sanitizedResult = sanitizeOpenAIResponsesStreamEvent(eventData, { headers })
+        if (!sanitizedResult.changed) {
+          return line
+        }
+
+        changed = true
+        return `data: ${JSON.stringify(sanitizedResult.data)}`
+      } catch (error) {
+        return line
+      }
+    })
+
+    if (!changed) {
+      return `${event}\n\n`
+    }
+
+    return `${rewrittenLines.join('\n')}\n\n`
   }
 
   // 处理 429 限流错误
