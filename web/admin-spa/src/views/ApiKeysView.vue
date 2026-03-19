@@ -2144,6 +2144,7 @@
       :show="showUsageDetailModal"
       @close="showUsageDetailModal = false"
       @open-timeline="openTimeline"
+      @refresh-stats="refreshUsageDetailStats"
     />
 
     <TagManagementModal
@@ -2719,11 +2720,7 @@ const loadApiKeys = async (clearStatsCache = true) => {
 }
 
 // 异步加载当前页的统计数据
-const loadPageStats = async () => {
-  const currentPageKeys = apiKeys.value
-  if (!currentPageKeys || currentPageKeys.length === 0) return
-
-  // 获取当前时间范围
+const getCurrentStatsQuery = () => {
   let currentTimeRange = globalDateFilter.preset
   let startDate = null
   let endDate = null
@@ -2738,53 +2735,102 @@ const loadPageStats = async () => {
     endDate = globalDateFilter.customEnd
   }
 
-  // 筛选出需要加载的 keys（未缓存或时间范围变化）
-  const keysNeedStats = currentPageKeys.filter((key) => {
-    const cached = statsCache.value.get(key.id)
-    if (!cached) return true
-    if (cached.timeRange !== currentTimeRange) return true
-    if (currentTimeRange === 'custom') {
-      if (cached.startDate !== startDate || cached.endDate !== endDate) return true
-    }
-    return false
-  })
+  return {
+    timeRange: currentTimeRange,
+    startDate,
+    endDate
+  }
+}
 
-  if (keysNeedStats.length === 0) return
+const updateStatsCache = (statsByKeyId, query) => {
+  const timestamp = Date.now()
 
-  // 标记为加载中
-  const keyIds = keysNeedStats.map((k) => k.id)
-  keyIds.forEach((id) => statsLoading.value.add(id))
+  for (const [keyId, stats] of Object.entries(statsByKeyId || {})) {
+    statsCache.value.set(keyId, {
+      stats,
+      timeRange: query.timeRange,
+      startDate: query.startDate,
+      endDate: query.endDate,
+      timestamp
+    })
+  }
+}
+
+const shouldRefreshStatsCache = (keyId, query) => {
+  const cached = statsCache.value.get(keyId)
+  if (!cached) return true
+  if (cached.timeRange !== query.timeRange) return true
+  if (query.timeRange === 'custom') {
+    return cached.startDate !== query.startDate || cached.endDate !== query.endDate
+  }
+  return false
+}
+
+const fetchStatsForKeyIds = async (keyIds, { force = false } = {}) => {
+  const normalizedKeyIds = [...new Set((keyIds || []).filter(Boolean))]
+  if (normalizedKeyIds.length === 0) return {}
+
+  const query = getCurrentStatsQuery()
+  const keysToFetch = force
+    ? normalizedKeyIds
+    : normalizedKeyIds.filter((keyId) => shouldRefreshStatsCache(keyId, query))
+
+  if (keysToFetch.length === 0) {
+    return normalizedKeyIds.reduce((stats, keyId) => {
+      const cached = getCachedStats(keyId)
+      if (cached) {
+        stats[keyId] = cached
+      }
+      return stats
+    }, {})
+  }
+
+  keysToFetch.forEach((id) => statsLoading.value.add(id))
 
   try {
     const requestBody = {
-      keyIds,
-      timeRange: currentTimeRange
+      keyIds: keysToFetch,
+      timeRange: query.timeRange
     }
-    if (currentTimeRange === 'custom') {
-      requestBody.startDate = startDate
-      requestBody.endDate = endDate
+    if (query.timeRange === 'custom') {
+      requestBody.startDate = query.startDate
+      requestBody.endDate = query.endDate
     }
 
     const response = await httpApis.getApiKeysBatchStatsApi(requestBody)
 
     if (response.success && response.data) {
-      // 更新缓存
-      for (const [keyId, stats] of Object.entries(response.data)) {
-        statsCache.value.set(keyId, {
-          stats,
-          timeRange: currentTimeRange,
-          startDate,
-          endDate,
-          timestamp: Date.now()
-        })
-      }
+      updateStatsCache(response.data, query)
+      return normalizedKeyIds.reduce((stats, keyId) => {
+        const cached = getCachedStats(keyId)
+        if (cached) {
+          stats[keyId] = cached
+        }
+        return stats
+      }, {})
     }
   } catch (error) {
     console.error('加载统计数据失败:', error)
-    // 不显示 toast，避免打扰用户
   } finally {
-    keyIds.forEach((id) => statsLoading.value.delete(id))
+    keysToFetch.forEach((id) => statsLoading.value.delete(id))
   }
+
+  return normalizedKeyIds.reduce((stats, keyId) => {
+    const cached = getCachedStats(keyId)
+    if (cached) {
+      stats[keyId] = cached
+    }
+    return stats
+  }, {})
+}
+
+// 异步加载当前页的统计数据
+const loadPageStats = async () => {
+  const currentPageKeys = apiKeys.value
+  if (!currentPageKeys || currentPageKeys.length === 0) return
+
+  // 筛选出需要加载的 keys（未缓存或时间范围变化）
+  await fetchStatsForKeyIds(currentPageKeys.map((key) => key.id))
 }
 
 // 获取缓存的统计数据
@@ -4270,11 +4316,12 @@ const formatWindowTime = (seconds) => {
 //   return Math.min(percentage, 100)
 // }
 
-// 显示使用详情
-const showUsageDetails = (apiKey) => {
+const buildUsageDetailApiKey = (apiKey) => {
+  if (!apiKey) return null
+
   const cachedStats = getCachedStats(apiKey.id)
 
-  const enrichedApiKey = {
+  return {
     ...apiKey,
     dailyCost: cachedStats?.dailyCost ?? apiKey.dailyCost ?? 0,
     weeklyOpusCost: cachedStats?.weeklyOpusCost ?? apiKey.weeklyOpusCost ?? 0,
@@ -4299,9 +4346,37 @@ const showUsageDetails = (apiKey) => {
       }
     }
   }
+}
 
-  selectedApiKeyForDetail.value = enrichedApiKey
+const syncUsageDetailApiKey = (keyId) => {
+  if (!keyId) return
+
+  const currentPageKey = apiKeys.value.find((key) => key.id === keyId)
+  const baseApiKey =
+    currentPageKey ||
+    (selectedApiKeyForDetail.value?.id === keyId ? selectedApiKeyForDetail.value : null)
+
+  if (!baseApiKey) return
+
+  selectedApiKeyForDetail.value = buildUsageDetailApiKey(baseApiKey)
+}
+
+const refreshUsageDetailStats = async (keyId = selectedApiKeyForDetail.value?.id) => {
+  if (!keyId) return
+
+  await fetchStatsForKeyIds([keyId], { force: true })
+
+  if (selectedApiKeyForDetail.value?.id === keyId) {
+    syncUsageDetailApiKey(keyId)
+  }
+}
+
+// 显示使用详情
+const showUsageDetails = async (apiKey) => {
+  selectedApiKeyForDetail.value = buildUsageDetailApiKey(apiKey)
   showUsageDetailModal.value = true
+
+  await refreshUsageDetailStats(apiKey.id)
 }
 
 const openTimeline = (keyId) => {
