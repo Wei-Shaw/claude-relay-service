@@ -21,6 +21,10 @@ const axios = require('axios')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 const ProxyHelper = require('../utils/proxyHelper')
 const upstreamErrorHelper = require('../utils/upstreamErrorHelper')
+const {
+  buildGeminiApiClientError,
+  sanitizeGeminiApiStreamEvent
+} = require('../utils/geminiApiErrorAdapter')
 
 // 处理 Gemini 上游错误，标记账户为临时不可用
 const handleGeminiUpstreamError = async (
@@ -369,6 +373,74 @@ async function normalizeAxiosStreamError(error) {
   }
 }
 
+function rewriteGeminiApiSSELine(line, options = {}) {
+  if (typeof line !== 'string' || !line.startsWith('data:')) {
+    return line
+  }
+
+  const jsonStr = line.slice(5).trim()
+  if (!jsonStr || jsonStr === '[DONE]') {
+    return line
+  }
+
+  try {
+    const eventData = JSON.parse(jsonStr)
+    const sanitizedResult = sanitizeGeminiApiStreamEvent(eventData, options)
+    if (!sanitizedResult.changed) {
+      return line
+    }
+
+    return `data: ${JSON.stringify(sanitizedResult.data)}`
+  } catch {
+    return line
+  }
+}
+
+function buildStandardGeminiApiStreamPassthroughBody(normalizedError) {
+  const responseBody = {
+    error: {
+      message: normalizedError.message,
+      type: 'api_error'
+    }
+  }
+
+  if (normalizedError.status) {
+    responseBody.error.upstreamStatus = normalizedError.status
+  }
+  if (normalizedError.statusText) {
+    responseBody.error.upstreamStatusText = normalizedError.statusText
+  }
+  if (normalizedError.parsedBody && typeof normalizedError.parsedBody === 'object') {
+    responseBody.error.upstreamResponse = normalizedError.parsedBody
+  } else if (normalizedError.rawBody) {
+    responseBody.error.upstreamRaw = normalizedError.rawBody
+  }
+
+  return responseBody
+}
+
+function writeGeminiApiStreamError(res, error, options = {}) {
+  const safeErrorResponse = buildGeminiApiClientError(error.response?.status || null, error, {
+    headers: error.response?.headers,
+    fallbackStatus: options.fallbackStatus || 503
+  })
+
+  if (!res.headersSent) {
+    res.status(safeErrorResponse.status).json(safeErrorResponse.body)
+    return
+  }
+
+  if (!res.destroyed) {
+    try {
+      res.write(`data: ${JSON.stringify(safeErrorResponse.body)}\n\n`)
+      res.write('data: [DONE]\n\n')
+    } catch (writeError) {
+      logger.error('Error sending Gemini API stream error event:', writeError)
+    }
+  }
+  res.end()
+}
+
 /**
  * 解析账户代理配置
  */
@@ -654,9 +726,6 @@ async function handleMessages(req, res) {
         geminiResponse.on('data', (chunk) => {
           try {
             const chunkStr = chunk.toString()
-            res.write(chunkStr)
-
-            // 尝试从 SSE 流中提取 usage 数据
             streamBuffer += chunkStr
 
             // 如果 buffer 过大，进行保护性清理（防止内存泄漏）
@@ -670,17 +739,25 @@ async function handleMessages(req, res) {
             streamBuffer = lines.pop() || ''
 
             for (const line of lines) {
+              const rewrittenLine = rewriteGeminiApiSSELine(line)
+
+              if (!res.destroyed) {
+                res.write(`${rewrittenLine}\n`)
+              }
+
               if (line.startsWith('data:')) {
                 const data = line.substring(5).trim()
-                if (data && data !== '[DONE]') {
-                  try {
-                    const parsed = JSON.parse(data)
-                    if (parsed.usageMetadata || parsed.response?.usageMetadata) {
-                      totalUsage = parsed.usageMetadata || parsed.response.usageMetadata
-                    }
-                  } catch (e) {
-                    // 解析失败，忽略
+                if (!data || data === '[DONE]') {
+                  continue
+                }
+
+                try {
+                  const parsed = JSON.parse(data)
+                  if (parsed.usageMetadata || parsed.response?.usageMetadata) {
+                    totalUsage = parsed.usageMetadata || parsed.response.usageMetadata
                   }
+                } catch (e) {
+                  // 解析失败，忽略
                 }
               }
             }
@@ -690,6 +767,9 @@ async function handleMessages(req, res) {
         })
 
         geminiResponse.on('end', () => {
+          if (streamBuffer && !res.destroyed) {
+            res.write(streamBuffer)
+          }
           res.end()
 
           // 异步记录使用统计
@@ -718,16 +798,7 @@ async function handleMessages(req, res) {
 
         geminiResponse.on('error', (error) => {
           logger.error('Stream error:', error)
-          if (!res.headersSent) {
-            res.status(500).json({
-              error: {
-                message: getSafeMessage(error) || 'Stream error',
-                type: 'api_error'
-              }
-            })
-          } else {
-            res.end()
-          }
+          writeGeminiApiStreamError(res, error, { fallbackStatus: 503 })
         })
       } else {
         // OAuth 账户：使用原有的流式传输逻辑
@@ -776,15 +847,23 @@ async function handleMessages(req, res) {
     )
 
     // 返回错误响应
-    const status = errorStatus || 500
-    const errorResponse = {
-      error: error.error || {
-        message: getSafeMessage(error) || 'Internal server error',
-        type: 'api_error'
+    if (accountType === 'gemini-api') {
+      const safeErrorResponse = buildGeminiApiClientError(errorStatus || null, error, {
+        headers: error.response?.headers,
+        fallbackStatus: 503
+      })
+      res.status(safeErrorResponse.status).json(safeErrorResponse.body)
+    } else {
+      const status = errorStatus || 500
+      const errorResponse = {
+        error: error.error || {
+          message: getSafeMessage(error) || 'Internal server error',
+          type: 'api_error'
+        }
       }
-    }
 
-    res.status(status).json(errorResponse)
+      res.status(status).json(errorResponse)
+    }
   } finally {
     // 清理资源
     if (abortController) {
@@ -1416,6 +1495,11 @@ async function handleRetrieveUserQuota(req, res) {
  * 处理 countTokens 请求
  */
 async function handleCountTokens(req, res) {
+  let accountId = null
+  let accountType = null
+  let account = null
+  let sessionHash = null
+
   try {
     if (!ensureGeminiPermission(req, res)) {
       return undefined
@@ -1426,7 +1510,7 @@ async function handleCountTokens(req, res) {
     const { contents } = requestData
     // 从路径参数或请求体中获取模型名
     const model = requestData.model || req.params.modelName || 'gemini-2.5-flash'
-    const sessionHash = sessionHelper.generateSessionHash(req.body)
+    sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 验证必需参数
     if (!contents || !Array.isArray(contents)) {
@@ -1445,10 +1529,9 @@ async function handleCountTokens(req, res) {
       model,
       { allowApiAccounts: true }
     )
-    const { accountId, accountType } = schedulerResult
+    ;({ accountId, accountType } = schedulerResult)
     const isApiAccount = accountType === 'gemini-api'
 
-    let account
     if (isApiAccount) {
       account = await geminiApiAccountService.getAccount(accountId)
     } else {
@@ -1526,12 +1609,29 @@ async function handleCountTokens(req, res) {
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
     logger.error(`Error in countTokens endpoint (${version})`, { error: error.message })
-    res.status(500).json({
-      error: {
-        message: getSafeMessage(error) || 'Internal server error',
-        type: 'api_error'
-      }
-    })
+    await handleGeminiUpstreamError(
+      error.response?.status,
+      accountId,
+      accountType,
+      sessionHash,
+      error.response?.headers,
+      account?.disableAutoProtection
+    )
+
+    if (accountType === 'gemini-api') {
+      const safeErrorResponse = buildGeminiApiClientError(error.response?.status || null, error, {
+        headers: error.response?.headers,
+        fallbackStatus: 503
+      })
+      res.status(safeErrorResponse.status).json(safeErrorResponse.body)
+    } else {
+      res.status(500).json({
+        error: {
+          message: getSafeMessage(error) || 'Internal server error',
+          type: 'api_error'
+        }
+      })
+    }
   }
   return undefined
 }
@@ -2452,12 +2552,20 @@ async function handleStandardGenerateContent(req, res) {
       account?.disableAutoProtection
     )
 
-    res.status(500).json({
-      error: {
-        message: getSafeMessage(error) || 'Internal server error',
-        type: 'api_error'
-      }
-    })
+    if (accountType === 'gemini-api') {
+      const safeErrorResponse = buildGeminiApiClientError(error.response?.status || null, error, {
+        headers: error.response?.headers,
+        fallbackStatus: 503
+      })
+      res.status(safeErrorResponse.status).json(safeErrorResponse.body)
+    } else {
+      res.status(500).json({
+        error: {
+          message: getSafeMessage(error) || 'Internal server error',
+          type: 'api_error'
+        }
+      })
+    }
   }
 }
 
@@ -2783,6 +2891,13 @@ async function handleStandardStreamGenerateContent(req, res) {
         try {
           parsed = JSON.parse(dataPayload)
 
+          if (isApiAccount) {
+            const sanitizedResult = sanitizeGeminiApiStreamEvent(parsed)
+            if (sanitizedResult.changed) {
+              parsed = sanitizedResult.data
+            }
+          }
+
           if (parsed.usageMetadata) {
             totalUsage = parsed.usageMetadata
           } else if (parsed.response?.usageMetadata) {
@@ -2891,31 +3006,35 @@ async function handleStandardStreamGenerateContent(req, res) {
         heartbeatTimer = null
       }
 
-      if (!res.headersSent) {
-        res.status(500).json({
-          error: {
-            message: getSafeMessage(error) || 'Stream error',
-            type: 'api_error'
-          }
-        })
+      if (isApiAccount) {
+        writeGeminiApiStreamError(res, error, { fallbackStatus: 503 })
       } else {
-        if (!res.destroyed) {
-          try {
-            res.write(
-              `data: ${JSON.stringify({
-                error: {
-                  message: getSafeMessage(error) || 'Stream error',
-                  type: 'stream_error',
-                  code: error.code
-                }
-              })}\n\n`
-            )
-            res.write('data: [DONE]\n\n')
-          } catch (writeError) {
-            logger.error('Error sending error event:', writeError)
+        if (!res.headersSent) {
+          res.status(500).json({
+            error: {
+              message: getSafeMessage(error) || 'Stream error',
+              type: 'api_error'
+            }
+          })
+        } else {
+          if (!res.destroyed) {
+            try {
+              res.write(
+                `data: ${JSON.stringify({
+                  error: {
+                    message: getSafeMessage(error) || 'Stream error',
+                    type: 'stream_error',
+                    code: error.code
+                  }
+                })}\n\n`
+              )
+              res.write('data: [DONE]\n\n')
+            } catch (writeError) {
+              logger.error('Error sending error event:', writeError)
+            }
           }
+          res.end()
         }
-        res.end()
       }
     })
   } catch (error) {
@@ -2938,26 +3057,23 @@ async function handleStandardStreamGenerateContent(req, res) {
     )
 
     if (!res.headersSent) {
+      if (accountType === 'gemini-api') {
+        const passthroughBody = buildStandardGeminiApiStreamPassthroughBody(normalizedError)
+        const safeErrorResponse = buildGeminiApiClientError(
+          error.statusCode || normalizedError.status || null,
+          normalizedError.parsedBody || normalizedError.rawBody || error,
+          {
+            headers: error.response?.headers,
+            fallbackStatus: 503,
+            originalBody: passthroughBody
+          }
+        )
+
+        return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
+      }
+
       const statusCode = error.statusCode || normalizedError.status || 500
-      const responseBody = {
-        error: {
-          message: normalizedError.message,
-          type: 'api_error'
-        }
-      }
-
-      if (normalizedError.status) {
-        responseBody.error.upstreamStatus = normalizedError.status
-      }
-      if (normalizedError.statusText) {
-        responseBody.error.upstreamStatusText = normalizedError.statusText
-      }
-      if (normalizedError.parsedBody && typeof normalizedError.parsedBody === 'object') {
-        responseBody.error.upstreamResponse = normalizedError.parsedBody
-      } else if (normalizedError.rawBody) {
-        responseBody.error.upstreamRaw = normalizedError.rawBody
-      }
-
+      const responseBody = buildStandardGeminiApiStreamPassthroughBody(normalizedError)
       return res.status(statusCode).json(responseBody)
     }
   } finally {
