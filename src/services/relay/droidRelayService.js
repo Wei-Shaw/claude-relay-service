@@ -10,6 +10,7 @@ const logger = require('../../utils/logger')
 const runtimeAddon = require('../../utils/runtimeAddon')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const { createRequestDetailMeta } = require('../../utils/requestDetailHelper')
+const { buildDroidClientError, sanitizeDroidStreamEvent } = require('../../utils/droidErrorAdapter')
 
 const SYSTEM_PROMPT = 'You are Droid, an AI software engineering agent built by Factory.'
 const RUNTIME_EVENT_FMT_PAYLOAD = 'fmtPayload'
@@ -386,25 +387,39 @@ class DroidRelayService {
       }
 
       if (error.response) {
-        // HTTP 错误响应
-        return {
-          statusCode: error.response.status,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            error.response.data || {
+        const safeErrorResponse = buildDroidClientError(
+          error.response.status,
+          error.response.data,
+          {
+            headers: error.response.headers,
+            endpointType: normalizedEndpoint,
+            originalBody: error.response.data || {
               error: 'upstream_error',
               message: error.message
             }
-          )
+          }
+        )
+
+        // HTTP 错误响应
+        return {
+          statusCode: safeErrorResponse.status,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(safeErrorResponse.body)
         }
       }
 
       // 网络错误或其他错误（统一返回 4xx）
       const mappedStatus = this._mapNetworkErrorStatus(error)
+      const safeErrorResponse = buildDroidClientError(null, error, {
+        endpointType: normalizedEndpoint,
+        fallbackStatus: mappedStatus,
+        originalBody: this._buildNetworkErrorBody(error)
+      })
+
       return {
-        statusCode: mappedStatus,
+        statusCode: safeErrorResponse.status,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(this._buildNetworkErrorBody(error))
+        body: JSON.stringify(safeErrorResponse.body)
       }
     }
   }
@@ -482,7 +497,11 @@ class DroidRelayService {
 
           logger.error('❌ Droid stream error:', error)
           const mappedStatus = this._mapNetworkErrorStatus(error)
-          const errorBody = this._buildNetworkErrorBody(error)
+          const safeErrorResponse = buildDroidClientError(null, error, {
+            endpointType,
+            fallbackStatus: mappedStatus,
+            originalBody: this._buildNetworkErrorBody(error)
+          })
 
           if (!clientResponse.destroyed) {
             if (!clientResponse.writableEnded) {
@@ -492,9 +511,9 @@ class DroidRelayService {
                 typeof clientResponse.json === 'function'
 
               if (canUseJson) {
-                clientResponse.status(mappedStatus).json(errorBody)
+                clientResponse.status(safeErrorResponse.status).json(safeErrorResponse.body)
               } else {
-                const errorPayload = JSON.stringify(errorBody)
+                const errorPayload = JSON.stringify(safeErrorResponse.body)
 
                 if (!hasForwardedData) {
                   if (typeof clientResponse.setHeader === 'function') {
@@ -510,7 +529,7 @@ class DroidRelayService {
             }
           }
 
-          resolveOnce({ statusCode: mappedStatus, streaming: true, error })
+          resolveOnce({ statusCode: safeErrorResponse.status, streaming: true, error })
         } else {
           rejectOnce(error)
         }
@@ -564,10 +583,14 @@ class DroidRelayService {
               })
             }
             if (!clientResponse.headersSent) {
-              clientResponse.status(res.statusCode).json({
-                error: 'upstream_error',
-                details: body
+              const parsedBody = this._parseJsonSafe(body)
+              const safeErrorResponse = buildDroidClientError(res.statusCode, parsedBody || body, {
+                endpointType,
+                headers: res.headers,
+                originalBody: parsedBody || { error: 'upstream_error', details: body }
               })
+
+              clientResponse.status(safeErrorResponse.status).json(safeErrorResponse.body)
             }
             resolveOnce({ statusCode: res.statusCode, streaming: true })
           })
@@ -590,6 +613,7 @@ class DroidRelayService {
 
         // Usage 数据收集
         let buffer = ''
+        let lineBuffer = ''
         const currentUsageData = {}
         const model = requestBody.model || 'unknown'
 
@@ -599,9 +623,17 @@ class DroidRelayService {
           completionWindow = (completionWindow + chunkStr).slice(-1024)
           hasForwardedData = true
 
-          // 转发数据到客户端
-          clientResponse.write(chunk)
-          hasForwardedData = true
+          lineBuffer += chunkStr
+          const lines = lineBuffer.split('\n')
+          lineBuffer = lines.pop() || ''
+
+          for (const line of lines) {
+            const outputLine = this._rewriteDroidStreamLineForClient(line, { endpointType })
+
+            if (!clientResponse.destroyed) {
+              clientResponse.write(`${outputLine}\n`)
+            }
+          }
 
           // 解析 usage 数据（根据端点类型）
           if (endpointType === 'anthropic') {
@@ -621,6 +653,11 @@ class DroidRelayService {
 
         res.on('end', async () => {
           responseCompleted = true
+
+          if (lineBuffer && !clientResponse.destroyed) {
+            clientResponse.write(lineBuffer)
+          }
+
           clientResponse.end()
 
           // 记录 usage 数据
@@ -1513,6 +1550,46 @@ class DroidRelayService {
         `⚠️ 清理 Droid API Key 粘性映射失败：${accountId}（endpoint: ${endpointType}）`,
         error
       )
+    }
+  }
+
+  _parseJsonSafe(value) {
+    if (typeof value !== 'string') {
+      return value && typeof value === 'object' ? value : null
+    }
+
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return null
+    }
+
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      return null
+    }
+  }
+
+  _rewriteDroidStreamLineForClient(line, options = {}) {
+    if (typeof line !== 'string' || !line.startsWith('data: ')) {
+      return line
+    }
+
+    const jsonStr = line.slice(6).trim()
+    if (!jsonStr || jsonStr === '[DONE]') {
+      return line
+    }
+
+    try {
+      const eventData = JSON.parse(jsonStr)
+      const sanitizedResult = sanitizeDroidStreamEvent(eventData, options)
+      if (!sanitizedResult.changed) {
+        return line
+      }
+
+      return `data: ${JSON.stringify(sanitizedResult.data)}`
+    } catch {
+      return line
     }
   }
 
