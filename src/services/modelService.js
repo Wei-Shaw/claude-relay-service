@@ -63,6 +63,9 @@ class ModelService {
           'gpt-5.4',
           'gpt-5.4-high',
           'gpt-5.4-xhigh',
+          'gpt-5.3-codex',
+          'gpt-5.3-codex-spark',
+          'gpt-5.4',
           'gpt-5.4-pro'
         ]
       },

@@ -322,32 +322,6 @@
             </div>
           </div>
 
-          <!-- 允许 1M 上下文 -->
-          <div>
-            <div class="mb-3 flex items-center gap-4">
-              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >允许 1M 上下文</label
-              >
-              <div class="flex gap-4">
-                <label class="flex cursor-pointer items-center">
-                  <input v-model="form.allow1mContext" class="mr-2" type="radio" :value="true" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">启用</span>
-                </label>
-                <label class="flex cursor-pointer items-center">
-                  <input v-model="form.allow1mContext" class="mr-2" type="radio" :value="false" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">禁用</span>
-                </label>
-                <label class="flex cursor-pointer items-center">
-                  <input v-model="form.allow1mContext" class="mr-2" type="radio" :value="null" />
-                  <span class="text-sm text-gray-700 dark:text-gray-300">不修改</span>
-                </label>
-              </div>
-            </div>
-            <p class="ml-0 text-xs text-gray-500 dark:text-gray-400">
-              启用后允许使用 [1m] 模型（需要 Bedrock 账户支持）
-            </p>
-          </div>
-
           <!-- 服务权限 -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -583,8 +557,7 @@ const form = reactive({
   bedrockAccountId: '',
   droidAccountId: '',
   tags: [],
-  isActive: null, // null表示不修改
-  allow1mContext: null // null表示不修改
+  isActive: null // null表示不修改
 })
 
 const UNCHANGED_OPTION_VALUE = '__KEEP_ORIGINAL__'
@@ -867,11 +840,6 @@ const batchUpdateApiKeys = async () => {
     // 激活状态
     if (form.isActive !== null) {
       updates.isActive = form.isActive
-    }
-
-    // 1M 上下文
-    if (form.allow1mContext !== null) {
-      updates.allow1mContext = form.allow1mContext
     }
 
     // 标签处理

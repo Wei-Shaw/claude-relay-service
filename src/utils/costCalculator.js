@@ -82,7 +82,7 @@ class CostCalculator {
    * @param {string} model - 模型名称
    * @returns {Object} 费用详情
    */
-  static calculateCost(usage, model = 'unknown') {
+  static calculateCost(usage, model = 'unknown', serviceTier = null) {
     // 如果 usage 包含详细的 cache_creation 对象或是 1M 模型，使用 pricingService 来处理
     if (
       (usage.cache_creation && typeof usage.cache_creation === 'object') ||
@@ -148,10 +148,22 @@ class CostCalculator {
     let usingDynamicPricing = false
 
     if (pricingData) {
-      // 转换动态价格格式为内部格式
-      const inputPrice = (pricingData.input_cost_per_token || 0) * 1000000 // 转换为per 1M tokens
-      const outputPrice = (pricingData.output_cost_per_token || 0) * 1000000
-      const cacheReadPrice = (pricingData.cache_read_input_token_cost || 0) * 1000000
+      // 检查是否使用 priority 定价
+      const usePriority = serviceTier === 'priority' && pricingData.supports_service_tier
+
+      // 转换动态价格格式为内部格式（priority 定价时使用 *_priority 字段，回退到标准价格）
+      const inputPrice =
+        ((usePriority && pricingData.input_cost_per_token_priority) ||
+          pricingData.input_cost_per_token ||
+          0) * 1000000
+      const outputPrice =
+        ((usePriority && pricingData.output_cost_per_token_priority) ||
+          pricingData.output_cost_per_token ||
+          0) * 1000000
+      const cacheReadPrice =
+        ((usePriority && pricingData.cache_read_input_token_cost_priority) ||
+          pricingData.cache_read_input_token_cost ||
+          0) * 1000000
 
       // OpenAI 模型的特殊处理：
       // - 如果没有 cache_creation_input_token_cost，缓存创建按普通 input 价格计费

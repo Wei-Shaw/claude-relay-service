@@ -1,6 +1,7 @@
 const logger = require('../../utils/logger')
 const { CLIENT_DEFINITIONS } = require('../clientDefinitions')
 const { bestSimilarityByTemplates, SYSTEM_PROMPT_THRESHOLD } = require('../../utils/contents')
+const metadataUserIdHelper = require('../../utils/metadataUserIdHelper')
 
 /**
  * Claude Code CLI 验证器
@@ -188,26 +189,10 @@ class ClaudeCodeValidator {
       }
 
       const userId = req.body.metadata.user_id
-      // 格式: user_{64位字符串}_account__session_{哈希值}
-      // user_d98385411c93cd074b2cefd5c9831fe77f24a53e4ecdcd1f830bba586fe62cb9_account__session_17cf0fd3-d51b-4b59-977d-b899dafb3022
-      const userIdPattern = /^user_[a-fA-F0-9]{64}_account__session_[\w-]+$/
-
-      if (!userIdPattern.test(userId)) {
-        logger.debug(`Claude Code validation failed - invalid user_id format: ${userId}`)
-
-        // 提供更详细的错误信息
-        if (!userId.startsWith('user_')) {
-          logger.debug('user_id must start with "user_"')
-        } else {
-          const parts = userId.split('_')
-          if (parts.length < 4) {
-            logger.debug('user_id format is incomplete')
-          } else if (parts[1].length !== 64) {
-            logger.debug(`user hash must be 64 characters, got ${parts[1].length}`)
-          } else if (parts[2] !== 'account' || parts[3] !== '' || parts[4] !== 'session') {
-            logger.debug('user_id must contain "_account__session_"')
-          }
-        }
+      if (!metadataUserIdHelper.isValid(userId)) {
+        logger.debug(
+          `Claude Code validation failed - invalid user_id format: ${typeof userId === 'string' ? userId.slice(0, 80) : typeof userId}`
+        )
         return false
       }
 

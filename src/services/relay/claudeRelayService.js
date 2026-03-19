@@ -17,6 +17,7 @@ const { createClaudeTestPayload } = require('../../utils/testPayloadHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const metadataUserIdHelper = require('../../utils/metadataUserIdHelper')
 const {
   getHttpsAgentForStream,
   getHttpsAgentForNonStream,
@@ -1190,19 +1191,20 @@ class ClaudeRelayService {
 
   // 🔄 替换请求中的客户端标识
   _replaceClientId(body, unifiedClientId) {
-    if (!body || !body.metadata || !body.metadata.user_id || !unifiedClientId) {
+    if (!body?.metadata?.user_id || !unifiedClientId) {
       return
     }
 
-    const userId = body.metadata.user_id
-    // user_id格式：user_{64位十六进制}_account__session_{uuid}
-    // 只替换第一个下划线后到_account之前的部分（客户端标识）
-    const match = userId.match(/^user_[a-f0-9]{64}(_account__session_[a-f0-9-]{36})$/)
-    if (match && match[1]) {
-      // 替换客户端标识部分
-      body.metadata.user_id = `user_${unifiedClientId}${match[1]}`
-      logger.info(`🔄 Replaced client ID with unified ID: ${body.metadata.user_id}`)
+    const parsed = metadataUserIdHelper.parse(body.metadata.user_id)
+    if (!parsed) {
+      return
     }
+
+    body.metadata.user_id = metadataUserIdHelper.build({
+      ...parsed,
+      deviceId: unifiedClientId
+    })
+    logger.info(`🔄 Replaced client ID with unified ID: ${body.metadata.user_id}`)
   }
 
   // 🧹 移除 billing header 系统提示元素
