@@ -1,6 +1,7 @@
 const redis = require('../models/redis')
 const pricingService = require('../services/pricingService')
 const CostCalculator = require('./costCalculator')
+const slidingWindowRateLimit = require('./slidingWindowRateLimit')
 
 function toNumber(value) {
   const num = Number(value)
@@ -32,10 +33,6 @@ async function updateRateLimitCounters(
   const cacheReadTokens = toNumber(usageSummary.cacheReadTokens)
 
   const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
-
-  if (totalTokens > 0 && rateLimitInfo.tokenCountKey) {
-    await client.incrby(rateLimitInfo.tokenCountKey, Math.round(totalTokens))
-  }
 
   let totalCost = 0
   let ratedCost = 0
@@ -103,8 +100,23 @@ async function updateRateLimitCounters(
     }
   }
 
-  if (ratedCost > 0 && rateLimitInfo.costCountKey) {
-    await client.incrbyfloat(rateLimitInfo.costCountKey, ratedCost)
+  if (rateLimitInfo.apiKeyId && rateLimitInfo.windowMinutes > 0) {
+    await slidingWindowRateLimit.incrementWindowUsage(
+      rateLimitInfo.apiKeyId,
+      rateLimitInfo.windowMinutes,
+      {
+        tokens: Math.round(totalTokens),
+        cost: ratedCost
+      }
+    )
+  } else {
+    if (totalTokens > 0 && rateLimitInfo.tokenCountKey) {
+      await client.incrby(rateLimitInfo.tokenCountKey, Math.round(totalTokens))
+    }
+
+    if (ratedCost > 0 && rateLimitInfo.costCountKey) {
+      await client.incrbyfloat(rateLimitInfo.costCountKey, ratedCost)
+    }
   }
 
   return { totalTokens, totalCost, ratedCost }

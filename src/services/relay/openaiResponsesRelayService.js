@@ -9,6 +9,7 @@ const config = require('../../../config/config')
 const crypto = require('crypto')
 const LRUCache = require('../../utils/lruCache')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { updateRateLimitCounters } = require('../../utils/rateLimitHelper')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
@@ -43,6 +44,34 @@ function extractCacheCreationTokens(usageData) {
 class OpenAIResponsesRelayService {
   constructor() {
     this.defaultTimeout = config.requestTimeout || 600000
+  }
+
+  async _applyRateLimitTracking(req, usageSummary, model, context = '', preCalculatedCost = null) {
+    if (!req?.rateLimitInfo) {
+      return
+    }
+
+    const label = context ? ` (${context})` : ''
+
+    try {
+      const { totalTokens, totalCost } = await updateRateLimitCounters(
+        req.rateLimitInfo,
+        usageSummary,
+        model,
+        req.apiKey?.id,
+        'openai-responses',
+        preCalculatedCost
+      )
+
+      if (totalTokens > 0) {
+        logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
+      }
+      if (typeof totalCost === 'number' && totalCost > 0) {
+        logger.api(`💰 Updated rate limit cost count${label}: +$${totalCost.toFixed(6)}`)
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to update rate limit counters${label}:`, error)
+    }
   }
 
   // 节流更新 lastUsedAt
@@ -349,7 +378,7 @@ class OpenAIResponsesRelayService {
       }
 
       // 处理非流式响应
-      return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model)
+      return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model, req)
     } catch (error) {
       // 清理 AbortController
       if (abortController && !abortController.signal.aborted) {
@@ -603,7 +632,7 @@ class OpenAIResponsesRelayService {
           const modelToRecord = actualModel || requestedModel || 'gpt-4'
 
           const serviceTier = req._serviceTier || null
-          await apiKeyService.recordUsage(
+          const recordedCosts = await apiKeyService.recordUsage(
             apiKeyData.id,
             actualInputTokens, // 传递实际输入（不含缓存）
             outputTokens,
@@ -617,6 +646,19 @@ class OpenAIResponsesRelayService {
 
           logger.info(
             `📊 Recorded usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), CacheCreate: ${cacheCreateTokens}, Output: ${outputTokens}, Total: ${totalTokens}, Model: ${modelToRecord}`
+          )
+
+          await this._applyRateLimitTracking(
+            req,
+            {
+              inputTokens: actualInputTokens,
+              outputTokens,
+              cacheCreateTokens,
+              cacheReadTokens
+            },
+            modelToRecord,
+            'openai-responses-stream',
+            recordedCosts
           )
 
           // 更新账户的 token 使用统计
@@ -709,7 +751,7 @@ class OpenAIResponsesRelayService {
   }
 
   // 处理非流式响应
-  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel) {
+  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel, req) {
     const responseData = response.data
 
     // 提取 usage 数据和实际 model
@@ -735,7 +777,7 @@ class OpenAIResponsesRelayService {
           usageData.total_tokens || totalInputTokens + outputTokens + cacheCreateTokens
 
         const serviceTier = req._serviceTier || null
-        await apiKeyService.recordUsage(
+        const recordedCosts = await apiKeyService.recordUsage(
           apiKeyData.id,
           actualInputTokens, // 传递实际输入（不含缓存）
           outputTokens,
@@ -749,6 +791,19 @@ class OpenAIResponsesRelayService {
 
         logger.info(
           `📊 Recorded non-stream usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), CacheCreate: ${cacheCreateTokens}, Output: ${outputTokens}, Total: ${totalTokens}, Model: ${actualModel}`
+        )
+
+        await this._applyRateLimitTracking(
+          req,
+          {
+            inputTokens: actualInputTokens,
+            outputTokens,
+            cacheCreateTokens,
+            cacheReadTokens
+          },
+          actualModel,
+          'openai-responses-non-stream',
+          recordedCosts
         )
 
         // 更新账户的 token 使用统计
