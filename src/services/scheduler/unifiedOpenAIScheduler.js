@@ -683,16 +683,10 @@ class UnifiedOpenAIScheduler {
         await openaiAccountService.setAccountRateLimited(accountId, true, resetsInSeconds)
       } else if (accountType === 'openai-responses') {
         // 对于 OpenAI-Responses 账户，使用与普通 OpenAI 账户类似的处理方式
+        // markAccountRateLimited 内部已处理 schedulable/rateLimitResetAt 等字段
+        // 同时会检查 disableAutoProtection，若启用则跳过限流标记
         const duration = resetsInSeconds ? Math.ceil(resetsInSeconds / 60) : null
         await openaiResponsesAccountService.markAccountRateLimited(accountId, duration)
-
-        // 同时更新调度状态，避免继续被调度
-        await openaiResponsesAccountService.updateAccount(accountId, {
-          schedulable: 'false',
-          rateLimitResetAt: resetsInSeconds
-            ? new Date(Date.now() + resetsInSeconds * 1000).toISOString()
-            : new Date(Date.now() + 3600000).toISOString() // 默认1小时
-        })
       }
 
       // 删除会话映射
