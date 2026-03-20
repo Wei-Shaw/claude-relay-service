@@ -162,18 +162,23 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
     } else {
       // 处理普通 OpenAI 账户
       account = await openaiAccountService.getAccount(result.accountId)
-      if (!account || !account.accessToken) {
-        const error = new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
-        error.statusCode = 403 // Forbidden - 账户配置错误
+      if (!account) {
+        const error = new Error(`OpenAI account ${result.accountId} not found`)
+        error.statusCode = 403
         error.accountId = result.accountId
         error.accountType = result.accountType
         throw error
       }
 
-      // 检查 token 是否过期并自动刷新（双重保护）
-      if (openaiAccountService.isTokenExpired(account)) {
+      const missingAccessToken = !account.accessToken
+      const tokenExpired = !missingAccessToken && openaiAccountService.isTokenExpired(account)
+
+      if (missingAccessToken || tokenExpired) {
         if (account.refreshToken) {
-          logger.info(`🔄 Token expired, auto-refreshing for account ${account.name} (fallback)`)
+          const refreshReason = missingAccessToken ? 'missing access token' : 'token expired'
+          logger.info(
+            `🔄 OpenAI account ${account.name} requires refresh (${refreshReason}), refreshing now`
+          )
           try {
             await openaiAccountService.refreshAccountToken(result.accountId)
             // 重新获取更新后的账户
@@ -181,7 +186,9 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
             logger.info(`✅ Token refreshed successfully in route handler`)
           } catch (refreshError) {
             logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
-            const error = new Error(`Token expired and refresh failed: ${refreshError.message}`)
+            const error = new Error(
+              `${missingAccessToken ? 'Missing access token' : 'Token expired'} and refresh failed: ${refreshError.message}`
+            )
             error.statusCode = 403 // Forbidden - 认证失败
             error.accountId = result.accountId
             error.accountType = result.accountType
@@ -189,13 +196,23 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
           }
         } else {
           const error = new Error(
-            `Token expired and no refresh token available for account ${account.name}`
+            missingAccessToken
+              ? `OpenAI account ${account.name} has no access token and no refresh token`
+              : `Token expired and no refresh token available for account ${account.name}`
           )
           error.statusCode = 403 // Forbidden - 认证失败
           error.accountId = result.accountId
           error.accountType = result.accountType
           throw error
         }
+      }
+
+      if (!account?.accessToken) {
+        const error = new Error(`OpenAI account ${result.accountId} has no valid accessToken`)
+        error.statusCode = 403 // Forbidden - 账户配置错误
+        error.accountId = result.accountId
+        error.accountType = result.accountType
+        throw error
       }
 
       // 解密 accessToken（account.accessToken 是加密的）
