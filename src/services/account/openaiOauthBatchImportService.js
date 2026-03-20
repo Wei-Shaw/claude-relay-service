@@ -1,6 +1,7 @@
 const fs = require('fs/promises')
 const path = require('path')
 const openaiAccountService = require('./openaiAccountService')
+const accountGroupService = require('../accountGroupService')
 const logger = require('../../utils/logger')
 
 const DEFAULT_IMPORT_FOLDER_PATH = '/Users/hobee/Downloads/accounts_json'
@@ -10,6 +11,7 @@ const MAX_IMPORT_FILE_SIZE = 1024 * 1024
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const JWT_SEGMENT_REGEX = /^[A-Za-z0-9_-]+$/
 const TOKEN_REGEX = /^[A-Za-z0-9._~:/+=-]+$/
+const ACCESS_TOKEN_ONLY_EXPIRES_IN = 365 * 24 * 60 * 60
 
 function normalizeEmail(value) {
   if (typeof value !== 'string') {
@@ -54,6 +56,19 @@ function validateRefreshToken(refreshToken) {
   return isTokenBaseFormatValid(refreshToken)
 }
 
+function decodeJwtPayload(token) {
+  if (!isLikelyJwt(token)) {
+    return null
+  }
+
+  try {
+    const segments = token.split('.')
+    return JSON.parse(Buffer.from(segments[1], 'base64url').toString('utf8'))
+  } catch (error) {
+    return null
+  }
+}
+
 function sanitizeFileName(fileName) {
   if (typeof fileName !== 'string' || !fileName.trim()) {
     return ''
@@ -89,12 +104,17 @@ function pickStringValue(containers, keys) {
 function extractAccountFields(payload) {
   const root = payload && typeof payload === 'object' ? payload : {}
   const nestedSources = [root, root.openaiOauth, root.oauth, root.tokens, root.oauthTokens]
+  const accessToken = normalizeToken(
+    pickStringValue(nestedSources, ['access_token', 'accessToken', 'access token'])
+  )
+  const accessTokenPayload = decodeJwtPayload(accessToken)
+  const email =
+    normalizeEmail(pickStringValue(nestedSources, ['email'])) ||
+    normalizeEmail(accessTokenPayload?.email)
 
   return {
-    email: normalizeEmail(pickStringValue(nestedSources, ['email'])),
-    accessToken: normalizeToken(
-      pickStringValue(nestedSources, ['access_token', 'accessToken', 'access token'])
-    ),
+    email,
+    accessToken,
     refreshToken: normalizeToken(
       pickStringValue(nestedSources, ['refresh_token', 'refreshToken', 'refresh token'])
     )
@@ -248,15 +268,20 @@ function parseImportFiles(files) {
       return
     }
 
-    if (!extracted.accessToken) {
+    if (!extracted.accessToken && !extracted.refreshToken) {
       mergeFailure(
         failures,
-        buildFailureItem(fileName, '缺少 access_token 字段', 'MISSING_ACCESS_TOKEN', extracted.email)
+        buildFailureItem(
+          fileName,
+          'access_token 和 refresh_token 不能同时缺失',
+          'MISSING_OPENAI_TOKENS',
+          extracted.email
+        )
       )
       return
     }
 
-    if (!validateAccessToken(extracted.accessToken)) {
+    if (extracted.accessToken && !validateAccessToken(extracted.accessToken)) {
       mergeFailure(
         failures,
         buildFailureItem(
@@ -269,23 +294,15 @@ function parseImportFiles(files) {
       return
     }
 
-    if (!extracted.refreshToken) {
+    if (extracted.refreshToken && !validateRefreshToken(extracted.refreshToken)) {
       mergeFailure(
         failures,
         buildFailureItem(
           fileName,
-          '缺少 refresh_token 字段',
-          'MISSING_REFRESH_TOKEN',
+          'refresh_token 格式无效',
+          'INVALID_REFRESH_TOKEN',
           extracted.email
         )
-      )
-      return
-    }
-
-    if (!validateRefreshToken(extracted.refreshToken)) {
-      mergeFailure(
-        failures,
-        buildFailureItem(fileName, 'refresh_token 格式无效', 'INVALID_REFRESH_TOKEN', extracted.email)
       )
       return
     }
@@ -352,13 +369,24 @@ function detectDuplicateEmails(records, existingEmailSet) {
 function normalizeImportOptions(options = {}) {
   const rawPriority = Number(options.priority)
   const rawRateLimitDuration = Number(options.rateLimitDuration)
-  const accountType = ['shared', 'dedicated'].includes(options.accountType)
+  const accountType = ['shared', 'dedicated', 'group'].includes(options.accountType)
     ? options.accountType
     : 'shared'
+  const normalizedGroupIds = Array.isArray(options.groupIds)
+    ? options.groupIds
+        .map((groupId) => String(groupId || '').trim())
+        .filter((groupId) => groupId.length > 0)
+    : []
+  const legacyGroupId = String(options.groupId || '').trim()
+
+  if (legacyGroupId && !normalizedGroupIds.includes(legacyGroupId)) {
+    normalizedGroupIds.push(legacyGroupId)
+  }
 
   return {
     accountType,
     description: typeof options.description === 'string' ? options.description.trim() : '',
+    groupIds: Array.from(new Set(normalizedGroupIds)),
     priority: Number.isFinite(rawPriority) ? Math.min(100, Math.max(1, rawPriority)) : 50,
     rateLimitDuration: Number.isFinite(rawRateLimitDuration)
       ? Math.max(0, rawRateLimitDuration)
@@ -369,7 +397,59 @@ function normalizeImportOptions(options = {}) {
   }
 }
 
+async function validateImportOptions(options) {
+  if (options.accountType !== 'group') {
+    return
+  }
+
+  if (!Array.isArray(options.groupIds) || options.groupIds.length === 0) {
+    throw new Error('分组调度模式下，批量导入至少需要选择一个分组')
+  }
+
+  for (const groupId of options.groupIds) {
+    const group = await accountGroupService.getGroup(groupId)
+    if (!group) {
+      throw new Error(`分组不存在: ${groupId}`)
+    }
+    if (group.platform !== 'openai') {
+      throw new Error(`分组平台不匹配: ${group.name || groupId}`)
+    }
+  }
+}
+
+async function assignImportedAccountsToGroups(accounts, options) {
+  if (
+    options.accountType !== 'group' ||
+    !Array.isArray(options.groupIds) ||
+    options.groupIds.length === 0
+  ) {
+    return
+  }
+
+  for (const account of accounts) {
+    await accountGroupService.setAccountGroups(account.id, options.groupIds, 'openai')
+  }
+}
+
+async function rollbackImportedAccounts(accounts) {
+  for (const account of accounts) {
+    try {
+      await accountGroupService.removeAccountFromAllGroups(account.id, 'openai')
+    } catch (groupError) {
+      logger.warn(`回滚 OpenAI 批量导入分组失败: ${account.id}`, groupError.message)
+    }
+
+    try {
+      await openaiAccountService.deleteAccount(account.id)
+    } catch (deleteError) {
+      logger.warn(`回滚 OpenAI 批量导入账号失败: ${account.id}`, deleteError.message)
+    }
+  }
+}
+
 function buildAccountData(record, options) {
+  const expiresIn = record.accessToken && !record.refreshToken ? ACCESS_TOKEN_ONLY_EXPIRES_IN : 3600
+
   return {
     name: record.email,
     description: options.description || 'OpenAI OAuth 批量导入',
@@ -380,7 +460,7 @@ function buildAccountData(record, options) {
       idToken: '',
       accessToken: record.accessToken,
       refreshToken: record.refreshToken,
-      expires_in: 3600
+      expires_in: expiresIn
     },
     accountInfo: {
       accountId: '',
@@ -429,6 +509,7 @@ async function importOpenAIOAuthAccounts(payload = {}) {
   const startedAt = Date.now()
   const source = await loadImportFiles(payload)
   const options = normalizeImportOptions(payload)
+  await validateImportOptions(options)
   const report = buildReportBase(source)
 
   const { validRecords, failures: parseFailures } = parseImportFiles(source.files)
@@ -449,7 +530,17 @@ async function importOpenAIOAuthAccounts(payload = {}) {
   }
 
   const accountDataList = validRecords.map((record) => buildAccountData(record, options))
-  const createdAccounts = await openaiAccountService.createAccountsAtomic(accountDataList)
+  let createdAccounts = []
+
+  try {
+    createdAccounts = await openaiAccountService.createAccountsAtomic(accountDataList)
+    await assignImportedAccountsToGroups(createdAccounts, options)
+  } catch (error) {
+    if (createdAccounts.length > 0) {
+      await rollbackImportedAccounts(createdAccounts)
+    }
+    throw error
+  }
 
   report.summary.successCount = createdAccounts.length
   report.summary.failedCount = 0
