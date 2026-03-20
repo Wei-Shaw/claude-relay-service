@@ -26,6 +26,7 @@ const OPENAI_CONFIG = {
   REDIRECT_URI: 'http://localhost:1455/auth/callback',
   SCOPE: 'openid profile email offline_access'
 }
+const ACCESS_TOKEN_ONLY_EXPIRES_IN = 365 * 24 * 60 * 60
 
 /**
  * 生成 PKCE 参数
@@ -38,6 +39,28 @@ function generateOpenAIPKCE() {
   return {
     codeVerifier,
     codeChallenge
+  }
+}
+
+function normalizeOpenAIOauthPayload(openaiOauth = {}) {
+  const source = openaiOauth && typeof openaiOauth === 'object' ? openaiOauth : {}
+  const accessToken = typeof source.accessToken === 'string' ? source.accessToken.trim() : ''
+  const refreshToken = typeof source.refreshToken === 'string' ? source.refreshToken.trim() : ''
+  const rawExpiresIn = Number(source.expires_in)
+  const expiresIn =
+    Number.isFinite(rawExpiresIn) && rawExpiresIn > 0
+      ? Math.floor(rawExpiresIn)
+      : refreshToken
+        ? 3600
+        : ACCESS_TOKEN_ONLY_EXPIRES_IN
+
+  return {
+    ...source,
+    accessToken,
+    refreshToken,
+    expires_in: expiresIn,
+    hasAccessToken: !!accessToken,
+    hasRefreshToken: !!refreshToken
   }
 }
 
@@ -342,6 +365,20 @@ router.post('/', authenticateAdmin, async (req, res) => {
       })
     }
 
+    const normalizedOpenAIOauth = normalizeOpenAIOauthPayload(openaiOauth || {})
+
+    if (!normalizedOpenAIOauth.hasAccessToken && !normalizedOpenAIOauth.hasRefreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Access Token 和 Refresh Token 不能同时为空'
+      })
+    }
+
+    const shouldRequireImmediateRefresh =
+      !!needsImmediateRefresh && !!requireRefreshSuccess && normalizedOpenAIOauth.hasRefreshToken
+    const shouldTryImmediateRefresh =
+      !!needsImmediateRefresh && !requireRefreshSuccess && normalizedOpenAIOauth.hasRefreshToken
+
     // 准备账户数据
     const accountData = {
       name,
@@ -350,7 +387,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
       priority: priority || 50,
       rateLimitDuration:
         rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
-      openaiOauth: openaiOauth || {},
+      openaiOauth: normalizedOpenAIOauth,
       accountInfo: accountInfo || {},
       proxy: proxy || null,
       isActive: true,
@@ -358,7 +395,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
     }
 
     // 如果需要立即刷新且必须成功（OpenAI 手动模式）
-    if (needsImmediateRefresh && requireRefreshSuccess) {
+    if (shouldRequireImmediateRefresh) {
       // 先创建临时账户以测试刷新
       const tempAccount = await openaiAccountService.createAccount(accountData)
 
@@ -450,7 +487,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
     }
 
     // 如果需要刷新但不强制成功（OAuth 模式可能已有完整信息）
-    if (needsImmediateRefresh && !requireRefreshSuccess) {
+    if (shouldTryImmediateRefresh) {
       try {
         logger.info(`🔄 尝试刷新 OpenAI 账户 ${createdAccount.id}`)
         await openaiAccountService.refreshAccountToken(createdAccount.id)
@@ -556,6 +593,9 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
     const mappedUpdates = mapExpiryField(updates, 'OpenAI', id)
 
     const { needsImmediateRefresh, requireRefreshSuccess } = mappedUpdates
+    const normalizedOpenAIOauth = mappedUpdates.openaiOauth
+      ? normalizeOpenAIOauthPayload(mappedUpdates.openaiOauth)
+      : null
 
     // 验证accountType的有效性
     if (
@@ -585,14 +625,14 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
     }
 
     // 如果更新了 Refresh Token，需要验证其有效性
-    if (mappedUpdates.openaiOauth?.refreshToken && needsImmediateRefresh && requireRefreshSuccess) {
+    if (normalizedOpenAIOauth?.hasRefreshToken && needsImmediateRefresh && requireRefreshSuccess) {
       // 先更新 token 信息
       const tempUpdateData = {}
-      if (mappedUpdates.openaiOauth.refreshToken) {
-        tempUpdateData.refreshToken = mappedUpdates.openaiOauth.refreshToken
+      if (normalizedOpenAIOauth.refreshToken) {
+        tempUpdateData.refreshToken = normalizedOpenAIOauth.refreshToken
       }
-      if (mappedUpdates.openaiOauth.accessToken) {
-        tempUpdateData.accessToken = mappedUpdates.openaiOauth.accessToken
+      if (normalizedOpenAIOauth.accessToken) {
+        tempUpdateData.accessToken = normalizedOpenAIOauth.accessToken
       }
       // 更新代理配置（如果有）
       if (mappedUpdates.proxy !== undefined) {
@@ -699,18 +739,18 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
     const updateData = { ...mappedUpdates }
 
     // 处理敏感数据加密
-    if (mappedUpdates.openaiOauth) {
-      updateData.openaiOauth = mappedUpdates.openaiOauth
+    if (normalizedOpenAIOauth) {
+      updateData.openaiOauth = normalizedOpenAIOauth
       // 编辑时不允许直接输入 ID Token，只能通过刷新获取
-      if (mappedUpdates.openaiOauth.accessToken) {
-        updateData.accessToken = mappedUpdates.openaiOauth.accessToken
+      if (normalizedOpenAIOauth.accessToken) {
+        updateData.accessToken = normalizedOpenAIOauth.accessToken
       }
-      if (mappedUpdates.openaiOauth.refreshToken) {
-        updateData.refreshToken = mappedUpdates.openaiOauth.refreshToken
+      if (normalizedOpenAIOauth.refreshToken) {
+        updateData.refreshToken = normalizedOpenAIOauth.refreshToken
       }
-      if (mappedUpdates.openaiOauth.expires_in) {
+      if (normalizedOpenAIOauth.expires_in) {
         updateData.expiresAt = new Date(
-          Date.now() + mappedUpdates.openaiOauth.expires_in * 1000
+          Date.now() + normalizedOpenAIOauth.expires_in * 1000
         ).toISOString()
       }
     }
