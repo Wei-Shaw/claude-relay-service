@@ -527,6 +527,8 @@ class PricingService {
     const standardPricing = this.getModelPricing(modelName)
     const pricing = standardPricing
     const isLongContextModeEnabled = isLongContextModel || hasContext1mBeta
+    const ignores200kLongContextPricing =
+      typeof normalizedModelName === 'string' && normalizedModelName.startsWith('claude-opus-4-6')
 
     // Fast Mode 倍率：优先从 provider_specific_entry.fast 读取，默认 6 倍
     const fastMultiplier = isFastModeRequest ? pricing?.provider_specific_entry?.fast || 6 : 1
@@ -534,11 +536,17 @@ class PricingService {
     // 当 [1m] 模型总输入超过 200K 时，进入 200K+ 计费逻辑
     // 根据 Anthropic 官方文档：当总输入超过 200K 时，整个请求所有 token 类型都使用高档价格
     if (isLongContextModeEnabled && totalInputTokens > 200000) {
-      isLongContextRequest = true
-      useLongContextPricing = true
-      logger.info(
-        `💰 Using 200K+ pricing for ${modelName}: total input tokens = ${totalInputTokens.toLocaleString()}`
-      )
+      if (ignores200kLongContextPricing) {
+        logger.info(
+          `💰 Skipping 200K+ pricing for ${modelName}: Opus 4.6 uses flat pricing across 1M context`
+        )
+      } else {
+        isLongContextRequest = true
+        useLongContextPricing = true
+        logger.info(
+          `💰 Using 200K+ pricing for ${modelName}: total input tokens = ${totalInputTokens.toLocaleString()}`
+        )
+      }
     }
 
     if (!pricing) {
