@@ -262,6 +262,15 @@ jobs:
       if: steps.check.outputs.needs_bump == 'true'
       run: |
         NEW_TAG="${{ steps.next_version.outputs.new_tag }}"
+        # If tag already exists, increment patch until we find an available one
+        while git rev-parse "$NEW_TAG" >/dev/null 2>&1; do
+          echo "Tag $NEW_TAG already exists, incrementing..."
+          VERSION=${NEW_TAG#v}
+          IFS='.' read -r -a parts <<< "$VERSION"
+          NEW_PATCH=$(( parts[2] + 1 ))
+          NEW_TAG="v${parts[0]}.${parts[1]}.${NEW_PATCH}"
+        done
+        echo "Creating tag: $NEW_TAG"
         git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
         git push origin HEAD:main "$NEW_TAG"
 
