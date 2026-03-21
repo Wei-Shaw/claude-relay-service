@@ -75,7 +75,7 @@ class AccountGroupService {
    */
   async createGroup(groupData) {
     try {
-      const { name, platform, description = '' } = groupData
+      const { name, platform, description = '', allowSharedFallback = false } = groupData
 
       // 验证必填字段
       if (!name || !platform) {
@@ -96,6 +96,7 @@ class AccountGroupService {
         name,
         platform,
         description,
+        allowSharedFallback: allowSharedFallback ? 'true' : 'false',
         createdAt: now,
         updatedAt: now
       }
@@ -150,6 +151,11 @@ class AccountGroupService {
       delete updateData.id
       delete updateData.platform
       delete updateData.createdAt
+
+      // Convert boolean to string for Redis
+      if (updateData.allowSharedFallback !== undefined) {
+        updateData.allowSharedFallback = updateData.allowSharedFallback ? 'true' : 'false'
+      }
 
       // 更新分组
       await client.hmset(groupKey, updateData)
