@@ -40,8 +40,14 @@ class UnifiedClaudeScheduler {
     this.SESSION_MAPPING_PREFIX = 'unified_claude_session_mapping:'
   }
 
+  // 🔍 Check if the request uses 1M context (detected via anthropic-beta header)
+  _is1mContextRequest(betaHeader) {
+    if (!betaHeader) return false
+    return betaHeader.includes('context-1m')
+  }
+
   // 🔍 检查账户是否支持请求的模型
-  _isModelSupportedByAccount(account, accountType, requestedModel, context = '') {
+  _isModelSupportedByAccount(account, accountType, requestedModel, context = '', betaHeader = '') {
     if (!requestedModel) {
       return true // 没有指定模型时，默认支持
     }
@@ -64,7 +70,27 @@ class UnifiedClaudeScheduler {
         return false
       }
 
-      // 2. Opus model subscription level check
+      // 2. 1M context check for Pro accounts
+      // Pro accounts do not support 1M context models (detected via anthropic-beta header containing "context-1m")
+      if (betaHeader && this._is1mContextRequest(betaHeader) && account.subscriptionInfo) {
+        try {
+          const info =
+            typeof account.subscriptionInfo === 'string'
+              ? JSON.parse(account.subscriptionInfo)
+              : account.subscriptionInfo
+
+          if (isProAccount(info)) {
+            logger.info(
+              `🚫 Claude account ${account.name} (Pro) does not support 1M context model${context ? ` ${context}` : ''}`
+            )
+            return false
+          }
+        } catch (_e) {
+          // Parse failed, assume Max, allow 1M
+        }
+      }
+
+      // 3. Opus model subscription level check
       // VERSION RESTRICTION LOGIC:
       // - Free: No Opus models
       // - Pro: Only Opus 4.5+ (isOpus45OrNewer = true)
@@ -176,8 +202,11 @@ class UnifiedClaudeScheduler {
     apiKeyData,
     sessionHash = null,
     requestedModel = null,
-    forcedAccount = null
+    forcedAccount = null,
+    requestOptions = {}
   ) {
+    const betaHeader = requestOptions?.betaHeader || ''
+
     try {
       // 🔒 如果有强制绑定的账户（全局会话绑定），仅 claude-official 类型受影响
       if (forcedAccount && forcedAccount.accountId && forcedAccount.accountType) {
@@ -251,7 +280,8 @@ class UnifiedClaudeScheduler {
             groupId,
             sessionHash,
             effectiveModel,
-            vendor === 'ccr'
+            vendor === 'ccr',
+            betaHeader
           )
         }
 
@@ -390,7 +420,8 @@ class UnifiedClaudeScheduler {
             const isAvailable = await this._isAccountAvailable(
               mappedAccount.accountId,
               mappedAccount.accountType,
-              effectiveModel
+              effectiveModel,
+              betaHeader
             )
             if (isAvailable) {
               // 🚀 智能会话续期：剩余时间少于14天时自动续期到15天（续期正确的 unified 映射键）
@@ -399,6 +430,11 @@ class UnifiedClaudeScheduler {
                 `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
               )
               return mappedAccount
+            } else if (betaHeader && this._is1mContextRequest(betaHeader)) {
+              // 1M context bypass: preserve mapping, just skip for this request
+              logger.info(
+                `🔄 Sticky session account ${mappedAccount.accountId} does not support 1M context, bypassing (mapping preserved)`
+              )
             } else {
               logger.warn(
                 `⚠️ Mapped account ${mappedAccount.accountId} is no longer available, selecting new account`
@@ -433,8 +469,9 @@ class UnifiedClaudeScheduler {
       // 选择第一个账户
       const selectedAccount = sortedAccounts[0]
 
-      // 如果有会话哈希，建立新的映射
-      if (sessionHash) {
+      // Create new session mapping if we have a session hash (skip on 1M bypass to preserve original mapping)
+      const is1mBypassMain = betaHeader && this._is1mContextRequest(betaHeader)
+      if (sessionHash && !is1mBypassMain) {
         await this._setSessionMapping(
           sessionHash,
           selectedAccount.accountId,
@@ -626,7 +663,15 @@ class UnifiedClaudeScheduler {
         // 检查是否可调度
 
         // 检查模型支持
-        if (!this._isModelSupportedByAccount(account, 'claude-official', requestedModel)) {
+        if (
+          !this._isModelSupportedByAccount(
+            account,
+            'claude-official',
+            requestedModel,
+            '',
+            betaHeader
+          )
+        ) {
           continue
         }
 
@@ -979,7 +1024,7 @@ class UnifiedClaudeScheduler {
   }
 
   // 🔍 检查账户是否可用
-  async _isAccountAvailable(accountId, accountType, requestedModel = null) {
+  async _isAccountAvailable(accountId, accountType, requestedModel = null, betaHeader = '') {
     try {
       if (accountType === 'claude-official') {
         const account = await redis.getClaudeAccount(accountId)
@@ -1003,7 +1048,8 @@ class UnifiedClaudeScheduler {
             account,
             'claude-official',
             requestedModel,
-            'in session check'
+            'in session check',
+            betaHeader
           )
         ) {
           return false
@@ -1463,7 +1509,8 @@ class UnifiedClaudeScheduler {
     groupId,
     sessionHash = null,
     requestedModel = null,
-    allowCcr = false
+    allowCcr = false,
+    betaHeader = ''
   ) {
     try {
       // 获取分组信息
@@ -1488,7 +1535,8 @@ class UnifiedClaudeScheduler {
               const isAvailable = await this._isAccountAvailable(
                 mappedAccount.accountId,
                 mappedAccount.accountType,
-                requestedModel
+                requestedModel,
+                betaHeader
               )
               if (isAvailable) {
                 // 🚀 智能会话续期：续期 unified 映射键
@@ -1498,10 +1546,22 @@ class UnifiedClaudeScheduler {
                 )
                 return mappedAccount
               }
+              // 1M context bypass: don't delete sticky mapping, just skip for this request
+              // so non-1M requests continue using the original account
+              if (betaHeader && this._is1mContextRequest(betaHeader)) {
+                logger.info(
+                  `🔄 Sticky session account ${mappedAccount.accountId} does not support 1M context, bypassing for this request (mapping preserved)`
+                )
+                // Fall through to normal account selection without deleting mapping
+              } else {
+                // Other unavailability reasons: delete mapping
+                await this._deleteSessionMapping(sessionHash)
+              }
             }
+          } else {
+            // Mapped account not in this group, delete mapping
+            await this._deleteSessionMapping(sessionHash)
           }
-          // 如果映射的账户不可用或不在分组中，删除映射
-          await this._deleteSessionMapping(sessionHash)
         }
       }
 
@@ -1569,7 +1629,15 @@ class UnifiedClaudeScheduler {
 
         if (isActive && status && isSchedulable(account.schedulable)) {
           // 检查模型支持
-          if (!this._isModelSupportedByAccount(account, accountType, requestedModel, 'in group')) {
+          if (
+            !this._isModelSupportedByAccount(
+              account,
+              accountType,
+              requestedModel,
+              'in group',
+              betaHeader
+            )
+          ) {
             continue
           }
 
@@ -1628,7 +1696,9 @@ class UnifiedClaudeScheduler {
       const selectedAccount = sortedAccounts[0]
 
       // 如果有会话哈希，建立新的映射
-      if (sessionHash) {
+      // On 1M context bypass, do not overwrite the existing sticky session mapping
+      const is1mBypass = betaHeader && this._is1mContextRequest(betaHeader)
+      if (sessionHash && !is1mBypass) {
         await this._setSessionMapping(
           sessionHash,
           selectedAccount.accountId,
@@ -1636,6 +1706,10 @@ class UnifiedClaudeScheduler {
         )
         logger.info(
           `🎯 Created new sticky session mapping in group: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) for session ${sessionHash}`
+        )
+      } else if (sessionHash && is1mBypass) {
+        logger.info(
+          `🔄 1M context bypass: using ${selectedAccount.name} (${selectedAccount.accountId}) without updating sticky session mapping`
         )
       }
 
