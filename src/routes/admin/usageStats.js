@@ -155,6 +155,60 @@ const resolveAccountByPlatform = async (accountId, platform) => {
   return null
 }
 
+function normalizeAccountUsageInfo(accountId, provider, account) {
+  const isActive =
+    typeof account.isActive === 'boolean'
+      ? account.isActive
+      : typeof account.isActive === 'string'
+        ? account.isActive === 'true'
+        : Boolean(account.isActive)
+
+  return {
+    id: account.id || accountId,
+    provider,
+    name: account.name || '',
+    email: account.email || '',
+    status: account.status || (isActive ? 'active' : 'inactive'),
+    isActive,
+    createdAt: account.createdAt || ''
+  }
+}
+
+async function resolveAccountForUsage(accountId) {
+  const serviceMap = [
+    ['claude', claudeAccountService],
+    ['claude-console', claudeConsoleAccountService],
+    ['gemini', geminiAccountService],
+    ['gemini-api', geminiApiAccountService],
+    ['openai', openaiAccountService],
+    ['openai-responses', openaiResponsesAccountService],
+    ['droid', droidAccountService],
+    ['ccr', ccrAccountService]
+  ]
+
+  for (const [provider, service] of serviceMap) {
+    try {
+      const account = await service.getAccount(accountId)
+      if (account) {
+        return normalizeAccountUsageInfo(accountId, provider, account)
+      }
+    } catch (error) {
+      logger.debug(`⚠️ Failed to get account ${accountId} from ${provider}: ${error.message}`)
+    }
+  }
+
+  try {
+    const bedrockResult = await bedrockAccountService.getAccount(accountId)
+    if (bedrockResult.success && bedrockResult.data) {
+      return normalizeAccountUsageInfo(accountId, 'bedrock', bedrockResult.data)
+    }
+  } catch (error) {
+    logger.debug(`⚠️ Failed to get account ${accountId} from bedrock: ${error.message}`)
+  }
+
+  return null
+}
+
 const getApiKeyName = async (keyId) => {
   try {
     const keyData = await redis.getApiKey(keyId)
@@ -203,28 +257,24 @@ router.get('/accounts/usage-stats', authenticateAdmin, async (req, res) => {
 router.get('/accounts/:accountId/usage-stats', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params
-    const accountStats = await redis.getAccountUsageStats(accountId)
-
-    // 获取账户基本信息
-    const accountData = await claudeAccountService.getAccount(accountId)
-    if (!accountData) {
+    const accountInfo = await resolveAccountForUsage(accountId)
+    if (!accountInfo) {
       return res.status(404).json({
         success: false,
         error: 'Account not found'
       })
     }
 
+    const accountStats = await redis.getAccountUsageStats(accountId, {
+      accountType: accountInfo.provider,
+      createdAt: accountInfo.createdAt
+    })
+
     return res.json({
       success: true,
       data: {
         ...accountStats,
-        accountInfo: {
-          name: accountData.name,
-          email: accountData.email,
-          status: accountData.status,
-          isActive: accountData.isActive,
-          createdAt: accountData.createdAt
-        }
+        accountInfo
       },
       timestamp: new Date().toISOString()
     })
