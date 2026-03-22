@@ -1032,9 +1032,7 @@ program.parse()
 if (!process.argv.slice(2).length) {
   console.log(styles.title('🚀 Claude Relay Service CLI\n'))
   console.log('使用以下命令管理服务:\n')
-  console.log(
-    '  claude-relay-cli remote        - 远程管理 CLI（认证、profile、管理接口读写）'
-  )
+  console.log('  claude-relay-cli remote        - 远程管理 CLI（认证、profile、管理接口读写）')
   console.log('  claude-relay-cli admin         - 创建初始管理员账户')
   console.log('  claude-relay-cli keys          - API Key 管理（查看/修改过期时间/续期/删除）')
   console.log('  claude-relay-cli bedrock       - Bedrock 账户管理（创建/查看/编辑/测试/删除）')
