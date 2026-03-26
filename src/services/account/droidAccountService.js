@@ -1369,6 +1369,18 @@ class DroidAccountService {
   }
 
   /**
+   * 确保账户 token 有效（未过期直接返回，过期则刷新）
+   */
+  async ensureValidToken(accountId) {
+    try {
+      const accessToken = await this.getValidAccessToken(accountId)
+      return { success: true, accessToken }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
    * 获取可调度的 Droid 账户列表
    */
   async getSchedulableAccounts(endpointType = null) {
