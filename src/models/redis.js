@@ -2140,7 +2140,12 @@ class RedisClient {
   }
 
   // 📊 获取账户使用统计
-  async getAccountUsageStats(accountId, accountType = null) {
+  async getAccountUsageStats(accountId, accountTypeOrOptions = null) {
+    const options =
+      accountTypeOrOptions && typeof accountTypeOrOptions === 'object'
+        ? accountTypeOrOptions
+        : { accountType: accountTypeOrOptions }
+    const { accountType = null, createdAt: createdAtInput = '' } = options
     const accountKey = `account_usage:${accountId}`
     const today = getDateStringInTimezone()
     const accountDailyKey = `account_usage:daily:${accountId}:${today}`
@@ -2157,34 +2162,56 @@ class RedisClient {
       this.client.hgetall(accountMonthlyKey)
     ])
 
-    // 获取账户创建时间来计算平均值 - 支持不同类型的账号
-    let accountData = {}
-    if (accountType === 'droid') {
-      accountData = await this.client.hgetall(`droid:account:${accountId}`)
-    } else if (accountType === 'openai') {
-      accountData = await this.client.hgetall(`openai:account:${accountId}`)
-    } else if (accountType === 'openai-responses') {
-      accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
+    const prefixMap = {
+      claude: ['claude:account', 'claude_account'],
+      'claude-console': ['claude_console_account', 'claude:account', 'claude_account'],
+      gemini: ['gemini:account', 'gemini_account'],
+      'gemini-api': ['gemini_api_account', 'gemini:account', 'gemini_account'],
+      openai: ['openai:account', 'openai_account'],
+      'openai-responses': ['openai_responses_account'],
+      droid: ['droid:account'],
+      ccr: ['ccr:account', 'ccr_account'],
+      bedrock: ['bedrock:account', 'bedrock_account']
+    }
+
+    const fallbackPrefixes = [
+      'claude:account',
+      'claude_account',
+      'claude_console_account',
+      'gemini:account',
+      'gemini_account',
+      'gemini_api_account',
+      'openai:account',
+      'openai_account',
+      'openai_responses_account',
+      'droid:account',
+      'ccr:account',
+      'ccr_account',
+      'bedrock:account',
+      'bedrock_account'
+    ]
+
+    let createdAt = null
+    const parsedCreatedAt = createdAtInput ? new Date(createdAtInput) : null
+    if (parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())) {
+      createdAt = parsedCreatedAt
     } else {
-      // 尝试多个前缀（优先 claude:account:）
-      accountData = await this.client.hgetall(`claude:account:${accountId}`)
-      if (!accountData.createdAt) {
-        accountData = await this.client.hgetall(`claude_account:${accountId}`)
-      }
-      if (!accountData.createdAt) {
-        accountData = await this.client.hgetall(`openai:account:${accountId}`)
-      }
-      if (!accountData.createdAt) {
-        accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
-      }
-      if (!accountData.createdAt) {
-        accountData = await this.client.hgetall(`openai_account:${accountId}`)
-      }
-      if (!accountData.createdAt) {
-        accountData = await this.client.hgetall(`droid:account:${accountId}`)
+      const prefixes = prefixMap[accountType] || fallbackPrefixes
+      for (const prefix of prefixes) {
+        const accountData = await this.client.hgetall(`${prefix}:${accountId}`)
+        if (accountData.createdAt) {
+          const parsed = new Date(accountData.createdAt)
+          if (!Number.isNaN(parsed.getTime())) {
+            createdAt = parsed
+            break
+          }
+        }
       }
     }
-    const createdAt = accountData.createdAt ? new Date(accountData.createdAt) : new Date()
+
+    if (!createdAt) {
+      createdAt = new Date()
+    }
     const now = new Date()
     const daysSinceCreated = Math.max(1, Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)))
 
