@@ -17,6 +17,7 @@ const { getSafeMessage } = require('./utils/errorSanitizer')
 const apiRoutes = require('./routes/api')
 const unifiedRoutes = require('./routes/unified')
 const adminRoutes = require('./routes/admin')
+const adminExtensionsRoutes = require('./routes/adminExtensions')
 const webRoutes = require('./routes/web')
 const apiStatsRoutes = require('./routes/apiStats')
 const geminiRoutes = require('./routes/geminiRoutes')
@@ -350,6 +351,7 @@ class Application {
         },
         apiRoutes
       )
+      this.app.use('/admin', adminExtensionsRoutes)
       this.app.use('/admin', adminRoutes)
       this.app.use('/users', userRoutes)
       // 使用 web 路由（包含 auth 和页面重定向）
