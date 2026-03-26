@@ -72,6 +72,9 @@ class ClaudeRelayService {
         .split(',')
         .map((p) => p.trim())
         .filter(Boolean)
+        // Strip context-1m beta: 1M context is now GA (no header needed).
+        // Keeping it triggers legacy extra-usage checks on some orgs.
+        .filter((p) => !p.startsWith('context-1m'))
         .forEach(addBeta)
     }
 
@@ -432,7 +435,9 @@ class ClaudeRelayService {
         accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(
           apiKeyData,
           sessionHash,
-          requestBody.model
+          requestBody.model,
+          null,
+          { betaHeader: clientHeaders?.['anthropic-beta'] || '' }
         )
       } catch (error) {
         if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
@@ -1776,7 +1781,9 @@ class ClaudeRelayService {
         accountSelection = await unifiedClaudeScheduler.selectAccountForApiKey(
           apiKeyData,
           sessionHash,
-          requestBody.model
+          requestBody.model,
+          null,
+          { betaHeader: clientHeaders?.['anthropic-beta'] || '' }
         )
       } catch (error) {
         if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
