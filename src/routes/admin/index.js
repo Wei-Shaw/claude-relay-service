@@ -28,6 +28,7 @@ const claudeRelayConfigRoutes = require('./claudeRelayConfig')
 const syncRoutes = require('./sync')
 const serviceRatesRoutes = require('./serviceRates')
 const quotaCardsRoutes = require('./quotaCards')
+const quotaMonitoringRoutes = require("./quotaMonitoring")
 const errorHistoryRoutes = require('./errorHistory')
 
 // 挂载所有子路由
@@ -48,6 +49,7 @@ router.use('/', claudeRelayConfigRoutes)
 router.use('/', syncRoutes)
 router.use('/', serviceRatesRoutes)
 router.use('/', quotaCardsRoutes)
+router.use('/', quotaMonitoringRoutes)
 router.use('/', errorHistoryRoutes)
 
 // 使用相对路径的模块（需要指定基础路径前缀）
