@@ -29,6 +29,11 @@ describe('quotaExceededHelper', () => {
     expect(isQuotaExceededError(403, 'quota exceeded for this account')).toBe(true)
   })
 
+  it('detects balance-disabled and no-plan style chinese payloads', () => {
+    expect(isQuotaExceededError(403, 'API Key 不允许使用余额且无可用套餐')).toBe(true)
+    expect(isQuotaExceededError(403, '当前无可用套餐，且该 API Key 不允许使用余额')).toBe(true)
+  })
+
   it('applies a two-hour cooldown and clears sticky mapping when quota is exceeded', async () => {
     const clearSessionMapping = jest.fn().mockResolvedValue(undefined)
 

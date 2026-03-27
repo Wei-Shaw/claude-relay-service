@@ -21,7 +21,10 @@ const KEYWORD_MATCHERS = [
   'insufficient_quota',
   'quota_exceeded',
   'credit balance is too low',
-  'usage limit reached'
+  'usage limit reached',
+  '无可用套餐',
+  '不允许使用余额',
+  '余额不足'
 ]
 
 function tryParseJson(value) {
