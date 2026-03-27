@@ -1508,6 +1508,19 @@ class UnifiedClaudeScheduler {
       // 获取分组内的所有账户
       const memberIds = await accountGroupService.getGroupMembers(groupId)
       if (memberIds.length === 0) {
+        if (group.allowSharedFallback === 'true') {
+          logger.info(`🔄 Group ${group.name} has no members, falling back to shared pool`)
+          const fallbackResult = await this._selectSharedFallbackAccount(
+            group.platform,
+            requestedModel
+          )
+          if (fallbackResult) {
+            logger.info(
+              `🎯 Shared fallback selected: ${fallbackResult.accountId} (${fallbackResult.accountType}) for group ${group.name}`
+            )
+            return fallbackResult
+          }
+        }
         throw new Error(`Group ${group.name} has no members`)
       }
 
@@ -1618,6 +1631,27 @@ class UnifiedClaudeScheduler {
       }
 
       if (availableAccounts.length === 0) {
+        // Check if the group allows falling back to the shared account pool
+        if (group.allowSharedFallback === 'true') {
+          logger.info(
+            `🔄 Group ${group.name} has no available members, falling back to shared pool`
+          )
+          const fallbackResult = await this._selectSharedFallbackAccount(
+            group.platform,
+            requestedModel
+          )
+          if (fallbackResult) {
+            logger.info(
+              `🎯 Shared fallback selected: ${fallbackResult.accountId} (${fallbackResult.accountType}) for group ${group.name}`
+            )
+            // Do not create sticky session mapping for fallback accounts
+            return fallbackResult
+          }
+          // Shared pool also empty
+          throw new Error(
+            `No available accounts in group ${group.name} and no shared accounts available`
+          )
+        }
         throw new Error(`No available accounts in group ${group.name}`)
       }
 
@@ -1650,6 +1684,119 @@ class UnifiedClaudeScheduler {
     } catch (error) {
       logger.error(`❌ Failed to select account from group ${groupId}:`, error)
       throw error
+    }
+  }
+
+  // 🔄 Select a shared account as fallback when group has no available members
+  async _selectSharedFallbackAccount(platform, requestedModel, betaHeader = '') {
+    const availableAccounts = []
+    const isOpusRequest =
+      requestedModel && typeof requestedModel === 'string'
+        ? requestedModel.toLowerCase().includes('opus')
+        : false
+
+    if (platform === 'claude') {
+      // Claude Official shared accounts
+      const claudeAccounts = await redis.getAllClaudeAccounts()
+      for (const account of claudeAccounts) {
+        if (
+          account.isActive === 'true' &&
+          account.status !== 'error' &&
+          account.status !== 'blocked' &&
+          account.status !== 'temp_error' &&
+          (account.accountType === 'shared' || !account.accountType) &&
+          isSchedulable(account.schedulable)
+        ) {
+          if (
+            !this._isModelSupportedByAccount(
+              account,
+              'claude-official',
+              requestedModel,
+              'shared fallback',
+              betaHeader
+            )
+          ) {
+            continue
+          }
+          if (await this.isAccountTemporarilyUnavailable(account.id, 'claude-official')) continue
+          if (await claudeAccountService.isAccountRateLimited(account.id)) continue
+          if (isOpusRequest) {
+            if (await claudeAccountService.isAccountOpusRateLimited(account.id)) continue
+          }
+          availableAccounts.push({
+            ...account,
+            accountId: account.id,
+            accountType: 'claude-official',
+            priority: parseInt(account.priority) || 50,
+            lastUsedAt: account.lastUsedAt || '0'
+          })
+        }
+      }
+
+      // Claude Console accounts
+      const consoleAccounts = await claudeConsoleAccountService.getAllAccounts()
+      for (const account of consoleAccounts) {
+        if (
+          account.isActive === true &&
+          account.status === 'active' &&
+          isSchedulable(account.schedulable)
+        ) {
+          if (
+            !this._isModelSupportedByAccount(
+              account,
+              'claude-console',
+              requestedModel,
+              'shared fallback'
+            )
+          ) {
+            continue
+          }
+          if (await this.isAccountTemporarilyUnavailable(account.id, 'claude-console')) continue
+          if (await this.isAccountRateLimited(account.id, 'claude-console')) continue
+          if (account.maxConcurrentTasks > 0) {
+            const concurrency = await redis.getConsoleAccountConcurrency(account.id)
+            if (concurrency >= account.maxConcurrentTasks) continue
+          }
+          availableAccounts.push({
+            ...account,
+            accountId: account.id,
+            accountType: 'claude-console',
+            priority: parseInt(account.priority) || 50,
+            lastUsedAt: account.lastUsedAt || '0'
+          })
+        }
+      }
+
+      // CCR accounts
+      const ccrAccounts = await ccrAccountService.getAllAccounts()
+      for (const account of ccrAccounts) {
+        if (account.status === 'active' && isSchedulable(account.schedulable)) {
+          if (!this._isModelSupportedByAccount(account, 'ccr', requestedModel, 'shared fallback')) {
+            continue
+          }
+          if (await this.isAccountTemporarilyUnavailable(account.id, 'ccr')) continue
+          if (await this.isAccountRateLimited(account.id, 'ccr')) continue
+          availableAccounts.push({
+            ...account,
+            accountId: account.id,
+            accountType: 'ccr',
+            priority: parseInt(account.priority) || 50,
+            lastUsedAt: account.lastUsedAt || '0'
+          })
+        }
+      }
+    }
+
+    // TODO: Add gemini/openai/droid shared pool fallback if needed
+
+    if (availableAccounts.length === 0) {
+      return null
+    }
+
+    const sorted = sortAccountsByPriority(availableAccounts)
+    return {
+      accountId: sorted[0].accountId,
+      accountType: sorted[0].accountType
     }
   }
 

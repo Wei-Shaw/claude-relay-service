@@ -15,12 +15,13 @@ const router = express.Router()
 // 创建账户分组
 router.post('/', authenticateAdmin, async (req, res) => {
   try {
-    const { name, platform, description } = req.body
+    const { name, platform, description, allowSharedFallback } = req.body
 
     const group = await accountGroupService.createGroup({
       name,
       platform,
-      description
+      description,
+      allowSharedFallback
     })
 
     return res.json({ success: true, data: group })

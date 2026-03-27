@@ -194,6 +194,18 @@
             />
           </div>
 
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >允许共享账户回退</label
+              >
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                分组内无可用账户时使用共享账户池
+              </p>
+            </div>
+            <el-switch v-model="editForm.allowSharedFallback" />
+          </div>
+
           <div class="flex gap-3 pt-4">
             <button
               class="btn btn-primary flex-1 px-4 py-2"
@@ -274,6 +286,18 @@
             />
           </div>
 
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >允许共享账户回退</label
+              >
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                分组内无可用账户时使用共享账户池
+              </p>
+            </div>
+            <el-switch v-model="createForm.allowSharedFallback" />
+          </div>
+
           <div class="flex gap-3 pt-4">
             <button
               class="btn btn-primary flex-1 px-4 py-2"
@@ -351,7 +375,8 @@ const creating = ref(false)
 const createForm = ref({
   name: '',
   platform: 'claude',
-  description: ''
+  description: '',
+  allowSharedFallback: false
 })
 
 // 编辑表单
@@ -361,7 +386,8 @@ const editingGroup = ref(null)
 const editForm = ref({
   name: '',
   platform: '',
-  description: ''
+  description: '',
+  allowSharedFallback: false
 })
 
 // 格式化日期
@@ -391,7 +417,8 @@ const createGroup = async () => {
     await httpApis.createAccountGroupApi({
       name: createForm.value.name,
       platform: createForm.value.platform,
-      description: createForm.value.description
+      description: createForm.value.description,
+      allowSharedFallback: createForm.value.allowSharedFallback
     })
 
     showToast('分组创建成功', 'success')
@@ -417,7 +444,8 @@ const cancelCreate = () => {
   createForm.value = {
     name: '',
     platform: 'claude',
-    description: ''
+    description: '',
+    allowSharedFallback: false
   }
 }
 
@@ -427,7 +455,8 @@ const editGroup = (group) => {
   editForm.value = {
     name: group.name,
     platform: group.platform,
-    description: group.description || ''
+    description: group.description || '',
+    allowSharedFallback: group.allowSharedFallback === 'true'
   }
   showEditForm.value = true
 }
@@ -443,7 +472,8 @@ const updateGroup = async () => {
   try {
     await httpApis.updateAccountGroupApi(editingGroup.value.id, {
       name: editForm.value.name,
-      description: editForm.value.description
+      description: editForm.value.description,
+      allowSharedFallback: editForm.value.allowSharedFallback
     })
 
     showToast('分组更新成功', 'success')
@@ -464,7 +494,8 @@ const cancelEdit = () => {
   editForm.value = {
     name: '',
     platform: '',
-    description: ''
+    description: '',
+    allowSharedFallback: false
   }
 }
 
