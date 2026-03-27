@@ -356,6 +356,18 @@ async function handleMessagesRequest(req, res) {
       }
     }
 
+    // 检测 1M 上下文窗口请求（anthropic-beta 包含 context-1m）
+    const betaHeader = (req.headers['anthropic-beta'] || '').toLowerCase()
+    const is1mContextRequest = betaHeader.includes('context-1m')
+    if (is1mContextRequest && !req.apiKey.allow1mContext) {
+      return res.status(403).json({
+        error: {
+          type: 'forbidden',
+          message: '该 API Key 未启用 1M 上下文窗口，请联系管理员开启或切换为非 [1m] 模型'
+        }
+      })
+    }
+
     logger.api('📥 /v1/messages request received', {
       model: req.body.model || null,
       forcedVendor,
@@ -537,6 +549,13 @@ async function handleMessagesRequest(req, res) {
           return
         }
         throw error
+      }
+
+      // 1M 上下文窗口：记录日志（admin 已通过 allow1mContext 授权，信任其决定）
+      if (is1mContextRequest) {
+        logger.api(
+          `📐 1M context request allowed for key: ${req.apiKey.name}, accountType: ${accountType}`
+        )
       }
 
       // 🔗 在成功调度后建立会话绑定（仅 claude-official 类型）
@@ -917,10 +936,6 @@ async function handleMessagesRequest(req, res) {
           logger.error('❌ Bedrock stream request failed:', error)
           if (!res.headersSent) {
             return res.status(500).json({ error: 'Bedrock service error', message: error.message })
-          }
-          // SSE 流已开始但出错：确保连接被关闭，防止客户端 pending
-          if (!res.writableEnded) {
-            res.end()
           }
           return undefined
         }
