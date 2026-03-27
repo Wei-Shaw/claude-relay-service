@@ -109,14 +109,6 @@ async function updateRateLimitCounters(
         cost: ratedCost
       }
     )
-  } else {
-    if (totalTokens > 0 && rateLimitInfo.tokenCountKey) {
-      await client.incrby(rateLimitInfo.tokenCountKey, Math.round(totalTokens))
-    }
-
-    if (ratedCost > 0 && rateLimitInfo.costCountKey) {
-      await client.incrbyfloat(rateLimitInfo.costCountKey, ratedCost)
-    }
   }
 
   return { totalTokens, totalCost, ratedCost }

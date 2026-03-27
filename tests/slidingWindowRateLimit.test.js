@@ -57,6 +57,37 @@ function createFakeRedisClient() {
     async expire() {
       return 1
     },
+    async eval(script, numKeys, ...args) {
+      // Simulate the INCREMENT_BUCKET_LUA script atomically
+      const key = args[0]
+      const field = args[1]
+      const reqDelta = Number(args[2])
+      const tokDelta = Number(args[3])
+      const costDelta = Number(args[4])
+      const ttl = Number(args[5])
+
+      const hash = ensureHash(key)
+      const cur = Object.prototype.hasOwnProperty.call(hash, field) ? hash[field] : null
+
+      let r = 0
+      let t = 0
+      let c = 0
+      if (cur) {
+        const parts = String(cur).split('|')
+        r = Number(parts[0]) || 0
+        t = Number(parts[1]) || 0
+        c = Number(parts[2]) || 0
+      }
+      r = Math.max(0, r + reqDelta)
+      t = Math.max(0, t + tokDelta)
+      c = Math.max(0, Math.floor((c + costDelta) * 1e6 + 0.5) / 1e6)
+
+      const val = `${r}|${t}|${c}`
+      hash[field] = val
+      // ttl ignored in fake client
+      void ttl
+      return val
+    },
     pipeline() {
       const commands = []
       const pipelineApi = {
@@ -153,6 +184,40 @@ describe('slidingWindowRateLimit', () => {
     expect(snapshot.windowStartTime).toBe((currentBucket - 59) * 60000)
     expect(snapshot.windowEndTime).toBe((currentBucket - 58) * 60000 + 60 * 60000)
     expect(snapshot.staleFields).toContain(String(currentBucket - 70))
+  })
+
+  test('incrementWindowUsage atomically increments bucket values', async () => {
+    const client = createFakeRedisClient()
+    const keyId = 'key-inc'
+    const now = Date.UTC(2026, 0, 1, 10, 30, 0)
+
+    // First increment creates the bucket
+    const snap1 = await slidingWindowRateLimit.incrementWindowUsage(
+      keyId,
+      60,
+      { requests: 1, tokens: 100, cost: 1.5 },
+      { client, now }
+    )
+    expect(snap1.requests).toBe(1)
+    expect(snap1.tokens).toBe(100)
+    expect(snap1.cost).toBe(1.5)
+
+    // Second increment adds to existing bucket
+    const snap2 = await slidingWindowRateLimit.incrementWindowUsage(
+      keyId,
+      60,
+      { tokens: 200, cost: 0.75 },
+      { client, now }
+    )
+    expect(snap2.requests).toBe(1)
+    expect(snap2.tokens).toBe(300)
+    expect(snap2.cost).toBe(2.25)
+
+    // Verify the raw bucket value in Redis
+    const bucketKey = slidingWindowRateLimit._private.getBucketKey(keyId)
+    const bucketId = String(Math.floor(now / 60000))
+    const raw = await client.hget(bucketKey, bucketId)
+    expect(raw).toBe('1|300|2.25')
   })
 
   test('getWindowSnapshot migrates legacy fixed-window counters into sliding buckets', async () => {

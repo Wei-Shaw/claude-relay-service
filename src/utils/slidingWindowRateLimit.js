@@ -5,6 +5,30 @@ const MINUTE_MS = 60 * 1000
 const FALLBACK_RETENTION_BUFFER_SECONDS = 24 * 60 * 60
 const SLIDING_BUCKET_KEY_PREFIX = 'rate_limit:sliding:buckets:'
 
+// Lua script for atomic increment of bucket values (avoids read-modify-write race)
+const INCREMENT_BUCKET_LUA = `
+local cur = redis.call('HGET', KEYS[1], ARGV[1])
+local r, t, c = 0, 0, 0
+if cur then
+  local pos1 = string.find(cur, '|', 1, true)
+  if pos1 then
+    local pos2 = string.find(cur, '|', pos1 + 1, true)
+    if pos2 then
+      r = tonumber(string.sub(cur, 1, pos1 - 1)) or 0
+      t = tonumber(string.sub(cur, pos1 + 1, pos2 - 1)) or 0
+      c = tonumber(string.sub(cur, pos2 + 1)) or 0
+    end
+  end
+end
+r = math.max(0, r + tonumber(ARGV[2]))
+t = math.max(0, t + tonumber(ARGV[3]))
+c = math.max(0, math.floor((c + tonumber(ARGV[4])) * 1e6 + 0.5) / 1e6)
+local val = r .. '|' .. t .. '|' .. c
+redis.call('HSET', KEYS[1], ARGV[1], val)
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[5]))
+return val
+`
+
 function toInt(value) {
   const parsed = Number.parseInt(value, 10)
   return Number.isFinite(parsed) ? parsed : 0
@@ -343,17 +367,19 @@ async function incrementWindowUsage(keyId, windowMinutes, increments = {}, optio
   const bucketKey = getBucketKey(keyId)
   const bucketId = String(getBucketId(now))
 
-  const currentValue = parseBucketValue(await client.hget(bucketKey, bucketId))
-  const nextValue = {
-    requests: currentValue.requests + requestsDelta,
-    tokens: currentValue.tokens + tokensDelta,
-    cost: roundCost(currentValue.cost + costDelta)
-  }
+  const retentionSeconds = getBucketRetentionSeconds(windowMinutes)
+  const resultRaw = await client.eval(
+    INCREMENT_BUCKET_LUA,
+    1,
+    bucketKey,
+    bucketId,
+    requestsDelta,
+    tokensDelta,
+    costDelta,
+    retentionSeconds
+  )
 
-  const pipeline = client.pipeline()
-  pipeline.hset(bucketKey, bucketId, serializeBucketValue(nextValue))
-  pipeline.expire(bucketKey, getBucketRetentionSeconds(windowMinutes))
-  await pipeline.exec()
+  const nextValue = parseBucketValue(resultRaw)
 
   return {
     requests: nextValue.requests,
