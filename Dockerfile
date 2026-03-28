@@ -7,9 +7,8 @@ WORKDIR /app
 # 📦 复制 package 文件
 COPY package*.json ./
 
-# 🔽 安装依赖 (生产环境) - 使用 BuildKit 缓存加速
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --only=production
+# 🔽 安装依赖 (生产环境)
+RUN npm ci --only=production
 
 # 🎯 前端构建阶段 (与后端依赖并行)
 FROM node:18-alpine AS frontend-builder
@@ -20,9 +19,8 @@ WORKDIR /app/web/admin-spa
 # 📦 复制前端依赖文件
 COPY web/admin-spa/package*.json ./
 
-# 🔽 安装前端依赖 - 使用 BuildKit 缓存加速
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+# 🔽 安装前端依赖
+RUN npm ci
 
 # 📋 复制前端源代码
 COPY web/admin-spa/ ./
