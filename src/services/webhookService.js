@@ -8,6 +8,9 @@ const webhookConfigService = require('./webhookConfigService')
 const { getISOStringWithTimezone } = require('../utils/dateHelper')
 const appConfig = require('../../config/config')
 
+// 账号维度的通知类型（需要按分组过滤）
+const ACCOUNT_SCOPED_NOTIFICATION_TYPES = ['accountAnomaly', 'rateLimitRecovery']
+
 class WebhookService {
   constructor() {
     this.platformHandlers = {
@@ -37,17 +40,44 @@ class WebhookService {
         return
       }
 
-      // 检查通知类型是否启用（test类型始终允许发送）
-      if (type !== 'test' && config.notificationTypes && !config.notificationTypes[type]) {
+      // 检查通知类型是否启用
+      if (config.notificationTypes && !config.notificationTypes[type]) {
         logger.debug(`通知类型 ${type} 已禁用`)
         return
       }
 
       // 获取启用的平台
-      const enabledPlatforms = await webhookConfigService.getEnabledPlatforms()
+      let enabledPlatforms = await webhookConfigService.getEnabledPlatforms()
       if (enabledPlatforms.length === 0) {
         logger.debug('没有启用的webhook平台')
         return
+      }
+
+      // 根据通知类型过滤平台
+      const isAccountScoped = ACCOUNT_SCOPED_NOTIFICATION_TYPES.includes(type)
+
+      if (isAccountScoped) {
+        // 账号维度通知：按分组过滤
+        enabledPlatforms = await this.filterPlatformsByAccountGroups(enabledPlatforms, type, data)
+        if (enabledPlatforms.length === 0) {
+          logger.debug(`账号维度通知 ${type} 没有匹配的目标平台`)
+          return { succeeded: 0, failed: 0 }
+        }
+      } else {
+        // 系统维度通知：排除那些"仅接收账号通知"的平台
+        enabledPlatforms = enabledPlatforms.filter((platform) => {
+          if (platform.filterByAccountGroups) {
+            logger.debug(
+              `平台 ${platform.name || platform.type} 仅接收账号通知，跳过系统通知 ${type}`
+            )
+            return false
+          }
+          return true
+        })
+        if (enabledPlatforms.length === 0) {
+          logger.debug(`系统维度通知 ${type} 没有可接收的平台`)
+          return { succeeded: 0, failed: 0 }
+        }
       }
 
       logger.info(`📢 发送 ${type} 通知到 ${enabledPlatforms.length} 个平台`)
@@ -74,6 +104,120 @@ class WebhookService {
       logger.error('发送webhook通知失败:', error)
       throw error
     }
+  }
+
+  /**
+   * 根据账户分组过滤目标平台
+   * @param {Array} platforms - 启用的平台列表
+   * @param {string} type - 通知类型
+   * @param {Object} data - 通知数据
+   * @returns {Array} 过滤后的平台列表
+   */
+  async filterPlatformsByAccountGroups(platforms, type, data) {
+    try {
+      // 延迟加载 accountGroupService 避免循环依赖
+      const accountGroupService = require('./accountGroupService')
+
+      // 提取通知涉及的账户信息
+      const involvedAccounts = this.extractInvolvedAccounts(type, data)
+
+      if (involvedAccounts.length === 0) {
+        // 无法确定账户信息，发送到所有平台（保守策略）
+        return platforms
+      }
+
+      // 获取这些账户所属的分组
+      const accountGroupIds = new Set()
+      for (const { accountId, platform: accountPlatform } of involvedAccounts) {
+        // 规范化平台名称
+        const normalizedPlatform = this.normalizeAccountPlatform(accountPlatform)
+
+        try {
+          // 使用反向索引批量获取（性能优化）
+          const groupsMap = await accountGroupService.batchGetAccountGroupsByIndex(
+            [accountId],
+            normalizedPlatform,
+            { skipMemberCount: true }
+          )
+
+          const groups = groupsMap.get(accountId) || []
+          groups.forEach((group) => accountGroupIds.add(group.id))
+        } catch (error) {
+          logger.warn(`获取账户 ${accountId} 的分组失败:`, error.message)
+        }
+      }
+
+      // 过滤平台
+      return platforms.filter((platform) => {
+        // 未启用分组过滤的平台接收所有通知（向后兼容）
+        // filterByAccountGroups: false 或 undefined = 接收所有通知
+        if (!platform.filterByAccountGroups) {
+          return true
+        }
+
+        // 启用了分组过滤但没有配置任何分组 = 不接收任何账号维度通知
+        // 这处理了分组被删除后的情况
+        if (!platform.accountGroupIds || platform.accountGroupIds.length === 0) {
+          logger.debug(`平台 ${platform.name || platform.type} 启用了分组过滤但无关联分组，跳过`)
+          return false
+        }
+
+        // 检查平台关联的分组是否与账户所属分组有交集
+        return platform.accountGroupIds.some((groupId) => accountGroupIds.has(groupId))
+      })
+    } catch (error) {
+      logger.error('过滤平台分组失败，回退到发送所有平台:', error)
+      return platforms
+    }
+  }
+
+  /**
+   * 从通知数据中提取涉及的账户信息
+   * @param {string} type - 通知类型
+   * @param {Object} data - 通知数据
+   * @returns {Array} 账户信息数组 [{accountId, platform}]
+   */
+  extractInvolvedAccounts(type, data) {
+    const accounts = []
+
+    if (type === 'accountAnomaly') {
+      // 单个账户通知
+      if (data.accountId) {
+        accounts.push({
+          accountId: data.accountId,
+          platform: data.platform
+        })
+      }
+    } else if (type === 'rateLimitRecovery') {
+      // 批量账户通知
+      if (data.accounts && Array.isArray(data.accounts)) {
+        data.accounts.forEach((account) => {
+          if (account.accountId) {
+            accounts.push({
+              accountId: account.accountId,
+              platform: account.platform
+            })
+          }
+        })
+      }
+    }
+
+    return accounts
+  }
+
+  /**
+   * 规范化账户平台名称（与 accountGroupService 一致）
+   * @param {string} platform - 原始平台名称
+   * @returns {string} 规范化后的平台名称
+   */
+  normalizeAccountPlatform(platform) {
+    const platformMap = {
+      'claude-oauth': 'claude',
+      'claude-console': 'claude',
+      'openai-responses': 'openai'
+      // gemini, droid 保持不变
+    }
+    return platformMap[platform] || platform
   }
 
   /**
