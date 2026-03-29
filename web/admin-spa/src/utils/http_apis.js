@@ -26,7 +26,28 @@ export const getBatchModelStatsApi = (apiIds, period = 'daily') =>
 export const loginApi = (data) => request({ url: '/web/auth/login', method: 'POST', data })
 export const getAuthUserApi = () => request({ url: '/web/auth/user', method: 'GET' })
 export const changePasswordApi = (data) =>
-  request({ url: '/web/auth/change-password', method: 'POST', data })
+  request({ url: '/web/auth/change-password', method: 'POST', data, skipAuthRedirect: true })
+export const verifyAdminTwoFactorApi = (data) =>
+  request({ url: '/web/auth/2fa/verify', method: 'POST', data })
+export const getAdminTwoFactorStatusApi = () =>
+  request({ url: '/web/auth/2fa/status', method: 'GET' })
+export const createAdminTwoFactorSetupApi = (data) =>
+  request({ url: '/web/auth/2fa/setup', method: 'POST', data, skipAuthRedirect: true })
+export const enableAdminTwoFactorApi = (data) =>
+  request({ url: '/web/auth/2fa/enable', method: 'POST', data, skipAuthRedirect: true })
+export const disableAdminTwoFactorApi = (data) =>
+  request({ url: '/web/auth/2fa/disable', method: 'POST', data, skipAuthRedirect: true })
+export const regenerateAdminRecoveryCodesApi = (data) =>
+  request({
+    url: '/web/auth/2fa/recovery-codes/regenerate',
+    method: 'POST',
+    data,
+    skipAuthRedirect: true
+  })
+export const emergencyRecoverAdminTwoFactorApi = (data) =>
+  request({ url: '/web/auth/2fa/emergency-recover', method: 'POST', data })
+export const resetAdminEmergencyRecoveryApi = (data) =>
+  request({ url: '/web/auth/2fa/reset-emergency', method: 'POST', data, skipAuthRedirect: true })
 
 // OEM 设置
 export const getOemSettingsApi = () => request({ url: '/admin/oem-settings', method: 'GET' })
@@ -312,6 +333,8 @@ export const getFrontUserUsageStatsApi = (id, params) =>
   request({ url: `/users/${id}/usage-stats`, method: 'GET', params })
 export const updateFrontUserRoleApi = (id, data) =>
   request({ url: `/users/${id}/role`, method: 'PATCH', data })
+export const resetFrontUserTwoFactorApi = (id) =>
+  request({ url: `/users/${id}/reset-2fa`, method: 'POST' })
 
 // Webhook 配置
 export const getWebhookConfigApi = (config) =>
