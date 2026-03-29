@@ -4,10 +4,30 @@ const crypto = require('crypto')
 const path = require('path')
 const fs = require('fs')
 const redis = require('../models/redis')
+const TwoFactorService = require('../services/twoFactorService')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 
 const router = express.Router()
+const twoFactorService = new TwoFactorService({
+  redis,
+  encryptionKey: config.security.encryptionKey,
+  challengeTtlMs: config.security.twoFactorPendingLoginTtlMs,
+  maxChallengeAttempts: config.security.twoFactorMaxChallengeAttempts,
+  recoveryCodesCount: config.security.twoFactorRecoveryCodesCount
+})
+
+function buildAdminSession(username) {
+  const now = new Date().toISOString()
+  return {
+    token: crypto.randomBytes(32).toString('hex'),
+    sessionData: {
+      username,
+      loginTime: now,
+      lastActivity: now
+    }
+  }
+}
 
 // 🏠 服务静态文件
 router.use('/assets', express.static(path.join(__dirname, '../../web/assets')))
@@ -81,15 +101,26 @@ router.post('/auth/login', async (req, res) => {
       })
     }
 
-    // 生成会话token
-    const sessionId = crypto.randomBytes(32).toString('hex')
+    const twoFactorEnabled = await twoFactorService.isTwoFactorEnabledForAdmin()
+    if (twoFactorEnabled) {
+      const challenge = await twoFactorService.createPendingChallenge({
+        subjectType: 'admin',
+        subjectId: adminData.username,
+        username: adminData.username,
+        ip: req.ip || 'unknown',
+        userAgent: req.get('user-agent') || 'unknown'
+      })
 
-    // 存储会话
-    const sessionData = {
-      username: adminData.username,
-      loginTime: new Date().toISOString(),
-      lastActivity: new Date().toISOString()
+      return res.json({
+        success: true,
+        requiresTwoFactor: true,
+        pendingLoginToken: challenge.pendingLoginToken,
+        pendingLoginExpiresIn: challenge.pendingLoginExpiresIn,
+        canUseRecoveryCode: true
+      })
     }
+
+    const { token: sessionId, sessionData } = buildAdminSession(adminData.username)
 
     await redis.setSession(sessionId, sessionData, config.security.adminSessionTimeout)
 
@@ -109,6 +140,43 @@ router.post('/auth/login', async (req, res) => {
     return res.status(500).json({
       error: 'Login failed',
       message: 'Internal server error'
+    })
+  }
+})
+
+// 🔐 管理员 2FA 验证
+router.post('/auth/2fa/verify', async (req, res) => {
+  try {
+    const { pendingLoginToken, otpCode, recoveryCode } = req.body
+
+    if (!pendingLoginToken) {
+      return res.status(400).json({
+        error: 'Missing pending token',
+        message: 'Pending login token is required'
+      })
+    }
+
+    const result = await twoFactorService.verifyAdminSecondFactor({
+      pendingLoginToken,
+      otpCode,
+      recoveryCode
+    })
+
+    const { token, sessionData } = buildAdminSession(result.username)
+    await redis.setSession(token, sessionData, config.security.adminSessionTimeout)
+
+    return res.json({
+      success: true,
+      token,
+      expiresIn: config.security.adminSessionTimeout,
+      username: result.username,
+      usedRecoveryCode: !!result.usedRecoveryCode
+    })
+  } catch (error) {
+    logger.error('❌ Admin two-factor verification error:', error)
+    return res.status(401).json({
+      error: 'Two-factor verification failed',
+      message: error.message || 'Two-factor verification failed'
     })
   }
 })
