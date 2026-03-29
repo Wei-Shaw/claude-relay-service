@@ -59,6 +59,17 @@
                 <button
                   :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
+                    activeTab === 'security'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                  ]"
+                  @click="handleTabChange('security')"
+                >
+                  Security
+                </button>
+                <button
+                  :class="[
+                    'rounded-md px-3 py-2 text-sm font-medium',
                     activeTab === 'tutorial'
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                       : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
@@ -327,6 +338,10 @@
         <UserUsageStats />
       </div>
 
+      <div v-else-if="activeTab === 'security'" class="space-y-6">
+        <UserTwoFactorSection />
+      </div>
+
       <!-- Tutorial Tab -->
       <div v-else-if="activeTab === 'tutorial'" class="space-y-6">
         <TutorialView />
@@ -344,6 +359,7 @@ import { showToast, formatNumber, formatDate } from '@/utils/tools'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import UserApiKeysManager from '@/components/user/UserApiKeysManager.vue'
 import UserUsageStats from '@/components/user/UserUsageStats.vue'
+import UserTwoFactorSection from '@/components/security/UserTwoFactorSection.vue'
 import TutorialView from '@/views/TutorialView.vue'
 
 const router = useRouter()
