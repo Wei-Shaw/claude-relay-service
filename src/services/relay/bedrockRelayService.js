@@ -400,18 +400,26 @@ class BedrockRelayService {
     } catch (error) {
       logger.error('❌ Bedrock流式请求失败:', error)
 
-      // 发送错误事件
-      if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'application/json' })
+      const bedrockError = this._handleBedrockError(error, accountId, bedrockAccount)
+
+      // 发送错误事件并关闭连接
+      try {
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Content-Type': 'text/event-stream' })
+        }
+        if (!res.writableEnded) {
+          res.write('event: error\n')
+          res.write(`data: ${JSON.stringify({ error: bedrockError.message })}\n\n`)
+          res.end()
+        }
+      } catch (writeError) {
+        logger.error('❌ Failed to write error response:', writeError.message)
+        if (!res.writableEnded) {
+          res.end()
+        }
       }
 
-      res.write('event: error\n')
-      res.write(
-        `data: ${JSON.stringify({ error: this._handleBedrockError(error, accountId, bedrockAccount).message })}\n\n`
-      )
-      res.end()
-
-      throw this._handleBedrockError(error, accountId, bedrockAccount)
+      throw bedrockError
     } finally {
       // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && accountId) {
@@ -590,9 +598,14 @@ class BedrockRelayService {
 
   // 转换Claude格式请求到Bedrock格式
   _convertToBedrockFormat(requestBody) {
+    // 当启用 thinking 时，max_tokens 必须大于 budget_tokens，不能强制限制
+    const maxTokens = requestBody.thinking
+      ? requestBody.max_tokens || this.maxOutputTokens
+      : Math.min(requestBody.max_tokens || this.maxOutputTokens, this.maxOutputTokens)
+
     const bedrockPayload = {
       anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: Math.min(requestBody.max_tokens || this.maxOutputTokens, this.maxOutputTokens),
+      max_tokens: maxTokens,
       messages: requestBody.messages || []
     }
 
@@ -625,6 +638,16 @@ class BedrockRelayService {
 
     if (requestBody.tool_choice) {
       bedrockPayload.tool_choice = requestBody.tool_choice
+    }
+
+    // Extended thinking 支持
+    if (requestBody.thinking) {
+      bedrockPayload.thinking = requestBody.thinking
+    }
+
+    // metadata 透传
+    if (requestBody.metadata) {
+      bedrockPayload.metadata = requestBody.metadata
     }
 
     // Sanitize cache_control for Bedrock compatibility (strip unsupported fields like "scope")

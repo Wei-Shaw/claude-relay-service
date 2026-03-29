@@ -278,7 +278,7 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
       expect(result.pricing.ephemeral1h).toBeCloseTo(0.00006, 12) // 0.00003 * 2
     })
 
-    it('Opus 4.6 在 fast-mode + [1m] 且超过 200K 时应叠加计费（12x input）', () => {
+    it('Opus 4.6 在 fast-mode + [1m] 且超过 200K 时不应叠加长上下文加价', () => {
       const usage = {
         input_tokens: 210000,
         output_tokens: 1000,
@@ -290,11 +290,29 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
 
       const result = pricingService.calculateCost(usage, 'claude-opus-4-6[1m]')
 
-      expect(result.isLongContextRequest).toBe(true)
-      // input: 0.000005 -> long context 0.00001 -> fast 6x => 0.00006 (即标准 12x)
-      expect(result.pricing.input).toBeCloseTo(0.00006, 12)
-      // output: 0.000025 -> long context 0.0000375 -> fast 6x => 0.000225 (即标准 9x)
-      expect(result.pricing.output).toBeCloseTo(0.000225, 12)
+      expect(result.isLongContextRequest).toBe(false)
+      // input: 0.000005（200K+ 维持同价）-> fast 6x => 0.00003
+      expect(result.pricing.input).toBeCloseTo(0.00003, 12)
+      // output: 0.000025（200K+ 维持同价）-> fast 6x => 0.00015
+      expect(result.pricing.output).toBeCloseTo(0.00015, 12)
+    })
+
+    it('Opus 4.6 在 [1m] 且超过 200K、未开启 fast-mode 时保持基础价格', () => {
+      const usage = {
+        input_tokens: 210000,
+        output_tokens: 1000,
+        cache_creation_input_tokens: 10000,
+        cache_read_input_tokens: 10000,
+        request_anthropic_beta: 'context-1m-2025-08-07'
+      }
+
+      const result = pricingService.calculateCost(usage, 'claude-opus-4-6[1m]')
+
+      expect(result.isLongContextRequest).toBe(false)
+      expect(result.pricing.input).toBeCloseTo(0.000005, 12)
+      expect(result.pricing.output).toBeCloseTo(0.000025, 12)
+      expect(result.pricing.cacheCreate).toBeCloseTo(0.00000625, 12)
+      expect(result.pricing.cacheRead).toBeCloseTo(0.0000005, 12)
     })
   })
 
