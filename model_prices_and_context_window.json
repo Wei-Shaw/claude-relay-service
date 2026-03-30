@@ -308,18 +308,14 @@
   "claude-opus-4-6": {
     "cache_creation_input_token_cost": 6.25e-06,
     "cache_creation_input_token_cost_above_1hr": 1e-05,
-    "cache_creation_input_token_cost_above_200k_tokens": 1.25e-05,
     "cache_read_input_token_cost": 5e-07,
-    "cache_read_input_token_cost_above_200k_tokens": 1e-06,
     "input_cost_per_token": 5e-06,
-    "input_cost_per_token_above_200k_tokens": 1e-05,
     "litellm_provider": "anthropic",
     "max_input_tokens": 1000000,
     "max_output_tokens": 128000,
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
-    "output_cost_per_token_above_200k_tokens": 3.75e-05,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -343,18 +339,14 @@
   "claude-opus-4-6-20260205": {
     "cache_creation_input_token_cost": 6.25e-06,
     "cache_creation_input_token_cost_above_1hr": 1e-05,
-    "cache_creation_input_token_cost_above_200k_tokens": 1.25e-05,
     "cache_read_input_token_cost": 5e-07,
-    "cache_read_input_token_cost_above_200k_tokens": 1e-06,
     "input_cost_per_token": 5e-06,
-    "input_cost_per_token_above_200k_tokens": 1e-05,
     "litellm_provider": "anthropic",
     "max_input_tokens": 1000000,
     "max_output_tokens": 128000,
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
-    "output_cost_per_token_above_200k_tokens": 3.75e-05,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -378,18 +370,14 @@
   "claude-opus-4-6-thinking": {
     "cache_creation_input_token_cost": 6.25e-06,
     "cache_creation_input_token_cost_above_1hr": 1e-05,
-    "cache_creation_input_token_cost_above_200k_tokens": 1.25e-05,
     "cache_read_input_token_cost": 5e-07,
-    "cache_read_input_token_cost_above_200k_tokens": 1e-06,
     "input_cost_per_token": 5e-06,
-    "input_cost_per_token_above_200k_tokens": 1e-05,
     "litellm_provider": "anthropic",
     "max_input_tokens": 1000000,
     "max_output_tokens": 128000,
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
-    "output_cost_per_token_above_200k_tokens": 3.75e-05,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -534,18 +522,14 @@
   "claude-sonnet-4-6": {
     "cache_creation_input_token_cost": 3.75e-06,
     "cache_creation_input_token_cost_above_1hr": 6e-06,
-    "cache_creation_input_token_cost_above_200k_tokens": 7.5e-06,
     "cache_read_input_token_cost": 3e-07,
-    "cache_read_input_token_cost_above_200k_tokens": 6e-07,
     "input_cost_per_token": 3e-06,
-    "input_cost_per_token_above_200k_tokens": 6e-06,
     "litellm_provider": "anthropic",
-    "max_input_tokens": 200000,
+    "max_input_tokens": 1000000,
     "max_output_tokens": 64000,
     "max_tokens": 64000,
     "mode": "chat",
     "output_cost_per_token": 1.5e-05,
-    "output_cost_per_token_above_200k_tokens": 2.25e-05,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -3074,6 +3058,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3116,6 +3101,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3152,6 +3138,7 @@
       "text"
     ],
     "supports_function_calling": false,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": false,
@@ -3186,6 +3173,7 @@
       "text"
     ],
     "supports_function_calling": false,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": false,
@@ -3218,6 +3206,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3259,6 +3248,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3301,6 +3291,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3341,6 +3332,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3379,6 +3371,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3414,6 +3407,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": false,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3449,6 +3443,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": false,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3472,6 +3467,7 @@
     "mode": "chat",
     "output_cost_per_token": 1e-05,
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
     "supports_pdf_input": true,
@@ -3529,6 +3525,7 @@
       "image"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": true,
     "supports_parallel_function_calling": true,
@@ -3568,6 +3565,7 @@
       "image"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": true,
     "supports_parallel_function_calling": true,
@@ -3607,6 +3605,7 @@
       "image"
     ],
     "supports_function_calling": false,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": true,
     "supports_parallel_function_calling": false,
@@ -3643,6 +3642,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3676,6 +3676,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3712,6 +3713,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3751,6 +3753,7 @@
       "image"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": true,
     "supports_parallel_function_calling": true,
@@ -3791,6 +3794,7 @@
       "image"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": true,
     "supports_parallel_function_calling": true,
@@ -3829,6 +3833,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3865,6 +3870,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3898,6 +3904,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3931,6 +3938,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -3968,6 +3976,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -4004,6 +4013,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -4040,6 +4050,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -4089,6 +4100,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": true,
     "supports_parallel_function_calling": true,
@@ -4151,13 +4163,19 @@
   },
   "gpt-5.4-mini": {
     "cache_read_input_token_cost": 7.5e-08,
+    "cache_read_input_token_cost_batches": 3.8e-08,
+    "cache_read_input_token_cost_flex": 1e-08,
     "input_cost_per_token": 7.5e-07,
+    "input_cost_per_token_batches": 3.75e-07,
+    "input_cost_per_token_flex": 3.75e-07,
     "litellm_provider": "openai",
     "max_input_tokens": 400000,
     "max_output_tokens": 128000,
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 4.5e-06,
+    "output_cost_per_token_batches": 2.25e-06,
+    "output_cost_per_token_flex": 2.25e-06,
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/batch",
@@ -4171,7 +4189,9 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": false,
     "supports_native_streaming": true,
+    "supports_none_reasoning_effort": true,
     "supports_parallel_function_calling": true,
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
@@ -4180,17 +4200,25 @@
     "supports_service_tier": true,
     "supports_system_messages": true,
     "supports_tool_choice": true,
-    "supports_vision": true
+    "supports_vision": true,
+    "supports_web_search": true,
+    "supports_xhigh_reasoning_effort": true
   },
   "gpt-5.4-nano": {
     "cache_read_input_token_cost": 2e-08,
+    "cache_read_input_token_cost_batches": 1e-08,
+    "cache_read_input_token_cost_flex": 1e-08,
     "input_cost_per_token": 2e-07,
+    "input_cost_per_token_batches": 1e-07,
+    "input_cost_per_token_flex": 1e-07,
     "litellm_provider": "openai",
     "max_input_tokens": 400000,
     "max_output_tokens": 128000,
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 1.25e-06,
+    "output_cost_per_token_batches": 6.25e-07,
+    "output_cost_per_token_flex": 6.25e-07,
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/batch",
@@ -4204,15 +4232,20 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": false,
     "supports_native_streaming": true,
+    "supports_none_reasoning_effort": true,
     "supports_parallel_function_calling": true,
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_service_tier": true,
     "supports_system_messages": true,
     "supports_tool_choice": true,
-    "supports_vision": true
+    "supports_vision": true,
+    "supports_web_search": true,
+    "supports_xhigh_reasoning_effort": true
   },
   "gpt-5.4-pro": {
     "cache_read_input_token_cost": 3e-06,
@@ -4248,6 +4281,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
@@ -4296,6 +4330,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
     "supports_parallel_function_calling": true,
