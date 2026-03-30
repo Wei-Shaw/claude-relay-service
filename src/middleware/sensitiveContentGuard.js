@@ -16,12 +16,14 @@ const SENSITIVE_PATTERNS = [
   {
     type: 'aws_access_key',
     pattern: /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/
-  },
-  {
-    type: 'aws_secret_key',
-    pattern: /\b[A-Za-z0-9/+=]{40}\b/
   }
 ]
+
+const AWS_SECRET_KEY_VALUE_PATTERN = /^[A-Za-z0-9/+=]{40}$/
+const AWS_SECRET_KEY_CONTEXT_PATTERN =
+  /(?:^|[^A-Za-z0-9])(?:aws[_-]?)?secret(?:[_-]?access)?[_-]?key(?:[^A-Za-z0-9]|$)/i
+const AWS_SECRET_KEY_INLINE_PATTERN =
+  /(?:^|[^A-Za-z0-9])(?:aws[_-]?)?secret(?:[_-]?access)?[_-]?key\s*[:=]\s*['"]?([A-Za-z0-9/+=]{40})['"]?/i
 
 const PROTECTED_PATH_PREFIXES = [
   '/api',
@@ -59,34 +61,156 @@ function shouldInspectRequest(req) {
   return PROTECTED_PATH_PREFIXES.some((prefix) => lowerPath.startsWith(prefix))
 }
 
-function collectSensitiveTypes(value, collector, depth = 0) {
+function isResponsesStylePath(req) {
+  const path = normalizePath(req.originalUrl || req.url || req.path).toLowerCase()
+  return (
+    path.startsWith('/openai/responses') ||
+    path.startsWith('/openai/v1/responses') ||
+    path.startsWith('/azure/response')
+  )
+}
+
+function appendTextContent(content, collector, allowedTypes = null) {
+  if (typeof content === 'string') {
+    collector.push(content)
+    return
+  }
+
+  if (!Array.isArray(content)) {
+    return
+  }
+
+  for (const item of content) {
+    if (typeof item === 'string') {
+      collector.push(item)
+      continue
+    }
+
+    if (!item || typeof item !== 'object') {
+      continue
+    }
+
+    if (
+      typeof item.text === 'string' &&
+      (!allowedTypes || allowedTypes.has(item.type) || item.type === undefined)
+    ) {
+      collector.push(item.text)
+    }
+  }
+}
+
+function getInspectablePayloads(req) {
+  if (!isResponsesStylePath(req) || !req.body || typeof req.body !== 'object') {
+    return [req.body]
+  }
+
+  const payloads = []
+  const ignoredTopLevelKeys = new Set([
+    'model',
+    'instructions',
+    'tools',
+    'include',
+    'reasoning',
+    'text',
+    'input',
+    'messages',
+    'stream',
+    'store',
+    'service_tier',
+    'prompt_cache_key',
+    'conversation_id',
+    'session_id',
+    'max_output_tokens',
+    'temperature',
+    'top_p',
+    'user'
+  ])
+
+  if (typeof req.body.prompt === 'string') {
+    payloads.push(req.body.prompt)
+  }
+
+  if (Array.isArray(req.body.messages)) {
+    for (const message of req.body.messages) {
+      if (!message || message.role !== 'user') {
+        continue
+      }
+      appendTextContent(message.content, payloads)
+    }
+  }
+
+  if (typeof req.body.input === 'string') {
+    payloads.push(req.body.input)
+  } else if (Array.isArray(req.body.input)) {
+    for (const item of req.body.input) {
+      if (!item || typeof item !== 'object') {
+        continue
+      }
+
+      if (item.type === 'message') {
+        if (item.role !== 'user' && item.role !== 'developer') {
+          continue
+        }
+        appendTextContent(item.content, payloads, new Set(['input_text', 'text']))
+        continue
+      }
+
+      if (item.type === 'input_text' && typeof item.text === 'string') {
+        payloads.push(item.text)
+      }
+    }
+  }
+
+  for (const [key, value] of Object.entries(req.body)) {
+    if (ignoredTopLevelKeys.has(key)) {
+      continue
+    }
+    payloads.push({ [key]: value })
+  }
+
+  return payloads
+}
+
+function containsAwsSecretKey(value, keyContext = '') {
+  if (typeof value !== 'string') {
+    return false
+  }
+
+  const trimmed = value.trim()
+  if (AWS_SECRET_KEY_INLINE_PATTERN.test(trimmed)) {
+    return true
+  }
+
+  return AWS_SECRET_KEY_CONTEXT_PATTERN.test(keyContext) && AWS_SECRET_KEY_VALUE_PATTERN.test(trimmed)
+}
+
+function collectSensitiveTypes(value, collector, depth = 0, keyContext = '') {
   if (value === undefined || value === null || depth > 8) {
     return
   }
 
   if (typeof value === 'string') {
-    const hasModelProviderKey =
-      SENSITIVE_PATTERNS.find((entry) => entry.type === 'openai_api_key').pattern.test(value) ||
-      SENSITIVE_PATTERNS.find((entry) => entry.type === 'anthropic_api_key').pattern.test(value)
-
     for (const { type, pattern } of SENSITIVE_PATTERNS) {
-      if (type === 'aws_secret_key' && hasModelProviderKey) {
-        continue
-      }
       if (pattern.test(value)) {
         collector.add(type)
       }
+    }
+    if (containsAwsSecretKey(value, keyContext)) {
+      collector.add('aws_secret_key')
     }
     return
   }
 
   if (Array.isArray(value)) {
-    value.forEach((item) => collectSensitiveTypes(item, collector, depth + 1))
+    value.forEach((item, index) => collectSensitiveTypes(item, collector, depth + 1, `${keyContext}[${index}]`))
     return
   }
 
   if (typeof value === 'object') {
-    Object.values(value).forEach((item) => collectSensitiveTypes(item, collector, depth + 1))
+    Object.entries(value).forEach(([key, item]) => {
+      const nextContext = keyContext ? `${keyContext}.${key}` : key
+      collectSensitiveTypes(item, collector, depth + 1, nextContext)
+    })
   }
 }
 
@@ -96,7 +220,9 @@ function sensitiveContentGuard(req, res, next) {
   }
 
   const detectedTypes = new Set()
-  collectSensitiveTypes(req.body, detectedTypes)
+  for (const payload of getInspectablePayloads(req)) {
+    collectSensitiveTypes(payload, detectedTypes)
+  }
 
   if (detectedTypes.size === 0) {
     return next()
