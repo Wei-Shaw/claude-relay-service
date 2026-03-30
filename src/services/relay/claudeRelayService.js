@@ -17,6 +17,7 @@ const { createClaudeTestPayload } = require('../../utils/testPayloadHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { applyQuotaExceededCooldown } = require('../../utils/quotaExceededHelper')
 const metadataUserIdHelper = require('../../utils/metadataUserIdHelper')
 const {
   getHttpsAgentForStream,
@@ -195,9 +196,13 @@ class ClaudeRelayService {
   // Anthropic 对未开启 Extra Usage 的账户请求长上下文模型时返回此错误
   // 这不是真正的限流，不应标记账户为 rate limited
   _isExtraUsageRequired429(statusCode, body) {
-    if (statusCode !== 429) return false
+    if (statusCode !== 429) {
+      return false
+    }
     const message = this._extractErrorMessage(body)
-    if (!message) return false
+    if (!message) {
+      return false
+    }
     return message.toLowerCase().includes('extra usage')
   }
 
@@ -732,6 +737,23 @@ class ClaudeRelayService {
         // 检查是否为403状态码（禁止访问，非封禁类）
         // 注意：如果进行了重试，retryCount > 0；这里的 403 是重试后最终的结果
         else if (response.statusCode === 403) {
+          const quotaCooldown = await applyQuotaExceededCooldown({
+            accountId,
+            accountType,
+            statusCode: 403,
+            payload: response.body,
+            sessionHash,
+            clearSessionMapping: (hash) => unifiedClaudeScheduler.clearSessionMapping(hash)
+          })
+          if (quotaCooldown.applied) {
+            return {
+              statusCode: response.statusCode,
+              headers: response.headers,
+              body: response.body,
+              dedicatedRateLimitMessage
+            }
+          }
+
           logger.error(
             `🚫 Forbidden error (403) detected for account ${accountId}${retryCount > 0 ? ` after ${retryCount} retries` : ''}, temporarily pausing`
           )
@@ -851,14 +873,24 @@ class ClaudeRelayService {
             sessionHash,
             rateLimitResetTimestamp
           )
-          await upstreamErrorHelper
-            .markTempUnavailable(
-              accountId,
-              accountType,
-              429,
-              upstreamErrorHelper.parseRetryAfter(response.headers)
-            )
-            .catch(() => {})
+          const quotaCooldown = await applyQuotaExceededCooldown({
+            accountId,
+            accountType,
+            statusCode: 429,
+            payload: response.body,
+            sessionHash,
+            clearSessionMapping: (hash) => unifiedClaudeScheduler.clearSessionMapping(hash)
+          })
+          if (!quotaCooldown.applied) {
+            await upstreamErrorHelper
+              .markTempUnavailable(
+                accountId,
+                accountType,
+                429,
+                upstreamErrorHelper.parseRetryAfter(response.headers)
+              )
+              .catch(() => {})
+          }
 
           if (dedicatedRateLimitMessage) {
             return {
@@ -2160,14 +2192,24 @@ class ClaudeRelayService {
                 sessionHash,
                 rateLimitResetTimestamp
               )
-              await upstreamErrorHelper
-                .markTempUnavailable(
-                  accountId,
-                  accountType,
-                  429,
-                  upstreamErrorHelper.parseRetryAfter(res.headers)
-                )
-                .catch(() => {})
+              const quotaCooldown = await applyQuotaExceededCooldown({
+                accountId,
+                accountType,
+                statusCode: 429,
+                payload: errorBody429,
+                sessionHash,
+                clearSessionMapping: (hash) => unifiedClaudeScheduler.clearSessionMapping(hash)
+              })
+              if (!quotaCooldown.applied) {
+                await upstreamErrorHelper
+                  .markTempUnavailable(
+                    accountId,
+                    accountType,
+                    429,
+                    upstreamErrorHelper.parseRetryAfter(res.headers)
+                  )
+                  .catch(() => {})
+              }
               logger.warn(`🚫 [Stream] Rate limit detected for account ${accountId}, status 429`)
 
               if (isDedicatedOfficialAccount) {
@@ -2315,6 +2357,18 @@ class ClaudeRelayService {
                 await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch(() => {})
               }
             } else if (res.statusCode === 403) {
+              const quotaCooldown = await applyQuotaExceededCooldown({
+                accountId,
+                accountType,
+                statusCode: 403,
+                payload: errorData,
+                sessionHash,
+                clearSessionMapping: (hash) => unifiedClaudeScheduler.clearSessionMapping(hash)
+              })
+              if (quotaCooldown.applied) {
+                return
+              }
+
               // 403 处理：先检查是否为封禁性质的 403（组织被禁用/OAuth 被禁止）
               // 注意：重试逻辑已在 handleErrorResponse 外部提前处理
               if (this._isOrganizationDisabledError(res.statusCode, errorData)) {
@@ -2500,6 +2554,7 @@ class ClaudeRelayService {
         const allUsageData = [] // 收集所有的usage事件
         let currentUsageData = {} // 当前正在收集的usage数据
         let rateLimitDetected = false // 限流检测标志
+        let streamErrorPayload = null
 
         // 监听数据块，解析SSE并寻找usage信息
         // 🧹 内存优化：在闭包创建前提取需要的值，避免闭包捕获 body 和 requestOptions
@@ -2649,6 +2704,7 @@ class ClaudeRelayService {
                     data.error.message.toLowerCase().includes("exceed your account's rate limit")
                   ) {
                     rateLimitDetected = true
+                    streamErrorPayload = data
                     logger.warn(`🚫 Rate limit detected in stream for account ${accountId}`)
                   }
                 } catch (parseError) {
@@ -2824,14 +2880,24 @@ class ClaudeRelayService {
                 sessionHash,
                 rateLimitResetTimestamp
               )
-              await upstreamErrorHelper
-                .markTempUnavailable(
-                  accountId,
-                  accountType,
-                  429,
-                  upstreamErrorHelper.parseRetryAfter(res.headers)
-                )
-                .catch(() => {})
+              const quotaCooldown = await applyQuotaExceededCooldown({
+                accountId,
+                accountType,
+                statusCode: 429,
+                payload: streamErrorPayload,
+                sessionHash,
+                clearSessionMapping: (hash) => unifiedClaudeScheduler.clearSessionMapping(hash)
+              })
+              if (!quotaCooldown.applied) {
+                await upstreamErrorHelper
+                  .markTempUnavailable(
+                    accountId,
+                    accountType,
+                    429,
+                    upstreamErrorHelper.parseRetryAfter(res.headers)
+                  )
+                  .catch(() => {})
+              }
             }
           } else if (res.statusCode === 200) {
             // 请求成功，清除401和500错误计数

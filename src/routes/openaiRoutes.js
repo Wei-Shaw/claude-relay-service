@@ -15,6 +15,7 @@ const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { IncrementalSSEParser } = require('../utils/sseParser')
 const { getSafeMessage } = require('../utils/errorSanitizer')
+const { applyQuotaExceededCooldown } = require('../utils/quotaExceededHelper')
 
 // Codex CLI 系统提示词（非 Codex CLI 客户端请求时注入，统一端点也使用）
 const CODEX_CLI_INSTRUCTIONS =
@@ -448,13 +449,24 @@ const handleResponses = async (req, res) => {
         logger.error('⚠️ Failed to parse rate limit error:', e)
       }
 
-      // 标记账户为限流状态
-      await unifiedOpenAIScheduler.markAccountRateLimited(
+      const quotaCooldown = await applyQuotaExceededCooldown({
         accountId,
-        'openai',
+        accountType: 'openai',
+        statusCode: 429,
+        payload: errorData,
         sessionHash,
-        resetsInSeconds
-      )
+        clearSessionMapping: (hash) => unifiedOpenAIScheduler._deleteSessionMapping(hash)
+      })
+
+      if (!quotaCooldown.applied) {
+        // 标记账户为限流状态
+        await unifiedOpenAIScheduler.markAccountRateLimited(
+          accountId,
+          'openai',
+          sessionHash,
+          resetsInSeconds
+        )
+      }
 
       // 返回错误响应给客户端
       const errorResponse = errorData || {
@@ -530,12 +542,23 @@ const handleResponses = async (req, res) => {
       }
 
       try {
-        await unifiedOpenAIScheduler.markAccountUnauthorized(
+        const quotaCooldown = await applyQuotaExceededCooldown({
           accountId,
-          'openai',
+          accountType: 'openai',
+          statusCode: unauthorizedStatus,
+          payload: errorData,
           sessionHash,
-          reason
-        )
+          clearSessionMapping: (hash) => unifiedOpenAIScheduler._deleteSessionMapping(hash)
+        })
+
+        if (!quotaCooldown.applied) {
+          await unifiedOpenAIScheduler.markAccountUnauthorized(
+            accountId,
+            'openai',
+            sessionHash,
+            reason
+          )
+        }
       } catch (markError) {
         logger.error(
           `❌ Failed to mark OpenAI account unauthorized after ${unauthorizedStatus}:`,

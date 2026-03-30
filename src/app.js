@@ -39,6 +39,7 @@ const {
   requestSizeLimit
 } = require('./middleware/auth')
 const { browserFallbackMiddleware } = require('./middleware/browserFallback')
+const sensitiveContentGuard = require('./middleware/sensitiveContentGuard')
 
 class Application {
   constructor() {
@@ -242,6 +243,7 @@ class Application {
         })
       )
       this.app.use(express.urlencoded({ extended: true, limit: '100mb' }))
+      this.app.use(sensitiveContentGuard)
       this.app.use(securityMiddleware)
 
       // 🎯 信任代理

@@ -21,6 +21,7 @@ const axios = require('axios')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 const ProxyHelper = require('../utils/proxyHelper')
 const upstreamErrorHelper = require('../utils/upstreamErrorHelper')
+const { applyQuotaExceededCooldown } = require('../utils/quotaExceededHelper')
 
 // 处理 Gemini 上游错误，标记账户为临时不可用
 const handleGeminiUpstreamError = async (
@@ -29,13 +30,28 @@ const handleGeminiUpstreamError = async (
   accountType,
   sessionHash,
   headers,
-  disableAutoProtection = false
+  disableAutoProtection = false,
+  payload = null
 ) => {
   if (!accountId || !errorStatus) {
     return
   }
   const autoProtectionDisabled = disableAutoProtection === true || disableAutoProtection === 'true'
   try {
+    if (!autoProtectionDisabled) {
+      const quotaCooldown = await applyQuotaExceededCooldown({
+        accountId,
+        accountType: accountType || 'gemini',
+        statusCode: errorStatus,
+        payload,
+        sessionHash,
+        clearSessionMapping: (hash) => unifiedGeminiScheduler._deleteSessionMapping(hash)
+      })
+      if (quotaCooldown.applied) {
+        return
+      }
+    }
+
     if (errorStatus === 429) {
       if (!autoProtectionDisabled) {
         const ttl = upstreamErrorHelper.parseRetryAfter(headers)
@@ -772,7 +788,8 @@ async function handleMessages(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error.response?.data
     )
 
     // 返回错误响应
@@ -1761,7 +1778,8 @@ async function handleGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error.response?.data
     )
     res.status(500).json({
       error: {
@@ -2150,7 +2168,8 @@ async function handleStreamGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error.response?.data
     )
 
     if (!res.headersSent) {
@@ -2449,7 +2468,8 @@ async function handleStandardGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error.response?.data
     )
 
     res.status(500).json({
@@ -2934,7 +2954,8 @@ async function handleStandardStreamGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error.response?.data
     )
 
     if (!res.headersSent) {
