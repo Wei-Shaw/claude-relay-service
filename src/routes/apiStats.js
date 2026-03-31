@@ -1164,7 +1164,7 @@ router.post('/api-key/test-gemini', async (req, res) => {
 // 🧪 OpenAI/Codex API Key 端点测试接口
 router.post('/api-key/test-openai', async (req, res) => {
   const config = require('../../config/config')
-  const { createOpenAITestPayload } = require('../utils/testPayloadHelper')
+  const { createCodexTestHeaders, createOpenAITestPayload } = require('../utils/testPayloadHelper')
 
   try {
     const { apiKey, model = 'gpt-5', prompt = 'hi' } = req.body
@@ -1219,13 +1219,17 @@ router.post('/api-key/test-openai', async (req, res) => {
 
     const axios = require('axios')
     const payload = createOpenAITestPayload(model, { prompt, maxTokens })
+    const { headers: codexHeaders } = createCodexTestHeaders({
+      sessionId: payload.session_id,
+      stream: payload.stream !== false
+    })
 
     try {
       const response = await axios.post(apiUrl, payload, {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
-          'User-Agent': 'codex_cli_rs/1.0.0'
+          ...codexHeaders
         },
         timeout: 60000,
         responseType: 'stream',

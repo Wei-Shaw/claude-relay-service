@@ -1,5 +1,9 @@
 const crypto = require('crypto')
 const { mapToErrorCode, sanitizeErrorMessage } = require('./errorSanitizer')
+const { CODEX_CLI_INSTRUCTIONS } = require('./codexCliInstructions')
+
+const DEFAULT_CODEX_TEST_USER_AGENT = 'codex_cli_rs/1.0.0 (test harness)'
+const DEFAULT_CODEX_TEST_ORIGINATOR = 'codex_cli_rs'
 
 // 将原始错误信息映射为安全的标准错误码消息
 const sanitizeErrorMsg = (msg) => {
@@ -24,6 +28,42 @@ function generateSessionString() {
   const hex64 = randomHex(32) // 32 bytes => 64 hex characters
   const uuid = crypto.randomUUID()
   return `user_${hex64}_account__session_${uuid}`
+}
+
+/**
+ * 生成 Codex 测试用会话 ID
+ * @returns {string} 会话 ID
+ */
+function generateCodexTestSessionId() {
+  return `codex_test_${crypto.randomUUID()}_${randomHex(8)}`
+}
+
+/**
+ * 生成贴近真实 Codex CLI 的测试请求头
+ * @param {object} options - 可选配置
+ * @param {string} options.sessionId - 指定会话 ID
+ * @param {string} options.userAgent - 指定 User-Agent
+ * @param {string} options.originator - 指定 originator
+ * @param {boolean} options.stream - 是否流式
+ * @returns {{sessionId: string, headers: object}} 会话 ID 与请求头
+ */
+function createCodexTestHeaders(options = {}) {
+  const {
+    sessionId = generateCodexTestSessionId(),
+    userAgent = DEFAULT_CODEX_TEST_USER_AGENT,
+    originator = DEFAULT_CODEX_TEST_ORIGINATOR,
+    stream = true
+  } = options
+
+  return {
+    sessionId,
+    headers: {
+      'user-agent': userAgent,
+      originator,
+      session_id: sessionId,
+      accept: stream ? 'text/event-stream' : 'application/json'
+    }
+  }
 }
 
 /**
@@ -289,7 +329,14 @@ function createGeminiTestPayload(_model = 'gemini-2.5-pro', options = {}) {
  * @returns {object} 测试请求体
  */
 function createOpenAITestPayload(model = 'gpt-5', options = {}) {
-  const { prompt = 'hi', maxTokens = 100, stream = true } = options
+  const {
+    prompt = 'hi',
+    maxTokens = 100,
+    stream = true,
+    sessionId = generateCodexTestSessionId(),
+    instructions = CODEX_CLI_INSTRUCTIONS
+  } = options
+
   return {
     model,
     input: [
@@ -299,7 +346,9 @@ function createOpenAITestPayload(model = 'gpt-5', options = {}) {
       }
     ],
     max_output_tokens: maxTokens,
-    stream
+    stream,
+    session_id: sessionId,
+    instructions
   }
 }
 
@@ -365,6 +414,8 @@ function extractErrorMessage(json, fallback) {
 module.exports = {
   randomHex,
   generateSessionString,
+  generateCodexTestSessionId,
+  createCodexTestHeaders,
   createClaudeTestPayload,
   createGeminiTestPayload,
   createOpenAITestPayload,
