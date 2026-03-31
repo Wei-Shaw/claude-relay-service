@@ -4,8 +4,8 @@
  */
 
 const express = require('express')
-const axios = require('axios')
 const openaiResponsesAccountService = require('../../services/account/openaiResponsesAccountService')
+const openaiResponsesRelayService = require('../../services/relay/openaiResponsesRelayService')
 const apiKeyService = require('../../services/apiKeyService')
 const accountGroupService = require('../../services/accountGroupService')
 const redis = require('../../models/redis')
@@ -13,8 +13,6 @@ const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
-const { createOpenAITestPayload, extractErrorMessage } = require('../../utils/testPayloadHelper')
-const { getProxyAgent } = require('../../utils/proxyHelper')
 
 const router = express.Router()
 
@@ -458,92 +456,28 @@ router.post('/openai-responses-accounts/:id/reset-usage', authenticateAdmin, asy
 // 测试 OpenAI-Responses 账户连通性
 router.post('/openai-responses-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
   const { accountId } = req.params
-  const { model = 'gpt-4o-mini' } = req.body
-  const startTime = Date.now()
+  const { model = 'gpt-5' } = req.body
 
   try {
-    // 获取账户信息（apiKey 已自动解密）
-    const account = await openaiResponsesAccountService.getAccount(accountId)
-    if (!account) {
-      return res.status(404).json({ error: 'Account not found' })
-    }
-
-    if (!account.apiKey) {
-      return res.status(401).json({ error: 'API Key not found or decryption failed' })
-    }
-
-    // 构造测试请求（根据 providerEndpoint 和 baseApi 决定端点路径）
-    const baseUrl = account.baseApi || 'https://api.openai.com'
-    const providerEndpoint = account.providerEndpoint || 'responses'
-    let endpointPath = '/responses'
-    if (providerEndpoint === 'auto') {
-      endpointPath = '/responses' // 测试时默认用 responses
-    }
-    // 防止 baseApi 已含 /v1 时路径重复
-    if (!baseUrl.endsWith('/v1')) {
-      endpointPath = `/v1${endpointPath}`
-    }
-    const apiUrl = `${baseUrl}${endpointPath}`
-    const payload = createOpenAITestPayload(model, { stream: false })
-
-    const requestConfig = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${account.apiKey}`
-      },
-      timeout: 30000
-    }
-
-    // 配置代理
-    if (account.proxy) {
-      const agent = getProxyAgent(account.proxy)
-      if (agent) {
-        requestConfig.httpsAgent = agent
-        requestConfig.httpAgent = agent
-      }
-    }
-
-    const response = await axios.post(apiUrl, payload, requestConfig)
-    const latency = Date.now() - startTime
-
-    // 提取响应文本（Responses API 格式）
-    let responseText = ''
-    const output = response.data?.output
-    if (Array.isArray(output)) {
-      for (const item of output) {
-        if (item.type === 'message' && Array.isArray(item.content)) {
-          for (const block of item.content) {
-            if (block.type === 'output_text' && block.text) {
-              responseText += block.text
-            }
-          }
-        }
-      }
-    }
-
-    logger.success(
-      `✅ OpenAI-Responses account test passed: ${account.name} (${accountId}), latency: ${latency}ms`
-    )
+    const result = await openaiResponsesRelayService.testAccountConnection(accountId, model)
 
     return res.json({
       success: true,
-      data: {
-        accountId,
-        accountName: account.name,
-        model,
-        latency,
-        responseText: responseText.substring(0, 200)
-      }
+      data: result
     })
   } catch (error) {
-    const latency = Date.now() - startTime
     logger.error(`❌ OpenAI-Responses account test failed: ${accountId}`, error.message)
+
+    if (error.status === 404 || error.status === 401) {
+      return res.status(error.status).json({ error: error.message })
+    }
 
     return res.status(500).json({
       success: false,
       error: 'Test failed',
-      message: extractErrorMessage(error.response?.data, error.message),
-      latency
+      message: error.message,
+      latency: error.latency,
+      upstreamStatus: error.status
     })
   }
 })
