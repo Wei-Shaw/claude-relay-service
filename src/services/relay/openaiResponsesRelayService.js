@@ -13,6 +13,11 @@ const {
   buildOpenAIResponsesClientError,
   sanitizeOpenAIResponsesStreamEvent
 } = require('../../utils/openaiResponsesErrorAdapter')
+const {
+  createCodexTestHeaders,
+  createOpenAITestPayload,
+  extractErrorMessage
+} = require('../../utils/testPayloadHelper')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
@@ -82,6 +87,222 @@ class OpenAIResponsesRelayService {
     await unifiedOpenAIScheduler._deleteSessionMapping(sessionHash).catch(() => {})
   }
 
+  _normalizeTargetPath(reqPath, fullAccount) {
+    const providerEndpoint = fullAccount.providerEndpoint || 'responses'
+    const originalPath = reqPath || '/v1/responses'
+    let targetPath = originalPath
+
+    if (
+      providerEndpoint === 'responses' &&
+      (targetPath === '/v1/chat/completions' || targetPath === '/chat/completions')
+    ) {
+      const newPath = targetPath.startsWith('/v1') ? '/v1/responses' : '/responses'
+      logger.info(`📝 Normalized path (${originalPath}) → ${newPath} (providerEndpoint=responses)`)
+      targetPath = newPath
+    }
+
+    const baseApi = fullAccount.baseApi || ''
+    if (baseApi.endsWith('/v1') && targetPath.startsWith('/v1/')) {
+      targetPath = targetPath.slice(3)
+    }
+
+    return targetPath
+  }
+
+  _buildRequestHeaders(reqHeaders = {}, fullAccount) {
+    const headers = {
+      ...filterForOpenAI(reqHeaders),
+      Authorization: `Bearer ${fullAccount.apiKey}`,
+      'Content-Type': 'application/json'
+    }
+
+    if (fullAccount.userAgent) {
+      headers['User-Agent'] = fullAccount.userAgent
+      logger.debug(`📱 Using custom User-Agent: ${fullAccount.userAgent}`)
+    } else if (reqHeaders['user-agent']) {
+      headers['User-Agent'] = reqHeaders['user-agent']
+      logger.debug(`📱 Forwarding original User-Agent: ${reqHeaders['user-agent']}`)
+    }
+
+    return headers
+  }
+
+  _createRequestOptions(req, fullAccount, options = {}) {
+    const targetPath = this._normalizeTargetPath(req.path, fullAccount)
+    const targetUrl = `${fullAccount.baseApi || ''}${targetPath}`
+    logger.info(`🎯 Forwarding to: ${targetUrl}`)
+
+    const headers = this._buildRequestHeaders(req.headers || {}, fullAccount)
+    const requestOptions = {
+      method: req.method,
+      url: targetUrl,
+      headers,
+      data: req.body,
+      timeout: options.timeout || this.defaultTimeout,
+      responseType: req.body?.stream ? 'stream' : 'json',
+      validateStatus: () => true
+    }
+
+    if (options.signal) {
+      requestOptions.signal = options.signal
+    }
+
+    if (fullAccount.proxy) {
+      const proxyAgent = ProxyHelper.createProxyAgent(fullAccount.proxy)
+      if (proxyAgent) {
+        requestOptions.httpAgent = proxyAgent
+        requestOptions.httpsAgent = proxyAgent
+        requestOptions.proxy = false
+        logger.info(
+          `🌐 Using proxy for OpenAI-Responses: ${ProxyHelper.getProxyDescription(fullAccount.proxy)}`
+        )
+      }
+    }
+
+    return {
+      targetPath,
+      targetUrl,
+      headers,
+      requestOptions
+    }
+  }
+
+  _extractResponseText(outputData) {
+    const source = Array.isArray(outputData?.output)
+      ? outputData.output
+      : Array.isArray(outputData?.response?.output)
+        ? outputData.response.output
+        : Array.isArray(outputData)
+          ? outputData
+          : []
+
+    let responseText = ''
+    for (const item of source) {
+      if (item?.type === 'message' && Array.isArray(item.content)) {
+        for (const block of item.content) {
+          if (block?.type === 'output_text' && block.text) {
+            responseText += block.text
+          } else if (typeof block?.text === 'string') {
+            responseText += block.text
+          }
+        }
+      } else if (item?.type === 'output_text' && item.text) {
+        responseText += item.text
+      }
+    }
+
+    return responseText
+  }
+
+  async _readStreamBody(stream) {
+    return new Promise((resolve) => {
+      const chunks = []
+      stream.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
+      stream.on('end', () => resolve(Buffer.concat(chunks).toString()))
+      stream.on('error', () => resolve(Buffer.concat(chunks).toString()))
+    })
+  }
+
+  _parseTestStreamBody(rawBody) {
+    let responseText = ''
+    let errorMessage = ''
+    let lastParsed = null
+
+    const lines = rawBody.split('\n')
+    for (const line of lines) {
+      if (!line.startsWith('data:')) {
+        continue
+      }
+
+      const jsonStr = line.slice(5).trim()
+      if (!jsonStr || jsonStr === '[DONE]') {
+        continue
+      }
+
+      try {
+        const eventData = JSON.parse(jsonStr)
+        lastParsed = eventData
+
+        if (
+          eventData.type === 'response.output_text.delta' &&
+          typeof eventData.delta === 'string'
+        ) {
+          responseText += eventData.delta
+          continue
+        }
+
+        if (eventData.type === 'response.content_part.delta' && eventData.delta?.text) {
+          responseText += eventData.delta.text
+          continue
+        }
+
+        if (eventData.type === 'response.completed' && eventData.response && !responseText) {
+          responseText = this._extractResponseText(eventData.response)
+          continue
+        }
+
+        if ((eventData.type === 'error' || eventData.error) && !errorMessage) {
+          errorMessage = extractErrorMessage(eventData, 'Unknown error')
+        }
+      } catch {
+        // 忽略无效事件，尽量保留已解析出的文本
+      }
+    }
+
+    if (!responseText && lastParsed?.response) {
+      responseText = this._extractResponseText(lastParsed.response)
+    }
+
+    return {
+      responseText,
+      errorMessage
+    }
+  }
+
+  async _parseTestResponse(response) {
+    const fallbackError = `API Error: ${response.status}`
+
+    if (response.data && typeof response.data.pipe === 'function') {
+      const rawBody = await this._readStreamBody(response.data)
+      const { responseText, errorMessage } = this._parseTestStreamBody(rawBody)
+      let parsedData = null
+
+      try {
+        parsedData = JSON.parse(rawBody)
+      } catch {
+        parsedData = null
+      }
+
+      return {
+        responseText: responseText || this._extractResponseText(parsedData),
+        errorMessage:
+          errorMessage ||
+          extractErrorMessage(parsedData, rawBody.trim() || fallbackError) ||
+          fallbackError
+      }
+    }
+
+    if (typeof response.data === 'string') {
+      try {
+        const parsed = JSON.parse(response.data)
+        return {
+          responseText: this._extractResponseText(parsed),
+          errorMessage: extractErrorMessage(parsed, fallbackError)
+        }
+      } catch {
+        return {
+          responseText: '',
+          errorMessage: response.data || fallbackError
+        }
+      }
+    }
+
+    return {
+      responseText: this._extractResponseText(response.data),
+      errorMessage: extractErrorMessage(response.data, fallbackError)
+    }
+  }
+
   async _markOther4xxTempUnavailable(account, status, sessionHash, source = 'response') {
     if (!account?.id || !this._shouldTempPauseOther4xx(status)) {
       return false
@@ -144,74 +365,9 @@ class OpenAIResponsesRelayService {
       req.once('close', handleClientDisconnect)
       res.once('close', handleClientDisconnect)
 
-      // 构建目标 URL（根据 providerEndpoint 配置决定端点路径）
-      const providerEndpoint = fullAccount.providerEndpoint || 'responses'
-      let targetPath = req.path
-
-      // 根据 providerEndpoint 配置归一化路径
-      // 注意：unified.js 已将 /v1/chat/completions 的请求体转换为 Responses 格式，
-      // 因此这里只需归一化路径即可；反向 responses→completions 需要同时转换请求体，
-      // 目前不支持，所以只保留 responses 和 auto 两种模式
-      if (
-        providerEndpoint === 'responses' &&
-        (targetPath === '/v1/chat/completions' || targetPath === '/chat/completions')
-      ) {
-        const newPath = targetPath.startsWith('/v1') ? '/v1/responses' : '/responses'
-        logger.info(`📝 Normalized path (${req.path}) → ${newPath} (providerEndpoint=responses)`)
-        targetPath = newPath
-      }
-      // providerEndpoint === 'auto' 时保持原始路径不变
-
-      // 防止 baseApi 已含 /v1 时路径重复（如 baseApi=http://host/v1 + targetPath=/v1/responses → /v1/v1/responses）
-      const baseApi = fullAccount.baseApi || ''
-      if (baseApi.endsWith('/v1') && targetPath.startsWith('/v1/')) {
-        targetPath = targetPath.slice(3) // '/v1/responses' → '/responses'
-      }
-      const targetUrl = `${baseApi}${targetPath}`
-      logger.info(`🎯 Forwarding to: ${targetUrl}`)
-
-      // 构建请求头 - 使用统一的 headerFilter 移除 CDN headers
-      const headers = {
-        ...filterForOpenAI(req.headers),
-        Authorization: `Bearer ${fullAccount.apiKey}`,
-        'Content-Type': 'application/json'
-      }
-
-      // 处理 User-Agent
-      if (fullAccount.userAgent) {
-        // 使用自定义 User-Agent
-        headers['User-Agent'] = fullAccount.userAgent
-        logger.debug(`📱 Using custom User-Agent: ${fullAccount.userAgent}`)
-      } else if (req.headers['user-agent']) {
-        // 透传原始 User-Agent
-        headers['User-Agent'] = req.headers['user-agent']
-        logger.debug(`📱 Forwarding original User-Agent: ${req.headers['user-agent']}`)
-      }
-
-      // 配置请求选项
-      const requestOptions = {
-        method: req.method,
-        url: targetUrl,
-        headers,
-        data: req.body,
-        timeout: this.defaultTimeout,
-        responseType: req.body?.stream ? 'stream' : 'json',
-        validateStatus: () => true, // 允许处理所有状态码
+      const { targetUrl, headers, requestOptions } = this._createRequestOptions(req, fullAccount, {
         signal: abortController.signal
-      }
-
-      // 配置代理（如果有）
-      if (fullAccount.proxy) {
-        const proxyAgent = ProxyHelper.createProxyAgent(fullAccount.proxy)
-        if (proxyAgent) {
-          requestOptions.httpAgent = proxyAgent
-          requestOptions.httpsAgent = proxyAgent
-          requestOptions.proxy = false
-          logger.info(
-            `🌐 Using proxy for OpenAI-Responses: ${ProxyHelper.getProxyDescription(fullAccount.proxy)}`
-          )
-        }
-      }
+      })
 
       // 记录请求信息
       logger.info('📤 OpenAI-Responses relay request', {
@@ -967,6 +1123,72 @@ class OpenAIResponsesRelayService {
 
     // 返回处理后的数据，避免循环引用
     return { resetsInSeconds, errorData }
+  }
+
+  async testAccountConnection(accountId, model = 'gpt-5') {
+    const startTime = Date.now()
+
+    try {
+      const account = await openaiResponsesAccountService.getAccount(accountId)
+      if (!account) {
+        const notFoundError = new Error('Account not found')
+        notFoundError.status = 404
+        throw notFoundError
+      }
+
+      if (!account.apiKey) {
+        const authError = new Error('API Key not found or decryption failed')
+        authError.status = 401
+        throw authError
+      }
+
+      const { sessionId, headers: testHeaders } = createCodexTestHeaders({ stream: true })
+      const payload = createOpenAITestPayload(model, {
+        stream: true,
+        maxTokens: 64,
+        sessionId
+      })
+
+      const mockReq = {
+        method: 'POST',
+        path: '/v1/responses',
+        headers: testHeaders,
+        body: payload
+      }
+
+      const { requestOptions } = this._createRequestOptions(mockReq, account, {
+        timeout: 30000
+      })
+
+      const response = await axios(requestOptions)
+      const latency = Date.now() - startTime
+      const parsed = await this._parseTestResponse(response)
+
+      if (response.status >= 400) {
+        const upstreamError = new Error(parsed.errorMessage || `API Error: ${response.status}`)
+        upstreamError.status = response.status
+        upstreamError.latency = latency
+        throw upstreamError
+      }
+
+      logger.info(
+        `✅ OpenAI-Responses account test passed: ${account.name} (${accountId}), latency: ${latency}ms`
+      )
+
+      return {
+        accountId,
+        accountName: account.name,
+        model,
+        latency,
+        requestMode: 'codex_cli_simulated',
+        responseText: parsed.responseText.substring(0, 200)
+      }
+    } catch (error) {
+      if (error.latency === undefined) {
+        error.latency = Date.now() - startTime
+      }
+      throw error
+    }
   }
 
   // 过滤请求头 - 已迁移到 headerFilter 工具类
