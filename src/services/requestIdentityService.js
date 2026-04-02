@@ -372,6 +372,13 @@ function transform(payload = {}) {
   const { nextBody } = rewriteUserId(currentBody, payload.accountId, accountUuid)
   const headerResult = rewriteHeaders(currentHeaders, accountIdForHeaders)
 
+  // 剥离可能暴露 relay/gateway 信息的泄漏字段（纵深防御）
+  if (nextBody && typeof nextBody === 'object') {
+    delete nextBody.baseUrl
+    delete nextBody.base_url
+    delete nextBody.gateway
+  }
+
   const nextHeaders = headerResult ? headerResult.nextHeaders : currentHeaders
   const abortResponse =
     headerResult && headerResult.abortResponse ? headerResult.abortResponse : null

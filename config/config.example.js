@@ -102,7 +102,7 @@ const config = {
   },
 
   // ⏱️ 请求超时配置
-  requestTimeout: parseInt(process.env.REQUEST_TIMEOUT) || 600000, // 默认 10 分钟
+  requestTimeout: parseInt(process.env.REQUEST_TIMEOUT) || 3600000, // 默认 60 分钟
 
   // 📈 使用限制
   limits: {
@@ -239,6 +239,26 @@ const config = {
     overloadTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_OVERLOAD_TTL_SECONDS) || 600, // 529过载暂停秒数
     authErrorTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_AUTH_TTL_SECONDS) || 1800, // 401/403认证错误暂停秒数
     timeoutTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_TIMEOUT_TTL_SECONDS) || 300 // 504超时暂停秒数
+  },
+
+  // 🔒 身份重写配置（防封号统一身份）
+  identityRewrite: {
+    enabled: process.env.IDENTITY_REWRITE_ENABLED === 'true', // 默认关闭
+    forwardEventBatch: process.env.IDENTITY_FORWARD_EVENT_BATCH === 'true', // 转发遥测事件
+    defaults: {
+      platform: process.env.IDENTITY_PLATFORM || 'darwin',
+      shell: process.env.IDENTITY_SHELL || 'zsh',
+      osVersion: process.env.IDENTITY_OS_VERSION || 'Darwin 24.4.0',
+      workingDir: process.env.IDENTITY_WORKING_DIR || '/Users/user/projects',
+      version: process.env.IDENTITY_CC_VERSION || '2.1.81',
+      arch: process.env.IDENTITY_ARCH || 'arm64',
+      nodeVersion: process.env.IDENTITY_NODE_VERSION || 'v24.3.0',
+      terminal: process.env.IDENTITY_TERMINAL || 'iTerm2.app',
+      constrainedMemory: parseInt(process.env.IDENTITY_CONSTRAINED_MEMORY) || 34359738368, // 32GB
+      rssRange: [300000000, 500000000], // 300-500MB
+      heapTotalRange: [40000000, 80000000], // 40-80MB
+      heapUsedRange: [100000000, 200000000] // 100-200MB
+    }
   }
 }
 

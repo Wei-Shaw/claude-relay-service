@@ -13,6 +13,7 @@ const redis = require('../../models/redis')
 const ClaudeCodeValidator = require('../../validators/clients/claudeCodeValidator')
 const { formatDateWithTimezone } = require('../../utils/dateHelper')
 const requestIdentityService = require('../requestIdentityService')
+const identityRewriteService = require('../identityRewriteService')
 const { createClaudeTestPayload } = require('../../utils/testPayloadHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
@@ -569,7 +570,7 @@ class ClaudeRelayService {
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
 
       const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
-      const processedBody = this._processRequestBody(requestBody, account)
+      const processedBody = await this._processRequestBody(requestBody, account)
       // 🧹 内存优化：存储到 bodyStore，避免闭包捕获
       const originalBodyString = JSON.stringify(processedBody)
       bodyStoreIdNonStream = ++this._bodyStoreIdCounter
@@ -1072,7 +1073,7 @@ class ClaudeRelayService {
   }
 
   // 🔄 处理请求体
-  _processRequestBody(body, account = null) {
+  async _processRequestBody(body, account = null) {
     if (!body) {
       return body
     }
@@ -1139,8 +1140,22 @@ class ClaudeRelayService {
       }
     }
 
-    // 移除 x-anthropic-billing-header 系统元素，避免将客户端 billing 标识传递给上游 API
-    this._removeBillingHeaderFromSystem(processedBody)
+    // 处理 billing header：如果身份重写启用则重写，否则剥离
+    const identityRewriteConfig = config.identityRewrite
+    if (identityRewriteConfig?.enabled && account) {
+      try {
+        const profile = await identityRewriteService.getProfile(account.id)
+        identityRewriteService.rewriteSystemPrompt(processedBody, profile)
+        logger.debug('✅ Rewrote system prompt with identity profile')
+      } catch (err) {
+        logger.warn('⚠️ Failed to rewrite system prompt:', err.message)
+        // 失败时回退到剥离
+        this._removeBillingHeaderFromSystem(processedBody)
+      }
+    } else {
+      // 移除 x-anthropic-billing-header 系统元素，避免将客户端 billing 标识传递给上游 API
+      this._removeBillingHeaderFromSystem(processedBody)
+    }
 
     this._enforceCacheControlLimit(processedBody)
 
@@ -1238,6 +1253,35 @@ class ClaudeRelayService {
         )
       }
     }
+  }
+
+  // 🔍 从请求中捕获环境信息（用于播种身份配置）
+  _captureEnvFromRequest(body, clientHeaders) {
+    const env = {}
+
+    // 从 headers 提取信息
+    if (clientHeaders) {
+      const ua = clientHeaders['user-agent'] || clientHeaders['User-Agent']
+      if (ua) {
+        const versionMatch = ua.match(/claude-cli\/([\d.]+)/)
+        if (versionMatch) {
+          env.version = versionMatch[1]
+        }
+      }
+
+      // 从 Stainless headers 提取
+      env.platform = clientHeaders['x-stainless-os'] || 'darwin'
+      env.arch = clientHeaders['x-stainless-arch'] || 'arm64'
+      env.nodeVersion = clientHeaders['x-stainless-runtime-version'] || 'v24.3.0'
+    }
+
+    // 从 body 提取信息（如果存在）
+    if (body && body.metadata && body.metadata.user_id) {
+      // 这里可以解析 user_id 获取更多信息
+      // 但目前主要依赖 headers
+    }
+
+    return env
   }
 
   // 🔢 验证并限制max_tokens参数
@@ -1481,6 +1525,32 @@ class ClaudeRelayService {
       Object.keys(claudeCodeHeaders).forEach((key) => {
         finalHeaders[key] = claudeCodeHeaders[key]
       })
+    }
+
+    // 如果是真实的 Claude Code 请求且身份重写启用，播种身份配置
+    const identityRewriteConfig = config.identityRewrite
+    if (isRealClaudeCode && identityRewriteConfig?.enabled && account) {
+      // 从请求中捕获环境信息用于播种
+      const capturedEnv = this._captureEnvFromRequest(body, clientHeaders)
+      await identityRewriteService.seedProfile(account.id, capturedEnv)
+    }
+
+    // 处理 billing header：启用身份重写时重写指纹，否则剥离
+    if (finalHeaders['x-anthropic-billing-header']) {
+      if (identityRewriteConfig?.enabled) {
+        try {
+          const profile = await identityRewriteService.getProfile(account?.id)
+          finalHeaders['x-anthropic-billing-header'] = finalHeaders[
+            'x-anthropic-billing-header'
+          ].replace(/cc_version=[\d.]+\.[a-f0-9]{3}/g, `cc_version=${profile.version}.000`)
+          logger.debug('✅ Rewrote billing header fingerprint')
+        } catch (err) {
+          logger.warn('⚠️ Failed to rewrite billing header:', err.message)
+          delete finalHeaders['x-anthropic-billing-header']
+        }
+      } else {
+        delete finalHeaders['x-anthropic-billing-header']
+      }
     }
 
     // 应用请求身份转换
@@ -1919,7 +1989,7 @@ class ClaudeRelayService {
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
 
       const isRealClaudeCodeRequest = this._isActualClaudeCodeRequest(requestBody, clientHeaders)
-      const processedBody = this._processRequestBody(requestBody, account)
+      const processedBody = await this._processRequestBody(requestBody, account)
       // 🧹 内存优化：存储到 bodyStore，不放入 requestOptions 避免闭包捕获
       const originalBodyString = JSON.stringify(processedBody)
       const bodyStoreId = ++this._bodyStoreIdCounter
