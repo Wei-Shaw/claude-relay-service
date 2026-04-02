@@ -1145,7 +1145,7 @@ class ClaudeRelayService {
     if (identityRewriteConfig?.enabled && account) {
       try {
         const profile = await identityRewriteService.getProfile(account.id)
-        identityRewriteService.rewriteSystemPrompt(processedBody, profile)
+        identityRewriteService.rewriteSystemPrompt(processedBody, profile, account.id)
         logger.debug('✅ Rewrote system prompt with identity profile')
       } catch (err) {
         logger.warn('⚠️ Failed to rewrite system prompt:', err.message)
@@ -1327,7 +1327,7 @@ class ClaudeRelayService {
           'content-length': String(Buffer.byteLength(bodyString)),
           authorization: `Bearer ${accessToken}`,
           'User-Agent':
-            (await this.captureAndGetUnifiedUserAgent(clientHeaders)) ||
+            (await this.captureAndGetUnifiedUserAgent(clientHeaders, account)) ||
             'claude-cli/1.0.119 (external, cli)'
         },
         agent: proxyAgent || getHttpsAgentForNonStream(),
@@ -1610,9 +1610,13 @@ class ClaudeRelayService {
       if (identityRewriteConfig?.enabled) {
         try {
           const profile = await identityRewriteService.getProfile(account?.id)
+          const versionSuffix = identityRewriteService.generateVersionSuffix(account?.id)
           finalHeaders['x-anthropic-billing-header'] = finalHeaders[
             'x-anthropic-billing-header'
-          ].replace(/cc_version=[\d.]+\.[a-f0-9]{3}/g, `cc_version=${profile.version}.000`)
+          ].replace(
+            /cc_version=[\d.]+\.[a-f0-9]{3}/g,
+            `cc_version=${profile.version}.${versionSuffix}`
+          )
           logger.debug('✅ Rewrote billing header fingerprint')
         } catch (err) {
           logger.warn('⚠️ Failed to rewrite billing header:', err.message)
@@ -3230,11 +3234,13 @@ class ClaudeRelayService {
 
   // 🔧 动态捕获并获取统一的 User-Agent
   async captureAndGetUnifiedUserAgent(clientHeaders, account) {
-    if (account.useUnifiedUserAgent !== 'true') {
+    if (!account || account.useUnifiedUserAgent !== 'true') {
       return null
     }
 
-    const CACHE_KEY = 'claude_code_user_agent:daily'
+    // per-account 缓存，避免多账户共享同一 User-Agent
+    const accountId = account.id || account.accountId || 'global'
+    const CACHE_KEY = `claude_code_user_agent:daily:${accountId}`
     const TTL = 90000 // 25小时
 
     // ⚠️ 重要：这里通过正则表达式判断是否为 Claude Code 客户端

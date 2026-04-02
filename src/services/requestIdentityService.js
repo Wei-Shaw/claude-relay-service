@@ -325,12 +325,15 @@ function rewriteUserId(body, accountId, accountUuid) {
   const effectiveScheduler = accountId ? String(accountId) : 'unknown-scheduler'
   const hashedSession = formatUuidFromSeed(`${effectiveScheduler}::${seedTail}`)
 
+  // 哈希 deviceId（per-account 唯一，避免多账户共享同一 device_id）
+  const hashedDeviceId = formatUuidFromSeed(`${effectiveScheduler}::device::${parsed.deviceId}`)
+
   // 注入真实 accountUuid
   const effectiveUuid = normalizeAccountUuid(accountUuid) || parsed.accountUuid || ''
 
   // 以原格式重建
   const nextUserId = metadataUserIdHelper.build({
-    deviceId: parsed.deviceId,
+    deviceId: hashedDeviceId,
     accountUuid: effectiveUuid,
     sessionId: hashedSession,
     isJsonFormat: parsed.isJsonFormat

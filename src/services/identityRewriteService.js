@@ -167,7 +167,7 @@ function getPlatformDefaults(platform) {
  * @param {Object} body - 请求体（会被修改）
  * @param {Object} profile - 身份配置
  */
-function rewriteSystemPrompt(body, profile) {
+function rewriteSystemPrompt(body, profile, accountId) {
   if (!body || typeof body !== 'object') {
     return
   }
@@ -177,13 +177,13 @@ function rewriteSystemPrompt(body, profile) {
   // 处理 system 字段
   if (body.system) {
     if (typeof body.system === 'string') {
-      body.system = rewritePromptText(body.system, p)
+      body.system = rewritePromptText(body.system, p, accountId)
     } else if (Array.isArray(body.system)) {
       body.system = body.system.map((item) => {
         if (item && typeof item.text === 'string') {
           return {
             ...item,
-            text: rewritePromptText(item.text, p)
+            text: rewritePromptText(item.text, p, accountId)
           }
         }
         return item
@@ -203,16 +203,17 @@ function rewriteSystemPrompt(body, profile) {
  * @param {Object} profile - 身份配置
  * @returns {string} 重写后的文本
  */
-function rewritePromptText(text, profile) {
+function rewritePromptText(text, profile, accountId) {
   if (typeof text !== 'string') {
     return text
   }
 
   const p = profile || getDefaultProfile()
+  const suffix = generateVersionSuffix(accountId)
   let result = text
 
-  // 重写 billing header 指纹
-  result = result.replace(REGEX.billingFingerprint, `cc_version=${p.version}.000`)
+  // 重写 billing header 指纹（per-account 后缀）
+  result = result.replace(REGEX.billingFingerprint, `cc_version=${p.version}.${suffix}`)
 
   // 重写 Platform
   result = result.replace(REGEX.platform, `Platform: ${p.platform}`)
@@ -451,6 +452,21 @@ function rewriteAdditionalMetadata(b64, _profile) {
 }
 
 /**
+ * 生成 per-account 的 billing 版本后缀
+ * 替代硬编码的 .000，避免所有账户共享同一后缀
+ * @param {string} [accountId] - 账户 ID
+ * @returns {string} 3 字符十六进制后缀
+ */
+function generateVersionSuffix(accountId) {
+  if (!accountId) {
+    return '000'
+  }
+
+  const crypto = require('crypto')
+  return crypto.createHash('sha256').update(String(accountId)).digest('hex').slice(0, 3)
+}
+
+/**
  * 生成设备 ID
  * 基于 accountId + 配置生成确定性设备 ID（哈希）
  * 每个账户会得到唯一的 device_id，避免多账户共享同一设备指纹
@@ -510,5 +526,6 @@ module.exports = {
   stripLeakFields,
   generateDeviceId,
   generateEmail,
+  generateVersionSuffix,
   REGEX
 }

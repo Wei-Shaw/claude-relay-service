@@ -1906,8 +1906,9 @@ router.all('/api/organizations/:orgId/policy_limits*', authenticateApiKey, async
     const identityRewriteConfig = config.identityRewrite
 
     if (identityRewriteConfig?.enabled && req.body && typeof req.body === 'object') {
-      const profile = await identityRewriteService.getProfile(null)
-      identityRewriteService.rewriteGenericIdentity(req.body, profile)
+      const accountId = req.apiKey?.claudeAccountId || null
+      const profile = await identityRewriteService.getProfile(accountId)
+      identityRewriteService.rewriteGenericIdentity(req.body, profile, accountId)
     }
 
     // 返回空成功响应（relay 不需要真正转发这些管理路径）
@@ -1924,8 +1925,9 @@ router.all('/api/settings*', authenticateApiKey, async (req, res) => {
     const identityRewriteConfig = config.identityRewrite
 
     if (identityRewriteConfig?.enabled && req.body && typeof req.body === 'object') {
-      const profile = await identityRewriteService.getProfile(null)
-      identityRewriteService.rewriteGenericIdentity(req.body, profile)
+      const accountId = req.apiKey?.claudeAccountId || null
+      const profile = await identityRewriteService.getProfile(accountId)
+      identityRewriteService.rewriteGenericIdentity(req.body, profile, accountId)
     }
 
     res.status(200).json({})

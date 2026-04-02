@@ -51,12 +51,21 @@ describe('Identity Rewrite Service', () => {
   })
 
   describe('rewritePromptText', () => {
-    it('should rewrite billing fingerprint in text', () => {
+    it('should rewrite billing fingerprint with per-account suffix', () => {
       const text = 'cc_version=2.1.81.abc x-anthropic-billing-header'
-      const result = identityRewriteService.rewritePromptText(text, defaultProfile)
+      const result = identityRewriteService.rewritePromptText(text, defaultProfile, 'account-1')
 
-      expect(result).toContain('cc_version=2.1.81.000')
       expect(result).not.toContain('cc_version=2.1.81.abc')
+      // Suffix should be a 3-char hex derived from accountId, not .000
+      expect(result).toMatch(/cc_version=2\.1\.81\.[a-f0-9]{3}/)
+    })
+
+    it('should generate different billing suffixes for different accounts', () => {
+      const text = 'cc_version=2.1.81.abc'
+      const r1 = identityRewriteService.rewritePromptText(text, defaultProfile, 'account-1')
+      const r2 = identityRewriteService.rewritePromptText(text, defaultProfile, 'account-2')
+
+      expect(r1).not.toBe(r2)
     })
 
     it('should rewrite Platform in system prompt', () => {
@@ -464,6 +473,33 @@ describe('Identity Rewrite Service', () => {
     it('should return default email when no accountId', () => {
       expect(identityRewriteService.generateEmail(null)).toBe('user@example.com')
       expect(identityRewriteService.generateEmail(undefined)).toBe('user@example.com')
+    })
+  })
+
+  describe('generateVersionSuffix', () => {
+    it('should return 3-char hex for accountId', () => {
+      const suffix = identityRewriteService.generateVersionSuffix('account-1')
+
+      expect(suffix).toMatch(/^[a-f0-9]{3}$/)
+    })
+
+    it('should be deterministic', () => {
+      const s1 = identityRewriteService.generateVersionSuffix('account-1')
+      const s2 = identityRewriteService.generateVersionSuffix('account-1')
+
+      expect(s1).toBe(s2)
+    })
+
+    it('should differ per account', () => {
+      const s1 = identityRewriteService.generateVersionSuffix('account-1')
+      const s2 = identityRewriteService.generateVersionSuffix('account-2')
+
+      expect(s1).not.toBe(s2)
+    })
+
+    it('should return 000 when no accountId', () => {
+      expect(identityRewriteService.generateVersionSuffix(null)).toBe('000')
+      expect(identityRewriteService.generateVersionSuffix(undefined)).toBe('000')
     })
   })
 })
