@@ -1284,6 +1284,76 @@ class ClaudeRelayService {
     return env
   }
 
+  // 📡 转发遥测事件（经过身份重写）
+  async forwardEventBatch(body, clientHeaders) {
+    const identityRewriteConfig = config.identityRewrite
+    if (!identityRewriteConfig?.enabled || !identityRewriteConfig?.forwardEventBatch) {
+      return { dropped: true }
+    }
+
+    try {
+      // 获取一个可用账户（遥测不需要粘性会话，随机选一个）
+      const allAccounts = await redis.getAllClaudeAccounts()
+      const activeAccounts = allAccounts.filter((a) => a.status === 'active')
+      if (activeAccounts.length === 0) {
+        logger.debug('📡 No active accounts for telemetry forwarding')
+        return { dropped: true }
+      }
+
+      const account = activeAccounts[Math.floor(Math.random() * activeAccounts.length)]
+      const accountId = account.id
+      const accessToken = await claudeAccountService.getValidAccessToken(accountId)
+      if (!accessToken) {
+        return { dropped: true }
+      }
+
+      // 重写事件体
+      const profile = await identityRewriteService.getProfile(accountId)
+      const rewrittenBody = identityRewriteService.rewriteEventBatch(body, profile)
+
+      // 获取代理
+      const proxyAgent = await this._getProxyAgent(accountId)
+
+      // 火忘式转发到上游
+      const bodyString = JSON.stringify(rewrittenBody)
+      const options = {
+        hostname: 'api.anthropic.com',
+        port: 443,
+        path: '/api/event_logging/batch',
+        method: 'POST',
+        headers: {
+          host: 'api.anthropic.com',
+          'content-type': 'application/json',
+          'content-length': String(Buffer.byteLength(bodyString)),
+          authorization: `Bearer ${accessToken}`,
+          'User-Agent':
+            (await this.captureAndGetUnifiedUserAgent(clientHeaders)) ||
+            'claude-cli/1.0.119 (external, cli)'
+        },
+        agent: proxyAgent || getHttpsAgentForNonStream(),
+        timeout: 10000
+      }
+
+      const req = https.request(options, (res) => {
+        // 消费响应避免内存泄漏
+        res.resume()
+        logger.debug(`📡 Telemetry forwarded: ${res.statusCode}`)
+      })
+
+      req.on('error', (err) => {
+        logger.debug(`📡 Telemetry forward failed (non-critical): ${err.message}`)
+      })
+
+      req.write(bodyString)
+      req.end()
+
+      return { forwarded: true }
+    } catch (error) {
+      logger.debug(`📡 Telemetry forward error (non-critical): ${error.message}`)
+      return { dropped: true }
+    }
+  }
+
   // 🔢 验证并限制max_tokens参数
   _validateAndLimitMaxTokens(body) {
     if (!body || !body.max_tokens) {

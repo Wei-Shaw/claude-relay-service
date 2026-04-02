@@ -357,6 +357,42 @@ describe('Identity Rewrite Service', () => {
     })
   })
 
+  describe('rewriteGenericIdentity', () => {
+    it('should rewrite device_id and email', () => {
+      const body = {
+        device_id: 'real-device-id',
+        email: 'realuser@company.com',
+        other_field: 'should remain'
+      }
+
+      identityRewriteService.rewriteGenericIdentity(body, defaultProfile)
+
+      expect(body.device_id).not.toBe('real-device-id')
+      expect(body.device_id).toHaveLength(64) // sha256 hex
+      expect(body.email).toBe('user@example.com')
+      expect(body.other_field).toBe('should remain')
+    })
+
+    it('should skip fields that do not exist', () => {
+      const body = { other_field: 'value' }
+
+      identityRewriteService.rewriteGenericIdentity(body, defaultProfile)
+
+      expect(body.device_id).toBeUndefined()
+      expect(body.email).toBeUndefined()
+      expect(body.other_field).toBe('value')
+    })
+
+    it('should handle non-object input gracefully', () => {
+      expect(() =>
+        identityRewriteService.rewriteGenericIdentity(null, defaultProfile)
+      ).not.toThrow()
+      expect(() =>
+        identityRewriteService.rewriteGenericIdentity('string', defaultProfile)
+      ).not.toThrow()
+    })
+  })
+
   describe('generateDeviceId', () => {
     it('should generate deterministic device ID for same profile', () => {
       const id1 = identityRewriteService.generateDeviceId(defaultProfile)

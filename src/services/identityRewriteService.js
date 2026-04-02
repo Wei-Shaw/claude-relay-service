@@ -252,6 +252,26 @@ function rewriteHomePaths(text, workingDir) {
 }
 
 /**
+ * 重写通用身份字段
+ * 用于 /policy_limits、/settings 等非消息路径
+ * 防止 device_id 和 email 通过旁路泄漏
+ * @param {Object} body - 请求体（会被修改）
+ * @param {Object} profile - 身份配置
+ */
+function rewriteGenericIdentity(body, profile) {
+  if (!body || typeof body !== 'object') {
+    return
+  }
+
+  if (body.device_id) {
+    body.device_id = generateDeviceId(profile || getDefaultProfile())
+  }
+  if (body.email) {
+    body.email = 'user@example.com'
+  }
+}
+
+/**
  * 剥离泄漏字段
  * 删除可能暴露 relay/gateway 信息的字段
  * @param {Object} body - 请求体（会被修改）
@@ -462,6 +482,7 @@ module.exports = {
   rewriteSystemPrompt,
   rewritePromptText,
   rewriteHomePaths,
+  rewriteGenericIdentity,
   rewriteEventBatch,
   buildCanonicalEnv,
   buildCanonicalProcess,

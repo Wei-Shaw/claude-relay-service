@@ -11,6 +11,7 @@ const logger = require('../utils/logger')
 const { getEffectiveModel, parseVendorPrefixedModel } = require('../utils/modelHelper')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
+const config = require('../../config/config')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const claudeAccountService = require('../services/account/claudeAccountService')
 const claudeConsoleAccountService = require('../services/account/claudeConsoleAccountService')
@@ -1885,9 +1886,53 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
   }
 })
 
-// Claude Code 客户端遥测端点 - 返回成功响应避免 404 日志
-router.post('/api/event_logging/batch', (req, res) => {
+// Claude Code 客户端遥测端点 - 身份重写后转发或丢弃
+router.post('/api/event_logging/batch', async (req, res) => {
+  // 立即返回 200，转发在后台进行（火忘式）
   res.status(200).json({ success: true })
+
+  try {
+    await claudeRelayService.forwardEventBatch(req.body, req.headers)
+  } catch (error) {
+    logger.debug('📡 Telemetry forward error (non-critical):', error.message)
+  }
+})
+
+// Claude Code 客户端旁路请求 - 重写身份字段后转发
+// policy_limits 和 settings 路径会携带 device_id/email，需要重写防止旁路泄漏
+router.all('/api/organizations/:orgId/policy_limits*', authenticateApiKey, async (req, res) => {
+  try {
+    const identityRewriteService = require('../services/identityRewriteService')
+    const identityRewriteConfig = config.identityRewrite
+
+    if (identityRewriteConfig?.enabled && req.body && typeof req.body === 'object') {
+      const profile = await identityRewriteService.getProfile(null)
+      identityRewriteService.rewriteGenericIdentity(req.body, profile)
+    }
+
+    // 返回空成功响应（relay 不需要真正转发这些管理路径）
+    res.status(200).json({})
+  } catch (error) {
+    logger.debug('⚠️ Policy limits request error:', error.message)
+    res.status(200).json({})
+  }
+})
+
+router.all('/api/settings*', authenticateApiKey, async (req, res) => {
+  try {
+    const identityRewriteService = require('../services/identityRewriteService')
+    const identityRewriteConfig = config.identityRewrite
+
+    if (identityRewriteConfig?.enabled && req.body && typeof req.body === 'object') {
+      const profile = await identityRewriteService.getProfile(null)
+      identityRewriteService.rewriteGenericIdentity(req.body, profile)
+    }
+
+    res.status(200).json({})
+  } catch (error) {
+    logger.debug('⚠️ Settings request error:', error.message)
+    res.status(200).json({})
+  }
 })
 
 module.exports = router
