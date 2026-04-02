@@ -1887,12 +1887,14 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
 })
 
 // Claude Code 客户端遥测端点 - 身份重写后转发或丢弃
-router.post('/api/event_logging/batch', async (req, res) => {
+// 使用 authenticateApiKey 确保使用客户端绑定的账户，避免跨账户遥测污染
+router.post('/api/event_logging/batch', authenticateApiKey, async (req, res) => {
   // 立即返回 200，转发在后台进行（火忘式）
   res.status(200).json({ success: true })
 
   try {
-    await claudeRelayService.forwardEventBatch(req.body, req.headers)
+    const accountId = req.apiKey?.claudeAccountId || null
+    await claudeRelayService.forwardEventBatch(req.body, req.headers, accountId)
   } catch (error) {
     logger.debug('📡 Telemetry forward error (non-critical):', error.message)
   }

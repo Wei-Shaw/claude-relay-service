@@ -1285,23 +1285,25 @@ class ClaudeRelayService {
   }
 
   // 📡 转发遥测事件（经过身份重写）
-  async forwardEventBatch(body, clientHeaders) {
+  async forwardEventBatch(body, clientHeaders, boundAccountId) {
     const identityRewriteConfig = config.identityRewrite
     if (!identityRewriteConfig?.enabled || !identityRewriteConfig?.forwardEventBatch) {
       return { dropped: true }
     }
 
+    // 必须有绑定的账户 ID，不使用随机账户（防止跨账户遥测污染）
+    if (!boundAccountId) {
+      logger.debug('📡 No bound account for telemetry, dropping')
+      return { dropped: true }
+    }
+
     try {
-      // 获取一个可用账户（遥测不需要粘性会话，随机选一个）
-      const allAccounts = await redis.getAllClaudeAccounts()
-      const activeAccounts = allAccounts.filter((a) => a.status === 'active')
-      if (activeAccounts.length === 0) {
-        logger.debug('📡 No active accounts for telemetry forwarding')
+      const accountId = boundAccountId
+      const account = await claudeAccountService.getAccount(accountId)
+      if (!account || account.status !== 'active') {
+        logger.debug('📡 Bound account not active for telemetry forwarding')
         return { dropped: true }
       }
-
-      const account = activeAccounts[Math.floor(Math.random() * activeAccounts.length)]
-      const accountId = account.id
       const accessToken = await claudeAccountService.getValidAccessToken(accountId)
       if (!accessToken) {
         return { dropped: true }
@@ -1606,37 +1608,43 @@ class ClaudeRelayService {
     }
 
     // 处理 billing header：启用身份重写时重写指纹，否则剥离
-    if (finalHeaders['x-anthropic-billing-header']) {
+    // 大小写不敏感查找，防止 X-Anthropic-Billing-Header 等变体绕过
+    const billingHeaderKey = Object.keys(finalHeaders).find(
+      (k) => k.toLowerCase() === 'x-anthropic-billing-header'
+    )
+    if (billingHeaderKey) {
       if (identityRewriteConfig?.enabled) {
         try {
           const profile = await identityRewriteService.getProfile(account?.id)
           const versionSuffix = identityRewriteService.generateVersionSuffix(account?.id)
-          finalHeaders['x-anthropic-billing-header'] = finalHeaders[
-            'x-anthropic-billing-header'
-          ].replace(
+          finalHeaders[billingHeaderKey] = finalHeaders[billingHeaderKey].replace(
             /cc_version=[\d.]+\.[a-f0-9]{3}/g,
             `cc_version=${profile.version}.${versionSuffix}`
           )
           logger.debug('✅ Rewrote billing header fingerprint')
         } catch (err) {
           logger.warn('⚠️ Failed to rewrite billing header:', err.message)
-          delete finalHeaders['x-anthropic-billing-header']
+          delete finalHeaders[billingHeaderKey]
         }
       } else {
-        delete finalHeaders['x-anthropic-billing-header']
+        delete finalHeaders[billingHeaderKey]
       }
     }
 
     // 应用请求身份转换
-    const extensionResult = this._applyRequestIdentityTransform(requestPayload, finalHeaders, {
-      account,
-      accountId,
-      accountType,
-      sessionHash,
-      clientHeaders,
-      requestOptions,
-      isStream
-    })
+    const extensionResult = await this._applyRequestIdentityTransform(
+      requestPayload,
+      finalHeaders,
+      {
+        account,
+        accountId,
+        accountType,
+        sessionHash,
+        clientHeaders,
+        requestOptions,
+        isStream
+      }
+    )
 
     if (extensionResult.abortResponse) {
       return { abortResponse: extensionResult.abortResponse }
@@ -1699,7 +1707,7 @@ class ClaudeRelayService {
     }
   }
 
-  _applyRequestIdentityTransform(body, headers, context = {}) {
+  async _applyRequestIdentityTransform(body, headers, context = {}) {
     const normalizedHeaders = headers && typeof headers === 'object' ? { ...headers } : {}
 
     try {
@@ -1709,7 +1717,7 @@ class ClaudeRelayService {
         ...context
       }
 
-      const result = requestIdentityService.transform(payload)
+      const result = await requestIdentityService.transform(payload)
       if (!result || typeof result !== 'object') {
         return { body, headers: normalizedHeaders }
       }
