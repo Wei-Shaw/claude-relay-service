@@ -259,8 +259,9 @@ function rewriteHomePaths(text, workingDir) {
  * @param {Object} body - 请求体（会被修改）
  * @param {Object} profile - 身份配置
  * @param {string} [accountId] - 账户 ID（用于生成唯一 device_id/email）
+ * @param {string} [accountEmail] - 账户真实邮箱（优先使用）
  */
-function rewriteGenericIdentity(body, profile, accountId) {
+function rewriteGenericIdentity(body, profile, accountId, accountEmail) {
   if (!body || typeof body !== 'object') {
     return
   }
@@ -269,7 +270,7 @@ function rewriteGenericIdentity(body, profile, accountId) {
     body.device_id = generateDeviceId(profile || getDefaultProfile(), accountId)
   }
   if (body.email) {
-    body.email = generateEmail(accountId)
+    body.email = accountEmail || body.email
   }
 }
 
@@ -293,9 +294,11 @@ function stripLeakFields(body) {
  * 重写 device_id, email, env, process，剥离泄漏字段
  * @param {Object} body - 事件批量请求体
  * @param {Object} profile - 身份配置
+ * @param {string} [accountId] - 账户 ID
+ * @param {string} [accountEmail] - 账户真实邮箱（优先使用）
  * @returns {Object} 重写后的请求体
  */
-function rewriteEventBatch(body, profile, accountId) {
+function rewriteEventBatch(body, profile, accountId, accountEmail) {
   if (!body || typeof body !== 'object' || !Array.isArray(body.events)) {
     return body
   }
@@ -315,7 +318,7 @@ function rewriteEventBatch(body, profile, accountId) {
       data.device_id = generateDeviceId(p, accountId)
     }
     if (data.email) {
-      data.email = generateEmail(accountId)
+      data.email = accountEmail || data.email
     }
 
     // 重写环境对象（完全替换）

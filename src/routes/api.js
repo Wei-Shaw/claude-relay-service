@@ -1908,9 +1908,13 @@ router.all('/api/organizations/:orgId/policy_limits*', authenticateApiKey, async
     const identityRewriteConfig = config.identityRewrite
 
     if (identityRewriteConfig?.enabled && req.body && typeof req.body === 'object') {
+      const claudeAccountService = require('../services/account/claudeAccountService')
       const accountId = req.apiKey?.claudeAccountId || null
-      const profile = await identityRewriteService.getProfile(accountId)
-      identityRewriteService.rewriteGenericIdentity(req.body, profile, accountId)
+      const [profile, accountEmail] = await Promise.all([
+        identityRewriteService.getProfile(accountId),
+        accountId ? claudeAccountService.getAccountEmail(accountId) : Promise.resolve('')
+      ])
+      identityRewriteService.rewriteGenericIdentity(req.body, profile, accountId, accountEmail)
     }
 
     // 返回空成功响应（relay 不需要真正转发这些管理路径）
@@ -1927,9 +1931,13 @@ router.all('/api/settings*', authenticateApiKey, async (req, res) => {
     const identityRewriteConfig = config.identityRewrite
 
     if (identityRewriteConfig?.enabled && req.body && typeof req.body === 'object') {
+      const claudeAccountService = require('../services/account/claudeAccountService')
       const accountId = req.apiKey?.claudeAccountId || null
-      const profile = await identityRewriteService.getProfile(accountId)
-      identityRewriteService.rewriteGenericIdentity(req.body, profile, accountId)
+      const [profile, accountEmail] = await Promise.all([
+        identityRewriteService.getProfile(accountId),
+        accountId ? claudeAccountService.getAccountEmail(accountId) : Promise.resolve('')
+      ])
+      identityRewriteService.rewriteGenericIdentity(req.body, profile, accountId, accountEmail)
     }
 
     res.status(200).json({})

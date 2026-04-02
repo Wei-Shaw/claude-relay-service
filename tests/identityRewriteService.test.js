@@ -274,7 +274,7 @@ describe('Identity Rewrite Service', () => {
   })
 
   describe('rewriteEventBatch', () => {
-    it('should rewrite device_id and email per-account', () => {
+    it('should rewrite device_id and use real account email', () => {
       const body = {
         events: [
           {
@@ -286,23 +286,48 @@ describe('Identity Rewrite Service', () => {
         ]
       }
 
-      const result = identityRewriteService.rewriteEventBatch(body, defaultProfile, 'account-1')
+      const result = identityRewriteService.rewriteEventBatch(
+        body,
+        defaultProfile,
+        'account-1',
+        'real@gmail.com'
+      )
 
       expect(result.events[0].event_data.device_id).not.toBe('original-device-id')
-      expect(result.events[0].event_data.email).toContain('@example.com')
-      expect(result.events[0].event_data.email).not.toBe('original@example.com')
+      expect(result.events[0].event_data.email).toBe('real@gmail.com')
     })
 
-    it('should generate different device_id/email for different accounts', () => {
+    it('should keep original email when accountEmail is empty', () => {
+      const body = {
+        events: [{ event_data: { device_id: 'orig', email: 'orig@test.com' } }]
+      }
+
+      const result = identityRewriteService.rewriteEventBatch(body, defaultProfile, 'account-1', '')
+
+      expect(result.events[0].event_data.email).toBe('orig@test.com')
+    })
+
+    it('should generate different device_ids for different accounts', () => {
       const makeBody = () => ({
         events: [{ event_data: { device_id: 'orig', email: 'orig@test.com' } }]
       })
 
-      const r1 = identityRewriteService.rewriteEventBatch(makeBody(), defaultProfile, 'account-1')
-      const r2 = identityRewriteService.rewriteEventBatch(makeBody(), defaultProfile, 'account-2')
+      const r1 = identityRewriteService.rewriteEventBatch(
+        makeBody(),
+        defaultProfile,
+        'account-1',
+        'a1@gmail.com'
+      )
+      const r2 = identityRewriteService.rewriteEventBatch(
+        makeBody(),
+        defaultProfile,
+        'account-2',
+        'a2@gmail.com'
+      )
 
       expect(r1.events[0].event_data.device_id).not.toBe(r2.events[0].event_data.device_id)
-      expect(r1.events[0].event_data.email).not.toBe(r2.events[0].event_data.email)
+      expect(r1.events[0].event_data.email).toBe('a1@gmail.com')
+      expect(r2.events[0].event_data.email).toBe('a2@gmail.com')
     })
 
     it('should replace env object entirely', () => {
@@ -380,31 +405,54 @@ describe('Identity Rewrite Service', () => {
   })
 
   describe('rewriteGenericIdentity', () => {
-    it('should rewrite device_id and email per-account', () => {
+    it('should rewrite device_id and use real account email', () => {
       const body = {
         device_id: 'real-device-id',
         email: 'realuser@company.com',
         other_field: 'should remain'
       }
 
-      identityRewriteService.rewriteGenericIdentity(body, defaultProfile, 'account-1')
+      identityRewriteService.rewriteGenericIdentity(
+        body,
+        defaultProfile,
+        'account-1',
+        'account1@gmail.com'
+      )
 
       expect(body.device_id).not.toBe('real-device-id')
       expect(body.device_id).toHaveLength(64) // sha256 hex
-      expect(body.email).toContain('@example.com')
-      expect(body.email).not.toBe('realuser@company.com')
+      expect(body.email).toBe('account1@gmail.com')
       expect(body.other_field).toBe('should remain')
     })
 
-    it('should generate different identities for different accounts', () => {
+    it('should keep original email when accountEmail is empty', () => {
+      const body = { device_id: 'orig', email: 'orig@test.com' }
+
+      identityRewriteService.rewriteGenericIdentity(body, defaultProfile, 'account-1', '')
+
+      expect(body.email).toBe('orig@test.com')
+    })
+
+    it('should generate different device_ids for different accounts', () => {
       const body1 = { device_id: 'orig', email: 'orig@test.com' }
       const body2 = { device_id: 'orig', email: 'orig@test.com' }
 
-      identityRewriteService.rewriteGenericIdentity(body1, defaultProfile, 'account-1')
-      identityRewriteService.rewriteGenericIdentity(body2, defaultProfile, 'account-2')
+      identityRewriteService.rewriteGenericIdentity(
+        body1,
+        defaultProfile,
+        'account-1',
+        'a1@gmail.com'
+      )
+      identityRewriteService.rewriteGenericIdentity(
+        body2,
+        defaultProfile,
+        'account-2',
+        'a2@gmail.com'
+      )
 
       expect(body1.device_id).not.toBe(body2.device_id)
-      expect(body1.email).not.toBe(body2.email)
+      expect(body1.email).toBe('a1@gmail.com')
+      expect(body2.email).toBe('a2@gmail.com')
     })
 
     it('should skip fields that do not exist', () => {

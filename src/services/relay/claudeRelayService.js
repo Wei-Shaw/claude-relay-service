@@ -1309,9 +1309,17 @@ class ClaudeRelayService {
         return { dropped: true }
       }
 
-      // 重写事件体（传入 accountId 确保 device_id/email 按账户唯一）
-      const profile = await identityRewriteService.getProfile(accountId)
-      const rewrittenBody = identityRewriteService.rewriteEventBatch(body, profile, accountId)
+      // 重写事件体（传入 accountId 确保 device_id 按账户唯一，email 用真实邮箱）
+      const [profile, accountEmail] = await Promise.all([
+        identityRewriteService.getProfile(accountId),
+        claudeAccountService.getAccountEmail(accountId)
+      ])
+      const rewrittenBody = identityRewriteService.rewriteEventBatch(
+        body,
+        profile,
+        accountId,
+        accountEmail
+      )
 
       // 获取代理
       const proxyAgent = await this._getProxyAgent(accountId)
