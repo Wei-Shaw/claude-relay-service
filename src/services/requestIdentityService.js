@@ -153,24 +153,6 @@ function applyFingerprintToHeaders(headers, fingerprint) {
   return nextHeaders
 }
 
-function persistFingerprint(accountId, fingerprint) {
-  if (!accountId || !hasFingerprintValues(fingerprint)) {
-    return
-  }
-
-  const client = getRedisClient()
-  const key = `${REDIS_KEY_PREFIX}${accountId}`
-  const serialized = JSON.stringify(fingerprint)
-
-  const command = client.set(key, serialized, 'NX')
-
-  if (command && typeof command.catch === 'function') {
-    command.catch((error) => {
-      logger.error(`requestIdentityService: Redis 持久化指纹失败 (${accountId}): ${error.message}`)
-    })
-  }
-}
-
 function getHeaderValueCaseInsensitive(headers, key) {
   if (!headers || typeof headers !== 'object') {
     return undefined
@@ -232,7 +214,7 @@ function resolveAccountId(payload) {
   return null
 }
 
-function rewriteHeaders(headers, accountId) {
+async function rewriteHeaders(headers, accountId) {
   if (!headers || typeof headers !== 'object') {
     return { nextHeaders: headers, changed: false }
   }
@@ -242,8 +224,8 @@ function rewriteHeaders(headers, accountId) {
   }
 
   const workingHeaders = { ...headers }
-  const fingerprint = collectFingerprintFromHeaders(workingHeaders)
-  const fieldCount = Object.keys(fingerprint).length
+  const incomingFingerprint = collectFingerprintFromHeaders(workingHeaders)
+  const fieldCount = Object.keys(incomingFingerprint).length
 
   if (fieldCount < MIN_FINGERPRINT_FIELDS) {
     logger.warn(
@@ -252,20 +234,31 @@ function rewriteHeaders(headers, accountId) {
     return { nextHeaders: workingHeaders, changed: false }
   }
 
+  // 先读缓存：确保同一账户始终使用相同的 stainless 指纹
+  let effectiveFingerprint = incomingFingerprint
   try {
-    persistFingerprint(accountId, fingerprint)
-  } catch (error) {
-    logger.error(`requestIdentityService: 持久化指纹失败 (${accountId}): ${error.message}`)
-    return {
-      abortResponse: {
-        statusCode: 500,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ error: 'fingerprint_persist_failed', message: '指纹信息持久化失败' })
+    const client = getRedisClient()
+    const key = `${REDIS_KEY_PREFIX}${accountId}`
+    const cached = await client.get(key)
+
+    if (cached) {
+      // 缓存存在，使用缓存的指纹（忽略当前请求的值）
+      effectiveFingerprint = JSON.parse(cached)
+    } else {
+      // 缓存不存在，用当前请求的指纹播种
+      await client.set(key, JSON.stringify(incomingFingerprint), 'NX')
+      // 再读一次确认（防止并发竞争）
+      const confirmed = await client.get(key)
+      if (confirmed) {
+        effectiveFingerprint = JSON.parse(confirmed)
       }
     }
+  } catch (error) {
+    logger.error(`requestIdentityService: 指纹缓存操作失败 (${accountId}): ${error.message}`)
+    // 失败时使用当前请求的指纹（降级处理）
   }
 
-  const appliedHeaders = applyFingerprintToHeaders(workingHeaders, fingerprint)
+  const appliedHeaders = applyFingerprintToHeaders(workingHeaders, effectiveFingerprint)
   const changed = headersChanged(workingHeaders, appliedHeaders)
 
   return { nextHeaders: appliedHeaders, changed }
@@ -325,12 +318,16 @@ function rewriteUserId(body, accountId, accountUuid) {
   const effectiveScheduler = accountId ? String(accountId) : 'unknown-scheduler'
   const hashedSession = formatUuidFromSeed(`${effectiveScheduler}::${seedTail}`)
 
+  // deviceId 纯粹由 accountId 决定，不依赖客户端输入
+  // 确保同一账户无论哪个客户端连接，都产生相同的 device_id
+  const hashedDeviceId = formatUuidFromSeed(`${effectiveScheduler}::device`)
+
   // 注入真实 accountUuid
   const effectiveUuid = normalizeAccountUuid(accountUuid) || parsed.accountUuid || ''
 
   // 以原格式重建
   const nextUserId = metadataUserIdHelper.build({
-    deviceId: parsed.deviceId,
+    deviceId: hashedDeviceId,
     accountUuid: effectiveUuid,
     sessionId: hashedSession,
     isJsonFormat: parsed.isJsonFormat
@@ -355,7 +352,7 @@ function rewriteUserId(body, accountId, accountUuid) {
  * @param {Object} payload.account - 账户对象
  * @returns {Object} 转换后的 { body, headers, abortResponse? }
  */
-function transform(payload = {}) {
+async function transform(payload = {}) {
   const currentBody = payload.body
   const currentHeaders = payload.headers
 
@@ -370,7 +367,14 @@ function transform(payload = {}) {
   const accountIdForHeaders = resolveAccountId(payload)
 
   const { nextBody } = rewriteUserId(currentBody, payload.accountId, accountUuid)
-  const headerResult = rewriteHeaders(currentHeaders, accountIdForHeaders)
+  const headerResult = await rewriteHeaders(currentHeaders, accountIdForHeaders)
+
+  // 剥离可能暴露 relay/gateway 信息的泄漏字段（纵深防御）
+  if (nextBody && typeof nextBody === 'object') {
+    delete nextBody.baseUrl
+    delete nextBody.base_url
+    delete nextBody.gateway
+  }
 
   const nextHeaders = headerResult ? headerResult.nextHeaders : currentHeaders
   const abortResponse =

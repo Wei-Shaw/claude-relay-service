@@ -451,4 +451,96 @@ router.post('/models/pricing/refresh', authenticateAdmin, async (req, res) => {
   }
 })
 
+// ==================== 身份重写验证 ====================
+
+// 预览身份重写效果（dry-run）
+router.get('/identity-rewrite/verify', authenticateAdmin, async (req, res) => {
+  try {
+    const identityRewriteService = require('../../services/identityRewriteService')
+    const identityRewriteConfig = config.identityRewrite
+
+    if (!identityRewriteConfig?.enabled) {
+      return res.json({
+        enabled: false,
+        message: 'Identity rewrite is disabled (IDENTITY_REWRITE_ENABLED=false)'
+      })
+    }
+
+    // 构造样本输入
+    const sampleInput = {
+      metadata: {
+        user_id: JSON.stringify({
+          device_id: 'REAL_DEVICE_ID_abc123def456',
+          account_uuid: 'shared-account-uuid',
+          session_id: 'session-xxx'
+        })
+      },
+      system: [
+        {
+          type: 'text',
+          text: 'x-anthropic-billing-header: cc_version=2.1.81.a1b; cc_entrypoint=cli;'
+        },
+        {
+          type: 'text',
+          text: 'Here is useful information about the environment:\n<env>\nWorking directory: /home/bob/myproject\nPlatform: linux\nShell: bash\nOS Version: Linux 6.5.0-generic\n</env>'
+        }
+      ],
+      messages: [{ role: 'user', content: 'Check /home/bob/myproject/src/main.js' }]
+    }
+
+    // 可选：传入 accountId 使用账户级配置
+    const accountId = req.query.accountId || null
+    const profile = await identityRewriteService.getProfile(accountId)
+
+    // 深拷贝用于重写
+    const rewritten = JSON.parse(JSON.stringify(sampleInput))
+    identityRewriteService.rewriteSystemPrompt(rewritten, profile)
+
+    // 样本事件批量
+    const sampleEvent = {
+      events: [
+        {
+          event_data: {
+            device_id: 'original-device-id',
+            email: 'realuser@company.com',
+            env: { platform: 'linux', is_ci: true, terminal: 'gnome-terminal' },
+            baseUrl: 'https://relay.example.com'
+          }
+        }
+      ]
+    }
+
+    const rewrittenEvent = identityRewriteService.rewriteEventBatch(sampleEvent, profile, accountId)
+
+    res.json({
+      enabled: true,
+      forwardEventBatch: identityRewriteConfig.forwardEventBatch || false,
+      profile,
+      messages_rewrite: {
+        _info: 'Shows how identity rewrite transforms a sample /v1/messages request',
+        before: {
+          system_billing: sampleInput.system[0].text,
+          system_env: sampleInput.system[1].text,
+          user_message: sampleInput.messages[0].content
+        },
+        after: {
+          system_billing: rewritten.system[0].text,
+          system_env: rewritten.system[1].text,
+          user_message: rewritten.messages[0].content,
+          user_message_note:
+            'User messages are NOT rewritten (preserves real file paths for tool calls)'
+        }
+      },
+      event_rewrite: {
+        _info: 'Shows how event_logging/batch events are rewritten',
+        before: sampleEvent.events[0].event_data,
+        after: rewrittenEvent.events[0].event_data
+      }
+    })
+  } catch (error) {
+    logger.error('Failed to verify identity rewrite:', error)
+    res.status(500).json({ error: 'Failed to verify identity rewrite', message: error.message })
+  }
+})
+
 module.exports = router

@@ -1340,6 +1340,19 @@ class ClaudeAccountService {
     return this._encryptionKeyCache
   }
 
+  // 🔓 获取账户真实邮箱（解密后，不掩码）
+  async getAccountEmail(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData?.email) {
+        return ''
+      }
+      return this._decryptSensitiveData(accountData.email)
+    } catch (_error) {
+      return ''
+    }
+  }
+
   // 🎭 掩码邮箱地址
   _maskEmail(email) {
     if (!email || !email.includes('@')) {

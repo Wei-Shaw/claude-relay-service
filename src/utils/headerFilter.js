@@ -73,6 +73,7 @@ function filterForClaude(headers) {
     'anthropic-beta',
     'accept-language',
     'sec-fetch-mode',
+    'x-anthropic-billing-header', // 身份重写需要的 billing header
     // 注意：不透传 accept-encoding，避免客户端发送的 zstd 等 Node.js 不支持的编码
     // 被转发到上游，导致 axios 无法解压响应（Node 18 zlib 不支持 zstd）
     'user-agent',
