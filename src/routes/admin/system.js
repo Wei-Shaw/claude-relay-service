@@ -510,7 +510,7 @@ router.get('/identity-rewrite/verify', authenticateAdmin, async (req, res) => {
       ]
     }
 
-    const rewrittenEvent = identityRewriteService.rewriteEventBatch(sampleEvent, profile)
+    const rewrittenEvent = identityRewriteService.rewriteEventBatch(sampleEvent, profile, accountId)
 
     res.json({
       enabled: true,

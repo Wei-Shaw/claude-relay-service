@@ -257,17 +257,18 @@ function rewriteHomePaths(text, workingDir) {
  * 防止 device_id 和 email 通过旁路泄漏
  * @param {Object} body - 请求体（会被修改）
  * @param {Object} profile - 身份配置
+ * @param {string} [accountId] - 账户 ID（用于生成唯一 device_id/email）
  */
-function rewriteGenericIdentity(body, profile) {
+function rewriteGenericIdentity(body, profile, accountId) {
   if (!body || typeof body !== 'object') {
     return
   }
 
   if (body.device_id) {
-    body.device_id = generateDeviceId(profile || getDefaultProfile())
+    body.device_id = generateDeviceId(profile || getDefaultProfile(), accountId)
   }
   if (body.email) {
-    body.email = 'user@example.com'
+    body.email = generateEmail(accountId)
   }
 }
 
@@ -293,7 +294,7 @@ function stripLeakFields(body) {
  * @param {Object} profile - 身份配置
  * @returns {Object} 重写后的请求体
  */
-function rewriteEventBatch(body, profile) {
+function rewriteEventBatch(body, profile, accountId) {
   if (!body || typeof body !== 'object' || !Array.isArray(body.events)) {
     return body
   }
@@ -308,12 +309,12 @@ function rewriteEventBatch(body, profile) {
 
     const data = { ...event.event_data }
 
-    // 重写 identity 字段
+    // 重写 identity 字段（per-account 唯一）
     if (data.device_id) {
-      data.device_id = generateDeviceId(p)
+      data.device_id = generateDeviceId(p, accountId)
     }
     if (data.email) {
-      data.email = 'user@example.com' // 使用默认邮箱
+      data.email = generateEmail(accountId)
     }
 
     // 重写环境对象（完全替换）
@@ -451,17 +452,35 @@ function rewriteAdditionalMetadata(b64, _profile) {
 
 /**
  * 生成设备 ID
- * 基于配置生成确定性设备 ID（哈希）
+ * 基于 accountId + 配置生成确定性设备 ID（哈希）
+ * 每个账户会得到唯一的 device_id，避免多账户共享同一设备指纹
  * @param {Object} profile - 身份配置
+ * @param {string} [accountId] - 账户 ID（用于区分不同账户）
  * @returns {string} 64 字符十六进制设备 ID
  */
-function generateDeviceId(profile) {
+function generateDeviceId(profile, accountId) {
   const p = profile || getDefaultProfile()
   const crypto = require('crypto')
 
-  // 基于配置生成确定性哈希
-  const seed = `${p.platform}:${p.arch}:${p.nodeVersion}:${p.terminal}`
+  // accountId 混入 seed，确保每个账户的 device_id 唯一
+  const seed = `${accountId || 'default'}:${p.platform}:${p.arch}:${p.nodeVersion}:${p.terminal}`
   return crypto.createHash('sha256').update(seed).digest('hex')
+}
+
+/**
+ * 生成账户级伪邮箱
+ * 基于 accountId 生成确定性的伪邮箱，避免所有账户共享同一邮箱
+ * @param {string} [accountId] - 账户 ID
+ * @returns {string} 伪邮箱地址
+ */
+function generateEmail(accountId) {
+  if (!accountId) {
+    return 'user@example.com'
+  }
+
+  const crypto = require('crypto')
+  const hash = crypto.createHash('sha256').update(String(accountId)).digest('hex').slice(0, 8)
+  return `user-${hash}@example.com`
 }
 
 /**
@@ -490,5 +509,6 @@ module.exports = {
   rewriteAdditionalMetadata,
   stripLeakFields,
   generateDeviceId,
+  generateEmail,
   REGEX
 }
