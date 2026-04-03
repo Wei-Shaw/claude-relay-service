@@ -165,9 +165,9 @@ const TOKEN_COUNT_PATHS = new Set([
 
 function extractApiKey(req) {
   const candidates = [
+    req.headers['authorization'], // 第一优先级
     req.headers['x-api-key'],
     req.headers['x-goog-api-key'],
-    req.headers['authorization'],
     req.headers['api-key'],
     req.query?.key
   ]
