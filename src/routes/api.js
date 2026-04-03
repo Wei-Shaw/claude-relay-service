@@ -756,6 +756,10 @@ async function handleMessagesRequest(req, res) {
           if (!res.headersSent) {
             return res.status(500).json({ error: 'Bedrock service error', message: error.message })
           }
+          // SSE 流已开始但出错：确保连接被关闭，防止客户端 pending
+          if (!res.writableEnded) {
+            res.end()
+          }
           return undefined
         }
       } else if (accountType === 'ccr') {
