@@ -1163,14 +1163,14 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       // 获取窗口开始时间和计算剩余时间
       const windowStart = await client.get(windowStartKey)
       if (windowStart) {
-        const now = Date.now()
+        const nowMs = Date.now()
         windowStartTime = parseInt(windowStart)
         const windowDuration = rateLimitWindow * 60 * 1000 // 转换为毫秒
         windowEndTime = windowStartTime + windowDuration
 
         // 如果窗口还有效
-        if (now < windowEndTime) {
-          windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
+        if (nowMs < windowEndTime) {
+          windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - nowMs) / 1000))
         } else {
           // 窗口已过期
           windowRemainingSeconds = 0
