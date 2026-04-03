@@ -3614,8 +3614,8 @@ const setGlobalDateFilterPreset = (preset) => {
       }
 
       globalDateFilter.customRange = [formatDate(startDate), formatDate(today)]
-      globalDateFilter.customStart = startDate.toISOString().split('T')[0]
-      globalDateFilter.customEnd = today.toISOString().split('T')[0]
+      globalDateFilter.customStart = formatLocalDate(startDate)
+      globalDateFilter.customEnd = formatLocalDate(today)
     }
   } else if (preset === 'all') {
     // 全部时间选项
@@ -3637,8 +3637,8 @@ const setGlobalDateFilterPreset = (preset) => {
       startDate.setDate(today.getDate() - 29)
     }
 
-    globalDateFilter.customStart = startDate.toISOString().split('T')[0]
-    globalDateFilter.customEnd = today.toISOString().split('T')[0]
+    globalDateFilter.customStart = formatLocalDate(startDate)
+    globalDateFilter.customEnd = formatLocalDate(today)
   }
 
   loadApiKeys()
@@ -3668,8 +3668,8 @@ const initApiKeyDateFilter = (keyId) => {
   apiKeyDateFilters.value[keyId] = {
     type: 'preset',
     preset: 'today',
-    customStart: today.toISOString().split('T')[0],
-    customEnd: today.toISOString().split('T')[0],
+    customStart: formatLocalDate(today),
+    customEnd: formatLocalDate(today),
     customRange: null,
     presetOptions: [
       { value: 'today', label: '今日', days: 1 },
@@ -3717,8 +3717,8 @@ const setApiKeyDateFilterPreset = (preset, keyId) => {
         }
 
         filter.customRange = [formatDate(startDate), formatDate(today)]
-        filter.customStart = startDate.toISOString().split('T')[0]
-        filter.customEnd = today.toISOString().split('T')[0]
+        filter.customStart = formatLocalDate(startDate)
+        filter.customEnd = formatLocalDate(today)
       }
     } else {
       // 预设选项
@@ -3726,8 +3726,8 @@ const setApiKeyDateFilterPreset = (preset, keyId) => {
       const startDate = new Date(today)
       startDate.setDate(today.getDate() - (option.days - 1))
 
-      filter.customStart = startDate.toISOString().split('T')[0]
-      filter.customEnd = today.toISOString().split('T')[0]
+      filter.customStart = formatLocalDate(startDate)
+      filter.customEnd = formatLocalDate(today)
 
       const formatDate = (date) => {
         return (
@@ -3766,6 +3766,16 @@ const onApiKeyCustomDateRangeChange = (keyId, value) => {
 }
 
 // 禁用未来日期
+const formatLocalDate = (date) => {
+  return (
+    date.getFullYear() +
+    '-' +
+    String(date.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(date.getDate()).padStart(2, '0')
+  )
+}
+
 const disabledDate = (date) => {
   return date > new Date()
 }
@@ -3782,8 +3792,8 @@ const resetApiKeyDateFilter = (keyId) => {
   const startDate = new Date(today)
   startDate.setHours(0, 0, 0, 0) // 今日从0点开始
 
-  filter.customStart = today.toISOString().split('T')[0]
-  filter.customEnd = today.toISOString().split('T')[0]
+  filter.customStart = formatLocalDate(today)
+  filter.customEnd = formatLocalDate(today)
   filter.customRange = null
 
   // 重新加载数据
