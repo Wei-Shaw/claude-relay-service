@@ -10,6 +10,7 @@ const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { calculateWaitTimeStats } = require('../utils/statsHelper')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
+const slidingWindowRateLimit = require('../utils/slidingWindowRateLimit')
 
 // 工具函数
 function sleep(ms) {
@@ -1065,47 +1066,22 @@ const authenticateApiKey = async (req, res, next) => {
       (rateLimitRequests > 0 || validation.keyData.tokenLimit > 0 || rateLimitCost > 0)
 
     if (hasRateLimits) {
-      const windowStartKey = `rate_limit:window_start:${validation.keyData.id}`
-      const requestCountKey = `rate_limit:requests:${validation.keyData.id}`
-      const tokenCountKey = `rate_limit:tokens:${validation.keyData.id}`
-      const costCountKey = `rate_limit:cost:${validation.keyData.id}` // 新增：费用计数器
-
       const now = Date.now()
-      const windowDuration = rateLimitWindow * 60 * 1000 // 转换为毫秒
-
-      // 获取窗口开始时间
-      let windowStart = await redis.getClient().get(windowStartKey)
-
-      if (!windowStart) {
-        // 第一次请求，设置窗口开始时间
-        await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
-        await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
-        await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
-        await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
-        windowStart = now
-      } else {
-        windowStart = parseInt(windowStart)
-
-        // 检查窗口是否已过期
-        if (now - windowStart >= windowDuration) {
-          // 窗口已过期，重置
-          await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
-          await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
-          await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
-          await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
-          windowStart = now
-        }
-      }
-
-      // 获取当前计数
-      const currentRequests = parseInt((await redis.getClient().get(requestCountKey)) || '0')
-      const currentTokens = parseInt((await redis.getClient().get(tokenCountKey)) || '0')
-      const currentCost = parseFloat((await redis.getClient().get(costCountKey)) || '0') // 新增：当前费用
+      const windowStats = await slidingWindowRateLimit.getWindowSnapshot(
+        validation.keyData.id,
+        rateLimitWindow,
+        { now }
+      )
+      const currentRequests = windowStats.requests || 0
+      const currentTokens = windowStats.tokens || 0
+      const currentCost = windowStats.cost || 0
+      const windowStart = windowStats.windowStartTime || now
+      const windowEnd = windowStats.windowEndTime || now
+      const remainingMinutes = Math.max(1, Math.ceil((windowEnd - now) / 60000))
 
       // 检查请求次数限制
       if (rateLimitRequests > 0 && currentRequests >= rateLimitRequests) {
-        const resetTime = new Date(windowStart + windowDuration)
-        const remainingMinutes = Math.ceil((resetTime - now) / 60000)
+        const resetTime = new Date(windowEnd)
 
         logger.security(
           `🚦 Rate limit exceeded (requests) for key: ${validation.keyData.id} (${validation.keyData.name}), requests: ${currentRequests}/${rateLimitRequests}`
@@ -1126,8 +1102,7 @@ const authenticateApiKey = async (req, res, next) => {
       if (tokenLimit > 0) {
         // 使用Token限制（向后兼容）
         if (currentTokens >= tokenLimit) {
-          const resetTime = new Date(windowStart + windowDuration)
-          const remainingMinutes = Math.ceil((resetTime - now) / 60000)
+          const resetTime = new Date(windowEnd)
 
           logger.security(
             `🚦 Rate limit exceeded (tokens) for key: ${validation.keyData.id} (${validation.keyData.name}), tokens: ${currentTokens}/${tokenLimit}`
@@ -1145,8 +1120,7 @@ const authenticateApiKey = async (req, res, next) => {
       } else if (rateLimitCost > 0) {
         // 使用费用限制（新功能）
         if (currentCost >= rateLimitCost) {
-          const resetTime = new Date(windowStart + windowDuration)
-          const remainingMinutes = Math.ceil((resetTime - now) / 60000)
+          const resetTime = new Date(windowEnd)
 
           logger.security(
             `💰 Rate limit exceeded (cost) for key: ${validation.keyData.id} (${
@@ -1165,16 +1139,22 @@ const authenticateApiKey = async (req, res, next) => {
         }
       }
 
-      // 增加请求计数
-      await redis.getClient().incr(requestCountKey)
+      // 请求进入系统时立即记一次，用于请求数限制；费用/Token 在响应结束后补记。
+      await slidingWindowRateLimit.incrementRequestCount(
+        validation.keyData.id,
+        rateLimitWindow,
+        1,
+        {
+          now
+        }
+      )
 
       // 存储限流信息到请求对象
       req.rateLimitInfo = {
-        windowStart,
-        windowDuration,
-        requestCountKey,
-        tokenCountKey,
-        costCountKey, // 新增：费用计数器
+        apiKeyId: validation.keyData.id,
+        windowMinutes: rateLimitWindow,
+        windowStartTime: windowStart,
+        windowEndTime: windowEnd,
         currentRequests: currentRequests + 1,
         currentTokens,
         currentCost, // 新增：当前费用

@@ -4,6 +4,7 @@ const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const CostCalculator = require('../../utils/costCalculator')
+const slidingWindowRateLimit = require('../../utils/slidingWindowRateLimit')
 const config = require('../../../config/config')
 
 const router = express.Router()
@@ -1147,34 +1148,24 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
 
     // 只在启用了窗口限制时查询窗口数据
     if (rateLimitWindow > 0) {
-      const requestCountKey = `rate_limit:requests:${keyId}`
-      const tokenCountKey = `rate_limit:tokens:${keyId}`
-      const costCountKey = `rate_limit:cost:${keyId}`
-      const windowStartKey = `rate_limit:window_start:${keyId}`
+      const windowStats = await slidingWindowRateLimit.getWindowSnapshot(keyId, rateLimitWindow, {
+        client
+      })
+      const {
+        requests = 0,
+        tokens = 0,
+        cost = 0,
+        windowRemainingSeconds: remainingSeconds = null,
+        windowStartTime: startTime = null,
+        windowEndTime: endTime = null
+      } = windowStats
 
-      currentWindowRequests = parseInt((await client.get(requestCountKey)) || '0')
-      currentWindowTokens = parseInt((await client.get(tokenCountKey)) || '0')
-      currentWindowCost = parseFloat((await client.get(costCountKey)) || '0')
-
-      // 获取窗口开始时间和计算剩余时间
-      const windowStart = await client.get(windowStartKey)
-      if (windowStart) {
-        const now = Date.now()
-        windowStartTime = parseInt(windowStart)
-        const windowDuration = rateLimitWindow * 60 * 1000 // 转换为毫秒
-        windowEndTime = windowStartTime + windowDuration
-
-        // 如果窗口还有效
-        if (now < windowEndTime) {
-          windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
-        } else {
-          // 窗口已过期
-          windowRemainingSeconds = 0
-          currentWindowRequests = 0
-          currentWindowTokens = 0
-          currentWindowCost = 0
-        }
-      }
+      currentWindowRequests = requests
+      currentWindowTokens = tokens
+      currentWindowCost = cost
+      windowRemainingSeconds = remainingSeconds
+      windowStartTime = startTime
+      windowEndTime = endTime
     }
   } catch (error) {
     logger.warn(`⚠️ 获取实时限制数据失败 (key: ${keyId}):`, error.message)

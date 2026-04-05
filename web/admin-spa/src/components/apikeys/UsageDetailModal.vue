@@ -237,6 +237,7 @@
                   :window-end-time="apiKey.windowEndTime"
                   :window-remaining-seconds="apiKey.windowRemainingSeconds"
                   :window-start-time="apiKey.windowStartTime"
+                  @window-expired="refreshStats"
                 />
               </div>
 
@@ -338,7 +339,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'open-timeline'])
+const emit = defineEmits(['close', 'open-timeline', 'refresh-stats'])
 
 // 计算属性
 const totalRequests = computed(() => props.apiKey.usage?.total?.requests || 0)
@@ -435,5 +436,9 @@ const close = () => {
 
 const openTimeline = () => {
   emit('open-timeline', props.apiKey?.id)
+}
+
+const refreshStats = () => {
+  emit('refresh-stats', props.apiKey?.id)
 }
 </script>

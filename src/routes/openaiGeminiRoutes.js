@@ -7,6 +7,7 @@ const unifiedGeminiScheduler = require('../services/scheduler/unifiedGeminiSched
 const { getAvailableModels } = require('../services/relay/geminiRelayService')
 const crypto = require('crypto')
 const apiKeyService = require('../services/apiKeyService')
+const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 
 // 生成会话哈希
 function generateSessionHash(req) {
@@ -33,6 +34,40 @@ function ensureAntigravityProjectId(account) {
 // 检查 API Key 权限
 function checkPermissions(apiKeyData, requiredPermission = 'gemini') {
   return apiKeyService.hasPermission(apiKeyData?.permissions, requiredPermission)
+}
+
+async function applyRateLimitTracking(
+  req,
+  usageSummary,
+  model,
+  context = '',
+  preCalculatedCost = null
+) {
+  if (!req.rateLimitInfo) {
+    return
+  }
+
+  const label = context ? ` (${context})` : ''
+
+  try {
+    const { totalTokens, totalCost } = await updateRateLimitCounters(
+      req.rateLimitInfo,
+      usageSummary,
+      model,
+      req.apiKey?.id,
+      'gemini',
+      preCalculatedCost
+    )
+
+    if (totalTokens > 0) {
+      logger.api(`📊 Updated rate limit token count${label}: +${totalTokens} tokens`)
+    }
+    if (typeof totalCost === 'number' && totalCost > 0) {
+      logger.api(`💰 Updated rate limit cost count${label}: +$${totalCost.toFixed(6)}`)
+    }
+  } catch (error) {
+    logger.error(`❌ Failed to update rate limit counters${label}:`, error)
+  }
 }
 
 // 转换 OpenAI 消息格式到 Gemini 格式
@@ -532,7 +567,7 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
         // 记录使用统计
         if (!usageReported && totalUsage.totalTokenCount > 0) {
           try {
-            await apiKeyService.recordUsage(
+            const recordedCosts = await apiKeyService.recordUsage(
               apiKeyData.id,
               totalUsage.promptTokenCount || 0,
               totalUsage.candidatesTokenCount || 0,
@@ -544,6 +579,19 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
             )
             logger.info(
               `📊 Recorded Gemini stream usage - Input: ${totalUsage.promptTokenCount}, Output: ${totalUsage.candidatesTokenCount}, Total: ${totalUsage.totalTokenCount}`
+            )
+
+            await applyRateLimitTracking(
+              req,
+              {
+                inputTokens: totalUsage.promptTokenCount || 0,
+                outputTokens: totalUsage.candidatesTokenCount || 0,
+                cacheCreateTokens: 0,
+                cacheReadTokens: 0
+              },
+              model,
+              'openai-gemini-stream',
+              recordedCosts
             )
 
             // 修复：标记 usage 已上报，避免重复上报
@@ -634,7 +682,7 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       // 记录使用统计
       if (openaiResponse.usage) {
         try {
-          await apiKeyService.recordUsage(
+          const recordedCosts = await apiKeyService.recordUsage(
             apiKeyData.id,
             openaiResponse.usage.prompt_tokens || 0,
             openaiResponse.usage.completion_tokens || 0,
@@ -646,6 +694,19 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
           )
           logger.info(
             `📊 Recorded Gemini usage - Input: ${openaiResponse.usage.prompt_tokens}, Output: ${openaiResponse.usage.completion_tokens}, Total: ${openaiResponse.usage.total_tokens}`
+          )
+
+          await applyRateLimitTracking(
+            req,
+            {
+              inputTokens: openaiResponse.usage.prompt_tokens || 0,
+              outputTokens: openaiResponse.usage.completion_tokens || 0,
+              cacheCreateTokens: 0,
+              cacheReadTokens: 0
+            },
+            model,
+            'openai-gemini-non-stream',
+            recordedCosts
           )
         } catch (error) {
           logger.error('Failed to record Gemini usage:', error)

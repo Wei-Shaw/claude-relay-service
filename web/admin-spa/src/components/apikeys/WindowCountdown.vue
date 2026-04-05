@@ -81,7 +81,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 
 const props = defineProps({
   label: {
@@ -138,9 +138,12 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['window-expired'])
+
 // 响应式数据
 const remainingSeconds = ref(props.windowRemainingSeconds)
 let intervalId = null
+let hasEmittedExpiry = false
 
 // 计算属性
 const windowState = computed(() => {
@@ -236,59 +239,78 @@ const getCostProgressColor = () => {
   return 'bg-green-500'
 }
 
+const stopCountdown = () => {
+  if (intervalId) {
+    clearInterval(intervalId)
+    intervalId = null
+  }
+}
+
 // 更新倒计时
 const updateCountdown = () => {
-  if (props.windowEndTime && remainingSeconds.value > 0) {
-    const now = Date.now()
-    const remaining = Math.max(0, Math.floor((props.windowEndTime - now) / 1000))
-    remainingSeconds.value = remaining
-
-    if (remaining === 0) {
-      // 窗口已过期，停止倒计时
-      if (intervalId) {
-        clearInterval(intervalId)
-        intervalId = null
-      }
-    }
+  if (!props.windowEndTime) {
+    stopCountdown()
+    return
   }
+
+  const previousRemaining = remainingSeconds.value
+  const now = Date.now()
+  const remaining = Math.max(0, Math.floor((props.windowEndTime - now) / 1000))
+  remainingSeconds.value = remaining
+
+  if (remaining > 0) {
+    hasEmittedExpiry = false
+    return
+  }
+
+  stopCountdown()
+
+  if (previousRemaining > 0 && !hasEmittedExpiry) {
+    hasEmittedExpiry = true
+    emit('window-expired')
+  }
+}
+
+const syncCountdown = () => {
+  remainingSeconds.value = props.windowRemainingSeconds
+
+  if (remainingSeconds.value > 0) {
+    hasEmittedExpiry = false
+  }
+
+  if (props.windowStartTime !== null && props.windowEndTime) {
+    updateCountdown()
+
+    if (remainingSeconds.value > 0 && !intervalId) {
+      intervalId = setInterval(updateCountdown, 1000)
+    }
+    return
+  }
+
+  stopCountdown()
 }
 
 // 监听props变化
 watch(
-  () => props.windowRemainingSeconds,
-  (newVal) => {
-    remainingSeconds.value = newVal
-  }
-)
-
-watch(
-  () => props.windowEndTime,
-  (newVal) => {
-    if (newVal) {
-      // 重新计算剩余时间
-      updateCountdown()
-
-      // 如果窗口活跃且没有定时器，启动定时器
-      if (!intervalId && remainingSeconds.value > 0) {
-        intervalId = setInterval(updateCountdown, 1000)
-      }
+  () => [props.windowRemainingSeconds, props.windowStartTime, props.windowEndTime],
+  (
+    [windowRemainingSeconds, , windowEndTime],
+    [previousRemainingSeconds, , previousWindowEndTime] = []
+  ) => {
+    if (
+      windowEndTime !== previousWindowEndTime ||
+      (windowRemainingSeconds ?? 0) > 0 ||
+      (previousRemainingSeconds ?? 0) > 0
+    ) {
+      hasEmittedExpiry = false
     }
-  }
-)
 
-// 生命周期钩子
-onMounted(() => {
-  if (props.windowEndTime && remainingSeconds.value > 0) {
-    // 立即更新一次
-    updateCountdown()
-    // 启动定时器
-    intervalId = setInterval(updateCountdown, 1000)
-  }
-})
+    syncCountdown()
+  },
+  { immediate: true }
+)
 
 onUnmounted(() => {
-  if (intervalId) {
-    clearInterval(intervalId)
-  }
+  stopCountdown()
 })
 </script>
