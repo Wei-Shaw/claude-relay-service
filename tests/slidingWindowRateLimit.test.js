@@ -182,8 +182,7 @@ describe('slidingWindowRateLimit', () => {
     expect(snapshot.tokens).toBe(500)
     expect(snapshot.cost).toBe(6)
     expect(snapshot.windowStartTime).toBe((currentBucket - 59) * 60000)
-    // windowEndTime 基于最新 bucket（currentBucket - 5），而非最老 bucket
-    expect(snapshot.windowEndTime).toBe((currentBucket - 4) * 60000 + 60 * 60000)
+    expect(snapshot.windowEndTime).toBe((currentBucket - 58) * 60000 + 60 * 60000)
     expect(snapshot.staleFields).toContain(String(currentBucket - 70))
   })
 

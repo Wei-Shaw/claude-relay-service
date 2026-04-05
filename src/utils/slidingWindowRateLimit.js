@@ -113,7 +113,6 @@ function buildSnapshotFromBuckets(rawBuckets, windowMinutes, now = Date.now()) {
   const normalizedNow = toNumber(now) || Date.now()
   const minIncludedBucketId = Math.floor((normalizedNow - windowDurationMs) / MINUTE_MS)
   let oldestActiveBucketId = null
-  let newestActiveBucketId = null
 
   for (const [bucketIdRaw, bucketValueRaw] of Object.entries(rawBuckets || {})) {
     const bucketId = toInt(bucketIdRaw)
@@ -140,9 +139,6 @@ function buildSnapshotFromBuckets(rawBuckets, windowMinutes, now = Date.now()) {
     if (oldestActiveBucketId === null || bucketId < oldestActiveBucketId) {
       oldestActiveBucketId = bucketId
     }
-    if (newestActiveBucketId === null || bucketId > newestActiveBucketId) {
-      newestActiveBucketId = bucketId
-    }
   }
 
   if (oldestActiveBucketId === null) {
@@ -151,9 +147,7 @@ function buildSnapshotFromBuckets(rawBuckets, windowMinutes, now = Date.now()) {
 
   snapshot.hasActiveWindow = true
   snapshot.windowStartTime = getBucketTimestamp(oldestActiveBucketId)
-  // windowEndTime 基于最新 bucket：所有当前数据完全过期的时间点
-  // 修复：之前基于 oldestActiveBucketId，导致旧 bucket 被淘汰后 windowEnd 不断后延
-  snapshot.windowEndTime = getBucketTimestamp(newestActiveBucketId + 1) + windowDurationMs
+  snapshot.windowEndTime = getBucketTimestamp(oldestActiveBucketId + 1) + windowDurationMs
   snapshot.windowRemainingSeconds = Math.max(
     0,
     Math.ceil((snapshot.windowEndTime - normalizedNow) / 1000)
