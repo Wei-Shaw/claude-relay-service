@@ -9,6 +9,7 @@ const config = require('../../../config/config')
 const crypto = require('crypto')
 const LRUCache = require('../../utils/lruCache')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { applyQuotaExceededCooldown } = require('../../utils/quotaExceededHelper')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
@@ -176,7 +177,7 @@ class OpenAIResponsesRelayService {
 
       // 处理 429 限流错误
       if (response.status === 429) {
-        const { resetsInSeconds, errorData } = await this._handle429Error(
+        const { resetsInSeconds, errorData, quotaCooldownApplied } = await this._handle429Error(
           account,
           response,
           req.body?.stream,
@@ -185,7 +186,7 @@ class OpenAIResponsesRelayService {
 
         const oaiAutoProtectionDisabled =
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
-        if (!oaiAutoProtectionDisabled) {
+        if (!oaiAutoProtectionDisabled && !quotaCooldownApplied) {
           await upstreamErrorHelper
             .markTempUnavailable(
               account.id,
@@ -253,13 +254,24 @@ class OpenAIResponsesRelayService {
           errorData
         })
 
+        const oaiAutoProtectionDisabled =
+          account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+        const quotaCooldown = oaiAutoProtectionDisabled
+          ? { applied: false }
+          : await applyQuotaExceededCooldown({
+              accountId: account?.id,
+              accountType: 'openai-responses',
+              statusCode: response.status,
+              payload: errorData,
+              sessionHash,
+              clearSessionMapping: (hash) => unifiedOpenAIScheduler._deleteSessionMapping(hash)
+            })
+
         if (response.status === 401) {
           logger.warn(`🚫 OpenAI Responses账号认证失败（401错误）for account ${account?.id}`)
 
           try {
             // 仅临时暂停，不永久禁用
-            const oaiAutoProtectionDisabled =
-              account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
             if (!oaiAutoProtectionDisabled) {
               await upstreamErrorHelper
                 .markTempUnavailable(account.id, 'openai-responses', 401)
@@ -301,10 +313,8 @@ class OpenAIResponsesRelayService {
         }
 
         // 处理 5xx 上游错误
-        if (response.status >= 500 && account?.id) {
+        if (!quotaCooldown.applied && response.status >= 500 && account?.id) {
           try {
-            const oaiAutoProtectionDisabled =
-              account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
             if (!oaiAutoProtectionDisabled) {
               await upstreamErrorHelper.markTempUnavailable(
                 account.id,
@@ -349,7 +359,7 @@ class OpenAIResponsesRelayService {
       }
 
       // 处理非流式响应
-      return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model)
+      return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model, req)
     } catch (error) {
       // 清理 AbortController
       if (abortController && !abortController.signal.aborted) {
@@ -709,7 +719,7 @@ class OpenAIResponsesRelayService {
   }
 
   // 处理非流式响应
-  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel) {
+  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel, req = null) {
     const responseData = response.data
 
     // 提取 usage 数据和实际 model
@@ -790,6 +800,7 @@ class OpenAIResponsesRelayService {
   async _handle429Error(account, response, isStream = false, sessionHash = null) {
     let resetsInSeconds = null
     let errorData = null
+    let quotaCooldownApplied = false
 
     try {
       // 对于429错误，响应可能是JSON或SSE格式
@@ -869,13 +880,28 @@ class OpenAIResponsesRelayService {
       logger.error('⚠️ Failed to parse rate limit error:', e)
     }
 
-    // 使用统一调度器标记账户为限流状态（与普通OpenAI账号保持一致）
-    await unifiedOpenAIScheduler.markAccountRateLimited(
-      account.id,
-      'openai-responses',
-      sessionHash,
-      resetsInSeconds
+    quotaCooldownApplied = Boolean(
+      (
+        await applyQuotaExceededCooldown({
+          accountId: account.id,
+          accountType: 'openai-responses',
+          statusCode: 429,
+          payload: errorData,
+          sessionHash,
+          clearSessionMapping: (hash) => unifiedOpenAIScheduler._deleteSessionMapping(hash)
+        })
+      ).applied
     )
+
+    if (!quotaCooldownApplied) {
+      // 使用统一调度器标记账户为限流状态（与普通OpenAI账号保持一致）
+      await unifiedOpenAIScheduler.markAccountRateLimited(
+        account.id,
+        'openai-responses',
+        sessionHash,
+        resetsInSeconds
+      )
+    }
 
     logger.warn('OpenAI-Responses account rate limited', {
       accountId: account.id,
@@ -886,7 +912,7 @@ class OpenAIResponsesRelayService {
     })
 
     // 返回处理后的数据，避免循环引用
-    return { resetsInSeconds, errorData }
+    return { resetsInSeconds, errorData, quotaCooldownApplied }
   }
 
   // 过滤请求头 - 已迁移到 headerFilter 工具类
