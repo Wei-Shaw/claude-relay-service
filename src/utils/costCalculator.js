@@ -191,6 +191,11 @@ class CostCalculator {
       pricing = MODEL_PRICING[model] || MODEL_PRICING['unknown']
     }
 
+    // 安全兜底：确保 pricing 始终有值（防止自定义模型不在价格表中导致 undefined）
+    if (!pricing) {
+      pricing = MODEL_PRICING['unknown']
+    }
+
     // 计算各类型token的费用 (USD)
     const inputCost = (inputTokens / 1000000) * pricing.input
     const outputCost = (outputTokens / 1000000) * pricing.output
