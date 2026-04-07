@@ -15,6 +15,7 @@ const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { IncrementalSSEParser } = require('../utils/sseParser')
 const { getSafeMessage } = require('../utils/errorSanitizer')
+const { isCodexClientUserAgent, extractCodexSessionId } = require('../utils/codexClientHeaders')
 
 // Codex CLI 系统提示词（非 Codex CLI 客户端请求时注入，统一端点也使用）
 const CODEX_CLI_INSTRUCTIONS =
@@ -253,13 +254,7 @@ const handleResponses = async (req, res) => {
 
     // 从请求头或请求体中提取会话 ID
     // NOTE: For some clients, prompt_cache_key is the only stable per-session key.
-    const sessionId =
-      req.headers['session_id'] ||
-      req.headers['x-session-id'] ||
-      req.body?.session_id ||
-      req.body?.conversation_id ||
-      req.body?.prompt_cache_key ||
-      null
+    const sessionId = extractCodexSessionId(req.headers, req.body)
 
     sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
 
@@ -277,11 +272,9 @@ const handleResponses = async (req, res) => {
 
     const isStream = req.body?.stream !== false // 默认为流式（兼容现有行为）
 
-    // 判断是否为 Codex CLI 的请求（基于 User-Agent）
-    // 支持: codex_vscode, codex_cli_rs, codex_exec (非交互式/脚本模式)
+    // 判断是否为 Codex 客户端请求（基于 User-Agent）
     const userAgent = req.headers['user-agent'] || ''
-    const codexCliPattern = /^(codex_vscode|codex_cli_rs|codex_exec)\/[\d.]+/i
-    const isCodexCLI = codexCliPattern.test(userAgent)
+    const isCodexCLI = isCodexClientUserAgent(userAgent)
 
     // 提取 service_tier 用于后续费用计算（在字段被移除前保存）
     req._serviceTier = req.body?.service_tier || null
@@ -328,7 +321,15 @@ const handleResponses = async (req, res) => {
     // 基于白名单构造上游所需的请求头，确保键为小写且值受控
     const incoming = req.headers || {}
 
-    const allowedKeys = ['version', 'openai-beta', 'session_id']
+    const allowedKeys = [
+      'version',
+      'openai-beta',
+      'session_id',
+      'x-client-request-id',
+      'x-codex-turn-metadata',
+      'originator',
+      'user-agent'
+    ]
 
     const headers = {}
     for (const key of allowedKeys) {
@@ -349,6 +350,10 @@ const handleResponses = async (req, res) => {
     headers['host'] = 'chatgpt.com'
     headers['accept'] = isStream ? 'text/event-stream' : 'application/json'
     headers['content-type'] = 'application/json'
+    if (sessionId) {
+      headers['session_id'] = headers['session_id'] || sessionId
+      headers['x-client-request-id'] = headers['x-client-request-id'] || sessionId
+    }
     if (!isCompactRoute) {
       req.body['store'] = false
     } else if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'store')) {
