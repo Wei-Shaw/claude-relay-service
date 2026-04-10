@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid')
 const config = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const slidingWindowRateLimit = require('../utils/slidingWindowRateLimit')
 const serviceRatesService = require('./serviceRatesService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 
@@ -812,44 +813,18 @@ class ApiKeyService {
 
         // 获取当前时间窗口的请求次数、Token使用量和费用
         if (key.rateLimitWindow > 0) {
-          const requestCountKey = `rate_limit:requests:${key.id}`
-          const tokenCountKey = `rate_limit:tokens:${key.id}`
-          const costCountKey = `rate_limit:cost:${key.id}` // 新增：费用计数器
-          const windowStartKey = `rate_limit:window_start:${key.id}`
+          const windowStats = await slidingWindowRateLimit.getWindowSnapshot(
+            key.id,
+            key.rateLimitWindow,
+            { client }
+          )
 
-          key.currentWindowRequests = parseInt((await client.get(requestCountKey)) || '0')
-          key.currentWindowTokens = parseInt((await client.get(tokenCountKey)) || '0')
-          key.currentWindowCost = parseFloat((await client.get(costCountKey)) || '0') // 新增：当前窗口费用
-
-          // 获取窗口开始时间和计算剩余时间
-          const windowStart = await client.get(windowStartKey)
-          if (windowStart) {
-            const now = Date.now()
-            const windowStartTime = parseInt(windowStart)
-            const windowDuration = key.rateLimitWindow * 60 * 1000 // 转换为毫秒
-            const windowEndTime = windowStartTime + windowDuration
-
-            // 如果窗口还有效
-            if (now < windowEndTime) {
-              key.windowStartTime = windowStartTime
-              key.windowEndTime = windowEndTime
-              key.windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
-            } else {
-              // 窗口已过期，下次请求会重置
-              key.windowStartTime = null
-              key.windowEndTime = null
-              key.windowRemainingSeconds = 0
-              // 重置计数为0，因为窗口已过期
-              key.currentWindowRequests = 0
-              key.currentWindowTokens = 0
-              key.currentWindowCost = 0 // 新增：重置费用
-            }
-          } else {
-            // 窗口还未开始（没有任何请求）
-            key.windowStartTime = null
-            key.windowEndTime = null
-            key.windowRemainingSeconds = null
-          }
+          key.currentWindowRequests = windowStats.requests || 0
+          key.currentWindowTokens = windowStats.tokens || 0
+          key.currentWindowCost = windowStats.cost || 0
+          key.windowStartTime = windowStats.windowStartTime
+          key.windowEndTime = windowStats.windowEndTime
+          key.windowRemainingSeconds = windowStats.windowRemainingSeconds
         } else {
           key.currentWindowRequests = 0
           key.currentWindowTokens = 0
@@ -956,6 +931,20 @@ class ApiKeyService {
       const activeKeyIds = apiKeys.map((k) => k.id)
       const statsMap = await redis.batchGetApiKeyStats(activeKeyIds)
 
+      const windowConfigs = apiKeys
+        .map((key) => ({
+          keyId: key.id,
+          windowMinutes: parseInt(key.rateLimitWindow || 0)
+        }))
+        .filter((item) => item.windowMinutes > 0)
+
+      const windowStatsMap = await slidingWindowRateLimit.getWindowSnapshotsByConfig(
+        windowConfigs,
+        {
+          legacyFallback: true
+        }
+      )
+
       // 5. 合并数据
       for (const key of apiKeys) {
         const stats = statsMap.get(key.id) || {}
@@ -1054,33 +1043,16 @@ class ApiKeyService {
 
         // Rate limit 窗口数据
         if (key.rateLimitWindow > 0) {
-          const rl = stats.rateLimit || {}
-          key.currentWindowRequests = rl.requests || 0
-          key.currentWindowTokens = rl.tokens || 0
-          key.currentWindowCost = rl.cost || 0
-
-          if (rl.windowStart) {
-            const now = Date.now()
-            const windowDuration = key.rateLimitWindow * 60 * 1000
-            const windowEndTime = rl.windowStart + windowDuration
-
-            if (now < windowEndTime) {
-              key.windowStartTime = rl.windowStart
-              key.windowEndTime = windowEndTime
-              key.windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
-            } else {
-              key.windowStartTime = null
-              key.windowEndTime = null
-              key.windowRemainingSeconds = 0
-              key.currentWindowRequests = 0
-              key.currentWindowTokens = 0
-              key.currentWindowCost = 0
-            }
-          } else {
-            key.windowStartTime = null
-            key.windowEndTime = null
-            key.windowRemainingSeconds = null
-          }
+          const windowStats = windowStatsMap.get(key.id) || {}
+          key.currentWindowRequests = windowStats.requests || 0
+          key.currentWindowTokens = windowStats.tokens || 0
+          key.currentWindowCost = windowStats.cost || 0
+          key.windowStartTime = windowStats.windowStartTime || null
+          key.windowEndTime = windowStats.windowEndTime || null
+          key.windowRemainingSeconds =
+            windowStats.windowRemainingSeconds !== undefined
+              ? windowStats.windowRemainingSeconds
+              : null
         } else {
           key.currentWindowRequests = 0
           key.currentWindowTokens = 0

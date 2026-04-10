@@ -6,6 +6,7 @@ const CostCalculator = require('../utils/costCalculator')
 const claudeAccountService = require('../services/account/claudeAccountService')
 const openaiAccountService = require('../services/account/openaiAccountService')
 const serviceRatesService = require('../services/serviceRatesService')
+const slidingWindowRateLimit = require('../utils/slidingWindowRateLimit')
 const {
   createClaudeTestPayload,
   extractErrorMessage,
@@ -389,37 +390,26 @@ router.post('/api/user-stats', async (req, res) => {
       // 获取当前时间窗口的请求次数、Token使用量和费用
       if (fullKeyData.rateLimitWindow > 0) {
         const client = redis.getClientSafe()
-        const requestCountKey = `rate_limit:requests:${keyId}`
-        const tokenCountKey = `rate_limit:tokens:${keyId}`
-        const costCountKey = `rate_limit:cost:${keyId}` // 新增：费用计数key
-        const windowStartKey = `rate_limit:window_start:${keyId}`
+        const windowStats = await slidingWindowRateLimit.getWindowSnapshot(
+          keyId,
+          fullKeyData.rateLimitWindow,
+          { client }
+        )
+        const {
+          requests = 0,
+          tokens = 0,
+          cost = 0,
+          windowStartTime: startTime = null,
+          windowEndTime: endTime = null,
+          windowRemainingSeconds: remainingSeconds = null
+        } = windowStats
 
-        currentWindowRequests = parseInt((await client.get(requestCountKey)) || '0')
-        currentWindowTokens = parseInt((await client.get(tokenCountKey)) || '0')
-        currentWindowCost = parseFloat((await client.get(costCountKey)) || '0') // 新增：获取当前窗口费用
-
-        // 获取窗口开始时间和计算剩余时间
-        const windowStart = await client.get(windowStartKey)
-        if (windowStart) {
-          const now = Date.now()
-          windowStartTime = parseInt(windowStart)
-          const windowDuration = fullKeyData.rateLimitWindow * 60 * 1000 // 转换为毫秒
-          windowEndTime = windowStartTime + windowDuration
-
-          // 如果窗口还有效
-          if (now < windowEndTime) {
-            windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
-          } else {
-            // 窗口已过期，下次请求会重置
-            windowStartTime = null
-            windowEndTime = null
-            windowRemainingSeconds = 0
-            // 重置计数为0，因为窗口已过期
-            currentWindowRequests = 0
-            currentWindowTokens = 0
-            currentWindowCost = 0 // 新增：重置窗口费用
-          }
-        }
+        currentWindowRequests = requests
+        currentWindowTokens = tokens
+        currentWindowCost = cost
+        windowStartTime = startTime
+        windowEndTime = endTime
+        windowRemainingSeconds = remainingSeconds
       }
 
       // 获取当日费用
