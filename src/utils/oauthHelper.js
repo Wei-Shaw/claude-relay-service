@@ -14,7 +14,7 @@ const OAUTH_CONFIG = {
   TOKEN_URL: 'https://platform.claude.com/v1/oauth/token',
   CLIENT_ID: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
   REDIRECT_URI: 'https://platform.claude.com/oauth/code/callback',
-  SCOPES: 'org:create_api_key user:profile user:inference user:sessions:claude_code',
+  SCOPES: 'org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload',
   SCOPES_SETUP: 'user:inference' // Setup Token 只需要推理权限
 }
 
