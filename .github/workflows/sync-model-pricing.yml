@@ -12,7 +12,7 @@ jobs:
       contents: write
     steps:
       - name: 检出 price-mirror 分支
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: price-mirror
           fetch-depth: 0
