@@ -37,6 +37,7 @@
     "docker:down": "docker-compose down",
     "migrate:apikey-expiry": "node scripts/migrate-apikey-expiry.js",
     "migrate:apikey-expiry:dry": "node scripts/migrate-apikey-expiry.js --dry-run",
+    "migrate:request-detail-retention-hours": "node scripts/reset-request-detail-retention-hours.js",
     "migrate:fix-usage-stats": "node scripts/fix-usage-stats.js",
     "data:export": "node scripts/data-transfer.js export",
     "data:import": "node scripts/data-transfer.js import",

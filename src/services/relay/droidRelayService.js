@@ -9,6 +9,7 @@ const { updateRateLimitCounters } = require('../../utils/rateLimitHelper')
 const logger = require('../../utils/logger')
 const runtimeAddon = require('../../utils/runtimeAddon')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { createRequestDetailMeta } = require('../../utils/requestDetailHelper')
 
 const SYSTEM_PROMPT = 'You are Droid, an AI software engineering agent built by Factory.'
 const RUNTIME_EVENT_FMT_PAYLOAD = 'fmtPayload'
@@ -628,7 +629,12 @@ class DroidRelayService {
               currentUsageData,
               apiKeyData,
               account,
-              model
+              model,
+              createRequestDetailMeta(clientRequest, {
+                requestBody,
+                stream: true,
+                statusCode: clientResponse.statusCode
+              })
             )
 
             const usageSummary = {
@@ -878,9 +884,9 @@ class DroidRelayService {
   /**
    * 记录从流中解析的 usage 数据
    */
-  async _recordUsageFromStreamData(usageData, apiKeyData, account, model) {
+  async _recordUsageFromStreamData(usageData, apiKeyData, account, model, requestMeta = null) {
     const normalizedUsage = this._normalizeUsageSnapshot(usageData)
-    const costs = await this._recordUsage(apiKeyData, account, model, normalizedUsage)
+    const costs = await this._recordUsage(apiKeyData, account, model, normalizedUsage, requestMeta)
     return { normalizedUsage, costs }
   }
 
@@ -1243,7 +1249,17 @@ class DroidRelayService {
     const normalizedUsage = this._normalizeUsageSnapshot(usage)
 
     if (!skipUsageRecord) {
-      const droidCosts = await this._recordUsage(apiKeyData, account, model, normalizedUsage)
+      const droidCosts = await this._recordUsage(
+        apiKeyData,
+        account,
+        model,
+        normalizedUsage,
+        createRequestDetailMeta(clientRequest, {
+          requestBody,
+          stream: false,
+          statusCode: response.status || 200
+        })
+      )
 
       const totalTokens = this._getTotalTokens(normalizedUsage)
 
@@ -1288,7 +1304,7 @@ class DroidRelayService {
   /**
    * 记录使用统计
    */
-  async _recordUsage(apiKeyData, account, model, usageObject = {}) {
+  async _recordUsage(apiKeyData, account, model, usageObject = {}, requestMeta = null) {
     const totalTokens = this._getTotalTokens(usageObject)
 
     if (totalTokens <= 0) {
@@ -1307,7 +1323,8 @@ class DroidRelayService {
           usageObject,
           model,
           accountId,
-          'droid'
+          'droid',
+          requestMeta
         )
       } else if (accountId) {
         await redis.incrementAccountUsage(

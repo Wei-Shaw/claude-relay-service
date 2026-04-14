@@ -21,6 +21,7 @@ const {
 } = require('../utils/warmupInterceptor')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const { dumpAnthropicMessagesRequest } = require('../utils/anthropicRequestDump')
+const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
 const {
   handleAnthropicMessagesToGemini,
   handleAnthropicCountTokensToGemini
@@ -499,7 +500,18 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(_apiKeyId, usageObject, model, usageAccountId, accountType)
+                .recordUsageWithDetails(
+                  _apiKeyId,
+                  usageObject,
+                  model,
+                  usageAccountId,
+                  accountType,
+                  createRequestDetailMeta(req, {
+                    requestBody: _requestBody,
+                    stream: true,
+                    statusCode: res.statusCode
+                  })
+                )
                 .then((costs) => {
                   queueRateLimitUpdate(
                     _rateLimitInfo,
@@ -630,7 +642,12 @@ async function handleMessagesRequest(req, res) {
                   usageObject,
                   model,
                   usageAccountId,
-                  'claude-console'
+                  'claude-console',
+                  createRequestDetailMeta(req, {
+                    requestBody: _requestBodyConsole,
+                    stream: true,
+                    statusCode: res.statusCode
+                  })
                 )
                 .then((costs) => {
                   queueRateLimitUpdate(
@@ -694,7 +711,8 @@ async function handleMessagesRequest(req, res) {
           const result = await bedrockRelayService.handleStreamRequest(
             _requestBodyBedrock,
             bedrockAccountResult.data,
-            res
+            res,
+            req
           )
 
           // 记录Bedrock使用统计
@@ -711,7 +729,13 @@ async function handleMessagesRequest(req, res) {
                 0,
                 result.model,
                 accountId,
-                'bedrock'
+                'bedrock',
+                null,
+                createRequestDetailMeta(req, {
+                  requestBody: _requestBodyBedrock,
+                  stream: true,
+                  statusCode: res.statusCode
+                })
               )
               .then((costs) => {
                 queueRateLimitUpdate(
@@ -754,7 +778,10 @@ async function handleMessagesRequest(req, res) {
         } catch (error) {
           logger.error('❌ Bedrock stream request failed:', error)
           if (!res.headersSent) {
-            return res.status(500).json({ error: 'Bedrock service error', message: error.message })
+            const statusCode = error.$metadata?.httpStatusCode || 500
+            return res
+              .status(statusCode)
+              .json({ error: 'Bedrock service error', message: error.message })
           }
           // SSE 流已开始但出错：确保连接被关闭，防止客户端 pending
           if (!res.writableEnded) {
@@ -838,7 +865,18 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(_apiKeyIdCcr, usageObject, model, usageAccountId, 'ccr')
+                .recordUsageWithDetails(
+                  _apiKeyIdCcr,
+                  usageObject,
+                  model,
+                  usageAccountId,
+                  'ccr',
+                  createRequestDetailMeta(req, {
+                    requestBody: _requestBodyCcr,
+                    stream: true,
+                    statusCode: res.statusCode
+                  })
+                )
                 .then((costs) => {
                   queueRateLimitUpdate(
                     _rateLimitInfoCcr,
@@ -1146,8 +1184,9 @@ async function handleMessagesRequest(req, res) {
           }
         } catch (error) {
           logger.error('❌ Bedrock non-stream request failed:', error)
+          const statusCode = error.$metadata?.httpStatusCode || 500
           response = {
-            statusCode: 500,
+            statusCode,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ error: 'Bedrock service error', message: error.message }),
             accountId
@@ -1264,7 +1303,12 @@ async function handleMessagesRequest(req, res) {
             usageObject,
             model,
             responseAccountId,
-            accountType
+            accountType,
+            createRequestDetailMeta(req, {
+              requestBody: _requestBodyNonStream,
+              stream: false,
+              statusCode: response.statusCode
+            })
           )
 
           await queueRateLimitUpdate(

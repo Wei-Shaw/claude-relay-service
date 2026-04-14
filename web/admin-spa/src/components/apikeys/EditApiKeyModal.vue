@@ -539,6 +539,212 @@
             </p>
           </div>
 
+          <div
+            class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-700 dark:bg-emerald-900/20"
+          >
+            <div class="mb-3 flex items-center gap-2">
+              <div
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-emerald-500"
+              >
+                <i class="fas fa-sliders-h text-xs text-white" />
+              </div>
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                OpenAI Responses 请求处理
+              </h4>
+            </div>
+
+            <div class="space-y-3">
+              <label class="flex cursor-pointer items-start gap-3">
+                <input
+                  v-model="form.enableOpenAIResponsesCodexAdaptation"
+                  class="mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-emerald-600 focus:ring-emerald-500"
+                  type="checkbox"
+                />
+                <span class="flex-1">
+                  <span class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <span class="inline-flex items-center gap-1">
+                      <span>非 Codex 请求兼容为 Codex 风格</span>
+                      <el-tooltip placement="top">
+                        <template #content>
+                          <div class="w-[250px] space-y-2 text-xs leading-relaxed">
+                            <div>只对 `/openai/responses` 和 `/openai/v1/responses` 生效。</div>
+                            <div>
+                              关闭后不再做 Codex 风格字段改写，会保留原始 `text`、`service_tier`
+                              等字段。
+                            </div>
+                            <div>
+                              普通 OpenAI 账号仍会保留必要的 `gpt-5-*` 模型名兼容，
+                              方便调度和上游请求继续命中 `gpt-5`。
+                            </div>
+                          </div>
+                        </template>
+                        <span class="inline-flex" @click.stop.prevent>
+                          <i
+                            class="fas fa-question-circle cursor-help text-xs text-gray-400 hover:text-gray-600"
+                          />
+                        </span>
+                      </el-tooltip>
+                    </span>
+                  </span>
+                </span>
+              </label>
+
+              <label class="flex cursor-pointer items-start gap-3">
+                <input
+                  v-model="form.enableOpenAIResponsesPayloadRules"
+                  class="mt-0.5 h-4 w-4 rounded border-gray-300 bg-gray-100 text-emerald-600 focus:ring-emerald-500"
+                  type="checkbox"
+                />
+                <span class="flex-1">
+                  <span class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <span class="inline-flex items-center gap-1">
+                      <span>启用 Payload 规则</span>
+                      <el-tooltip placement="top">
+                        <template #content>
+                          <div class="w-[240px] space-y-2 text-xs leading-relaxed">
+                            <div>开启后会按顺序写入字段。</div>
+                            <div>只填字段不填值时，会把该字段写成空字符串。</div>
+                          </div>
+                        </template>
+                        <span class="inline-flex" @click.stop.prevent>
+                          <i
+                            class="fas fa-question-circle cursor-help text-xs text-gray-400 hover:text-gray-600"
+                          />
+                        </span>
+                      </el-tooltip>
+                    </span>
+                  </span>
+                </span>
+              </label>
+
+              <div
+                v-if="form.enableOpenAIResponsesPayloadRules"
+                class="rounded-lg border border-emerald-100 bg-white/70 p-3 dark:border-emerald-800 dark:bg-gray-800/40"
+              >
+                <div class="mb-3 flex items-center justify-between">
+                  <div
+                    class="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    <span>Payload 规则</span>
+                    <el-tooltip placement="top">
+                      <template #content>
+                        <div class="w-[240px] space-y-2 text-xs leading-relaxed">
+                          <div>规则会按列表顺序依次执行，后面的规则可以覆盖前面的结果。</div>
+                          <div>两个开关都开启时，先做 Codex 风格兼容，再应用这里的规则。</div>
+                        </div>
+                      </template>
+                      <span class="inline-flex" @click.stop.prevent>
+                        <i
+                          class="fas fa-question-circle cursor-help text-xs text-gray-400 hover:text-gray-600"
+                        />
+                      </span>
+                    </el-tooltip>
+                  </div>
+                  <button
+                    class="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
+                    type="button"
+                    @click="addPayloadRule"
+                  >
+                    <i class="fas fa-plus mr-1" />
+                    新增规则
+                  </button>
+                </div>
+
+                <div class="space-y-3">
+                  <div
+                    v-for="(rule, index) in form.openaiResponsesPayloadRules"
+                    :key="`payload-rule-${index}`"
+                    class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/70"
+                  >
+                    <div class="mb-3 flex items-center justify-between">
+                      <span class="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        规则 {{ index + 1 }}
+                      </span>
+                      <button
+                        class="text-sm text-red-500 transition-colors hover:text-red-600"
+                        type="button"
+                        @click="removePayloadRule(index)"
+                      >
+                        <i class="fas fa-trash-alt" />
+                      </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                      <div>
+                        <label
+                          class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                        >
+                          字段路径
+                        </label>
+                        <input
+                          v-model="rule.path"
+                          class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                          placeholder="例如 text.format.type"
+                          type="text"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                        >
+                          值类型
+                        </label>
+                        <select
+                          v-model="rule.valueType"
+                          class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                        >
+                          <option
+                            v-for="option in payloadRuleValueTypeOptions"
+                            :key="option.value"
+                            :value="option.value"
+                          >
+                            {{ option.label }}
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="mt-3">
+                      <label
+                        class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                      >
+                        值
+                      </label>
+                      <textarea
+                        v-if="rule.valueType === 'json'"
+                        v-model="rule.value"
+                        class="form-input w-full resize-y border-gray-300 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                        placeholder='例如 {"type":"json_schema"}'
+                        rows="4"
+                      />
+                      <input
+                        v-else
+                        v-model="rule.value"
+                        class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                        :placeholder="
+                          rule.valueType === 'boolean'
+                            ? 'true 或 false'
+                            : rule.valueType === 'number'
+                              ? '例如 123'
+                              : '留空则写入空字符串'
+                        "
+                        type="text"
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="form.openaiResponsesPayloadRules.length === 0"
+                    class="rounded-lg border border-dashed border-emerald-200 px-4 py-6 text-center text-sm text-gray-500 dark:border-emerald-800 dark:text-gray-400"
+                  >
+                    还没有规则，点右上角新增一条。
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div>
             <div class="mb-3 flex items-center justify-between">
               <label class="text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -813,7 +1019,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { showToast } from '@/utils/tools'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
@@ -923,6 +1129,19 @@ const availableServices = [
   { key: 'ccr', label: 'CCR' }
 ]
 
+const payloadRuleValueTypeOptions = [
+  { value: 'string', label: '字符串' },
+  { value: 'number', label: '数字' },
+  { value: 'boolean', label: '布尔' },
+  { value: 'json', label: 'JSON' }
+]
+
+const createEmptyPayloadRule = () => ({
+  path: '',
+  valueType: 'string',
+  value: ''
+})
+
 // 表单数据
 const form = reactive({
   name: '',
@@ -948,6 +1167,9 @@ const form = reactive({
   modelInput: '',
   enableClientRestriction: false,
   allowedClients: [],
+  enableOpenAIResponsesCodexAdaptation: true,
+  enableOpenAIResponsesPayloadRules: false,
+  openaiResponsesPayloadRules: [],
   tags: [],
   isActive: true,
   ownerId: '' // 新增：所有者ID
@@ -1007,6 +1229,73 @@ const removeTag = (index) => {
   form.tags.splice(index, 1)
 }
 
+const addPayloadRule = () => {
+  form.openaiResponsesPayloadRules.push(createEmptyPayloadRule())
+}
+
+const removePayloadRule = (index) => {
+  form.openaiResponsesPayloadRules.splice(index, 1)
+}
+
+const normalizePayloadRule = (rule = {}) => ({
+  path: typeof rule.path === 'string' ? rule.path.trim() : '',
+  valueType:
+    typeof rule.valueType === 'string' &&
+    payloadRuleValueTypeOptions.some((option) => option.value === rule.valueType)
+      ? rule.valueType
+      : 'string',
+  value: rule.value === undefined || rule.value === null ? '' : String(rule.value)
+})
+
+const buildPayloadRulesForSubmit = () => {
+  const normalizedRules = form.openaiResponsesPayloadRules
+    .map((rule) => normalizePayloadRule(rule))
+    .filter((rule) => rule.path)
+
+  for (const rule of normalizedRules) {
+    if (rule.value === '') {
+      continue
+    }
+
+    if (rule.valueType === 'number') {
+      if (!Number.isFinite(Number(rule.value))) {
+        showToast(`字段 ${rule.path} 的值不是合法数字`, 'error')
+        return null
+      }
+      continue
+    }
+
+    if (rule.valueType === 'boolean') {
+      const normalized = rule.value.trim().toLowerCase()
+      if (normalized !== 'true' && normalized !== 'false') {
+        showToast(`字段 ${rule.path} 的值必须是 true 或 false`, 'error')
+        return null
+      }
+      continue
+    }
+
+    if (rule.valueType === 'json') {
+      try {
+        JSON.parse(rule.value)
+      } catch (error) {
+        showToast(`字段 ${rule.path} 的值不是合法 JSON`, 'error')
+        return null
+      }
+    }
+  }
+
+  return normalizedRules
+}
+
+watch(
+  () => form.enableOpenAIResponsesPayloadRules,
+  (enabled) => {
+    if (enabled && form.openaiResponsesPayloadRules.length === 0) {
+      addPayloadRule()
+    }
+  }
+)
+
 // 更新 API Key
 const updateApiKey = async () => {
   // 检查是否设置了时间窗口但费用限制为0
@@ -1035,6 +1324,12 @@ const updateApiKey = async () => {
           filteredServiceRates[key] = value
         }
       }
+    }
+
+    const payloadRules = buildPayloadRulesForSubmit()
+    if (payloadRules === null) {
+      loading.value = false
+      return
     }
 
     const data = {
@@ -1071,6 +1366,10 @@ const updateApiKey = async () => {
           : 0,
       weeklyResetDay: form.weeklyResetDay,
       weeklyResetHour: form.weeklyResetHour,
+      enableOpenAIResponsesCodexAdaptation: form.enableOpenAIResponsesCodexAdaptation,
+      enableOpenAIResponsesPayloadRules: form.enableOpenAIResponsesPayloadRules,
+      // 规则内容独立持久化，关闭开关时也要保留已保存的休眠规则。
+      openaiResponsesPayloadRules: payloadRules,
       permissions: form.permissions,
       tags: form.tags
     }
@@ -1448,6 +1747,19 @@ onMounted(async () => {
     props.apiKey.enableModelRestriction === true || props.apiKey.enableModelRestriction === 'true'
   form.enableClientRestriction =
     props.apiKey.enableClientRestriction === true || props.apiKey.enableClientRestriction === 'true'
+  form.enableOpenAIResponsesCodexAdaptation =
+    props.apiKey.enableOpenAIResponsesCodexAdaptation === undefined ||
+    props.apiKey.enableOpenAIResponsesCodexAdaptation === true ||
+    props.apiKey.enableOpenAIResponsesCodexAdaptation === 'true'
+  form.enableOpenAIResponsesPayloadRules =
+    props.apiKey.enableOpenAIResponsesPayloadRules === true ||
+    props.apiKey.enableOpenAIResponsesPayloadRules === 'true'
+  form.openaiResponsesPayloadRules = Array.isArray(props.apiKey.openaiResponsesPayloadRules)
+    ? props.apiKey.openaiResponsesPayloadRules.map((rule) => normalizePayloadRule(rule))
+    : []
+  if (form.enableOpenAIResponsesPayloadRules && form.openaiResponsesPayloadRules.length === 0) {
+    addPayloadRule()
+  }
   // 初始化活跃状态，默认为 true（强制转换为布尔值，因为Redis返回字符串）
   form.isActive =
     props.apiKey.isActive === undefined ||

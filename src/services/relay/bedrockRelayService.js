@@ -20,10 +20,8 @@ class BedrockRelayService {
     this.defaultSmallModel =
       process.env.ANTHROPIC_SMALL_FAST_MODEL || 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
 
-    // Token配置
-    this.maxOutputTokens = parseInt(process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS) || 4096
-    this.maxThinkingTokens = parseInt(process.env.MAX_THINKING_TOKENS) || 1024
-    this.enablePromptCaching = process.env.DISABLE_PROMPT_CACHING !== '1'
+    // Token配置 — 仅作为客户端未指定 max_tokens 时的回退默认值，不用于截断
+    this.maxOutputTokens = parseInt(process.env.BEDROCK_MAX_OUTPUT_TOKENS) || 128000
 
     // 创建Bedrock客户端
     this.clients = new Map() // 缓存不同区域的客户端
@@ -39,7 +37,11 @@ class BedrockRelayService {
     }
 
     const clientConfig = {
-      region: targetRegion
+      region: targetRegion,
+      requestHandler: {
+        requestTimeout: config.requestTimeout || 600000, // 与其他 relay 服务保持一致
+        connectionTimeout: 10000
+      }
     }
 
     // 如果账户配置了特定的AWS凭证，使用它们
@@ -238,10 +240,11 @@ class BedrockRelayService {
   }
 
   // 处理流式请求
-  async handleStreamRequest(requestBody, bedrockAccount = null, res) {
+  async handleStreamRequest(requestBody, bedrockAccount = null, res, req = null) {
     const accountId = bedrockAccount?.id
     let queueLockAcquired = false
     let queueRequestId = null
+    let abortController = null
 
     try {
       // 📬 用户消息队列处理
@@ -323,8 +326,19 @@ class BedrockRelayService {
 
       logger.debug(`🌊 Bedrock流式请求 - 模型: ${modelId}, 区域: ${region}`)
 
+      // 创建 AbortController 用于客户端断开时取消上游请求
+      abortController = new AbortController()
+      if (req) {
+        req.on('close', () => {
+          if (abortController && !abortController.signal.aborted) {
+            logger.info(`🔌 客户端断开，取消 Bedrock 上游请求 - 账户: ${accountId}`)
+            abortController.abort()
+          }
+        })
+      }
+
       const startTime = Date.now()
-      const response = await client.send(command)
+      const response = await client.send(command, { abortSignal: abortController.signal })
 
       // 📬 请求已发送成功，立即释放队列锁（无需等待响应处理完成）
       // 因为限流基于请求发送时刻计算（RPM），不是请求完成时刻
@@ -360,25 +374,34 @@ class BedrockRelayService {
       })
 
       let totalUsage = null
-      let isFirstChunk = true
 
       // 处理流式响应
+      // Bedrock InvokeModelWithResponseStream 返回的 JSON 事件结构与 Claude API 完全一致，
+      // 直接透传即可，无需重新构造。避免丢失字段或与新版本 API 不兼容。
       for await (const chunk of response.body) {
+        // 客户端已断开，停止处理
+        if (abortController.signal.aborted) {
+          logger.debug(`🔌 Bedrock 流处理中止 - 客户端已断开`)
+          break
+        }
+
         if (chunk.chunk) {
           const chunkData = JSON.parse(new TextDecoder().decode(chunk.chunk.bytes))
-          const claudeEvent = this._convertBedrockStreamToClaudeFormat(chunkData, isFirstChunk)
 
-          if (claudeEvent) {
-            // 发送SSE事件
-            res.write(`event: ${claudeEvent.type}\n`)
-            res.write(`data: ${JSON.stringify(claudeEvent.data)}\n\n`)
-
-            // 提取使用统计 (usage is reported in message_delta per Claude API spec)
-            if (claudeEvent.type === 'message_delta' && claudeEvent.data.usage) {
-              totalUsage = claudeEvent.data.usage
+          // 透传 Bedrock 事件到客户端（格式与 Claude SSE 一致）
+          // 修正 message_start 中的模型名：Bedrock 格式 → 标准 Claude 格式
+          // 客户端依赖标准模型名判定上下文窗口，否则可能过早触发 "Context limit reached"
+          if (chunkData.type) {
+            if (chunkData.type === 'message_start' && chunkData.message?.model) {
+              chunkData.message.model = this._mapFromBedrockModel(chunkData.message.model)
             }
+            res.write(`event: ${chunkData.type}\n`)
+            res.write(`data: ${JSON.stringify(chunkData)}\n\n`)
+          }
 
-            isFirstChunk = false
+          // 提取使用统计 (usage is reported in message_delta per Claude API spec)
+          if (chunkData.type === 'message_delta' && chunkData.usage) {
+            totalUsage = chunkData.usage
           }
         }
       }
@@ -398,14 +421,24 @@ class BedrockRelayService {
         duration
       }
     } catch (error) {
+      // 客户端主动断开，不算错误
+      if (abortController?.signal?.aborted) {
+        logger.info(`🔌 Bedrock 流请求因客户端断开而中止 - 账户: ${accountId}`)
+        if (!res.writableEnded) {
+          res.end()
+        }
+        return { success: false, aborted: true }
+      }
+
       logger.error('❌ Bedrock流式请求失败:', error)
 
       const bedrockError = this._handleBedrockError(error, accountId, bedrockAccount)
+      const statusCode = this._getErrorStatusCode(error)
 
       // 发送错误事件并关闭连接
       try {
         if (!res.headersSent) {
-          res.writeHead(500, { 'Content-Type': 'text/event-stream' })
+          res.writeHead(statusCode, { 'Content-Type': 'text/event-stream' })
         }
         if (!res.writableEnded) {
           res.write('event: error\n')
@@ -469,6 +502,30 @@ class BedrockRelayService {
     }
 
     return bedrockModel
+  }
+
+  // 将Bedrock模型名反向映射为标准Claude格式
+  // 客户端（如 Claude Code）依赖标准模型名来判定上下文窗口大小，
+  // 若收到 Bedrock 格式名称则可能使用保守默认值，导致过早触发 "Context limit reached"。
+  _mapFromBedrockModel(bedrockModelId) {
+    if (!bedrockModelId) {
+      return bedrockModelId
+    }
+
+    // 已经是标准格式，直接返回
+    if (!bedrockModelId.includes('.anthropic.') && !bedrockModelId.startsWith('anthropic.')) {
+      return bedrockModelId
+    }
+
+    // 从 Bedrock ID 中提取核心模型名
+    // 格式: {region}.anthropic.{model-name}-v{version}:{variant}
+    // 或:   anthropic.{model-name}-v{version}:{variant}
+    const match = bedrockModelId.match(/(?:.*\.)?anthropic\.(claude-.+?)(?:-v\d+)?(?::\d+)?$/)
+    if (match) {
+      return match[1]
+    }
+
+    return bedrockModelId
   }
 
   // 将标准Claude模型名映射为Bedrock格式
@@ -598,11 +655,10 @@ class BedrockRelayService {
 
   // 转换Claude格式请求到Bedrock格式
   _convertToBedrockFormat(requestBody) {
-    // 当启用 thinking 时，max_tokens 必须大于 budget_tokens，不能强制限制
-    const maxTokens = requestBody.thinking
-      ? requestBody.max_tokens || this.maxOutputTokens
-      : Math.min(requestBody.max_tokens || this.maxOutputTokens, this.maxOutputTokens)
+    // 透传客户端的 max_tokens，仅在未指定时使用默认值作为回退
+    const maxTokens = requestBody.max_tokens || this.maxOutputTokens
 
+    // Bedrock 通过 Command 类型区分流式/非流式，payload 中不需要 stream 字段
     const bedrockPayload = {
       anthropic_version: 'bedrock-2023-05-31',
       max_tokens: maxTokens,
@@ -641,8 +697,16 @@ class BedrockRelayService {
     }
 
     // Extended thinking 支持
+    // Bedrock 只支持 "enabled" / "disabled"，不支持 "adaptive"
+    // adaptive 模式不要求 budget_tokens，但 Bedrock enabled 必须有
     if (requestBody.thinking) {
-      bedrockPayload.thinking = requestBody.thinking
+      bedrockPayload.thinking = { ...requestBody.thinking }
+      if (bedrockPayload.thinking.type === 'adaptive') {
+        bedrockPayload.thinking.type = 'enabled'
+        if (!bedrockPayload.thinking.budget_tokens) {
+          bedrockPayload.thinking.budget_tokens = maxTokens - 1
+        }
+      }
     }
 
     // metadata 透传
@@ -659,11 +723,11 @@ class BedrockRelayService {
   // 转换Bedrock响应到Claude格式
   _convertFromBedrockFormat(bedrockResponse) {
     return {
-      id: `msg_${Date.now()}_bedrock`,
+      id: bedrockResponse.id || `msg_${Date.now()}_bedrock`,
       type: 'message',
-      role: 'assistant',
+      role: bedrockResponse.role || 'assistant',
       content: bedrockResponse.content || [],
-      model: bedrockResponse.model || this.defaultModel,
+      model: this._mapFromBedrockModel(bedrockResponse.model) || this.defaultModel,
       stop_reason: bedrockResponse.stop_reason || 'end_turn',
       stop_sequence: bedrockResponse.stop_sequence || null,
       usage: bedrockResponse.usage || {
@@ -673,80 +737,25 @@ class BedrockRelayService {
     }
   }
 
-  // 转换Bedrock流事件到Claude SSE格式
-  _convertBedrockStreamToClaudeFormat(bedrockChunk) {
-    if (bedrockChunk.type === 'message_start') {
-      return {
-        type: 'message_start',
-        data: {
-          type: 'message_start',
-          message: {
-            id: `msg_${Date.now()}_bedrock`,
-            type: 'message',
-            role: 'assistant',
-            content: [],
-            model: this.defaultModel,
-            stop_reason: null,
-            stop_sequence: null,
-            usage: bedrockChunk.message?.usage || { input_tokens: 0, output_tokens: 0 }
-          }
-        }
-      }
+  // 从 Bedrock 错误中提取 HTTP 状态码
+  _getErrorStatusCode(error) {
+    // AWS SDK v3 错误的 $metadata 包含 httpStatusCode
+    if (error.$metadata?.httpStatusCode) {
+      return error.$metadata.httpStatusCode
     }
 
-    if (bedrockChunk.type === 'content_block_start') {
-      return {
-        type: 'content_block_start',
-        data: {
-          type: 'content_block_start',
-          index: bedrockChunk.index || 0,
-          content_block: bedrockChunk.content_block || { type: 'text', text: '' }
-        }
-      }
+    // 根据错误类型映射状态码
+    const errorStatusMap = {
+      ThrottlingException: 429,
+      AccessDeniedException: 403,
+      ValidationException: 400,
+      ModelNotReadyException: 503,
+      ServiceUnavailableException: 503,
+      InternalServerException: 500,
+      ModelTimeoutException: 408
     }
 
-    if (bedrockChunk.type === 'content_block_delta') {
-      return {
-        type: 'content_block_delta',
-        data: {
-          type: 'content_block_delta',
-          index: bedrockChunk.index || 0,
-          delta: bedrockChunk.delta || {}
-        }
-      }
-    }
-
-    if (bedrockChunk.type === 'content_block_stop') {
-      return {
-        type: 'content_block_stop',
-        data: {
-          type: 'content_block_stop',
-          index: bedrockChunk.index || 0
-        }
-      }
-    }
-
-    if (bedrockChunk.type === 'message_delta') {
-      return {
-        type: 'message_delta',
-        data: {
-          type: 'message_delta',
-          delta: bedrockChunk.delta || {},
-          usage: bedrockChunk.usage || {}
-        }
-      }
-    }
-
-    if (bedrockChunk.type === 'message_stop') {
-      return {
-        type: 'message_stop',
-        data: {
-          type: 'message_stop'
-        }
-      }
-    }
-
-    return null
+    return errorStatusMap[error.name] || 500
   }
 
   // 处理Bedrock错误

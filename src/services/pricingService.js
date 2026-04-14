@@ -527,8 +527,13 @@ class PricingService {
     const standardPricing = this.getModelPricing(modelName)
     const pricing = standardPricing
     const isLongContextModeEnabled = isLongContextModel || hasContext1mBeta
+    // Per official Anthropic pricing: all Claude models have flat pricing with no 200K+ premium
+    // https://platform.claude.com/docs/en/about-claude/pricing
     const ignores200kLongContextPricing =
-      typeof normalizedModelName === 'string' && normalizedModelName.startsWith('claude-opus-4-6')
+      (typeof normalizedModelName === 'string' &&
+        normalizedModelName.toLowerCase().includes('claude')) ||
+      (typeof standardPricing?.litellm_provider === 'string' &&
+        standardPricing.litellm_provider.toLowerCase().includes('anthropic'))
 
     // Fast Mode 倍率：优先从 provider_specific_entry.fast 读取，默认 6 倍
     const fastMultiplier = isFastModeRequest ? pricing?.provider_specific_entry?.fast || 6 : 1
@@ -538,7 +543,7 @@ class PricingService {
     if (isLongContextModeEnabled && totalInputTokens > 200000) {
       if (ignores200kLongContextPricing) {
         logger.info(
-          `💰 Skipping 200K+ pricing for ${modelName}: Opus 4.6 uses flat pricing across 1M context`
+          `💰 Skipping 200K+ pricing for ${modelName}: Claude models use flat pricing regardless of context length`
         )
       } else {
         isLongContextRequest = true

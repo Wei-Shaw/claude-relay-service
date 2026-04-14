@@ -57,6 +57,7 @@ const tabs = computed(() => {
     { key: 'dashboard', name: '仪表板', shortName: '仪表板', icon: 'fas fa-tachometer-alt' },
     { key: 'apiKeys', name: 'API Keys', shortName: 'API', icon: 'fas fa-key' },
     { key: 'accounts', name: '账户管理', shortName: '账户', icon: 'fas fa-user-circle' },
+    { key: 'requestDetails', name: '请求明细', shortName: '明细', icon: 'fas fa-table' },
     { key: 'quotaCards', name: '额度卡', shortName: '额度卡', icon: 'fas fa-ticket-alt' }
   ]
 

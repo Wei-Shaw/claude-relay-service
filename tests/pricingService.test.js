@@ -1,12 +1,10 @@
 /**
- * PricingService 长上下文（200K+）分层计费测试
+ * PricingService 长上下文计费测试
  *
- * 测试当 [1m] 模型总输入超过 200K tokens 时的分层计费逻辑：
- * - 输入/输出优先使用 model_pricing.json 中的 *_above_200k_tokens 字段
- * - Claude 缓存价格按输入价格倍率推导：
- *   - 5m cache write = input * 1.25
- *   - 1h cache write = input * 2
- *   - cache read = input * 0.1
+ * 根据 Anthropic 官方定价页面（https://platform.claude.com/docs/en/about-claude/pricing）：
+ * - 所有 Claude 模型均为统一价格，无论上下文长度如何（1M token 内无额外加价）
+ * - Fast Mode 倍率仍适用（Opus 4.6）
+ * - 非 Claude 模型的 200K+ 分层计费逻辑仍保留
  */
 
 // Mock logger to avoid console output during tests
@@ -36,7 +34,7 @@ jest.mock('fs', () => {
   }
 })
 
-describe('PricingService - 200K+ Long Context Pricing', () => {
+describe('PricingService - Long Context Pricing', () => {
   let pricingService
   const fs = require('fs')
   const path = require('path')
@@ -80,7 +78,7 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
     jest.clearAllMocks()
   })
 
-  describe('阈值边界测试', () => {
+  describe('Claude 模型平坦计费（无 200K+ 加价）', () => {
     it('199999 tokens - 应使用基础价格', () => {
       const usage = {
         input_tokens: 199999,
@@ -96,22 +94,7 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
       expect(result.pricing.output).toBe(0.000015) // 基础价格
     })
 
-    it('200000 tokens - 应使用基础价格（边界不触发）', () => {
-      const usage = {
-        input_tokens: 200000,
-        output_tokens: 1000,
-        cache_creation_input_tokens: 0,
-        cache_read_input_tokens: 0
-      }
-
-      const result = pricingService.calculateCost(usage, 'claude-sonnet-4-20250514[1m]')
-
-      // 200000 不大于 200000，所以不触发高档价格
-      expect(result.isLongContextRequest).toBe(false)
-      expect(result.pricing.input).toBe(0.000003) // 基础价格
-    })
-
-    it('200001 tokens - 应使用 200K+ 高档价格', () => {
+    it('200001 tokens - Claude 模型应使用基础价格（无 200K+ 加价）', () => {
       const usage = {
         input_tokens: 200001,
         output_tokens: 1000,
@@ -121,14 +104,13 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
 
       const result = pricingService.calculateCost(usage, 'claude-sonnet-4-20250514[1m]')
 
-      expect(result.isLongContextRequest).toBe(true)
-      expect(result.pricing.input).toBe(0.000006) // 200K+ 高档价格
-      expect(result.pricing.output).toBe(0.0000225) // 200K+ 高档价格
+      // 官方定价：Claude 模型全局统一价格，超过 200K 不加价
+      expect(result.isLongContextRequest).toBe(false)
+      expect(result.pricing.input).toBe(0.000003) // 基础价格
+      expect(result.pricing.output).toBe(0.000015) // 基础价格
     })
-  })
 
-  describe('总输入计算（input + cache_creation + cache_read）', () => {
-    it('分散在各类 token 中总计超过 200K 应触发高档价格', () => {
+    it('分散在各类 token 中总计超过 200K 时 Claude 仍使用基础价格', () => {
       const usage = {
         input_tokens: 150000,
         output_tokens: 10000,
@@ -139,14 +121,14 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
 
       const result = pricingService.calculateCost(usage, 'claude-sonnet-4-20250514[1m]')
 
-      expect(result.isLongContextRequest).toBe(true)
-      expect(result.pricing.input).toBe(0.000006)
-      expect(result.pricing.output).toBe(0.0000225)
-      expect(result.pricing.cacheCreate).toBe(0.0000075)
-      expect(result.pricing.cacheRead).toBeCloseTo(0.0000006, 12)
+      expect(result.isLongContextRequest).toBe(false)
+      expect(result.pricing.input).toBe(0.000003) // 基础价格
+      expect(result.pricing.output).toBe(0.000015) // 基础价格
+      expect(result.pricing.cacheCreate).toBe(0.00000375) // 基础价格
+      expect(result.pricing.cacheRead).toBeCloseTo(0.0000003, 12) // 基础价格
     })
 
-    it('仅 cache_creation + cache_read 超过 200K 也应触发', () => {
+    it('仅 cache tokens 超过 200K 时 Claude 也使用基础价格', () => {
       const usage = {
         input_tokens: 50000,
         output_tokens: 5000,
@@ -157,50 +139,47 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
 
       const result = pricingService.calculateCost(usage, 'claude-sonnet-4-20250514[1m]')
 
-      expect(result.isLongContextRequest).toBe(true)
+      expect(result.isLongContextRequest).toBe(false)
+      expect(result.pricing.input).toBe(0.000003) // 基础价格
     })
-  })
 
-  describe('Cache 高档价格测试', () => {
-    it('cache_creation 应使用 cache_creation_input_token_cost_above_200k_tokens', () => {
+    it('claude-sonnet-4-5 超过 200K 时也使用基础价格', () => {
       const usage = {
-        input_tokens: 150000,
-        output_tokens: 1000,
-        cache_creation_input_tokens: 60000, // 60K cache creation
+        input_tokens: 300000,
+        output_tokens: 5000,
+        cache_creation_input_tokens: 0,
         cache_read_input_tokens: 0
       }
-      // Total: 210000 > 200000
 
-      const result = pricingService.calculateCost(usage, 'claude-sonnet-4-20250514[1m]')
+      const result = pricingService.calculateCost(usage, 'claude-sonnet-4-5[1m]')
 
-      // cache_creation_input_token_cost_above_200k_tokens = 0.0000075
-      expect(result.pricing.cacheCreate).toBe(0.0000075)
-      expect(result.cacheCreateCost).toBeCloseTo(60000 * 0.0000075, 10)
+      expect(result.isLongContextRequest).toBe(false)
+      expect(result.pricing.input).toBe(0.000003) // 基础价格 $3/MTok
+      expect(result.pricing.output).toBe(0.000015) // 基础价格 $15/MTok
     })
 
-    it('cache_read 应使用 cache_read_input_token_cost_above_200k_tokens', () => {
+    it('claude-sonnet-4-6 超过 200K 时也使用基础价格', () => {
       const usage = {
-        input_tokens: 150000,
-        output_tokens: 1000,
+        input_tokens: 500000,
+        output_tokens: 10000,
         cache_creation_input_tokens: 0,
-        cache_read_input_tokens: 60000 // 60K cache read
+        cache_read_input_tokens: 0
       }
-      // Total: 210000 > 200000
 
-      const result = pricingService.calculateCost(usage, 'claude-sonnet-4-20250514[1m]')
+      const result = pricingService.calculateCost(usage, 'claude-sonnet-4-6[1m]')
 
-      // cache_read_input_token_cost_above_200k_tokens = 0.0000006
-      expect(result.pricing.cacheRead).toBeCloseTo(0.0000006, 12)
-      expect(result.cacheReadCost).toBeCloseTo(60000 * 0.0000006, 10)
+      expect(result.isLongContextRequest).toBe(false)
+      expect(result.pricing.input).toBe(0.000003) // 基础价格 $3/MTok
+      expect(result.pricing.output).toBe(0.000015) // 基础价格 $15/MTok
     })
   })
 
   describe('详细缓存创建数据（ephemeral_5m / ephemeral_1h）', () => {
-    it('200K+ 时 Claude ephemeral_1h 应按 input * 2 计算', () => {
+    it('超过 200K 时 Claude 缓存价格仍使用基础价格', () => {
       const usage = {
         input_tokens: 200001,
         output_tokens: 1000,
-        cache_creation_input_tokens: 10000, // 向后兼容字段
+        cache_creation_input_tokens: 10000,
         cache_read_input_tokens: 0,
         cache_creation: {
           ephemeral_5m_input_tokens: 5000,
@@ -210,37 +189,17 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
 
       const result = pricingService.calculateCost(usage, 'claude-sonnet-4-20250514[1m]')
 
-      expect(result.isLongContextRequest).toBe(true)
-      // ephemeral_5m: 5000 * 0.0000075 = 0.0000375
-      expect(result.ephemeral5mCost).toBeCloseTo(5000 * 0.0000075, 10)
-      // 200K+ input = 0.000006, ephemeral_1h = input * 2 = 0.000012
-      expect(result.pricing.ephemeral1h).toBeCloseTo(0.000012, 10)
-      expect(result.ephemeral1hCost).toBeCloseTo(5000 * 0.000012, 10)
+      expect(result.isLongContextRequest).toBe(false)
+      // ephemeral_5m: 5000 * 0.00000375 = 0.00001875（基础 cache_creation 价格）
+      expect(result.ephemeral5mCost).toBeCloseTo(5000 * 0.00000375, 10)
+      // ephemeral_1h: 5000 * 0.000006（基础 1hr cache 价格）
+      expect(result.pricing.ephemeral1h).toBeCloseTo(0.000006, 10)
+      expect(result.ephemeral1hCost).toBeCloseTo(5000 * 0.000006, 10)
     })
   })
 
-  describe('回退测试', () => {
-    it('Claude 模型无 above_200k 字段时，200K+ 输入价格按 2 倍并推导缓存价格', () => {
-      const usage = {
-        input_tokens: 250000,
-        output_tokens: 1000,
-        cache_creation_input_tokens: 10000,
-        cache_read_input_tokens: 10000
-      }
-
-      const result = pricingService.calculateCost(usage, 'claude-3-haiku-20240307[1m]')
-
-      // 模型没有 above_200k 字段，Claude 200K+ 输入按 2 倍兜底
-      expect(result.isLongContextRequest).toBe(true)
-      expect(result.pricing.input).toBe(0.0000005) // 0.00000025 * 2
-      // 缓存价格由输入价格推导
-      expect(result.pricing.cacheCreate).toBeCloseTo(0.000000625, 12) // input * 1.25
-      expect(result.pricing.cacheRead).toBeCloseTo(0.00000005, 12) // input * 0.1
-    })
-  })
-
-  describe('Header 与 Fast Mode 适配', () => {
-    it('无 [1m] 后缀但带 context-1m beta，超过 200K 时应触发长上下文计费', () => {
+  describe('context-1m beta header 不影响 Claude 计费', () => {
+    it('无 [1m] 后缀但带 context-1m beta 且超过 200K，Claude 仍使用基础价格', () => {
       const usage = {
         input_tokens: 210000,
         output_tokens: 1000,
@@ -251,11 +210,14 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
 
       const result = pricingService.calculateCost(usage, 'claude-sonnet-4-20250514')
 
-      expect(result.isLongContextRequest).toBe(true)
-      expect(result.pricing.input).toBe(0.000006)
-      expect(result.pricing.output).toBe(0.0000225)
+      // Claude 模型统一定价，无论是否带 beta 头都不应有额外加价
+      expect(result.isLongContextRequest).toBe(false)
+      expect(result.pricing.input).toBe(0.000003) // 基础价格
+      expect(result.pricing.output).toBe(0.000015) // 基础价格
     })
+  })
 
+  describe('Fast Mode 计费（Opus 4.6）', () => {
     it('Opus 4.6 在 fast-mode beta + speed=fast 时应用 Fast Mode 6x', () => {
       const usage = {
         input_tokens: 100000,
@@ -278,7 +240,7 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
       expect(result.pricing.ephemeral1h).toBeCloseTo(0.00006, 12) // 0.00003 * 2
     })
 
-    it('Opus 4.6 在 fast-mode + [1m] 且超过 200K 时不应叠加长上下文加价', () => {
+    it('Opus 4.6 在 fast-mode + [1m] 且超过 200K 时不叠加长上下文加价', () => {
       const usage = {
         input_tokens: 210000,
         output_tokens: 1000,
@@ -363,23 +325,23 @@ describe('PricingService - 200K+ Long Context Pricing', () => {
     })
   })
 
-  describe('成本计算准确性', () => {
-    it('应正确计算 200K+ 场景下的总成本', () => {
+  describe('成本计算准确性（基础价格）', () => {
+    it('应正确以基础价格计算超过 200K 场景下的总成本', () => {
       const usage = {
         input_tokens: 150000,
         output_tokens: 10000,
         cache_creation_input_tokens: 40000,
         cache_read_input_tokens: 20000
       }
-      // Total input: 210000 > 200000 → 使用 200K+ 价格
+      // Total input: 210000 > 200000，但 Claude 使用基础价格
 
       const result = pricingService.calculateCost(usage, 'claude-sonnet-4-20250514[1m]')
 
-      // 手动计算预期成本
-      const expectedInputCost = 150000 * 0.000006 // $0.9
-      const expectedOutputCost = 10000 * 0.0000225 // $0.225
-      const expectedCacheCreateCost = 40000 * 0.0000075 // $0.3
-      const expectedCacheReadCost = 20000 * 0.0000006 // $0.012
+      // 手动计算预期成本（全部使用基础价格）
+      const expectedInputCost = 150000 * 0.000003 // $0.45
+      const expectedOutputCost = 10000 * 0.000015 // $0.15
+      const expectedCacheCreateCost = 40000 * 0.00000375 // $0.15
+      const expectedCacheReadCost = 20000 * 0.0000003 // $0.006
       const expectedTotal =
         expectedInputCost + expectedOutputCost + expectedCacheCreateCost + expectedCacheReadCost
 
