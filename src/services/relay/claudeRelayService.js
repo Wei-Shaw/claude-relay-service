@@ -258,6 +258,10 @@ class ClaudeRelayService {
 
     if (Array.isArray(body.tools)) {
       body.tools.forEach((tool) => {
+        if (!tool) return
+        // Skip provider-defined tools (tool_search, code_execution, etc.)
+        // whose names are fixed by the Anthropic API and must not be renamed.
+        if (tool.type && tool.type !== 'custom' && !tool.input_schema) return
         if (tool && typeof tool.name === 'string') {
           tool.name = transformName(tool.name)
         }
