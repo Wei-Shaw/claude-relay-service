@@ -3,12 +3,35 @@ const router = express.Router()
 const ldapService = require('../services/ldapService')
 const userService = require('../services/userService')
 const apiKeyService = require('../services/apiKeyService')
+const TwoFactorService = require('../services/twoFactorService')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const inputValidator = require('../utils/inputValidator')
 const { RateLimiterRedis } = require('rate-limiter-flexible')
 const redis = require('../models/redis')
 const { authenticateUser, authenticateUserOrAdmin, requireAdmin } = require('../middleware/auth')
+
+const TWO_FACTOR_ISSUER = 'Claude Relay Service'
+const twoFactorService = new TwoFactorService({
+  redis,
+  encryptionKey: config.security?.encryptionKey || 'claude-relay-service-2fa',
+  challengeTtlMs: config.security?.twoFactorPendingLoginTtlMs,
+  maxChallengeAttempts: config.security?.twoFactorMaxChallengeAttempts,
+  recoveryCodesCount: config.security?.twoFactorRecoveryCodesCount
+})
+
+async function verifyFreshLdapPassword(username, password) {
+  if (typeof ldapService.verifyUserCredentials === 'function') {
+    return ldapService.verifyUserCredentials(username, password)
+  }
+
+  const authResult = await ldapService.authenticateUserCredentials(username, password)
+  if (authResult?.sessionToken) {
+    await userService.invalidateUserSession(authResult.sessionToken)
+  }
+
+  return authResult
+}
 
 // 🚦 配置登录速率限制
 // 只基于IP地址限制，避免攻击者恶意锁定特定账户
@@ -137,6 +160,29 @@ router.post('/login', async (req, res) => {
     // 登录成功
     logger.info(`✅ User login successful: ${validatedUsername} from IP: ${clientIp}`)
 
+    const twoFactorEnabled = await twoFactorService.isTwoFactorEnabledForUser(authResult.user.id)
+    if (twoFactorEnabled) {
+      if (authResult.sessionToken) {
+        await userService.invalidateUserSession(authResult.sessionToken)
+      }
+
+      const challenge = await twoFactorService.createPendingChallenge({
+        subjectType: 'user',
+        subjectId: authResult.user.id,
+        username: authResult.user.username,
+        ip: clientIp,
+        userAgent: req.get('user-agent') || 'unknown'
+      })
+
+      return res.json({
+        success: true,
+        requiresTwoFactor: true,
+        pendingLoginToken: challenge.pendingLoginToken,
+        pendingLoginExpiresIn: challenge.pendingLoginExpiresIn,
+        canUseRecoveryCode: true
+      })
+    }
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -156,6 +202,231 @@ router.post('/login', async (req, res) => {
     res.status(500).json({
       error: 'Login error',
       message: 'Internal server error during login'
+    })
+  }
+})
+
+// 🔐 用户 2FA 验证
+router.post('/2fa/verify', async (req, res) => {
+  try {
+    const { pendingLoginToken, otpCode, recoveryCode } = req.body
+
+    if (!pendingLoginToken) {
+      return res.status(400).json({
+        error: 'Missing pending token',
+        message: 'Pending login token is required'
+      })
+    }
+
+    const result = await twoFactorService.verifyUserSecondFactor({
+      pendingLoginToken,
+      otpCode,
+      recoveryCode
+    })
+
+    const user = await userService.getUserById(result.subjectId, false)
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'User profile not found'
+      })
+    }
+
+    const sessionToken = await userService.createUserSession(result.subjectId)
+
+    return res.json({
+      success: true,
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        displayName: user.displayName,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role
+      },
+      sessionToken,
+      usedRecoveryCode: !!result.usedRecoveryCode
+    })
+  } catch (error) {
+    logger.error('❌ User two-factor verification error:', error)
+    return res.status(401).json({
+      error: 'Two-factor verification failed',
+      message: error.message || 'Two-factor verification failed'
+    })
+  }
+})
+
+// 📱 获取用户 2FA 状态
+router.get('/2fa/status', authenticateUser, async (req, res) => {
+  try {
+    const status = await twoFactorService.getUserStatus(req.user.id)
+
+    res.json({
+      success: true,
+      twoFactor: status
+    })
+  } catch (error) {
+    logger.error('❌ Get user 2FA status error:', error)
+    res.status(500).json({
+      error: 'Get 2FA status failed',
+      message: 'Failed to retrieve two-factor status'
+    })
+  }
+})
+
+// 📱 创建用户 2FA 设置
+router.post('/2fa/setup', authenticateUser, async (req, res) => {
+  try {
+    const { currentPassword } = req.body
+    const authResult = await verifyFreshLdapPassword(req.user.username, currentPassword)
+
+    if (!authResult?.success) {
+      return res.status(401).json({
+        error: 'Invalid current password',
+        message: authResult?.message || 'Current password is incorrect'
+      })
+    }
+
+    const setup = await twoFactorService.createUserSetup({
+      userId: req.user.id,
+      accountName: req.user.username,
+      issuer: TWO_FACTOR_ISSUER
+    })
+
+    res.json({
+      success: true,
+      ...setup
+    })
+  } catch (error) {
+    logger.error('❌ Create user 2FA setup error:', error)
+    res.status(400).json({
+      error: 'Create 2FA setup failed',
+      message: error.message || 'Failed to create two-factor setup'
+    })
+  }
+})
+
+// 📱 启用用户 2FA
+router.post('/2fa/enable', authenticateUser, async (req, res) => {
+  try {
+    const { currentPassword, setupToken, otpCode } = req.body
+    const authResult = await verifyFreshLdapPassword(req.user.username, currentPassword)
+
+    if (!authResult?.success) {
+      return res.status(401).json({
+        error: 'Invalid current password',
+        message: authResult?.message || 'Current password is incorrect'
+      })
+    }
+
+    const result = await twoFactorService.enableUserTwoFactor({
+      userId: req.user.id,
+      setupToken,
+      otpCode
+    })
+
+    await userService.invalidateOtherUserSessions(req.user.id, req.user.sessionToken)
+
+    res.json({
+      success: true,
+      ...result
+    })
+  } catch (error) {
+    logger.error('❌ Enable user 2FA error:', error)
+    res.status(400).json({
+      error: 'Enable 2FA failed',
+      message: error.message || 'Failed to enable two-factor authentication'
+    })
+  }
+})
+
+// 📱 禁用用户 2FA
+router.post('/2fa/disable', authenticateUser, async (req, res) => {
+  try {
+    const { currentPassword, otpCode, recoveryCode } = req.body
+    const authResult = await verifyFreshLdapPassword(req.user.username, currentPassword)
+
+    if (!authResult?.success) {
+      return res.status(401).json({
+        error: 'Invalid current password',
+        message: authResult?.message || 'Current password is incorrect'
+      })
+    }
+
+    await twoFactorService.disableUserTwoFactor({
+      userId: req.user.id,
+      otpCode,
+      recoveryCode
+    })
+
+    await userService.invalidateUserSessions(req.user.id)
+
+    res.json({
+      success: true,
+      message: 'Two-factor authentication disabled'
+    })
+  } catch (error) {
+    logger.error('❌ Disable user 2FA error:', error)
+    res.status(400).json({
+      error: 'Disable 2FA failed',
+      message: error.message || 'Failed to disable two-factor authentication'
+    })
+  }
+})
+
+// 📱 重新生成用户恢复码
+router.post('/2fa/recovery-codes/regenerate', authenticateUser, async (req, res) => {
+  try {
+    const { currentPassword, otpCode, recoveryCode } = req.body
+    const authResult = await verifyFreshLdapPassword(req.user.username, currentPassword)
+
+    if (!authResult?.success) {
+      return res.status(401).json({
+        error: 'Invalid current password',
+        message: authResult?.message || 'Current password is incorrect'
+      })
+    }
+
+    const result = await twoFactorService.regenerateUserRecoveryCodes({
+      userId: req.user.id,
+      otpCode,
+      recoveryCode
+    })
+
+    await userService.invalidateUserSessions(req.user.id)
+
+    res.json({
+      success: true,
+      ...result
+    })
+  } catch (error) {
+    logger.error('❌ Regenerate user recovery codes error:', error)
+    res.status(400).json({
+      error: 'Regenerate recovery codes failed',
+      message: error.message || 'Failed to regenerate recovery codes'
+    })
+  }
+})
+
+// 🔐 管理员重置用户 2FA
+router.post('/:userId/reset-2fa', authenticateUserOrAdmin, requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params
+
+    await twoFactorService.resetUserTwoFactor({ userId })
+    await userService.invalidateUserSessions(userId)
+
+    res.json({
+      success: true,
+      message: 'User two-factor authentication has been reset'
+    })
+  } catch (error) {
+    logger.error('❌ Reset user 2FA error:', error)
+    res.status(500).json({
+      error: 'Reset 2FA error',
+      message: 'Failed to reset user two-factor authentication'
     })
   }
 })
