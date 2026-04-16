@@ -1803,14 +1803,23 @@ class ClaudeRelayService {
         if (error.code === 'CLAUDE_DEDICATED_RATE_LIMITED') {
           const limitMessage = this._buildStandardRateLimitMessage(error.rateLimitEndAt)
           if (!responseStream.headersSent) {
-            responseStream.status(403)
-            responseStream.setHeader('Content-Type', 'application/json')
+            const existingConnection = responseStream.getHeader
+              ? responseStream.getHeader('Connection')
+              : null
+            responseStream.writeHead(429, {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              Connection: existingConnection || 'keep-alive',
+            })
           }
           responseStream.write(
-            JSON.stringify({
-              error: 'upstream_rate_limited',
-              message: limitMessage
-            })
+            `event: error\ndata: ${JSON.stringify({
+              type: 'error',
+              error: {
+                type: 'rate_limit_error',
+                message: limitMessage,
+              },
+            })}\n\n`
           )
           responseStream.end()
           return
@@ -1884,7 +1893,6 @@ class ClaudeRelayService {
             }
           })}\n\n`
           responseStream.write(errorEvent)
-          responseStream.write('data: [DONE]\n\n')
           responseStream.end()
           return
         }
@@ -1923,14 +1931,23 @@ class ClaudeRelayService {
       if (isOpusModelRequest && isDedicatedOfficialAccount && opusRateLimitActive) {
         const limitMessage = this._buildOpusLimitMessage(account?.opusRateLimitEndAt)
         if (!responseStream.headersSent) {
-          responseStream.status(403)
-          responseStream.setHeader('Content-Type', 'application/json')
+          const existingConnection = responseStream.getHeader
+            ? responseStream.getHeader('Connection')
+            : null
+          responseStream.writeHead(429, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: existingConnection || 'keep-alive',
+          })
         }
         responseStream.write(
-          JSON.stringify({
-            error: 'opus_weekly_limit',
-            message: limitMessage
-          })
+          `event: error\ndata: ${JSON.stringify({
+            type: 'error',
+            error: {
+              type: 'rate_limit_error',
+              message: limitMessage,
+            },
+          })}\n\n`
         )
         responseStream.end()
         return
@@ -2117,21 +2134,15 @@ class ClaudeRelayService {
                 } catch {
                   // 使用默认错误消息
                 }
-                if (toolNameStreamTransformer) {
-                  responseStream.write(
-                    `data: ${JSON.stringify({ type: 'error', error: errorMessage })}\n\n`
-                  )
-                } else {
-                  responseStream.write('event: error\n')
-                  responseStream.write(
-                    `data: ${JSON.stringify({
-                      error: 'Claude API error',
-                      status: 429,
-                      details: errorBody429,
-                      timestamp: new Date().toISOString()
-                    })}\n\n`
-                  )
-                }
+                responseStream.write(
+                  `event: error\ndata: ${JSON.stringify({
+                    type: 'error',
+                    error: {
+                      type: 'overloaded_error',
+                      message: errorMessage,
+                    },
+                  })}\n\n`
+                )
                 responseStream.end()
               }
               reject(new Error(`Claude API error: 429`))
@@ -2158,14 +2169,23 @@ class ClaudeRelayService {
               if (isDedicatedOfficialAccount) {
                 const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
                 if (!responseStream.headersSent) {
-                  responseStream.status(403)
-                  responseStream.setHeader('Content-Type', 'application/json')
+                  const existingConnection = responseStream.getHeader
+                    ? responseStream.getHeader('Connection')
+                    : null
+                  responseStream.writeHead(429, {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    Connection: existingConnection || 'keep-alive',
+                  })
                 }
                 responseStream.write(
-                  JSON.stringify({
-                    error: 'opus_weekly_limit',
-                    message: limitMessage
-                  })
+                  `event: error\ndata: ${JSON.stringify({
+                    type: 'error',
+                    error: {
+                      type: 'rate_limit_error',
+                      message: limitMessage,
+                    },
+                  })}\n\n`
                 )
                 responseStream.end()
                 resolve()
@@ -2196,14 +2216,23 @@ class ClaudeRelayService {
                   rateLimitResetTimestamp || account?.rateLimitEndAt
                 )
                 if (!responseStream.headersSent) {
-                  responseStream.status(403)
-                  responseStream.setHeader('Content-Type', 'application/json')
+                  const existingConnection = responseStream.getHeader
+                    ? responseStream.getHeader('Connection')
+                    : null
+                  responseStream.writeHead(429, {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    Connection: existingConnection || 'keep-alive',
+                  })
                 }
                 responseStream.write(
-                  JSON.stringify({
-                    error: 'upstream_rate_limited',
-                    message: limitMessage
-                  })
+                  `event: error\ndata: ${JSON.stringify({
+                    type: 'error',
+                    error: {
+                      type: 'rate_limit_error',
+                      message: limitMessage,
+                    },
+                  })}\n\n`
                 )
                 responseStream.end()
                 resolve()
@@ -2231,21 +2260,15 @@ class ClaudeRelayService {
               } catch {
                 // 使用默认错误消息
               }
-              if (toolNameStreamTransformer) {
-                responseStream.write(
-                  `data: ${JSON.stringify({ type: 'error', error: errorMessage })}\n\n`
-                )
-              } else {
-                responseStream.write('event: error\n')
-                responseStream.write(
-                  `data: ${JSON.stringify({
-                    error: 'Claude API error',
-                    status: 429,
-                    details: errorBody429,
-                    timestamp: new Date().toISOString()
-                  })}\n\n`
-                )
-              }
+              responseStream.write(
+                `event: error\ndata: ${JSON.stringify({
+                  type: 'error',
+                  error: {
+                    type: 'overloaded_error',
+                    message: errorMessage,
+                  },
+                })}\n\n`
+              )
               responseStream.end()
             }
             reject(new Error(`Claude API error: 429`))
@@ -2483,23 +2506,15 @@ class ClaudeRelayService {
                 // 使用默认错误消息
               }
 
-              // 如果有 streamTransformer（如测试请求），使用前端期望的格式
-              if (toolNameStreamTransformer) {
-                responseStream.write(
-                  `data: ${JSON.stringify({ type: 'error', error: errorMessage })}\n\n`
-                )
-              } else {
-                // 标准错误格式
-                responseStream.write('event: error\n')
-                responseStream.write(
-                  `data: ${JSON.stringify({
-                    error: 'Claude API error',
-                    status: res.statusCode,
-                    details: errorData,
-                    timestamp: new Date().toISOString()
-                  })}\n\n`
-                )
-              }
+              responseStream.write(
+                `event: error\ndata: ${JSON.stringify({
+                  type: 'error',
+                  error: {
+                    type: 'api_error',
+                    message: errorMessage,
+                  },
+                })}\n\n`
+              )
               responseStream.end()
             }
             reject(new Error(`Claude API error: ${res.statusCode}`))
@@ -2680,17 +2695,7 @@ class ClaudeRelayService {
             }
           } catch (error) {
             logger.error('❌ Error processing stream data:', error)
-            // 发送错误但不破坏流，让它自然结束
-            if (isStreamWritable(responseStream)) {
-              responseStream.write('event: error\n')
-              responseStream.write(
-                `data: ${JSON.stringify({
-                  error: 'Stream processing error',
-                  message: error.message,
-                  timestamp: new Date().toISOString()
-                })}\n\n`
-              )
-            }
+            // 仅记录日志，不向客户端注入错误事件，让流自然继续
           }
         })
 
@@ -2935,13 +2940,14 @@ class ClaudeRelayService {
         }
 
         if (isStreamWritable(responseStream)) {
-          // 发送 SSE 错误事件
-          responseStream.write('event: error\n')
+          // 发送符合 Anthropic 规范的 SSE 错误事件
           responseStream.write(
-            `data: ${JSON.stringify({
-              error: errorMessage,
-              code: error.code,
-              timestamp: new Date().toISOString()
+            `event: error\ndata: ${JSON.stringify({
+              type: 'error',
+              error: {
+                type: 'api_error',
+                message: errorMessage,
+              },
             })}\n\n`
           )
           responseStream.end()
@@ -2968,13 +2974,14 @@ class ClaudeRelayService {
           })
         }
         if (isStreamWritable(responseStream)) {
-          // 发送 SSE 错误事件
-          responseStream.write('event: error\n')
+          // 发送符合 Anthropic 规范的 SSE 错误事件
           responseStream.write(
-            `data: ${JSON.stringify({
-              error: 'Request timeout',
-              code: 'TIMEOUT',
-              timestamp: new Date().toISOString()
+            `event: error\ndata: ${JSON.stringify({
+              type: 'error',
+              error: {
+                type: 'api_error',
+                message: 'Request timeout',
+              },
             })}\n\n`
           )
           responseStream.end()
