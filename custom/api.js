@@ -21,7 +21,6 @@ const {
 } = require('../utils/warmupInterceptor')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const { dumpAnthropicMessagesRequest } = require('../utils/anthropicRequestDump')
-const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
 const {
   handleAnthropicMessagesToGemini,
   handleAnthropicCountTokensToGemini
@@ -357,6 +356,18 @@ async function handleMessagesRequest(req, res) {
       }
     }
 
+    // 检测 1M 上下文窗口请求（anthropic-beta 包含 context-1m）
+    const betaHeader = (req.headers['anthropic-beta'] || '').toLowerCase()
+    const is1mContextRequest = betaHeader.includes('context-1m')
+    if (is1mContextRequest && !req.apiKey.allow1mContext) {
+      return res.status(403).json({
+        error: {
+          type: 'forbidden',
+          message: '该 API Key 未启用 1M 上下文窗口，请联系管理员开启或切换为非 [1m] 模型'
+        }
+      })
+    }
+
     logger.api('📥 /v1/messages request received', {
       model: req.body.model || null,
       forcedVendor,
@@ -540,6 +551,13 @@ async function handleMessagesRequest(req, res) {
         throw error
       }
 
+      // 1M 上下文窗口：记录日志（admin 已通过 allow1mContext 授权，信任其决定）
+      if (is1mContextRequest) {
+        logger.api(
+          `📐 1M context request allowed for key: ${req.apiKey.name}, accountType: ${accountType}`
+        )
+      }
+
       // 🔗 在成功调度后建立会话绑定（仅 claude-official 类型）
       // claude-official 只接受：1) 新会话 2) 已绑定的会话
       if (
@@ -662,18 +680,7 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(
-                  _apiKeyId,
-                  usageObject,
-                  model,
-                  usageAccountId,
-                  accountType,
-                  createRequestDetailMeta(req, {
-                    requestBody: _requestBody,
-                    stream: true,
-                    statusCode: res.statusCode
-                  })
-                )
+                .recordUsageWithDetails(_apiKeyId, usageObject, model, usageAccountId, accountType)
                 .then((costs) => {
                   queueRateLimitUpdate(
                     _rateLimitInfo,
@@ -804,12 +811,7 @@ async function handleMessagesRequest(req, res) {
                   usageObject,
                   model,
                   usageAccountId,
-                  'claude-console',
-                  createRequestDetailMeta(req, {
-                    requestBody: _requestBodyConsole,
-                    stream: true,
-                    statusCode: res.statusCode
-                  })
+                  'claude-console'
                 )
                 .then((costs) => {
                   queueRateLimitUpdate(
@@ -873,8 +875,7 @@ async function handleMessagesRequest(req, res) {
           const result = await bedrockRelayService.handleStreamRequest(
             _requestBodyBedrock,
             bedrockAccountResult.data,
-            res,
-            req
+            res
           )
 
           // 记录Bedrock使用统计
@@ -891,13 +892,7 @@ async function handleMessagesRequest(req, res) {
                 0,
                 result.model,
                 accountId,
-                'bedrock',
-                null,
-                createRequestDetailMeta(req, {
-                  requestBody: _requestBodyBedrock,
-                  stream: true,
-                  statusCode: res.statusCode
-                })
+                'bedrock'
               )
               .then((costs) => {
                 queueRateLimitUpdate(
@@ -940,14 +935,7 @@ async function handleMessagesRequest(req, res) {
         } catch (error) {
           logger.error('❌ Bedrock stream request failed:', error)
           if (!res.headersSent) {
-            const statusCode = error.$metadata?.httpStatusCode || 500
-            return res
-              .status(statusCode)
-              .json({ error: 'Bedrock service error', message: error.message })
-          }
-          // SSE 流已开始但出错：确保连接被关闭，防止客户端 pending
-          if (!res.writableEnded) {
-            res.end()
+            return res.status(500).json({ error: 'Bedrock service error', message: error.message })
           }
           return undefined
         }
@@ -1027,18 +1015,7 @@ async function handleMessagesRequest(req, res) {
               }
 
               apiKeyService
-                .recordUsageWithDetails(
-                  _apiKeyIdCcr,
-                  usageObject,
-                  model,
-                  usageAccountId,
-                  'ccr',
-                  createRequestDetailMeta(req, {
-                    requestBody: _requestBodyCcr,
-                    stream: true,
-                    statusCode: res.statusCode
-                  })
-                )
+                .recordUsageWithDetails(_apiKeyIdCcr, usageObject, model, usageAccountId, 'ccr')
                 .then((costs) => {
                   queueRateLimitUpdate(
                     _rateLimitInfoCcr,
@@ -1346,9 +1323,8 @@ async function handleMessagesRequest(req, res) {
           }
         } catch (error) {
           logger.error('❌ Bedrock non-stream request failed:', error)
-          const statusCode = error.$metadata?.httpStatusCode || 500
           response = {
-            statusCode,
+            statusCode: 500,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ error: 'Bedrock service error', message: error.message }),
             accountId
@@ -1465,12 +1441,7 @@ async function handleMessagesRequest(req, res) {
             usageObject,
             model,
             responseAccountId,
-            accountType,
-            createRequestDetailMeta(req, {
-              requestBody: _requestBodyNonStream,
-              stream: false,
-              statusCode: response.statusCode
-            })
+            accountType
           )
 
           await queueRateLimitUpdate(
