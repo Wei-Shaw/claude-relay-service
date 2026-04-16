@@ -197,11 +197,16 @@ class Application {
       this.app.use(
         compression({
           filter: (req, res) => {
-            // 不压缩 Server-Sent Events
+            // Respect client's Accept-Encoding: identity (no compression desired)
+            const acceptEncoding = req.headers['accept-encoding']
+            if (acceptEncoding && acceptEncoding.trim() === 'identity') {
+              return false
+            }
+            // Don't compress Server-Sent Events
             if (res.getHeader('Content-Type') === 'text/event-stream') {
               return false
             }
-            // 使用默认的压缩判断
+            // Use default compression heuristics
             return compression.filter(req, res)
           }
         })
