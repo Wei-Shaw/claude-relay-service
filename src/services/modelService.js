@@ -73,6 +73,100 @@ class ModelService {
   }
 
   /**
+   * 获取有活跃账户支持的模型（OpenAI API 格式）
+   * 遍历所有账户类型，收集活跃账户模型映射中定义的模型
+   */
+  async getAvailableModels() {
+    const now = Math.floor(Date.now() / 1000)
+    const modelSet = new Set()
+
+    // 所有账户类型服务：[懒加载函数, 平台名]
+    const accountServices = [
+      [() => require('./account/claudeAccountService'), 'anthropic'],
+      [() => require('./account/claudeConsoleAccountService'), 'anthropic'],
+      [() => require('./account/openaiAccountService'), 'openai'],
+      [() => require('./account/openaiResponsesAccountService'), 'openai'],
+      [() => require('./account/geminiAccountService'), 'google'],
+      [() => require('./account/geminiApiAccountService'), 'google'],
+      [() => require('./account/bedrockAccountService'), 'anthropic'],
+      [() => require('./account/azureOpenaiAccountService'), 'openai'],
+      [() => require('./account/ccrAccountService'), 'anthropic'],
+      [() => require('./account/droidAccountService'), 'anthropic']
+    ]
+
+    const providerModels = {}
+
+    for (const [getService, provider] of accountServices) {
+      try {
+        const service = getService()
+        const accounts = await service.getAllAccounts()
+        const activeAccounts = Array.isArray(accounts)
+          ? accounts.filter((a) => a.isActive)
+          : (accounts?.data || []).filter((a) => a.isActive)
+
+        for (const account of activeAccounts) {
+          // 有 supportedModels/model_mapping 的账户（如 claude-console, ccr）
+          const raw = account.supportedModels || account.model_mapping
+          if (raw) {
+            const mapping = typeof raw === 'string' ? JSON.parse(raw) : raw
+            const keys = Array.isArray(mapping) ? mapping : Object.keys(mapping || {})
+            for (const modelId of keys) {
+              modelSet.add(modelId)
+              if (!providerModels[modelId]) {
+                providerModels[modelId] = provider
+              }
+            }
+          } else {
+            // 没有 model mapping 的标准账户，记录 provider 有活跃账户
+            if (!providerModels._activeProviders) {
+              providerModels._activeProviders = new Set()
+            }
+            providerModels._activeProviders.add(provider)
+          }
+        }
+      } catch (err) {
+        // 服务可能不存在，忽略
+      }
+    }
+
+    // 构建结果：来自模型映射的模型 + 静态列表中有活跃 provider 的模型
+    const result = []
+    const addedIds = new Set()
+
+    // 先添加模型映射中的模型
+    for (const modelId of modelSet) {
+      result.push({
+        id: modelId,
+        object: 'model',
+        created: now,
+        owned_by: providerModels[modelId] || 'unknown'
+      })
+      addedIds.add(modelId)
+    }
+
+    // 再添加静态列表中，有活跃标准账户（无 model mapping）的 provider 的模型
+    const activeProviders = providerModels._activeProviders
+    if (activeProviders && activeProviders.size > 0) {
+      for (const model of this.getAllModels()) {
+        if (activeProviders.has(model.owned_by) && !addedIds.has(model.id)) {
+          result.push(model)
+          addedIds.add(model.id)
+        }
+      }
+    }
+
+    // 如果结果为空（无任何活跃账户），回退到全部静态模型
+    if (result.length === 0) {
+      return this.getAllModels()
+    }
+
+    return result.sort((a, b) => {
+      if (a.owned_by !== b.owned_by) return a.owned_by.localeCompare(b.owned_by)
+      return a.id.localeCompare(b.id)
+    })
+  }
+
+  /**
    * 获取所有支持的模型（OpenAI API 格式）
    */
   getAllModels() {
