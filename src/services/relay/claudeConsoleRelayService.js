@@ -1481,7 +1481,8 @@ class ClaudeConsoleRelayService {
         responseStream,
         payload,
         proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
-        extraHeaders
+        extraHeaders,
+        sanitizeErrors: false // Admin测试显示完整错误信息
       }
 
       if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
