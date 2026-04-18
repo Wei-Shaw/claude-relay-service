@@ -278,6 +278,26 @@ describe('PricingService - Long Context Pricing', () => {
     })
   })
 
+  describe('Opus 4.7 支持', () => {
+    it('Bedrock Opus 4.7 模型 ID 能命中 Claude Opus 4.7 定价', () => {
+      const usage = {
+        input_tokens: 100000,
+        output_tokens: 20000,
+        cache_creation_input_tokens: 10000,
+        cache_read_input_tokens: 5000
+      }
+
+      const result = pricingService.calculateCost(usage, 'us.anthropic.claude-opus-4-7-v1')
+
+      expect(result.hasPricing).toBe(true)
+      expect(result.isLongContextRequest).toBe(false)
+      expect(result.pricing.input).toBeCloseTo(0.000005, 12)
+      expect(result.pricing.output).toBeCloseTo(0.000025, 12)
+      expect(result.pricing.cacheCreate).toBeCloseTo(0.00000625, 12)
+      expect(result.pricing.cacheRead).toBeCloseTo(0.0000005, 12)
+    })
+  })
+
   describe('兼容性测试', () => {
     it('非 [1m] 模型不受影响，始终使用基础价格', () => {
       const usage = {

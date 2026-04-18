@@ -536,6 +536,9 @@ class BedrockRelayService {
 
     // 标准Claude模型名到Bedrock模型名的映射表
     const modelMapping = {
+      // Claude Opus 4.7
+      'claude-opus-4-7': 'us.anthropic.claude-opus-4-7-v1',
+
       // Claude Opus 4.6
       'claude-opus-4-6': 'global.anthropic.claude-opus-4-6-v1',
 
@@ -806,6 +809,12 @@ class BedrockRelayService {
 
       // Bedrock暂不支持列出推理配置文件的API，返回预定义的模型列表
       const models = [
+        {
+          id: 'us.anthropic.claude-opus-4-7-v1',
+          name: 'Claude Opus 4.7',
+          provider: 'anthropic',
+          type: 'bedrock'
+        },
         {
           id: 'us.anthropic.claude-sonnet-4-20250514-v1:0',
           name: 'Claude Sonnet 4',
