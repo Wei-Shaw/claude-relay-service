@@ -18,6 +18,7 @@ const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const metadataUserIdHelper = require('../../utils/metadataUserIdHelper')
+const { sanitizeSystemText } = require('../claudeCloakingUtils')
 const {
   getHttpsAgentForStream,
   getHttpsAgentForNonStream,
@@ -1116,10 +1117,15 @@ class ClaudeRelayService {
           .join('\n\n')
       }
 
+      // 🧼 剥离 OpenCode 等第三方 CLI 的品牌字样，避免在下一步搬运到
+      //    user message 时把 "You are OpenCode"、opencode 的 GitHub/docs
+      //    URL、"if OpenCode honestly" 等标记原样透出给上游
+      originalSystemText = sanitizeSystemText(originalSystemText)
+
       // 将 system 替换为 Claude Code 标准提示词
       processedBody.system = this.claudeCodeSystemPrompt
 
-      // 将原始 system prompt 作为 user/assistant 消息对注入到 messages 开头
+      // 将（已清洗的）原始 system prompt 作为 user/assistant 消息对注入到 messages 开头
       // 模型仍通过 messages 接收完整指令，保留客户端功能
       if (originalSystemText && originalSystemText.trim()) {
         const instructionMessage = {
