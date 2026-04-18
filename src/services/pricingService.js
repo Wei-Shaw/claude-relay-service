@@ -376,12 +376,22 @@ class PricingService {
     // 尝试去掉区域前缀进行匹配
     if (modelName.includes('.anthropic.') || modelName.includes('.claude')) {
       // 提取不带区域前缀的模型名
-      const withoutRegion = modelName.replace(/^(us|eu|apac)\./, '')
+      const withoutRegion = modelName.replace(/^(global|us|eu|apac|jp)\./, '')
       if (this.pricingData[withoutRegion]) {
         logger.debug(
           `💰 Found pricing for ${modelName} by removing region prefix: ${withoutRegion}`
         )
         return this.pricingData[withoutRegion]
+      }
+
+      const canonicalBedrockModel = withoutRegion
+        .replace(/^anthropic\./, '')
+        .replace(/-v\d+(?::\d+)?$/, '')
+      if (this.pricingData[canonicalBedrockModel]) {
+        logger.debug(
+          `💰 Found pricing for ${modelName} using canonical Bedrock model: ${canonicalBedrockModel}`
+        )
+        return this.pricingData[canonicalBedrockModel]
       }
     }
 
@@ -399,10 +409,23 @@ class PricingService {
     // 对于Bedrock模型，尝试更智能的匹配
     if (modelName.includes('anthropic.claude')) {
       // 提取核心模型名部分（去掉区域和前缀）
-      const coreModel = modelName.replace(/^(us|eu|apac)\./, '').replace('anthropic.', '')
+      const coreModel = modelName.replace(/^(global|us|eu|apac|jp)\./, '').replace('anthropic.', '')
+      const canonicalCoreModel = coreModel.replace(/-v\d+(?::\d+)?$/, '')
+
+      if (this.pricingData[canonicalCoreModel]) {
+        logger.debug(
+          `💰 Found pricing for ${modelName} using canonical core model match: ${canonicalCoreModel}`
+        )
+        return this.pricingData[canonicalCoreModel]
+      }
 
       for (const [key, value] of Object.entries(this.pricingData)) {
-        if (key.includes(coreModel) || key.replace('anthropic.', '').includes(coreModel)) {
+        if (
+          key.includes(coreModel) ||
+          key.replace('anthropic.', '').includes(coreModel) ||
+          canonicalCoreModel.includes(key) ||
+          key.includes(canonicalCoreModel)
+        ) {
           logger.debug(`💰 Found pricing for ${modelName} using Bedrock core model match: ${key}`)
           return value
         }
