@@ -1269,7 +1269,7 @@ class ClaudeRelayService {
 
     try {
       // 使用缓存的定价数据
-      const pricingFilePath = path.join(__dirname, '../../data/model_pricing.json')
+      const pricingFilePath = path.join(process.cwd(), 'data', 'model_pricing.json')
       const pricingData = getPricingData(pricingFilePath)
 
       if (!pricingData) {
