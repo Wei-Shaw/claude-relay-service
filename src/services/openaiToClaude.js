@@ -331,12 +331,22 @@ class OpenAIToClaudeConverter {
    * 转换工具调用
    */
   _convertToolCalls(toolCalls) {
-    return toolCalls.map((tc) => ({
-      type: 'tool_use',
-      id: tc.id,
-      name: tc.function.name,
-      input: JSON.parse(tc.function.arguments)
-    }))
+    return toolCalls.map((tc) => {
+      let input
+
+      try {
+        input = JSON.parse(tc.function.arguments || '{}')
+      } catch {
+        input = tc.function.arguments ? { _raw: tc.function.arguments } : {}
+      }
+
+      return {
+        type: 'tool_use',
+        id: tc.id,
+        name: tc.function.name,
+        input
+      }
+    })
   }
 
   /**
