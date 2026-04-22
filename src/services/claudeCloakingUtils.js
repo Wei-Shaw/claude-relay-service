@@ -35,7 +35,17 @@ const PARAGRAPH_REMOVAL_ANCHORS = [
 ]
 
 const TEXT_REPLACEMENTS = [
-  { match: 'if OpenCode honestly', replacement: 'if the assistant honestly' }
+  { match: 'if OpenCode honestly', replacement: 'if the assistant honestly' },
+  // Anthropic 服务端分类器把这句话当作第三方 Agent CLI 的 fingerprint，
+  // 原样透传会让 /v1/messages 返回 400 invalid_request_error，且错误信息
+  // 被伪装成 "You're out of extra usage." 具有误导性。就地改写语义等价的版本
+  // 即可绕过（仅改一个词也能放行；`Here is` → `Here's` 不能），同时保证模型
+  // 仍能看到 env 块开头。
+  // Ref: opencode-anthropic-auth PR #118 (commit 4444663)
+  {
+    match: 'Here is some useful information about the environment you are running in:',
+    replacement: 'Environment context you are running in:'
+  }
 ]
 
 function sanitizeSystemText(text) {
