@@ -451,4 +451,49 @@ router.post('/models/pricing/refresh', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 获取所有自定义缓存价格覆盖
+router.get('/models/pricing/custom', authenticateAdmin, async (req, res) => {
+  try {
+    const data = pricingService.getCustomCachePricingMap()
+    res.json({ success: true, data })
+  } catch (error) {
+    logger.error('Failed to get custom cache pricing:', error)
+    res.status(500).json({ error: 'Failed to get custom cache pricing', message: error.message })
+  }
+})
+
+// 设置/更新某个模型的自定义缓存价格
+router.put('/models/pricing/custom/:model', authenticateAdmin, async (req, res) => {
+  try {
+    const model = decodeURIComponent(req.params.model || '')
+    if (!model) {
+      return res.status(400).json({ error: 'Model name is required' })
+    }
+    const body = req.body || {}
+    const override = await pricingService.setCustomCachePricing(model, {
+      cacheCreation: body.cacheCreation,
+      cacheRead: body.cacheRead
+    })
+    res.json({ success: true, data: override })
+  } catch (error) {
+    logger.warn('Failed to set custom cache pricing:', error.message)
+    res.status(400).json({ error: 'Invalid custom cache pricing', message: error.message })
+  }
+})
+
+// 清除某个模型的自定义缓存价格
+router.delete('/models/pricing/custom/:model', authenticateAdmin, async (req, res) => {
+  try {
+    const model = decodeURIComponent(req.params.model || '')
+    if (!model) {
+      return res.status(400).json({ error: 'Model name is required' })
+    }
+    await pricingService.deleteCustomCachePricing(model)
+    res.json({ success: true })
+  } catch (error) {
+    logger.error('Failed to delete custom cache pricing:', error)
+    res.status(500).json({ error: 'Failed to delete custom cache pricing', message: error.message })
+  }
+})
+
 module.exports = router
