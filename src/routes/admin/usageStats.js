@@ -520,6 +520,227 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
   }
 })
 
+// 获取单个 API Key 最近使用历史（用于详情弹窗走势图）
+router.get('/api-keys/:keyId/usage-history', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const { days = 30 } = req.query
+
+    const keyData = await redis.getApiKey(keyId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'API key not found'
+      })
+    }
+
+    const daysCount = Math.min(Math.max(parseInt(days, 10) || 30, 1), 60)
+    const keyCreatedAt = keyData.createdAt ? new Date(keyData.createdAt) : null
+    const keyUsageStats = await redis.getUsageStats(keyId)
+
+    const history = []
+    let totalCost = 0
+    let totalRequests = 0
+    let totalTokens = 0
+    let highestCostDay = null
+    let highestRequestDay = null
+
+    const today = new Date()
+
+    for (let offset = daysCount - 1; offset >= 0; offset--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - offset)
+
+      const tzDate = redis.getDateInTimezone(date)
+      const dateKey = redis.getDateStringInTimezone(date)
+      const monthLabel = String(tzDate.getUTCMonth() + 1).padStart(2, '0')
+      const dayLabel = String(tzDate.getUTCDate()).padStart(2, '0')
+      const label = `${monthLabel}/${dayLabel}`
+
+      const dailyKey = `usage:daily:${keyId}:${dateKey}`
+      const dailyData = await redis.client.hgetall(dailyKey)
+      const modelResults = await redis.scanAndGetAllChunked(`usage:${keyId}:model:daily:*:${dateKey}`)
+
+      let inputTokens = 0
+      let outputTokens = 0
+      let cacheCreateTokens = 0
+      let cacheReadTokens = 0
+      let requests = 0
+      let cost = 0
+
+      if (modelResults.length > 0) {
+        for (const { key: modelKey, data: modelData } of modelResults) {
+          const match = modelKey.match(/^usage:[^:]+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/)
+          const model = match ? match[1] : 'unknown'
+
+          const modelInputTokens =
+            parseInt(modelData.totalInputTokens) || parseInt(modelData.inputTokens) || 0
+          const modelOutputTokens =
+            parseInt(modelData.totalOutputTokens) || parseInt(modelData.outputTokens) || 0
+          const modelCacheCreateTokens =
+            parseInt(modelData.totalCacheCreateTokens) || parseInt(modelData.cacheCreateTokens) || 0
+          const modelCacheReadTokens =
+            parseInt(modelData.totalCacheReadTokens) || parseInt(modelData.cacheReadTokens) || 0
+          const modelRequests =
+            parseInt(modelData.totalRequests) || parseInt(modelData.requests) || 0
+
+          inputTokens += modelInputTokens
+          outputTokens += modelOutputTokens
+          cacheCreateTokens += modelCacheCreateTokens
+          cacheReadTokens += modelCacheReadTokens
+          requests += modelRequests
+
+          if ('ratedCostMicro' in modelData || 'realCostMicro' in modelData) {
+            cost += (parseInt(modelData.ratedCostMicro) || 0) / 1000000
+            continue
+          }
+
+          const usage = {
+            input_tokens: modelInputTokens,
+            output_tokens: modelOutputTokens,
+            cache_creation_input_tokens: modelCacheCreateTokens,
+            cache_read_input_tokens: modelCacheReadTokens
+          }
+
+          const eph5m = parseInt(modelData.ephemeral5mTokens) || 0
+          const eph1h = parseInt(modelData.ephemeral1hTokens) || 0
+          if (eph5m > 0 || eph1h > 0) {
+            usage.cache_creation = {
+              ephemeral_5m_input_tokens: eph5m,
+              ephemeral_1h_input_tokens: eph1h
+            }
+          }
+
+          const costResult = CostCalculator.calculateCost(usage, model)
+          cost += costResult.costs.total
+        }
+      } else {
+        inputTokens = parseInt(dailyData.totalInputTokens) || parseInt(dailyData.inputTokens) || 0
+        outputTokens =
+          parseInt(dailyData.totalOutputTokens) || parseInt(dailyData.outputTokens) || 0
+        cacheCreateTokens =
+          parseInt(dailyData.totalCacheCreateTokens) || parseInt(dailyData.cacheCreateTokens) || 0
+        cacheReadTokens =
+          parseInt(dailyData.totalCacheReadTokens) || parseInt(dailyData.cacheReadTokens) || 0
+        requests = parseInt(dailyData.totalRequests) || parseInt(dailyData.requests) || 0
+
+        const allTokens =
+          parseInt(dailyData.totalAllTokens) ||
+          parseInt(dailyData.allTokens) ||
+          inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+        if (allTokens > 0) {
+          const usage = {
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            cache_creation_input_tokens: cacheCreateTokens,
+            cache_read_input_tokens: cacheReadTokens
+          }
+
+          const eph5m = parseInt(dailyData.ephemeral5mTokens) || 0
+          const eph1h = parseInt(dailyData.ephemeral1hTokens) || 0
+          if (eph5m > 0 || eph1h > 0) {
+            usage.cache_creation = {
+              ephemeral_5m_input_tokens: eph5m,
+              ephemeral_1h_input_tokens: eph1h
+            }
+          }
+
+          const costResult = CostCalculator.calculateCost(usage, 'unknown')
+          cost = costResult.costs.total
+        }
+      }
+
+      const tokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+      const normalizedCost = Math.round(cost * 1000000) / 1000000
+
+      totalCost += normalizedCost
+      totalRequests += requests
+      totalTokens += tokens
+
+      if (!highestCostDay || normalizedCost > highestCostDay.cost) {
+        highestCostDay = {
+          date: dateKey,
+          label,
+          cost: normalizedCost,
+          formattedCost: CostCalculator.formatCost(normalizedCost)
+        }
+      }
+
+      if (!highestRequestDay || requests > highestRequestDay.requests) {
+        highestRequestDay = {
+          date: dateKey,
+          label,
+          requests
+        }
+      }
+
+      history.push({
+        date: dateKey,
+        label,
+        cost: normalizedCost,
+        formattedCost: CostCalculator.formatCost(normalizedCost),
+        requests,
+        tokens
+      })
+    }
+
+    let actualDaysForAvg = daysCount
+    if (keyCreatedAt) {
+      const now = new Date()
+      const diffTime = Math.abs(now - keyCreatedAt)
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      actualDaysForAvg = Math.min(diffDays, daysCount)
+      actualDaysForAvg = Math.max(actualDaysForAvg, 1)
+    }
+
+    const avgDailyCost = actualDaysForAvg > 0 ? totalCost / actualDaysForAvg : 0
+    const avgDailyRequests = actualDaysForAvg > 0 ? totalRequests / actualDaysForAvg : 0
+    const avgDailyTokens = actualDaysForAvg > 0 ? totalTokens / actualDaysForAvg : 0
+    const todayData = history.length > 0 ? history[history.length - 1] : null
+
+    return res.json({
+      success: true,
+      data: {
+        history,
+        summary: {
+          days: daysCount,
+          actualDaysUsed: actualDaysForAvg,
+          keyCreatedAt: keyCreatedAt ? keyCreatedAt.toISOString() : null,
+          totalCost,
+          totalCostFormatted: CostCalculator.formatCost(totalCost),
+          totalRequests,
+          totalTokens,
+          avgDailyCost,
+          avgDailyCostFormatted: CostCalculator.formatCost(avgDailyCost),
+          avgDailyRequests,
+          avgDailyTokens,
+          today: todayData
+            ? {
+                date: todayData.date,
+                cost: todayData.cost,
+                costFormatted: todayData.formattedCost,
+                requests: todayData.requests,
+                tokens: todayData.tokens
+              }
+            : null,
+          highestCostDay,
+          highestRequestDay
+        },
+        overview: keyUsageStats,
+        generatedAt: new Date().toISOString()
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get API key usage history:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get API key usage history',
+      message: error.message
+    })
+  }
+})
+
 // 📊 使用趋势和成本分析
 
 // 获取使用趋势数据
