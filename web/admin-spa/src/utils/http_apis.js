@@ -76,6 +76,8 @@ export const getApiKeyStatsApi = (id, params) =>
   request({ url: `/admin/api-keys/${id}/stats`, method: 'GET', params })
 export const getApiKeyModelStatsApi = (id, params) =>
   request({ url: `/admin/api-keys/${id}/model-stats`, method: 'GET', params })
+export const getApiKeyUsageHistoryApi = (id, days = 30) =>
+  request({ url: `/admin/api-keys/${id}/usage-history`, method: 'GET', params: { days } })
 export const getApiKeyTagsApi = () => request({ url: '/admin/api-keys/tags', method: 'GET' })
 export const getApiKeyTagsDetailsApi = () =>
   request({ url: '/admin/api-keys/tags/details', method: 'GET' })
