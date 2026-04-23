@@ -20,6 +20,7 @@ class PricingService {
     this.localHashFile = path.join(this.dataDir, 'model_pricing.sha256')
     this.pricingData = null
     this.lastUpdated = null
+    this.customCachePricing = {} // 模型名 -> { cacheCreation, cacheRead, updatedAt }
     this.updateInterval = 24 * 60 * 60 * 1000 // 24小时
     this.hashCheckInterval = 10 * 60 * 1000 // 10分钟哈希校验
     this.fileWatcher = null // 文件监听器
@@ -57,6 +58,9 @@ class PricingService {
 
       // 初次启动时执行一次哈希校验，确保与远端保持一致
       await this.syncWithRemoteHash()
+
+      // 加载自定义缓存价格覆盖
+      await this.loadCustomCachePricing()
 
       // 设置定时更新
       if (this.updateTimer) {
@@ -360,7 +364,7 @@ class PricingService {
     // 尝试直接匹配
     if (this.pricingData[modelName]) {
       logger.debug(`💰 Found exact pricing match for ${modelName}`)
-      return this.pricingData[modelName]
+      return this.applyCustomCacheOverride(this.pricingData[modelName], modelName)
     }
 
     // 特殊处理：gpt-5-codex 回退到 gpt-5
@@ -368,7 +372,7 @@ class PricingService {
       const fallbackPricing = this.pricingData['gpt-5']
       if (fallbackPricing) {
         logger.info(`💰 Using gpt-5 pricing as fallback for ${modelName}`)
-        return fallbackPricing
+        return this.applyCustomCacheOverride(fallbackPricing, 'gpt-5')
       }
     }
 
@@ -381,7 +385,7 @@ class PricingService {
         logger.debug(
           `💰 Found pricing for ${modelName} by removing region prefix: ${withoutRegion}`
         )
-        return this.pricingData[withoutRegion]
+        return this.applyCustomCacheOverride(this.pricingData[withoutRegion], withoutRegion)
       }
     }
 
@@ -392,7 +396,7 @@ class PricingService {
       const normalizedKey = key.toLowerCase().replace(/[_-]/g, '')
       if (normalizedKey.includes(normalizedModel) || normalizedModel.includes(normalizedKey)) {
         logger.debug(`💰 Found pricing for ${modelName} using fuzzy match: ${key}`)
-        return value
+        return this.applyCustomCacheOverride(value, key)
       }
     }
 
@@ -404,7 +408,7 @@ class PricingService {
       for (const [key, value] of Object.entries(this.pricingData)) {
         if (key.includes(coreModel) || key.replace('anthropic.', '').includes(coreModel)) {
           logger.debug(`💰 Found pricing for ${modelName} using Bedrock core model match: ${key}`)
-          return value
+          return this.applyCustomCacheOverride(value, key)
         }
       }
     }
@@ -427,6 +431,95 @@ class PricingService {
       pricing.cache_read_input_token_cost = pricing.input_cost_per_token * 0.1
     }
     return pricing
+  }
+
+  // 将自定义缓存价格覆盖应用到返回的价格对象
+  applyCustomCacheOverride(pricing, matchedKey) {
+    if (!pricing || !matchedKey) {
+      return pricing
+    }
+    const override = this.customCachePricing[matchedKey]
+    if (!override) {
+      return pricing
+    }
+    const hasCreation = Number.isFinite(override.cacheCreation) && override.cacheCreation >= 0
+    const hasRead = Number.isFinite(override.cacheRead) && override.cacheRead >= 0
+    if (!hasCreation && !hasRead) {
+      return pricing
+    }
+    const merged = { ...pricing }
+    if (hasCreation) {
+      merged.cache_creation_input_token_cost = override.cacheCreation
+    }
+    if (hasRead) {
+      merged.cache_read_input_token_cost = override.cacheRead
+    }
+    return merged
+  }
+
+  // 从 Redis 加载自定义缓存价格覆盖
+  async loadCustomCachePricing() {
+    try {
+      const redis = require('../models/redis')
+      const overrides = await redis.getCustomCachePricing()
+      this.customCachePricing = overrides || {}
+      const count = Object.keys(this.customCachePricing).length
+      if (count > 0) {
+        logger.info(`💰 Loaded ${count} custom cache pricing override(s)`)
+      }
+    } catch (error) {
+      logger.warn(`⚠️  Failed to load custom cache pricing: ${error.message}`)
+      this.customCachePricing = {}
+    }
+  }
+
+  // 校验并规范化单个覆盖字段（允许 null，其余必须为有限非负数）
+  _normalizeCacheOverrideField(value) {
+    if (value === null || value === undefined || value === '') {
+      return null
+    }
+    const num = typeof value === 'number' ? value : Number(value)
+    if (!Number.isFinite(num) || num < 0) {
+      throw new Error('Cache pricing override must be a finite non-negative number or null')
+    }
+    return num
+  }
+
+  // 设置/更新某个模型的自定义缓存价格覆盖
+  async setCustomCachePricing(modelName, { cacheCreation, cacheRead } = {}) {
+    if (!modelName || typeof modelName !== 'string') {
+      throw new Error('Model name is required')
+    }
+    const normalized = {
+      cacheCreation: this._normalizeCacheOverrideField(cacheCreation),
+      cacheRead: this._normalizeCacheOverrideField(cacheRead)
+    }
+    if (normalized.cacheCreation === null && normalized.cacheRead === null) {
+      throw new Error('At least one of cacheCreation / cacheRead must be provided')
+    }
+    normalized.updatedAt = new Date().toISOString()
+
+    const redis = require('../models/redis')
+    await redis.setCustomCachePricing(modelName, normalized)
+    this.customCachePricing[modelName] = normalized
+    logger.info(`💰 Set custom cache pricing for ${modelName}`)
+    return normalized
+  }
+
+  // 删除某个模型的自定义缓存价格覆盖
+  async deleteCustomCachePricing(modelName) {
+    if (!modelName || typeof modelName !== 'string') {
+      throw new Error('Model name is required')
+    }
+    const redis = require('../models/redis')
+    await redis.deleteCustomCachePricing(modelName)
+    delete this.customCachePricing[modelName]
+    logger.info(`💰 Removed custom cache pricing for ${modelName}`)
+  }
+
+  // 返回当前所有覆盖（供管理 UI 展示）
+  getCustomCachePricingMap() {
+    return { ...this.customCachePricing }
   }
 
   // 从 usage 对象中提取 beta 特性列表（小写）
