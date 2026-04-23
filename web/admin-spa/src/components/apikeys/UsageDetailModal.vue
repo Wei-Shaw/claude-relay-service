@@ -6,7 +6,7 @@
 
       <!-- 模态框 -->
       <div
-        class="modal-content relative mx-auto flex max-h-[90vh] w-[95%] max-w-5xl flex-col p-4 sm:w-full sm:p-6 md:p-8"
+        class="modal-content relative mx-auto flex max-h-[90vh] w-[95%] max-w-6xl flex-col p-4 sm:w-full sm:p-6 md:p-8"
       >
         <!-- 标题栏 -->
         <div class="mb-4 flex items-center justify-between sm:mb-6">
@@ -27,6 +27,10 @@
 
         <!-- 内容区 -->
         <div class="modal-scroll-content custom-scrollbar flex-1 overflow-y-auto">
+          <div v-if="loading" class="flex h-[50vh] items-center justify-center">
+            <div class="loading-spinner h-12 w-12 border-4 border-blue-500" />
+          </div>
+          <template v-else>
           <!-- 总体统计卡片 -->
           <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             <!-- 请求统计卡片 -->
@@ -143,6 +147,133 @@
                   {{ formatTokenCount(cacheReadTokens) }}
                 </span>
               </div>
+            </div>
+          </div>
+
+          <div class="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div
+              class="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-900/20"
+            >
+              <div
+                class="flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300"
+              >
+                <i class="fas fa-sun" />
+                今日概览
+              </div>
+              <div
+                class="rounded-xl bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-blue-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-blue-500/20"
+              >
+                <div class="flex items-center justify-between">
+                  <span>费用</span>
+                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{
+                    summary?.today?.costFormatted || formatCost(0)
+                  }}</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between">
+                  <span>请求</span>
+                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{
+                    formatNumber(summary?.today?.requests || 0)
+                  }}</span>
+                </div>
+                <div
+                  class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                >
+                  <span>Tokens</span>
+                  <span>{{ formatNumber(summary?.today?.tokens || 0) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="space-y-3 rounded-2xl border border-amber-100 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-900/20"
+            >
+              <div
+                class="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300"
+              >
+                <i class="fas fa-crown" />
+                最高费用日
+              </div>
+              <div
+                class="rounded-xl bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-amber-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-amber-500/20"
+              >
+                <div class="flex items-center justify-between">
+                  <span>日期</span>
+                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{
+                    formatDate(summary?.highestCostDay?.date)
+                  }}</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between">
+                  <span>费用</span>
+                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{
+                    summary?.highestCostDay?.formattedCost || formatCost(0)
+                  }}</span>
+                </div>
+                <div
+                  class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                >
+                  <span>请求</span>
+                  <span>{{
+                    formatNumber(findHistoryValue(summary?.highestCostDay?.date, 'requests'))
+                  }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 dark:border-emerald-500/20 dark:bg-emerald-900/20"
+            >
+              <div
+                class="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300"
+              >
+                <i class="fas fa-chart-bar" />
+                最高请求日
+              </div>
+              <div
+                class="rounded-xl bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-emerald-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-emerald-500/20"
+              >
+                <div class="flex items-center justify-between">
+                  <span>日期</span>
+                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{
+                    formatDate(summary?.highestRequestDay?.date)
+                  }}</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between">
+                  <span>请求</span>
+                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{
+                    formatNumber(summary?.highestRequestDay?.requests || 0)
+                  }}</span>
+                </div>
+                <div
+                  class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                >
+                  <span>费用</span>
+                  <span>{{
+                    formatCost(findHistoryValue(summary?.highestRequestDay?.date, 'cost'))
+                  }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="mb-6 rounded-2xl border border-gray-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+          >
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h4 class="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <i class="fas fa-chart-line mr-2 text-blue-500" /> 30天费用与请求趋势
+              </h4>
+              <span class="text-xs text-gray-400 dark:text-gray-500">
+                最新更新时间：{{ formatDateTime(generatedAt) }}
+              </span>
+            </div>
+            <div v-if="history.length > 0" class="h-[260px] sm:h-[300px]">
+              <canvas ref="chartCanvas" class="h-full w-full" />
+            </div>
+            <div
+              v-else
+              class="flex h-[220px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500"
+            >
+              暂无近期消耗数据
             </div>
           </div>
 
@@ -304,6 +435,7 @@
               </div>
             </div>
           </div>
+          </template>
         </div>
 
         <!-- 底部按钮 -->
@@ -321,9 +453,12 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import Chart from 'chart.js/auto'
+import { storeToRefs } from 'pinia'
 import LimitProgressBar from './LimitProgressBar.vue'
 import WindowCountdown from './WindowCountdown.vue'
+import { useThemeStore } from '@/stores/theme'
 
 import { formatNumber } from '@/utils/tools'
 
@@ -335,10 +470,30 @@ const props = defineProps({
   apiKey: {
     type: Object,
     required: true
+  },
+  history: {
+    type: Array,
+    default: () => []
+  },
+  summary: {
+    type: Object,
+    default: () => ({})
+  },
+  generatedAt: {
+    type: String,
+    default: ''
+  },
+  loading: {
+    type: Boolean,
+    default: false
   }
 })
 
 const emit = defineEmits(['close', 'open-timeline'])
+const themeStore = useThemeStore()
+const { isDarkMode } = storeToRefs(themeStore)
+const chartCanvas = ref(null)
+let chartInstance = null
 
 // 计算属性
 const totalRequests = computed(() => props.apiKey.usage?.total?.requests || 0)
@@ -417,6 +572,14 @@ const opusUsagePercentage = computed(() => {
   return (weeklyOpusCost.value / weeklyOpusCostLimit.value) * 100
 })
 
+const chartColors = computed(() => ({
+  text: isDarkMode.value ? '#e5e7eb' : '#374151',
+  grid: isDarkMode.value ? 'rgba(75, 85, 99, 0.25)' : 'rgba(209, 213, 219, 0.4)',
+  cost: '#3b82f6',
+  costFill: 'rgba(59, 130, 246, 0.15)',
+  requests: '#f97316'
+}))
+
 // 方法
 
 // 格式化Token数量（使用K/M单位）
@@ -429,11 +592,195 @@ const formatTokenCount = (count) => {
   return count.toString()
 }
 
+const formatCost = (value) => {
+  const num = Number(value || 0)
+  if (Number.isNaN(num)) return '$0.000000'
+  if (num >= 1) return `$${num.toFixed(2)}`
+  if (num >= 0.01) return `$${num.toFixed(3)}`
+  return `$${num.toFixed(6)}`
+}
+
+const formatDate = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    const parts = value.split('-')
+    if (parts.length === 3) return `${parts[1]}-${parts[2]}`
+    return value
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}-${day}`
+}
+
+const formatDateTime = (value) => {
+  if (!value) return '暂无'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+const findHistoryValue = (date, field) => {
+  if (!date) return 0
+  const target = props.history.find((item) => item.date === date)
+  return target ? target[field] || 0 : 0
+}
+
+const renderChart = async () => {
+  await nextTick()
+
+  if (!props.show || !chartCanvas.value) {
+    return
+  }
+
+  if (chartInstance) {
+    chartInstance.destroy()
+  }
+
+  if (!props.history || props.history.length === 0) {
+    chartInstance = null
+    return
+  }
+
+  const labels = props.history.map((item) => item.label)
+  const costs = props.history.map((item) => item.cost || 0)
+  const requests = props.history.map((item) => item.requests || 0)
+
+  chartInstance = new Chart(chartCanvas.value, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '费用 (USD)',
+          data: costs,
+          borderColor: chartColors.value.cost,
+          backgroundColor: chartColors.value.costFill,
+          tension: 0.35,
+          fill: true,
+          yAxisID: 'y'
+        },
+        {
+          label: '请求次数',
+          data: requests,
+          borderColor: chartColors.value.requests,
+          backgroundColor: 'transparent',
+          tension: 0.35,
+          yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          labels: {
+            color: chartColors.value.text
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              if (context.dataset.label === '费用 (USD)') {
+                return `${context.dataset.label}: ${formatCost(context.parsed.y)}`
+              }
+              return `${context.dataset.label}: ${formatNumber(context.parsed.y)} 次`
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: chartColors.value.text
+          },
+          grid: {
+            color: chartColors.value.grid
+          }
+        },
+        y: {
+          position: 'left',
+          ticks: {
+            color: chartColors.value.text,
+            callback: (value) => formatCost(value)
+          },
+          grid: {
+            color: chartColors.value.grid
+          }
+        },
+        y1: {
+          position: 'right',
+          ticks: {
+            color: chartColors.value.text,
+            callback: (value) => formatNumber(value)
+          },
+          grid: {
+            drawOnChartArea: false
+          }
+        }
+      }
+    }
+  })
+}
+
+const cleanupChart = () => {
+  if (chartInstance) {
+    chartInstance.destroy()
+    chartInstance = null
+  }
+}
+
 const close = () => {
+  cleanupChart()
   emit('close')
 }
 
 const openTimeline = () => {
   emit('open-timeline', props.apiKey?.id)
 }
+
+watch(
+  () => props.show,
+  (visible) => {
+    if (visible && !props.loading) {
+      renderChart()
+    } else if (!visible) {
+      cleanupChart()
+    }
+  }
+)
+
+watch(
+  () => props.loading,
+  (loading) => {
+    if (!loading && props.show) {
+      renderChart()
+    }
+  }
+)
+
+watch(
+  () => props.history,
+  () => {
+    if (props.show && !props.loading) {
+      renderChart()
+    }
+  },
+  { deep: true }
+)
+
+watch(isDarkMode, () => {
+  if (props.show && !props.loading) {
+    renderChart()
+  }
+})
+
+onUnmounted(() => {
+  cleanupChart()
+})
 </script>
