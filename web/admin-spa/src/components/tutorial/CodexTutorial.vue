@@ -68,7 +68,7 @@
           >
             <div class="whitespace-nowrap text-gray-300">{</div>
             <div class="whitespace-nowrap text-gray-300">
-              &nbsp;&nbsp;"OPENAI_API_KEY": "后台创建的API密钥"
+              &nbsp;&nbsp;"OPENAI_API_KEY": "{{ apiKeyPlaceholder }}"
             </div>
             <div class="whitespace-nowrap text-gray-300">}</div>
           </div>
@@ -88,8 +88,10 @@
           class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-500/40 dark:bg-yellow-950/30 sm:p-4"
         >
           <p class="text-sm text-yellow-700 dark:text-yellow-300">
-            💡 请将示例中的
-            <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">cr_xxxxxxxxxx</code>
+            💡 请将 auth.json 示例中的
+            <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{
+              apiKeyPlaceholder
+            }}</code>
             替换为您的实际 API 密钥
           </p>
         </div>
@@ -99,7 +101,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { useTutorialUrls } from '@/utils/useTutorialUrls'
 import NodeInstallTutorial from './NodeInstallTutorial.vue'
 
@@ -111,7 +114,27 @@ const props = defineProps({
   }
 })
 
+const DEFAULT_CODEX_TUTORIAL_MODEL = 'gpt-5.5'
+const CODEX_PROVIDER_NAME = '后台发你的秘钥'
+
+const authStore = useAuthStore()
 const { openaiBaseUrl } = useTutorialUrls()
+const apiKeyPlaceholder = CODEX_PROVIDER_NAME
+
+onMounted(() => {
+  authStore.loadOemSettings()
+})
+
+const codexTutorialModel = computed(() => {
+  const model = authStore.oemSettings?.codexTutorialModel
+  return typeof model === 'string' && model.trim() ? model.trim() : DEFAULT_CODEX_TUTORIAL_MODEL
+})
+
+const toTomlString = (value) =>
+  `"${String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/[\r\n]/g, ' ')}"`
 
 const configPath = computed(() =>
   props.platform === 'windows' ? '%USERPROFILE%\\.codex\\config.toml' : '~/.codex/config.toml'
@@ -122,14 +145,14 @@ const authPath = computed(() =>
 )
 
 const configTomlLines = computed(() => [
-  'model_provider = "crs"',
-  'model = "gpt-5-codex"',
+  `model_provider = ${toTomlString(CODEX_PROVIDER_NAME)}`,
+  `model = ${toTomlString(codexTutorialModel.value)}`,
   'model_reasoning_effort = "high"',
   'disable_response_storage = true',
   'preferred_auth_method = "apikey"',
   '',
-  '[model_providers.crs]',
-  'name = "crs"',
+  `[model_providers.${toTomlString(CODEX_PROVIDER_NAME)}]`,
+  `name = ${toTomlString(CODEX_PROVIDER_NAME)}`,
   `base_url = "${openaiBaseUrl.value}"`,
   'wire_api = "responses"',
   'requires_openai_auth = true'
@@ -148,8 +171,8 @@ const configTomlWriteCmd = computed(() => {
 
 const authJsonWriteCmd = computed(() => {
   if (props.platform === 'windows') {
-    return `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.codex" | Out-Null; '{"OPENAI_API_KEY": null}' | Set-Content -Path "$env:USERPROFILE\\.codex\\auth.json" -Force`
+    return `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.codex" | Out-Null; '{"OPENAI_API_KEY": "${apiKeyPlaceholder}"}' | Set-Content -Path "$env:USERPROFILE\\.codex\\auth.json" -Force`
   }
-  return `mkdir -p ~/.codex && echo '{"OPENAI_API_KEY": null}' > ~/.codex/auth.json`
+  return `mkdir -p ~/.codex && echo '{"OPENAI_API_KEY": "${apiKeyPlaceholder}"}' > ~/.codex/auth.json`
 })
 </script>
