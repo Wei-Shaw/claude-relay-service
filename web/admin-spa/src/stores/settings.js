@@ -3,6 +3,8 @@ import { ref } from 'vue'
 
 import { getOemSettingsApi, updateOemSettingsApi } from '@/utils/http_apis'
 
+const DEFAULT_CODEX_TUTORIAL_MODEL = 'gpt-5.5'
+
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
   const oemSettings = ref({
@@ -10,6 +12,7 @@ export const useSettingsStore = defineStore('settings', () => {
     siteIcon: '',
     siteIconData: '',
     showAdminButton: true,
+    codexTutorialModel: DEFAULT_CODEX_TUTORIAL_MODEL,
     apiStatsNotice: { enabled: false, title: '', content: '' },
     updatedAt: null
   })
@@ -46,6 +49,7 @@ export const useSettingsStore = defineStore('settings', () => {
       siteIcon: '',
       siteIconData: '',
       showAdminButton: true,
+      codexTutorialModel: DEFAULT_CODEX_TUTORIAL_MODEL,
       apiStatsNotice: { enabled: false, title: '', content: '' },
       updatedAt: null
     }

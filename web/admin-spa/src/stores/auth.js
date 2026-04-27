@@ -4,6 +4,8 @@ import router from '@/router'
 
 import { loginApi, getAuthUserApi, getOemSettingsApi } from '@/utils/http_apis'
 
+const DEFAULT_CODEX_TUTORIAL_MODEL = 'gpt-5.5'
+
 export const useAuthStore = defineStore('auth', () => {
   // 状态
   const isLoggedIn = ref(false)
@@ -15,7 +17,8 @@ export const useAuthStore = defineStore('auth', () => {
     siteName: 'Claude Relay Service',
     siteIcon: '',
     siteIconData: '',
-    faviconData: ''
+    faviconData: '',
+    codexTutorialModel: DEFAULT_CODEX_TUTORIAL_MODEL
   })
   const oemLoading = ref(true)
 
