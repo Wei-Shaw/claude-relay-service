@@ -447,13 +447,20 @@ class PricingService {
     if (!hasCreation && !hasRead) {
       return pricing
     }
-    const merged = { ...pricing }
+    const merged = { ...pricing, _customCacheOverride: {} }
     if (hasCreation) {
       merged.cache_creation_input_token_cost = override.cacheCreation
+      merged._customCacheOverride.cacheCreation = true
     }
     if (hasRead) {
       merged.cache_read_input_token_cost = override.cacheRead
+      merged._customCacheOverride.cacheRead = true
     }
+    logger.debug(
+      `💰 Custom cache override applied to ${matchedKey}: ` +
+        `creation=${hasCreation ? override.cacheCreation : 'official'}, ` +
+        `read=${hasRead ? override.cacheRead : 'official'}`
+    )
     return merged
   }
 
@@ -734,11 +741,13 @@ class PricingService {
 
     // Claude 兜底：pricing 字段缺失时用倍率从 actualInputPrice 推导
     // 此时 actualInputPrice 尚未含 fastMultiplier，下方统一应用
+    // 自定义覆盖已生效的字段不再走兜底（即使覆盖值为 0 也保留）
+    const customCacheOverride = pricing._customCacheOverride || {}
     if (isClaudeModel) {
-      if (!actualCacheCreatePrice) {
+      if (!actualCacheCreatePrice && !customCacheOverride.cacheCreation) {
         actualCacheCreatePrice = actualInputPrice * this.claudeCacheMultipliers.write5m
       }
-      if (!actualCacheReadPrice) {
+      if (!actualCacheReadPrice && !customCacheOverride.cacheRead) {
         actualCacheReadPrice = actualInputPrice * this.claudeCacheMultipliers.read
       }
       if (!actualEphemeral1hPrice) {
