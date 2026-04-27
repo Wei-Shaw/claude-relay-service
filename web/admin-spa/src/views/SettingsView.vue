@@ -39,6 +39,18 @@
           <button
             :class="[
               'border-b-2 pb-2 text-sm font-medium transition-colors',
+              activeSection === 'tutorial'
+                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+            @click="activeSection = 'tutorial'"
+          >
+            <i class="fas fa-graduation-cap mr-2"></i>
+            教程设置
+          </button>
+          <button
+            :class="[
+              'border-b-2 pb-2 text-sm font-medium transition-colors',
               activeSection === 'claude'
                 ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
@@ -463,6 +475,70 @@
                   上次更新: {{ formatDateTime(oemSettings.updatedAt) }}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 教程设置部分 -->
+        <div v-show="activeSection === 'tutorial'">
+          <div
+            class="mb-6 rounded-lg bg-gradient-to-r from-blue-50 to-cyan-50 p-6 dark:from-blue-900/20 dark:to-cyan-900/20"
+          >
+            <div class="flex items-start">
+              <div
+                class="mr-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white"
+              >
+                <i class="fas fa-graduation-cap"></i>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">使用教程配置</h3>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  控制后台“使用教程”里展示的默认配置内容。当前仅影响 Codex 的 config.toml 示例模型。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80">
+            <div class="mb-4 flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                <i class="fas fa-code mr-2 text-blue-500"></i>
+                Codex 教程
+              </h2>
+              <button
+                class="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                :disabled="saving"
+                @click="saveOemSettings"
+              >
+                <i class="fas fa-save mr-2"></i>
+                {{ saving ? '保存中...' : '保存配置' }}
+              </button>
+            </div>
+
+            <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                教程模型
+              </label>
+              <input
+                v-model="oemSettings.codexTutorialModel"
+                class="form-input w-full max-w-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                maxlength="100"
+                placeholder="gpt-5.5"
+                type="text"
+              />
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                保存后，Codex 使用教程中的
+                <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">model</code>
+                字段会使用这里的值；留空时后端会恢复为 gpt-5.5。
+              </p>
+            </div>
+
+            <div
+              v-if="oemSettings.updatedAt"
+              class="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-500 dark:bg-gray-700/50 dark:text-gray-400"
+            >
+              <i class="fas fa-clock mr-1"></i>
+              最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
             </div>
           </div>
         </div>
@@ -3127,6 +3203,7 @@ const saveOemSettings = async () => {
       siteIcon: oemSettings.value.siteIcon,
       siteIconData: oemSettings.value.siteIconData,
       showAdminButton: oemSettings.value.showAdminButton,
+      codexTutorialModel: oemSettings.value.codexTutorialModel,
       apiStatsNotice: oemSettings.value.apiStatsNotice
     }
     const result = await settingsStore.saveOemSettings(settings)
@@ -3145,7 +3222,7 @@ const resetOemSettings = async () => {
   if (
     !(await showConfirm(
       '重置设置',
-      '确定要重置为默认设置吗？\n\n这将清除所有自定义的网站名称和图标设置。',
+      '确定要重置为默认设置吗？\n\n这将清除自定义的网站名称、图标和教程配置。',
       '重置',
       '取消',
       'warning'
