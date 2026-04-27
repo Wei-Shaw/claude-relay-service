@@ -10,6 +10,16 @@ const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 
 const router = express.Router()
+const DEFAULT_CODEX_TUTORIAL_MODEL = 'gpt-5.5'
+
+function normalizeCodexTutorialModel(model) {
+  if (typeof model !== 'string') {
+    return DEFAULT_CODEX_TUTORIAL_MODEL
+  }
+
+  const normalized = model.replace(/[\r\n]/g, ' ').trim()
+  return normalized ? normalized.slice(0, 100) : DEFAULT_CODEX_TUTORIAL_MODEL
+}
 
 // ==================== Claude Code Headers 管理 ====================
 
@@ -267,6 +277,7 @@ router.get('/oem-settings', async (req, res) => {
       siteIcon: '',
       siteIconData: '', // Base64编码的图标数据
       showAdminButton: true, // 是否显示管理后台按钮
+      codexTutorialModel: DEFAULT_CODEX_TUTORIAL_MODEL,
       apiStatsNotice: {
         enabled: false,
         title: '',
@@ -279,6 +290,7 @@ router.get('/oem-settings', async (req, res) => {
     if (oemSettings) {
       try {
         settings = { ...defaultSettings, ...JSON.parse(oemSettings) }
+        settings.codexTutorialModel = normalizeCodexTutorialModel(settings.codexTutorialModel)
       } catch (err) {
         logger.warn('⚠️ Failed to parse OEM settings, using defaults:', err.message)
       }
@@ -301,7 +313,14 @@ router.get('/oem-settings', async (req, res) => {
 // 更新OEM设置
 router.put('/oem-settings', authenticateAdmin, async (req, res) => {
   try {
-    const { siteName, siteIcon, siteIconData, showAdminButton, apiStatsNotice } = req.body
+    const {
+      siteName,
+      siteIcon,
+      siteIconData,
+      showAdminButton,
+      apiStatsNotice,
+      codexTutorialModel
+    } = req.body
 
     // 验证输入
     if (!siteName || typeof siteName !== 'string' || siteName.trim().length === 0) {
@@ -333,6 +352,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       siteIcon: (siteIcon || '').trim(),
       siteIconData: (siteIconData || '').trim(), // Base64数据
       showAdminButton: showAdminButton !== false, // 默认为true
+      codexTutorialModel: normalizeCodexTutorialModel(codexTutorialModel),
       apiStatsNotice: {
         enabled: apiStatsNotice?.enabled === true,
         title: (apiStatsNotice?.title || '').trim().slice(0, 100),
