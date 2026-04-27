@@ -2141,7 +2141,11 @@
 
     <UsageDetailModal
       :api-key="selectedApiKeyForDetail || {}"
+      :generated-at="apiKeyUsageGeneratedAt"
+      :history="apiKeyUsageHistory"
+      :loading="apiKeyUsageLoading"
       :show="showUsageDetailModal"
+      :summary="apiKeyUsageSummary"
       @close="showUsageDetailModal = false"
       @open-timeline="openTimeline"
     />
@@ -2287,6 +2291,11 @@ const editingExpiryKey = ref(null)
 const expiryEditModalRef = ref(null)
 const showUsageDetailModal = ref(false)
 const selectedApiKeyForDetail = ref(null)
+const apiKeyUsageLoading = ref(false)
+const apiKeyUsageHistory = ref([])
+const apiKeyUsageSummary = ref({})
+const apiKeyUsageGeneratedAt = ref('')
+let latestUsageHistoryRequestId = 0
 
 // 标签相关
 const selectedTagFilter = ref('')
@@ -4302,6 +4311,11 @@ const showUsageDetails = (apiKey) => {
 
   selectedApiKeyForDetail.value = enrichedApiKey
   showUsageDetailModal.value = true
+  apiKeyUsageLoading.value = true
+  apiKeyUsageHistory.value = []
+  apiKeyUsageSummary.value = {}
+  apiKeyUsageGeneratedAt.value = ''
+  loadApiKeyUsageHistory(enrichedApiKey.id)
 }
 
 const openTimeline = (keyId) => {
@@ -4309,6 +4323,23 @@ const openTimeline = (keyId) => {
   if (!id) return
   showUsageDetailModal.value = false
   router.push(`/api-keys/${id}/usage-records`)
+}
+
+const loadApiKeyUsageHistory = async (keyId) => {
+  const requestId = ++latestUsageHistoryRequestId
+  const response = await httpApis.getApiKeyUsageHistoryApi(keyId, 30)
+  if (requestId !== latestUsageHistoryRequestId) {
+    return
+  }
+  if (response.success) {
+    const data = response.data || {}
+    apiKeyUsageHistory.value = data.history || []
+    apiKeyUsageSummary.value = data.summary || {}
+    apiKeyUsageGeneratedAt.value = data.generatedAt || ''
+  } else {
+    showToast(response.error || response.message || '加载 API 使用详情失败', 'error')
+  }
+  apiKeyUsageLoading.value = false
 }
 
 // 格式化时间（秒转换为可读格式） - 已移到 WindowLimitBar 组件中

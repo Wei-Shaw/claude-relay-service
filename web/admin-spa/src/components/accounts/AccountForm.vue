@@ -617,9 +617,18 @@
                     type="radio"
                     value="manual"
                   />
-                  <span class="text-sm text-gray-700 dark:text-gray-300"
-                    >手动输入 Access Token</span
-                  >
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                    form.platform === 'openai' ? '手动输入 Token' : '手动输入 Access Token'
+                  }}</span>
+                </label>
+                <label v-if="form.platform === 'openai'" class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.addType"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="batch-import"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">批量导入 JSON</span>
                 </label>
                 <label v-if="form.platform === 'droid'" class="flex cursor-pointer items-center">
                   <input
@@ -635,7 +644,7 @@
               </div>
             </div>
 
-            <div>
+            <div v-if="!isOpenAIBatchImportMode">
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >账户名称</label
               >
@@ -650,6 +659,21 @@
               <p v-if="errors.name" class="mt-1 text-xs text-red-500">
                 {{ errors.name }}
               </p>
+            </div>
+            <div
+              v-else
+              class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200"
+            >
+              <div class="flex items-start gap-2">
+                <i class="fas fa-circle-info mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                <div>
+                  <p class="font-semibold">批量导入模式</p>
+                  <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+                    账号名称会自动使用每个 JSON 中的 `email`
+                    字段；下方的描述、优先级、代理和限流配置会批量应用到导入的账号。
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div>
@@ -1999,6 +2023,70 @@
               </p>
             </div>
 
+            <div
+              v-if="isOpenAIBatchImportMode"
+              class="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-700 dark:bg-emerald-900/20"
+            >
+              <div class="flex items-start gap-2">
+                <i class="fas fa-file-import mt-1 text-emerald-600 dark:text-emerald-400" />
+                <div>
+                  <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                    批量导入 OpenAI OAuth 账号
+                  </p>
+                  <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+                    支持上传文件夹（JSON）或直接使用服务器路径导入；`access_token` / `refresh_token`
+                    至少提供一个，账号名称默认使用 email
+                    字段；若当前选择的是分组调度，导入后会自动加入所选分组。
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label class="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  服务器文件夹路径
+                </label>
+                <div class="flex gap-2">
+                  <input
+                    v-model="openaiBatchImportFolderPath"
+                    class="form-input flex-1 border-gray-300 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    placeholder="/Users/hobee/Downloads/accounts_json"
+                    type="text"
+                  />
+                  <button
+                    class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                    :disabled="openaiBatchImporting || loading"
+                    type="button"
+                    @click="importOpenAIBatchByPath"
+                  >
+                    {{ openaiBatchImporting ? '导入中...' : '按路径导入' }}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <button
+                  class="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 dark:border-emerald-600 dark:bg-gray-800 dark:text-emerald-300 dark:hover:bg-gray-700"
+                  :disabled="openaiBatchImporting || loading"
+                  type="button"
+                  @click="triggerOpenAIBatchFolderUpload"
+                >
+                  选择文件夹上传
+                </button>
+                <input
+                  ref="openaiBatchFolderInputRef"
+                  class="hidden"
+                  directory
+                  multiple
+                  type="file"
+                  webkitdirectory
+                  @change="handleOpenAIBatchFolderUpload"
+                />
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  已选择 {{ openaiBatchSelectedFileCount }} 个 JSON 文件
+                </p>
+              </div>
+            </div>
+
             <!-- 手动输入 Token 字段 -->
             <div
               v-if="
@@ -2096,7 +2184,8 @@
                     v-if="form.platform !== 'droid'"
                     class="text-xs text-blue-600 dark:text-blue-400"
                   >
-                    💡 如果未填写 Refresh Token，Token 过期后需要手动更新。
+                    💡 OpenAI 账号至少填写一个 Token；未填写 Refresh Token 时，Token
+                    过期后需要手动更新。
                   </p>
                   <p v-else class="text-xs text-red-600 dark:text-red-400">
                     ⚠️ Droid 账户必须填写 Refresh Token，缺失将导致无法自动刷新 Access Token。
@@ -2106,17 +2195,22 @@
 
               <div v-if="form.platform === 'openai'">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >Access Token (可选)</label
+                  >Access Token（与 Refresh Token 二选一）</label
                 >
                 <textarea
                   v-model="form.accessToken"
                   class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="可选：如果不填写，系统会自动通过 Refresh Token 获取..."
+                  :class="{ 'border-red-500': errors.accessToken }"
+                  placeholder="可单独填写 Access Token 直接运行..."
                   rows="4"
                 />
+                <p v-if="errors.accessToken" class="mt-1 text-xs text-red-500">
+                  {{ errors.accessToken }}
+                </p>
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <i class="fas fa-info-circle mr-1" />
-                  Access Token 可选填。如果不提供，系统会通过 Refresh Token 自动获取。
+                  只填写 Access Token 也可以直接运行，但过期后需要手动替换；填写 Refresh Token
+                  则可自动刷新并补全账号信息。
                 </p>
               </div>
 
@@ -2137,7 +2231,27 @@
                 </p>
               </div>
 
-              <div v-if="form.platform === 'openai' || form.platform === 'droid'">
+              <div v-if="form.platform === 'openai'">
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >Refresh Token（可选）</label
+                >
+                <textarea
+                  v-model="form.refreshToken"
+                  class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  :class="{ 'border-red-500': errors.refreshToken }"
+                  placeholder="可选：填写后系统会自动刷新 Access Token..."
+                  rows="4"
+                />
+                <p v-if="errors.refreshToken" class="mt-1 text-xs text-red-500">
+                  {{ errors.refreshToken }}
+                </p>
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <i class="fas fa-info-circle mr-1" />
+                  系统将使用 Refresh Token 自动获取 Access Token 和用户信息。
+                </p>
+              </div>
+
+              <div v-else-if="form.platform === 'droid'">
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Refresh Token *</label
                 >
@@ -2154,12 +2268,7 @@
                 </p>
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <i class="fas fa-info-circle mr-1" />
-                  <template v-if="form.platform === 'openai'">
-                    系统将使用 Refresh Token 自动获取 Access Token 和用户信息
-                  </template>
-                  <template v-else>
-                    系统将使用 Refresh Token 自动刷新 Factory.ai 访问令牌，确保账户保持可用。
-                  </template>
+                  系统将使用 Refresh Token 自动刷新 Factory.ai 访问令牌，确保账户保持可用。
                 </p>
               </div>
 
@@ -2295,7 +2404,7 @@
                 下一步
               </button>
               <button
-                v-else
+                v-else-if="!isOpenAIBatchImportMode"
                 class="btn btn-primary flex-1 px-6 py-3 font-semibold"
                 :disabled="loading"
                 type="button"
@@ -4128,6 +4237,10 @@ const cookieAuthLoading = ref(false)
 const cookieAuthError = ref('')
 const showSessionKeyHelp = ref(false)
 const batchProgress = ref({ current: 0, total: 0 }) // 批量进度
+const openaiBatchFolderInputRef = ref(null)
+const openaiBatchImporting = ref(false)
+const openaiBatchImportFolderPath = ref('/Users/hobee/Downloads/accounts_json')
+const openaiBatchSelectedFileCount = ref(0)
 
 // 解析后的 sessionKey 数量
 const parsedSessionKeyCount = computed(() => {
@@ -4502,6 +4615,138 @@ const parseApiKeysInput = (input) => {
   return uniqueKeys
 }
 
+const buildOpenAIBatchImportPayload = (extra = {}) => {
+  const proxyPayload = buildProxyPayload(form.value.proxy)
+  const normalizedGroupIds = Array.isArray(form.value.groupIds)
+    ? form.value.groupIds.filter((groupId) => String(groupId || '').trim())
+    : []
+
+  if (form.value.accountType === 'group' && normalizedGroupIds.length === 0) {
+    throw new Error('分组调度模式下，请至少选择一个分组后再批量导入')
+  }
+
+  return {
+    accountType:
+      form.value.accountType === 'group'
+        ? 'group'
+        : form.value.accountType === 'dedicated'
+          ? 'dedicated'
+          : 'shared',
+    groupId: form.value.accountType === 'group' ? normalizedGroupIds[0] : undefined,
+    groupIds: form.value.accountType === 'group' ? normalizedGroupIds : undefined,
+    priority: form.value.priority || 50,
+    rateLimitDuration: form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0,
+    description: form.value.description || '',
+    proxy: proxyPayload,
+    disableAutoProtection: !!form.value.disableAutoProtection,
+    ...extra
+  }
+}
+
+const getOpenAIBatchImportErrorMessage = (result) => {
+  const message = result?.message || '批量导入失败'
+  const failures = Array.isArray(result?.data?.failures) ? result.data.failures : []
+  if (failures.length === 0) {
+    return message
+  }
+
+  const preview = failures
+    .slice(0, 5)
+    .map((item) => `- ${item.fileName}: ${item.reason}`)
+    .join('\n')
+
+  const extraCount = failures.length > 5 ? `\n... 还有 ${failures.length - 5} 条失败记录` : ''
+  return `${message}\n${preview}${extraCount}`
+}
+
+const triggerOpenAIBatchFolderUpload = () => {
+  openaiBatchFolderInputRef.value?.click()
+}
+
+const importOpenAIBatchByPath = async () => {
+  if (openaiBatchImporting.value || loading.value) {
+    return
+  }
+
+  const folderPath = openaiBatchImportFolderPath.value?.trim()
+  if (!folderPath) {
+    showToast('请填写服务器文件夹路径', 'error')
+    return
+  }
+
+  openaiBatchImporting.value = true
+  try {
+    const payload = buildOpenAIBatchImportPayload({
+      folderPath
+    })
+
+    const result = await accountsStore.batchImportOpenAIOAuthAccounts(payload)
+    if (!result.success) {
+      showToast(getOpenAIBatchImportErrorMessage(result), 'error', '', 12000)
+      return
+    }
+
+    const summary = result?.data?.summary || {}
+    showToast(
+      `批量导入完成：成功 ${summary.successCount || 0} 个，失败 ${summary.failedCount || 0} 个`,
+      'success'
+    )
+    emit('success', result)
+  } catch (error) {
+    showToast(error.message || '批量导入失败', 'error')
+  } finally {
+    openaiBatchImporting.value = false
+  }
+}
+
+const handleOpenAIBatchFolderUpload = async (event) => {
+  const selectedFiles = Array.from(event?.target?.files || [])
+  const jsonFiles = selectedFiles.filter((file) => file.name.toLowerCase().endsWith('.json'))
+  openaiBatchSelectedFileCount.value = jsonFiles.length
+
+  if (jsonFiles.length === 0) {
+    showToast('所选文件夹中未找到 JSON 文件', 'error')
+    if (event?.target) {
+      event.target.value = ''
+    }
+    return
+  }
+
+  openaiBatchImporting.value = true
+  try {
+    const filePayload = await Promise.all(
+      jsonFiles.map(async (file) => ({
+        fileName: file.webkitRelativePath || file.name,
+        content: await file.text()
+      }))
+    )
+
+    const payload = buildOpenAIBatchImportPayload({
+      files: filePayload
+    })
+    const result = await accountsStore.batchImportOpenAIOAuthAccounts(payload)
+
+    if (!result.success) {
+      showToast(getOpenAIBatchImportErrorMessage(result), 'error', '', 12000)
+      return
+    }
+
+    const summary = result?.data?.summary || {}
+    showToast(
+      `批量导入完成：成功 ${summary.successCount || 0} 个，失败 ${summary.failedCount || 0} 个`,
+      'success'
+    )
+    emit('success', result)
+  } catch (error) {
+    showToast(error.message || '上传文件夹导入失败', 'error')
+  } finally {
+    openaiBatchImporting.value = false
+    if (event?.target) {
+      event.target.value = ''
+    }
+  }
+}
+
 const apiKeyModeOptions = [
   {
     value: 'append',
@@ -4542,6 +4787,10 @@ const currentApiKeyModeDescription = computed(() => {
   const option = apiKeyModeOptions.find((item) => item.value === form.value.apiKeyUpdateMode)
   return option ? option.description : apiKeyModeOptions[0].description
 })
+
+const isOpenAIBatchImportMode = computed(
+  () => !isEdit.value && form.value.platform === 'openai' && form.value.addType === 'batch-import'
+)
 
 // 表单验证错误
 const errors = ref({
@@ -5219,6 +5468,11 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
 
 // 创建账户（手动模式）
 const createAccount = async () => {
+  if (isOpenAIBatchImportMode.value) {
+    showToast('请使用批量导入区域中的按钮发起导入', 'info')
+    return
+  }
+
   // 清除之前的错误
   errors.value.name = ''
   errors.value.accessToken = ''
@@ -5312,12 +5566,13 @@ const createAccount = async () => {
   } else if (form.value.addType === 'manual') {
     // 手动模式验证 - 只有部分平台需要验证 Token
     if (form.value.platform === 'openai') {
-      // OpenAI 平台必须有 Refresh Token
-      if (!form.value.refreshToken || form.value.refreshToken.trim() === '') {
-        errors.value.refreshToken = '请填写 Refresh Token'
+      const accessToken = form.value.accessToken?.trim() || ''
+      const refreshToken = form.value.refreshToken?.trim() || ''
+
+      if (!accessToken && !refreshToken) {
+        errors.value.accessToken = 'Access Token 和 Refresh Token 至少填写一个'
         hasError = true
       }
-      // Access Token 可选，如果没有会通过 Refresh Token 获取
     } else if (form.value.platform === 'gemini') {
       // Gemini 平台需要 Access Token
       if (!form.value.accessToken || form.value.accessToken.trim() === '') {
@@ -5450,14 +5705,14 @@ const createAccount = async () => {
       data.priority = form.value.priority || 50
     } else if (form.value.platform === 'openai') {
       // OpenAI手动模式需要构建openaiOauth对象
-      const expiresInMs = form.value.refreshToken
-        ? 10 * 60 * 1000 // 10分钟
-        : 365 * 24 * 60 * 60 * 1000 // 1年
+      const accessToken = form.value.accessToken?.trim() || ''
+      const refreshToken = form.value.refreshToken?.trim() || ''
+      const expiresInMs = refreshToken ? 10 * 60 * 1000 : 365 * 24 * 60 * 60 * 1000
 
       data.openaiOauth = {
         idToken: '', // 不再需要用户输入，系统会自动获取
-        accessToken: form.value.accessToken || '', // Access Token 可选
-        refreshToken: form.value.refreshToken, // Refresh Token 必填
+        accessToken,
+        refreshToken,
         expires_in: Math.floor(expiresInMs / 1000) // 转换为秒
       }
 
@@ -5473,9 +5728,9 @@ const createAccount = async () => {
         emailVerified: false
       }
 
-      // OpenAI 手动模式必须刷新以获取完整信息（包括 ID Token）
-      data.needsImmediateRefresh = true
-      data.requireRefreshSuccess = true // 必须刷新成功才能创建账户
+      // 只有提供 Refresh Token 时才要求立即刷新补全账号信息
+      data.needsImmediateRefresh = !!refreshToken
+      data.requireRefreshSuccess = !!refreshToken
       data.priority = form.value.priority || 50
     } else if (form.value.platform === 'droid') {
       data.priority = form.value.priority || 50
@@ -5735,7 +5990,7 @@ const updateAccount = async () => {
         }
       } else if (props.account.platform === 'openai') {
         // OpenAI需要构建openaiOauth对象
-        const expiresInMs = form.value.refreshToken
+        const expiresInMs = trimmedRefreshToken
           ? 10 * 60 * 1000 // 10分钟
           : 365 * 24 * 60 * 60 * 1000 // 1年
 
@@ -6031,6 +6286,18 @@ watch(
   () => {
     if (errors.value.refreshToken && form.value.refreshToken?.trim()) {
       errors.value.refreshToken = ''
+    }
+  }
+)
+
+watch(
+  () => form.value.addType,
+  (newAddType) => {
+    if (newAddType === 'batch-import') {
+      errors.value.name = ''
+      if (form.value.platform === 'openai') {
+        form.value.name = ''
+      }
     }
   }
 )

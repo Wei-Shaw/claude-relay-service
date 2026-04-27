@@ -6,6 +6,7 @@ const { parseVendorPrefixedModel } = require('../../utils/modelHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { buildCcrClientError, sanitizeCcrStreamEvent } = require('../../utils/ccrErrorAdapter')
 
 class CcrRelayService {
   constructor() {
@@ -260,12 +261,14 @@ class CcrRelayService {
       )
 
       // 检查错误状态并相应处理
-      if (response.status === 401) {
+      if (response.status === 401 || response.status === 402 || response.status === 403) {
         logger.warn(`🚫 Unauthorized error detected for CCR account ${accountId}`)
         const autoProtectionDisabled =
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!autoProtectionDisabled) {
-          await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 401).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, 'ccr', response.status)
+            .catch(() => {})
         }
       } else if (response.status === 429) {
         logger.warn(`🚫 Rate limit detected for CCR account ${accountId}`)
@@ -319,6 +322,22 @@ class CcrRelayService {
       // 更新最后使用时间
       await this._updateLastUsedTime(accountId)
 
+      if (response.status >= 400) {
+        const safeErrorResponse = buildCcrClientError(response.status, response.data, {
+          headers: response.headers
+        })
+
+        return {
+          statusCode: safeErrorResponse.status,
+          headers: {
+            ...response.headers,
+            'content-type': response.headers?.['content-type'] || 'application/json'
+          },
+          body: JSON.stringify(safeErrorResponse.body),
+          accountId
+        }
+      }
+
       const responseBody =
         typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
       logger.debug(`[DEBUG] Final response body to return: ${responseBody}`)
@@ -350,7 +369,17 @@ class CcrRelayService {
         }
       }
 
-      throw error
+      const safeErrorResponse = buildCcrClientError(error.response?.status || null, error, {
+        headers: error.response?.headers,
+        fallbackStatus: 503
+      })
+
+      return {
+        statusCode: safeErrorResponse.status,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(safeErrorResponse.body),
+        accountId
+      }
     } finally {
       // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && accountId) {
@@ -647,9 +676,11 @@ class CcrRelayService {
             const autoProtectionDisabled =
               account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
 
-            if (response.status === 401) {
+            if (response.status === 401 || response.status === 402 || response.status === 403) {
               if (!autoProtectionDisabled) {
-                upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 401).catch(() => {})
+                upstreamErrorHelper
+                  .markTempUnavailable(accountId, 'ccr', response.status)
+                  .catch(() => {})
               }
             } else if (response.status === 429) {
               ccrAccountService.markAccountRateLimited(accountId)
@@ -680,31 +711,58 @@ class CcrRelayService {
               }
             }
 
-            // 设置错误响应的状态码和响应头
-            if (!responseStream.headersSent) {
-              const existingConnection = responseStream.getHeader
-                ? responseStream.getHeader('Connection')
-                : null
-              const errorHeaders = {
-                'Content-Type': response.headers['content-type'] || 'application/json',
-                'Cache-Control': 'no-cache',
-                Connection: existingConnection || 'keep-alive'
-              }
-              // 避免 Transfer-Encoding 冲突，让 Express 自动处理
-              delete errorHeaders['Transfer-Encoding']
-              delete errorHeaders['Content-Length']
-              responseStream.writeHead(response.status, errorHeaders)
-            }
-
-            // 直接透传错误数据，不进行包装
+            // 收集错误数据并清理后返回，隐藏上游服务的敏感信息
+            const errorChunks = []
             response.data.on('data', (chunk) => {
-              if (isStreamWritable(responseStream)) {
-                responseStream.write(chunk)
-              }
+              errorChunks.push(chunk)
             })
 
             response.data.on('end', () => {
               if (isStreamWritable(responseStream)) {
+                try {
+                  const errorData = Buffer.concat(errorChunks).toString()
+                  const parsedErrorData = this._parseCcrErrorPayload(errorData)
+                  const safeErrorResponse = buildCcrClientError(response.status, parsedErrorData, {
+                    headers: response.headers
+                  })
+
+                  if (!responseStream.headersSent) {
+                    const existingConnection = responseStream.getHeader
+                      ? responseStream.getHeader('Connection')
+                      : null
+                    const errorHeaders = {
+                      'Content-Type': 'application/json',
+                      'Cache-Control': 'no-cache',
+                      Connection: existingConnection || 'keep-alive'
+                    }
+                    delete errorHeaders['Transfer-Encoding']
+                    delete errorHeaders['Content-Length']
+                    responseStream.writeHead(safeErrorResponse.status, errorHeaders)
+                  }
+
+                  responseStream.write(JSON.stringify(safeErrorResponse.body))
+                } catch (parseError) {
+                  const safeErrorResponse = buildCcrClientError(response.status, null, {
+                    headers: response.headers
+                  })
+
+                  if (!responseStream.headersSent) {
+                    const existingConnection = responseStream.getHeader
+                      ? responseStream.getHeader('Connection')
+                      : null
+                    const errorHeaders = {
+                      'Content-Type': 'application/json',
+                      'Cache-Control': 'no-cache',
+                      Connection: existingConnection || 'keep-alive'
+                    }
+                    delete errorHeaders['Transfer-Encoding']
+                    delete errorHeaders['Content-Length']
+                    responseStream.writeHead(safeErrorResponse.status, errorHeaders)
+                  }
+
+                  logger.debug('⚠️ Failed to parse CCR upstream error payload:', parseError.message)
+                  responseStream.write(JSON.stringify(safeErrorResponse.body))
+                }
                 responseStream.end()
               }
               resolve() // 不抛出异常，正常完成流处理
@@ -789,6 +847,8 @@ class CcrRelayService {
                     outputLine = streamTransformer(line)
                   }
 
+                  outputLine = this._rewriteStreamLineForClient(outputLine, response.headers)
+
                   // 写入到响应流
                   if (outputLine && isStreamWritable(responseStream)) {
                     responseStream.write(`${outputLine}\n`)
@@ -862,25 +922,79 @@ class CcrRelayService {
           })
         })
         .catch((error) => {
-          if (!responseStream.headersSent) {
-            responseStream.writeHead(500, { 'Content-Type': 'application/json' })
-          }
+          const safeErrorResponse = buildCcrClientError(error.response?.status || null, error, {
+            headers: error.response?.headers,
+            fallbackStatus: 503
+          })
 
-          const errorResponse = {
-            error: {
-              type: 'internal_error',
-              message: 'CCR API request failed'
-            }
+          if (!responseStream.headersSent) {
+            responseStream.writeHead(safeErrorResponse.status, {
+              'Content-Type': 'application/json'
+            })
           }
 
           if (isStreamWritable(responseStream)) {
-            responseStream.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
+            responseStream.write(JSON.stringify(safeErrorResponse.body))
             responseStream.end()
           }
 
           reject(error)
         })
     })
+  }
+
+  _parseCcrErrorPayload(errorPayload) {
+    if (!errorPayload || typeof errorPayload !== 'string') {
+      return errorPayload
+    }
+
+    const trimmedPayload = errorPayload.trim()
+    if (!trimmedPayload) {
+      return null
+    }
+
+    if (!trimmedPayload.includes('data:')) {
+      return JSON.parse(trimmedPayload)
+    }
+
+    const lines = trimmedPayload.split('\n')
+    for (const line of lines) {
+      if (!line.startsWith('data:')) {
+        continue
+      }
+
+      const jsonStr = line.slice(5).trim()
+      if (!jsonStr || jsonStr === '[DONE]') {
+        continue
+      }
+
+      return JSON.parse(jsonStr)
+    }
+
+    return null
+  }
+
+  _rewriteStreamLineForClient(line, headers = {}) {
+    if (typeof line !== 'string' || !line.startsWith('data:')) {
+      return line
+    }
+
+    const jsonStr = line.slice(5).trim()
+    if (!jsonStr || jsonStr === '[DONE]') {
+      return line
+    }
+
+    try {
+      const eventData = JSON.parse(jsonStr)
+      const sanitizedResult = sanitizeCcrStreamEvent(eventData, { headers })
+      if (!sanitizedResult.changed) {
+        return line
+      }
+
+      return `data: ${JSON.stringify(sanitizedResult.data)}`
+    } catch {
+      return line
+    }
   }
 
   // 📊 解析SSE行以提取使用统计信息
