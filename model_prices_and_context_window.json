@@ -270,6 +270,7 @@
     "supports_assistant_prefill": true,
     "supports_computer_use": true,
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
@@ -297,6 +298,7 @@
     "supports_assistant_prefill": true,
     "supports_computer_use": true,
     "supports_function_calling": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
@@ -325,6 +327,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -358,6 +361,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -391,6 +395,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -424,6 +429,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -458,6 +464,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -609,9 +616,11 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": true,
     "supports_computer_use": true,
     "supports_function_calling": true,
+    "supports_max_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true,
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
@@ -4785,6 +4794,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_low_reasoning_effort": false,
     "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
@@ -4828,6 +4838,7 @@
       "text"
     ],
     "supports_function_calling": true,
+    "supports_low_reasoning_effort": false,
     "supports_minimal_reasoning_effort": true,
     "supports_native_streaming": true,
     "supports_none_reasoning_effort": false,
