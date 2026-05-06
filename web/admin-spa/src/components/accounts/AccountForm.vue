@@ -5104,8 +5104,17 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       // 添加 Gemini 优先级
       data.priority = form.value.priority || 50
     } else if (currentPlatform === 'openai') {
-      data.openaiOauth = tokenInfo.tokens || tokenInfo
-      data.accountInfo = tokenInfo.accountInfo
+      const rawTokenInfo = tokenInfo || {}
+      const openaiOauth = rawTokenInfo.tokens || rawTokenInfo
+
+      if (!openaiOauth || Object.keys(openaiOauth).length === 0) {
+        loading.value = false
+        showToast('OpenAI 授权成功，但未返回有效的 Token 数据，请重试。', 'error')
+        return
+      }
+
+      data.openaiOauth = openaiOauth
+      data.accountInfo = rawTokenInfo.accountInfo || {}
       data.priority = form.value.priority || 50
     } else if (currentPlatform === 'droid') {
       const rawTokens = tokenInfo.tokens || tokenInfo || {}

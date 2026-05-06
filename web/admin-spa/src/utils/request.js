@@ -41,7 +41,13 @@ const request = async (config) => {
     if (data) {
       if (typeof data.success !== 'undefined') return data
       // 处理 { error, message } 格式的响应
-      if (data.error || data.message) return { success: false, message: data.message || data.error }
+      if (data.error || data.message)
+        return {
+          success: false,
+          message: data.message || data.error,
+          details: data.details || null,
+          error: data.error || null
+        }
     }
     const status = error.response?.status
     const messages = {

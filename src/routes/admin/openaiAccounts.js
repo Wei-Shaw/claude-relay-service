@@ -217,11 +217,27 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
       }
     })
   } catch (error) {
+    const openaiError = error.response?.data?.error || null
+    const openaiErrorCode = openaiError?.code || ''
+    const openaiErrorMessage = openaiError?.message || ''
+
+    if (openaiErrorCode === 'unsupported_country_region_territory') {
+      logger.error('OpenAI OAuth token exchange rejected by region policy:', error)
+      return res.status(403).json({
+        success: false,
+        message:
+          'OpenAI 拒绝了这次授权码交换：当前服务端出口 IP 所在国家或地区不受支持。请更换服务端代理出口后重试。',
+        error: openaiErrorCode,
+        details: openaiErrorMessage
+      })
+    }
+
     logger.error('OpenAI OAuth token exchange failed:', error)
     return res.status(500).json({
       success: false,
       message: '交换授权码失败',
-      error: error.message
+      error: error.message,
+      details: openaiErrorMessage || null
     })
   }
 })

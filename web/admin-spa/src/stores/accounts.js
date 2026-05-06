@@ -241,8 +241,12 @@ export const useAccountsStore = defineStore('accounts', () => {
 
   const exchangeOpenAICode = async (data) => {
     const res = await httpApis.exchangeOpenAICodeApi(data)
-    if (!res.success) error.value = res.message
-    return res.success ? res.data : null
+    if (!res.success) {
+      error.value = res.message
+      const detailMessage = res.details ? `${res.message}\n${res.details}` : res.message
+      throw new Error(detailMessage || 'OpenAI 授权码交换失败')
+    }
+    return res.data
   }
 
   const generateDroidAuthUrl = async (proxyConfig) => {
