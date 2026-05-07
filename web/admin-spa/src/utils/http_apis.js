@@ -49,6 +49,14 @@ export const getTempUnavailableApi = () =>
 export const getUsageCostsApi = (period) =>
   request({ url: `/admin/usage-costs?period=${period}`, method: 'GET' })
 export const getUsageStatsApi = (url) => request({ url, method: 'GET' })
+export const getRequestDetailsApi = (params) =>
+  request({ url: '/admin/request-details', method: 'GET', params })
+export const getRequestDetailBodyPreviewStatsApi = (config) =>
+  request({ url: '/admin/request-details/body-preview-stats', method: 'GET', ...config })
+export const purgeRequestDetailBodyPreviewApi = (config) =>
+  request({ url: '/admin/request-details/body-preview-purge', method: 'POST', ...config })
+export const getRequestDetailApi = (requestId) =>
+  request({ url: `/admin/request-details/${requestId}`, method: 'GET' })
 
 // 客户端
 export const getSupportedClientsApi = () =>

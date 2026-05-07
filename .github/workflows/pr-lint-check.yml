@@ -26,7 +26,7 @@ jobs:
   lint-and-format:
     runs-on: ubuntu-latest
     name: Check Code Quality
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -86,11 +86,11 @@ jobs:
         run: |
           echo "🔍 Checking Prettier formatting for changed files..."
           echo "Changed files: ${{ steps.changed-files.outputs.all_changed_files }}"
-          
+
           # 初始化标志
           PRETTIER_FAILED=false
           PRETTIER_OUTPUT=""
-          
+
           # 检查每个改变的文件
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             if [ -f "$file" ]; then
@@ -127,7 +127,7 @@ jobs:
               fi
             fi
           done
-          
+
           # 输出结果
           if [ "$PRETTIER_FAILED" = true ]; then
             echo "prettier_failed=true" >> $GITHUB_OUTPUT
@@ -145,11 +145,11 @@ jobs:
         id: eslint-check
         run: |
           echo "🔍 Running ESLint on changed files..."
-          
+
           # 分离前端和后端文件
           BACKEND_FILES=""
           FRONTEND_FILES=""
-          
+
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             if [[ "$file" =~ \.(js|jsx|vue|cjs|mjs)$ ]] && [ -f "$file" ]; then
               if [[ "$file" == web/admin-spa/* ]]; then
@@ -159,10 +159,10 @@ jobs:
               fi
             fi
           done
-          
+
           ESLINT_FAILED=false
           ESLINT_OUTPUT=""
-          
+
           # 检查后端文件
           if [ -n "$BACKEND_FILES" ]; then
             echo "Linting backend files: $BACKEND_FILES"
@@ -176,7 +176,7 @@ jobs:
               ESLINT_OUTPUT="${ESLINT_OUTPUT}### Backend ESLint Issues\n\`\`\`\n${BACKEND_OUTPUT}\n\`\`\`\n\n"
             fi
           fi
-          
+
           # 检查前端文件
           if [ -n "$FRONTEND_FILES" ]; then
             echo "Linting frontend files: $FRONTEND_FILES"
@@ -192,7 +192,7 @@ jobs:
               ESLINT_OUTPUT="${ESLINT_OUTPUT}### Frontend ESLint Issues\n\`\`\`\n${FRONTEND_OUTPUT}\n\`\`\`\n\n"
             fi
           fi
-          
+
           # 输出结果
           if [ "$ESLINT_FAILED" = true ]; then
             echo "eslint_failed=true" >> $GITHUB_OUTPUT
@@ -224,14 +224,14 @@ jobs:
 
       - name: Comment PR with results
         if: failure()
-        continue-on-error: true  # 即使评论失败也继续
+        continue-on-error: true # 即使评论失败也继续
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             let comment = '## 🚨 Code Quality Check Failed\n\n';
-            
+
             // 读取 Prettier 报告
             if (fs.existsSync('prettier-report.md')) {
               const prettierReport = fs.readFileSync('prettier-report.md', 'utf8');
@@ -239,14 +239,14 @@ jobs:
               comment += prettierReport;
               comment += '\n**Fix command:**\n```bash\nnpm run format\n```\n\n';
             }
-            
+
             // 读取 ESLint 报告
             if (fs.existsSync('eslint-report.md')) {
               const eslintReport = fs.readFileSync('eslint-report.md', 'utf8');
               comment += '### ESLint Issues\n\n';
               comment += eslintReport;
             }
-            
+
             comment += '\n---\n';
             comment += '💡 **提示**: 在本地运行以下命令来自动修复大部分问题:\n';
             comment += '```bash\n';
@@ -259,19 +259,19 @@ jobs:
             comment += 'npm run format    # 修复前端 Prettier 格式问题\n';
             comment += 'npm run lint      # 修复前端 ESLint 问题\n';
             comment += '```\n';
-            
+
             // 查找是否已有机器人评论
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Code Quality Check Failed')
             );
-            
+
             if (botComment) {
               // 更新现有评论
               await github.rest.issues.updateComment({
@@ -292,7 +292,7 @@ jobs:
 
       - name: Success comment
         if: success() && steps.changed-files.outputs.any_changed == 'true'
-        continue-on-error: true  # 即使评论失败也继续
+        continue-on-error: true # 即使评论失败也继续
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
@@ -303,12 +303,12 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Code Quality Check Failed')
             );
-            
+
             if (botComment) {
               // 如果之前有失败评论，更新为成功
               await github.rest.issues.updateComment({

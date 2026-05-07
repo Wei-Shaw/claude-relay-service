@@ -18,6 +18,7 @@ const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const pricingService = require('../services/pricingService')
 const { getEffectiveModel } = require('../utils/modelHelper')
+const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
 
 // 🔧 辅助函数：检查 API Key 权限
 function checkPermissions(apiKeyData, requiredPermission = 'claude') {
@@ -305,7 +306,12 @@ async function handleChatCompletion(req, res, apiKeyData) {
               usageWithRequestMeta, // 传递 usage + 请求模式元信息（beta/speed）
               model,
               accountId,
-              accountType
+              accountType,
+              createRequestDetailMeta(req, {
+                requestBody: req.body,
+                stream: true,
+                statusCode: res.statusCode
+              })
             )
             .then((costs) => {
               queueRateLimitUpdate(
@@ -458,7 +464,12 @@ async function handleChatCompletion(req, res, apiKeyData) {
             usageWithRequestMeta, // 传递 usage + 请求模式元信息（beta/speed）
             claudeRequest.model,
             accountId,
-            accountType
+            accountType,
+            createRequestDetailMeta(req, {
+              requestBody: req.body,
+              stream: false,
+              statusCode: res.statusCode
+            })
           )
           .then((costs) => {
             queueRateLimitUpdate(

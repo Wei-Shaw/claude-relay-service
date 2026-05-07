@@ -34,6 +34,7 @@ const fs = require('fs')
 const path = require('path')
 const logger = require('../utils/logger')
 const { getProjectRoot } = require('../utils/projectPaths')
+const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
 const geminiAccountService = require('./account/geminiAccountService')
 const unifiedGeminiScheduler = require('./scheduler/unifiedGeminiScheduler')
 const sessionHelper = require('../utils/sessionHelper')
@@ -2145,7 +2146,13 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           0,
           effectiveModel,
           accountId,
-          'gemini'
+          'gemini',
+          null,
+          createRequestDetailMeta(req, {
+            requestBody: req.body,
+            stream: false,
+            statusCode: 200
+          })
         )
         await applyRateLimitTracking(
           req.rateLimitInfo,
@@ -2686,7 +2693,13 @@ async function handleAnthropicMessagesToGemini(req, res, { vendor, baseModel }) 
           0,
           effectiveModel,
           accountId,
-          'gemini'
+          'gemini',
+          null,
+          createRequestDetailMeta(req, {
+            requestBody: req.body,
+            stream: true,
+            statusCode: res.statusCode
+          })
         )
         await applyRateLimitTracking(
           req.rateLimitInfo,

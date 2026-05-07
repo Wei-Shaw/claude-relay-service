@@ -1098,6 +1098,163 @@
               </div>
             </div>
 
+            <!-- 请求明细采集 -->
+            <div
+              class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80"
+            >
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <div
+                    class="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg"
+                  >
+                    <i class="fas fa-table text-xl"></i>
+                  </div>
+                  <div class="ml-4">
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white">
+                      请求明细采集
+                    </h4>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      采集后台请求摘要，供“请求明细”标签页按时间、API Key、账户、模型和接口检索
+                    </p>
+                  </div>
+                </div>
+                <label class="relative inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="claudeConfig.requestDetailCaptureEnabled"
+                    class="peer sr-only"
+                    type="checkbox"
+                    @change="saveClaudeConfig"
+                  />
+                  <div
+                    class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-cyan-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-cyan-800"
+                  ></div>
+                </label>
+              </div>
+
+              <div v-if="claudeConfig.requestDetailCaptureEnabled" class="mt-6 space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <i class="fas fa-calendar-day mr-2 text-gray-400"></i>
+                    请求明细保留时间
+                  </label>
+                  <div class="mt-1 flex max-w-md flex-col gap-3 sm:flex-row sm:items-end">
+                    <div class="flex-1">
+                      <label
+                        class="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                      >
+                        天
+                      </label>
+                      <input
+                        v-model.number="requestDetailRetentionInput.days"
+                        class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                        max="30"
+                        min="0"
+                        placeholder="0"
+                        type="number"
+                        @change="handleRequestDetailRetentionChange"
+                      />
+                    </div>
+                    <div class="flex-1">
+                      <label
+                        class="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                      >
+                        小时
+                      </label>
+                      <input
+                        v-model.number="requestDetailRetentionInput.hours"
+                        class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                        max="23"
+                        min="0"
+                        placeholder="6"
+                        type="number"
+                        @change="handleRequestDetailRetentionChange"
+                      />
+                    </div>
+                  </div>
+                  <p
+                    v-if="requestDetailRetentionError"
+                    class="mt-2 text-xs text-red-500 dark:text-red-400"
+                  >
+                    {{ requestDetailRetentionError }}
+                  </p>
+                  <p
+                    v-else-if="requestDetailRetentionWarning"
+                    class="mt-2 text-xs text-amber-600 dark:text-amber-400"
+                  >
+                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                    {{ requestDetailRetentionWarning }}
+                  </p>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    新请求明细按小时保留，支持 0-30 天与 0-23 小时组合，总保留时间为 1-720
+                    小时；关闭采集不会删除已保留的数据，直到自然过期
+                  </p>
+                </div>
+
+                <div
+                  class="rounded-lg border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/30"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <i class="fas fa-eye mr-2 text-gray-400"></i>
+                        请求体预览
+                      </label>
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        关闭后，仅影响后续新请求不再保存请求体预览；历史预览可在「请求明细」页面手动清理。
+                      </p>
+                      <p
+                        v-if="claudeConfig.requestDetailBodyPreviewEnabled"
+                        class="mt-2 text-xs text-amber-600 dark:text-amber-400"
+                      >
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        开启请求体预览会增加 Redis 存储压力
+                      </p>
+                    </div>
+
+                    <button
+                      :aria-checked="claudeConfig.requestDetailBodyPreviewEnabled"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-4 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:ring-cyan-800"
+                      :class="
+                        claudeConfig.requestDetailBodyPreviewEnabled
+                          ? 'bg-cyan-500'
+                          : 'bg-gray-200 dark:bg-gray-700'
+                      "
+                      :disabled="requestDetailBodyPreviewSaving"
+                      role="switch"
+                      type="button"
+                      @click="handleRequestDetailBodyPreviewToggle"
+                    >
+                      <span class="sr-only">切换请求体预览</span>
+                      <span
+                        class="absolute left-[2px] top-[2px] h-5 w-5 rounded-full border bg-white transition-transform"
+                        :class="
+                          claudeConfig.requestDetailBodyPreviewEnabled
+                            ? 'translate-x-full border-white'
+                            : 'border-gray-300'
+                        "
+                      ></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 rounded-lg bg-cyan-50 p-4 dark:bg-cyan-900/20">
+                <div class="flex">
+                  <i class="fas fa-shield-alt mt-0.5 text-cyan-500"></i>
+                  <div class="ml-3">
+                    <p class="text-sm text-cyan-700 dark:text-cyan-300">
+                      <strong>采集内容：</strong>
+                      {{
+                        claudeConfig.requestDetailBodyPreviewEnabled
+                          ? '保存脱敏且截断后的请求体预览，以及 Token、费用、耗时和缓存指标，不保存完整原始提示词正文。'
+                          : '仅保存请求摘要字段、Token、费用、耗时和缓存指标，不保存请求体预览与完整原始提示词正文。'
+                      }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 配置更新信息 -->
             <div
               v-if="claudeConfig.updatedAt"
@@ -1817,7 +1974,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { showToast } from '@/utils/tools'
 import { useSettingsStore } from '@/stores/settings'
@@ -1871,13 +2028,19 @@ const showConfirm = (
     showConfirmModal.value = true
   })
 }
+
 const handleConfirmModal = () => {
   showConfirmModal.value = false
-  confirmResolve.value?.(true)
+  const resolve = confirmResolve.value
+  confirmResolve.value = null
+  resolve?.(true)
 }
+
 const handleCancelModal = () => {
   showConfirmModal.value = false
-  confirmResolve.value?.(false)
+  const resolve = confirmResolve.value
+  confirmResolve.value = null
+  resolve?.(false)
 }
 
 // 计算属性：隐藏管理后台按钮（反转 showAdminButton 的值）
@@ -1930,9 +2093,110 @@ const claudeConfig = ref({
   concurrentRequestQueueMaxSize: 3,
   concurrentRequestQueueMaxSizeMultiplier: 0,
   concurrentRequestQueueTimeoutMs: 10000,
+  requestDetailCaptureEnabled: false,
+  requestDetailRetentionHours: 6,
+  requestDetailBodyPreviewEnabled: false,
   updatedAt: null,
   updatedBy: null
 })
+
+const REQUEST_DETAIL_RETENTION_DEFAULT_HOURS = 6
+const REQUEST_DETAIL_RETENTION_WARNING_HOURS = 72
+const REQUEST_DETAIL_RETENTION_MAX_HOURS = 720
+
+const requestDetailRetentionInput = reactive({
+  days: 0,
+  hours: REQUEST_DETAIL_RETENTION_DEFAULT_HOURS
+})
+const requestDetailBodyPreviewSaving = ref(false)
+
+const normalizeRetentionPart = (value) => {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const splitRequestDetailRetentionHours = (totalHours = REQUEST_DETAIL_RETENTION_DEFAULT_HOURS) => {
+  const normalized = Math.max(
+    1,
+    Math.min(REQUEST_DETAIL_RETENTION_MAX_HOURS, normalizeRetentionPart(totalHours))
+  )
+  return {
+    days: Math.floor(normalized / 24),
+    hours: normalized % 24
+  }
+}
+
+const syncRequestDetailRetentionInput = (totalHours = REQUEST_DETAIL_RETENTION_DEFAULT_HOURS) => {
+  const { days, hours } = splitRequestDetailRetentionHours(totalHours)
+  requestDetailRetentionInput.days = days
+  requestDetailRetentionInput.hours = hours
+}
+
+const requestDetailRetentionTotalHours = computed(() => {
+  const days = normalizeRetentionPart(requestDetailRetentionInput.days)
+  const hours = normalizeRetentionPart(requestDetailRetentionInput.hours)
+  return days * 24 + hours
+})
+
+const requestDetailRetentionError = computed(() => {
+  const days = normalizeRetentionPart(requestDetailRetentionInput.days)
+  const hours = normalizeRetentionPart(requestDetailRetentionInput.hours)
+
+  if (days < 0 || days > 30) {
+    return '天数必须在 0 到 30 之间'
+  }
+
+  if (hours < 0 || hours > 23) {
+    return '小时数必须在 0 到 23 之间'
+  }
+
+  if (requestDetailRetentionTotalHours.value < 1) {
+    return '请求明细保留时间至少需要 1 小时'
+  }
+
+  if (requestDetailRetentionTotalHours.value > REQUEST_DETAIL_RETENTION_MAX_HOURS) {
+    return '请求明细保留时间不能超过 30 天'
+  }
+
+  return ''
+})
+
+const requestDetailRetentionWarning = computed(() => {
+  if (
+    !requestDetailRetentionError.value &&
+    requestDetailRetentionTotalHours.value > REQUEST_DETAIL_RETENTION_WARNING_HOURS
+  ) {
+    return '保留时间超过 72 小时会增加 Redis 存储压力'
+  }
+  return ''
+})
+
+const handleRequestDetailRetentionChange = () => {
+  if (requestDetailRetentionError.value) {
+    showToast(requestDetailRetentionError.value, 'error')
+    return
+  }
+
+  claudeConfig.value.requestDetailRetentionHours = requestDetailRetentionTotalHours.value
+  saveClaudeConfig()
+}
+
+const handleRequestDetailBodyPreviewToggle = async () => {
+  if (requestDetailBodyPreviewSaving.value) return
+
+  const nextValue = !claudeConfig.value.requestDetailBodyPreviewEnabled
+
+  requestDetailBodyPreviewSaving.value = true
+  try {
+    await saveClaudeConfig({ requestDetailBodyPreviewEnabled: nextValue })
+  } catch (error) {
+    if (error?.name === 'AbortError') return
+    showToast('更新请求体预览配置失败', 'error')
+    console.error(error)
+  } finally {
+    requestDetailBodyPreviewSaving.value = false
+  }
+}
 
 // 服务倍率配置
 const serviceRatesLoading = ref(false)
@@ -2230,9 +2494,14 @@ const loadClaudeConfig = async () => {
         concurrentRequestQueueMaxSizeMultiplier:
           response.config?.concurrentRequestQueueMaxSizeMultiplier ?? 0,
         concurrentRequestQueueTimeoutMs: response.config?.concurrentRequestQueueTimeoutMs ?? 10000,
+        requestDetailCaptureEnabled: response.config?.requestDetailCaptureEnabled ?? false,
+        requestDetailRetentionHours:
+          response.config?.requestDetailRetentionHours ?? REQUEST_DETAIL_RETENTION_DEFAULT_HOURS,
+        requestDetailBodyPreviewEnabled: response.config?.requestDetailBodyPreviewEnabled ?? false,
         updatedAt: response.config?.updatedAt || null,
         updatedBy: response.config?.updatedBy || null
       }
+      syncRequestDetailRetentionInput(claudeConfig.value.requestDetailRetentionHours)
     }
   } catch (error) {
     if (error.name === 'AbortError') return
@@ -2247,9 +2516,16 @@ const loadClaudeConfig = async () => {
 }
 
 // 保存 Claude 转发配置
-const saveClaudeConfig = async () => {
+const saveClaudeConfig = async (options = {}) => {
   if (!isMounted.value) return
   try {
+    const requestDetailBodyPreviewEnabled = Object.prototype.hasOwnProperty.call(
+      options,
+      'requestDetailBodyPreviewEnabled'
+    )
+      ? options.requestDetailBodyPreviewEnabled === true
+      : claudeConfig.value.requestDetailBodyPreviewEnabled
+
     const payload = {
       claudeCodeOnlyEnabled: claudeConfig.value.claudeCodeOnlyEnabled,
       globalSessionBindingEnabled: claudeConfig.value.globalSessionBindingEnabled,
@@ -2262,7 +2538,14 @@ const saveClaudeConfig = async () => {
       concurrentRequestQueueMaxSize: claudeConfig.value.concurrentRequestQueueMaxSize,
       concurrentRequestQueueMaxSizeMultiplier:
         claudeConfig.value.concurrentRequestQueueMaxSizeMultiplier,
-      concurrentRequestQueueTimeoutMs: claudeConfig.value.concurrentRequestQueueTimeoutMs
+      concurrentRequestQueueTimeoutMs: claudeConfig.value.concurrentRequestQueueTimeoutMs,
+      requestDetailCaptureEnabled: claudeConfig.value.requestDetailCaptureEnabled,
+      requestDetailRetentionHours: claudeConfig.value.requestDetailRetentionHours,
+      requestDetailBodyPreviewEnabled
+    }
+
+    if (options.purgeRequestDetailBodySnapshots === true) {
+      payload.purgeRequestDetailBodySnapshots = true
     }
 
     const response = await httpApis.updateClaudeRelayConfigApi(payload, {
@@ -2271,16 +2554,33 @@ const saveClaudeConfig = async () => {
     if (response.success && isMounted.value) {
       claudeConfig.value = {
         ...claudeConfig.value,
+        requestDetailRetentionHours:
+          response.config?.requestDetailRetentionHours ??
+          claudeConfig.value.requestDetailRetentionHours,
+        requestDetailBodyPreviewEnabled:
+          response.config?.requestDetailBodyPreviewEnabled ??
+          claudeConfig.value.requestDetailBodyPreviewEnabled,
         updatedAt: response.config?.updatedAt || new Date().toISOString(),
         updatedBy: response.config?.updatedBy || null
       }
-      showToast('Claude 转发配置已保存', 'success')
+      syncRequestDetailRetentionInput(claudeConfig.value.requestDetailRetentionHours)
+      showToast(
+        response.warning || response.message || 'Claude 转发配置已保存',
+        response.warning ? 'warning' : 'success'
+      )
+      return response
     }
+
+    if (isMounted.value) {
+      showToast(response.message || '保存 Claude 转发配置失败', 'error')
+    }
+    return response
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
     showToast('保存 Claude 转发配置失败', 'error')
     console.error(error)
+    return { success: false, message: error.message || '保存 Claude 转发配置失败' }
   }
 }
 

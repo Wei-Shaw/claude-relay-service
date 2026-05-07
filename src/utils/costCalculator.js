@@ -1,4 +1,7 @@
 const pricingService = require('../services/pricingService')
+const logger = require('./logger')
+
+const warnedDetailedPricingFallbackModels = new Set()
 
 // Claude模型价格配置 (USD per 1M tokens) - 备用定价
 const MODEL_PRICING = {
@@ -72,86 +75,137 @@ const MODEL_PRICING = {
 }
 
 class CostCalculator {
-  /**
-   * 计算单次请求的费用
-   * @param {Object} usage - 使用量数据
-   * @param {number} usage.input_tokens - 输入token数量
-   * @param {number} usage.output_tokens - 输出token数量
-   * @param {number} usage.cache_creation_input_tokens - 缓存创建token数量
-   * @param {number} usage.cache_read_input_tokens - 缓存读取token数量
-   * @param {string} model - 模型名称
-   * @returns {Object} 费用详情
-   */
-  static calculateCost(usage, model = 'unknown', serviceTier = null) {
-    // 如果 usage 包含详细的 cache_creation 对象或是 1M 模型，使用 pricingService 来处理
-    if (
+  static isFiniteNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value)
+  }
+
+  static isDetailedPricingRequest(usage, model = 'unknown') {
+    return (
       (usage.cache_creation && typeof usage.cache_creation === 'object') ||
-      (model && model.includes('[1m]'))
-    ) {
-      const result = pricingService.calculateCost(usage, model)
-      // 转换 pricingService 返回的格式到 costCalculator 的格式
-      return {
-        model,
-        pricing: {
-          input: result.pricing.input * 1000000, // 转换为 per 1M tokens
-          output: result.pricing.output * 1000000,
-          cacheWrite: result.pricing.cacheCreate * 1000000,
-          cacheRead: result.pricing.cacheRead * 1000000
-        },
-        usingDynamicPricing: true,
-        isLongContextRequest: result.isLongContextRequest || false,
-        usage: {
-          inputTokens: usage.input_tokens || 0,
-          outputTokens: usage.output_tokens || 0,
-          cacheCreateTokens: usage.cache_creation_input_tokens || 0,
-          cacheReadTokens: usage.cache_read_input_tokens || 0,
-          totalTokens:
-            (usage.input_tokens || 0) +
-            (usage.output_tokens || 0) +
-            (usage.cache_creation_input_tokens || 0) +
-            (usage.cache_read_input_tokens || 0)
-        },
-        costs: {
-          input: result.inputCost,
-          output: result.outputCost,
-          cacheWrite: result.cacheCreateCost,
-          cacheRead: result.cacheReadCost,
-          total: result.totalCost
-        },
-        formatted: {
-          input: this.formatCost(result.inputCost),
-          output: this.formatCost(result.outputCost),
-          cacheWrite: this.formatCost(result.cacheCreateCost),
-          cacheRead: this.formatCost(result.cacheReadCost),
-          total: this.formatCost(result.totalCost)
-        },
-        debug: {
-          isOpenAIModel: model.includes('gpt') || model.includes('o1'),
-          hasCacheCreatePrice: !!result.pricing.cacheCreate,
-          cacheCreateTokens: usage.cache_creation_input_tokens || 0,
-          cacheWritePriceUsed: result.pricing.cacheCreate * 1000000,
-          isLongContextModel: model && model.includes('[1m]'),
-          isLongContextRequest: result.isLongContextRequest || false
-        }
-      }
+      (typeof model === 'string' && model.includes('[1m]'))
+    )
+  }
+
+  static isValidPricingServiceResult(result) {
+    return (
+      result &&
+      result.hasPricing === true &&
+      result.pricing &&
+      this.isFiniteNumber(result.pricing.input) &&
+      this.isFiniteNumber(result.pricing.output) &&
+      this.isFiniteNumber(result.pricing.cacheCreate) &&
+      this.isFiniteNumber(result.pricing.cacheRead) &&
+      this.isFiniteNumber(result.inputCost) &&
+      this.isFiniteNumber(result.outputCost) &&
+      this.isFiniteNumber(result.cacheCreateCost) &&
+      this.isFiniteNumber(result.cacheReadCost) &&
+      this.isFiniteNumber(result.totalCost)
+    )
+  }
+
+  static isOpenAIModel(model, pricingData = null) {
+    if (typeof model === 'string' && (model.includes('gpt') || model.includes('o1'))) {
+      return true
     }
 
-    // 否则使用旧的逻辑（向后兼容）
+    return pricingData?.litellm_provider === 'openai'
+  }
+
+  static getPricingSource(model, pricingData) {
+    if (pricingData) {
+      return 'dynamic'
+    }
+
+    if (MODEL_PRICING[model]) {
+      return 'static'
+    }
+
+    return 'unknown-fallback'
+  }
+
+  static logDetailedPricingFallback(model, usage, result) {
+    const warnKey = typeof model === 'string' && model ? model : 'unknown'
+
+    if (warnedDetailedPricingFallbackModels.has(warnKey)) {
+      return
+    }
+
+    warnedDetailedPricingFallbackModels.add(warnKey)
+
+    const hasDetailedCache = !!(usage.cache_creation && typeof usage.cache_creation === 'object')
+    const isLongContextModel = typeof model === 'string' && model.includes('[1m]')
+
+    logger.warn(
+      `💰 Missing detailed pricing for model ${warnKey}; using fallback pricing ` +
+        `(hasPricing=${result?.hasPricing === true}, cacheCreation=${hasDetailedCache}, longContext=${isLongContextModel})`
+    )
+  }
+
+  static buildDetailedPricingResult(usage, model, result) {
+    return {
+      model,
+      pricing: {
+        input: result.pricing.input * 1000000, // 转换为 per 1M tokens
+        output: result.pricing.output * 1000000,
+        cacheWrite: result.pricing.cacheCreate * 1000000,
+        cacheRead: result.pricing.cacheRead * 1000000
+      },
+      usingDynamicPricing: true,
+      isLongContextRequest: result.isLongContextRequest || false,
+      usage: {
+        inputTokens: usage.input_tokens || 0,
+        outputTokens: usage.output_tokens || 0,
+        cacheCreateTokens: usage.cache_creation_input_tokens || 0,
+        cacheReadTokens: usage.cache_read_input_tokens || 0,
+        totalTokens:
+          (usage.input_tokens || 0) +
+          (usage.output_tokens || 0) +
+          (usage.cache_creation_input_tokens || 0) +
+          (usage.cache_read_input_tokens || 0)
+      },
+      costs: {
+        input: result.inputCost,
+        output: result.outputCost,
+        cacheWrite: result.cacheCreateCost,
+        cacheRead: result.cacheReadCost,
+        total: result.totalCost
+      },
+      formatted: {
+        input: this.formatCost(result.inputCost),
+        output: this.formatCost(result.outputCost),
+        cacheWrite: this.formatCost(result.cacheCreateCost),
+        cacheRead: this.formatCost(result.cacheReadCost),
+        total: this.formatCost(result.totalCost)
+      },
+      debug: {
+        isOpenAIModel: this.isOpenAIModel(model),
+        hasCacheCreatePrice: !!result.pricing.cacheCreate,
+        cacheCreateTokens: usage.cache_creation_input_tokens || 0,
+        cacheWritePriceUsed: result.pricing.cacheCreate * 1000000,
+        isLongContextModel: typeof model === 'string' && model.includes('[1m]'),
+        isLongContextRequest: result.isLongContextRequest || false,
+        usedFallbackPricing: false,
+        pricingSource: 'dynamic'
+      }
+    }
+  }
+
+  static buildLegacyCostResult(usage, model = 'unknown', serviceTier = null, options = {}) {
+    const safeModel = typeof model === 'string' && model ? model : 'unknown'
+
     const inputTokens = usage.input_tokens || 0
     const outputTokens = usage.output_tokens || 0
     const cacheCreateTokens = usage.cache_creation_input_tokens || 0
     const cacheReadTokens = usage.cache_read_input_tokens || 0
 
-    // 优先使用动态价格服务
-    const pricingData = pricingService.getModelPricing(model)
+    const pricingData = pricingService.getModelPricing(safeModel)
+    const pricingSource = this.getPricingSource(safeModel, pricingData)
     let pricing
     let usingDynamicPricing = false
 
     if (pricingData) {
-      // 检查是否使用 priority 定价
       const usePriority = serviceTier === 'priority' && pricingData.supports_service_tier
 
-      // 转换动态价格格式为内部格式（priority 定价时使用 *_priority 字段，回退到标准价格）
       const inputPrice =
         ((usePriority && pricingData.input_cost_per_token_priority) ||
           pricingData.input_cost_per_token ||
@@ -165,17 +219,13 @@ class CostCalculator {
           pricingData.cache_read_input_token_cost ||
           0) * 1000000
 
-      // OpenAI 模型的特殊处理：
-      // - 如果没有 cache_creation_input_token_cost，缓存创建按普通 input 价格计费
-      // - Claude 模型有专门的 cache_creation_input_token_cost
       let cacheWritePrice = (pricingData.cache_creation_input_token_cost || 0) * 1000000
 
-      // 检测是否为 OpenAI 模型（通过模型名或 litellm_provider）
-      const isOpenAIModel =
-        model.includes('gpt') || model.includes('o1') || pricingData.litellm_provider === 'openai'
-
-      if (isOpenAIModel && !pricingData.cache_creation_input_token_cost && cacheCreateTokens > 0) {
-        // OpenAI 模型：缓存创建按普通 input 价格计费
+      if (
+        this.isOpenAIModel(safeModel, pricingData) &&
+        !pricingData.cache_creation_input_token_cost &&
+        cacheCreateTokens > 0
+      ) {
         cacheWritePrice = inputPrice
       }
 
@@ -187,11 +237,9 @@ class CostCalculator {
       }
       usingDynamicPricing = true
     } else {
-      // 回退到静态价格
-      pricing = MODEL_PRICING[model] || MODEL_PRICING['unknown']
+      pricing = MODEL_PRICING[safeModel] || MODEL_PRICING['unknown']
     }
 
-    // 计算各类型token的费用 (USD)
     const inputCost = (inputTokens / 1000000) * pricing.input
     const outputCost = (outputTokens / 1000000) * pricing.output
     const cacheWriteCost = (cacheCreateTokens / 1000000) * pricing.cacheWrite
@@ -200,7 +248,7 @@ class CostCalculator {
     const totalCost = inputCost + outputCost + cacheWriteCost + cacheReadCost
 
     return {
-      model,
+      model: safeModel,
       pricing,
       usingDynamicPricing,
       usage: {
@@ -217,7 +265,6 @@ class CostCalculator {
         cacheRead: cacheReadCost,
         total: totalCost
       },
-      // 格式化的费用字符串
       formatted: {
         input: this.formatCost(inputCost),
         output: this.formatCost(outputCost),
@@ -225,14 +272,46 @@ class CostCalculator {
         cacheRead: this.formatCost(cacheReadCost),
         total: this.formatCost(totalCost)
       },
-      // 添加调试信息
       debug: {
-        isOpenAIModel: model.includes('gpt') || model.includes('o1'),
+        isOpenAIModel: this.isOpenAIModel(safeModel, pricingData),
         hasCacheCreatePrice: !!pricingData?.cache_creation_input_token_cost,
         cacheCreateTokens,
-        cacheWritePriceUsed: pricing.cacheWrite
+        cacheWritePriceUsed: pricing.cacheWrite,
+        isLongContextModel: typeof safeModel === 'string' && safeModel.includes('[1m]'),
+        isLongContextRequest: false,
+        usedFallbackPricing:
+          options.usedFallbackPricing === true || pricingSource === 'unknown-fallback',
+        pricingSource
       }
     }
+  }
+
+  /**
+   * 计算单次请求的费用
+   * @param {Object} usage - 使用量数据
+   * @param {number} usage.input_tokens - 输入token数量
+   * @param {number} usage.output_tokens - 输出token数量
+   * @param {number} usage.cache_creation_input_tokens - 缓存创建token数量
+   * @param {number} usage.cache_read_input_tokens - 缓存读取token数量
+   * @param {string} model - 模型名称
+   * @returns {Object} 费用详情
+   */
+  static calculateCost(usage, model = 'unknown', serviceTier = null) {
+    // 如果 usage 包含详细的 cache_creation 对象或是 1M 模型，优先使用 pricingService
+    if (this.isDetailedPricingRequest(usage, model)) {
+      const result = pricingService.calculateCost(usage, model)
+      if (this.isValidPricingServiceResult(result)) {
+        return this.buildDetailedPricingResult(usage, model, result)
+      }
+
+      this.logDetailedPricingFallback(model, usage, result)
+
+      return this.buildLegacyCostResult(usage, model, serviceTier, {
+        usedFallbackPricing: true
+      })
+    }
+
+    return this.buildLegacyCostResult(usage, model, serviceTier)
   }
 
   /**

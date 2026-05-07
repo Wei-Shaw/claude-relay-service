@@ -21,6 +21,7 @@ const axios = require('axios')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 const ProxyHelper = require('../utils/proxyHelper')
 const upstreamErrorHelper = require('../utils/upstreamErrorHelper')
+const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
 
 // 处理 Gemini 上游错误，标记账户为临时不可用
 const handleGeminiUpstreamError = async (
@@ -586,7 +587,13 @@ async function handleMessages(req, res) {
               0,
               model,
               accountId,
-              'gemini'
+              'gemini',
+              null,
+              createRequestDetailMeta(req, {
+                requestBody: req.body,
+                stream,
+                statusCode: res.statusCode || 200
+              })
             )
           }
         }
@@ -616,7 +623,11 @@ async function handleMessages(req, res) {
           apiKeyId: apiKeyData.id,
           signal: abortController.signal,
           projectId: effectiveProjectId,
-          accountId: account.id
+          accountId: account.id,
+          requestMeta: createRequestDetailMeta(req, {
+            requestBody: req.body,
+            stream
+          })
         })
       } else {
         geminiResponse = await sendGeminiRequest({
@@ -630,7 +641,11 @@ async function handleMessages(req, res) {
           apiKeyId: apiKeyData.id,
           signal: abortController.signal,
           projectId: effectiveProjectId,
-          accountId: account.id
+          accountId: account.id,
+          requestMeta: createRequestDetailMeta(req, {
+            requestBody: req.body,
+            stream
+          })
         })
       }
     }
@@ -703,7 +718,13 @@ async function handleMessages(req, res) {
                 0,
                 model,
                 accountId,
-                'gemini'
+                'gemini',
+                null,
+                createRequestDetailMeta(req, {
+                  requestBody: req.body,
+                  stream: true,
+                  statusCode: res.statusCode
+                })
               )
               .then(() => {
                 logger.info(
@@ -1720,7 +1741,13 @@ async function handleGenerateContent(req, res) {
           0,
           model,
           account.id,
-          'gemini'
+          'gemini',
+          null,
+          createRequestDetailMeta(req, {
+            requestBody: req.body,
+            stream: false,
+            statusCode: res.statusCode || 200
+          })
         )
         logger.info(
           `📊 Recorded Gemini usage - Input: ${usage.promptTokenCount}, Output: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`
@@ -2070,7 +2097,13 @@ async function handleStreamGenerateContent(req, res) {
             0,
             model,
             account.id,
-            'gemini'
+            'gemini',
+            null,
+            createRequestDetailMeta(req, {
+              requestBody: req.body,
+              stream: true,
+              statusCode: res.statusCode
+            })
           )
           .then((costs) =>
             applyRateLimitTracking(
@@ -2424,7 +2457,13 @@ async function handleStandardGenerateContent(req, res) {
           0,
           model,
           accountId,
-          'gemini'
+          'gemini',
+          null,
+          createRequestDetailMeta(req, {
+            requestBody: req.body,
+            stream: false,
+            statusCode: res.statusCode || 200
+          })
         )
         logger.info(
           `📊 Recorded Gemini usage - Input: ${usage.promptTokenCount}, Output: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`
@@ -2866,7 +2905,13 @@ async function handleStandardStreamGenerateContent(req, res) {
             0,
             model,
             accountId,
-            'gemini'
+            'gemini',
+            null,
+            createRequestDetailMeta(req, {
+              requestBody: req.body,
+              stream: true,
+              statusCode: res.statusCode
+            })
           )
           .then(() => {
             logger.info(

@@ -29,7 +29,7 @@ function buildRequestData({ messages, model, temperature, maxTokens, sessionId }
   return requestData
 }
 
-async function* handleStreamResponse(response, model, apiKeyId, accountId) {
+async function* handleStreamResponse(response, model, apiKeyId, accountId, requestMeta = null) {
   let buffer = ''
   let totalUsage = {
     promptTokenCount: 0,
@@ -83,7 +83,9 @@ async function* handleStreamResponse(response, model, apiKeyId, accountId) {
                   0,
                   model,
                   accountId,
-                  'gemini'
+                  'gemini',
+                  null,
+                  requestMeta
                 )
                 usageRecorded = true
               }
@@ -105,7 +107,9 @@ async function* handleStreamResponse(response, model, apiKeyId, accountId) {
         0,
         model,
         accountId,
-        'gemini'
+        'gemini',
+        null,
+        requestMeta
       )
     }
   }
@@ -122,7 +126,8 @@ async function sendAntigravityRequest({
   apiKeyId,
   signal,
   projectId,
-  accountId = null
+  accountId = null,
+  requestMeta = null
 }) {
   const requestedModel = normalizeAntigravityModelInput(model)
 
@@ -146,7 +151,7 @@ async function sendAntigravityRequest({
   })
 
   if (stream) {
-    return handleStreamResponse(response, requestedModel, apiKeyId, accountId)
+    return handleStreamResponse(response, requestedModel, apiKeyId, accountId, requestMeta)
   }
 
   const payload = response.data?.response || response.data
@@ -161,7 +166,9 @@ async function sendAntigravityRequest({
       0,
       requestedModel,
       accountId,
-      'gemini'
+      'gemini',
+      null,
+      requestMeta
     )
   }
 
