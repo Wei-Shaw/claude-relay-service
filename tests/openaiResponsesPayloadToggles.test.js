@@ -103,6 +103,7 @@ const openaiAccountService = require('../src/services/account/openaiAccountServi
 const openaiResponsesAccountService = require('../src/services/account/openaiResponsesAccountService')
 const openaiResponsesRelayService = require('../src/services/relay/openaiResponsesRelayService')
 const openaiRoutes = require('../src/routes/openaiRoutes')
+const { buildResponsesRequestFromAnthropic } = require('../src/services/anthropicToOpenaiResponses')
 
 function createHash(value) {
   return crypto.createHash('sha256').update(value).digest('hex')
@@ -410,6 +411,156 @@ describe('openai responses payload toggles', () => {
       model: 'gpt-5',
       text: { format: {} },
       store: false
+    })
+  })
+
+  test('normalizes gpt-5.5-high to gpt-5.5 with reasoning effort for scheduling and upstream requests', async () => {
+    unifiedOpenAIScheduler.selectAccountForApiKey.mockResolvedValue({
+      accountId: 'openai-1',
+      accountType: 'openai'
+    })
+    openaiAccountService.getAccount.mockResolvedValue({
+      id: 'openai-1',
+      name: 'OpenAI Account',
+      accessToken: 'encrypted-token',
+      accountId: 'chatgpt-account-1'
+    })
+    axios.post.mockResolvedValue({
+      status: 200,
+      data: {
+        model: 'gpt-5.5',
+        usage: {
+          input_tokens: 9,
+          output_tokens: 4,
+          total_tokens: 13
+        }
+      },
+      headers: {}
+    })
+
+    const req = createReq({
+      body: {
+        model: 'gpt-5.5-high',
+        prompt_cache_key: 'gpt55-high-key',
+        stream: false
+      },
+      apiKeyOverrides: {
+        enableOpenAIResponsesCodexAdaptation: false,
+        enableOpenAIResponsesPayloadRules: false
+      }
+    })
+
+    await openaiRoutes.handleResponses(req, createRes())
+
+    expect(unifiedOpenAIScheduler.selectAccountForApiKey).toHaveBeenCalledWith(
+      req.apiKey,
+      createHash('gpt55-high-key'),
+      'gpt-5.5'
+    )
+    expect(req.body.model).toBe('gpt-5.5')
+    expect(req.body.reasoning).toEqual({ effort: 'high' })
+    expect(axios.post.mock.calls[0][1]).toMatchObject({
+      model: 'gpt-5.5',
+      reasoning: { effort: 'high' },
+      store: false
+    })
+  })
+
+  test('normalizes payload-rule gpt-5.5-xhigh aliases after rule application', async () => {
+    unifiedOpenAIScheduler.selectAccountForApiKey.mockResolvedValue({
+      accountId: 'openai-1',
+      accountType: 'openai'
+    })
+    openaiAccountService.getAccount.mockResolvedValue({
+      id: 'openai-1',
+      name: 'OpenAI Account',
+      accessToken: 'encrypted-token',
+      accountId: 'chatgpt-account-1'
+    })
+    axios.post.mockResolvedValue({
+      status: 200,
+      data: {
+        model: 'gpt-5.5',
+        usage: {
+          input_tokens: 8,
+          output_tokens: 5,
+          total_tokens: 13
+        }
+      },
+      headers: {}
+    })
+
+    const req = createReq({
+      body: {
+        model: 'gpt-4.1',
+        prompt_cache_key: 'gpt55-rule-key',
+        stream: false
+      },
+      apiKeyOverrides: {
+        enableOpenAIResponsesCodexAdaptation: false,
+        enableOpenAIResponsesPayloadRules: true,
+        openaiResponsesPayloadRules: [
+          { path: 'model', valueType: 'string', value: 'gpt-5.5-xhigh' }
+        ]
+      }
+    })
+
+    await openaiRoutes.handleResponses(req, createRes())
+
+    expect(unifiedOpenAIScheduler.selectAccountForApiKey).toHaveBeenCalledWith(
+      req.apiKey,
+      createHash('gpt55-rule-key'),
+      'gpt-5.5'
+    )
+    expect(req.body.model).toBe('gpt-5.5')
+    expect(req.body.reasoning).toEqual({ effort: 'xhigh' })
+    expect(axios.post.mock.calls[0][1]).toMatchObject({
+      model: 'gpt-5.5',
+      reasoning: { effort: 'xhigh' },
+      store: false
+    })
+  })
+
+  test('builds anthropic bridge requests with gpt-5.5 alias and reasoning effort', () => {
+    expect(
+      buildResponsesRequestFromAnthropic({
+        model: 'gpt-5.5-high',
+        messages: [{ role: 'user', content: 'hello' }]
+      })
+    ).toMatchObject({
+      model: 'gpt-5.5',
+      reasoning: {
+        effort: 'high',
+        summary: 'auto'
+      }
+    })
+
+    expect(
+      buildResponsesRequestFromAnthropic({
+        model: 'gpt-5.5-xhigh',
+        messages: [{ role: 'user', content: 'hello' }],
+        output_config: { effort: 'high' }
+      })
+    ).toMatchObject({
+      model: 'gpt-5.5',
+      reasoning: {
+        effort: 'high',
+        summary: 'auto'
+      }
+    })
+
+    expect(
+      buildResponsesRequestFromAnthropic({
+        model: 'gpt-5.5-high',
+        messages: [{ role: 'user', content: 'hello' }],
+        reasoning: { effort: 'xhigh', summary: 'detailed' }
+      })
+    ).toMatchObject({
+      model: 'gpt-5.5',
+      reasoning: {
+        effort: 'xhigh',
+        summary: 'detailed'
+      }
     })
   })
 

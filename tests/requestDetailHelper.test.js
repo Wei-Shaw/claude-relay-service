@@ -155,6 +155,18 @@ describe('requestDetailHelper', () => {
       resolveRequestDetailReasoning({
         requestBodySnapshot: {
           preview:
+            '{"model":"gpt-5.5","reasoning":{"effort":"xhigh","summary":"auto"}}...[26 chars]'
+        }
+      })
+    ).toEqual({
+      reasoningDisplay: 'xhigh',
+      reasoningSource: 'reasoning.effort'
+    })
+
+    expect(
+      resolveRequestDetailReasoning({
+        requestBodySnapshot: {
+          preview:
             '{"model":"claude-opus-4-6","thinking":{"type":"enabled","budget_tokens":4096}...[60 chars]'
         }
       })

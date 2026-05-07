@@ -170,6 +170,18 @@ function resolveCodexReasoningAlias(model) {
       effort: 'xhigh'
     }
   }
+  if (normalized === 'gpt-5.5-high') {
+    return {
+      normalizedModel: 'gpt-5.5',
+      effort: 'high'
+    }
+  }
+  if (normalized === 'gpt-5.5-xhigh') {
+    return {
+      normalizedModel: 'gpt-5.5',
+      effort: 'xhigh'
+    }
+  }
 
   return null
 }
@@ -394,7 +406,7 @@ const handleResponses = async (req, res) => {
   let proxy = null
   let accessToken = null
   const isAnthropicBridge = req._anthropicBridge === true
-  let anthropicBridgeModel = req._anthropicBridgeRequestedModel || req.body?.model || null
+  const anthropicBridgeModel = req._anthropicBridgeRequestedModel || req.body?.model || null
   let shouldEmitStreamToClient = false
 
   try {
@@ -805,6 +817,7 @@ const handleResponses = async (req, res) => {
           errorResponse = upstream.data
         }
       } catch (_) {
+        //
       }
 
       if (isAnthropicBridge) {
@@ -947,9 +960,7 @@ const handleResponses = async (req, res) => {
         logger.error('Failed to process non-stream response:', error)
         if (!res.headersSent) {
           const payload = { error: { message: 'Failed to process response' } }
-          res
-            .status(500)
-            .json(isAnthropicBridge ? normalizeErrorForAnthropic(payload) : payload)
+          res.status(500).json(isAnthropicBridge ? normalizeErrorForAnthropic(payload) : payload)
         }
         return
       }
@@ -998,12 +1009,16 @@ const handleResponses = async (req, res) => {
           const events = parseSSEFromChunk(chunk.toString(), anthropicBufferState)
           for (const eventData of events) {
             processSSEEvent(eventData)
-            if (eventData.type === 'response.completed' || eventData.type === 'response.incomplete') {
+            if (
+              eventData.type === 'response.completed' ||
+              eventData.type === 'response.incomplete'
+            ) {
               anthropicTerminalEvent = eventData
             }
             if (eventData.type === 'response.failed' || eventData.type === 'error') {
-              anthropicStreamError =
-                eventData?.response?.error || { message: eventData.message || 'Upstream error' }
+              anthropicStreamError = eventData?.response?.error || {
+                message: eventData.message || 'Upstream error'
+              }
             }
             const mapped = anthropicConverter.convertStreamEvent(
               eventData,
@@ -1045,8 +1060,9 @@ const handleResponses = async (req, res) => {
             anthropicTerminalEvent = eventData
           }
           if (eventData.type === 'response.failed' || eventData.type === 'error') {
-            anthropicStreamError =
-              eventData?.response?.error || { message: eventData.message || 'Upstream error' }
+            anthropicStreamError = eventData?.response?.error || {
+              message: eventData.message || 'Upstream error'
+            }
           }
           const mapped = anthropicConverter.convertStreamEvent(
             eventData,
@@ -1177,7 +1193,9 @@ const handleResponses = async (req, res) => {
         if (isAnthropicBridge && shouldEmitStreamToClient) {
           sendAnthropicStreamError(res, 502, { error: { message: 'Upstream stream error' } })
         } else if (isAnthropicBridge) {
-          res.status(502).json(normalizeErrorForAnthropic({ error: { message: 'Upstream stream error' } }))
+          res
+            .status(502)
+            .json(normalizeErrorForAnthropic({ error: { message: 'Upstream stream error' } }))
         } else {
           res.status(502).json({ error: { message: 'Upstream stream error' } })
         }
