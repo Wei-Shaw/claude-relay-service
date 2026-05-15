@@ -9,6 +9,7 @@ const apiKeyService = require('../services/apiKeyService')
 const { authenticateApiKey } = require('../middleware/auth')
 const logger = require('../utils/logger')
 const { getEffectiveModel, parseVendorPrefixedModel } = require('../utils/modelHelper')
+const { rewriteModelFieldsForClient } = require('../utils/modelDisplayHelper')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
@@ -465,7 +466,8 @@ async function handleMessagesRequest(req, res) {
               }
 
               const cacheReadTokens = usageData.cache_read_input_tokens || 0
-              const model = usageData.model || 'unknown'
+              const actualModel = usageData.model || _requestBody.model || 'unknown'
+              const displayModel = _requestBody.model || actualModel
 
               // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
               const { accountId: usageAccountId } = usageData
@@ -503,13 +505,15 @@ async function handleMessagesRequest(req, res) {
                 .recordUsageWithDetails(
                   _apiKeyId,
                   usageObject,
-                  model,
+                  actualModel,
                   usageAccountId,
                   accountType,
                   createRequestDetailMeta(req, {
                     requestBody: _requestBody,
                     stream: true,
-                    statusCode: res.statusCode
+                    statusCode: res.statusCode,
+                    requestedModel: _requestBody.model,
+                    displayModel
                   })
                 )
                 .then((costs) => {
@@ -521,7 +525,7 @@ async function handleMessagesRequest(req, res) {
                       cacheCreateTokens,
                       cacheReadTokens
                     },
-                    model,
+                    actualModel,
                     'claude-stream',
                     _apiKeyId,
                     accountType,
@@ -539,7 +543,7 @@ async function handleMessagesRequest(req, res) {
                       cacheCreateTokens,
                       cacheReadTokens
                     },
-                    model,
+                    actualModel,
                     'claude-stream',
                     _apiKeyId,
                     accountType
@@ -548,7 +552,7 @@ async function handleMessagesRequest(req, res) {
 
               usageDataCaptured = true
               logger.api(
-                `📊 Stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
+                `📊 Stream usage recorded (real) - Model: ${displayModel}, Actual Model: ${actualModel}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
               )
             } else {
               logger.warn(
@@ -599,7 +603,8 @@ async function handleMessagesRequest(req, res) {
               }
 
               const cacheReadTokens = usageData.cache_read_input_tokens || 0
-              const model = usageData.model || 'unknown'
+              const actualModel = usageData.model || _requestBodyConsole.model || 'unknown'
+              const displayModel = _requestBodyConsole.model || actualModel
 
               // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
               const usageAccountId = usageData.accountId
@@ -640,13 +645,15 @@ async function handleMessagesRequest(req, res) {
                 .recordUsageWithDetails(
                   _apiKeyIdConsole,
                   usageObject,
-                  model,
+                  actualModel,
                   usageAccountId,
                   'claude-console',
                   createRequestDetailMeta(req, {
                     requestBody: _requestBodyConsole,
                     stream: true,
-                    statusCode: res.statusCode
+                    statusCode: res.statusCode,
+                    requestedModel: _requestBodyConsole.model,
+                    displayModel
                   })
                 )
                 .then((costs) => {
@@ -658,7 +665,7 @@ async function handleMessagesRequest(req, res) {
                       cacheCreateTokens,
                       cacheReadTokens
                     },
-                    model,
+                    actualModel,
                     'claude-console-stream',
                     _apiKeyIdConsole,
                     accountType,
@@ -675,7 +682,7 @@ async function handleMessagesRequest(req, res) {
                       cacheCreateTokens,
                       cacheReadTokens
                     },
-                    model,
+                    actualModel,
                     'claude-console-stream',
                     _apiKeyIdConsole,
                     accountType
@@ -684,7 +691,7 @@ async function handleMessagesRequest(req, res) {
 
               usageDataCaptured = true
               logger.api(
-                `📊 Stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
+                `📊 Stream usage recorded (real) - Model: ${displayModel}, Actual Model: ${actualModel}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
               )
             } else {
               logger.warn(
@@ -830,7 +837,8 @@ async function handleMessagesRequest(req, res) {
               }
 
               const cacheReadTokens = usageData.cache_read_input_tokens || 0
-              const model = usageData.model || 'unknown'
+              const actualModel = usageData.model || _requestBodyCcr.model || 'unknown'
+              const displayModel = _requestBodyCcr.model || actualModel
 
               // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
               const usageAccountId = usageData.accountId
@@ -868,13 +876,15 @@ async function handleMessagesRequest(req, res) {
                 .recordUsageWithDetails(
                   _apiKeyIdCcr,
                   usageObject,
-                  model,
+                  actualModel,
                   usageAccountId,
                   'ccr',
                   createRequestDetailMeta(req, {
                     requestBody: _requestBodyCcr,
                     stream: true,
-                    statusCode: res.statusCode
+                    statusCode: res.statusCode,
+                    requestedModel: _requestBodyCcr.model,
+                    displayModel
                   })
                 )
                 .then((costs) => {
@@ -886,7 +896,7 @@ async function handleMessagesRequest(req, res) {
                       cacheCreateTokens,
                       cacheReadTokens
                     },
-                    model,
+                    actualModel,
                     'ccr-stream',
                     _apiKeyIdCcr,
                     'ccr',
@@ -903,7 +913,7 @@ async function handleMessagesRequest(req, res) {
                       cacheCreateTokens,
                       cacheReadTokens
                     },
-                    model,
+                    actualModel,
                     'ccr-stream',
                     _apiKeyIdCcr,
                     'ccr'
@@ -912,7 +922,7 @@ async function handleMessagesRequest(req, res) {
 
               usageDataCaptured = true
               logger.api(
-                `📊 CCR stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
+                `📊 CCR stream usage recorded (real) - Model: ${displayModel}, Actual Model: ${actualModel}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens}, Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
               )
             } else {
               logger.warn(
@@ -1257,10 +1267,13 @@ async function handleMessagesRequest(req, res) {
           }
 
           const cacheReadTokens = jsonData.usage.cache_read_input_tokens || 0
-          // Parse the model to remove vendor prefix if present (e.g., "ccr,gemini-2.5-pro" -> "gemini-2.5-pro")
-          const rawModel = jsonData.model || _requestBodyNonStream.model || 'unknown'
+          // Parse the upstream model to remove vendor prefix if present.
+          const rawModel =
+            response.actualModel || jsonData.model || _requestBodyNonStream.model || 'unknown'
           const { baseModel: usageBaseModel } = parseVendorPrefixedModel(rawModel)
-          const model = usageBaseModel || rawModel
+          const actualModel = usageBaseModel || rawModel
+          const displayModel =
+            response.displayModel || _requestBodyNonStream.model || actualModel
 
           // 构建 usage 对象以传递给 recordUsageWithDetails
           const usageObject = {
@@ -1301,13 +1314,15 @@ async function handleMessagesRequest(req, res) {
           const nonStreamCosts = await apiKeyService.recordUsageWithDetails(
             _apiKeyIdNonStream,
             usageObject,
-            model,
+            actualModel,
             responseAccountId,
             accountType,
             createRequestDetailMeta(req, {
               requestBody: _requestBodyNonStream,
               stream: false,
-              statusCode: response.statusCode
+              statusCode: response.statusCode,
+              requestedModel: _requestBodyNonStream.model,
+              displayModel
             })
           )
 
@@ -1319,7 +1334,7 @@ async function handleMessagesRequest(req, res) {
               cacheCreateTokens,
               cacheReadTokens
             },
-            model,
+            actualModel,
             'claude-non-stream',
             _apiKeyIdNonStream,
             accountType,
@@ -1328,14 +1343,23 @@ async function handleMessagesRequest(req, res) {
 
           usageRecorded = true
           logger.api(
-            `📊 Non-stream usage recorded (real) - Model: ${model}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens} (5m: ${ephemeral5mTokens}, 1h: ${ephemeral1hTokens}), Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
+            `📊 Non-stream usage recorded (real) - Model: ${displayModel}, Actual Model: ${actualModel}, Input: ${inputTokens}, Output: ${outputTokens}, Cache Create: ${cacheCreateTokens} (5m: ${ephemeral5mTokens}, 1h: ${ephemeral1hTokens}), Cache Read: ${cacheReadTokens}, Total: ${inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens} tokens`
           )
         } else {
           logger.warn('⚠️ No usage data found in Claude API JSON response')
         }
 
         // 使用 Express 内建的 res.json() 发送响应（简单可靠）
-        res.json(jsonData)
+        // 对错误响应进行清理，隐藏上游服务的敏感信息
+        if (response.statusCode >= 400) {
+          res.json(sanitizeUpstreamError(jsonData))
+        } else {
+          rewriteModelFieldsForClient(
+            jsonData,
+            response.displayModel || _requestBodyNonStream.model
+          )
+          res.json(jsonData)
+        }
       } catch (parseError) {
         logger.warn('⚠️ Failed to parse Claude API response as JSON:', parseError.message)
         logger.info('📄 Raw response body:', response.body)

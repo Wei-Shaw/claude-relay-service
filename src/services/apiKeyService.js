@@ -7,6 +7,7 @@ const serviceRatesService = require('./serviceRatesService')
 const requestDetailService = require('./requestDetailService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 const { finalizeRequestDetailMeta } = require('../utils/requestDetailHelper')
+const { normalizeDisplayModel } = require('../utils/modelDisplayHelper')
 const requestBodyRuleService = require('./requestBodyRuleService')
 
 const ACCOUNT_TYPE_CONFIG = {
@@ -1858,6 +1859,13 @@ class ApiKeyService {
   ) {
     try {
       const finalizedRequestMeta = finalizeRequestDetailMeta(requestMeta)
+      const actualModel = normalizeDisplayModel(model) || 'unknown'
+      const requestedModel =
+        normalizeDisplayModel(finalizedRequestMeta?.requestedModel) ||
+        normalizeDisplayModel(finalizedRequestMeta?.requestBody?.model)
+      const displayModel =
+        normalizeDisplayModel(finalizedRequestMeta?.displayModel) || requestedModel
+      const recordModel = displayModel || actualModel
       // 提取 token 数量
       const inputTokens = usageObject.input_tokens || 0
       const outputTokens = usageObject.output_tokens || 0
@@ -1875,17 +1883,17 @@ class ApiKeyService {
           logger.warn('⚠️ PricingService not initialized, initializing now...')
           await pricingService.initialize()
         }
-        costInfo = pricingService.calculateCost(usageObject, model)
+        costInfo = pricingService.calculateCost(usageObject, actualModel)
 
         // 验证计算结果
         if (!costInfo || typeof costInfo.totalCost !== 'number') {
-          logger.error(`❌ Invalid cost calculation result for model ${model}:`, costInfo)
+          logger.error(`❌ Invalid cost calculation result for model ${actualModel}:`, costInfo)
           // 使用 CostCalculator 作为后备
           const CostCalculator = require('../utils/costCalculator')
-          const fallbackCost = CostCalculator.calculateCost(usageObject, model)
+          const fallbackCost = CostCalculator.calculateCost(usageObject, actualModel)
           if (fallbackCost && fallbackCost.costs && fallbackCost.costs.total > 0) {
             logger.warn(
-              `⚠️ Using fallback cost calculation for ${model}: $${fallbackCost.costs.total}`
+              `⚠️ Using fallback cost calculation for ${actualModel}: $${fallbackCost.costs.total}`
             )
             costInfo = {
               totalCost: fallbackCost.costs.total,
@@ -1897,15 +1905,15 @@ class ApiKeyService {
           }
         }
       } catch (pricingError) {
-        logger.error(`❌ Failed to calculate cost for model ${model}:`, pricingError)
+        logger.error(`❌ Failed to calculate cost for model ${actualModel}:`, pricingError)
         logger.error(`   Usage object:`, JSON.stringify(usageObject))
         // 使用 CostCalculator 作为后备
         try {
           const CostCalculator = require('../utils/costCalculator')
-          const fallbackCost = CostCalculator.calculateCost(usageObject, model)
+          const fallbackCost = CostCalculator.calculateCost(usageObject, actualModel)
           if (fallbackCost && fallbackCost.costs && fallbackCost.costs.total > 0) {
             logger.warn(
-              `⚠️ Using fallback cost calculation for ${model}: $${fallbackCost.costs.total}`
+              `⚠️ Using fallback cost calculation for ${actualModel}: $${fallbackCost.costs.total}`
             )
             costInfo = {
               totalCost: fallbackCost.costs.total,
@@ -1931,7 +1939,7 @@ class ApiKeyService {
       const realCostWithDetails = costInfo.totalCost || 0
       let ratedCostWithDetails = realCostWithDetails
       if (realCostWithDetails > 0) {
-        const service = serviceRatesService.getService(accountType, model)
+        const service = serviceRatesService.getService(accountType, actualModel)
         ratedCostWithDetails = await this.calculateRatedCost(keyId, service, realCostWithDetails)
       }
 
@@ -1943,7 +1951,7 @@ class ApiKeyService {
         outputTokens,
         cacheCreateTokens,
         cacheReadTokens,
-        model,
+        recordModel,
         ephemeral5mTokens,
         ephemeral1hTokens,
         costInfo.isLongContextRequest || false,
@@ -1956,15 +1964,15 @@ class ApiKeyService {
         // 记录倍率成本和真实成本
         await redis.incrementDailyCost(keyId, ratedCostWithDetails, realCostWithDetails)
         logger.database(
-          `💰 Recorded cost for ${keyId}: rated=$${ratedCostWithDetails.toFixed(6)}, real=$${realCostWithDetails.toFixed(6)}, model: ${model}`
+          `💰 Recorded cost for ${keyId}: rated=$${ratedCostWithDetails.toFixed(6)}, real=$${realCostWithDetails.toFixed(6)}, model: ${recordModel}, actualModel: ${actualModel}`
         )
 
-        // 记录 Opus 周费用（如果适用，也应用倍率）
+        // 记录 Claude 周费用（如果适用，也应用倍率）
         await this.recordOpusCost(
           keyId,
           ratedCostWithDetails,
           realCostWithDetails,
-          model,
+          actualModel,
           accountType
         )
 
@@ -1980,11 +1988,11 @@ class ApiKeyService {
         // 如果有 token 使用但费用为 0，记录警告
         if (totalTokens > 0) {
           logger.warn(
-            `⚠️ No cost recorded for ${keyId} - zero cost for model: ${model} (tokens: ${totalTokens})`
+            `⚠️ No cost recorded for ${keyId} - zero cost for model: ${actualModel} (tokens: ${totalTokens})`
           )
           logger.warn(`   This may indicate a pricing issue or model not found in pricing data`)
         } else {
-          logger.debug(`💰 No cost recorded for ${keyId} - zero tokens for model: ${model}`)
+          logger.debug(`💰 No cost recorded for ${keyId} - zero tokens for model: ${actualModel}`)
         }
       }
 
@@ -2015,7 +2023,7 @@ class ApiKeyService {
             cacheReadTokens,
             ephemeral5mTokens,
             ephemeral1hTokens,
-            model,
+            actualModel,
             costInfo.isLongContextRequest || false
           )
           logger.database(
@@ -2030,7 +2038,10 @@ class ApiKeyService {
 
       const usageRecord = {
         timestamp: new Date().toISOString(),
-        model,
+        model: recordModel,
+        actualModel,
+        requestedModel: requestedModel || null,
+        displayModel: displayModel || recordModel,
         accountId: accountId || null,
         accountType: accountType || null,
         requestId: finalizedRequestMeta?.requestId || null,
@@ -2064,7 +2075,12 @@ class ApiKeyService {
         logger.warn(`⚠️ Failed to schedule request detail capture: ${captureError.message}`)
       })
 
-      const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
+      const logParts = [
+        `Model: ${recordModel}`,
+        `Actual Model: ${actualModel}`,
+        `Input: ${inputTokens}`,
+        `Output: ${outputTokens}`
+      ]
       if (cacheCreateTokens > 0) {
         logParts.push(`Cache Create: ${cacheCreateTokens}`)
 
@@ -2092,7 +2108,10 @@ class ApiKeyService {
         keyId,
         keyName: keyData?.name,
         userId: keyData?.userId,
-        model,
+        model: recordModel,
+        actualModel,
+        requestedModel: requestedModel || null,
+        displayModel: displayModel || recordModel,
         inputTokens,
         outputTokens,
         cacheCreateTokens,
@@ -2144,6 +2163,9 @@ class ApiKeyService {
       accountId: usageRecord.accountId || null,
       accountType: usageRecord.accountType || null,
       model: usageRecord.model || 'unknown',
+      actualModel: usageRecord.actualModel || usageRecord.model || 'unknown',
+      requestedModel: usageRecord.requestedModel || null,
+      displayModel: usageRecord.displayModel || usageRecord.model || 'unknown',
       inputTokens: usageRecord.inputTokens || 0,
       outputTokens: usageRecord.outputTokens || 0,
       cacheReadTokens: usageRecord.cacheReadTokens || 0,

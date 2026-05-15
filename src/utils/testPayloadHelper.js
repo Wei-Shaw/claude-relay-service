@@ -1,5 +1,9 @@
 const crypto = require('crypto')
-const { mapToErrorCode } = require('./errorSanitizer')
+const { mapToErrorCode, sanitizeErrorMessage } = require('./errorSanitizer')
+const { CODEX_CLI_INSTRUCTIONS } = require('./codexCliInstructions')
+
+const DEFAULT_CODEX_TEST_USER_AGENT = 'codex_cli_rs/1.0.0 (test harness)'
+const DEFAULT_CODEX_TEST_ORIGINATOR = 'codex_cli_rs'
 
 // 将原始错误信息映射为安全的标准错误码消息
 const sanitizeErrorMsg = (msg) => {
@@ -24,6 +28,42 @@ function generateSessionString() {
   const hex64 = randomHex(32) // 32 bytes => 64 hex characters
   const uuid = crypto.randomUUID()
   return `user_${hex64}_account__session_${uuid}`
+}
+
+/**
+ * 生成 Codex 测试用会话 ID
+ * @returns {string} 会话 ID
+ */
+function generateCodexTestSessionId() {
+  return `codex_test_${crypto.randomUUID()}_${randomHex(8)}`
+}
+
+/**
+ * 生成贴近真实 Codex CLI 的测试请求头
+ * @param {object} options - 可选配置
+ * @param {string} options.sessionId - 指定会话 ID
+ * @param {string} options.userAgent - 指定 User-Agent
+ * @param {string} options.originator - 指定 originator
+ * @param {boolean} options.stream - 是否流式
+ * @returns {{sessionId: string, headers: object}} 会话 ID 与请求头
+ */
+function createCodexTestHeaders(options = {}) {
+  const {
+    sessionId = generateCodexTestSessionId(),
+    userAgent = DEFAULT_CODEX_TEST_USER_AGENT,
+    originator = DEFAULT_CODEX_TEST_ORIGINATOR,
+    stream = true
+  } = options
+
+  return {
+    sessionId,
+    headers: {
+      'user-agent': userAgent,
+      originator,
+      session_id: sessionId,
+      accept: stream ? 'text/event-stream' : 'application/json'
+    }
+  }
 }
 
 /**
@@ -86,6 +126,8 @@ function createClaudeTestPayload(model = 'claude-sonnet-4-5-20250929', options =
  * @param {object} [options.proxyAgent] - 代理agent
  * @param {number} [options.timeout] - 超时时间（默认30000）
  * @param {object} [options.extraHeaders] - 额外的请求头
+ * @param {boolean} [options.sanitize] - 旧参数：是否映射为标准错误码消息（默认false）
+ * @param {boolean} [options.sanitizeErrors] - 新参数：是否清理敏感错误信息（优先级更高）
  * @returns {Promise<void>}
  */
 async function sendStreamTestRequest(options) {
@@ -100,8 +142,17 @@ async function sendStreamTestRequest(options) {
     proxyAgent = null,
     timeout = 30000,
     extraHeaders = {},
-    sanitize = false
+    sanitize = false,
+    sanitizeErrors
   } = options
+
+  // 错误消息处理函数：兼容旧参数 sanitize 与新参数 sanitizeErrors
+  const processErrorMessage = (msg) => {
+    if (typeof sanitizeErrors === 'boolean') {
+      return sanitizeErrors ? sanitizeErrorMessage(msg) : msg
+    }
+    return sanitize ? sanitizeErrorMsg(msg) : msg
+  }
 
   const sendSSE = (type, data = {}) => {
     if (!responseStream.destroyed && !responseStream.writableEnded) {
@@ -180,11 +231,11 @@ async function sendStreamTestRequest(options) {
               errorMsg = errorData || errorMsg
             }
           }
-          endTest(false, sanitize ? sanitizeErrorMsg(errorMsg) : errorMsg)
+          endTest(false, processErrorMessage(errorMsg))
           resolve()
         })
         response.data.on('error', (err) => {
-          endTest(false, sanitize ? sanitizeErrorMsg(err.message) : err.message)
+          endTest(false, processErrorMessage(err.message))
           resolve()
         })
       })
@@ -219,7 +270,7 @@ async function sendStreamTestRequest(options) {
             }
             if (data.type === 'error' || data.error) {
               const errMsg = data.error?.message || data.message || data.error || 'Unknown error'
-              sendSSE('error', { error: errMsg })
+              sendSSE('error', { error: processErrorMessage(errMsg) })
             }
           } catch {
             // ignore parse errors
@@ -235,13 +286,13 @@ async function sendStreamTestRequest(options) {
       })
 
       response.data.on('error', (err) => {
-        endTest(false, err.message)
+        endTest(false, processErrorMessage(err.message))
         resolve()
       })
     })
   } catch (error) {
     logger.error('❌ Stream test request failed:', error.message)
-    endTest(false, error.message)
+    endTest(false, processErrorMessage(error.message))
   }
 }
 
@@ -278,7 +329,14 @@ function createGeminiTestPayload(_model = 'gemini-2.5-pro', options = {}) {
  * @returns {object} 测试请求体
  */
 function createOpenAITestPayload(model = 'gpt-5', options = {}) {
-  const { prompt = 'hi', maxTokens = 100, stream = true } = options
+  const {
+    prompt = 'hi',
+    maxTokens = 100,
+    stream = true,
+    sessionId = generateCodexTestSessionId(),
+    instructions = CODEX_CLI_INSTRUCTIONS
+  } = options
+
   return {
     model,
     input: [
@@ -288,7 +346,9 @@ function createOpenAITestPayload(model = 'gpt-5', options = {}) {
       }
     ],
     max_output_tokens: maxTokens,
-    stream
+    stream,
+    session_id: sessionId,
+    instructions
   }
 }
 
@@ -354,6 +414,8 @@ function extractErrorMessage(json, fallback) {
 module.exports = {
   randomHex,
   generateSessionString,
+  generateCodexTestSessionId,
+  createCodexTestHeaders,
   createClaudeTestPayload,
   createGeminiTestPayload,
   createOpenAITestPayload,

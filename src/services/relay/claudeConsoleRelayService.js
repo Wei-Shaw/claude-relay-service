@@ -13,6 +13,7 @@ const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const { filterForClaude } = require('../../utils/headerFilter')
+const { rewriteSsePayloadModels } = require('../../utils/modelDisplayHelper')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -432,7 +433,10 @@ class ClaudeConsoleRelayService {
         statusCode: response.status,
         headers: response.headers,
         body: responseBody,
-        accountId
+        accountId,
+        actualModel: mappedModel,
+        requestedModel: requestBody.model,
+        displayModel: requestBody.model
       }
     } catch (error) {
       // 处理特定错误
@@ -643,6 +647,8 @@ class ClaudeConsoleRelayService {
         }
       }
 
+      const clientDisplayModel = requestBody.model
+
       // 创建修改后的请求体
       const modifiedRequestBody = {
         ...requestBody,
@@ -681,7 +687,8 @@ class ClaudeConsoleRelayService {
               )
             }
           }
-        }
+        },
+        clientDisplayModel
       )
 
       // 更新最后使用时间
@@ -751,7 +758,8 @@ class ClaudeConsoleRelayService {
     usageCallback,
     streamTransformer = null,
     requestOptions = {},
-    onResponseHeaderReceived = null
+    onResponseHeaderReceived = null,
+    clientDisplayModel = body?.model
   ) {
     return new Promise((resolve, reject) => {
       let aborted = false
@@ -1031,7 +1039,9 @@ class ClaudeConsoleRelayService {
                   }
 
                   if (dataToWrite) {
-                    responseStream.write(dataToWrite)
+                    responseStream.write(
+                      rewriteSsePayloadModels(dataToWrite, clientDisplayModel)
+                    )
                   }
                 } else {
                   // 客户端连接已断开，记录警告（但仍继续解析usage）
@@ -1175,10 +1185,12 @@ class ClaudeConsoleRelayService {
                 if (streamTransformer) {
                   const transformed = streamTransformer(buffer)
                   if (transformed) {
-                    responseStream.write(transformed)
+                    responseStream.write(
+                      rewriteSsePayloadModels(transformed, clientDisplayModel)
+                    )
                   }
                 } else {
-                  responseStream.write(buffer)
+                  responseStream.write(rewriteSsePayloadModels(buffer, clientDisplayModel))
                 }
               }
 
@@ -1481,7 +1493,8 @@ class ClaudeConsoleRelayService {
         responseStream,
         payload,
         proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
-        extraHeaders
+        extraHeaders,
+        sanitizeErrors: false // Admin测试显示完整错误信息
       }
 
       if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
