@@ -582,7 +582,10 @@ function createRequestDetailMeta(req, overrides = {}) {
         : Boolean(requestBody && requestBody.stream === true),
     durationMs: durationMs ?? (effectiveStart ? Math.max(0, nowMs - effectiveStart) : null),
     requestStartedAt: effectiveStart ? new Date(effectiveStart).toISOString() : null,
-    requestBody
+    requestBody,
+    actualModel: overrides.actualModel || null,
+    requestedModel: overrides.requestedModel || null,
+    displayModel: overrides.displayModel || null
   }
 }
 
