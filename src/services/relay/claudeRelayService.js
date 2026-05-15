@@ -19,6 +19,7 @@ const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const metadataUserIdHelper = require('../../utils/metadataUserIdHelper')
+const { rewriteSsePayloadModels } = require('../../utils/modelDisplayHelper')
 const {
   getHttpsAgentForStream,
   getHttpsAgentForNonStream,
@@ -2694,12 +2695,15 @@ class ClaudeRelayService {
                 const linesToForward = lines.join('\n') + (lines.length > 0 ? '\n' : '')
                 // 如果有流转换器，应用转换
                 if (toolNameStreamTransformer) {
-                  const transformed = toolNameStreamTransformer(linesToForward)
+                  const transformed = rewriteSsePayloadModels(
+                    toolNameStreamTransformer(linesToForward),
+                    requestedModel
+                  )
                   if (transformed) {
                     responseStream.write(transformed)
                   }
                 } else {
-                  responseStream.write(linesToForward)
+                  responseStream.write(rewriteSsePayloadModels(linesToForward, requestedModel))
                 }
               } else {
                 // 客户端连接已断开，记录警告（但仍继续解析usage）
@@ -2828,12 +2832,15 @@ class ClaudeRelayService {
             // 处理缓冲区中剩余的数据
             if (buffer.trim() && isStreamWritable(responseStream)) {
               if (toolNameStreamTransformer) {
-                const transformed = toolNameStreamTransformer(buffer)
+                const transformed = rewriteSsePayloadModels(
+                  toolNameStreamTransformer(buffer),
+                  requestedModel
+                )
                 if (transformed) {
                   responseStream.write(transformed)
                 }
               } else {
-                responseStream.write(buffer)
+                responseStream.write(rewriteSsePayloadModels(buffer, requestedModel))
               }
             }
 
