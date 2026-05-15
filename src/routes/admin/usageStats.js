@@ -3098,7 +3098,8 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
 
     for (const record of filteredRecords) {
       const usage = toUsageObject(record)
-      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const costModel = record.actualModel || record.model || 'unknown'
+      const costData = CostCalculator.calculateCost(usage, costModel)
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
       const totalTokens =
@@ -3155,7 +3156,8 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
     const enrichedRecords = []
     for (const record of pageRecords) {
       const usage = toUsageObject(record)
-      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const costModel = record.actualModel || record.model || 'unknown'
+      const costData = CostCalculator.calculateCost(usage, costModel)
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
       const realCost =
@@ -3173,6 +3175,9 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
       enrichedRecords.push({
         timestamp: record.timestamp,
         model: record.model || 'unknown',
+        actualModel: record.actualModel || record.model || 'unknown',
+        requestedModel: record.requestedModel || null,
+        displayModel: record.displayModel || record.model || 'unknown',
         accountId: record.accountId || null,
         accountName: accountInfo?.name || null,
         accountStatus: accountInfo?.status ?? null,
@@ -3456,7 +3461,8 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
 
     for (const record of filteredRecords) {
       const usage = toUsageObject(record)
-      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const costModel = record.actualModel || record.model || 'unknown'
+      const costData = CostCalculator.calculateCost(usage, costModel)
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
       const totalTokens =
@@ -3485,7 +3491,8 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
     const enrichedRecords = []
     for (const record of pageRecords) {
       const usage = toUsageObject(record)
-      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const costModel = record.actualModel || record.model || 'unknown'
+      const costData = CostCalculator.calculateCost(usage, costModel)
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
       const realCost =
@@ -3500,6 +3507,9 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       enrichedRecords.push({
         timestamp: record.timestamp,
         model: record.model || 'unknown',
+        actualModel: record.actualModel || record.model || 'unknown',
+        requestedModel: record.requestedModel || null,
+        displayModel: record.displayModel || record.model || 'unknown',
         apiKeyId: record.apiKeyId,
         apiKeyName: record.apiKeyName,
         accountId,

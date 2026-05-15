@@ -7,6 +7,7 @@ const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const { buildCcrClientError, sanitizeCcrStreamEvent } = require('../../utils/ccrErrorAdapter')
+const { rewriteModelFieldsForClient } = require('../../utils/modelDisplayHelper')
 
 class CcrRelayService {
   constructor() {
@@ -346,7 +347,10 @@ class CcrRelayService {
         statusCode: response.status,
         headers: response.headers,
         body: responseBody,
-        accountId
+        accountId,
+        actualModel: mappedModel,
+        requestedModel: requestBody.model,
+        displayModel: requestBody.model
       }
     } catch (error) {
       // 处理特定错误
@@ -509,6 +513,8 @@ class CcrRelayService {
         }
       }
 
+      const clientDisplayModel = requestBody.model
+
       // 创建修改后的请求体，使用去前缀后的模型名
       const modifiedRequestBody = {
         ...requestBody,
@@ -545,7 +551,8 @@ class CcrRelayService {
               )
             }
           }
-        }
+        },
+        clientDisplayModel
       )
 
       // 更新最后使用时间
@@ -597,7 +604,8 @@ class CcrRelayService {
     usageCallback,
     streamTransformer = null,
     requestOptions = {},
-    onResponseHeaderReceived = null
+    onResponseHeaderReceived = null,
+    clientDisplayModel = body?.model
   ) {
     return new Promise((resolve, reject) => {
       let aborted = false
@@ -847,7 +855,11 @@ class CcrRelayService {
                     outputLine = streamTransformer(line)
                   }
 
-                  outputLine = this._rewriteStreamLineForClient(outputLine, response.headers)
+                  outputLine = this._rewriteStreamLineForClient(
+                    outputLine,
+                    response.headers,
+                    clientDisplayModel
+                  )
 
                   // 写入到响应流
                   if (outputLine && isStreamWritable(responseStream)) {
@@ -974,7 +986,7 @@ class CcrRelayService {
     return null
   }
 
-  _rewriteStreamLineForClient(line, headers = {}) {
+  _rewriteStreamLineForClient(line, headers = {}, displayModel = null) {
     if (typeof line !== 'string' || !line.startsWith('data:')) {
       return line
     }
@@ -987,11 +999,12 @@ class CcrRelayService {
     try {
       const eventData = JSON.parse(jsonStr)
       const sanitizedResult = sanitizeCcrStreamEvent(eventData, { headers })
-      if (!sanitizedResult.changed) {
+      const modelResult = rewriteModelFieldsForClient(sanitizedResult.data, displayModel)
+      if (!sanitizedResult.changed && !modelResult.changed) {
         return line
       }
 
-      return `data: ${JSON.stringify(sanitizedResult.data)}`
+      return `data: ${JSON.stringify(modelResult.data)}`
     } catch {
       return line
     }
