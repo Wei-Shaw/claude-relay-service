@@ -280,7 +280,8 @@ async function handleChatCompletion(req, res, apiKeyData) {
       const usageCallback = (usage) => {
         // 记录使用统计
         if (usage && usage.input_tokens !== undefined && usage.output_tokens !== undefined) {
-          const model = usage.model || claudeRequest.model
+          const actualModel = usage.model || claudeRequest.model
+          const displayModel = req.body.model || actualModel
           const cacheCreateTokens =
             (usage.cache_creation && typeof usage.cache_creation === 'object'
               ? (usage.cache_creation.ephemeral_5m_input_tokens || 0) +
@@ -304,13 +305,15 @@ async function handleChatCompletion(req, res, apiKeyData) {
             .recordUsageWithDetails(
               apiKeyData.id,
               usageWithRequestMeta, // 传递 usage + 请求模式元信息（beta/speed）
-              model,
+              actualModel,
               accountId,
               accountType,
               createRequestDetailMeta(req, {
                 requestBody: req.body,
                 stream: true,
-                statusCode: res.statusCode
+                statusCode: res.statusCode,
+                requestedModel: req.body.model,
+                displayModel
               })
             )
             .then((costs) => {
@@ -322,7 +325,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
                   cacheCreateTokens,
                   cacheReadTokens
                 },
-                model,
+                actualModel,
                 `openai-${accountType}-stream`,
                 req.apiKey?.id,
                 accountType,
@@ -339,7 +342,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
                   cacheCreateTokens,
                   cacheReadTokens
                 },
-                model,
+                actualModel,
                 `openai-${accountType}-stream`,
                 req.apiKey?.id,
                 accountType
@@ -440,6 +443,8 @@ async function handleChatCompletion(req, res, apiKeyData) {
       // 记录使用统计
       if (claudeData.usage) {
         const { usage } = claudeData
+        const actualModel = claudeData.model || claudeRequest.model
+        const displayModel = req.body.model || actualModel
         const cacheCreateTokens =
           (usage.cache_creation && typeof usage.cache_creation === 'object'
             ? (usage.cache_creation.ephemeral_5m_input_tokens || 0) +
@@ -462,13 +467,15 @@ async function handleChatCompletion(req, res, apiKeyData) {
           .recordUsageWithDetails(
             apiKeyData.id,
             usageWithRequestMeta, // 传递 usage + 请求模式元信息（beta/speed）
-            claudeRequest.model,
+            actualModel,
             accountId,
             accountType,
             createRequestDetailMeta(req, {
               requestBody: req.body,
               stream: false,
-              statusCode: res.statusCode
+              statusCode: res.statusCode,
+              requestedModel: req.body.model,
+              displayModel
             })
           )
           .then((costs) => {
@@ -480,7 +487,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
                 cacheCreateTokens,
                 cacheReadTokens
               },
-              claudeRequest.model,
+              actualModel,
               `openai-${accountType}-non-stream`,
               req.apiKey?.id,
               accountType,
@@ -497,7 +504,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
                 cacheCreateTokens,
                 cacheReadTokens
               },
-              claudeRequest.model,
+              actualModel,
               `openai-${accountType}-non-stream`,
               req.apiKey?.id,
               accountType
