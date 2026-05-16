@@ -163,7 +163,21 @@ const classifyError = (statusCode) => {
 }
 
 // 解析 429 响应头中的重置时间（返回秒数）
-const parseRetryAfter = (headers) => {
+const parseRetryAfter = (headers, responseBody) => {
+  // Google Code Assist API 在 body 里返回 reset 时间
+  // e.g. "Your quota will reset after 10s."
+  if (responseBody) {
+    const msg =
+      typeof responseBody === 'string'
+        ? responseBody
+        : responseBody?.error?.message || ''
+    const match = msg.match(/reset after (\d+)s/i)
+    if (match) {
+      const seconds = parseInt(match[1], 10)
+      if (seconds > 0) return seconds
+    }
+  }
+
   if (!headers) {
     return null
   }
