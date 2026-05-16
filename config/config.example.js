@@ -239,6 +239,14 @@ const config = {
     overloadTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_OVERLOAD_TTL_SECONDS) || 600, // 529过载暂停秒数
     authErrorTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_AUTH_TTL_SECONDS) || 1800, // 401/403认证错误暂停秒数
     timeoutTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_TIMEOUT_TTL_SECONDS) || 300 // 504超时暂停秒数
+  },
+
+  // 🔄 调度器配置
+  scheduler: {
+    // 是否在默认账户池中包含 CCR 账户（不需要 ccr: 前缀）
+    // 默认 false：CCR 账户只能通过 ccr: 前缀访问
+    // 设置 true：所有请求都可以访问 CCR 账户，无需前缀
+    includeCcrInDefaultPool: process.env.SCHEDULER_INCLUDE_CCR_IN_DEFAULT_POOL === 'true'
   }
 }
 
