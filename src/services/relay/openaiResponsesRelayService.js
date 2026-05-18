@@ -780,12 +780,12 @@ class OpenAIResponsesRelayService {
     })
 
     response.data.on('end', async () => {
-      streamEnded = true
-
       // 处理剩余的 buffer
       if (buffer.trim()) {
         writeEventToClient(buffer)
       }
+
+      streamEnded = true
 
       // 记录使用统计
       if (usageData) {
