@@ -944,6 +944,49 @@ const ALLOWED_MAX_TOKENS = [100, 500, 1000, 2000, 4096]
 const sanitizeMaxTokens = (value) =>
   ALLOWED_MAX_TOKENS.includes(Number(value)) ? Number(value) : 1000
 
+function extractOpenAIResponseText(outputData) {
+  const source = Array.isArray(outputData?.output)
+    ? outputData.output
+    : Array.isArray(outputData?.response?.output)
+      ? outputData.response.output
+      : Array.isArray(outputData)
+        ? outputData
+        : []
+
+  let responseText = ''
+  for (const item of source) {
+    if (item?.type === 'message' && Array.isArray(item.content)) {
+      for (const block of item.content) {
+        if (block?.type === 'output_text' && block.text) {
+          responseText += block.text
+        } else if (typeof block?.text === 'string') {
+          responseText += block.text
+        }
+      }
+    } else if (item?.type === 'output_text' && item.text) {
+      responseText += item.text
+    }
+  }
+
+  return responseText
+}
+
+function extractOpenAIStreamError(eventData) {
+  if (!eventData || typeof eventData !== 'object') {
+    return null
+  }
+
+  if (eventData.error) {
+    return eventData.error.message || eventData.message || eventData.error || 'Unknown error'
+  }
+
+  if (eventData.type === 'response.failed') {
+    return eventData.response?.error?.message || eventData.response?.error || 'Response failed'
+  }
+
+  return null
+}
+
 // 🧪 API Key 端点测试接口 - 测试API Key是否能正常访问服务
 router.post('/api-key/test', async (req, res) => {
   const config = require('../../config/config')
@@ -1259,36 +1302,92 @@ router.post('/api-key/test-openai', async (req, res) => {
       }
 
       let buffer = ''
+      let responseText = ''
+      let streamError = null
+
+      const sendContent = (text) => {
+        if (!text) {
+          return
+        }
+        responseText += text
+        res.write(`data: ${JSON.stringify({ type: 'content', text })}\n\n`)
+      }
+
+      const processOpenAIStreamLine = (line) => {
+        if (!line.startsWith('data:')) {
+          return
+        }
+
+        const jsonStr = line.substring(5).trim()
+        if (!jsonStr || jsonStr === '[DONE]') {
+          return
+        }
+
+        try {
+          const data = JSON.parse(jsonStr)
+          const errorText = extractOpenAIStreamError(data)
+          if (errorText) {
+            streamError = errorText
+            return
+          }
+
+          if (data.type === 'response.output_text.delta' && data.delta) {
+            sendContent(data.delta)
+          } else if (data.type === 'response.content_part.delta' && data.delta?.text) {
+            sendContent(data.delta.text)
+          } else if (data.type === 'response.output_text.done' && data.text && !responseText) {
+            sendContent(data.text)
+          } else if (
+            data.type === 'response.content_part.done' &&
+            data.part?.text &&
+            !responseText
+          ) {
+            sendContent(data.part.text)
+          } else if (data.type === 'response.output_item.done' && data.item && !responseText) {
+            sendContent(extractOpenAIResponseText([data.item]))
+          } else if (data.type === 'response.completed' && data.response && !responseText) {
+            sendContent(extractOpenAIResponseText(data.response))
+          } else if (data.type === 'response.incomplete') {
+            streamError =
+              data.response?.incomplete_details?.reason ||
+              data.response?.status ||
+              'Response incomplete'
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       response.data.on('data', (chunk) => {
         buffer += chunk.toString()
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
 
         for (const line of lines) {
-          if (!line.startsWith('data:')) {
-            continue
-          }
-          const jsonStr = line.substring(5).trim()
-          if (!jsonStr || jsonStr === '[DONE]') {
-            continue
-          }
-
-          try {
-            const data = JSON.parse(jsonStr)
-            // OpenAI Responses 格式: output[].content[].text 或 delta
-            if (data.type === 'response.output_text.delta' && data.delta) {
-              res.write(`data: ${JSON.stringify({ type: 'content', text: data.delta })}\n\n`)
-            } else if (data.type === 'response.content_part.delta' && data.delta?.text) {
-              res.write(`data: ${JSON.stringify({ type: 'content', text: data.delta.text })}\n\n`)
-            }
-          } catch {
-            // ignore
-          }
+          processOpenAIStreamLine(line)
         }
       })
 
       response.data.on('end', () => {
-        res.write(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
+        if (buffer.trim()) {
+          const lines = buffer.split('\n')
+          buffer = ''
+          for (const line of lines) {
+            processOpenAIStreamLine(line)
+          }
+        }
+
+        if (streamError) {
+          res.write(
+            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: sanitizeErrorMsg(streamError) })}\n\n`
+          )
+        } else if (responseText) {
+          res.write(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
+        } else {
+          res.write(
+            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: 'No response content received from upstream' })}\n\n`
+          )
+        }
         res.end()
       })
 
