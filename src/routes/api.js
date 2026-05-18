@@ -22,6 +22,7 @@ const {
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const { dumpAnthropicMessagesRequest } = require('../utils/anthropicRequestDump')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
+const StreamTextCollector = require('../utils/streamTextCollector')
 const {
   handleAnthropicMessagesToGemini,
   handleAnthropicCountTokensToGemini
@@ -432,6 +433,8 @@ async function handleMessagesRequest(req, res) {
         const _requestBody = req.body // 传递后清除引用
         const _apiKey = req.apiKey
         const _headers = req.headers
+        // 📡 Langfuse 输出文本捕获器（按 Anthropic SSE 解析）
+        const _langfuseCollector = new StreamTextCollector({ format: 'anthropic' })
 
         await claudeRelayService.relayStreamRequestWithUsageCapture(
           _requestBody,
@@ -499,6 +502,15 @@ async function handleMessagesRequest(req, res) {
                 }
               }
 
+              const _streamMetaOfficial = createRequestDetailMeta(req, {
+                requestBody: _requestBody,
+                stream: true,
+                statusCode: res.statusCode
+              })
+              _streamMetaOfficial.responseText = _langfuseCollector.getText()
+              if (_langfuseCollector.isTruncated()) {
+                _streamMetaOfficial.outputTruncated = true
+              }
               apiKeyService
                 .recordUsageWithDetails(
                   _apiKeyId,
@@ -506,11 +518,7 @@ async function handleMessagesRequest(req, res) {
                   model,
                   usageAccountId,
                   accountType,
-                  createRequestDetailMeta(req, {
-                    requestBody: _requestBody,
-                    stream: true,
-                    statusCode: res.statusCode
-                  })
+                  _streamMetaOfficial
                 )
                 .then((costs) => {
                   queueRateLimitUpdate(
@@ -556,7 +564,9 @@ async function handleMessagesRequest(req, res) {
                 JSON.stringify(usageData)
               )
             }
-          }
+          },
+          null,
+          { langfuseCollector: _langfuseCollector }
         )
       } else if (accountType === 'claude-console') {
         // Claude Console账号使用Console转发服务（需要传递accountId）
@@ -566,6 +576,8 @@ async function handleMessagesRequest(req, res) {
         const _requestBodyConsole = req.body
         const _apiKeyConsole = req.apiKey
         const _headersConsole = req.headers
+        // 📡 Langfuse 输出文本捕获器
+        const _langfuseCollectorConsole = new StreamTextCollector({ format: 'anthropic' })
 
         await claudeConsoleRelayService.relayStreamRequestWithUsageCapture(
           _requestBodyConsole,
@@ -643,11 +655,18 @@ async function handleMessagesRequest(req, res) {
                   model,
                   usageAccountId,
                   'claude-console',
-                  createRequestDetailMeta(req, {
-                    requestBody: _requestBodyConsole,
-                    stream: true,
-                    statusCode: res.statusCode
-                  })
+                  (() => {
+                    const _meta = createRequestDetailMeta(req, {
+                      requestBody: _requestBodyConsole,
+                      stream: true,
+                      statusCode: res.statusCode
+                    })
+                    _meta.responseText = _langfuseCollectorConsole.getText()
+                    if (_langfuseCollectorConsole.isTruncated()) {
+                      _meta.outputTruncated = true
+                    }
+                    return _meta
+                  })()
                 )
                 .then((costs) => {
                   queueRateLimitUpdate(
@@ -693,7 +712,9 @@ async function handleMessagesRequest(req, res) {
               )
             }
           },
-          accountId
+          accountId,
+          null,
+          { langfuseCollector: _langfuseCollectorConsole }
         )
       } else if (accountType === 'bedrock') {
         // Bedrock账号使用Bedrock转发服务
@@ -720,6 +741,17 @@ async function handleMessagesRequest(req, res) {
             const inputTokens = result.usage.input_tokens || 0
             const outputTokens = result.usage.output_tokens || 0
 
+            const _bedrockMeta = createRequestDetailMeta(req, {
+              requestBody: _requestBodyBedrock,
+              stream: true,
+              statusCode: res.statusCode
+            })
+            if (typeof result.responseText === 'string') {
+              _bedrockMeta.responseText = result.responseText
+              if (result.responseTextTruncated) {
+                _bedrockMeta.outputTruncated = true
+              }
+            }
             apiKeyService
               .recordUsage(
                 _apiKeyIdBedrock,
@@ -731,11 +763,7 @@ async function handleMessagesRequest(req, res) {
                 accountId,
                 'bedrock',
                 null,
-                createRequestDetailMeta(req, {
-                  requestBody: _requestBodyBedrock,
-                  stream: true,
-                  statusCode: res.statusCode
-                })
+                _bedrockMeta
               )
               .then((costs) => {
                 queueRateLimitUpdate(
@@ -797,6 +825,8 @@ async function handleMessagesRequest(req, res) {
         const _requestBodyCcr = req.body
         const _apiKeyCcr = req.apiKey
         const _headersCcr = req.headers
+        // 📡 Langfuse 输出文本捕获器
+        const _langfuseCollectorCcr = new StreamTextCollector({ format: 'anthropic' })
 
         await ccrRelayService.relayStreamRequestWithUsageCapture(
           _requestBodyCcr,
@@ -871,11 +901,18 @@ async function handleMessagesRequest(req, res) {
                   model,
                   usageAccountId,
                   'ccr',
-                  createRequestDetailMeta(req, {
-                    requestBody: _requestBodyCcr,
-                    stream: true,
-                    statusCode: res.statusCode
-                  })
+                  (() => {
+                    const _meta = createRequestDetailMeta(req, {
+                      requestBody: _requestBodyCcr,
+                      stream: true,
+                      statusCode: res.statusCode
+                    })
+                    _meta.responseText = _langfuseCollectorCcr.getText()
+                    if (_langfuseCollectorCcr.isTruncated()) {
+                      _meta.outputTruncated = true
+                    }
+                    return _meta
+                  })()
                 )
                 .then((costs) => {
                   queueRateLimitUpdate(
@@ -921,7 +958,9 @@ async function handleMessagesRequest(req, res) {
               )
             }
           },
-          accountId
+          accountId,
+          null,
+          { langfuseCollector: _langfuseCollectorCcr }
         )
       }
 
@@ -1298,17 +1337,33 @@ async function handleMessagesRequest(req, res) {
 
           // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
           const { accountId: responseAccountId } = response
+          // 提取助手响应文本用于 Langfuse 输出捕获
+          let nonStreamResponseText = ''
+          try {
+            if (Array.isArray(jsonData?.content)) {
+              nonStreamResponseText = jsonData.content
+                .filter((part) => part && (part.type === 'text' || typeof part.text === 'string'))
+                .map((part) => part.text || '')
+                .join('')
+            } else if (typeof jsonData?.content === 'string') {
+              nonStreamResponseText = jsonData.content
+            }
+          } catch (_textError) {
+            nonStreamResponseText = ''
+          }
+          const nonStreamMeta = createRequestDetailMeta(req, {
+            requestBody: _requestBodyNonStream,
+            stream: false,
+            statusCode: response.statusCode
+          })
+          nonStreamMeta.responseText = nonStreamResponseText
           const nonStreamCosts = await apiKeyService.recordUsageWithDetails(
             _apiKeyIdNonStream,
             usageObject,
             model,
             responseAccountId,
             accountType,
-            createRequestDetailMeta(req, {
-              requestBody: _requestBodyNonStream,
-              stream: false,
-              statusCode: response.statusCode
-            })
+            nonStreamMeta
           )
 
           await queueRateLimitUpdate(
