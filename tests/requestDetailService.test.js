@@ -27,17 +27,22 @@ jest.mock('../src/services/account/openaiResponsesAccountService', () => ({
 jest.mock('../src/services/account/azureOpenaiAccountService', () => ({ getAccount: jest.fn() }))
 jest.mock('../src/services/account/droidAccountService', () => ({ getAccount: jest.fn() }))
 jest.mock('../src/services/account/bedrockAccountService', () => ({ getAccount: jest.fn() }))
+jest.mock('../src/utils/costCalculator', () => ({
+  calculateCost: jest.fn()
+}))
 
 const redis = require('../src/models/redis')
 const claudeRelayConfigService = require('../src/services/claudeRelayConfigService')
 const claudeAccountService = require('../src/services/account/claudeAccountService')
+const claudeConsoleAccountService = require('../src/services/account/claudeConsoleAccountService')
 const openaiAccountService = require('../src/services/account/openaiAccountService')
 const bedrockAccountService = require('../src/services/account/bedrockAccountService')
+const CostCalculator = require('../src/utils/costCalculator')
 const requestDetailService = require('../src/services/requestDetailService')
 
 describe('requestDetailService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    jest.resetAllMocks()
     jest.useFakeTimers().setSystemTime(Date.parse('2026-04-07T18:00:00.000Z'))
   })
 
@@ -128,8 +133,8 @@ describe('requestDetailService', () => {
           inputTokens: 100,
           outputTokens: 50,
           cacheReadTokens: 60,
-          cacheCreateTokens: 40,
-          totalTokens: 250,
+          cacheCreateTokens: 0,
+          totalTokens: 210,
           cost: 0.5,
           durationMs: 1200,
           requestBodySnapshot: { model: 'gpt-5.4' }
@@ -157,6 +162,8 @@ describe('requestDetailService', () => {
     expect(result.summary.totalRequests).toBe(1)
     expect(result.summary.cacheCreateTokens).toBe(0)
     expect(result.summary.cacheCreateNotApplicable).toBe(true)
+    expect(result.summary.cacheHitNumerator).toBe(60)
+    expect(result.summary.cacheHitDenominator).toBe(160)
     expect(result.summary.cacheHitRate).toBe(37.5)
     expect(result.availableFilters.models).toEqual(['gpt-5.4'])
     expect(result.filters.hasCustomDateRange).toBe(true)
@@ -194,7 +201,7 @@ describe('requestDetailService', () => {
           inputTokens: 100,
           outputTokens: 20,
           cacheReadTokens: 60,
-          cacheCreateTokens: 40,
+          cacheCreateTokens: 0,
           totalTokens: 180,
           cost: 0.3,
           durationMs: 500
@@ -228,7 +235,12 @@ describe('requestDetailService', () => {
     expect(result.summary.totalRequests).toBe(2)
     expect(result.summary.cacheCreateNotApplicable).toBe(false)
     expect(result.summary.cacheCreateTokens).toBe(30)
-    expect(result.summary.cacheHitRate).toBe(40.91)
+    expect(result.summary.cacheHitNumerator).toBe(90)
+    expect(result.summary.cacheHitDenominator).toBe(310)
+    expect(result.summary.cacheHitFormula).toBe(
+      'cacheReadTokens / (inputTokens + cacheReadTokens + cacheCreateTokens)'
+    )
+    expect(result.summary.cacheHitRate).toBe(29.03)
   })
 
   test('listRequestDetails treats azure-openai cache hits as openai-style metrics', async () => {
@@ -274,6 +286,97 @@ describe('requestDetailService', () => {
     expect(result.records[0].cacheHitRate).toBe(37.5)
     expect(result.summary.cacheCreateTokens).toBe(0)
     expect(result.summary.cacheHitRate).toBe(37.5)
+  })
+
+  test('reads retained zero-cost unknown model records with recomputed display cost', async () => {
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: true
+    })
+
+    redis.getApiKey.mockResolvedValue({ name: 'Mimo Key' })
+    claudeConsoleAccountService.getAccount.mockResolvedValue({ name: 'Claude Console' })
+    CostCalculator.calculateCost.mockReturnValue({
+      costs: {
+        input: 0.051618,
+        output: 0.000765,
+        cacheCreate: 0,
+        cacheWrite: 0,
+        cacheRead: 0.0006144,
+        total: 0.0529974
+      },
+      debug: {
+        usedFallbackPricing: true,
+        pricingSource: 'unknown-fallback'
+      },
+      usingDynamicPricing: false
+    })
+
+    const storedRecord = JSON.stringify({
+      requestId: 'req_mimo',
+      timestamp: '2026-04-07T12:00:00.000Z',
+      endpoint: '/api/v1/messages',
+      method: 'POST',
+      apiKeyId: 'key_mimo',
+      accountId: 'acct_mimo',
+      accountType: 'claude-console',
+      model: 'mimo-v2.5-pro',
+      inputTokens: 17206,
+      outputTokens: 51,
+      cacheReadTokens: 2048,
+      cacheCreateTokens: 0,
+      totalTokens: 19305,
+      cost: 0,
+      realCost: 0,
+      realCostBreakdown: {
+        input: 0,
+        output: 0,
+        cacheCreate: 0,
+        cacheRead: 0
+      },
+      durationMs: 5662
+    })
+    const client = {
+      zrangebyscore: jest.fn().mockResolvedValue(['req_mimo', '1775563200000']),
+      mget: jest.fn().mockResolvedValue([storedRecord]),
+      get: jest.fn().mockResolvedValue(storedRecord),
+      set: jest.fn().mockResolvedValue('OK')
+    }
+    redis.getClient.mockReturnValue(client)
+
+    const result = await requestDetailService.listRequestDetails({
+      startDate: '2026-04-07T00:00:00.000Z',
+      endDate: '2026-04-07T23:59:59.000Z'
+    })
+    const detail = await requestDetailService.getRequestDetail('req_mimo')
+
+    expect(result.records).toHaveLength(1)
+    expect(result.records[0].cacheHitRate).toBe(10.64)
+    expect(result.records[0].cacheHitNumerator).toBe(2048)
+    expect(result.records[0].cacheHitDenominator).toBe(19254)
+    expect(result.records[0].cost).toBe(0.052997)
+    expect(result.records[0].realCost).toBe(0.052997)
+    expect(result.records[0].costRecomputed).toBe(true)
+    expect(result.records[0].usedFallbackPricing).toBe(true)
+    expect(result.records[0].pricingSource).toBe('unknown-fallback')
+    expect(result.records[0].realCostBreakdown).toEqual(
+      expect.objectContaining({
+        input: 0.051618,
+        output: 0.000765,
+        cacheRead: 0.0006144,
+        total: 0.0529974
+      })
+    )
+    expect(result.summary.cacheHitRate).toBe(10.64)
+    expect(result.summary.totalCost).toBe(0.052997)
+    expect(detail.record.cost).toBe(0.052997)
+    expect(detail.record.costRecomputed).toBe(true)
+    expect(client.set).not.toHaveBeenCalledWith(
+      'request_detail:item:req_mimo',
+      expect.any(String),
+      expect.anything()
+    )
   })
 
   test('listRequestDetails still exposes retained data when capture is disabled', async () => {

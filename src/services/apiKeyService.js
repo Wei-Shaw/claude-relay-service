@@ -1866,56 +1866,50 @@ class ApiKeyService {
 
       const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
 
-      // 计算费用（支持详细的缓存类型）- 添加错误处理
-      let costInfo = { totalCost: 0, ephemeral5mCost: 0, ephemeral1hCost: 0 }
+      // 计算费用统一走 CostCalculator，缺少动态价格时使用内置 unknown fallback。
+      let costInfo = {
+        totalCost: 0,
+        inputCost: 0,
+        outputCost: 0,
+        cacheCreateCost: 0,
+        cacheReadCost: 0,
+        ephemeral5mCost: 0,
+        ephemeral1hCost: 0,
+        isLongContextRequest: false,
+        usedFallbackPricing: false,
+        pricingSource: null
+      }
       try {
-        const pricingService = require('./pricingService')
-        // 确保 pricingService 已初始化
-        if (!pricingService.pricingData) {
-          logger.warn('⚠️ PricingService not initialized, initializing now...')
-          await pricingService.initialize()
-        }
-        costInfo = pricingService.calculateCost(usageObject, model)
+        const CostCalculator = require('../utils/costCalculator')
+        const calculatedCost = CostCalculator.calculateCost(usageObject, model)
+        const costs = calculatedCost?.costs || {}
+        const totalCost = Number(costs.total ?? calculatedCost?.totalCost ?? 0)
 
-        // 验证计算结果
-        if (!costInfo || typeof costInfo.totalCost !== 'number') {
-          logger.error(`❌ Invalid cost calculation result for model ${model}:`, costInfo)
-          // 使用 CostCalculator 作为后备
-          const CostCalculator = require('../utils/costCalculator')
-          const fallbackCost = CostCalculator.calculateCost(usageObject, model)
-          if (fallbackCost && fallbackCost.costs && fallbackCost.costs.total > 0) {
-            logger.warn(
-              `⚠️ Using fallback cost calculation for ${model}: $${fallbackCost.costs.total}`
-            )
-            costInfo = {
-              totalCost: fallbackCost.costs.total,
-              ephemeral5mCost: 0,
-              ephemeral1hCost: 0
-            }
-          } else {
-            costInfo = { totalCost: 0, ephemeral5mCost: 0, ephemeral1hCost: 0 }
-          }
+        if (!Number.isFinite(totalCost)) {
+          throw new Error(`Invalid cost calculation result for model ${model}`)
+        }
+
+        costInfo = {
+          totalCost,
+          inputCost: Number(costs.input ?? calculatedCost?.inputCost ?? 0) || 0,
+          outputCost: Number(costs.output ?? calculatedCost?.outputCost ?? 0) || 0,
+          cacheCreateCost:
+            Number(costs.cacheCreate ?? costs.cacheWrite ?? calculatedCost?.cacheCreateCost ?? 0) ||
+            0,
+          cacheReadCost: Number(costs.cacheRead ?? calculatedCost?.cacheReadCost ?? 0) || 0,
+          ephemeral5mCost: Number(costs.ephemeral5m ?? calculatedCost?.ephemeral5mCost ?? 0) || 0,
+          ephemeral1hCost: Number(costs.ephemeral1h ?? calculatedCost?.ephemeral1hCost ?? 0) || 0,
+          isLongContextRequest:
+            calculatedCost?.isLongContextRequest === true ||
+            calculatedCost?.debug?.isLongContextRequest === true,
+          usedFallbackPricing: calculatedCost?.debug?.usedFallbackPricing === true,
+          pricingSource:
+            calculatedCost?.debug?.pricingSource ||
+            (calculatedCost?.usingDynamicPricing ? 'dynamic' : 'unknown-fallback')
         }
       } catch (pricingError) {
         logger.error(`❌ Failed to calculate cost for model ${model}:`, pricingError)
         logger.error(`   Usage object:`, JSON.stringify(usageObject))
-        // 使用 CostCalculator 作为后备
-        try {
-          const CostCalculator = require('../utils/costCalculator')
-          const fallbackCost = CostCalculator.calculateCost(usageObject, model)
-          if (fallbackCost && fallbackCost.costs && fallbackCost.costs.total > 0) {
-            logger.warn(
-              `⚠️ Using fallback cost calculation for ${model}: $${fallbackCost.costs.total}`
-            )
-            costInfo = {
-              totalCost: fallbackCost.costs.total,
-              ephemeral5mCost: 0,
-              ephemeral1hCost: 0
-            }
-          }
-        } catch (fallbackError) {
-          logger.error(`❌ Fallback cost calculation also failed:`, fallbackError)
-        }
       }
 
       // 提取详细的缓存创建数据
@@ -2048,14 +2042,26 @@ class ApiKeyService {
         totalTokens,
         cost: Number(ratedCostWithDetails.toFixed(6)),
         realCost: Number(realCostWithDetails.toFixed(6)),
+        costBreakdown: {
+          input: costInfo.inputCost || 0,
+          output: costInfo.outputCost || 0,
+          cacheCreate: costInfo.cacheCreateCost || 0,
+          cacheRead: costInfo.cacheReadCost || 0,
+          ephemeral5m: costInfo.ephemeral5mCost || 0,
+          ephemeral1h: costInfo.ephemeral1hCost || 0,
+          total: realCostWithDetails
+        },
         realCostBreakdown: {
           input: costInfo.inputCost || 0,
           output: costInfo.outputCost || 0,
           cacheCreate: costInfo.cacheCreateCost || 0,
           cacheRead: costInfo.cacheReadCost || 0,
           ephemeral5m: costInfo.ephemeral5mCost || 0,
-          ephemeral1h: costInfo.ephemeral1hCost || 0
+          ephemeral1h: costInfo.ephemeral1hCost || 0,
+          total: realCostWithDetails
         },
+        pricingSource: costInfo.pricingSource || null,
+        usedFallbackPricing: costInfo.usedFallbackPricing === true,
         isLongContext: costInfo.isLongContextRequest || false
       }
 
@@ -2153,6 +2159,8 @@ class ApiKeyService {
       realCost: usageRecord.realCost || usageRecord.cost || 0,
       costBreakdown: usageRecord.costBreakdown || null,
       realCostBreakdown: usageRecord.realCostBreakdown || usageRecord.costBreakdown || null,
+      pricingSource: usageRecord.pricingSource || null,
+      usedFallbackPricing: usageRecord.usedFallbackPricing === true,
       isLongContextRequest:
         usageRecord.isLongContext === true || usageRecord.isLongContextRequest === true
     })
