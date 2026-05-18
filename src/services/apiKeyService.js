@@ -182,6 +182,7 @@ class ApiKeyService {
       openaiAccountId = null,
       azureOpenaiAccountId = null,
       bedrockAccountId = null, // 添加 Bedrock 账号ID支持
+      vertexAccountId = null, // 添加 Vertex AI 账号ID支持
       droidAccountId = null,
       permissions = [], // 数组格式，空数组表示全部服务，如 ['claude', 'gemini']
       isActive = true,
@@ -241,6 +242,7 @@ class ApiKeyService {
       openaiAccountId: openaiAccountId || '',
       azureOpenaiAccountId: azureOpenaiAccountId || '',
       bedrockAccountId: bedrockAccountId || '', // 添加 Bedrock 账号ID
+      vertexAccountId: vertexAccountId || '', // 添加 Vertex AI 账号ID
       droidAccountId: droidAccountId || '',
       permissions: JSON.stringify(normalizePermissions(permissions)),
       enableModelRestriction: String(enableModelRestriction),
@@ -317,6 +319,7 @@ class ApiKeyService {
       openaiAccountId: keyData.openaiAccountId,
       azureOpenaiAccountId: keyData.azureOpenaiAccountId,
       bedrockAccountId: keyData.bedrockAccountId, // 添加 Bedrock 账号ID
+      vertexAccountId: keyData.vertexAccountId, // 添加 Vertex AI 账号ID
       droidAccountId: keyData.droidAccountId,
       permissions: normalizePermissions(keyData.permissions),
       enableModelRestriction: keyData.enableModelRestriction === 'true',
@@ -516,6 +519,7 @@ class ApiKeyService {
           openaiAccountId: keyData.openaiAccountId,
           azureOpenaiAccountId: keyData.azureOpenaiAccountId,
           bedrockAccountId: keyData.bedrockAccountId, // 添加 Bedrock 账号ID
+          vertexAccountId: keyData.vertexAccountId, // 添加 Vertex AI 账号ID
           droidAccountId: keyData.droidAccountId,
           permissions: normalizePermissions(keyData.permissions),
           tokenLimit: parseInt(keyData.tokenLimit),
@@ -662,6 +666,7 @@ class ApiKeyService {
           openaiAccountId: keyData.openaiAccountId,
           azureOpenaiAccountId: keyData.azureOpenaiAccountId,
           bedrockAccountId: keyData.bedrockAccountId,
+          vertexAccountId: keyData.vertexAccountId,
           droidAccountId: keyData.droidAccountId,
           permissions: normalizePermissions(keyData.permissions),
           tokenLimit: parseInt(keyData.tokenLimit),
@@ -1338,6 +1343,7 @@ class ApiKeyService {
         'openaiAccountId',
         'azureOpenaiAccountId',
         'bedrockAccountId', // 添加 Bedrock 账号ID
+        'vertexAccountId', // 添加 Vertex AI 账号ID
         'droidAccountId',
         'permissions',
         'expiresAt',
@@ -2444,6 +2450,7 @@ class ApiKeyService {
         geminiAccountId: keyData.geminiAccountId,
         openaiAccountId: keyData.openaiAccountId,
         bedrockAccountId: keyData.bedrockAccountId,
+        vertexAccountId: keyData.vertexAccountId,
         droidAccountId: keyData.droidAccountId,
         azureOpenaiAccountId: keyData.azureOpenaiAccountId,
         ccrAccountId: keyData.ccrAccountId,
@@ -2605,6 +2612,7 @@ class ApiKeyService {
         'openai-responses': 'openaiAccountId', // 特殊处理，带 responses: 前缀
         azure_openai: 'azureOpenaiAccountId',
         bedrock: 'bedrockAccountId',
+        vertex: 'vertexAccountId',
         droid: 'droidAccountId',
         ccr: null // CCR 账号没有对应的 API Key 字段
       }

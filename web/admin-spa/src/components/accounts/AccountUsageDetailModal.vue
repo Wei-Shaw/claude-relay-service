@@ -367,7 +367,8 @@ const platformLabelMap = {
   gemini: 'Gemini',
   'gemini-api': 'Gemini API',
   droid: 'Droid',
-  bedrock: 'Claude AWS Bedrock'
+  bedrock: 'Claude AWS Bedrock',
+  vertex: 'Claude Google Cloud Vertex AI'
 }
 
 const platformLabel = computed(() => platformLabelMap[props.account?.platform] || '未知平台')

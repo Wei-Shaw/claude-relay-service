@@ -1,6 +1,7 @@
 const claudeAccountService = require('../account/claudeAccountService')
 const claudeConsoleAccountService = require('../account/claudeConsoleAccountService')
 const bedrockAccountService = require('../account/bedrockAccountService')
+const vertexAccountService = require('../account/vertexAccountService')
 const ccrAccountService = require('../account/ccrAccountService')
 const accountGroupService = require('../accountGroupService')
 const redis = require('../../models/redis')
@@ -373,6 +374,40 @@ class UnifiedClaudeScheduler {
         }
       }
 
+      // 4. 检查 Vertex AI 账户绑定
+      if (apiKeyData.vertexAccountId) {
+        const boundVertexAccountResult = await vertexAccountService.getAccount(
+          apiKeyData.vertexAccountId
+        )
+        if (
+          boundVertexAccountResult.success &&
+          boundVertexAccountResult.data.isActive === true &&
+          isSchedulable(boundVertexAccountResult.data.schedulable)
+        ) {
+          const isTempUnavailable = await this.isAccountTemporarilyUnavailable(
+            apiKeyData.vertexAccountId,
+            'vertex'
+          )
+          if (isTempUnavailable) {
+            logger.warn(
+              `⏱️ Bound Vertex account ${apiKeyData.vertexAccountId} is temporarily unavailable, falling back to pool`
+            )
+          } else {
+            logger.info(
+              `🎯 Using bound dedicated Vertex account: ${boundVertexAccountResult.data.name} (${apiKeyData.vertexAccountId}) for API key ${apiKeyData.name}`
+            )
+            return {
+              accountId: apiKeyData.vertexAccountId,
+              accountType: 'vertex'
+            }
+          }
+        } else {
+          logger.warn(
+            `⚠️ Bound Vertex account ${apiKeyData.vertexAccountId} is not available (isActive: ${boundVertexAccountResult?.data?.isActive}, schedulable: ${boundVertexAccountResult?.data?.schedulable}), falling back to pool`
+          )
+        }
+      }
+
       // CCR 账户不支持绑定（仅通过 ccr, 前缀进行 CCR 路由）
 
       // 如果有会话哈希，检查是否有已映射的账户
@@ -608,6 +643,41 @@ class UnifiedClaudeScheduler {
       } else {
         logger.warn(
           `⚠️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is not available (isActive: ${boundBedrockAccountResult?.data?.isActive}, schedulable: ${boundBedrockAccountResult?.data?.schedulable})`
+        )
+      }
+    }
+
+    // 4. 检查 Vertex AI 账户绑定
+    if (apiKeyData.vertexAccountId) {
+      const boundVertexAccountResult = await vertexAccountService.getAccount(
+        apiKeyData.vertexAccountId
+      )
+      if (
+        boundVertexAccountResult.success &&
+        boundVertexAccountResult.data.isActive === true &&
+        isSchedulable(boundVertexAccountResult.data.schedulable)
+      ) {
+        if (await this.isAccountTemporarilyUnavailable(apiKeyData.vertexAccountId, 'vertex')) {
+          logger.warn(
+            `⏱️ Bound Vertex account ${apiKeyData.vertexAccountId} is temporarily unavailable, falling back to shared pool`
+          )
+        } else {
+          logger.info(
+            `🎯 Using bound dedicated Vertex account: ${boundVertexAccountResult.data.name} (${apiKeyData.vertexAccountId})`
+          )
+          return [
+            {
+              ...boundVertexAccountResult.data,
+              accountId: boundVertexAccountResult.data.id,
+              accountType: 'vertex',
+              priority: parseInt(boundVertexAccountResult.data.priority) || 50,
+              lastUsedAt: boundVertexAccountResult.data.lastUsedAt || '0'
+            }
+          ]
+        }
+      } else {
+        logger.warn(
+          `⚠️ Bound Vertex account ${apiKeyData.vertexAccountId} is not available (isActive: ${boundVertexAccountResult?.data?.isActive}, schedulable: ${boundVertexAccountResult?.data?.schedulable})`
         )
       }
     }
@@ -885,6 +955,46 @@ class UnifiedClaudeScheduler {
       }
     }
 
+    // 获取 Vertex AI 账户（共享池）
+    const vertexAccountsResult = await vertexAccountService.getAllAccounts()
+    if (vertexAccountsResult.success) {
+      const vertexAccounts = vertexAccountsResult.data
+      logger.info(`📋 Found ${vertexAccounts.length} total Vertex AI accounts`)
+
+      for (const account of vertexAccounts) {
+        logger.info(
+          `🔍 Checking Vertex account: ${account.name} - isActive: ${account.isActive}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
+        )
+
+        if (
+          account.isActive === true &&
+          account.accountType === 'shared' &&
+          isSchedulable(account.schedulable)
+        ) {
+          const isTempUnavailable = await this.isAccountTemporarilyUnavailable(account.id, 'vertex')
+          if (isTempUnavailable) {
+            logger.debug(`⏭️ Skipping Vertex account ${account.name} - temporarily unavailable`)
+            continue
+          }
+
+          availableAccounts.push({
+            ...account,
+            accountId: account.id,
+            accountType: 'vertex',
+            priority: parseInt(account.priority) || 50,
+            lastUsedAt: account.lastUsedAt || '0'
+          })
+          logger.info(
+            `✅ Added Vertex account to available pool: ${account.name} (priority: ${account.priority})`
+          )
+        } else {
+          logger.info(
+            `❌ Vertex account ${account.name} not eligible - isActive: ${account.isActive}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
+          )
+        }
+      }
+    }
+
     // 获取CCR账户（共享池）- 仅当明确要求包含时
     if (includeCcr) {
       const ccrAccounts = await ccrAccountService.getAllAccounts()
@@ -953,7 +1063,7 @@ class UnifiedClaudeScheduler {
     }
 
     logger.info(
-      `📊 Total available accounts: ${availableAccounts.length} (Claude: ${availableAccounts.filter((a) => a.accountType === 'claude-official').length}, Console: ${availableAccounts.filter((a) => a.accountType === 'claude-console').length}, Bedrock: ${availableAccounts.filter((a) => a.accountType === 'bedrock').length}, CCR: ${availableAccounts.filter((a) => a.accountType === 'ccr').length})`
+      `📊 Total available accounts: ${availableAccounts.length} (Claude: ${availableAccounts.filter((a) => a.accountType === 'claude-official').length}, Console: ${availableAccounts.filter((a) => a.accountType === 'claude-console').length}, Bedrock: ${availableAccounts.filter((a) => a.accountType === 'bedrock').length}, Vertex: ${availableAccounts.filter((a) => a.accountType === 'vertex').length}, CCR: ${availableAccounts.filter((a) => a.accountType === 'ccr').length})`
     )
 
     // 🚨 最终检查：只有在没有任何可用账户时，才根据Console并发排除情况抛出专用错误码
@@ -1127,6 +1237,20 @@ class UnifiedClaudeScheduler {
         }
 
         // Bedrock账户暂不需要限流检查，因为AWS管理限流
+        return true
+      } else if (accountType === 'vertex') {
+        const accountResult = await vertexAccountService.getAccount(accountId)
+        if (!accountResult.success || !accountResult.data.isActive) {
+          return false
+        }
+        if (!isSchedulable(accountResult.data.schedulable)) {
+          logger.info(`🚫 Vertex account ${accountId} is not schedulable`)
+          return false
+        }
+        if (await this.isAccountTemporarilyUnavailable(accountId, 'vertex')) {
+          return false
+        }
+        // Vertex AI 账户暂不需要限流检查，由 Google Cloud 管理
         return true
       } else if (accountType === 'ccr') {
         const account = await ccrAccountService.getAccount(accountId)
