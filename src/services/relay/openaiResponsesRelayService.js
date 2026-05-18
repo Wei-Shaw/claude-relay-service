@@ -365,8 +365,8 @@ class OpenAIResponsesRelayService {
         }
       }
 
-      // 监听客户端断开事件
-      req.once('close', handleClientDisconnect)
+      // 监听客户端断开事件。不要使用 req.close：在流式响应中它可能只表示请求体已读完。
+      req.once('aborted', handleClientDisconnect)
       res.once('close', handleClientDisconnect)
 
       const { targetUrl, headers, requestOptions } = this._createRequestOptions(req, fullAccount, {
@@ -491,7 +491,7 @@ class OpenAIResponsesRelayService {
           })
 
           // 清理监听器
-          req.removeListener('close', handleClientDisconnect)
+          req.removeListener('aborted', handleClientDisconnect)
           res.removeListener('close', handleClientDisconnect)
 
           return res.status(unauthorizedResponse.status).json(unauthorizedResponse.body)
@@ -529,7 +529,7 @@ class OpenAIResponsesRelayService {
         }
 
         // 清理监听器
-        req.removeListener('close', handleClientDisconnect)
+        req.removeListener('aborted', handleClientDisconnect)
         res.removeListener('close', handleClientDisconnect)
 
         const safeErrorResponse = buildOpenAIResponsesClientError(response.status, errorData, {
@@ -871,7 +871,7 @@ class OpenAIResponsesRelayService {
       }
 
       // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
+      req.removeListener('aborted', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
 
       if (!res.destroyed) {
@@ -890,7 +890,7 @@ class OpenAIResponsesRelayService {
       logger.error('Stream error:', error)
 
       // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
+      req.removeListener('aborted', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
 
       if (!res.headersSent) {
@@ -914,7 +914,6 @@ class OpenAIResponsesRelayService {
       }
     }
 
-    req.on('close', cleanup)
     req.on('aborted', cleanup)
   }
 

@@ -987,6 +987,42 @@ function extractOpenAIStreamError(eventData) {
   return null
 }
 
+function summarizeOpenAIStreamEvent(eventData) {
+  if (!eventData || typeof eventData !== 'object') {
+    return null
+  }
+
+  if (eventData.type === 'response.completed' && eventData.response) {
+    const output = Array.isArray(eventData.response.output) ? eventData.response.output : []
+    return {
+      status: eventData.response.status,
+      outputTypes: output.map((item) => item?.type).filter(Boolean),
+      contentTypes: output
+        .flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
+        .map((part) => part?.type)
+        .filter(Boolean)
+    }
+  }
+
+  if (eventData.type === 'response.output_item.done' && eventData.item) {
+    return {
+      itemType: eventData.item.type,
+      contentTypes: Array.isArray(eventData.item.content)
+        ? eventData.item.content.map((part) => part?.type).filter(Boolean)
+        : []
+    }
+  }
+
+  if (Array.isArray(eventData.choices)) {
+    return {
+      object: eventData.object,
+      choiceKeys: Object.keys(eventData.choices[0] || {})
+    }
+  }
+
+  return null
+}
+
 // 🧪 API Key 端点测试接口 - 测试API Key是否能正常访问服务
 router.post('/api-key/test', async (req, res) => {
   const config = require('../../config/config')
@@ -1304,6 +1340,8 @@ router.post('/api-key/test-openai', async (req, res) => {
       let buffer = ''
       let responseText = ''
       let streamError = null
+      const seenEventTypes = new Set()
+      let lastEventSummary = null
 
       const sendContent = (text) => {
         if (!text) {
@@ -1325,6 +1363,16 @@ router.post('/api-key/test-openai', async (req, res) => {
 
         try {
           const data = JSON.parse(jsonStr)
+          if (data.type) {
+            seenEventTypes.add(data.type)
+          } else if (data.object) {
+            seenEventTypes.add(data.object)
+          }
+          const summary = summarizeOpenAIStreamEvent(data)
+          if (summary) {
+            lastEventSummary = summary
+          }
+
           const errorText = extractOpenAIStreamError(data)
           if (errorText) {
             streamError = errorText
@@ -1384,8 +1432,16 @@ router.post('/api-key/test-openai', async (req, res) => {
         } else if (responseText) {
           res.write(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
         } else {
+          const details = {
+            events: Array.from(seenEventTypes).slice(-10),
+            lastEvent: lastEventSummary
+          }
           res.write(
-            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: 'No response content received from upstream' })}\n\n`
+            `data: ${JSON.stringify({
+              type: 'test_complete',
+              success: false,
+              error: `No response content received from upstream: ${JSON.stringify(details)}`
+            })}\n\n`
           )
         }
         res.end()
