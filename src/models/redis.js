@@ -1955,6 +1955,51 @@ class RedisClient {
     await this.client.expire(weeklyKey, 14 * 24 * 3600)
   }
 
+  // 💰 获取本周全模型费用（支持自定义重置周期）
+  async getWeeklyCost(keyId, resetDay = 1, resetHour = 0) {
+    const periodStr = getPeriodString(resetDay, resetHour)
+    const costKey = `usage:weekly:${keyId}:${periodStr}`
+    const cost = await this.client.get(costKey)
+    const result = parseFloat(cost || 0)
+    logger.debug(
+      `💰 Getting weekly cost for ${keyId}, period: ${periodStr}, key: ${costKey}, value: ${cost}, result: ${result}`
+    )
+    return result
+  }
+
+  // 💰 增加本周全模型费用（支持倍率成本和真实成本，支持自定义重置周期）
+  // amount: 倍率后的成本（用于限额校验）
+  // realAmount: 真实成本（用于对账），如果不传则等于 amount
+  async incrementWeeklyCost(keyId, amount, realAmount = null, resetDay = 1, resetHour = 0) {
+    const periodStr = getPeriodString(resetDay, resetHour)
+    const weeklyKey = `usage:weekly:${keyId}:${periodStr}`
+    const realWeeklyKey = `usage:real:weekly:${keyId}:${periodStr}`
+    const actualRealAmount = realAmount !== null ? realAmount : amount
+
+    logger.debug(
+      `💰 Incrementing weekly cost for ${keyId}, period: ${periodStr}, rated: $${amount}, real: $${actualRealAmount}`
+    )
+
+    const pipeline = this.client.pipeline()
+    pipeline.incrbyfloat(weeklyKey, amount)
+    pipeline.incrbyfloat(realWeeklyKey, actualRealAmount)
+    // 设置周费用键的过期时间为 2 周
+    pipeline.expire(weeklyKey, 14 * 24 * 3600)
+    pipeline.expire(realWeeklyKey, 14 * 24 * 3600)
+
+    const results = await pipeline.exec()
+    logger.debug(`💰 Weekly cost incremented successfully, new weekly total: $${results[0][1]}`)
+  }
+
+  // 💰 覆盖设置本周全模型费用（用于回填/迁移，支持自定义周期标识）
+  async setWeeklyCost(keyId, amount, periodString = null, resetDay = 1, resetHour = 0) {
+    const currentPeriod = periodString || getPeriodString(resetDay, resetHour)
+    const weeklyKey = `usage:weekly:${keyId}:${currentPeriod}`
+
+    await this.client.set(weeklyKey, String(amount || 0))
+    await this.client.expire(weeklyKey, 14 * 24 * 3600)
+  }
+
   // 💰 计算账户的每日费用（基于模型使用，使用索引集合替代 KEYS）
   async getAccountDailyCost(accountId) {
     const CostCalculator = require('../utils/costCalculator')
@@ -4831,6 +4876,8 @@ redisClient.batchGetApiKeyStats = async function (keyIds) {
     pipeline.zcard(`concurrency:${keyId}`)
     // weekly opus cost (1 get)
     pipeline.get(`usage:opus:weekly:${keyId}:${currentWeek}`)
+    // weekly cost - all models (1 get)
+    pipeline.get(`usage:weekly:${keyId}:${currentWeek}`)
     // rate limit (4 get)
     pipeline.get(`rate_limit:requests:${keyId}`)
     pipeline.get(`rate_limit:tokens:${keyId}`)
@@ -4842,7 +4889,7 @@ redisClient.batchGetApiKeyStats = async function (keyIds) {
 
   const results = await pipeline.exec()
   const statsMap = new Map()
-  const FIELDS_PER_KEY = 14
+  const FIELDS_PER_KEY = 15
 
   for (let i = 0; i < keyIds.length; i++) {
     const keyId = keyIds[i]
@@ -4858,6 +4905,7 @@ redisClient.batchGetApiKeyStats = async function (keyIds) {
       [, costTotal],
       [, concurrency],
       [, weeklyOpusCost],
+      [, weeklyCost],
       [, rateLimitRequests],
       [, rateLimitTokens],
       [, rateLimitCost],
@@ -4878,6 +4926,7 @@ redisClient.batchGetApiKeyStats = async function (keyIds) {
       concurrency: concurrency || 0,
       dailyCost: parseFloat(costDaily || 0),
       weeklyOpusCost: parseFloat(weeklyOpusCost || 0),
+      weeklyCost: parseFloat(weeklyCost || 0),
       rateLimit: {
         requests: parseInt(rateLimitRequests || 0),
         tokens: parseInt(rateLimitTokens || 0),
