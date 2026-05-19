@@ -250,11 +250,7 @@ class WeeklyClaudeCostInitService {
 
             // ----- Opus bucket：保留运行时 recordOpusCost 的过滤条件 -----
             const opusAccountType = inferAccountType(keyData)
-            if (
-              isClaudeModel &&
-              opusAccountType &&
-              OPUS_ACCOUNT_TYPES.includes(opusAccountType)
-            ) {
+            if (isClaudeModel && opusAccountType && OPUS_ACCOUNT_TYPES.includes(opusAccountType)) {
               matchedClaudeEntries++
               const opusService = serviceRatesService.getService(opusAccountType, entry.model)
 
@@ -277,10 +273,7 @@ class WeeklyClaudeCostInitService {
                 opusCostByKeyDate.set(entry.keyId, new Map())
               }
               const opusDateMap = opusCostByKeyDate.get(entry.keyId)
-              opusDateMap.set(
-                entry.dateStr,
-                (opusDateMap.get(entry.dateStr) || 0) + opusRatedCost
-              )
+              opusDateMap.set(entry.dateStr, (opusDateMap.get(entry.dateStr) || 0) + opusRatedCost)
             }
 
             // ----- 全模型 bucket：所有模型 + 所有账户类型 -----
