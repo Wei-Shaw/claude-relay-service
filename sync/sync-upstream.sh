@@ -69,6 +69,18 @@ if [ "$MERGE_EXIT" -eq 0 ]; then
     NEW_HEAD=$(git rev-parse --short HEAD)
     info "上游更改合并成功。"
     info "新的 HEAD：$NEW_HEAD"
+
+    # 9. 版本号追加 .pt 后缀
+    if [ -f "VERSION" ] && git diff --name-only HEAD~1 | grep -qx "VERSION"; then
+        VERSION=$(cat VERSION | tr -d '\n')
+        if [[ "$VERSION" != *.pt ]]; then
+            echo "${VERSION}.pt" > VERSION
+            git add VERSION
+            git commit -m "chore: 同步后追加 .pt 版本后缀 [skip ci]" >/dev/null 2>&1
+            info "版本号已更新为 ${VERSION}.pt"
+        fi
+    fi
+
     echo ""
     info "推送到您的 origin："
     echo "  git push origin $LOCAL_BRANCH"
