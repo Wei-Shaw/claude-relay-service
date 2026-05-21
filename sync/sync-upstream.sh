@@ -3,7 +3,7 @@ set -euo pipefail
 
 UPSTREAM_URL="https://github.com/Wei-Shaw/claude-relay-service.git"
 UPSTREAM_NAME="upstream"
-UPSTREAM_BRANCH="master"
+UPSTREAM_BRANCH="main"
 LOCAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 info() { printf '\033[1;34m%s\033[0m\n' "$*"; }
