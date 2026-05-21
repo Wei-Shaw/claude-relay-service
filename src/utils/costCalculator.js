@@ -166,15 +166,21 @@ class CostCalculator {
       costs: {
         input: result.inputCost,
         output: result.outputCost,
+        cacheCreate: result.cacheCreateCost,
         cacheWrite: result.cacheCreateCost,
         cacheRead: result.cacheReadCost,
+        ephemeral5m: result.ephemeral5mCost || 0,
+        ephemeral1h: result.ephemeral1hCost || 0,
         total: result.totalCost
       },
       formatted: {
         input: this.formatCost(result.inputCost),
         output: this.formatCost(result.outputCost),
+        cacheCreate: this.formatCost(result.cacheCreateCost),
         cacheWrite: this.formatCost(result.cacheCreateCost),
         cacheRead: this.formatCost(result.cacheReadCost),
+        ephemeral5m: this.formatCost(result.ephemeral5mCost || 0),
+        ephemeral1h: this.formatCost(result.ephemeral1hCost || 0),
         total: this.formatCost(result.totalCost)
       },
       debug: {
@@ -261,15 +267,21 @@ class CostCalculator {
       costs: {
         input: inputCost,
         output: outputCost,
+        cacheCreate: cacheWriteCost,
         cacheWrite: cacheWriteCost,
         cacheRead: cacheReadCost,
+        ephemeral5m: 0,
+        ephemeral1h: 0,
         total: totalCost
       },
       formatted: {
         input: this.formatCost(inputCost),
         output: this.formatCost(outputCost),
+        cacheCreate: this.formatCost(cacheWriteCost),
         cacheWrite: this.formatCost(cacheWriteCost),
         cacheRead: this.formatCost(cacheReadCost),
+        ephemeral5m: this.formatCost(0),
+        ephemeral1h: this.formatCost(0),
         total: this.formatCost(totalCost)
       },
       debug: {

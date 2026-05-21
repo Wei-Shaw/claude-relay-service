@@ -57,7 +57,11 @@
             <p class="info-value text-amber-600 dark:text-amber-400">
               {{ formatCost(detail.cost) }}
             </p>
-            <p class="info-sub">真实成本 {{ formatCost(detail.realCost) }}</p>
+            <p class="info-sub">
+              {{ detail.costRecomputed ? '估算成本' : '真实成本' }}
+              {{ formatCost(detail.realCost) }}
+              <span v-if="detail.usedFallbackPricing">unknown fallback</span>
+            </p>
           </div>
           <div class="info-card">
             <p class="info-label">缓存命中率</p>
@@ -365,9 +369,7 @@ const formattedSnapshot = computed(() => {
   return JSON.stringify(snapshotSource, null, 2)
 })
 
-const cacheHitRateLabel = computed(() =>
-  detail.value?.isOpenAIRelated ? 'cached_tokens / prompt_tokens' : '读 / (读 + 建)'
-)
+const cacheHitRateLabel = computed(() => '读 / (输入 + 读 + 建)')
 
 const emitClose = () => emit('close')
 

@@ -10,7 +10,11 @@ jest.mock(
 
 jest.mock('../src/models/redis', () => ({
   setApiKey: jest.fn(),
-  getApiKey: jest.fn()
+  getApiKey: jest.fn(),
+  incrementTokenUsage: jest.fn(),
+  incrementDailyCost: jest.fn(),
+  incrementAccountUsage: jest.fn(),
+  addUsageRecord: jest.fn()
 }))
 
 jest.mock('../src/services/costRankService', () => ({
@@ -25,11 +29,24 @@ jest.mock('../src/services/apiKeyIndexService', () => ({
 jest.mock('../src/utils/logger', () => ({
   success: jest.fn(),
   warn: jest.fn(),
-  error: jest.fn()
+  error: jest.fn(),
+  database: jest.fn(),
+  debug: jest.fn()
 }))
 
-jest.mock('../src/services/serviceRatesService', () => ({}))
-jest.mock('../src/services/requestDetailService', () => ({}))
+jest.mock('../src/services/serviceRatesService', () => ({
+  getService: jest.fn(),
+  getServiceRate: jest.fn()
+}))
+jest.mock('../src/services/requestDetailService', () => ({
+  captureRequestDetail: jest.fn()
+}))
+jest.mock('../src/services/billingEventPublisher', () => ({
+  publishBillingEvent: jest.fn()
+}))
+jest.mock('../src/utils/costCalculator', () => ({
+  calculateCost: jest.fn()
+}))
 jest.mock('../src/utils/modelHelper', () => ({
   isClaudeFamilyModel: jest.fn(() => false)
 }))
@@ -38,11 +55,29 @@ jest.mock('../src/utils/requestDetailHelper', () => ({
 }))
 
 const redis = require('../src/models/redis')
+const serviceRatesService = require('../src/services/serviceRatesService')
+const requestDetailService = require('../src/services/requestDetailService')
+const billingEventPublisher = require('../src/services/billingEventPublisher')
+const CostCalculator = require('../src/utils/costCalculator')
 const apiKeyService = require('../src/services/apiKeyService')
 
 describe('apiKeyService openai responses config', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    redis.getApiKey.mockResolvedValue({
+      id: 'key-1',
+      name: 'Key',
+      serviceRates: '{}'
+    })
+    redis.setApiKey.mockResolvedValue()
+    redis.incrementTokenUsage.mockResolvedValue()
+    redis.incrementDailyCost.mockResolvedValue()
+    redis.incrementAccountUsage.mockResolvedValue()
+    redis.addUsageRecord.mockResolvedValue()
+    serviceRatesService.getService.mockReturnValue('claude')
+    serviceRatesService.getServiceRate.mockResolvedValue(1)
+    requestDetailService.captureRequestDetail.mockResolvedValue({ captured: true })
+    billingEventPublisher.publishBillingEvent.mockResolvedValue()
   })
 
   test('generateApiKey stores default toggle values', async () => {
@@ -122,5 +157,84 @@ describe('apiKeyService openai responses config', () => {
     expect(result.openaiResponsesPayloadRules).toEqual([
       { path: 'model', valueType: 'string', value: 'gpt-5' }
     ])
+  })
+
+  test('recordUsageWithDetails uses CostCalculator unknown fallback for missing model pricing', async () => {
+    CostCalculator.calculateCost.mockReturnValue({
+      costs: {
+        input: 0.051618,
+        output: 0.000765,
+        cacheCreate: 0,
+        cacheWrite: 0,
+        cacheRead: 0.0006144,
+        total: 0.0529974
+      },
+      debug: {
+        usedFallbackPricing: true,
+        pricingSource: 'unknown-fallback',
+        isLongContextRequest: false
+      },
+      usingDynamicPricing: false
+    })
+
+    const result = await apiKeyService.recordUsageWithDetails(
+      'key-1',
+      {
+        input_tokens: 17206,
+        output_tokens: 51,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 2048
+      },
+      'mimo-v2.5-pro',
+      'acct-1',
+      'claude-console',
+      {
+        requestId: 'req-1',
+        endpoint: '/api/v1/messages',
+        method: 'POST',
+        statusCode: 200
+      }
+    )
+
+    expect(CostCalculator.calculateCost).toHaveBeenCalledWith(
+      {
+        input_tokens: 17206,
+        output_tokens: 51,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 2048
+      },
+      'mimo-v2.5-pro'
+    )
+    expect(result.realCost).toBeCloseTo(0.0529974, 10)
+    expect(result.ratedCost).toBeCloseTo(0.0529974, 10)
+    expect(redis.incrementDailyCost.mock.calls[0][0]).toBe('key-1')
+    expect(redis.incrementDailyCost.mock.calls[0][1]).toBeCloseTo(0.0529974, 10)
+    expect(redis.incrementDailyCost.mock.calls[0][2]).toBeCloseTo(0.0529974, 10)
+    expect(redis.addUsageRecord).toHaveBeenCalledWith(
+      'key-1',
+      expect.objectContaining({
+        model: 'mimo-v2.5-pro',
+        cost: 0.052997,
+        realCost: 0.052997,
+        usedFallbackPricing: true,
+        pricingSource: 'unknown-fallback',
+        costBreakdown: expect.objectContaining({
+          input: 0.051618,
+          output: 0.000765,
+          cacheRead: 0.0006144,
+          total: 0.0529974
+        })
+      })
+    )
+    expect(requestDetailService.captureRequestDetail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'req-1',
+        model: 'mimo-v2.5-pro',
+        cost: 0.052997,
+        realCost: 0.052997,
+        usedFallbackPricing: true,
+        pricingSource: 'unknown-fallback'
+      })
+    )
   })
 })
