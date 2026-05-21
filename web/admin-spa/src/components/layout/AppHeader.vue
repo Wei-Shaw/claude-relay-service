@@ -1,7 +1,7 @@
 <template>
   <!-- 顶部导航 -->
   <div
-    class="glass-strong mb-4 rounded-xl p-3 shadow-xl sm:mb-6 sm:rounded-2xl sm:p-4 md:mb-8 md:rounded-3xl md:p-6"
+    class="glass-strong mb-[10px] rounded-xl p-[10px] shadow-xl sm:rounded-2xl md:rounded-3xl"
     style="z-index: 10; position: relative"
   >
     <div class="flex flex-col items-center justify-between gap-3 sm:flex-row sm:gap-4">

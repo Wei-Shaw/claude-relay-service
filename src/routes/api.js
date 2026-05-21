@@ -1537,8 +1537,8 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
 
     const modelService = require('../services/modelService')
 
-    // 从 modelService 获取所有支持的模型
-    const models = modelService.getAllModels()
+    // 只返回有活跃账户支持的模型
+    const models = await modelService.getAvailableModels()
 
     // 可选：根据 API Key 的模型限制过滤
     let filteredModels = models
