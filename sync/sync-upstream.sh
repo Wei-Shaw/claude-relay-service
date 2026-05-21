@@ -4,7 +4,7 @@ set -euo pipefail
 UPSTREAM_URL="https://github.com/Wei-Shaw/claude-relay-service.git"
 UPSTREAM_NAME="upstream"
 UPSTREAM_BRANCH="master"
-LOCAL_BRANCH="master"
+LOCAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 info() { printf '\033[1;34m%s\033[0m\n' "$*"; }
 err()  { printf '\033[1;31merror: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -18,13 +18,7 @@ if [ -n "$(git status --porcelain)" ]; then
     err "工作目录不干净。请在同步前先暂存或提交您的更改。"
 fi
 
-# 3. 检查当前分支
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-if [ "$CURRENT_BRANCH" != "$LOCAL_BRANCH" ]; then
-    err "当前不在 '$LOCAL_BRANCH' 分支（当前为 '$CURRENT_BRANCH'）。请运行：git switch $LOCAL_BRANCH"
-fi
-
-# 4. 配置上游远程仓库（幂等操作）
+# 3. 配置上游远程仓库（幂等操作）
 if git remote get-url "$UPSTREAM_NAME" >/dev/null 2>&1; then
     EXISTING_URL=$(git remote get-url "$UPSTREAM_NAME")
     if [ "$EXISTING_URL" != "$UPSTREAM_URL" ]; then
