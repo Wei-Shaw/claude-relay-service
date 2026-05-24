@@ -199,6 +199,38 @@
           </p>
         </div>
 
+        <!-- 全模型周费用限制 -->
+        <div v-if="statsData.limits.weeklyCostLimit > 0">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
+              >全模型周费用限制</span
+            >
+            <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+              ${{ (statsData.limits.weeklyCost || 0).toFixed(4) }} / ${{
+                statsData.limits.weeklyCostLimit.toFixed(2)
+              }}
+            </span>
+          </div>
+          <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+            <div
+              class="h-2 rounded-full transition-all duration-300"
+              :class="getWeeklyCostProgressColor()"
+              :style="{ width: getWeeklyCostProgress() + '%' }"
+            />
+          </div>
+          <p
+            v-if="statsData.limits.weeklyResetDay"
+            class="mt-1 text-xs text-gray-400 dark:text-gray-500"
+          >
+            每{{
+              ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][
+                statsData.limits.weeklyResetDay || 1
+              ]
+            }}
+            {{ String(statsData.limits.weeklyResetHour || 0).padStart(2, '0') }}:00 (UTC+8) 重置
+          </p>
+        </div>
+
         <!-- 时间窗口限制 -->
         <div
           v-if="
@@ -413,6 +445,23 @@ const getOpusWeeklyCostProgressColor = () => {
   if (progress >= 100) return 'bg-red-500'
   if (progress >= 80) return 'bg-yellow-500'
   return 'bg-indigo-500' // 使用紫色表示Opus模型
+}
+
+// 获取全模型周费用进度
+const getWeeklyCostProgress = () => {
+  if (!statsData.value.limits.weeklyCostLimit || statsData.value.limits.weeklyCostLimit === 0)
+    return 0
+  const percentage =
+    (statsData.value.limits.weeklyCost / statsData.value.limits.weeklyCostLimit) * 100
+  return Math.min(percentage, 100)
+}
+
+// 获取全模型周费用进度条颜色
+const getWeeklyCostProgressColor = () => {
+  const progress = getWeeklyCostProgress()
+  if (progress >= 100) return 'bg-red-500'
+  if (progress >= 80) return 'bg-yellow-500'
+  return 'bg-cyan-500'
 }
 
 // 格式化数字

@@ -196,6 +196,7 @@ class ApiKeyService {
       dailyCostLimit = 0,
       totalCostLimit = 0,
       weeklyOpusCostLimit = 0,
+      weeklyCostLimit = 0,
       tags = [],
       activationDays = 0, // 新增：激活后有效天数（0表示不使用此功能）
       activationUnit = 'days', // 新增：激活时间单位 'hours' 或 'days'
@@ -250,6 +251,7 @@ class ApiKeyService {
       dailyCostLimit: String(dailyCostLimit || 0),
       totalCostLimit: String(totalCostLimit || 0),
       weeklyOpusCostLimit: String(weeklyOpusCostLimit || 0),
+      weeklyCostLimit: String(weeklyCostLimit || 0),
       tags: JSON.stringify(tags || []),
       activationDays: String(activationDays || 0), // 新增：激活后有效天数
       activationUnit: activationUnit || 'days', // 新增：激活时间单位
@@ -326,6 +328,7 @@ class ApiKeyService {
       dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
       totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
       weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
+      weeklyCostLimit: parseFloat(keyData.weeklyCostLimit || 0),
       tags: JSON.parse(keyData.tags || '[]'),
       activationDays: parseInt(keyData.activationDays || 0),
       activationUnit: keyData.activationUnit || 'days',
@@ -432,6 +435,7 @@ class ApiKeyService {
       const dailyCostLimit = parseFloat(keyData.dailyCostLimit || 0)
       const totalCostLimit = parseFloat(keyData.totalCostLimit || 0)
       const weeklyOpusCostLimit = parseFloat(keyData.weeklyOpusCostLimit || 0)
+      const weeklyCostLimit = parseFloat(keyData.weeklyCostLimit || 0)
 
       const costQueries = []
       if (dailyCostLimit > 0) {
@@ -447,6 +451,13 @@ class ApiKeyService {
           redis
             .getWeeklyOpusCost(keyData.id, resetDay, resetHour)
             .then((v) => ({ weeklyOpusCost: v || 0 }))
+        )
+      }
+      if (weeklyCostLimit > 0) {
+        const resetDay = parseInt(keyData.weeklyResetDay || 1)
+        const resetHour = parseInt(keyData.weeklyResetHour || 0)
+        costQueries.push(
+          redis.getWeeklyCost(keyData.id, resetDay, resetHour).then((v) => ({ weeklyCost: v || 0 }))
         )
       }
 
@@ -530,9 +541,11 @@ class ApiKeyService {
           dailyCostLimit,
           totalCostLimit,
           weeklyOpusCostLimit,
+          weeklyCostLimit,
           dailyCost: costData.dailyCost || 0,
           totalCost: costData.totalCost || 0,
           weeklyOpusCost: costData.weeklyOpusCost || 0,
+          weeklyCost: costData.weeklyCost || 0,
           weeklyResetDay: parseInt(keyData.weeklyResetDay || 1),
           weeklyResetHour: parseInt(keyData.weeklyResetHour || 0),
           tags,
@@ -676,10 +689,17 @@ class ApiKeyService {
           dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
           totalCostLimit: parseFloat(keyData.totalCostLimit || 0),
           weeklyOpusCostLimit: parseFloat(keyData.weeklyOpusCostLimit || 0),
+          weeklyCostLimit: parseFloat(keyData.weeklyCostLimit || 0),
           dailyCost: dailyCost || 0,
           totalCost: costStats?.total || 0,
           weeklyOpusCost:
             (await redis.getWeeklyOpusCost(
+              keyData.id,
+              parseInt(keyData.weeklyResetDay || 1),
+              parseInt(keyData.weeklyResetHour || 0)
+            )) || 0,
+          weeklyCost:
+            (await redis.getWeeklyCost(
               keyData.id,
               parseInt(keyData.weeklyResetDay || 1),
               parseInt(keyData.weeklyResetHour || 0)
@@ -899,9 +919,16 @@ class ApiKeyService {
         key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0)
         key.totalCostLimit = parseFloat(key.totalCostLimit || 0)
         key.weeklyOpusCostLimit = parseFloat(key.weeklyOpusCostLimit || 0)
+        key.weeklyCostLimit = parseFloat(key.weeklyCostLimit || 0)
         key.dailyCost = (await redis.getDailyCost(key.id)) || 0
         key.weeklyOpusCost =
           (await redis.getWeeklyOpusCost(
+            key.id,
+            parseInt(key.weeklyResetDay || 1),
+            parseInt(key.weeklyResetHour || 0)
+          )) || 0
+        key.weeklyCost =
+          (await redis.getWeeklyCost(
             key.id,
             parseInt(key.weeklyResetDay || 1),
             parseInt(key.weeklyResetHour || 0)
@@ -1132,6 +1159,7 @@ class ApiKeyService {
         key.totalCost = stats.costStats?.total || 0
         key.dailyCost = stats.dailyCost || 0
         key.weeklyOpusCost = stats.weeklyOpusCost || 0
+        key.weeklyCost = stats.weeklyCost || 0
 
         // 并发
         key.currentConcurrency = stats.concurrency || 0
@@ -1145,6 +1173,7 @@ class ApiKeyService {
         key.dailyCostLimit = parseFloat(key.dailyCostLimit) || 0
         key.totalCostLimit = parseFloat(key.totalCostLimit) || 0
         key.weeklyOpusCostLimit = parseFloat(key.weeklyOpusCostLimit) || 0
+        key.weeklyCostLimit = parseFloat(key.weeklyCostLimit) || 0
         key.activationDays = parseInt(key.activationDays) || 0
         key.isActive = key.isActive === 'true' || key.isActive === true
         key.enableModelRestriction =
@@ -1353,6 +1382,7 @@ class ApiKeyService {
         'dailyCostLimit',
         'totalCostLimit',
         'weeklyOpusCostLimit',
+        'weeklyCostLimit',
         'tags',
         'userId', // 新增：用户ID（所有者变更）
         'userUsername', // 新增：用户名（所有者变更）
@@ -1724,6 +1754,8 @@ class ApiKeyService {
 
         // 记录 Opus 周费用（如果适用）
         await this.recordOpusCost(keyId, ratedCost, realCost, model, accountType)
+        // 记录全模型周费用（所有模型 + 所有账户类型）
+        await this.recordWeeklyCost(keyId, ratedCost, realCost)
       } else {
         logger.debug(`💰 No cost recorded for ${keyId} - zero cost for model: ${model}`)
       }
@@ -1847,6 +1879,24 @@ class ApiKeyService {
     }
   }
 
+  // 📊 记录全模型周费用（不做模型/账户类型过滤，所有请求都累加）
+  // ratedCost: 倍率后的成本（用于限额校验）
+  // realCost: 真实成本（用于对账），如果不传则等于 ratedCost
+  async recordWeeklyCost(keyId, ratedCost, realCost) {
+    try {
+      const keyData = await redis.getApiKey(keyId)
+      const resetDay = parseInt(keyData?.weeklyResetDay || 1)
+      const resetHour = parseInt(keyData?.weeklyResetHour || 0)
+
+      await redis.incrementWeeklyCost(keyId, ratedCost, realCost, resetDay, resetHour)
+      logger.database(
+        `💰 Recorded weekly cost for ${keyId}: rated=$${ratedCost.toFixed(6)}, real=$${realCost.toFixed(6)}`
+      )
+    } catch (error) {
+      logger.error('❌ Failed to record weekly cost:', error)
+    }
+  }
+
   // 📊 记录使用情况（新版本，支持详细的缓存类型）
   async recordUsageWithDetails(
     keyId,
@@ -1961,6 +2011,8 @@ class ApiKeyService {
           model,
           accountType
         )
+        // 记录全模型周费用（所有模型 + 所有账户类型）
+        await this.recordWeeklyCost(keyId, ratedCostWithDetails, realCostWithDetails)
 
         // 记录详细的缓存费用（如果有）
         if (costInfo.ephemeral5mCost > 0 || costInfo.ephemeral1hCost > 0) {

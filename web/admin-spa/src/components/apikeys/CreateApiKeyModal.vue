@@ -431,7 +431,10 @@
                 设置 Claude 模型的周费用限制，仅对 Claude 模型请求生效，0 或留空表示无限制
               </p>
               <div
-                v-if="form.weeklyOpusCostLimit && Number(form.weeklyOpusCostLimit) > 0"
+                v-if="
+                  (form.weeklyOpusCostLimit && Number(form.weeklyOpusCostLimit) > 0) ||
+                  (form.weeklyCostLimit && Number(form.weeklyCostLimit) > 0)
+                "
                 class="mt-2 flex gap-3"
               >
                 <div class="flex-1">
@@ -465,6 +468,55 @@
                   </select>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >全模型周费用限制 (美元)</label
+            >
+            <div class="space-y-2">
+              <div class="flex gap-2">
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.weeklyCostLimit = '100'"
+                >
+                  $100
+                </button>
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.weeklyCostLimit = '500'"
+                >
+                  $500
+                </button>
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.weeklyCostLimit = '1000'"
+                >
+                  $1000
+                </button>
+                <button
+                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  type="button"
+                  @click="form.weeklyCostLimit = ''"
+                >
+                  自定义
+                </button>
+              </div>
+              <input
+                v-model="form.weeklyCostLimit"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                min="0"
+                placeholder="0 表示无限制"
+                step="0.01"
+                type="number"
+              />
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                所有模型（含 Claude）请求都计入此额度，重置日/时与上方共用，0 或留空表示无限制
+              </p>
             </div>
           </div>
 
@@ -1095,6 +1147,7 @@ const form = reactive({
   dailyCostLimit: '',
   totalCostLimit: '',
   weeklyOpusCostLimit: '',
+  weeklyCostLimit: '',
   weeklyResetDay: 1,
   weeklyResetHour: 0,
   expireDuration: '',
@@ -1530,6 +1583,10 @@ const createApiKey = async () => {
       weeklyOpusCostLimit:
         form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null
           ? parseFloat(form.weeklyOpusCostLimit)
+          : 0,
+      weeklyCostLimit:
+        form.weeklyCostLimit !== '' && form.weeklyCostLimit !== null
+          ? parseFloat(form.weeklyCostLimit)
           : 0,
       weeklyResetDay: form.weeklyResetDay,
       weeklyResetHour: form.weeklyResetHour,
