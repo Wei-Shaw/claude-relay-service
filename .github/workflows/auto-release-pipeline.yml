@@ -284,7 +284,7 @@ jobs:
 
     - name: Create GitHub Release
       if: steps.check.outputs.needs_bump == 'true'
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.next_version.outputs.new_tag }}
         name: Release ${{ steps.next_version.outputs.new_version }}
