@@ -2,8 +2,10 @@ const express = require('express')
 const claudeRelayService = require('../services/relay/claudeRelayService')
 const claudeConsoleRelayService = require('../services/relay/claudeConsoleRelayService')
 const bedrockRelayService = require('../services/relay/bedrockRelayService')
+const vertexRelayService = require('../services/relay/vertexRelayService')
 const ccrRelayService = require('../services/relay/ccrRelayService')
 const bedrockAccountService = require('../services/account/bedrockAccountService')
+const vertexAccountService = require('../services/account/vertexAccountService')
 const unifiedClaudeScheduler = require('../services/scheduler/unifiedClaudeScheduler')
 const apiKeyService = require('../services/apiKeyService')
 const { authenticateApiKey } = require('../middleware/auth')
@@ -789,6 +791,100 @@ async function handleMessagesRequest(req, res) {
           }
           return undefined
         }
+      } else if (accountType === 'vertex') {
+        // Vertex AI 账号使用 Vertex 转发服务
+        const _apiKeyIdVertex = req.apiKey.id
+        const _rateLimitInfoVertex = req.rateLimitInfo
+        const _requestBodyVertex = req.body
+
+        try {
+          const vertexAccountResult = await vertexAccountService.getAccount(accountId)
+          if (!vertexAccountResult.success) {
+            throw new Error('Failed to get Vertex account details')
+          }
+
+          const result = await vertexRelayService.handleStreamRequest(
+            _requestBodyVertex,
+            vertexAccountResult.data,
+            res,
+            req
+          )
+
+          // 记录 Vertex 使用统计
+          if (result.usage) {
+            const inputTokens = result.usage.input_tokens || 0
+            const outputTokens = result.usage.output_tokens || 0
+            const cacheCreateTokens = result.usage.cache_creation_input_tokens || 0
+            const cacheReadTokens = result.usage.cache_read_input_tokens || 0
+
+            apiKeyService
+              .recordUsage(
+                _apiKeyIdVertex,
+                inputTokens,
+                outputTokens,
+                cacheCreateTokens,
+                cacheReadTokens,
+                result.model,
+                accountId,
+                'vertex',
+                null,
+                createRequestDetailMeta(req, {
+                  requestBody: _requestBodyVertex,
+                  stream: true,
+                  statusCode: res.statusCode
+                })
+              )
+              .then((costs) => {
+                queueRateLimitUpdate(
+                  _rateLimitInfoVertex,
+                  {
+                    inputTokens,
+                    outputTokens,
+                    cacheCreateTokens,
+                    cacheReadTokens
+                  },
+                  result.model,
+                  'vertex-stream',
+                  _apiKeyIdVertex,
+                  'vertex',
+                  costs
+                )
+              })
+              .catch((error) => {
+                logger.error('❌ Failed to record Vertex stream usage:', error)
+                queueRateLimitUpdate(
+                  _rateLimitInfoVertex,
+                  {
+                    inputTokens,
+                    outputTokens,
+                    cacheCreateTokens,
+                    cacheReadTokens
+                  },
+                  result.model,
+                  'vertex-stream',
+                  _apiKeyIdVertex,
+                  'vertex'
+                )
+              })
+
+            usageDataCaptured = true
+            logger.api(
+              `📊 Vertex stream usage recorded - Model: ${result.model}, Input: ${inputTokens}, Output: ${outputTokens}, Total: ${inputTokens + outputTokens} tokens`
+            )
+          }
+        } catch (error) {
+          logger.error('❌ Vertex stream request failed:', error)
+          if (!res.headersSent) {
+            const statusCode = error.statusCode || error.response?.status || 500
+            return res
+              .status(statusCode)
+              .json({ error: 'Vertex service error', message: error.message })
+          }
+          if (!res.writableEnded) {
+            res.end()
+          }
+          return undefined
+        }
       } else if (accountType === 'ccr') {
         // CCR账号使用CCR转发服务（需要传递accountId）
         // 🧹 内存优化：提取需要的值
@@ -1189,6 +1285,45 @@ async function handleMessagesRequest(req, res) {
             statusCode,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ error: 'Bedrock service error', message: error.message }),
+            accountId
+          }
+        }
+      } else if (accountType === 'vertex') {
+        // Vertex AI 账号使用 Vertex 转发服务
+        try {
+          const vertexAccountResult = await vertexAccountService.getAccount(accountId)
+          if (!vertexAccountResult.success) {
+            throw new Error('Failed to get Vertex account details')
+          }
+
+          const result = await vertexRelayService.handleNonStreamRequest(
+            _requestBodyNonStream,
+            vertexAccountResult.data
+          )
+
+          response = {
+            statusCode: result.success ? 200 : 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(result.success ? result.data : { error: result.error }),
+            accountId
+          }
+
+          if (result.success && result.usage) {
+            const responseData = JSON.parse(response.body)
+            responseData.usage = result.usage
+            // 用去除 @<date> 后缀的模型名替换响应中的 model 字段，方便下游 usage 统计
+            if (result.model) {
+              responseData.model = result.model
+            }
+            response.body = JSON.stringify(responseData)
+          }
+        } catch (error) {
+          logger.error('❌ Vertex non-stream request failed:', error)
+          const statusCode = error.statusCode || error.response?.status || 500
+          response = {
+            statusCode,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Vertex service error', message: error.message }),
             accountId
           }
         }
@@ -1760,6 +1895,18 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
           error: {
             type: 'not_supported',
             message: 'Token counting is not supported for Bedrock accounts'
+          }
+        }
+      })
+    }
+
+    if (accountType === 'vertex') {
+      throw Object.assign(new Error('Token counting is not supported for Vertex AI accounts'), {
+        httpStatus: 501,
+        errorPayload: {
+          error: {
+            type: 'not_supported',
+            message: 'Token counting is not supported for Vertex AI accounts'
           }
         }
       })

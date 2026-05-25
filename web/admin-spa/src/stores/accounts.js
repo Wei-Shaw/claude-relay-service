@@ -8,6 +8,7 @@ const PLATFORM_CONFIG = {
   claude: { endpoint: 'claude-accounts', stateKey: 'claudeAccounts' },
   'claude-console': { endpoint: 'claude-console-accounts', stateKey: 'claudeConsoleAccounts' },
   bedrock: { endpoint: 'bedrock-accounts', stateKey: 'bedrockAccounts' },
+  vertex: { endpoint: 'vertex-accounts', stateKey: 'vertexAccounts' },
   gemini: { endpoint: 'gemini-accounts', stateKey: 'geminiAccounts' },
   openai: { endpoint: 'openai-accounts', stateKey: 'openaiAccounts' },
   azure_openai: { endpoint: 'azure-openai-accounts', stateKey: 'azureOpenaiAccounts' },
@@ -22,6 +23,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const claudeAccounts = ref([])
   const claudeConsoleAccounts = ref([])
   const bedrockAccounts = ref([])
+  const vertexAccounts = ref([])
   const geminiAccounts = ref([])
   const openaiAccounts = ref([])
   const azureOpenaiAccounts = ref([])
@@ -37,6 +39,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     claudeAccounts,
     claudeConsoleAccounts,
     bedrockAccounts,
+    vertexAccounts,
     geminiAccounts,
     openaiAccounts,
     azureOpenaiAccounts,
@@ -68,6 +71,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const fetchClaudeConsoleAccounts = () =>
     fetchAccounts(httpApis.getClaudeConsoleAccountsApi, claudeConsoleAccounts)
   const fetchBedrockAccounts = () => fetchAccounts(httpApis.getBedrockAccountsApi, bedrockAccounts)
+  const fetchVertexAccounts = () => fetchAccounts(httpApis.getVertexAccountsApi, vertexAccounts)
   const fetchGeminiAccounts = () => fetchAccounts(httpApis.getGeminiAccountsApi, geminiAccounts)
   const fetchOpenAIAccounts = () => fetchAccounts(httpApis.getOpenAIAccountsApi, openaiAccounts)
   const fetchAzureOpenAIAccounts = () =>
@@ -82,6 +86,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       fetchClaudeAccounts(),
       fetchClaudeConsoleAccounts(),
       fetchBedrockAccounts(),
+      fetchVertexAccounts(),
       fetchGeminiAccounts(),
       fetchOpenAIAccounts(),
       fetchAzureOpenAIAccounts(),
@@ -98,6 +103,8 @@ export const useAccountsStore = defineStore('accounts', () => {
     mutateAccount(httpApis.createClaudeConsoleAccountApi, fetchClaudeConsoleAccounts, data)
   const createBedrockAccount = (data) =>
     mutateAccount(httpApis.createBedrockAccountApi, fetchBedrockAccounts, data)
+  const createVertexAccount = (data) =>
+    mutateAccount(httpApis.createVertexAccountApi, fetchVertexAccounts, data)
   const createGeminiAccount = (data) =>
     mutateAccount(httpApis.createGeminiAccountApi, fetchGeminiAccounts, data)
   const createOpenAIAccount = (data) =>
@@ -118,6 +125,8 @@ export const useAccountsStore = defineStore('accounts', () => {
     mutateAccount(httpApis.updateClaudeConsoleAccountApi, fetchClaudeConsoleAccounts, id, data)
   const updateBedrockAccount = (id, data) =>
     mutateAccount(httpApis.updateBedrockAccountApi, fetchBedrockAccounts, id, data)
+  const updateVertexAccount = (id, data) =>
+    mutateAccount(httpApis.updateVertexAccountApi, fetchVertexAccounts, id, data)
   const updateGeminiAccount = (id, data) =>
     mutateAccount(httpApis.updateGeminiAccountApi, fetchGeminiAccounts, id, data)
   const updateOpenAIAccount = (id, data) =>
@@ -160,6 +169,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         claude: fetchClaudeAccounts,
         'claude-console': fetchClaudeConsoleAccounts,
         bedrock: fetchBedrockAccounts,
+        vertex: fetchVertexAccounts,
         gemini: fetchGeminiAccounts,
         openai: fetchOpenAIAccounts,
         azure_openai: fetchAzureOpenAIAccounts,
@@ -266,6 +276,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     claudeAccounts.value = []
     claudeConsoleAccounts.value = []
     bedrockAccounts.value = []
+    vertexAccounts.value = []
     geminiAccounts.value = []
     openaiAccounts.value = []
     azureOpenaiAccounts.value = []
@@ -281,6 +292,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     claudeAccounts,
     claudeConsoleAccounts,
     bedrockAccounts,
+    vertexAccounts,
     geminiAccounts,
     openaiAccounts,
     azureOpenaiAccounts,
@@ -293,6 +305,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     fetchClaudeAccounts,
     fetchClaudeConsoleAccounts,
     fetchBedrockAccounts,
+    fetchVertexAccounts,
     fetchGeminiAccounts,
     fetchOpenAIAccounts,
     fetchAzureOpenAIAccounts,
@@ -302,6 +315,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     createClaudeAccount,
     createClaudeConsoleAccount,
     createBedrockAccount,
+    createVertexAccount,
     createGeminiAccount,
     createOpenAIAccount,
     createDroidAccount,
@@ -312,6 +326,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     updateClaudeAccount,
     updateClaudeConsoleAccount,
     updateBedrockAccount,
+    updateVertexAccount,
     updateGeminiAccount,
     updateOpenAIAccount,
     updateAzureOpenAIAccount,
