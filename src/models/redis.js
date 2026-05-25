@@ -5260,6 +5260,34 @@ redisClient.getApiKeyCount = async function () {
   return { total: keyIds.length, active }
 }
 
+// 💰 自定义模型缓存价格覆盖
+redisClient.getCustomCachePricing = async function () {
+  const client = this.getClientSafe()
+  const raw = await client.hgetall('pricing:custom_cache')
+  const result = {}
+  if (!raw) {
+    return result
+  }
+  for (const [model, value] of Object.entries(raw)) {
+    try {
+      result[model] = JSON.parse(value)
+    } catch (_e) {
+      // 旧数据或损坏数据，忽略
+    }
+  }
+  return result
+}
+
+redisClient.setCustomCachePricing = async function (model, override) {
+  const client = this.getClientSafe()
+  await client.hset('pricing:custom_cache', model, JSON.stringify(override))
+}
+
+redisClient.deleteCustomCachePricing = async function (model) {
+  const client = this.getClientSafe()
+  await client.hdel('pricing:custom_cache', model)
+}
+
 // 清理过期的系统分钟统计数据（启动时调用）
 redisClient.cleanupSystemMetrics = async function () {
   logger.info('🧹 清理过期的系统分钟统计数据...')
