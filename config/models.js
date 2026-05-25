@@ -37,6 +37,9 @@ const OPENAI_MODELS = [
   { value: 'gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark' },
   { value: 'gpt-5.4', label: 'GPT-5.4' },
   { value: 'gpt-5.4-pro', label: 'GPT-5.4 Pro' },
+  { value: 'gpt-5.5', label: 'GPT-5.5' },
+  { value: 'gpt-5.5-high', label: 'GPT-5.5 High' },
+  { value: 'gpt-5.5-xhigh', label: 'GPT-5.5 XHigh' },
   { value: 'codex-mini', label: 'Codex Mini' }
 ]
 
