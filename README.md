@@ -675,6 +675,34 @@ npm run service:restart:daemon
 npm run service:stop
 ```
 
+### 管理 CLI（remote）
+
+`remote` 命令通过后台管理接口工作，支持本地保存多套 profile，不需要每次都显式传 `--server`。
+
+```bash
+# 登录并保存到指定 profile
+npm run cli -- remote auth login --profile prod --server https://code.example.com --use
+
+# 查看当前登录信息
+npm run cli -- remote auth whoami
+
+# 查看本地 profile
+npm run cli -- remote profile list
+
+# 读取后台管理数据
+npm run cli -- remote system supported-clients
+npm run cli -- remote groups list
+npm run cli -- remote accounts openai list
+```
+
+默认配置文件：
+
+```bash
+~/.claude-relay-service/cli-auth.json
+```
+
+可通过环境变量 `CLAUDE_RELAY_CLI_CONFIG` 自定义路径。
+
 ### 监控使用情况
 
 - **Web界面**: `http://你的域名:3000/web` - 查看使用统计
