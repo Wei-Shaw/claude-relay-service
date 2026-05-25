@@ -34,7 +34,7 @@
       </div>
 
       <div class="rounded-lg bg-white px-6 py-8 shadow dark:bg-gray-800 dark:shadow-xl">
-        <form class="space-y-6" @submit.prevent="handleLogin">
+        <form v-if="!userStore.pendingTwoFactor" class="space-y-6" @submit.prevent="handleLogin">
           <div>
             <label
               class="block text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -140,6 +140,16 @@
             </router-link>
           </div>
         </form>
+
+        <TwoFactorChallengeForm
+          v-else
+          description="LDAP 密码已通过校验。请输入身份验证器中的动态验证码，或改用恢复码完成登录。"
+          :error="error"
+          :loading="loading"
+          :username="userStore.pendingTwoFactor?.username"
+          @cancel="handleCancelTwoFactor"
+          @submit="handleVerifyTwoFactor"
+        />
       </div>
     </div>
   </div>
@@ -152,6 +162,7 @@ import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { showToast } from '@/utils/tools'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import TwoFactorChallengeForm from '@/components/security/TwoFactorChallengeForm.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -175,10 +186,14 @@ const handleLogin = async () => {
   error.value = ''
 
   try {
-    await userStore.login({
+    const result = await userStore.login({
       username: form.username,
       password: form.password
     })
+
+    if (result?.requiresTwoFactor) {
+      return
+    }
 
     showToast('Login successful!', 'success')
     router.push('/user-dashboard')
@@ -188,6 +203,27 @@ const handleLogin = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleVerifyTwoFactor = async (payload) => {
+  loading.value = true
+  error.value = ''
+
+  try {
+    await userStore.verifyTwoFactor(payload)
+    showToast('Login successful!', 'success')
+    router.push('/user-dashboard')
+  } catch (err) {
+    console.error('Two-factor login error:', err)
+    error.value = err.response?.data?.message || err.message || 'Two-factor verification failed'
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleCancelTwoFactor = () => {
+  userStore.cancelTwoFactorLogin()
+  error.value = ''
 }
 
 onMounted(() => {
