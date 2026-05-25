@@ -905,6 +905,15 @@ class Application {
             // 不阻止退出流程
           }
 
+          // 📡 Flush Langfuse 队列，确保关闭前未发送的事件被上报
+          try {
+            const langfuseTracker = require('./utils/langfuseTracker')
+            await langfuseTracker.flush()
+            logger.info('📡 Langfuse tracker flushed')
+          } catch (error) {
+            logger.warn('⚠️ Error flushing Langfuse tracker:', error.message)
+          }
+
           try {
             await redis.disconnect()
             logger.info('👋 Redis disconnected')
