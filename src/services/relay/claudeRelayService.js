@@ -849,17 +849,40 @@ class ClaudeRelayService {
                 }
               }
             } else {
-              isRateLimited = true
-              if (!Number.isNaN(parsedResetTimestamp)) {
-                rateLimitResetTimestamp = parsedResetTimestamp
-                logger.info(
-                  `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
+              // 瞬时节流检测：无 reset 时间戳 + 5h-status 为 allowed
+              // → RPM/并发节流，非 session window 耗尽，仅应用短暂冷却
+              const nonStream5hStatus = response.headers
+                ? response.headers['anthropic-ratelimit-unified-5h-status'] ||
+                  response.headers['Anthropic-Ratelimit-Unified-5h-Status']
+                : null
+              const isTransientThrottle =
+                Number.isNaN(parsedResetTimestamp) && nonStream5hStatus === 'allowed'
+
+              if (isTransientThrottle) {
+                logger.warn(
+                  `⚡ [Non-Stream] Transient 429 for account ${accountId} (5h-status: allowed, no reset header) - skipping full rate limit marking, applying short cooldown only`
                 )
-              }
-              if (isDedicatedOfficialAccount) {
-                dedicatedRateLimitMessage = this._buildStandardRateLimitMessage(
-                  rateLimitResetTimestamp || account?.rateLimitEndAt
-                )
+                await upstreamErrorHelper
+                  .markTempUnavailable(
+                    accountId,
+                    accountType,
+                    429,
+                    upstreamErrorHelper.parseRetryAfter(response.headers)
+                  )
+                  .catch(() => {})
+              } else {
+                isRateLimited = true
+                if (!Number.isNaN(parsedResetTimestamp)) {
+                  rateLimitResetTimestamp = parsedResetTimestamp
+                  logger.info(
+                    `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
+                  )
+                }
+                if (isDedicatedOfficialAccount) {
+                  dedicatedRateLimitMessage = this._buildStandardRateLimitMessage(
+                    rateLimitResetTimestamp || account?.rateLimitEndAt
+                  )
+                }
               }
             }
           }
@@ -2891,7 +2914,32 @@ class ClaudeRelayService {
               : null
             const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
 
-            if (isOpusModelRequest && !Number.isNaN(parsedResetTimestamp)) {
+            const isAgentViewAuxiliaryRequest = this._isAgentViewAuxiliaryRequest(
+              requestBody,
+              clientHeaders
+            )
+            // 瞬时节流检测：无 reset 时间戳 + 5h-status 为 allowed
+            // → RPM/并发节流，非 session window 耗尽，跳过长期限流标记
+            const isTransientThrottle =
+              Number.isNaN(parsedResetTimestamp) && sessionWindowStatus === 'allowed'
+
+            if (isAgentViewAuxiliaryRequest) {
+              logger.warn(
+                `🚫 [Stream] Agent View auxiliary request hit 429 for account ${accountId}; skipping account-level rate-limit marking`
+              )
+            } else if (isTransientThrottle) {
+              logger.warn(
+                `⚡ [Stream] Transient 429 for account ${accountId} (5h-status: allowed, no reset header) - skipping full rate limit marking, applying short cooldown only`
+              )
+              await upstreamErrorHelper
+                .markTempUnavailable(
+                  accountId,
+                  accountType,
+                  429,
+                  upstreamErrorHelper.parseRetryAfter(res.headers)
+                )
+                .catch(() => {})
+            } else if (isOpusModelRequest && !Number.isNaN(parsedResetTimestamp)) {
               await claudeAccountService.markAccountOpusRateLimited(accountId, parsedResetTimestamp)
               logger.warn(
                 `🚫 [Stream] Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
