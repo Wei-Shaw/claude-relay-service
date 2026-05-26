@@ -500,6 +500,7 @@ router.post('/openai-responses-accounts/:accountId/test', authenticateAdmin, asy
       if (agent) {
         requestConfig.httpsAgent = agent
         requestConfig.httpAgent = agent
+        requestConfig.proxy = false
       }
     }
 

@@ -270,3 +270,6 @@ class ProxyHelper {
 }
 
 module.exports = ProxyHelper
+
+// Backward-compatible named export used by older admin test routes.
+module.exports.getProxyAgent = ProxyHelper.createProxyAgent.bind(ProxyHelper)
