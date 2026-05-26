@@ -10,6 +10,7 @@ const openaiResponsesAccountService = require('../services/account/openaiRespons
 const openaiResponsesRelayService = require('../services/relay/openaiResponsesRelayService')
 const apiKeyService = require('../services/apiKeyService')
 const redis = require('../models/redis')
+const modelService = require('../services/modelService')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
@@ -137,6 +138,88 @@ function applyCodexCliAdaptation(body = {}) {
   })
 
   body.instructions = CODEX_CLI_INSTRUCTIONS
+}
+
+function toCodexModelInfo(model, priority = 99) {
+  return {
+    slug: model.id,
+    display_name: model.id,
+    description: null,
+    default_reasoning_level: 'medium',
+    supported_reasoning_levels: [
+      { effort: 'low', description: 'Fast responses with lighter reasoning' },
+      { effort: 'medium', description: 'Balances speed and reasoning depth for everyday tasks' },
+      { effort: 'high', description: 'Greater reasoning depth for complex problems' },
+      { effort: 'xhigh', description: 'Extra high reasoning depth for complex problems' }
+    ],
+    shell_type: 'shell_command',
+    visibility: 'list',
+    supported_in_api: true,
+    priority,
+    additional_speed_tiers: [],
+    availability_nux: null,
+    upgrade: null,
+    base_instructions: CODEX_CLI_INSTRUCTIONS,
+    supports_reasoning_summaries: false,
+    default_reasoning_summary: 'auto',
+    support_verbosity: true,
+    default_verbosity: 'medium',
+    apply_patch_tool_type: 'freeform',
+    web_search_tool_type: 'text',
+    truncation_policy: {
+      mode: 'tokens',
+      limit: 10000
+    },
+    supports_parallel_tool_calls: true,
+    supports_image_detail_original: false,
+    context_window: 272000,
+    max_context_window: 272000,
+    auto_compact_token_limit: null,
+    effective_context_window_percent: 95,
+    experimental_supported_tools: [],
+    input_modalities: ['text', 'image'],
+    supports_search_tool: false
+  }
+}
+
+function getModelListForApiKey(apiKeyData = {}) {
+  let models = modelService.getAllModels()
+
+  if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
+    models = models.filter((model) => !apiKeyData.restrictedModels.includes(model.id))
+  }
+
+  return models
+}
+
+async function handleModels(req, res) {
+  try {
+    if (!checkOpenAIPermissions(req.apiKey || {})) {
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access OpenAI',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
+
+    const data = getModelListForApiKey(req.apiKey || {})
+
+    return res.json({
+      object: 'list',
+      data,
+      models: data.map((model, index) => toCodexModelInfo(model, index))
+    })
+  } catch (error) {
+    logger.error('Failed to get OpenAI/Codex models:', error)
+    return res.status(500).json({
+      error: {
+        message: 'Failed to retrieve models',
+        type: 'api_error'
+      }
+    })
+  }
 }
 
 async function applyRateLimitTracking(
@@ -966,6 +1049,8 @@ const handleResponses = async (req, res) => {
 }
 
 // 注册两个路由路径，都使用相同的处理函数
+router.get('/models', authenticateApiKey, handleModels)
+router.get('/v1/models', authenticateApiKey, handleModels)
 router.post('/responses', authenticateApiKey, handleResponses)
 router.post('/v1/responses', authenticateApiKey, handleResponses)
 router.post('/responses/compact', authenticateApiKey, handleResponses)
@@ -1037,4 +1122,5 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
 
 module.exports = router
 module.exports.handleResponses = handleResponses
+module.exports.handleModels = handleModels
 module.exports.CODEX_CLI_INSTRUCTIONS = CODEX_CLI_INSTRUCTIONS
