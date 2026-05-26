@@ -72,6 +72,7 @@ defineProps({
 })
 
 const { droidClaudeBaseUrl, droidOpenaiBaseUrl } = useTutorialUrls()
+const codexModel = import.meta.env.VITE_TUTORIAL_CODEX_MODEL || 'gpt-5.5'
 
 const droidCliConfigLines = computed(() => [
   '{',
@@ -85,8 +86,8 @@ const droidCliConfigLines = computed(() => [
   '      "max_tokens": 8192',
   '    },',
   '    {',
-  '      "model_display_name": "GPT-5.5 [crs]",',
-  '      "model": "gpt-5.5",',
+  `      "model_display_name": "${codexModel} [crs]",`,
+  `      "model": "${codexModel}",`,
   `      "base_url": "${droidOpenaiBaseUrl.value}",`,
   '      "api_key": "你的API密钥",',
   '      "provider": "openai",',

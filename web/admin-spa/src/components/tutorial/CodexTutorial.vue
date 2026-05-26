@@ -112,6 +112,7 @@ const props = defineProps({
 })
 
 const { openaiBaseUrl } = useTutorialUrls()
+const codexModel = import.meta.env.VITE_TUTORIAL_CODEX_MODEL || 'gpt-5.5'
 
 const configPath = computed(() =>
   props.platform === 'windows' ? '%USERPROFILE%\\.codex\\config.toml' : '~/.codex/config.toml'
@@ -123,7 +124,7 @@ const authPath = computed(() =>
 
 const configTomlLines = computed(() => [
   'model_provider = "crs"',
-  'model = "gpt-5.5"',
+  `model = "${codexModel}"`,
   'model_reasoning_effort = "high"',
   'disable_response_storage = true',
   'preferred_auth_method = "apikey"',

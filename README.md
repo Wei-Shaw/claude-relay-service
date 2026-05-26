@@ -460,6 +460,8 @@ claude
 
 > 💡 **IntelliJ IDEA 用户推荐**：[Claude Code Plus](https://github.com/touwaeriol/claude-code-plus) - 将 Claude Code 直接集成到 IDE，支持代码理解、文件读写、命令执行。插件市场搜索 `Claude Code Plus` 即可安装。
 
+> 💡 管理后台「使用教程」页的快捷配置模型可在构建前通过环境变量覆盖：`VITE_TUTORIAL_CODEX_MODEL`（默认 `gpt-5.5`）、`VITE_TUTORIAL_GEMINI_MODEL`（默认 `gemini-3.1-pro-preview`）。
+
 **Gemini CLI 设置环境变量：**
 
 **方式一（推荐）：通过 Gemini Assist API 方式访问**
