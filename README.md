@@ -460,6 +460,8 @@ claude
 
 > 💡 **IntelliJ IDEA 用户推荐**：[Claude Code Plus](https://github.com/touwaeriol/claude-code-plus) - 将 Claude Code 直接集成到 IDE，支持代码理解、文件读写、命令执行。插件市场搜索 `Claude Code Plus` 即可安装。
 
+> 💡 管理后台「使用教程」页的快捷配置模型可在构建前通过环境变量覆盖：`VITE_TUTORIAL_CODEX_MODEL`（默认 `gpt-5.5`）、`VITE_TUTORIAL_GEMINI_MODEL`（默认 `gemini-3.1-pro-preview`）。
+
 **Gemini CLI 设置环境变量：**
 
 **方式一（推荐）：通过 Gemini Assist API 方式访问**
@@ -468,7 +470,7 @@ claude
 CODE_ASSIST_ENDPOINT="http://127.0.0.1:3000/gemini"  # 根据实际填写你服务器的ip地址或者域名
 GOOGLE_CLOUD_ACCESS_TOKEN="后台创建的API密钥"
 GOOGLE_GENAI_USE_GCA="true"
-GEMINI_MODEL="gemini-2.5-pro" # 如果你有gemini3权限可以填： gemini-3-pro-preview
+GEMINI_MODEL="gemini-3.1-pro-preview"
 ```
 
 > **认证**：只能选 ```Login with Google``` 进行认证，如果跳 Google请删除 ```~/.gemini/settings.json``` 后再尝试启动```gemini```。  
@@ -480,7 +482,7 @@ GEMINI_MODEL="gemini-2.5-pro" # 如果你有gemini3权限可以填： gemini-3-p
 ```bash
 GOOGLE_GEMINI_BASE_URL="http://127.0.0.1:3000/gemini"  # 根据实际填写你服务器的ip地址或者域名
 GEMINI_API_KEY="后台创建的API密钥"
-GEMINI_MODEL="gemini-2.5-pro" # 如果你有gemini3权限可以填： gemini-3-pro-preview
+GEMINI_MODEL="gemini-3.1-pro-preview"
 ```
 
 > **认证**：只能选 ```Use Gemini API Key``` 进行认证，如果提示 ```Enter Gemini API Key``` 请直接留空按回车。如果一打开就跳 Google请删除 ```~/.gemini/settings.json``` 后再尝试启动```gemini```。
@@ -505,7 +507,7 @@ gemini  # 或其他 Gemini CLI 命令
 
 ```toml
 model_provider = "crs"
-model = "gpt-5.1-codex-max"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 disable_response_storage = true
 preferred_auth_method = "apikey"
@@ -543,8 +545,8 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
       "max_tokens": 64000
     },
     {
-      "model_display_name": "GPT5-Codex [crs]",
-      "model": "gpt-5-codex",
+      "model_display_name": "GPT-5.5 [crs]",
+      "model": "gpt-5.5",
       "base_url": "http://127.0.0.1:3000/droid/openai",
       "api_key": "后台创建的API密钥",
       "provider": "openai",
@@ -603,7 +605,7 @@ claude-opus-4-20250514     # Claude Opus 4
 http://你的服务器:3000/gemini
 
 # 模型ID示例
-gemini-2.5-pro             # Gemini 2.5 Pro
+gemini-3.1-pro-preview     # Gemini 3.1 Pro Preview
 ```
 
 配置步骤：
@@ -618,7 +620,7 @@ gemini-2.5-pro             # Gemini 2.5 Pro
 http://你的服务器:3000/openai
 
 # 模型ID（固定）
-gpt-5                      # Codex使用固定模型ID
+gpt-5.5                    # Codex使用模型ID
 ```
 
 配置步骤：
