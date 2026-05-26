@@ -38,7 +38,7 @@
               </div>
               <div class="whitespace-nowrap text-gray-300">$env:GEMINI_API_KEY = "你的API密钥"</div>
               <div class="whitespace-nowrap text-gray-300">
-                $env:GEMINI_MODEL = "gemini-2.5-pro"
+                $env:GEMINI_MODEL = "gemini-3.1-pro-preview"
               </div>
             </div>
             <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
@@ -69,8 +69,8 @@
                 [System.EnvironmentVariableTarget]::User)
               </div>
               <div class="whitespace-nowrap text-gray-300">
-                [System.Environment]::SetEnvironmentVariable("GEMINI_MODEL", "gemini-2.5-pro",
-                [System.EnvironmentVariableTarget]::User)
+                [System.Environment]::SetEnvironmentVariable("GEMINI_MODEL",
+                "gemini-3.1-pro-preview", [System.EnvironmentVariableTarget]::User)
               </div>
             </div>
             <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
@@ -96,7 +96,7 @@
               </div>
               <div class="whitespace-nowrap text-gray-300">export GEMINI_API_KEY="你的API密钥"</div>
               <div class="whitespace-nowrap text-gray-300">
-                export GEMINI_MODEL="gemini-2.5-pro"
+                export GEMINI_MODEL="gemini-3.1-pro-preview"
               </div>
             </div>
             <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
@@ -123,7 +123,7 @@
               </div>
               <div class="whitespace-nowrap text-gray-300">export GEMINI_API_KEY="你的API密钥"</div>
               <div class="whitespace-nowrap text-gray-300">
-                export GEMINI_MODEL="gemini-2.5-pro"
+                export GEMINI_MODEL="gemini-3.1-pro-preview"
               </div>
             </div>
             <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">然后执行：</p>
