@@ -467,6 +467,10 @@ async function handleChatCompletion(req, res, apiKeyData) {
             accountType,
             createRequestDetailMeta(req, {
               requestBody: req.body,
+              responseBody: openaiResponse,
+              upstreamResponseId: claudeData.id || openaiResponse.id || null,
+              finishReason:
+                claudeData.stop_reason || openaiResponse.choices?.[0]?.finish_reason || null,
               stream: false,
               statusCode: res.statusCode
             })

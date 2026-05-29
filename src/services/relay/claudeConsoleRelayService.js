@@ -1473,7 +1473,16 @@ class ClaudeConsoleRelayService {
       const apiUrl = cleanUrl.endsWith('/v1/messages')
         ? cleanUrl
         : `${cleanUrl}/v1/messages?beta=true`
-      const payload = createClaudeTestPayload(model, { stream: true })
+      let mappedModel = model
+      if (
+        account.supportedModels &&
+        typeof account.supportedModels === 'object' &&
+        !Array.isArray(account.supportedModels)
+      ) {
+        mappedModel = claudeConsoleAccountService.getMappedModel(account.supportedModels, model)
+      }
+
+      const payload = createClaudeTestPayload(mappedModel, { stream: true })
 
       const extraHeaders = account.userAgent ? { 'User-Agent': account.userAgent } : {}
       const requestOptions = {

@@ -30,6 +30,31 @@ router.get('/request-details', authenticateAdmin, async (req, res) => {
   }
 })
 
+router.get('/request-details/sessions', authenticateAdmin, async (req, res) => {
+  try {
+    const data = await requestDetailService.listRequestDetailSessions(req.query || {})
+    return res.json({
+      success: true,
+      data
+    })
+  } catch (error) {
+    if (error?.statusCode === 400) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request detail session query',
+        message: error.message
+      })
+    }
+
+    logger.error('❌ Failed to list request detail sessions:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to list request detail sessions',
+      message: error.message
+    })
+  }
+})
+
 router.get('/request-details/body-preview-stats', authenticateAdmin, async (_req, res) => {
   try {
     const data = await requestDetailService.getRequestBodyPreviewStats()

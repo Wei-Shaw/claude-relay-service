@@ -14,7 +14,7 @@ const crypto = require('crypto')
 const sessionHelper = require('../utils/sessionHelper')
 const unifiedGeminiScheduler = require('../services/scheduler/unifiedGeminiScheduler')
 const apiKeyService = require('../services/apiKeyService')
-const redis = require('../models/redis')
+const usageStatsService = require('../services/usageStatsService')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { parseSSELine } = require('../utils/sseParser')
 const axios = require('axios')
@@ -970,7 +970,7 @@ async function handleUsage(req, res) {
   try {
     const keyData = req.apiKey
     // 按需查询 usage 数据
-    const usage = await redis.getUsageStats(keyData.id)
+    const usage = await usageStatsService.getUsageStats(keyData.id)
 
     res.json({
       object: 'usage',
@@ -999,7 +999,7 @@ async function handleKeyInfo(req, res) {
   try {
     const keyData = req.apiKey
     // 按需查询 usage 数据（仅 key-info 端点需要）
-    const usage = await redis.getUsageStats(keyData.id)
+    const usage = await usageStatsService.getUsageStats(keyData.id)
     const tokensUsed = usage?.total?.tokens || 0
 
     res.json({
@@ -1745,6 +1745,9 @@ async function handleGenerateContent(req, res) {
           null,
           createRequestDetailMeta(req, {
             requestBody: req.body,
+            responseBody: response,
+            upstreamResponseId: response?.response?.responseId || response?.response?.id || null,
+            finishReason: response?.response?.candidates?.[0]?.finishReason || null,
             stream: false,
             statusCode: res.statusCode || 200
           })
@@ -2461,6 +2464,9 @@ async function handleStandardGenerateContent(req, res) {
           null,
           createRequestDetailMeta(req, {
             requestBody: req.body,
+            responseBody: response,
+            upstreamResponseId: response?.response?.responseId || response?.response?.id || null,
+            finishReason: response?.response?.candidates?.[0]?.finishReason || null,
             stream: false,
             statusCode: res.statusCode || 200
           })

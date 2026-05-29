@@ -1,9 +1,14 @@
+const crypto = require('crypto')
+const config = require('../../config/config')
+const metadataUserIdHelper = require('./metadataUserIdHelper')
+const { createResponsePayloadMetaFromBody } = require('./responsePayloadCapture')
+
 const SENSITIVE_KEY_PATTERN =
   /(authorization|proxy-authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|cookie|set-cookie|client_secret|private[_-]?key|proxy)/i
-const DEFAULT_MAX_STRING_CHARS = 80
+const DEFAULT_MAX_STRING_CHARS = 1024 * 1024
 const DEFAULT_MAX_ARRAY_ITEMS = 24
 const DEFAULT_MAX_DEPTH = 6
-const DEFAULT_MAX_TOTAL_CHARS = 12000
+const DEFAULT_MAX_TOTAL_CHARS = 1024 * 1024
 const ENCRYPTED_CONTENT_KEY = 'encrypted_content'
 const TOOLS_KEY = 'tools'
 const PREVIEW_TRUNCATION_SUFFIX_PATTERN = /\.\.\.\[(?:truncated )?(\d+) chars\]$/
@@ -544,6 +549,197 @@ function getRequestEndpoint(req) {
   return queryIndex >= 0 ? originalUrl.slice(0, queryIndex) : originalUrl
 }
 
+function getHeaderValue(req, names = []) {
+  for (const name of names) {
+    if (typeof req?.get === 'function') {
+      const value = normalizeNonEmptyString(req.get(name))
+      if (value) {
+        return value
+      }
+    }
+
+    const lowerName = name.toLowerCase()
+    const value = normalizeNonEmptyString(req?.headers?.[name] || req?.headers?.[lowerName])
+    if (value) {
+      return value
+    }
+  }
+
+  return null
+}
+
+function getPathValue(source, path) {
+  if (!source || typeof source !== 'object') {
+    return null
+  }
+
+  let cursor = source
+  for (const segment of path.split('.')) {
+    if (!cursor || typeof cursor !== 'object') {
+      return null
+    }
+    cursor = cursor[segment]
+  }
+
+  return normalizeNonEmptyString(cursor)
+}
+
+function firstNonEmptyString(...values) {
+  for (const value of values) {
+    const normalized = normalizeNonEmptyString(value)
+    if (normalized) {
+      return normalized
+    }
+  }
+
+  return null
+}
+
+function firstBodyPathValue(body, paths = []) {
+  for (const path of paths) {
+    const value = getPathValue(body, path)
+    if (value) {
+      return value
+    }
+  }
+
+  return null
+}
+
+function hashRequestDetailIdentifier(value) {
+  const normalized = normalizeNonEmptyString(value)
+  if (!normalized) {
+    return null
+  }
+
+  return crypto.createHash('sha256').update(normalized).digest('hex')
+}
+
+function extractClientIp(req, overrides = {}) {
+  const forwardedFor = getHeaderValue(req, ['x-forwarded-for'])
+  const forwardedIp = forwardedFor ? forwardedFor.split(',')[0]?.trim() : null
+
+  return firstNonEmptyString(
+    overrides.clientIp,
+    req?.ip,
+    forwardedIp,
+    getHeaderValue(req, ['x-real-ip', 'cf-connecting-ip', 'x-client-ip']),
+    req?.socket?.remoteAddress,
+    req?.connection?.remoteAddress
+  )
+}
+
+function inferRequestSource(req, endpoint, overrides = {}) {
+  const explicitSource = firstNonEmptyString(
+    overrides.requestSource,
+    req?.requestSource,
+    getHeaderValue(req, [
+      'x-request-source',
+      'x-client-name',
+      'x-client-version',
+      'anthropic-client-name'
+    ])
+  )
+  if (explicitSource) {
+    return explicitSource
+  }
+
+  if (endpoint?.startsWith('/droid/')) {
+    return 'droid'
+  }
+  if (endpoint?.startsWith('/azure/')) {
+    return 'azure-openai'
+  }
+  if (endpoint?.startsWith('/openai/')) {
+    return 'openai'
+  }
+  if (endpoint?.startsWith('/gemini') || endpoint?.startsWith('/v1beta/models')) {
+    return 'gemini'
+  }
+  if (endpoint?.startsWith('/api/') || endpoint === '/api') {
+    return 'claude'
+  }
+
+  return null
+}
+
+function extractRequestAnalysisFields(req, requestBody, endpoint, overrides = {}) {
+  const metadataUserId = firstNonEmptyString(
+    overrides.metadataUserId,
+    req?.metadataUserId,
+    firstBodyPathValue(requestBody, [
+      'metadata.user_id',
+      'metadata.userId',
+      'metadata.uid',
+      'user_id',
+      'userId',
+      'user'
+    ])
+  )
+  const sessionId = firstNonEmptyString(
+    overrides.sessionId,
+    req?.sessionId,
+    getHeaderValue(req, [
+      'x-session-id',
+      'session-id',
+      'x-codex-session-id',
+      'x-droid-session-id',
+      'x-ms-client-request-id'
+    ]),
+    firstBodyPathValue(requestBody, [
+      'session_id',
+      'sessionId',
+      'metadata.session_id',
+      'metadata.sessionId',
+      'metadata.codex_session_id',
+      'metadata.codexSessionId'
+    ]),
+    metadataUserIdHelper.extractSessionId(metadataUserId)
+  )
+  const conversationId = firstNonEmptyString(
+    overrides.conversationId,
+    req?.conversationId,
+    getHeaderValue(req, ['x-conversation-id', 'conversation-id', 'x-thread-id']),
+    firstBodyPathValue(requestBody, [
+      'conversation_id',
+      'conversationId',
+      'thread_id',
+      'threadId',
+      'metadata.conversation_id',
+      'metadata.conversationId',
+      'metadata.thread_id',
+      'metadata.threadId'
+    ])
+  )
+  const promptCacheKey = firstNonEmptyString(
+    overrides.promptCacheKey,
+    getHeaderValue(req, ['x-prompt-cache-key', 'prompt-cache-key']),
+    firstBodyPathValue(requestBody, [
+      'prompt_cache_key',
+      'promptCacheKey',
+      'metadata.prompt_cache_key',
+      'metadata.promptCacheKey'
+    ])
+  )
+  const serviceTier = firstNonEmptyString(
+    overrides.serviceTier,
+    getHeaderValue(req, ['openai-service-tier', 'x-service-tier', 'service-tier']),
+    firstBodyPathValue(requestBody, ['service_tier', 'serviceTier'])
+  )
+
+  return {
+    sessionId,
+    sessionHash: firstNonEmptyString(overrides.sessionHash, hashRequestDetailIdentifier(sessionId)),
+    conversationId,
+    promptCacheKey,
+    metadataUserId,
+    serviceTier,
+    clientIp: extractClientIp(req, overrides),
+    userAgent: firstNonEmptyString(overrides.userAgent, getHeaderValue(req, ['user-agent'])),
+    requestSource: inferRequestSource(req, endpoint, overrides)
+  }
+}
+
 function toTimestampMs(value) {
   const numericValue = toFiniteNumber(value)
   if (numericValue !== null) {
@@ -563,6 +759,88 @@ function toTimestampMs(value) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function toIsoStringFromTimestamp(value) {
+  const timestampMs = toTimestampMs(value)
+  return timestampMs !== null ? new Date(timestampMs).toISOString() : null
+}
+
+function computeElapsedMs(startMs, endMs) {
+  if (startMs === null || endMs === null) {
+    return null
+  }
+
+  return Math.max(0, endMs - startMs)
+}
+
+function normalizeTimingMs(value) {
+  const num = toFiniteNumber(value)
+  return num === null ? null : Math.max(0, Math.trunc(num))
+}
+
+const RESPONSE_PAYLOAD_META_KEYS = [
+  'responseHeaders',
+  'responseBody',
+  'responseBodySnapshot',
+  'responseTextPreview',
+  'responseBodySizeBytes',
+  'responseBodyTruncated',
+  'upstreamResponseId',
+  'finishReason',
+  'errorBody',
+  'responseMetadata'
+]
+const RESPONSE_BODY_META_KEYS = new Set([
+  'responseBody',
+  'responseBodySnapshot',
+  'responseTextPreview',
+  'responseBodySizeBytes',
+  'responseBodyTruncated'
+])
+
+function isRecordObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function buildResponsePayloadMeta(req, overrides = {}) {
+  const responsePayloadMeta = {}
+  const captureMeta =
+    typeof req?.responsePayloadCapture?.toRequestDetailMeta === 'function'
+      ? req.responsePayloadCapture.toRequestDetailMeta()
+      : null
+
+  if (isRecordObject(captureMeta)) {
+    Object.assign(responsePayloadMeta, captureMeta)
+  }
+
+  if (isRecordObject(overrides.responsePayload)) {
+    Object.assign(responsePayloadMeta, overrides.responsePayload)
+  }
+
+  const explicitResponseBody =
+    Object.prototype.hasOwnProperty.call(overrides, 'responseBodySnapshot') ||
+    Object.prototype.hasOwnProperty.call(overrides, 'responseBody')
+  if (explicitResponseBody) {
+    const responseBody = Object.prototype.hasOwnProperty.call(overrides, 'responseBodySnapshot')
+      ? overrides.responseBodySnapshot
+      : overrides.responseBody
+    Object.assign(
+      responsePayloadMeta,
+      createResponsePayloadMetaFromBody(responseBody, config.responsePayloadCapture)
+    )
+  }
+
+  for (const key of RESPONSE_PAYLOAD_META_KEYS) {
+    if (explicitResponseBody && RESPONSE_BODY_META_KEYS.has(key)) {
+      continue
+    }
+    if (Object.prototype.hasOwnProperty.call(overrides, key)) {
+      responsePayloadMeta[key] = overrides[key]
+    }
+  }
+
+  return responsePayloadMeta
+}
+
 function createRequestDetailMeta(req, overrides = {}) {
   const nowMs = Date.now()
   const statusCode = toFiniteNumber(overrides.statusCode)
@@ -570,20 +848,52 @@ function createRequestDetailMeta(req, overrides = {}) {
   const requestStartedAt = toFiniteNumber(overrides.requestStartedAt)
   const reqStartedAt = toFiniteNumber(req?.requestStartedAt)
   const effectiveStart = requestStartedAt ?? reqStartedAt
+  const firstByteAt =
+    toTimestampMs(overrides.firstByteAt) ?? toTimestampMs(req?.requestTiming?.firstByteAt)
+  const firstTokenAt =
+    toTimestampMs(overrides.firstTokenAt) ?? toTimestampMs(req?.requestTiming?.firstTokenAt)
+  const responseCompletedAt =
+    toTimestampMs(overrides.responseCompletedAt) ??
+    toTimestampMs(req?.requestTiming?.responseCompletedAt)
+  const durationEndMs = responseCompletedAt ?? nowMs
+  const effectiveDurationMs =
+    durationMs ?? (effectiveStart ? Math.max(0, durationEndMs - effectiveStart) : null)
+  const timeToFirstByteMs =
+    normalizeTimingMs(overrides.timeToFirstByteMs) ?? computeElapsedMs(effectiveStart, firstByteAt)
+  const timeToFirstTokenMs =
+    normalizeTimingMs(overrides.timeToFirstTokenMs) ??
+    computeElapsedMs(effectiveStart, firstTokenAt)
+  const contentGenerationMs =
+    normalizeTimingMs(overrides.contentGenerationMs) ??
+    (effectiveDurationMs !== null && timeToFirstTokenMs !== null
+      ? Math.max(0, effectiveDurationMs - timeToFirstTokenMs)
+      : null)
   const requestBody = overrides.requestBody !== undefined ? overrides.requestBody : req?.body
+  const endpoint = overrides.endpoint || getRequestEndpoint(req)
+  const analysisFields = extractRequestAnalysisFields(req, requestBody, endpoint, overrides)
+  const responsePayloadFields = buildResponsePayloadMeta(req, overrides)
 
   return {
     requestId: overrides.requestId || req?.requestId || null,
-    endpoint: overrides.endpoint || getRequestEndpoint(req),
+    endpoint,
     method: overrides.method || req?.method || null,
     statusCode: statusCode ?? req?.res?.statusCode ?? 200,
     stream:
       typeof overrides.stream === 'boolean'
         ? overrides.stream
         : Boolean(requestBody && requestBody.stream === true),
-    durationMs: durationMs ?? (effectiveStart ? Math.max(0, nowMs - effectiveStart) : null),
+    durationMs: effectiveDurationMs,
     requestStartedAt: effectiveStart ? new Date(effectiveStart).toISOString() : null,
-    requestBody
+    firstByteAt: toIsoStringFromTimestamp(firstByteAt),
+    firstTokenAt: toIsoStringFromTimestamp(firstTokenAt),
+    responseCompletedAt: toIsoStringFromTimestamp(responseCompletedAt),
+    timeToFirstByteMs,
+    timeToFirstTokenMs,
+    contentGenerationMs,
+    requestBody,
+    ...responsePayloadFields,
+    ...analysisFields,
+    metadata: overrides.metadata || null
   }
 }
 
@@ -593,13 +903,31 @@ function finalizeRequestDetailMeta(requestMeta = null) {
   }
 
   const requestStartedAtMs = toTimestampMs(requestMeta.requestStartedAt)
+  const firstByteAt = toTimestampMs(requestMeta.firstByteAt)
+  const firstTokenAt = toTimestampMs(requestMeta.firstTokenAt)
+  const responseCompletedAt = toTimestampMs(requestMeta.responseCompletedAt) ?? Date.now()
   const durationMs =
     requestStartedAtMs !== null
-      ? Math.max(0, Date.now() - requestStartedAtMs)
+      ? Math.max(0, responseCompletedAt - requestStartedAtMs)
       : toFiniteNumber(requestMeta.durationMs)
+  const timeToFirstByteMs =
+    normalizeTimingMs(requestMeta.timeToFirstByteMs) ??
+    computeElapsedMs(requestStartedAtMs, firstByteAt)
+  const timeToFirstTokenMs =
+    normalizeTimingMs(requestMeta.timeToFirstTokenMs) ??
+    computeElapsedMs(requestStartedAtMs, firstTokenAt)
+  const contentGenerationMs =
+    normalizeTimingMs(requestMeta.contentGenerationMs) ??
+    (durationMs !== null && timeToFirstTokenMs !== null
+      ? Math.max(0, durationMs - timeToFirstTokenMs)
+      : null)
 
   return {
     ...requestMeta,
+    responseCompletedAt: toIsoStringFromTimestamp(responseCompletedAt),
+    timeToFirstByteMs,
+    timeToFirstTokenMs,
+    contentGenerationMs,
     durationMs
   }
 }
@@ -711,6 +1039,7 @@ module.exports = {
   finalizeRequestDetailMeta,
   extractOpenAICacheReadTokens,
   isOpenAIRelatedEndpoint,
+  hashRequestDetailIdentifier,
   CACHE_HIT_FORMULA,
   getRequestDetailCacheMetrics,
   calculateCacheHitRate

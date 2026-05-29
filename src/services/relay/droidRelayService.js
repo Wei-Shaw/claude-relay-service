@@ -1256,6 +1256,9 @@ class DroidRelayService {
         normalizedUsage,
         createRequestDetailMeta(clientRequest, {
           requestBody,
+          responseBody: data,
+          upstreamResponseId: data.id || null,
+          finishReason: data.choices?.[0]?.finish_reason || data.finish_reason || null,
           stream: false,
           statusCode: response.status || 200
         })

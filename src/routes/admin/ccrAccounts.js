@@ -8,6 +8,7 @@ const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
 const { extractErrorMessage } = require('../../utils/testPayloadHelper')
+const { parseVendorPrefixedModel } = require('../../utils/modelHelper')
 
 const router = express.Router()
 
@@ -437,10 +438,23 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
     const axios = require('axios')
     const { getProxyAgent } = require('../../utils/proxyHelper')
 
-    const baseUrl = account.baseUrl || 'https://api.anthropic.com'
-    const apiUrl = `${baseUrl}/v1/messages`
+    const { baseModel } = parseVendorPrefixedModel(model)
+    let mappedModel = baseModel
+    if (
+      account.supportedModels &&
+      typeof account.supportedModels === 'object' &&
+      !Array.isArray(account.supportedModels)
+    ) {
+      mappedModel = ccrAccountService.getMappedModel(account.supportedModels, baseModel)
+    }
+
+    const baseUrl = (account.baseUrl || account.apiUrl || 'https://api.anthropic.com').replace(
+      /\/$/,
+      ''
+    )
+    const apiUrl = baseUrl.endsWith('/v1/messages') ? baseUrl : `${baseUrl}/v1/messages`
     const payload = {
-      model,
+      model: mappedModel,
       max_tokens: 100,
       messages: [{ role: 'user', content: 'Say "Hello" in one word.' }]
     }
@@ -482,6 +496,7 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
         accountId,
         accountName: account.name,
         model,
+        upstreamModel: mappedModel,
         latency,
         responseText: responseText.substring(0, 200)
       }

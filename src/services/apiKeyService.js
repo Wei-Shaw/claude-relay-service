@@ -5,6 +5,7 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const serviceRatesService = require('./serviceRatesService')
 const requestDetailService = require('./requestDetailService')
+const usageStatsService = require('./usageStatsService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 const { finalizeRequestDetailMeta } = require('../utils/requestDetailHelper')
 const requestBodyRuleService = require('./requestBodyRuleService')
@@ -435,10 +436,14 @@ class ApiKeyService {
 
       const costQueries = []
       if (dailyCostLimit > 0) {
-        costQueries.push(redis.getDailyCost(keyData.id).then((v) => ({ dailyCost: v || 0 })))
+        costQueries.push(
+          usageStatsService.getDailyCost(keyData.id).then((v) => ({ dailyCost: v || 0 }))
+        )
       }
       if (totalCostLimit > 0) {
-        costQueries.push(redis.getCostStats(keyData.id).then((v) => ({ totalCost: v?.total || 0 })))
+        costQueries.push(
+          usageStatsService.getCostStats(keyData.id).then((v) => ({ totalCost: v?.total || 0 }))
+        )
       }
       if (weeklyOpusCostLimit > 0) {
         const resetDay = parseInt(keyData.weeklyResetDay || 1)
@@ -599,12 +604,12 @@ class ApiKeyService {
 
       // 获取当日费用
       const [dailyCost, costStats] = await Promise.all([
-        redis.getDailyCost(keyData.id),
-        redis.getCostStats(keyData.id)
+        usageStatsService.getDailyCost(keyData.id),
+        usageStatsService.getCostStats(keyData.id)
       ])
 
       // 获取使用统计
-      const usage = await redis.getUsageStats(keyData.id)
+      const usage = await usageStatsService.getUsageStats(keyData.id)
 
       // 解析限制模型数据
       let restrictedModels = []
@@ -869,8 +874,8 @@ class ApiKeyService {
 
       // 为每个key添加使用统计和当前并发数
       for (const key of apiKeys) {
-        key.usage = await redis.getUsageStats(key.id)
-        const costStats = await redis.getCostStats(key.id)
+        key.usage = await usageStatsService.getUsageStats(key.id)
+        const costStats = await usageStatsService.getCostStats(key.id)
         // 为前端兼容性：把费用信息同步到 usage 对象里
         if (key.usage && costStats) {
           key.usage.total = key.usage.total || {}
@@ -899,7 +904,7 @@ class ApiKeyService {
         key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0)
         key.totalCostLimit = parseFloat(key.totalCostLimit || 0)
         key.weeklyOpusCostLimit = parseFloat(key.weeklyOpusCostLimit || 0)
-        key.dailyCost = (await redis.getDailyCost(key.id)) || 0
+        key.dailyCost = (await usageStatsService.getDailyCost(key.id)) || 0
         key.weeklyOpusCost =
           (await redis.getWeeklyOpusCost(
             key.id,
@@ -1699,25 +1704,29 @@ class ApiKeyService {
         ratedCost = await this.calculateRatedCost(keyId, service, realCost)
       }
 
-      // 记录API Key级别的使用统计（包含费用）
-      await redis.incrementTokenUsage(
-        keyId,
-        totalTokens,
-        inputTokens,
-        outputTokens,
-        cacheCreateTokens,
-        cacheReadTokens,
-        model,
-        0, // ephemeral5mTokens - 暂时为0，后续处理
-        0, // ephemeral1hTokens - 暂时为0，后续处理
-        isLongContextRequest,
-        realCost,
-        ratedCost
-      )
+      if (usageStatsService.shouldWriteRedis()) {
+        // 记录API Key级别的使用统计（包含费用）
+        await redis.incrementTokenUsage(
+          keyId,
+          totalTokens,
+          inputTokens,
+          outputTokens,
+          cacheCreateTokens,
+          cacheReadTokens,
+          model,
+          0, // ephemeral5mTokens - 暂时为0，后续处理
+          0, // ephemeral1hTokens - 暂时为0，后续处理
+          isLongContextRequest,
+          realCost,
+          ratedCost
+        )
+      }
 
       // 记录费用统计到每日/每月汇总
       if (realCost > 0) {
-        await redis.incrementDailyCost(keyId, ratedCost, realCost)
+        if (usageStatsService.shouldWriteRedis()) {
+          await redis.incrementDailyCost(keyId, ratedCost, realCost)
+        }
         logger.database(
           `💰 Recorded cost for ${keyId}: rated=$${ratedCost.toFixed(6)}, real=$${realCost.toFixed(6)}, model: ${model}`
         )
@@ -1780,6 +1789,12 @@ class ApiKeyService {
         statusCode: finalizedRequestMeta?.statusCode || null,
         stream: finalizedRequestMeta?.stream === true,
         durationMs: finalizedRequestMeta?.durationMs ?? null,
+        firstByteAt: finalizedRequestMeta?.firstByteAt || null,
+        firstTokenAt: finalizedRequestMeta?.firstTokenAt || null,
+        responseCompletedAt: finalizedRequestMeta?.responseCompletedAt || null,
+        timeToFirstByteMs: finalizedRequestMeta?.timeToFirstByteMs ?? null,
+        timeToFirstTokenMs: finalizedRequestMeta?.timeToFirstTokenMs ?? null,
+        contentGenerationMs: finalizedRequestMeta?.contentGenerationMs ?? null,
         inputTokens,
         outputTokens,
         cacheCreateTokens,
@@ -1792,7 +1807,15 @@ class ApiKeyService {
         isLongContext: isLongContextRequest
       }
 
-      await redis.addUsageRecord(keyId, usageRecord)
+      if (usageStatsService.shouldWriteRedis()) {
+        await redis.addUsageRecord(keyId, usageRecord)
+      }
+      if (usageStatsService.shouldWritePostgres()) {
+        const postgresUsageWrite = usageStatsService.recordUsageEvent(keyId, usageRecord, keyData)
+        if (usageStatsService.getWriteMode() === 'postgres') {
+          await postgresUsageWrite
+        }
+      }
       this._captureRequestDetail(keyId, usageRecord, finalizedRequestMeta).catch((captureError) => {
         logger.warn(`⚠️ Failed to schedule request detail capture: ${captureError.message}`)
       })
@@ -1929,26 +1952,30 @@ class ApiKeyService {
         ratedCostWithDetails = await this.calculateRatedCost(keyId, service, realCostWithDetails)
       }
 
-      // 记录API Key级别的使用统计（包含费用）
-      await redis.incrementTokenUsage(
-        keyId,
-        totalTokens,
-        inputTokens,
-        outputTokens,
-        cacheCreateTokens,
-        cacheReadTokens,
-        model,
-        ephemeral5mTokens,
-        ephemeral1hTokens,
-        costInfo.isLongContextRequest || false,
-        realCostWithDetails,
-        ratedCostWithDetails
-      )
+      if (usageStatsService.shouldWriteRedis()) {
+        // 记录API Key级别的使用统计（包含费用）
+        await redis.incrementTokenUsage(
+          keyId,
+          totalTokens,
+          inputTokens,
+          outputTokens,
+          cacheCreateTokens,
+          cacheReadTokens,
+          model,
+          ephemeral5mTokens,
+          ephemeral1hTokens,
+          costInfo.isLongContextRequest || false,
+          realCostWithDetails,
+          ratedCostWithDetails
+        )
+      }
 
       // 记录费用到每日/每月汇总
       if (realCostWithDetails > 0) {
         // 记录倍率成本和真实成本
-        await redis.incrementDailyCost(keyId, ratedCostWithDetails, realCostWithDetails)
+        if (usageStatsService.shouldWriteRedis()) {
+          await redis.incrementDailyCost(keyId, ratedCostWithDetails, realCostWithDetails)
+        }
         logger.database(
           `💰 Recorded cost for ${keyId}: rated=$${ratedCostWithDetails.toFixed(6)}, real=$${realCostWithDetails.toFixed(6)}, model: ${model}`
         )
@@ -2065,7 +2092,15 @@ class ApiKeyService {
         isLongContext: costInfo.isLongContextRequest || false
       }
 
-      await redis.addUsageRecord(keyId, usageRecord)
+      if (usageStatsService.shouldWriteRedis()) {
+        await redis.addUsageRecord(keyId, usageRecord)
+      }
+      if (usageStatsService.shouldWritePostgres()) {
+        const postgresUsageWrite = usageStatsService.recordUsageEvent(keyId, usageRecord, keyData)
+        if (usageStatsService.getWriteMode() === 'postgres') {
+          await postgresUsageWrite
+        }
+      }
       this._captureRequestDetail(keyId, usageRecord, finalizedRequestMeta).catch((captureError) => {
         logger.warn(`⚠️ Failed to schedule request detail capture: ${captureError.message}`)
       })
@@ -2145,7 +2180,37 @@ class ApiKeyService {
       statusCode: requestMeta?.statusCode ?? usageRecord.statusCode ?? 200,
       stream: requestMeta?.stream === true || usageRecord.stream === true,
       durationMs: requestMeta?.durationMs ?? usageRecord.durationMs ?? null,
+      firstByteAt: requestMeta?.firstByteAt || usageRecord.firstByteAt || null,
+      firstTokenAt: requestMeta?.firstTokenAt || usageRecord.firstTokenAt || null,
+      responseCompletedAt:
+        requestMeta?.responseCompletedAt || usageRecord.responseCompletedAt || null,
+      timeToFirstByteMs: requestMeta?.timeToFirstByteMs ?? usageRecord.timeToFirstByteMs ?? null,
+      timeToFirstTokenMs: requestMeta?.timeToFirstTokenMs ?? usageRecord.timeToFirstTokenMs ?? null,
+      contentGenerationMs:
+        requestMeta?.contentGenerationMs ?? usageRecord.contentGenerationMs ?? null,
       requestBody: requestMeta?.requestBody,
+      responseHeaders: requestMeta?.responseHeaders ?? usageRecord.responseHeaders,
+      responseBody: requestMeta?.responseBody ?? usageRecord.responseBody,
+      responseBodySnapshot: requestMeta?.responseBodySnapshot ?? usageRecord.responseBodySnapshot,
+      responseTextPreview: requestMeta?.responseTextPreview ?? usageRecord.responseTextPreview,
+      responseBodySizeBytes:
+        requestMeta?.responseBodySizeBytes ?? usageRecord.responseBodySizeBytes,
+      responseBodyTruncated:
+        requestMeta?.responseBodyTruncated ?? usageRecord.responseBodyTruncated,
+      upstreamResponseId: requestMeta?.upstreamResponseId || usageRecord.upstreamResponseId || null,
+      finishReason: requestMeta?.finishReason || usageRecord.finishReason || null,
+      errorBody: requestMeta?.errorBody ?? usageRecord.errorBody,
+      responseMetadata: requestMeta?.responseMetadata ?? usageRecord.responseMetadata,
+      sessionId: requestMeta?.sessionId || usageRecord.sessionId || null,
+      sessionHash: requestMeta?.sessionHash || usageRecord.sessionHash || null,
+      conversationId: requestMeta?.conversationId || usageRecord.conversationId || null,
+      promptCacheKey: requestMeta?.promptCacheKey || usageRecord.promptCacheKey || null,
+      metadataUserId: requestMeta?.metadataUserId || usageRecord.metadataUserId || null,
+      serviceTier: requestMeta?.serviceTier || usageRecord.serviceTier || null,
+      clientIp: requestMeta?.clientIp || usageRecord.clientIp || null,
+      userAgent: requestMeta?.userAgent || usageRecord.userAgent || null,
+      requestSource: requestMeta?.requestSource || usageRecord.requestSource || null,
+      metadata: requestMeta?.metadata || usageRecord.metadata || null,
       apiKeyId: keyId,
       accountId: usageRecord.accountId || null,
       accountType: usageRecord.accountType || null,
@@ -2161,6 +2226,7 @@ class ApiKeyService {
       realCostBreakdown: usageRecord.realCostBreakdown || usageRecord.costBreakdown || null,
       pricingSource: usageRecord.pricingSource || null,
       usedFallbackPricing: usageRecord.usedFallbackPricing === true,
+      errorType: usageRecord.errorType || null,
       isLongContextRequest:
         usageRecord.isLongContext === true || usageRecord.isLongContextRequest === true
     })
@@ -2319,33 +2385,7 @@ class ApiKeyService {
 
   // 📈 获取使用统计
   async getUsageStats(keyId, options = {}) {
-    const usageStats = await redis.getUsageStats(keyId)
-
-    // options 可能是字符串（兼容旧接口），仅当为对象时才解析
-    const optionObject =
-      options && typeof options === 'object' && !Array.isArray(options) ? options : {}
-
-    if (optionObject.includeRecords === false) {
-      return usageStats
-    }
-
-    const recordLimit = optionObject.recordLimit || 20
-    const recentRecords = await redis.getUsageRecords(keyId, recordLimit)
-
-    // API 兼容：同时输出 costBreakdown 和 realCostBreakdown
-    const compatibleRecords = recentRecords.map((record) => {
-      const breakdown = record.realCostBreakdown || record.costBreakdown
-      return {
-        ...record,
-        costBreakdown: breakdown,
-        realCostBreakdown: breakdown
-      }
-    })
-
-    return {
-      ...usageStats,
-      recentRecords: compatibleRecords
-    }
+    return await usageStatsService.getUsageStatsWithRecords(keyId, options)
   }
 
   // 📊 获取账户使用统计
@@ -2379,9 +2419,9 @@ class ApiKeyService {
       // Populate usage stats for each user's API key (same as getAllApiKeys does)
       const userKeysWithUsage = []
       for (const key of userKeys) {
-        const usage = await redis.getUsageStats(key.id)
-        const dailyCost = (await redis.getDailyCost(key.id)) || 0
-        const costStats = await redis.getCostStats(key.id)
+        const usage = await usageStatsService.getUsageStats(key.id)
+        const dailyCost = (await usageStatsService.getDailyCost(key.id)) || 0
+        const costStats = await usageStatsService.getCostStats(key.id)
 
         userKeysWithUsage.push({
           id: key.id,
@@ -2573,8 +2613,8 @@ class ApiKeyService {
 
       // 汇总所有API Key的统计数据
       for (const keyId of keyIds) {
-        const keyStats = await redis.getUsageStats(keyId)
-        const costStats = await redis.getCostStats(keyId)
+        const keyStats = await usageStatsService.getUsageStats(keyId)
+        const costStats = await usageStatsService.getCostStats(keyId)
         if (keyStats && keyStats.total) {
           stats.totalRequests += keyStats.total.requests || 0
           stats.totalInputTokens += keyStats.total.inputTokens || 0
@@ -2776,7 +2816,7 @@ class ApiKeyService {
       }
 
       const currentLimit = parseFloat(keyData.totalCostLimit || 0)
-      const costStats = await redis.getCostStats(keyId)
+      const costStats = await usageStatsService.getCostStats(keyId)
       const currentUsed = costStats?.total || 0
 
       // 不能扣到比已使用的还少

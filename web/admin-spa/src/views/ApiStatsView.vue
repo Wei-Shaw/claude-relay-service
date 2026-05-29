@@ -223,6 +223,8 @@
             <ModelUsageStats period="monthly" />
             <ModelUsageStats period="alltime" />
           </div>
+
+          <ApiKeyRequestDetails v-if="!multiKeyMode" :api-id="apiId" :api-key="apiKey" />
         </div>
       </div>
     </div>
@@ -471,6 +473,7 @@
     <UnifiedTestModal
       :api-key-name="statsData?.name || ''"
       :api-key-value="apiKey"
+      :extra-model-options="statsData?.testModelOptions || {}"
       mode="apikey"
       :service-type="testServiceType"
       :show="showTestModal"
@@ -542,6 +545,7 @@ import LimitConfig from '@/components/apistats/LimitConfig.vue'
 import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import ServiceCostCards from '@/components/apistats/ServiceCostCards.vue'
+import ApiKeyRequestDetails from '@/components/apistats/ApiKeyRequestDetails.vue'
 import TutorialView from './TutorialView.vue'
 import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 

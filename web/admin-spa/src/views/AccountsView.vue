@@ -2320,7 +2320,7 @@ const getInitialPageSize = () => {
       return parsedSize
     }
   }
-  return 10
+  return 100
 }
 const pageSizeOptions = [10, 20, 50, 100]
 const pageSize = ref(getInitialPageSize())

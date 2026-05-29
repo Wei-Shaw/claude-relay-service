@@ -27,6 +27,16 @@ export const getBatchStatsApi = (apiIds) =>
   request({ url: '/apiStats/api/batch-stats', method: 'POST', data: { apiIds } })
 export const getBatchModelStatsApi = (apiIds, period = 'daily') =>
   request({ url: '/apiStats/api/batch-model-stats', method: 'POST', data: { apiIds, period } })
+export const getApiStatsRequestDetailsApi = (data) =>
+  request({ url: '/apiStats/api/request-details', method: 'POST', data })
+export const getApiStatsRequestDetailSessionsApi = (data) =>
+  request({ url: '/apiStats/api/request-detail-sessions', method: 'POST', data })
+export const getApiStatsRequestDetailApi = (requestId, data) =>
+  request({
+    url: `/apiStats/api/request-details/${encodeURIComponent(requestId)}`,
+    method: 'POST',
+    data
+  })
 
 // 认证
 export const loginApi = (data) => request({ url: '/web/auth/login', method: 'POST', data })
@@ -57,6 +67,8 @@ export const getUsageCostsApi = (period) =>
 export const getUsageStatsApi = (url) => request({ url, method: 'GET' })
 export const getRequestDetailsApi = (params) =>
   request({ url: '/admin/request-details', method: 'GET', params })
+export const getRequestDetailSessionsApi = (params) =>
+  request({ url: '/admin/request-details/sessions', method: 'GET', params })
 export const getRequestDetailBodyPreviewStatsApi = (config) =>
   request({ url: '/admin/request-details/body-preview-stats', method: 'GET', ...config })
 export const purgeRequestDetailBodyPreviewApi = (config) =>

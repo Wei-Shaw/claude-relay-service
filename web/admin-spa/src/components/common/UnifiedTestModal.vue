@@ -295,7 +295,8 @@ const props = defineProps({
   // apikey 模式
   apiKeyValue: { type: String, default: '' },
   apiKeyName: { type: String, default: '' },
-  serviceType: { type: String, default: 'claude' }
+  serviceType: { type: String, default: 'claude' },
+  extraModelOptions: { type: [Object, Array], default: () => ({}) }
 })
 
 const emit = defineEmits(['close'])
@@ -314,7 +315,99 @@ const loadModels = async () => {
 
 onMounted(loadModels)
 
+const normalizeModelOptions = (models) => {
+  if (!Array.isArray(models)) return []
+
+  return models
+    .map((model) => {
+      if (typeof model === 'string') {
+        const value = model.trim()
+        return value ? { value, label: value } : null
+      }
+
+      if (model && typeof model === 'object') {
+        const value = String(model.value || model.id || model.model || '').trim()
+        if (!value) return null
+        const label = String(model.label || model.name || value).trim() || value
+        return { value, label }
+      }
+
+      return null
+    })
+    .filter(Boolean)
+}
+
+const mergeModelOptions = (...groups) => {
+  const seen = new Set()
+  const merged = []
+
+  groups.flat().forEach((model) => {
+    if (!model?.value || seen.has(model.value)) return
+    seen.add(model.value)
+    merged.push(model)
+  })
+
+  return merged
+}
+
+const extractConfiguredSourceModels = (supportedModels) => {
+  let parsed = supportedModels
+
+  if (typeof supportedModels === 'string') {
+    try {
+      parsed = JSON.parse(supportedModels)
+    } catch {
+      parsed = supportedModels
+    }
+  }
+
+  if (Array.isArray(parsed)) {
+    return parsed
+      .map((model) => {
+        if (typeof model === 'string') return model.trim()
+        if (model && typeof model === 'object') {
+          return String(model.value || model.id || model.model || '').trim()
+        }
+        return ''
+      })
+      .filter(Boolean)
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    return Object.keys(parsed)
+      .map((model) => model.trim())
+      .filter(Boolean)
+  }
+
+  return []
+}
+
+const accountMappingModelPlatforms = new Set(['claude-console', 'ccr', 'gemini', 'gemini-api'])
+
+const accountMappingModels = computed(() => {
+  if (props.mode !== 'account' || !accountMappingModelPlatforms.has(props.account?.platform)) {
+    return []
+  }
+
+  return normalizeModelOptions(extractConfiguredSourceModels(props.account?.supportedModels))
+})
+
+const externalModelOptions = computed(() => {
+  const options = props.extraModelOptions
+
+  if (Array.isArray(options)) {
+    return normalizeModelOptions(options)
+  }
+
+  if (!options || typeof options !== 'object') {
+    return []
+  }
+
+  return normalizeModelOptions(options[props.serviceType] || [])
+})
+
 const availableModels = computed(() => {
+  let baseModels = []
   if (props.mode === 'account') {
     const platform = props.account?.platform
     if (!platform) return []
@@ -322,10 +415,13 @@ const availableModels = computed(() => {
     if (platform === 'azure-openai') {
       return [{ value: props.account.deploymentName, label: props.account.deploymentName }]
     }
-    return modelsFromApi.value.platforms?.[platform] || []
+    baseModels = modelsFromApi.value.platforms?.[platform] || []
+  } else {
+    // apikey 模式
+    baseModels = modelsFromApi.value[props.serviceType] || []
   }
-  // apikey 模式
-  return modelsFromApi.value[props.serviceType] || []
+
+  return mergeModelOptions(baseModels, accountMappingModels.value, externalModelOptions.value)
 })
 
 // 各平台回退默认模型（模型列表未加载时使用）

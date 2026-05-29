@@ -13,6 +13,7 @@
 
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const usageStatsService = require('./usageStatsService')
 
 // ============================================================================
 // 常量配置
@@ -88,6 +89,12 @@ class CostRankService {
     logger.info('🔄 Initializing CostRankService...')
 
     try {
+      if (usageStatsService.shouldReadPostgres()) {
+        this.isInitialized = true
+        logger.success('CostRankService initialized in PostgreSQL read mode')
+        return
+      }
+
       // 启动时立即更新所有索引（异步，不阻塞启动）
       this.updateAllRanks().catch((err) => {
         logger.error('Failed to initialize cost ranks:', err)
@@ -152,6 +159,11 @@ class CostRankService {
    * @param {string} timeRange - 时间范围
    */
   async updateRank(timeRange) {
+    if (usageStatsService.shouldReadPostgres()) {
+      logger.debug(`Skipping Redis cost rank update for ${timeRange} in PostgreSQL read mode`)
+      return
+    }
+
     const client = redis.getClient()
     if (!client) {
       logger.warn('Redis client not available, skipping cost rank update')
@@ -263,6 +275,10 @@ class CostRankService {
    * @param {string} keyId - API Key ID
    */
   async addKeyToIndexes(keyId) {
+    if (usageStatsService.shouldReadPostgres()) {
+      return
+    }
+
     const client = redis.getClient()
     if (!client) {
       return
@@ -288,6 +304,10 @@ class CostRankService {
    * @param {string} keyId - API Key ID
    */
   async removeKeyFromIndexes(keyId) {
+    if (usageStatsService.shouldReadPostgres()) {
+      return
+    }
+
     const client = redis.getClient()
     if (!client) {
       return
@@ -321,6 +341,20 @@ class CostRankService {
    * @returns {Promise<string[]>} keyId 列表
    */
   async getSortedKeyIds(timeRange, sortOrder = 'desc', offset = 0, limit = -1) {
+    if (usageStatsService.shouldReadPostgres()) {
+      const keyIds = await this._getActiveApiKeyIds()
+      const costs = await usageStatsService.getBatchKeyCosts(timeRange, keyIds)
+      const sorted = [...costs.entries()]
+        .sort((a, b) => (sortOrder === 'asc' ? a[1] - b[1] : b[1] - a[1]))
+        .map(([keyId]) => keyId)
+
+      if (limit === -1) {
+        return sorted.slice(offset)
+      }
+
+      return sorted.slice(offset, offset + limit)
+    }
+
     const client = redis.getClient()
     if (!client) {
       throw new Error('Redis client not available')
@@ -343,6 +377,11 @@ class CostRankService {
    * @returns {Promise<number>} 费用
    */
   async getKeyCost(timeRange, keyId) {
+    if (usageStatsService.shouldReadPostgres()) {
+      const costs = await usageStatsService.getBatchKeyCosts(timeRange, [keyId])
+      return costs.get(keyId) || 0
+    }
+
     const client = redis.getClient()
     if (!client) {
       return 0
@@ -359,6 +398,10 @@ class CostRankService {
    * @returns {Promise<Map<string, number>>} keyId -> cost
    */
   async getBatchKeyCosts(timeRange, keyIds) {
+    if (usageStatsService.shouldReadPostgres()) {
+      return usageStatsService.getBatchKeyCosts(timeRange, keyIds)
+    }
+
     const client = redis.getClient()
     if (!client || keyIds.length === 0) {
       return new Map()
@@ -386,6 +429,20 @@ class CostRankService {
    * @returns {Promise<Object>} 各时间范围的状态
    */
   async getRankStatus() {
+    if (usageStatsService.shouldReadPostgres()) {
+      const keyIds = await this._getActiveApiKeyIds()
+      const status = {}
+      for (const timeRange of VALID_TIME_RANGES) {
+        status[timeRange] = {
+          lastUpdate: null,
+          keyCount: keyIds.length,
+          status: 'postgres',
+          updateDuration: 0
+        }
+      }
+      return status
+    }
+
     const client = redis.getClient()
     if (!client) {
       return {}
@@ -426,6 +483,15 @@ class CostRankService {
    * @param {string} timeRange - 时间范围，不传则刷新全部
    */
   async forceRefresh(timeRange = null) {
+    if (usageStatsService.shouldReadPostgres()) {
+      logger.info(
+        timeRange
+          ? `PostgreSQL cost rank for ${timeRange} is query-time, refresh skipped`
+          : 'PostgreSQL cost rank is query-time, refresh skipped'
+      )
+      return
+    }
+
     if (timeRange) {
       await this.updateRank(timeRange)
     } else {
@@ -444,6 +510,11 @@ class CostRankService {
    * @returns {Promise<Map<string, number>>} keyId -> cost
    */
   async calculateCustomRangeCosts(startDate, endDate) {
+    if (usageStatsService.shouldReadPostgres()) {
+      const keyIds = await this._getActiveApiKeyIds()
+      return usageStatsService.calculateCustomRangeCosts(keyIds, startDate, endDate)
+    }
+
     const client = redis.getClient()
     if (!client) {
       throw new Error('Redis client not available')

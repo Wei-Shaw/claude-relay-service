@@ -6,6 +6,7 @@ const logger = require('../../utils/logger')
 const CostCalculator = require('../../utils/costCalculator')
 const config = require('../../../config/config')
 const requestBodyRuleService = require('../../services/requestBodyRuleService')
+const usageStatsService = require('../../services/usageStatsService')
 
 const router = express.Router()
 
@@ -135,8 +136,8 @@ router.get('/users', authenticateAdmin, async (req, res) => {
 router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) => {
   try {
     const { keyId } = req.params
-    const costStats = await redis.getCostStats(keyId)
-    const dailyCost = await redis.getDailyCost(keyId)
+    const costStats = await usageStatsService.getCostStats(keyId)
+    const dailyCost = await usageStatsService.getDailyCost(keyId)
     const today = redis.getDateStringInTimezone()
 
     // 获取所有相关的Redis键
@@ -165,7 +166,7 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
 // 获取所有被使用过的模型列表
 router.get('/api-keys/used-models', authenticateAdmin, async (req, res) => {
   try {
-    const models = await redis.getAllUsedModels()
+    const models = await usageStatsService.getAllUsedModels()
     return res.json({ success: true, data: models })
   } catch (error) {
     logger.error('❌ Failed to get used models:', error)
@@ -466,7 +467,7 @@ async function getApiKeysSortedByCostPrecomputed(options) {
 
   // 模型筛选
   if (modelFilter.length > 0) {
-    const keyIdsWithModels = await redis.getKeyIdsWithModels(
+    const keyIdsWithModels = await usageStatsService.getKeyIdsWithModels(
       orderedKeys.map((k) => k.id),
       modelFilter
     )
@@ -581,7 +582,7 @@ async function getApiKeysSortedByCostCustom(options) {
 
   // 模型筛选
   if (modelFilter.length > 0) {
-    const keyIdsWithModels = await redis.getKeyIdsWithModels(
+    const keyIdsWithModels = await usageStatsService.getKeyIdsWithModels(
       orderedKeys.map((k) => k.id),
       modelFilter
     )
@@ -1132,7 +1133,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
 
     // 只在启用了每日费用限制时查询
     if (dailyCostLimit > 0) {
-      dailyCost = await redis.getDailyCost(keyId)
+      dailyCost = await usageStatsService.getDailyCost(keyId)
     }
 
     // 始终查询 allTimeCost（用于展示和限额校验）

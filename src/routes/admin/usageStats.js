@@ -1,5 +1,6 @@
 const express = require('express')
 const apiKeyService = require('../../services/apiKeyService')
+const usageStatsService = require('../../services/usageStatsService')
 const ccrAccountService = require('../../services/account/ccrAccountService')
 const claudeAccountService = require('../../services/account/claudeAccountService')
 const claudeConsoleAccountService = require('../../services/account/claudeConsoleAccountService')
@@ -925,6 +926,11 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
     logger.info(
       `📊 Getting model stats for API key: ${keyId}, period: ${period}, startDate: ${startDate}, endDate: ${endDate}`
     )
+
+    if (usageStatsService.shouldReadPostgres() && period !== 'custom') {
+      const modelStats = await usageStatsService.getModelStatsForKey(keyId, period)
+      return res.json({ success: true, data: modelStats })
+    }
 
     const _client = redis.getClientSafe()
     const today = redis.getDateStringInTimezone()
@@ -2718,7 +2724,10 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
       return res.status(404).json({ success: false, error: 'API key not found' })
     }
 
-    const rawRecords = await redis.getUsageRecords(keyId, 5000)
+    const rawRecords = usageStatsService.shouldReadPostgres()
+      ? (await usageStatsService.getUsageStatsWithRecords(keyId, { recordLimit: 5000 }))
+          .recentRecords || []
+      : await redis.getUsageRecords(keyId, 5000)
 
     const accountServices = [
       { type: 'claude', getter: (id) => claudeAccountService.getAccount(id) },

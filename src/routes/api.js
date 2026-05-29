@@ -1306,6 +1306,9 @@ async function handleMessagesRequest(req, res) {
             accountType,
             createRequestDetailMeta(req, {
               requestBody: _requestBodyNonStream,
+              responseBody: jsonData,
+              upstreamResponseId: jsonData.id || null,
+              finishReason: jsonData.stop_reason || null,
               stream: false,
               statusCode: response.statusCode
             })

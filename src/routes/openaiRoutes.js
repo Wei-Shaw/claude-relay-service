@@ -9,7 +9,7 @@ const openaiAccountService = require('../services/account/openaiAccountService')
 const openaiResponsesAccountService = require('../services/account/openaiResponsesAccountService')
 const openaiResponsesRelayService = require('../services/relay/openaiResponsesRelayService')
 const apiKeyService = require('../services/apiKeyService')
-const redis = require('../models/redis')
+const usageStatsService = require('../services/usageStatsService')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
@@ -714,6 +714,9 @@ const handleResponses = async (req, res) => {
             req._serviceTier,
             createRequestDetailMeta(req, {
               requestBody: req.body,
+              responseBody: responseData,
+              upstreamResponseId: responseData.id || null,
+              finishReason: responseData.choices?.[0]?.finish_reason || responseData.status || null,
               stream: false,
               statusCode: upstream.status
             })
@@ -976,7 +979,7 @@ router.get('/usage', authenticateApiKey, async (req, res) => {
   try {
     const keyData = req.apiKey
     // 按需查询 usage 数据
-    const usage = await redis.getUsageStats(keyData.id)
+    const usage = await usageStatsService.getUsageStats(keyData.id)
 
     res.json({
       object: 'usage',
@@ -1003,7 +1006,7 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
   try {
     const keyData = req.apiKey
     // 按需查询 usage 数据（仅 key-info 端点需要）
-    const usage = await redis.getUsageStats(keyData.id)
+    const usage = await usageStatsService.getUsageStats(keyData.id)
     const tokensUsed = usage?.total?.tokens || 0
     res.json({
       id: keyData.id,

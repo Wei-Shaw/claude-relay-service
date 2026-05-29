@@ -653,6 +653,9 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
             null,
             createRequestDetailMeta(req, {
               requestBody: req.body,
+              responseBody: openaiResponse,
+              upstreamResponseId: openaiResponse.id || null,
+              finishReason: openaiResponse.choices?.[0]?.finish_reason || null,
               stream: false,
               statusCode: res.statusCode || 200
             })

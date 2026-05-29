@@ -158,7 +158,7 @@
                       v-model="filters.keyword"
                       class="toolbar-element w-full"
                       clearable
-                      placeholder="搜索 Request ID / API Key / 账户 / 模型 / 接口"
+                      placeholder="搜索 API Key / 账户 / 模型 / 接口 / User-Agent"
                     >
                       <template #prefix>
                         <i class="fas fa-search text-cyan-500" />
@@ -335,6 +335,23 @@
                 </el-tooltip>
               </div>
             </div>
+
+            <div
+              v-if="filters.session"
+              class="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-2 text-sm text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-200"
+            >
+              <span class="font-semibold">Session 过滤</span>
+              <span class="max-w-full truncate" :title="filters.session">
+                {{ formatFilterSessionValue(filters.session) }}
+              </span>
+              <button
+                class="ml-auto rounded-lg px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:text-indigo-200 dark:hover:bg-indigo-900/50"
+                type="button"
+                @click="clearSessionFilter"
+              >
+                清除
+              </button>
+            </div>
           </div>
         </template>
       </div>
@@ -396,6 +413,11 @@
                     接口
                   </th>
                   <th
+                    class="min-w-[220px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                  >
+                    User-Agent
+                  </th>
+                  <th
                     class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     输入
@@ -431,6 +453,16 @@
                     耗时
                   </th>
                   <th
+                    class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                  >
+                    首词
+                  </th>
+                  <th
+                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                  >
+                    生成速度
+                  </th>
+                  <th
                     class="min-w-[96px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     操作
@@ -447,9 +479,15 @@
                 >
                   <td class="table-cell">
                     <div class="font-medium">{{ formatDate(record.timestamp) }}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ record.requestId }}
-                    </div>
+                    <button
+                      v-if="getSessionValue(record)"
+                      class="mt-1 block whitespace-normal break-all text-left text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                      :title="getSessionValue(record)"
+                      type="button"
+                      @click="applySessionFilter(record)"
+                    >
+                      {{ getSessionValue(record) }}
+                    </button>
                   </td>
                   <td class="table-cell">
                     <div class="font-semibold">
@@ -475,6 +513,14 @@
                       {{ record.method || 'POST' }}
                     </div>
                   </td>
+                  <td class="table-cell">
+                    <div
+                      class="max-w-[260px] truncate text-xs text-gray-600 dark:text-gray-300"
+                      :title="record.userAgent || '-'"
+                    >
+                      {{ record.userAgent || '-' }}
+                    </div>
+                  </td>
                   <td class="table-cell text-blue-600 dark:text-blue-400">
                     {{ formatNumber(record.inputTokens) }}
                   </td>
@@ -494,6 +540,10 @@
                     {{ formatCost(record.cost) }}
                   </td>
                   <td class="table-cell">{{ formatDuration(record.durationMs) }}</td>
+                  <td class="table-cell">
+                    {{ formatNullableDuration(record.timeToFirstTokenMs) }}
+                  </td>
+                  <td class="table-cell">{{ formatGenerationSpeed(record) }}</td>
                   <td class="table-cell text-right">
                     <button
                       class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
@@ -536,6 +586,17 @@
                 <div>API Key：{{ record.apiKeyName || '-' }}</div>
                 <div>账户：{{ record.accountName || '-' }}</div>
                 <div>推理：{{ formatReasoning(record.reasoningDisplay) }}</div>
+                <div class="col-span-2 break-all text-xs">
+                  User-Agent：{{ record.userAgent || '-' }}
+                </div>
+                <button
+                  v-if="getSessionValue(record)"
+                  class="col-span-2 break-all text-left text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                  type="button"
+                  @click="applySessionFilter(record)"
+                >
+                  {{ getSessionValue(record) }}
+                </button>
                 <div>输入：{{ formatNumber(record.inputTokens) }}</div>
                 <div>输出：{{ formatNumber(record.outputTokens) }}</div>
                 <div>缓存读：{{ formatNumber(record.cacheReadTokens) }}</div>
@@ -546,10 +607,11 @@
                 </div>
                 <div>命中率：{{ formatPercent(record.cacheHitRate) }}</div>
                 <div>耗时：{{ formatDuration(record.durationMs) }}</div>
+                <div>首词：{{ formatNullableDuration(record.timeToFirstTokenMs) }}</div>
+                <div>速度：{{ formatGenerationSpeed(record) }}</div>
                 <div class="text-amber-600 dark:text-amber-400">
                   费用：{{ formatCost(record.cost) }}
                 </div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">{{ record.requestId }}</div>
               </div>
             </div>
           </div>
@@ -627,6 +689,7 @@ const filters = reactive({
   accountId: '',
   model: '',
   endpoint: '',
+  session: '',
   sortOrder: 'desc'
 })
 
@@ -637,6 +700,7 @@ const hasActiveFilters = computed(() => {
     filters.accountId ||
     filters.model ||
     filters.endpoint ||
+    filters.session ||
     (filters.dateRange && filters.dateRange.length === 2)
   )
 })
@@ -668,7 +732,8 @@ const emptyHint = computed(() => {
     filters.apiKeyId ||
     filters.accountId ||
     filters.model ||
-    filters.endpoint
+    filters.endpoint ||
+    filters.session
   ) {
     return '当前筛选条件下没有结果，请尝试放宽搜索条件。'
   }
@@ -711,6 +776,7 @@ const buildParams = (page, snapshotId = activeSnapshotId.value) => {
   if (filters.accountId) params.accountId = filters.accountId
   if (filters.model) params.model = filters.model
   if (filters.endpoint) params.endpoint = filters.endpoint
+  if (filters.session) params.session = filters.session
   if (filters.dateRange && filters.dateRange.length === 2) {
     const [startDate, endDate] = filters.dateRange
     const parsedStart = dayjs(startDate)
@@ -745,6 +811,7 @@ const syncResponseState = (data) => {
   filters.accountId = filterEcho.accountId || ''
   filters.model = filterEcho.model || ''
   filters.endpoint = filterEcho.endpoint || ''
+  filters.session = filterEcho.session || ''
   filters.sortOrder = filterEcho.sortOrder || 'desc'
   if (filterEcho.startDate && filterEcho.endDate) {
     const nextRange = [toPickerDate(filterEcho.startDate), toPickerDate(filterEcho.endDate)]
@@ -832,6 +899,7 @@ const resetFilters = () => {
   filters.accountId = ''
   filters.model = ''
   filters.endpoint = ''
+  filters.session = ''
   filters.sortOrder = 'desc'
   pagination.currentPage = 1
   fetchRecords(1)
@@ -889,6 +957,37 @@ const closeDetail = () => {
   activeRequestId.value = ''
 }
 
+const getSessionValue = (record) =>
+  record?.sessionId || record?.sessionHash || record?.conversationId || record?.metadataUserId || ''
+
+const formatFilterSessionValue = (value) => {
+  if (!value) return '-'
+  return value.length > 72 ? `${value.slice(0, 32)}...${value.slice(-16)}` : value
+}
+
+const applySessionValue = (session) => {
+  if (!session) return
+  if (filters.session === session) {
+    pagination.currentPage = 1
+    invalidateSnapshot()
+    fetchRecords(1)
+    return
+  }
+
+  filters.session = session
+}
+
+const applySessionFilter = (record) => {
+  const session = getSessionValue(record)
+  if (!session) return
+  applySessionValue(session)
+}
+
+const clearSessionFilter = () => {
+  if (!filters.session) return
+  filters.session = ''
+}
+
 const exportCsv = async () => {
   if (exporting.value) return
   exporting.value = true
@@ -929,40 +1028,50 @@ const exportCsv = async () => {
 
     const headers = [
       '统计时间',
-      'Request ID',
       'API Key',
       '使用账户',
       '消费类型',
       '模型',
       '推理',
       '接口',
+      'User-Agent',
+      'Session',
       '输入',
       '输出',
       '缓存读取',
       '缓存创建',
       '缓存命中率',
       '费用',
-      '耗时(ms)'
+      '耗时(ms)',
+      '首包(ms)',
+      '首词(ms)',
+      '内容生成(ms)',
+      '生成速度(tokens/s)'
     ]
 
     const rows = [headers.join(',')]
     aggregated.forEach((record) => {
       const row = [
         formatDate(record.timestamp),
-        record.requestId || '',
         record.apiKeyName || record.apiKeyId || '',
         record.accountName || record.accountId || '',
         record.accountTypeName || record.accountType || '',
         record.model || '',
         formatReasoning(record.reasoningDisplay),
         record.endpoint || '',
+        record.userAgent || '',
+        getSessionValue(record),
         record.inputTokens || 0,
         record.outputTokens || 0,
         record.cacheReadTokens || 0,
         formatCacheCreate(record.cacheCreateTokens, record.cacheCreateNotApplicable),
         formatPercent(record.cacheHitRate),
         formatCost(record.cost),
-        record.durationMs || 0
+        record.durationMs || 0,
+        record.timeToFirstByteMs ?? '',
+        record.timeToFirstTokenMs ?? '',
+        record.contentGenerationMs ?? '',
+        getGenerationSpeed(record) ?? ''
       ]
       rows.push(row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     })
@@ -1008,6 +1117,21 @@ const formatRetentionHours = (value) => {
   return `保留 ${hours} 小时`
 }
 const formatDuration = (value) => `${Number(value || 0)}ms`
+const formatNullableDuration = (value) =>
+  value === null || value === undefined || value === '' ? '-' : `${Number(value)}ms`
+const getGenerationSpeed = (record) => {
+  const outputTokens = Number(record?.outputTokens || 0)
+  const contentGenerationMs = Number(record?.contentGenerationMs || 0)
+  if (outputTokens <= 0 || contentGenerationMs <= 0) {
+    return null
+  }
+
+  return Number(((outputTokens * 1000) / contentGenerationMs).toFixed(2))
+}
+const formatGenerationSpeed = (record) => {
+  const speed = getGenerationSpeed(record)
+  return speed === null ? '-' : `${speed} tok/s`
+}
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
 const formatReasoning = (value) => value || '-'
 
@@ -1025,7 +1149,14 @@ watch(
 )
 
 watch(
-  () => [filters.apiKeyId, filters.accountId, filters.model, filters.endpoint, filters.sortOrder],
+  () => [
+    filters.apiKeyId,
+    filters.accountId,
+    filters.model,
+    filters.endpoint,
+    filters.session,
+    filters.sortOrder
+  ],
   () => {
     debouncedKeywordFetch.cancel()
     pagination.currentPage = 1

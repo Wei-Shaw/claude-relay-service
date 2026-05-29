@@ -10,10 +10,188 @@ const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { calculateWaitTimeStats } = require('../utils/statsHelper')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
+const { createResponsePayloadCapture } = require('../utils/responsePayloadCapture')
 
 // 工具函数
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function normalizeResponseChunk(chunk, encoding) {
+  if (chunk === null || chunk === undefined) {
+    return ''
+  }
+
+  if (Buffer.isBuffer(chunk)) {
+    return chunk.toString(typeof encoding === 'string' ? encoding : 'utf8')
+  }
+
+  if (typeof chunk === 'string') {
+    return chunk
+  }
+
+  return String(chunk)
+}
+
+function hasContentTokenPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return false
+  }
+
+  if (
+    payload.type === 'content_block_delta' &&
+    payload.delta &&
+    typeof payload.delta === 'object'
+  ) {
+    return Boolean(payload.delta.text || payload.delta.partial_json || payload.delta.thinking)
+  }
+
+  if (
+    payload.type === 'content_block_start' &&
+    payload.content_block &&
+    typeof payload.content_block === 'object'
+  ) {
+    return Boolean(payload.content_block.text)
+  }
+
+  if (
+    (payload.type === 'response.output_text.delta' ||
+      payload.type === 'response.reasoning_text.delta') &&
+    typeof payload.delta === 'string' &&
+    payload.delta.length > 0
+  ) {
+    return true
+  }
+
+  if (Array.isArray(payload.choices)) {
+    return payload.choices.some((choice) =>
+      Boolean(
+        choice?.delta?.content ||
+          choice?.delta?.reasoning_content ||
+          choice?.delta?.tool_calls?.length
+      )
+    )
+  }
+
+  if (Array.isArray(payload.candidates)) {
+    return payload.candidates.some((candidate) =>
+      candidate?.content?.parts?.some((part) => Boolean(part?.text))
+    )
+  }
+
+  return false
+}
+
+function chunkHasContentToken(chunkText) {
+  if (!chunkText) {
+    return false
+  }
+
+  for (const rawLine of chunkText.split('\n')) {
+    const line = rawLine.trim()
+    if (!line.startsWith('data:')) {
+      continue
+    }
+
+    const dataText = line.slice(5).trim()
+    if (!dataText || dataText === '[DONE]') {
+      continue
+    }
+
+    try {
+      if (hasContentTokenPayload(JSON.parse(dataText))) {
+        return true
+      }
+    } catch (_error) {
+      // Ignore non-JSON SSE payloads.
+    }
+  }
+
+  return false
+}
+
+function shouldInspectFirstContentToken(req, res) {
+  if (req?.requestTiming?.firstTokenAt) {
+    return false
+  }
+
+  const contentType = String(res?.getHeader?.('Content-Type') || '').toLowerCase()
+  return (
+    contentType.includes('text/event-stream') ||
+    req?.body?.stream === true ||
+    /stream/i.test(req?.originalUrl || '')
+  )
+}
+
+function recordResponseTiming(req, res, chunk, encoding) {
+  if (!req?.requestTiming) {
+    return
+  }
+
+  const now = Date.now()
+  const chunkText = normalizeResponseChunk(chunk, encoding)
+  if (!chunkText) {
+    return
+  }
+
+  if (!req.requestTiming.firstByteAt) {
+    req.requestTiming.firstByteAt = now
+  }
+
+  if (shouldInspectFirstContentToken(req, res) && chunkHasContentToken(chunkText)) {
+    req.requestTiming.firstTokenAt = now
+  }
+}
+
+function isRequestDetailResponseCaptureRoute(req) {
+  const url = req?.originalUrl || req?.url || ''
+  return (
+    url === '/api' ||
+    url.startsWith('/api/') ||
+    url === '/claude' ||
+    url.startsWith('/claude/') ||
+    url === '/openai' ||
+    url.startsWith('/openai/') ||
+    url === '/azure' ||
+    url.startsWith('/azure/') ||
+    url === '/droid' ||
+    url.startsWith('/droid/') ||
+    url === '/gemini' ||
+    url.startsWith('/gemini/') ||
+    url === '/antigravity' ||
+    url.startsWith('/antigravity/') ||
+    url === '/gemini-cli' ||
+    url.startsWith('/gemini-cli/')
+  )
+}
+
+function ensureResponsePayloadCapture(req, res) {
+  if (req.responsePayloadCapture) {
+    return req.responsePayloadCapture
+  }
+
+  if (config.responsePayloadCapture?.mode === 'off' || !isRequestDetailResponseCaptureRoute(req)) {
+    return null
+  }
+
+  req.responsePayloadCapture = createResponsePayloadCapture(config.responsePayloadCapture)
+  if (typeof res?.getHeaders === 'function') {
+    req.responsePayloadCapture.setHeaders(res.getHeaders())
+  }
+
+  return req.responsePayloadCapture
+}
+
+function captureResponsePayloadChunk(req, res, chunk, encoding) {
+  const capture = ensureResponsePayloadCapture(req, res)
+  if (!capture) {
+    return
+  }
+
+  if (typeof res?.getHeaders === 'function') {
+    capture.setHeaders(res.getHeaders())
+  }
+  capture.appendChunk(chunk, encoding)
 }
 
 /**
@@ -1769,6 +1947,11 @@ const requestLogger = (req, res, next) => {
   // 添加请求ID到请求对象
   req.requestId = requestId
   req.requestStartedAt = start
+  req.requestTiming = {
+    requestStartedAt: start,
+    firstByteAt: null,
+    firstTokenAt: null
+  }
   res.setHeader('X-Request-ID', requestId)
 
   // 获取客户端信息
@@ -1790,6 +1973,33 @@ const requestLogger = (req, res, next) => {
   res.json = (body) => {
     res._responseBody = body
     return originalJson(body)
+  }
+
+  const originalWrite = res.write.bind(res)
+  res.write = (chunk, encoding, callback) => {
+    if (typeof encoding === 'function') {
+      callback = encoding
+      encoding = undefined
+    }
+    captureResponsePayloadChunk(req, res, chunk, encoding)
+    recordResponseTiming(req, res, chunk, encoding)
+    return originalWrite(chunk, encoding, callback)
+  }
+
+  const originalEnd = res.end.bind(res)
+  res.end = (chunk, encoding, callback) => {
+    if (typeof chunk === 'function') {
+      callback = chunk
+      chunk = undefined
+      encoding = undefined
+    } else if (typeof encoding === 'function') {
+      callback = encoding
+      encoding = undefined
+    }
+    captureResponsePayloadChunk(req, res, chunk, encoding)
+    recordResponseTiming(req, res, chunk, encoding)
+    req.requestTiming.responseCompletedAt = Date.now()
+    return originalEnd(chunk, encoding, callback)
   }
 
   res.on('finish', () => {

@@ -7,6 +7,13 @@ jest.mock('../src/services/claudeRelayConfigService', () => ({
   getConfig: jest.fn()
 }))
 
+jest.mock('../config/config', () => ({
+  requestDetailStorage: {
+    writeMode: 'redis',
+    readMode: 'redis'
+  }
+}))
+
 jest.mock('../src/utils/logger', () => ({
   warn: jest.fn(),
   debug: jest.fn(),
@@ -30,19 +37,35 @@ jest.mock('../src/services/account/bedrockAccountService', () => ({ getAccount: 
 jest.mock('../src/utils/costCalculator', () => ({
   calculateCost: jest.fn()
 }))
+jest.mock('../src/services/requestDetailStores/postgresRequestDetailStore', () => ({
+  upsertRequestDetail: jest.fn(),
+  upsertRequestDetails: jest.fn(),
+  listRecordsInRange: jest.fn(),
+  listRecordsPage: jest.fn(),
+  listSessionSummaries: jest.fn(),
+  getListSummary: jest.fn(),
+  getAvailableFilters: jest.fn(),
+  getRequestDetail: jest.fn(),
+  countRequestBodySnapshots: jest.fn(),
+  purgeRequestBodySnapshots: jest.fn()
+}))
 
 const redis = require('../src/models/redis')
+const appConfig = require('../config/config')
 const claudeRelayConfigService = require('../src/services/claudeRelayConfigService')
 const claudeAccountService = require('../src/services/account/claudeAccountService')
 const claudeConsoleAccountService = require('../src/services/account/claudeConsoleAccountService')
 const openaiAccountService = require('../src/services/account/openaiAccountService')
 const bedrockAccountService = require('../src/services/account/bedrockAccountService')
 const CostCalculator = require('../src/utils/costCalculator')
+const requestDetailPostgresStore = require('../src/services/requestDetailStores/postgresRequestDetailStore')
 const requestDetailService = require('../src/services/requestDetailService')
 
 describe('requestDetailService', () => {
   beforeEach(() => {
     jest.resetAllMocks()
+    appConfig.requestDetailStorage.writeMode = 'redis'
+    appConfig.requestDetailStorage.readMode = 'redis'
     jest.useFakeTimers().setSystemTime(Date.parse('2026-04-07T18:00:00.000Z'))
   })
 
@@ -81,6 +104,13 @@ describe('requestDetailService', () => {
       cacheReadTokens: 3,
       cacheCreateTokens: 2,
       cost: 0.123456,
+      durationMs: 2500,
+      timeToFirstByteMs: 300,
+      timeToFirstTokenMs: 900,
+      contentGenerationMs: 1600,
+      firstByteAt: '2026-04-07T12:00:00.300Z',
+      firstTokenAt: '2026-04-07T12:00:00.900Z',
+      responseCompletedAt: '2026-04-07T12:00:02.500Z',
       requestBody: {
         apiKey: 'super-secret',
         model: 'gpt-5.4',
@@ -88,6 +118,15 @@ describe('requestDetailService', () => {
           effort: 'medium'
         },
         prompt: 'hello'
+      },
+      responseBody: {
+        id: 'resp_123',
+        output: [{ type: 'message', content: 'world' }]
+      },
+      responseBodyTruncated: false,
+      responseTextPreview: '{"id":"resp_123"',
+      responseMetadata: {
+        captureMode: 'full'
       }
     })
 
@@ -104,8 +143,107 @@ describe('requestDetailService', () => {
     expect(storedPayload.endpoint).toBe('/openai/v1/responses')
     expect(storedPayload.reasoningDisplay).toBe('medium')
     expect(storedPayload.reasoningSource).toBe('reasoning.effort')
+    expect(storedPayload.timeToFirstByteMs).toBe(300)
+    expect(storedPayload.timeToFirstTokenMs).toBe(900)
+    expect(storedPayload.contentGenerationMs).toBe(1600)
+    expect(storedPayload.firstTokenAt).toBe('2026-04-07T12:00:00.900Z')
+    expect(storedPayload.responseBodySnapshot.id).toBe('resp_123')
+    expect(storedPayload.responseBodyTruncated).toBe(false)
+    expect(storedPayload.responseTextPreview).toBe('{"id":"resp_123"')
+    expect(storedPayload.responseMetadata.captureMode).toBe('full')
     expect(multi.zadd).toHaveBeenCalled()
     expect(exec).toHaveBeenCalled()
+    expect(requestDetailPostgresStore.upsertRequestDetail).not.toHaveBeenCalled()
+  })
+
+  test('captureRequestDetail dual-writes to PostgreSQL after Redis and tolerates PG failures', async () => {
+    const exec = jest.fn().mockResolvedValue([])
+    const multi = {
+      set: jest.fn().mockReturnThis(),
+      zadd: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec
+    }
+
+    appConfig.requestDetailStorage.writeMode = 'dual'
+    requestDetailPostgresStore.upsertRequestDetail.mockRejectedValue(new Error('pg down'))
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: true
+    })
+    redis.getClient.mockReturnValue({ multi: jest.fn(() => multi) })
+
+    const result = await requestDetailService.captureRequestDetail({
+      requestId: 'req_dual_1',
+      timestamp: '2026-04-07T12:00:00.000Z',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      model: 'gpt-5.4',
+      sessionId: 'session-123'
+    })
+
+    expect(result).toEqual({ captured: true, requestId: 'req_dual_1' })
+    expect(exec).toHaveBeenCalled()
+    expect(requestDetailPostgresStore.upsertRequestDetail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'req_dual_1',
+        sessionId: 'session-123',
+        sessionHash: expect.any(String)
+      })
+    )
+  })
+
+  test('captureRequestDetail still writes PostgreSQL when Redis write is unavailable in dual mode', async () => {
+    appConfig.requestDetailStorage.writeMode = 'dual'
+    requestDetailPostgresStore.upsertRequestDetail.mockResolvedValue({ upserted: 1 })
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: true
+    })
+    redis.getClient.mockReturnValue(null)
+
+    const result = await requestDetailService.captureRequestDetail({
+      requestId: 'req_dual_pg_only',
+      timestamp: '2026-04-07T12:00:00.000Z',
+      endpoint: '/api/v1/messages',
+      method: 'POST',
+      model: 'glm-5.1'
+    })
+
+    expect(result).toEqual({ captured: true, requestId: 'req_dual_pg_only' })
+    expect(requestDetailPostgresStore.upsertRequestDetail).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'req_dual_pg_only' })
+    )
+  })
+
+  test('captureRequestDetail writes PostgreSQL only in postgres write mode', async () => {
+    appConfig.requestDetailStorage.writeMode = 'postgres'
+    requestDetailPostgresStore.upsertRequestDetail.mockResolvedValue({ upserted: 1 })
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false
+    })
+
+    const result = await requestDetailService.captureRequestDetail({
+      requestId: 'req_pg_only',
+      timestamp: '2026-04-07T12:00:00.000Z',
+      endpoint: '/droid/openai/v1/responses',
+      method: 'POST',
+      model: 'gpt-5.4',
+      metadataUserId: 'user-1'
+    })
+
+    expect(result).toEqual({ captured: true, requestId: 'req_pg_only' })
+    expect(redis.getClient).not.toHaveBeenCalled()
+    expect(requestDetailPostgresStore.upsertRequestDetail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'req_pg_only',
+        metadataUserId: 'user-1'
+      })
+    )
   })
 
   test('listRequestDetails applies openai cache display flags and openai hit-rate formula', async () => {
@@ -1013,7 +1151,8 @@ describe('requestDetailService', () => {
         outputTokens: 5,
         totalTokens: 15,
         cost: 0.1,
-        durationMs: 300
+        durationMs: 300,
+        sessionId: 'session_1'
       })
     }
 
@@ -1084,7 +1223,8 @@ describe('requestDetailService', () => {
         outputTokens: 5,
         totalTokens: 15,
         cost: 0.1,
-        durationMs: 300
+        durationMs: 300,
+        sessionId: 'session_1'
       })
     }
 
@@ -1153,7 +1293,8 @@ describe('requestDetailService', () => {
         outputTokens: 5,
         totalTokens: 15,
         cost: 0.1,
-        durationMs: 300
+        durationMs: 300,
+        sessionId: 'session_1'
       })
     }
 
@@ -1220,7 +1361,8 @@ describe('requestDetailService', () => {
         outputTokens: 5,
         totalTokens: 15,
         cost: 0.1,
-        durationMs: 300
+        durationMs: 300,
+        sessionId: 'session_1'
       })
     }
 
@@ -1284,7 +1426,8 @@ describe('requestDetailService', () => {
         outputTokens: 5,
         totalTokens: 15,
         cost: 0.1,
-        durationMs: 300
+        durationMs: 300,
+        sessionId: 'session_1'
       })
     }
 
@@ -1299,12 +1442,14 @@ describe('requestDetailService', () => {
 
     // Filter with leading/trailing whitespace must still match records
     const result = await requestDetailService.listRequestDetails({
-      apiKeyId: '  key_1  '
+      apiKeyId: '  key_1  ',
+      session: '  session_1  '
     })
 
     expect(result.pagination.totalRecords).toBe(1)
     expect(result.records).toHaveLength(1)
     expect(result.filters.apiKeyId).toBe('key_1')
+    expect(result.filters.session).toBe('session_1')
   })
 
   test('listRequestDetails skips snapshot creation when result count exceeds the limit', async () => {
@@ -1805,6 +1950,219 @@ describe('requestDetailService', () => {
     expect(result.records).toHaveLength(1)
     expect(result.records[0].timestamp).toBe('2026-04-07T12:00:00.000Z')
     expect(result.availableFilters.dateRange.earliest).toBe('2026-04-07T12:00:00.000Z')
+  })
+
+  test('listRequestDetails reads PostgreSQL records when read mode is postgres', async () => {
+    appConfig.requestDetailStorage.readMode = 'postgres'
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: true
+    })
+    redis.getApiKey.mockResolvedValue({ name: 'PG Key' })
+    openaiAccountService.getAccount.mockResolvedValue({ name: 'PG Account' })
+    requestDetailPostgresStore.getListSummary.mockResolvedValue({
+      totalRequests: 1,
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheReadTokens: 50,
+      cacheCreateTokens: 0,
+      totalCost: 0.4,
+      avgDurationMs: 800,
+      cacheHitRate: 33.33,
+      cacheHitNumerator: 50,
+      cacheHitDenominator: 150,
+      cacheHitFormula: 'cacheReadTokens / (inputTokens + cacheReadTokens + cacheCreateTokens)',
+      cacheCreateNotApplicable: true
+    })
+    requestDetailPostgresStore.getAvailableFilters.mockResolvedValue({
+      apiKeys: [{ id: 'key_pg', name: 'key_pg' }],
+      accounts: [{ id: 'acct_pg', name: 'acct_pg', accountType: 'openai' }],
+      models: ['gpt-5.4'],
+      endpoints: ['/openai/v1/responses'],
+      dateRange: {
+        earliest: '2026-04-07T12:00:00.000Z',
+        latest: '2026-04-07T12:00:00.000Z'
+      }
+    })
+    requestDetailPostgresStore.listRecordsPage.mockResolvedValue([
+      {
+        requestId: 'req_pg_1',
+        timestamp: '2026-04-07T12:00:00.000Z',
+        endpoint: '/openai/v1/responses',
+        method: 'POST',
+        apiKeyId: 'key_pg',
+        accountId: 'acct_pg',
+        accountType: 'openai',
+        model: 'gpt-5.4',
+        inputTokens: 100,
+        outputTokens: 20,
+        cacheReadTokens: 50,
+        cacheCreateTokens: 0,
+        totalTokens: 170,
+        cost: 0.4,
+        durationMs: 800,
+        conversationId: 'conv-1',
+        requestBodySnapshot: { model: 'gpt-5.4' }
+      }
+    ])
+
+    const result = await requestDetailService.listRequestDetails({
+      startDate: '2026-04-07T00:00:00.000Z',
+      endDate: '2026-04-07T23:59:59.000Z',
+      keyword: 'conv-1',
+      session: 'conv-1'
+    })
+
+    expect(result.readMode).toBe('postgres')
+    expect(result.snapshotId).toBeNull()
+    expect(result.records).toHaveLength(1)
+    expect(result.records[0].requestBodySnapshot).toBeUndefined()
+    expect(result.records[0].apiKeyName).toBe('PG Key')
+    expect(result.summary.totalRequests).toBe(1)
+    expect(result.summary.cacheHitRate).toBe(33.33)
+    expect(requestDetailPostgresStore.getListSummary).toHaveBeenCalledWith({
+      startDate: expect.any(Date),
+      endDate: expect.any(Date),
+      filters: expect.objectContaining({ keyword: 'conv-1', session: 'conv-1' })
+    })
+    expect(requestDetailPostgresStore.getListSummary.mock.calls[0][0].startDate.toISOString()).toBe(
+      '2026-04-07T00:00:00.000Z'
+    )
+    expect(requestDetailPostgresStore.listRecordsPage).toHaveBeenCalledWith({
+      startDate: expect.any(Date),
+      endDate: expect.any(Date),
+      filters: expect.objectContaining({ keyword: 'conv-1', session: 'conv-1' }),
+      sortOrder: 'desc',
+      page: 1,
+      pageSize: 50
+    })
+  })
+
+  test('getRequestDetail reads PostgreSQL records when read mode is postgres', async () => {
+    appConfig.requestDetailStorage.readMode = 'postgres'
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: true
+    })
+    redis.getApiKey.mockResolvedValue({ name: 'PG Key' })
+    openaiAccountService.getAccount.mockResolvedValue({ name: 'PG Account' })
+    requestDetailPostgresStore.getRequestDetail.mockResolvedValue({
+      requestId: 'req_pg_detail',
+      timestamp: '2026-04-07T12:00:00.000Z',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      apiKeyId: 'key_pg',
+      accountId: 'acct_pg',
+      accountType: 'openai',
+      model: 'gpt-5.4',
+      requestBodySnapshot: { model: 'gpt-5.4' },
+      metadataUserId: 'user-1'
+    })
+
+    const result = await requestDetailService.getRequestDetail('req_pg_detail')
+
+    expect(result.readMode).toBe('postgres')
+    expect(result.record.requestId).toBe('req_pg_detail')
+    expect(result.record.requestBodySnapshot).toEqual({ model: 'gpt-5.4' })
+    expect(result.record.metadataUserId).toBe('user-1')
+    expect(requestDetailPostgresStore.getRequestDetail).toHaveBeenCalledWith('req_pg_detail')
+  })
+
+  test('getRequestDetail does not hide older PostgreSQL records by Redis retention', async () => {
+    appConfig.requestDetailStorage.readMode = 'postgres'
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: true
+    })
+    requestDetailPostgresStore.getRequestDetail.mockResolvedValue({
+      requestId: 'req_pg_old',
+      timestamp: '2026-04-06T12:00:00.000Z',
+      endpoint: '/api/v1/messages',
+      method: 'POST',
+      apiKeyId: 'key_pg',
+      accountType: 'claude',
+      model: 'glm-5.1'
+    })
+
+    const result = await requestDetailService.getRequestDetail('req_pg_old')
+
+    expect(result.readMode).toBe('postgres')
+    expect(result.record.requestId).toBe('req_pg_old')
+  })
+
+  test('listRequestDetailSessions reads PostgreSQL session summaries', async () => {
+    appConfig.requestDetailStorage.readMode = 'postgres'
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: true
+    })
+    requestDetailPostgresStore.listSessionSummaries.mockResolvedValue({
+      sessions: [
+        {
+          sessionKey: 'session-1',
+          sessionId: 'session-1',
+          requestCount: 2,
+          models: ['glm-5.1'],
+          totalCost: 0.12,
+          p95TimeToFirstTokenMs: 3200
+        }
+      ],
+      totalSessions: 1
+    })
+
+    const result = await requestDetailService.listRequestDetailSessions({
+      startDate: '2026-04-07T00:00:00.000Z',
+      endDate: '2026-04-07T23:59:59.000Z',
+      apiKeyId: 'key_pg',
+      pageSize: 6
+    })
+
+    expect(result.readMode).toBe('postgres')
+    expect(result.sessions).toHaveLength(1)
+    expect(result.sessions[0].sessionId).toBe('session-1')
+    expect(result.pagination.totalSessions).toBe(1)
+    expect(requestDetailPostgresStore.listSessionSummaries).toHaveBeenCalledWith({
+      startDate: expect.any(Date),
+      endDate: expect.any(Date),
+      filters: expect.objectContaining({ apiKeyId: 'key_pg' }),
+      sortOrder: 'desc',
+      page: 1,
+      pageSize: 6
+    })
+    expect(
+      requestDetailPostgresStore.listSessionSummaries.mock.calls[0][0].startDate.toISOString()
+    ).toBe('2026-04-07T00:00:00.000Z')
+  })
+
+  test('body preview stats and purge use PostgreSQL when read mode is postgres', async () => {
+    appConfig.requestDetailStorage.readMode = 'postgres'
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false
+    })
+    requestDetailPostgresStore.countRequestBodySnapshots.mockResolvedValue(3)
+    requestDetailPostgresStore.purgeRequestBodySnapshots.mockResolvedValue({ updatedRecords: 3 })
+
+    const stats = await requestDetailService.getRequestBodyPreviewStats()
+    const purge = await requestDetailService.purgeRequestBodySnapshots()
+
+    expect(stats).toEqual({
+      captureEnabled: true,
+      retentionHours: 6,
+      bodyPreviewEnabled: false,
+      writeMode: 'redis',
+      readMode: 'postgres',
+      snapshotCount: 3,
+      hasSnapshots: true
+    })
+    expect(purge).toEqual({ updatedRecords: 3 })
+    expect(requestDetailPostgresStore.countRequestBodySnapshots).toHaveBeenCalled()
+    expect(requestDetailPostgresStore.purgeRequestBodySnapshots).toHaveBeenCalled()
   })
 
   test('purgeRequestBodySnapshots removes snapshots while keeping records', async () => {

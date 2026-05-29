@@ -756,6 +756,9 @@ class OpenAIResponsesRelayService {
           serviceTier,
           createRequestDetailMeta(req, {
             requestBody: req?.body,
+            responseBody: responseData,
+            upstreamResponseId: responseData?.id || responseData?.response?.id || null,
+            finishReason: responseData?.status || responseData?.response?.status || null,
             stream: false,
             statusCode: response.status
           })

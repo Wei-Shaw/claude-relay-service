@@ -6,6 +6,7 @@ const {
   finalizeRequestDetailMeta,
   extractOpenAICacheReadTokens,
   isOpenAIRelatedEndpoint,
+  hashRequestDetailIdentifier,
   getRequestDetailCacheMetrics,
   calculateCacheHitRate
 } = require('../src/utils/requestDetailHelper')
@@ -15,7 +16,7 @@ describe('requestDetailHelper', () => {
     jest.useRealTimers()
   })
 
-  test('sanitizeRequestBodySnapshot redacts secrets and truncates long text', () => {
+  test('sanitizeRequestBodySnapshot redacts secrets and preserves normal long text', () => {
     const snapshot = sanitizeRequestBodySnapshot({
       apiKey: 'super-secret-api-key',
       messages: [
@@ -27,10 +28,10 @@ describe('requestDetailHelper', () => {
     })
 
     expect(snapshot.apiKey).toContain('***')
-    expect(snapshot.messages[0].content).toBe(`${'x'.repeat(80)}...[320 chars]`)
+    expect(snapshot.messages[0].content).toBe('x'.repeat(400))
   })
 
-  test('sanitizeRequestBodySnapshot keeps all object keys while truncating long values', () => {
+  test('sanitizeRequestBodySnapshot keeps all object keys while preserving long values', () => {
     const payload = Object.fromEntries(
       Array.from({ length: 50 }, (_, index) => [
         `key_${index}`,
@@ -42,18 +43,18 @@ describe('requestDetailHelper', () => {
 
     expect(Object.keys(snapshot)).toHaveLength(50)
     expect(snapshot.__truncatedKeys).toBeUndefined()
-    expect(snapshot.key_0).toBe(`value-0-${'x'.repeat(72)}...[28 chars]`)
+    expect(snapshot.key_0).toBe(`value-0-${'x'.repeat(100)}`)
   })
 
   test('sanitizeRequestBodySnapshot still wraps oversized payloads in preview metadata', () => {
     const snapshot = sanitizeRequestBodySnapshot(
       Object.fromEntries(
-        Array.from({ length: 220 }, (_, index) => [`key_${index}`, `${index}-${'x'.repeat(120)}`])
+        Array.from({ length: 1100 }, (_, index) => [`key_${index}`, `${index}-${'x'.repeat(1024)}`])
       )
     )
 
     expect(snapshot.summary).toBe('request body snapshot truncated')
-    expect(snapshot.maxChars).toBe(12000)
+    expect(snapshot.maxChars).toBe(1024 * 1024)
     expect(typeof snapshot.preview).toBe('string')
     expect(snapshot.preview).toContain('...[')
   })
@@ -100,6 +101,65 @@ describe('requestDetailHelper', () => {
       { type: 'function', name: 'lookup_weather' },
       { name: 'claude_tool' }
     ])
+  })
+
+  test('createRequestDetailMeta includes stream timing breakdown from request timing', () => {
+    jest.useFakeTimers().setSystemTime(Date.parse('2026-04-07T12:00:03.500Z'))
+
+    const meta = createRequestDetailMeta(
+      {
+        requestId: 'req_timing',
+        method: 'POST',
+        originalUrl: '/api/v1/messages',
+        requestStartedAt: Date.parse('2026-04-07T12:00:00.000Z'),
+        requestTiming: {
+          firstByteAt: Date.parse('2026-04-07T12:00:00.400Z'),
+          firstTokenAt: Date.parse('2026-04-07T12:00:01.200Z')
+        },
+        body: {
+          stream: true,
+          model: 'claude-sonnet'
+        },
+        res: {
+          statusCode: 200
+        }
+      },
+      {}
+    )
+
+    expect(meta.durationMs).toBe(3500)
+    expect(meta.timeToFirstByteMs).toBe(400)
+    expect(meta.timeToFirstTokenMs).toBe(1200)
+    expect(meta.contentGenerationMs).toBe(2300)
+    expect(meta.firstTokenAt).toBe('2026-04-07T12:00:01.200Z')
+  })
+
+  test('createRequestDetailMeta includes captured response payload metadata', () => {
+    const req = {
+      requestId: 'req_response_capture',
+      originalUrl: '/api/v1/messages',
+      method: 'POST',
+      body: { model: 'claude-sonnet', stream: true },
+      responsePayloadCapture: {
+        toRequestDetailMeta: jest.fn(() => ({
+          responseBodySnapshot: 'data: {"type":"message_delta"}\n\n',
+          responseTextPreview: 'data: {"type"',
+          responseBodySizeBytes: 32,
+          responseBodyTruncated: false,
+          responseMetadata: {
+            captureMode: 'full'
+          }
+        }))
+      }
+    }
+
+    const meta = createRequestDetailMeta(req)
+
+    expect(meta.responseBodySnapshot).toContain('message_delta')
+    expect(meta.responseTextPreview).toBe('data: {"type"')
+    expect(meta.responseBodySizeBytes).toBe(32)
+    expect(meta.responseBodyTruncated).toBe(false)
+    expect(meta.responseMetadata).toEqual({ captureMode: 'full' })
   })
 
   test('extractRequestReasoningInfo supports openai, anthropic, and gemini payloads', () => {
@@ -185,6 +245,105 @@ describe('requestDetailHelper', () => {
     expect(meta.statusCode).toBe(201)
     expect(meta.durationMs).toBeGreaterThanOrEqual(200)
     expect(meta.requestBody).toEqual(req.body)
+  })
+
+  test('createRequestDetailMeta extracts OpenAI analysis fields from body metadata', () => {
+    const req = {
+      requestId: 'req_openai',
+      originalUrl: '/openai/v1/responses',
+      method: 'POST',
+      headers: {
+        'user-agent': 'codex-cli/1.0',
+        'x-forwarded-for': '203.0.113.10, 10.0.0.2'
+      },
+      body: {
+        model: 'gpt-5.4',
+        conversation_id: 'conv-123',
+        prompt_cache_key: 'cache-abc',
+        service_tier: 'priority',
+        metadata: {
+          user_id: 'user-123',
+          session_id: 'session-openai'
+        }
+      }
+    }
+
+    const meta = createRequestDetailMeta(req)
+
+    expect(meta.sessionId).toBe('session-openai')
+    expect(meta.sessionHash).toBe(hashRequestDetailIdentifier('session-openai'))
+    expect(meta.conversationId).toBe('conv-123')
+    expect(meta.promptCacheKey).toBe('cache-abc')
+    expect(meta.metadataUserId).toBe('user-123')
+    expect(meta.serviceTier).toBe('priority')
+    expect(meta.clientIp).toBe('203.0.113.10')
+    expect(meta.userAgent).toBe('codex-cli/1.0')
+    expect(meta.requestSource).toBe('openai')
+  })
+
+  test('createRequestDetailMeta extracts Claude Code session from metadata.user_id', () => {
+    const metadataUserId = JSON.stringify({
+      device_id: '2ac0b086292406bc48e30a5760a23e968c55f539c83e1b59f41fa05ebc8c8977',
+      account_uuid: '',
+      session_id: '51d963cd-e4b7-410f-9261-bb412e3fb0e8'
+    })
+    const meta = createRequestDetailMeta({
+      originalUrl: '/api/v1/messages',
+      method: 'POST',
+      headers: {
+        'user-agent': 'claude-cli/2.1.111 (external, cli)'
+      },
+      body: {
+        model: 'glm-5.1',
+        metadata: {
+          user_id: metadataUserId
+        }
+      }
+    })
+
+    expect(meta.sessionId).toBe('51d963cd-e4b7-410f-9261-bb412e3fb0e8')
+    expect(meta.sessionHash).toBe(
+      hashRequestDetailIdentifier('51d963cd-e4b7-410f-9261-bb412e3fb0e8')
+    )
+    expect(meta.metadataUserId).toBe(metadataUserId)
+    expect(meta.userAgent).toBe('claude-cli/2.1.111 (external, cli)')
+    expect(meta.requestSource).toBe('claude')
+  })
+
+  test('createRequestDetailMeta extracts Droid and Azure session shapes', () => {
+    const droidMeta = createRequestDetailMeta({
+      originalUrl: '/droid/openai/v1/responses',
+      method: 'POST',
+      headers: {
+        'x-droid-session-id': 'droid-session'
+      },
+      body: {
+        metadata: {
+          userId: 'droid-user'
+        }
+      }
+    })
+    const azureMeta = createRequestDetailMeta({
+      originalUrl: '/azure/chat/completions',
+      method: 'POST',
+      headers: {
+        'x-ms-client-request-id': 'azure-session',
+        'x-conversation-id': 'azure-conv',
+        'x-service-tier': 'standard'
+      },
+      body: {
+        user: 'azure-user'
+      }
+    })
+
+    expect(droidMeta.sessionId).toBe('droid-session')
+    expect(droidMeta.metadataUserId).toBe('droid-user')
+    expect(droidMeta.requestSource).toBe('droid')
+    expect(azureMeta.sessionId).toBe('azure-session')
+    expect(azureMeta.conversationId).toBe('azure-conv')
+    expect(azureMeta.metadataUserId).toBe('azure-user')
+    expect(azureMeta.serviceTier).toBe('standard')
+    expect(azureMeta.requestSource).toBe('azure-openai')
   })
 
   test('finalizeRequestDetailMeta refreshes duration from requestStartedAt', () => {

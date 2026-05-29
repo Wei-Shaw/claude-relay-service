@@ -1,6 +1,8 @@
 const redis = require('../models/redis')
+const config = require('../../config/config')
 const logger = require('../utils/logger')
 const claudeRelayConfigService = require('./claudeRelayConfigService')
+const requestDetailPostgresStore = require('./requestDetailStores/postgresRequestDetailStore')
 const claudeAccountService = require('./account/claudeAccountService')
 const claudeConsoleAccountService = require('./account/claudeConsoleAccountService')
 const ccrAccountService = require('./account/ccrAccountService')
@@ -17,6 +19,7 @@ const {
   getRequestDetailCacheMetrics,
   extractRequestReasoningInfo,
   resolveRequestDetailReasoning,
+  hashRequestDetailIdentifier,
   CACHE_HIT_FORMULA
 } = require('../utils/requestDetailHelper')
 
@@ -30,6 +33,8 @@ const REQUEST_DETAIL_SCAN_BATCH_SIZE = 200
 const REQUEST_DETAIL_QUERY_SNAPSHOT_TTL_SECONDS = 30
 const MAX_REQUEST_DETAIL_SNAPSHOT_POINTERS = 25000
 const MAX_REQUEST_DETAIL_SNAPSHOT_BYTES = 2 * 1024 * 1024
+const REQUEST_DETAIL_WRITE_MODES = new Set(['redis', 'dual', 'postgres'])
+const REQUEST_DETAIL_READ_MODES = new Set(['redis', 'postgres'])
 
 const accountTypeNames = {
   claude: 'Claude官方',
@@ -67,6 +72,18 @@ function clampRetentionHours(value) {
   return Math.min(Math.max(parsed, 1), MAX_RETENTION_HOURS)
 }
 
+function normalizeRequestDetailWriteMode(value) {
+  return REQUEST_DETAIL_WRITE_MODES.has(value) ? value : 'redis'
+}
+
+function normalizeRequestDetailReadMode(value) {
+  return REQUEST_DETAIL_READ_MODES.has(value) ? value : 'redis'
+}
+
+function isPlainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+}
+
 function normalizeNumber(value, digits = null) {
   const num = Number(value)
   if (!Number.isFinite(num)) {
@@ -78,6 +95,15 @@ function normalizeNumber(value, digits = null) {
   }
 
   return Number(num.toFixed(digits))
+}
+
+function normalizeNullableInteger(value) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  const num = Number(value)
+  return Number.isFinite(num) ? Math.trunc(num) : null
 }
 
 function normalizeTokenValue(value) {
@@ -273,6 +299,17 @@ function normalizeOptionalFilterValue(value) {
   return normalized ? normalized : null
 }
 
+function normalizeRequestDetailFilters(filters = {}) {
+  return {
+    ...filters,
+    apiKeyId: normalizeOptionalFilterValue(filters.apiKeyId),
+    accountId: normalizeOptionalFilterValue(filters.accountId),
+    model: normalizeOptionalFilterValue(filters.model),
+    endpoint: normalizeOptionalFilterValue(filters.endpoint),
+    session: normalizeOptionalFilterValue(filters.session)
+  }
+}
+
 function createRequestDetailDateBoundarySignature(type, rawValue, effectiveValue, boundaryValue) {
   if (!rawValue) {
     return {
@@ -338,6 +375,7 @@ function createRequestDetailFilterSignature(
     accountId: normalizeOptionalFilterValue(filters.accountId),
     model: normalizeOptionalFilterValue(filters.model),
     endpoint: normalizeOptionalFilterValue(filters.endpoint),
+    session: normalizeOptionalFilterValue(filters.session),
     sortOrder: filters.sortOrder === 'asc' ? 'asc' : 'desc',
     retentionHours:
       retentionHours !== null && retentionHours !== undefined ? Number(retentionHours) : null,
@@ -395,6 +433,7 @@ function requestDetailFilterSignaturesMatch(snapshotSignature, currentSignature)
     normalizedSnapshot.accountId === normalizedCurrent.accountId &&
     normalizedSnapshot.model === normalizedCurrent.model &&
     normalizedSnapshot.endpoint === normalizedCurrent.endpoint &&
+    normalizedSnapshot.session === normalizedCurrent.session &&
     normalizedSnapshot.sortOrder === normalizedCurrent.sortOrder &&
     normalizedSnapshot.retentionHours === normalizedCurrent.retentionHours &&
     requestDetailDateBoundarySignaturesMatch(
@@ -633,11 +672,13 @@ function finalizeSummary(accumulator) {
 
 class RequestDetailService {
   async getSettings() {
-    const config = await claudeRelayConfigService.getConfig()
+    const relayConfig = await claudeRelayConfigService.getConfig()
     return {
-      captureEnabled: config.requestDetailCaptureEnabled === true,
-      retentionHours: clampRetentionHours(config.requestDetailRetentionHours),
-      bodyPreviewEnabled: config.requestDetailBodyPreviewEnabled === true
+      captureEnabled: relayConfig.requestDetailCaptureEnabled === true,
+      retentionHours: clampRetentionHours(relayConfig.requestDetailRetentionHours),
+      bodyPreviewEnabled: relayConfig.requestDetailBodyPreviewEnabled === true,
+      writeMode: normalizeRequestDetailWriteMode(config.requestDetailStorage?.writeMode),
+      readMode: normalizeRequestDetailReadMode(config.requestDetailStorage?.readMode)
     }
   }
 
@@ -646,6 +687,8 @@ class RequestDetailService {
       captureEnabled: settings.captureEnabled,
       retentionHours: settings.retentionHours,
       bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      writeMode: settings.writeMode,
+      readMode: settings.readMode,
       snapshotId: null,
       records: [],
       pagination: {
@@ -664,6 +707,7 @@ class RequestDetailService {
         accountId: filters.accountId || null,
         model: filters.model || null,
         endpoint: filters.endpoint || null,
+        session: filters.session || null,
         hasCustomDateRange: Boolean(filters.startDate || filters.endDate),
         sortOrder: filters.sortOrder === 'asc' ? 'asc' : 'desc'
       },
@@ -694,6 +738,68 @@ class RequestDetailService {
     }
   }
 
+  _buildRecordMetadata(detail = {}) {
+    const metadata = isPlainObject(detail.metadata) ? { ...detail.metadata } : {}
+
+    if (detail.metadata !== undefined && !isPlainObject(detail.metadata)) {
+      metadata.rawMetadata = detail.metadata
+    }
+
+    for (const key of ['raw', 'debug', 'rawDebug', 'extra']) {
+      if (detail[key] !== undefined) {
+        metadata[key] = detail[key]
+      }
+    }
+
+    return metadata
+  }
+
+  _normalizeResponsePayload(detail = {}) {
+    const normalized = {}
+
+    if (detail.responseHeaders !== undefined) {
+      normalized.responseHeaders = detail.responseHeaders
+    }
+
+    const responseBodySnapshot =
+      detail.responseBodySnapshot !== undefined ? detail.responseBodySnapshot : detail.responseBody
+    if (responseBodySnapshot !== undefined) {
+      normalized.responseBodySnapshot = responseBodySnapshot
+    }
+
+    if (detail.responseTextPreview !== undefined) {
+      normalized.responseTextPreview = normalizeOptionalFilterValue(detail.responseTextPreview)
+    }
+
+    if (detail.responseBodySizeBytes !== undefined) {
+      normalized.responseBodySizeBytes = normalizeNullableInteger(detail.responseBodySizeBytes)
+    }
+
+    if (detail.responseBodyTruncated !== undefined) {
+      normalized.responseBodyTruncated = detail.responseBodyTruncated === true
+    }
+
+    if (detail.upstreamResponseId !== undefined) {
+      normalized.upstreamResponseId = normalizeOptionalFilterValue(detail.upstreamResponseId)
+    }
+
+    if (detail.finishReason !== undefined) {
+      normalized.finishReason = normalizeOptionalFilterValue(detail.finishReason)
+    }
+
+    if (detail.errorBody !== undefined) {
+      normalized.errorBody = detail.errorBody
+    }
+
+    if (detail.responseMetadata !== undefined) {
+      normalized.responseMetadata = isPlainObject(detail.responseMetadata)
+        ? detail.responseMetadata
+        : { rawResponseMetadata: detail.responseMetadata }
+    }
+
+    return normalized
+  }
+
   _normalizeRecord(detail, requestId, options = {}) {
     const requestBodySource = detail.requestBodySnapshot ?? detail.requestBody
     const timestamp = toIsoString(detail.timestamp) || new Date().toISOString()
@@ -709,10 +815,22 @@ class RequestDetailService {
     const cost = normalizeNumber(detail.cost, 6)
     const realCost = normalizeNumber(detail.realCost, 6)
     const reasoningInfo = extractRequestReasoningInfo(requestBodySource)
+    const timeToFirstByteMs = normalizeNullableInteger(detail.timeToFirstByteMs)
+    const timeToFirstTokenMs = normalizeNullableInteger(detail.timeToFirstTokenMs)
+    const contentGenerationMs =
+      normalizeNullableInteger(detail.contentGenerationMs) ??
+      (timeToFirstTokenMs !== null ? Math.max(0, durationMs - timeToFirstTokenMs) : null)
+    const sessionId = normalizeOptionalFilterValue(detail.sessionId)
+    const sessionHash =
+      normalizeOptionalFilterValue(detail.sessionHash) || hashRequestDetailIdentifier(sessionId)
+    const responsePayloadFields = this._normalizeResponsePayload(detail)
     const normalized = {
       requestId,
       timestamp,
       requestStartedAt: toIsoString(detail.requestStartedAt),
+      firstByteAt: toIsoString(detail.firstByteAt),
+      firstTokenAt: toIsoString(detail.firstTokenAt),
+      responseCompletedAt: toIsoString(detail.responseCompletedAt),
       endpoint: detail.endpoint || null,
       method: detail.method || null,
       statusCode,
@@ -734,9 +852,23 @@ class RequestDetailService {
       usedFallbackPricing: detail.usedFallbackPricing === true,
       costRecomputed: detail.costRecomputed === true,
       durationMs,
+      timeToFirstByteMs,
+      timeToFirstTokenMs,
+      contentGenerationMs,
       isLongContextRequest: detail.isLongContextRequest === true,
+      sessionId,
+      sessionHash,
+      conversationId: normalizeOptionalFilterValue(detail.conversationId),
+      promptCacheKey: normalizeOptionalFilterValue(detail.promptCacheKey),
+      metadataUserId: normalizeOptionalFilterValue(detail.metadataUserId),
+      serviceTier: normalizeOptionalFilterValue(detail.serviceTier),
+      clientIp: normalizeOptionalFilterValue(detail.clientIp),
+      userAgent: normalizeOptionalFilterValue(detail.userAgent),
+      requestSource: normalizeOptionalFilterValue(detail.requestSource),
       reasoningDisplay: detail.reasoningDisplay || reasoningInfo.reasoningDisplay || null,
-      reasoningSource: detail.reasoningSource || reasoningInfo.reasoningSource || null
+      reasoningSource: detail.reasoningSource || reasoningInfo.reasoningSource || null,
+      ...responsePayloadFields,
+      metadata: this._buildRecordMetadata(detail)
     }
 
     if (options.bodyPreviewEnabled && requestBodySource !== undefined) {
@@ -746,6 +878,32 @@ class RequestDetailService {
     return normalized
   }
 
+  async _writeRequestDetailToRedis(normalized, requestId, settings) {
+    const client = redis.getClient()
+    if (!client) {
+      return { captured: false, reason: 'redis_unavailable' }
+    }
+
+    const timestampMs = toMillis(normalized.timestamp) || Date.now()
+    const itemKey = `${REQUEST_DETAIL_ITEM_PREFIX}${requestId}`
+    const dayKey = `${REQUEST_DETAIL_DAY_INDEX_PREFIX}${formatDayKey(new Date(timestampMs))}`
+    const ttlSeconds = Math.max(3600, settings.retentionHours * 3600)
+    const indexTtlSeconds = ttlSeconds + 86400
+
+    await client
+      .multi()
+      .set(itemKey, JSON.stringify(normalized), 'EX', ttlSeconds)
+      .zadd(dayKey, timestampMs, requestId)
+      .expire(dayKey, indexTtlSeconds)
+      .exec()
+
+    return { captured: true, requestId }
+  }
+
+  async _writeRequestDetailToPostgres(normalized) {
+    await requestDetailPostgresStore.upsertRequestDetail(normalized)
+  }
+
   async captureRequestDetail(detail = {}) {
     try {
       const settings = await this.getSettings()
@@ -753,27 +911,41 @@ class RequestDetailService {
         return { captured: false, reason: 'disabled' }
       }
 
-      const client = redis.getClient()
-      if (!client) {
-        return { captured: false, reason: 'redis_unavailable' }
-      }
-
       const requestId = detail.requestId || makeRequestDetailId()
       const normalized = this._normalizeRecord(detail, requestId, {
         bodyPreviewEnabled: settings.bodyPreviewEnabled
       })
-      const timestampMs = toMillis(normalized.timestamp) || Date.now()
-      const itemKey = `${REQUEST_DETAIL_ITEM_PREFIX}${requestId}`
-      const dayKey = `${REQUEST_DETAIL_DAY_INDEX_PREFIX}${formatDayKey(new Date(timestampMs))}`
-      const ttlSeconds = Math.max(3600, settings.retentionHours * 3600)
-      const indexTtlSeconds = ttlSeconds + 86400
 
-      await client
-        .multi()
-        .set(itemKey, JSON.stringify(normalized), 'EX', ttlSeconds)
-        .zadd(dayKey, timestampMs, requestId)
-        .expire(dayKey, indexTtlSeconds)
-        .exec()
+      const shouldWriteRedis = settings.writeMode === 'redis' || settings.writeMode === 'dual'
+      const shouldWritePostgres = settings.writeMode === 'postgres' || settings.writeMode === 'dual'
+      let redisCaptured = false
+      let postgresCaptured = false
+      let lastReason = null
+
+      if (shouldWriteRedis) {
+        try {
+          const redisResult = await this._writeRequestDetailToRedis(normalized, requestId, settings)
+          redisCaptured = redisResult.captured === true
+          lastReason = redisResult.reason || lastReason
+        } catch (error) {
+          lastReason = 'redis_error'
+          logger.warn(`⚠️ Failed to write request detail to Redis: ${error.message}`)
+        }
+      }
+
+      if (shouldWritePostgres) {
+        try {
+          await this._writeRequestDetailToPostgres(normalized)
+          postgresCaptured = true
+        } catch (error) {
+          lastReason = 'postgres_error'
+          logger.warn(`⚠️ Failed to write request detail to PostgreSQL: ${error.message}`)
+        }
+      }
+
+      if (!redisCaptured && !postgresCaptured) {
+        return { captured: false, reason: lastReason || 'write_skipped', requestId }
+      }
 
       return { captured: true, requestId }
     } catch (error) {
@@ -847,6 +1019,20 @@ class RequestDetailService {
     const settings = await this.getSettings()
     let snapshotCount = 0
 
+    if (settings.readMode === 'postgres') {
+      snapshotCount = await requestDetailPostgresStore.countRequestBodySnapshots()
+
+      return {
+        captureEnabled: settings.captureEnabled,
+        retentionHours: settings.retentionHours,
+        bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        writeMode: settings.writeMode,
+        readMode: settings.readMode,
+        snapshotCount,
+        hasSnapshots: snapshotCount > 0
+      }
+    }
+
     await this._scanRequestDetailItemKeys(async (keys, client) => {
       const rawItems = await client.mget(keys)
       for (const rawItem of rawItems) {
@@ -865,12 +1051,19 @@ class RequestDetailService {
       captureEnabled: settings.captureEnabled,
       retentionHours: settings.retentionHours,
       bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      writeMode: settings.writeMode,
+      readMode: settings.readMode,
       snapshotCount,
       hasSnapshots: snapshotCount > 0
     }
   }
 
   async purgeRequestBodySnapshots() {
+    const settings = await this.getSettings()
+    if (settings.readMode === 'postgres') {
+      return requestDetailPostgresStore.purgeRequestBodySnapshots()
+    }
+
     let updatedRecords = 0
 
     await this._scanRequestDetailItemKeys(async (keys, client) => {
@@ -1113,7 +1306,19 @@ class RequestDetailService {
       record.accountTypeName,
       record.model,
       record.endpoint,
-      record.method
+      record.method,
+      record.timeToFirstByteMs,
+      record.timeToFirstTokenMs,
+      record.contentGenerationMs,
+      record.sessionId,
+      record.sessionHash,
+      record.conversationId,
+      record.promptCacheKey,
+      record.metadataUserId,
+      record.serviceTier,
+      record.clientIp,
+      record.userAgent,
+      record.requestSource
     ]
 
     return haystacks.some((value) =>
@@ -1136,6 +1341,17 @@ class RequestDetailService {
     if (filters.endpoint && record.endpoint !== filters.endpoint) {
       return false
     }
+    if (filters.session) {
+      const sessionMatches = [
+        record.sessionId,
+        record.sessionHash,
+        record.conversationId,
+        record.metadataUserId
+      ].some((value) => value === filters.session)
+      if (!sessionMatches) {
+        return false
+      }
+    }
 
     return true
   }
@@ -1149,6 +1365,7 @@ class RequestDetailService {
       accountId: filters.accountId || null,
       model: filters.model || null,
       endpoint: filters.endpoint || null,
+      session: filters.session || null,
       hasCustomDateRange: Boolean(filters.startDate || filters.endDate),
       sortOrder
     }
@@ -1443,6 +1660,8 @@ class RequestDetailService {
       captureEnabled: settings.captureEnabled,
       retentionHours: settings.retentionHours,
       bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      writeMode: settings.writeMode,
+      readMode: settings.readMode,
       snapshotId,
       records: pageRecords,
       pagination: {
@@ -1459,32 +1678,160 @@ class RequestDetailService {
     }
   }
 
-  async listRequestDetails(filters = {}) {
-    filters = {
-      ...filters,
-      apiKeyId: normalizeOptionalFilterValue(filters.apiKeyId),
-      accountId: normalizeOptionalFilterValue(filters.accountId),
-      model: normalizeOptionalFilterValue(filters.model),
-      endpoint: normalizeOptionalFilterValue(filters.endpoint)
+  async _resolvePostgresAvailableFilterDisplayNames(availableFilters = {}) {
+    const apiKeyCache = new Map()
+    const accountCache = new Map()
+
+    await Promise.all(
+      (availableFilters.apiKeys || []).map(async (entry) => {
+        const name = await this._getApiKeyName(entry.id, apiKeyCache)
+        if (name) {
+          entry.name = name
+        }
+      })
+    )
+
+    await Promise.all(
+      (availableFilters.accounts || []).map(async (entry) => {
+        const accountInfo = await this._resolveAccountInfo(
+          entry.id,
+          entry.accountType,
+          accountCache
+        )
+        if (accountInfo) {
+          entry.name = accountInfo.accountName
+          entry.accountType = accountInfo.accountType
+          entry.accountTypeName = accountInfo.accountTypeName
+        } else {
+          entry.accountTypeName =
+            entry.accountTypeName || accountTypeNames[entry.accountType] || accountTypeNames.unknown
+        }
+      })
+    )
+
+    return {
+      apiKeys: (availableFilters.apiKeys || []).sort((a, b) => a.name.localeCompare(b.name)),
+      accounts: (availableFilters.accounts || []).sort((a, b) => a.name.localeCompare(b.name)),
+      models: availableFilters.models || [],
+      endpoints: availableFilters.endpoints || [],
+      dateRange: availableFilters.dateRange || {
+        earliest: null,
+        latest: null
+      }
     }
+  }
+
+  async _buildPostgresListQueryData(
+    filters,
+    effectiveStart,
+    effectiveEnd,
+    sortOrder,
+    page,
+    pageSize
+  ) {
+    const [summary, availableFiltersRaw] = await Promise.all([
+      requestDetailPostgresStore.getListSummary({
+        startDate: effectiveStart,
+        endDate: effectiveEnd,
+        filters
+      }),
+      requestDetailPostgresStore.getAvailableFilters({
+        startDate: effectiveStart,
+        endDate: effectiveEnd
+      })
+    ])
+
+    const availableFilters =
+      await this._resolvePostgresAvailableFilterDisplayNames(availableFiltersRaw)
+    const totalRecords = Number(summary?.totalRequests || 0)
+    const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / pageSize) : 0
+    const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1
+    const hasSourceRecords = Boolean(availableFilters.dateRange.earliest) || totalRecords > 0
+
+    if (!hasSourceRecords) {
+      return {
+        hasSourceRecords: false,
+        totalRecords: 0,
+        currentPage: 1,
+        pageRecords: [],
+        recordsEnriched: false,
+        availableFilters,
+        summary
+      }
+    }
+
+    const pageRecords =
+      totalRecords > 0
+        ? await requestDetailPostgresStore.listRecordsPage({
+            startDate: effectiveStart,
+            endDate: effectiveEnd,
+            filters,
+            sortOrder,
+            page: currentPage,
+            pageSize
+          })
+        : []
+
+    return {
+      hasSourceRecords: true,
+      totalRecords,
+      currentPage,
+      pageRecords,
+      recordsEnriched: false,
+      availableFilters,
+      summary
+    }
+  }
+
+  async _buildPostgresListResponse({
+    settings,
+    responseFilters,
+    pageRecords: pageRecordsRaw = [],
+    totalRecords,
+    currentPage,
+    recordsEnriched = false,
+    availableFilters,
+    summary,
+    pageSize
+  }) {
+    const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / pageSize) : 0
+    const pageRecords = recordsEnriched ? pageRecordsRaw : await this._enrichRecords(pageRecordsRaw)
+
+    return {
+      captureEnabled: settings.captureEnabled,
+      retentionHours: settings.retentionHours,
+      bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      writeMode: settings.writeMode,
+      readMode: settings.readMode,
+      snapshotId: null,
+      records: pageRecords.map((record) => ({
+        ...record,
+        requestBodySnapshot: undefined
+      })),
+      pagination: {
+        currentPage,
+        pageSize,
+        totalRecords,
+        totalPages,
+        hasNextPage: totalPages > 0 && currentPage < totalPages,
+        hasPreviousPage: totalPages > 0 && currentPage > 1
+      },
+      filters: responseFilters,
+      availableFilters,
+      summary
+    }
+  }
+
+  async listRequestDetails(filters = {}) {
+    filters = normalizeRequestDetailFilters(filters)
     const settings = await this.getSettings()
     const emptyResult = this._emptyListResult(settings, filters)
 
-    const now = new Date()
-    const retentionStart = new Date(now.getTime() - settings.retentionHours * 3600 * 1000)
-    const startDate = filters.startDate ? new Date(filters.startDate) : retentionStart
-    const endDate = filters.endDate ? new Date(filters.endDate) : now
-
-    const effectiveStart = startDate < retentionStart ? retentionStart : startDate
-    const effectiveEnd = endDate > now ? now : endDate
-
-    if (Number.isNaN(effectiveStart.getTime()) || Number.isNaN(effectiveEnd.getTime())) {
-      throw new RequestDetailValidationError('Invalid date range')
-    }
-
-    if (effectiveStart > effectiveEnd) {
-      throw new RequestDetailValidationError('Start date must be before or equal to end date')
-    }
+    const { effectiveStart, effectiveEnd, retentionStart, now } = this._resolveEffectiveQueryRange(
+      filters,
+      settings,
+      { clampToRetention: settings.readMode !== 'postgres' }
+    )
 
     const page = Math.max(Number.parseInt(filters.page, 10) || 1, 1)
     const pageSize = Math.min(Math.max(Number.parseInt(filters.pageSize, 10) || 50, 1), 200)
@@ -1495,6 +1842,41 @@ class RequestDetailService {
       effectiveEnd,
       sortOrder
     )
+    if (settings.readMode === 'postgres') {
+      const queryData = await this._buildPostgresListQueryData(
+        filters,
+        effectiveStart,
+        effectiveEnd,
+        sortOrder,
+        page,
+        pageSize
+      )
+      if (!queryData.hasSourceRecords) {
+        return {
+          ...emptyResult,
+          captureEnabled: settings.captureEnabled,
+          retentionHours: settings.retentionHours,
+          bodyPreviewEnabled: settings.bodyPreviewEnabled,
+          writeMode: settings.writeMode,
+          readMode: settings.readMode,
+          snapshotId: null,
+          filters: responseFilters
+        }
+      }
+
+      return this._buildPostgresListResponse({
+        settings,
+        responseFilters,
+        pageRecords: queryData.pageRecords,
+        totalRecords: queryData.totalRecords,
+        currentPage: queryData.currentPage,
+        recordsEnriched: queryData.recordsEnriched,
+        availableFilters: queryData.availableFilters,
+        summary: queryData.summary,
+        pageSize
+      })
+    }
+
     const filterSignature = createRequestDetailFilterSignature(
       filters,
       {
@@ -1564,14 +1946,155 @@ class RequestDetailService {
     })
   }
 
+  _emptySessionSummaryResult(settings, filters = {}) {
+    const pageSize = Number.parseInt(filters.pageSize, 10) || 50
+    return {
+      captureEnabled: settings.captureEnabled,
+      retentionHours: settings.retentionHours,
+      bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      writeMode: settings.writeMode,
+      readMode: settings.readMode,
+      sessions: [],
+      pagination: {
+        currentPage: 1,
+        pageSize,
+        totalSessions: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false
+      },
+      filters: {
+        startDate: filters.startDate || null,
+        endDate: filters.endDate || null,
+        keyword: filters.keyword || null,
+        apiKeyId: filters.apiKeyId || null,
+        accountId: filters.accountId || null,
+        model: filters.model || null,
+        endpoint: filters.endpoint || null,
+        session: filters.session || null,
+        hasCustomDateRange: Boolean(filters.startDate || filters.endDate),
+        sortOrder: filters.sortOrder === 'asc' ? 'asc' : 'desc'
+      }
+    }
+  }
+
+  _resolveEffectiveQueryRange(filters, settings, options = {}) {
+    const now = new Date()
+    const retentionStart = new Date(now.getTime() - settings.retentionHours * 3600 * 1000)
+    const startDate = filters.startDate ? new Date(filters.startDate) : retentionStart
+    const endDate = filters.endDate ? new Date(filters.endDate) : now
+    const clampToRetention = options.clampToRetention !== false
+
+    const effectiveStart =
+      clampToRetention && startDate < retentionStart ? retentionStart : startDate
+    const effectiveEnd = endDate > now ? now : endDate
+
+    if (Number.isNaN(effectiveStart.getTime()) || Number.isNaN(effectiveEnd.getTime())) {
+      throw new RequestDetailValidationError('Invalid date range')
+    }
+
+    if (effectiveStart > effectiveEnd) {
+      throw new RequestDetailValidationError('Start date must be before or equal to end date')
+    }
+
+    return {
+      effectiveStart,
+      effectiveEnd,
+      retentionStart,
+      now
+    }
+  }
+
+  async listRequestDetailSessions(filters = {}) {
+    filters = normalizeRequestDetailFilters(filters)
+    const settings = await this.getSettings()
+    const { effectiveStart, effectiveEnd } = this._resolveEffectiveQueryRange(filters, settings, {
+      clampToRetention: settings.readMode !== 'postgres'
+    })
+    const page = Math.max(Number.parseInt(filters.page, 10) || 1, 1)
+    const pageSize = Math.min(Math.max(Number.parseInt(filters.pageSize, 10) || 50, 1), 200)
+    const sortOrder = filters.sortOrder === 'asc' ? 'asc' : 'desc'
+    const responseFilters = this._buildResponseFilters(
+      filters,
+      effectiveStart,
+      effectiveEnd,
+      sortOrder
+    )
+
+    if (settings.readMode !== 'postgres') {
+      return {
+        ...this._emptySessionSummaryResult(settings, filters),
+        filters: responseFilters
+      }
+    }
+
+    const result = await requestDetailPostgresStore.listSessionSummaries({
+      startDate: effectiveStart,
+      endDate: effectiveEnd,
+      filters,
+      sortOrder,
+      page,
+      pageSize
+    })
+
+    const totalSessions = Number(result.totalSessions || 0)
+    const totalPages = totalSessions > 0 ? Math.ceil(totalSessions / pageSize) : 0
+    const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1
+
+    return {
+      captureEnabled: settings.captureEnabled,
+      retentionHours: settings.retentionHours,
+      bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      writeMode: settings.writeMode,
+      readMode: settings.readMode,
+      sessions: result.sessions || [],
+      pagination: {
+        currentPage,
+        pageSize,
+        totalSessions,
+        totalPages,
+        hasNextPage: totalPages > 0 && currentPage < totalPages,
+        hasPreviousPage: totalPages > 0 && currentPage > 1
+      },
+      filters: responseFilters
+    }
+  }
+
   async getRequestDetail(requestId) {
     const settings = await this.getSettings()
+
+    if (settings.readMode === 'postgres') {
+      const parsed = await requestDetailPostgresStore.getRequestDetail(requestId)
+      if (!parsed) {
+        return {
+          captureEnabled: settings.captureEnabled,
+          retentionHours: settings.retentionHours,
+          bodyPreviewEnabled: settings.bodyPreviewEnabled,
+          writeMode: settings.writeMode,
+          readMode: settings.readMode,
+          record: null
+        }
+      }
+
+      const [enrichedRecord] = await this._enrichRecords([parsed])
+      return {
+        captureEnabled: settings.captureEnabled,
+        retentionHours: settings.retentionHours,
+        bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        writeMode: settings.writeMode,
+        readMode: settings.readMode,
+        record: enrichedRecord || null
+      }
+    }
+
     const client = redis.getClient()
     if (!client) {
       return {
         captureEnabled: settings.captureEnabled,
         retentionHours: settings.retentionHours,
         bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        writeMode: settings.writeMode,
+        readMode: settings.readMode,
         record: null
       }
     }
@@ -1583,6 +2106,8 @@ class RequestDetailService {
         captureEnabled: settings.captureEnabled,
         retentionHours: settings.retentionHours,
         bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        writeMode: settings.writeMode,
+        readMode: settings.readMode,
         record: null
       }
     }
@@ -1597,6 +2122,8 @@ class RequestDetailService {
           captureEnabled: settings.captureEnabled,
           retentionHours: settings.retentionHours,
           bodyPreviewEnabled: settings.bodyPreviewEnabled,
+          writeMode: settings.writeMode,
+          readMode: settings.readMode,
           record: null
         }
       }
@@ -1609,6 +2136,8 @@ class RequestDetailService {
         captureEnabled: settings.captureEnabled,
         retentionHours: settings.retentionHours,
         bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        writeMode: settings.writeMode,
+        readMode: settings.readMode,
         record: null
       }
     }
@@ -1618,6 +2147,8 @@ class RequestDetailService {
       captureEnabled: settings.captureEnabled,
       retentionHours: settings.retentionHours,
       bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      writeMode: settings.writeMode,
+      readMode: settings.readMode,
       record: enrichedRecord || null
     }
   }

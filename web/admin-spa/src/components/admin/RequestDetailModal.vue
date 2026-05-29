@@ -17,9 +17,6 @@
           <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
             {{ detail?.model || '加载中...' }}
           </h3>
-          <p class="mt-1 break-all text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-            Request ID: {{ requestId || '未知' }}
-          </p>
         </div>
         <div class="flex items-center gap-2 self-start sm:self-center">
           <el-tag v-if="detail" effect="dark" :type="statusTagType(detail.statusCode)">
@@ -41,7 +38,7 @@
       </div>
 
       <template v-else-if="detail">
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <div class="info-card">
             <p class="info-label">接口</p>
             <p class="info-value">{{ detail.endpoint || '-' }}</p>
@@ -51,6 +48,19 @@
             <p class="info-label">耗时</p>
             <p class="info-value">{{ formatDuration(detail.durationMs) }}</p>
             <p class="info-sub">{{ detail.stream ? '流式请求' : '非流式请求' }}</p>
+          </div>
+          <div class="info-card">
+            <p class="info-label">首词</p>
+            <p class="info-value">{{ formatNullableDuration(detail.timeToFirstTokenMs) }}</p>
+            <p class="info-sub">
+              首包 {{ formatNullableDuration(detail.timeToFirstByteMs) }} · 生成
+              {{ formatNullableDuration(detail.contentGenerationMs) }}
+            </p>
+          </div>
+          <div class="info-card">
+            <p class="info-label">生成速度</p>
+            <p class="info-value">{{ formatGenerationSpeed(detail) }}</p>
+            <p class="info-sub">按输出 Token / 内容生成耗时计算</p>
           </div>
           <div class="info-card">
             <p class="info-label">费用</p>
@@ -105,6 +115,10 @@
                 <p class="field-sub">
                   {{ detail.reasoningSource ? `来源：${detail.reasoningSource}` : '未指定' }}
                 </p>
+              </div>
+              <div class="md:col-span-2">
+                <p class="field-label">User-Agent</p>
+                <p class="field-value-compact break-all">{{ detail.userAgent || '-' }}</p>
               </div>
             </div>
           </div>
@@ -190,7 +204,18 @@
             </el-button>
           </div>
           <div v-if="hasRequestBodySnapshot" class="snapshot-panel">
-            <pre>{{ formattedSnapshot }}</pre>
+            <VueJsonPretty
+              v-if="snapshotCanRenderAsJson"
+              class="snapshot-json-viewer"
+              :collapsed-node-length="12"
+              :collapsed-on-click-brackets="true"
+              :data="snapshotJsonData"
+              :deep="3"
+              :show-icon="true"
+              :show-length="true"
+              theme="dark"
+            />
+            <pre v-else class="snapshot-plain-text">{{ formattedSnapshot }}</pre>
           </div>
           <div
             v-else-if="!bodyPreviewEnabled"
@@ -205,6 +230,83 @@
             未保存请求体快照
           </div>
         </div>
+
+        <div
+          class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+        >
+          <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h4 class="section-title mb-0">Response Body 快照</h4>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ responsePayloadSummary }}
+              </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <el-tag v-if="detail.responseBodyTruncated" size="small" type="warning">
+                已截断
+              </el-tag>
+              <el-button v-if="hasResponsePayload" size="small" @click="copyResponseSnapshot">
+                {{ responseSnapshotCanRenderAsJson ? '复制 JSON' : '复制文本' }}
+              </el-button>
+            </div>
+          </div>
+
+          <div v-if="hasResponseMeta" class="response-meta-grid">
+            <div class="response-meta-item">
+              <span>大小</span>
+              <strong>{{ formatBytes(detail.responseBodySizeBytes) }}</strong>
+            </div>
+            <div class="response-meta-item">
+              <span>Finish</span>
+              <strong>{{ detail.finishReason || '-' }}</strong>
+            </div>
+            <div class="response-meta-item">
+              <span>Upstream ID</span>
+              <strong class="break-all">{{ detail.upstreamResponseId || '-' }}</strong>
+            </div>
+            <div class="response-meta-item">
+              <span>捕获模式</span>
+              <strong>{{ formatCaptureMode(detail.responseMetadata?.captureMode) }}</strong>
+            </div>
+          </div>
+
+          <div v-if="hasResponsePayload" class="snapshot-panel mt-3">
+            <VueJsonPretty
+              v-if="responseSnapshotCanRenderAsJson"
+              class="snapshot-json-viewer"
+              :collapsed-node-length="12"
+              :collapsed-on-click-brackets="true"
+              :data="responseSnapshotJsonData"
+              :deep="3"
+              :show-icon="true"
+              :show-length="true"
+              theme="dark"
+            />
+            <pre v-else class="snapshot-plain-text">{{ formattedResponseSnapshot }}</pre>
+          </div>
+          <div
+            v-else
+            class="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"
+          >
+            未保存响应报文
+          </div>
+
+          <div v-if="hasResponseHeaders" class="mt-3">
+            <p class="field-label mb-2">Response Headers</p>
+            <div class="snapshot-panel snapshot-panel-compact">
+              <VueJsonPretty
+                class="snapshot-json-viewer"
+                :collapsed-node-length="12"
+                :collapsed-on-click-brackets="true"
+                :data="detail.responseHeaders"
+                :deep="2"
+                :show-icon="true"
+                :show-length="true"
+                theme="dark"
+              />
+            </div>
+          </div>
+        </div>
       </template>
     </div>
   </el-dialog>
@@ -213,6 +315,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
+import VueJsonPretty from 'vue-json-pretty'
+import 'vue-json-pretty/lib/styles.css'
 import { getRequestDetailApi } from '@/utils/http_apis'
 import { showToast, formatNumber } from '@/utils/tools'
 
@@ -224,6 +328,10 @@ const props = defineProps({
   requestId: {
     type: String,
     default: ''
+  },
+  fetchDetail: {
+    type: Function,
+    default: null
   }
 })
 
@@ -256,6 +364,69 @@ const tryFormatJsonString = (value) => {
     return JSON.stringify(JSON.parse(value), null, 2)
   } catch (error) {
     return null
+  }
+}
+
+const tryParseJsonString = (value) => {
+  if (typeof value !== 'string') {
+    return {
+      success: false,
+      data: null
+    }
+  }
+
+  try {
+    return {
+      success: true,
+      data: JSON.parse(value)
+    }
+  } catch (error) {
+    return {
+      success: false,
+      data: null
+    }
+  }
+}
+
+const tryParseSseDataString = (value) => {
+  if (typeof value !== 'string' || !value.includes('data:')) {
+    return {
+      success: false,
+      data: null
+    }
+  }
+
+  const events = []
+  let sawDataLine = false
+  for (const rawLine of value.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line.startsWith('data:')) {
+      continue
+    }
+
+    sawDataLine = true
+    const dataText = line.slice(5).trim()
+    if (!dataText || dataText === '[DONE]') {
+      continue
+    }
+
+    try {
+      events.push(JSON.parse(dataText))
+    } catch (error) {
+      events.push(dataText)
+    }
+  }
+
+  if (!sawDataLine || events.length === 0) {
+    return {
+      success: false,
+      data: null
+    }
+  }
+
+  return {
+    success: true,
+    data: events
   }
 }
 
@@ -337,8 +508,10 @@ const formatJsonLikeText = (value) => {
   return suffix ? `${trimmed}\n${suffix}` : trimmed
 }
 
+const hasPayloadValue = (value) => value !== null && value !== undefined && value !== ''
+
 const extractSnapshotDisplaySource = (snapshot) => {
-  if (!snapshot) {
+  if (!hasPayloadValue(snapshot)) {
     return ''
   }
 
@@ -353,20 +526,91 @@ const extractSnapshotDisplaySource = (snapshot) => {
   return snapshot
 }
 
-const hasRequestBodySnapshot = computed(() => Boolean(detail.value?.requestBodySnapshot))
-
-const formattedSnapshot = computed(() => {
-  if (!detail.value?.requestBodySnapshot) {
-    return ''
+const createSnapshotDisplay = (snapshot) => {
+  if (!hasPayloadValue(snapshot)) {
+    return {
+      canRenderAsJson: false,
+      jsonData: null,
+      text: ''
+    }
   }
 
-  const snapshotSource = extractSnapshotDisplaySource(detail.value.requestBodySnapshot)
+  const snapshotSource = extractSnapshotDisplaySource(snapshot)
 
   if (typeof snapshotSource === 'string') {
-    return tryFormatJsonString(snapshotSource) || formatJsonLikeText(snapshotSource)
+    const parsed = tryParseJsonString(snapshotSource)
+    const sseParsed = parsed.success ? parsed : tryParseSseDataString(snapshotSource)
+    const text = tryFormatJsonString(snapshotSource) || formatJsonLikeText(snapshotSource)
+
+    return {
+      canRenderAsJson: sseParsed.success,
+      jsonData: sseParsed.success ? sseParsed.data : null,
+      text
+    }
   }
 
-  return JSON.stringify(snapshotSource, null, 2)
+  return {
+    canRenderAsJson: true,
+    jsonData: snapshotSource,
+    text: JSON.stringify(snapshotSource, null, 2)
+  }
+}
+
+const hasRequestBodySnapshot = computed(() => hasPayloadValue(detail.value?.requestBodySnapshot))
+
+const snapshotDisplay = computed(() => createSnapshotDisplay(detail.value?.requestBodySnapshot))
+
+const snapshotCanRenderAsJson = computed(() => snapshotDisplay.value.canRenderAsJson)
+const snapshotJsonData = computed(() => snapshotDisplay.value.jsonData)
+const formattedSnapshot = computed(() => snapshotDisplay.value.text)
+
+const responsePayloadSource = computed(() =>
+  hasPayloadValue(detail.value?.responseBodySnapshot)
+    ? detail.value.responseBodySnapshot
+    : detail.value?.responseTextPreview
+)
+const hasResponsePayload = computed(() => hasPayloadValue(responsePayloadSource.value))
+const responseSnapshotDisplay = computed(() => createSnapshotDisplay(responsePayloadSource.value))
+const responseSnapshotCanRenderAsJson = computed(
+  () => responseSnapshotDisplay.value.canRenderAsJson
+)
+const responseSnapshotJsonData = computed(() => responseSnapshotDisplay.value.jsonData)
+const formattedResponseSnapshot = computed(() => responseSnapshotDisplay.value.text)
+const hasResponseHeaders = computed(
+  () =>
+    detail.value?.responseHeaders &&
+    typeof detail.value.responseHeaders === 'object' &&
+    Object.keys(detail.value.responseHeaders).length > 0
+)
+const hasResponseMeta = computed(() =>
+  Boolean(
+    detail.value?.responseBodySizeBytes !== undefined ||
+      detail.value?.finishReason ||
+      detail.value?.upstreamResponseId ||
+      detail.value?.responseMetadata?.captureMode
+  )
+)
+
+const responsePayloadSummary = computed(() => {
+  if (!detail.value) {
+    return '-'
+  }
+
+  const parts = []
+  if (detail.value.responseBodySizeBytes !== undefined) {
+    parts.push(`大小 ${formatBytes(detail.value.responseBodySizeBytes)}`)
+  }
+  if (detail.value.responseMetadata?.capturedBytes !== undefined) {
+    parts.push(`已捕获 ${formatBytes(detail.value.responseMetadata.capturedBytes)}`)
+  }
+  if (detail.value.responseBodyTruncated) {
+    parts.push('超过上限已截断')
+  }
+  if (!hasResponsePayload.value && parts.length === 0) {
+    return '当前记录没有响应报文快照'
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : '已保存响应报文快照'
 })
 
 const cacheHitRateLabel = computed(() => '读 / (输入 + 读 + 建)')
@@ -383,7 +627,9 @@ const fetchDetail = async () => {
   loading.value = true
   detail.value = null
   try {
-    const response = await getRequestDetailApi(targetRequestId)
+    const response = props.fetchDetail
+      ? await props.fetchDetail(targetRequestId)
+      : await getRequestDetailApi(targetRequestId)
     if (targetRequestId !== props.requestId || !props.show) return
     if (response?.success === false) {
       showToast(response.message || '加载请求详情失败', 'error')
@@ -403,22 +649,40 @@ const fetchDetail = async () => {
   }
 }
 
-const copySnapshot = async () => {
-  if (!formattedSnapshot.value) {
-    showToast('没有可复制的快照', 'info')
+const copyText = async (text, label) => {
+  if (!text) {
+    showToast(`没有可复制的${label}`, 'info')
     return
   }
 
   try {
-    await navigator.clipboard.writeText(formattedSnapshot.value)
-    showToast('已复制请求快照', 'success')
+    await navigator.clipboard.writeText(text)
+    showToast(`已复制${label}`, 'success')
   } catch (error) {
     showToast('复制失败，请手动复制', 'error')
   }
 }
 
+const copySnapshot = () => copyText(formattedSnapshot.value, '请求快照')
+const copyResponseSnapshot = () => copyText(formattedResponseSnapshot.value, '响应快照')
+
 const formatDate = (value) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-')
 const formatDuration = (value) => `${Number(value || 0)}ms`
+const formatNullableDuration = (value) =>
+  value === null || value === undefined || value === '' ? '-' : `${Number(value)}ms`
+const getGenerationSpeed = (record) => {
+  const outputTokens = Number(record?.outputTokens || 0)
+  const contentGenerationMs = Number(record?.contentGenerationMs || 0)
+  if (outputTokens <= 0 || contentGenerationMs <= 0) {
+    return null
+  }
+
+  return Number(((outputTokens * 1000) / contentGenerationMs).toFixed(2))
+}
+const formatGenerationSpeed = (record) => {
+  const speed = getGenerationSpeed(record)
+  return speed === null ? '-' : `${speed} tok/s`
+}
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
 const formatCacheCreate = (value, notApplicable = false) =>
   notApplicable ? '-' : formatNumber(value)
@@ -431,6 +695,25 @@ const formatCost = (value) => {
 }
 const formatCacheCreateCost = (value, notApplicable = false) =>
   notApplicable ? '-' : formatCost(value)
+const formatBytes = (value) => {
+  const bytes = Number(value)
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return '-'
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KiB`
+  }
+  return `${(bytes / 1024 / 1024).toFixed(2)} MiB`
+}
+const formatCaptureMode = (value) => {
+  if (value === 'full') return '完整'
+  if (value === 'preview') return '预览'
+  if (value === 'off') return '关闭'
+  return value || '-'
+}
 
 const statusTagType = (statusCode) => {
   if (statusCode >= 500) return 'danger'
@@ -585,6 +868,17 @@ onBeforeUnmount(() => {
   color: rgb(100 116 139);
 }
 
+.field-value-compact {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgb(31 41 55);
+}
+
+.dark .field-value-compact {
+  color: rgb(226 232 240);
+}
+
 .section-title {
   margin-bottom: 12px;
   font-size: 14px;
@@ -616,6 +910,40 @@ onBeforeUnmount(() => {
   background: rgba(30, 41, 59, 0.75);
 }
 
+.response-meta-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.response-meta-item {
+  min-width: 0;
+  border-radius: 12px;
+  background: rgb(248 250 252);
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.dark .response-meta-item {
+  background: rgba(30, 41, 59, 0.75);
+}
+
+.response-meta-item span {
+  display: block;
+  color: rgb(100 116 139);
+}
+
+.response-meta-item strong {
+  display: block;
+  margin-top: 4px;
+  color: rgb(30 41 59);
+  font-weight: 700;
+}
+
+.dark .response-meta-item strong {
+  color: rgb(226 232 240);
+}
+
 .snapshot-panel {
   max-height: 380px;
   overflow: auto;
@@ -624,13 +952,60 @@ onBeforeUnmount(() => {
   padding: 16px;
 }
 
-.snapshot-panel pre {
+.snapshot-panel-compact {
+  max-height: 220px;
+}
+
+.snapshot-plain-text {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 12px;
   line-height: 1.55;
   color: rgb(226 232 240);
+}
+
+.snapshot-json-viewer {
+  min-width: 100%;
+  color: rgb(226 232 240);
+}
+
+.snapshot-panel :deep(.vjs-tree) {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgb(226 232 240);
+}
+
+.snapshot-panel :deep(.vjs-tree-node) {
+  min-height: 20px;
+}
+
+.snapshot-panel :deep(.vjs-tree-node:hover),
+.snapshot-panel :deep(.vjs-tree-node.dark:hover),
+.snapshot-panel :deep(.vjs-tree-node.dark.is-highlight) {
+  background: rgba(51, 65, 85, 0.72);
+}
+
+.snapshot-panel :deep(.vjs-tree-node .vjs-indent-unit.has-line) {
+  border-left-color: rgba(148, 163, 184, 0.32);
+}
+
+.snapshot-panel :deep(.vjs-key) {
+  color: rgb(191 219 254);
+}
+
+.snapshot-panel :deep(.vjs-comment) {
+  color: rgb(148 163 184);
+}
+
+.snapshot-panel :deep(.vjs-carets),
+.snapshot-panel :deep(.vjs-tree-brackets) {
+  color: rgb(148 163 184);
+}
+
+.snapshot-panel :deep(.vjs-carets:hover),
+.snapshot-panel :deep(.vjs-tree-brackets:hover) {
+  color: rgb(96 165 250);
 }
 
 @media (max-width: 767px) {
@@ -661,7 +1036,8 @@ onBeforeUnmount(() => {
     padding: 14px;
   }
 
-  .snapshot-panel pre {
+  .snapshot-plain-text,
+  .snapshot-panel :deep(.vjs-tree) {
     font-size: 11px;
     line-height: 1.5;
   }
