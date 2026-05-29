@@ -11,7 +11,7 @@
 
       <!-- 设置分类导航 -->
       <div class="mb-6">
-        <nav class="flex space-x-8">
+        <nav class="flex flex-wrap gap-x-8 gap-y-3">
           <button
             :class="[
               'border-b-2 pb-2 text-sm font-medium transition-colors',
@@ -47,6 +47,18 @@
           >
             <i class="fas fa-robot mr-2"></i>
             Claude 转发
+          </button>
+          <button
+            :class="[
+              'border-b-2 pb-2 text-sm font-medium transition-colors',
+              activeSection === 'modelOptions'
+                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+            @click="activeSection = 'modelOptions'"
+          >
+            <i class="fas fa-list mr-2"></i>
+            模型选项
           </button>
           <button
             :class="[
@@ -1269,6 +1281,137 @@
           </div>
         </div>
 
+        <!-- 模型选项配置部分 -->
+        <div v-show="activeSection === 'modelOptions'">
+          <div v-if="claudeConfigLoading" class="py-12 text-center">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-gray-500 dark:text-gray-400">正在加载配置...</p>
+          </div>
+
+          <div v-else class="space-y-6">
+            <div class="rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80">
+              <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg"
+                    >
+                      <i class="fas fa-list"></i>
+                    </div>
+                    <div>
+                      <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                        Endpoint 模型选项
+                      </h2>
+                      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        账户白名单候选和模型映射快捷按钮从这里读取，按 endpoint 分开维护。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    type="button"
+                    @click="resetActiveModelEndpointConfig"
+                  >
+                    <i class="fas fa-rotate-left mr-2"></i>
+                    恢复当前默认
+                  </button>
+                  <button
+                    class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                    type="button"
+                    @click="saveModelEndpointConfigs"
+                  >
+                    <i class="fas fa-save mr-2"></i>
+                    保存模型选项
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid gap-5 lg:grid-cols-[220px_1fr]">
+                <div class="space-y-2">
+                  <button
+                    v-for="endpoint in modelEndpointConfigEntries"
+                    :key="endpoint.key"
+                    class="w-full rounded-lg border px-3 py-3 text-left transition-all"
+                    :class="
+                      activeModelEndpoint === endpoint.key
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/30 dark:text-blue-300'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
+                    "
+                    type="button"
+                    @click="activeModelEndpoint = endpoint.key"
+                  >
+                    <span class="block text-sm font-semibold">{{ endpoint.label }}</span>
+                    <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                      {{ endpoint.key }}
+                    </span>
+                  </button>
+                </div>
+
+                <div class="space-y-4">
+                  <div class="grid gap-4 lg:grid-cols-2">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Endpoint 显示名称
+                      </label>
+                      <input
+                        v-model="activeModelEndpointLabel"
+                        class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        type="text"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        当前 Endpoint
+                      </label>
+                      <div
+                        class="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-300"
+                      >
+                        {{ activeModelEndpoint }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-4 xl:grid-cols-2">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        白名单候选模型
+                      </label>
+                      <textarea
+                        v-model="activeModelWhitelistText"
+                        class="mt-2 min-h-80 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm leading-6 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        spellcheck="false"
+                      ></textarea>
+                      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        每行一个模型；可写成
+                        <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">model | label</code>
+                      </p>
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        快捷映射列表
+                      </label>
+                      <textarea
+                        v-model="activeMappingPresetText"
+                        class="mt-2 min-h-80 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm leading-6 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        spellcheck="false"
+                      ></textarea>
+                      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        每行一个映射；可写成
+                        <code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
+                          >from =&gt; to | 按钮名</code
+                        >
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 服务倍率配置部分 -->
         <div v-show="activeSection === 'serviceRates'">
           <!-- 加载状态 -->
@@ -2096,9 +2239,14 @@ const claudeConfig = ref({
   requestDetailCaptureEnabled: false,
   requestDetailRetentionHours: 6,
   requestDetailBodyPreviewEnabled: false,
+  modelEndpointConfigs: {},
   updatedAt: null,
   updatedBy: null
 })
+
+const defaultModelEndpointConfigs = ref({})
+const activeModelEndpoint = ref('claude')
+const modelEndpointDraftTexts = ref({})
 
 const REQUEST_DETAIL_RETENTION_DEFAULT_HOURS = 6
 const REQUEST_DETAIL_RETENTION_WARNING_HOURS = 72
@@ -2198,6 +2346,251 @@ const handleRequestDetailBodyPreviewToggle = async () => {
   }
 }
 
+const cloneModelEndpointConfigs = (configs = {}) =>
+  Object.fromEntries(
+    Object.entries(configs).map(([endpoint, config]) => [
+      endpoint,
+      {
+        label: config?.label || endpoint,
+        whitelistModels: Array.isArray(config?.whitelistModels)
+          ? config.whitelistModels.map((model) => ({
+              value: model.value,
+              label: model.label || model.value
+            }))
+          : [],
+        mappingPresets: Array.isArray(config?.mappingPresets)
+          ? config.mappingPresets.map((preset) => ({
+              label: preset.label || `+ ${preset.from}`,
+              from: preset.from,
+              to: preset.to
+            }))
+          : []
+      }
+    ])
+  )
+
+const ensureActiveModelEndpointConfig = () => {
+  const configs = claudeConfig.value.modelEndpointConfigs || {}
+  if (!configs[activeModelEndpoint.value]) {
+    const fallback = defaultModelEndpointConfigs.value[activeModelEndpoint.value] || {
+      label: activeModelEndpoint.value,
+      whitelistModels: [],
+      mappingPresets: []
+    }
+    claudeConfig.value.modelEndpointConfigs = {
+      ...configs,
+      [activeModelEndpoint.value]: cloneModelEndpointConfigs({
+        [activeModelEndpoint.value]: fallback
+      })[activeModelEndpoint.value]
+    }
+  }
+  return claudeConfig.value.modelEndpointConfigs[activeModelEndpoint.value]
+}
+
+const updateActiveModelEndpointConfig = (updates) => {
+  const current = ensureActiveModelEndpointConfig()
+  claudeConfig.value.modelEndpointConfigs = {
+    ...claudeConfig.value.modelEndpointConfigs,
+    [activeModelEndpoint.value]: {
+      ...current,
+      ...updates
+    }
+  }
+}
+
+const formatModelOptionLine = (model) => {
+  if (!model?.value) return ''
+  return model.label && model.label !== model.value
+    ? `${model.value} | ${model.label}`
+    : model.value
+}
+
+const parseModelOptionLines = (text) => {
+  const seen = new Set()
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [valuePart, ...labelParts] = line.split('|')
+      const value = valuePart.trim()
+      const label = labelParts.join('|').trim() || value
+      if (!value || seen.has(value)) return null
+      seen.add(value)
+      return { value, label }
+    })
+    .filter(Boolean)
+}
+
+const formatMappingPresetLine = (preset) => {
+  if (!preset?.from || !preset?.to) return ''
+  const base = `${preset.from} => ${preset.to}`
+  return preset.label ? `${base} | ${preset.label}` : base
+}
+
+const parseMappingPresetLines = (text) => {
+  const seen = new Set()
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [mappingPart, ...labelParts] = line.split('|')
+      const [fromPart, toPart] = mappingPart.split('=>')
+      const from = fromPart?.trim()
+      const to = (toPart || fromPart || '').trim()
+      if (!from || !to) return null
+
+      const key = `${from}\u0000${to}`
+      if (seen.has(key)) return null
+      seen.add(key)
+
+      return {
+        label: labelParts.join('|').trim() || `+ ${from}`,
+        from,
+        to
+      }
+    })
+    .filter(Boolean)
+}
+
+const getModelEndpointConfigForText = (endpoint) => {
+  const configs = claudeConfig.value.modelEndpointConfigs || {}
+  return (
+    configs[endpoint] ||
+    defaultModelEndpointConfigs.value[endpoint] || {
+      label: endpoint,
+      whitelistModels: [],
+      mappingPresets: []
+    }
+  )
+}
+
+const formatModelEndpointText = (endpoint, field) => {
+  const config = getModelEndpointConfigForText(endpoint)
+  if (field === 'whitelistText') {
+    return (config.whitelistModels || []).map(formatModelOptionLine).join('\n')
+  }
+  return (config.mappingPresets || []).map(formatMappingPresetLine).join('\n')
+}
+
+const getModelEndpointDraftText = (endpoint, field) => {
+  const draft = modelEndpointDraftTexts.value[endpoint]
+  if (draft && Object.prototype.hasOwnProperty.call(draft, field)) {
+    return draft[field]
+  }
+  return formatModelEndpointText(endpoint, field)
+}
+
+const setModelEndpointDraftText = (endpoint, field, value) => {
+  modelEndpointDraftTexts.value = {
+    ...modelEndpointDraftTexts.value,
+    [endpoint]: {
+      ...(modelEndpointDraftTexts.value[endpoint] || {}),
+      [field]: value || ''
+    }
+  }
+}
+
+const setModelEndpointDraftFromConfig = (endpoint, config) => {
+  modelEndpointDraftTexts.value = {
+    ...modelEndpointDraftTexts.value,
+    [endpoint]: {
+      whitelistText: (config.whitelistModels || []).map(formatModelOptionLine).join('\n'),
+      mappingText: (config.mappingPresets || []).map(formatMappingPresetLine).join('\n')
+    }
+  }
+}
+
+const buildModelEndpointConfigsForSave = () => {
+  const configs = cloneModelEndpointConfigs(claudeConfig.value.modelEndpointConfigs)
+
+  Object.entries(modelEndpointDraftTexts.value).forEach(([endpoint, draft]) => {
+    const fallback = defaultModelEndpointConfigs.value[endpoint] || {
+      label: endpoint,
+      whitelistModels: [],
+      mappingPresets: []
+    }
+    const current =
+      configs[endpoint] || cloneModelEndpointConfigs({ [endpoint]: fallback })[endpoint]
+
+    const hasWhitelistDraft = Object.prototype.hasOwnProperty.call(draft, 'whitelistText')
+    const hasMappingDraft = Object.prototype.hasOwnProperty.call(draft, 'mappingText')
+
+    configs[endpoint] = {
+      ...current,
+      whitelistModels: hasWhitelistDraft
+        ? parseModelOptionLines(draft.whitelistText || '')
+        : current.whitelistModels,
+      mappingPresets: hasMappingDraft
+        ? parseMappingPresetLines(draft.mappingText || '')
+        : current.mappingPresets
+    }
+  })
+
+  return cloneModelEndpointConfigs(configs)
+}
+
+const modelEndpointConfigEntries = computed(() =>
+  Object.entries(claudeConfig.value.modelEndpointConfigs || {}).map(([key, config]) => ({
+    key,
+    label: config?.label || key
+  }))
+)
+
+const activeModelEndpointLabel = computed({
+  get() {
+    return ensureActiveModelEndpointConfig().label
+  },
+  set(value) {
+    updateActiveModelEndpointConfig({ label: value?.trim() || activeModelEndpoint.value })
+  }
+})
+
+const activeModelWhitelistText = computed({
+  get() {
+    ensureActiveModelEndpointConfig()
+    return getModelEndpointDraftText(activeModelEndpoint.value, 'whitelistText')
+  },
+  set(value) {
+    setModelEndpointDraftText(activeModelEndpoint.value, 'whitelistText', value)
+  }
+})
+
+const activeMappingPresetText = computed({
+  get() {
+    ensureActiveModelEndpointConfig()
+    return getModelEndpointDraftText(activeModelEndpoint.value, 'mappingText')
+  },
+  set(value) {
+    setModelEndpointDraftText(activeModelEndpoint.value, 'mappingText', value)
+  }
+})
+
+const resetActiveModelEndpointConfig = async () => {
+  const fallback = defaultModelEndpointConfigs.value[activeModelEndpoint.value]
+  if (!fallback) {
+    showToast('当前 endpoint 没有默认配置', 'warning')
+    return
+  }
+
+  const clonedFallback = cloneModelEndpointConfigs({
+    [activeModelEndpoint.value]: fallback
+  })[activeModelEndpoint.value]
+
+  updateActiveModelEndpointConfig(clonedFallback)
+  setModelEndpointDraftFromConfig(activeModelEndpoint.value, clonedFallback)
+}
+
+const saveModelEndpointConfigs = async () => {
+  const response = await saveClaudeConfig({
+    modelEndpointConfigs: buildModelEndpointConfigsForSave()
+  })
+  if (response?.success) {
+    modelEndpointDraftTexts.value = {}
+  }
+}
+
 // 服务倍率配置
 const serviceRatesLoading = ref(false)
 const serviceRatesSaving = ref(false)
@@ -2253,7 +2646,7 @@ const sectionWatcher = watch(activeSection, async (newSection) => {
   if (!isMounted.value) return
   if (newSection === 'webhook') {
     await loadWebhookConfig()
-  } else if (newSection === 'claude') {
+  } else if (newSection === 'claude' || newSection === 'modelOptions') {
     await loadClaudeConfig()
   } else if (newSection === 'serviceRates') {
     await loadServiceRates()
@@ -2480,6 +2873,9 @@ const loadClaudeConfig = async () => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
+      defaultModelEndpointConfigs.value = cloneModelEndpointConfigs(
+        response.defaultModelEndpointConfigs || {}
+      )
       claudeConfig.value = {
         claudeCodeOnlyEnabled: response.config?.claudeCodeOnlyEnabled ?? false,
         globalSessionBindingEnabled: response.config?.globalSessionBindingEnabled ?? false,
@@ -2498,8 +2894,16 @@ const loadClaudeConfig = async () => {
         requestDetailRetentionHours:
           response.config?.requestDetailRetentionHours ?? REQUEST_DETAIL_RETENTION_DEFAULT_HOURS,
         requestDetailBodyPreviewEnabled: response.config?.requestDetailBodyPreviewEnabled ?? false,
+        modelEndpointConfigs: cloneModelEndpointConfigs(
+          response.config?.modelEndpointConfigs || response.defaultModelEndpointConfigs || {}
+        ),
         updatedAt: response.config?.updatedAt || null,
         updatedBy: response.config?.updatedBy || null
+      }
+      modelEndpointDraftTexts.value = {}
+      if (!claudeConfig.value.modelEndpointConfigs[activeModelEndpoint.value]) {
+        activeModelEndpoint.value =
+          Object.keys(claudeConfig.value.modelEndpointConfigs)[0] || 'claude'
       }
       syncRequestDetailRetentionInput(claudeConfig.value.requestDetailRetentionHours)
     }
@@ -2519,12 +2923,19 @@ const loadClaudeConfig = async () => {
 const saveClaudeConfig = async (options = {}) => {
   if (!isMounted.value) return
   try {
+    const hasModelEndpointConfigOption = Object.prototype.hasOwnProperty.call(
+      options,
+      'modelEndpointConfigs'
+    )
     const requestDetailBodyPreviewEnabled = Object.prototype.hasOwnProperty.call(
       options,
       'requestDetailBodyPreviewEnabled'
     )
       ? options.requestDetailBodyPreviewEnabled === true
       : claudeConfig.value.requestDetailBodyPreviewEnabled
+    const modelEndpointConfigs = hasModelEndpointConfigOption
+      ? options.modelEndpointConfigs
+      : buildModelEndpointConfigsForSave()
 
     const payload = {
       claudeCodeOnlyEnabled: claudeConfig.value.claudeCodeOnlyEnabled,
@@ -2541,7 +2952,8 @@ const saveClaudeConfig = async (options = {}) => {
       concurrentRequestQueueTimeoutMs: claudeConfig.value.concurrentRequestQueueTimeoutMs,
       requestDetailCaptureEnabled: claudeConfig.value.requestDetailCaptureEnabled,
       requestDetailRetentionHours: claudeConfig.value.requestDetailRetentionHours,
-      requestDetailBodyPreviewEnabled
+      requestDetailBodyPreviewEnabled,
+      modelEndpointConfigs
     }
 
     if (options.purgeRequestDetailBodySnapshots === true) {
@@ -2560,9 +2972,13 @@ const saveClaudeConfig = async (options = {}) => {
         requestDetailBodyPreviewEnabled:
           response.config?.requestDetailBodyPreviewEnabled ??
           claudeConfig.value.requestDetailBodyPreviewEnabled,
+        modelEndpointConfigs: cloneModelEndpointConfigs(
+          response.config?.modelEndpointConfigs || claudeConfig.value.modelEndpointConfigs
+        ),
         updatedAt: response.config?.updatedAt || new Date().toISOString(),
         updatedBy: response.config?.updatedBy || null
       }
+      modelEndpointDraftTexts.value = {}
       syncRequestDetailRetentionInput(claudeConfig.value.requestDetailRetentionHours)
       showToast(
         response.warning || response.message || 'Claude 转发配置已保存',

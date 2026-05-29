@@ -20,7 +20,8 @@ router.get('/claude-relay-config', authenticateAdmin, async (req, res) => {
     const config = await claudeRelayConfigService.getConfig()
     return res.json({
       success: true,
-      config
+      config,
+      defaultModelEndpointConfigs: claudeRelayConfigService.getDefaultModelEndpointConfigs()
     })
   } catch (error) {
     logger.error('❌ Failed to get Claude relay config:', error)
@@ -52,7 +53,8 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
       requestDetailCaptureEnabled,
       requestDetailRetentionHours,
       requestDetailBodyPreviewEnabled,
-      purgeRequestDetailBodySnapshots
+      purgeRequestDetailBodySnapshots,
+      modelEndpointConfigs
     } = req.body
 
     // 验证输入
@@ -201,6 +203,19 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'purgeRequestDetailBodySnapshots must be a boolean' })
     }
 
+    let normalizedModelEndpointConfigs
+    if (modelEndpointConfigs !== undefined) {
+      try {
+        normalizedModelEndpointConfigs =
+          claudeRelayConfigService.normalizeModelEndpointConfigs(modelEndpointConfigs)
+      } catch (validationError) {
+        return res.status(400).json({
+          error: 'Invalid modelEndpointConfigs',
+          message: validationError.message
+        })
+      }
+    }
+
     const updateData = {}
     if (claudeCodeOnlyEnabled !== undefined) {
       updateData.claudeCodeOnlyEnabled = claudeCodeOnlyEnabled
@@ -243,6 +258,9 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
     }
     if (requestDetailBodyPreviewEnabled !== undefined) {
       updateData.requestDetailBodyPreviewEnabled = requestDetailBodyPreviewEnabled
+    }
+    if (normalizedModelEndpointConfigs !== undefined) {
+      updateData.modelEndpointConfigs = normalizedModelEndpointConfigs
     }
 
     const updatedConfig = await claudeRelayConfigService.updateConfig(

@@ -9,6 +9,12 @@ export const getModelPricingStatusApi = () =>
   request({ url: '/admin/models/pricing/status', method: 'GET' })
 export const refreshModelPricingApi = () =>
   request({ url: '/admin/models/pricing/refresh', method: 'POST' })
+export const getCustomModelPricingApi = () =>
+  request({ url: '/admin/models/pricing/custom', method: 'GET' })
+export const updateCustomModelPricingApi = (data) =>
+  request({ url: '/admin/models/pricing/custom', method: 'PUT', data })
+export const deleteCustomModelPricingApi = (data) =>
+  request({ url: '/admin/models/pricing/custom', method: 'DELETE', data })
 
 // API Stats
 export const getKeyIdApi = (apiKey) =>
@@ -57,6 +63,12 @@ export const purgeRequestDetailBodyPreviewApi = (config) =>
   request({ url: '/admin/request-details/body-preview-purge', method: 'POST', ...config })
 export const getRequestDetailApi = (requestId) =>
   request({ url: `/admin/request-details/${requestId}`, method: 'GET' })
+export const getRouteRuleEndpointsApi = () =>
+  request({ url: '/admin/route-rules/endpoints', method: 'GET' })
+export const getRouteRuleExplainApi = (params) =>
+  request({ url: '/admin/route-rules/explain', method: 'GET', params })
+export const getRouteRuleLiveApi = (params) =>
+  request({ url: '/admin/route-rules/live', method: 'GET', params })
 
 // 客户端
 export const getSupportedClientsApi = () =>

@@ -6,6 +6,7 @@
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const metadataUserIdHelper = require('../utils/metadataUserIdHelper')
+const modelsConfig = require('../../config/models')
 
 const CONFIG_KEY = 'claude_relay_config'
 const SESSION_BINDING_PREFIX = 'original_session_binding:'
@@ -37,6 +38,48 @@ const DEFAULT_CONFIG = {
   updatedBy: null
 }
 
+const createDefaultConfig = () => ({
+  ...DEFAULT_CONFIG,
+  modelEndpointConfigs: modelsConfig.getDefaultModelEndpointConfigs()
+})
+
+const MODEL_ENDPOINT_LIMITS = {
+  maxEndpoints: 30,
+  maxModelsPerEndpoint: 300,
+  maxMappingsPerEndpoint: 300,
+  maxEndpointKeyLength: 80,
+  maxLabelLength: 120,
+  maxModelValueLength: 200
+}
+
+const normalizeString = (value, maxLength = MODEL_ENDPOINT_LIMITS.maxModelValueLength) => {
+  if (value === undefined || value === null) {
+    return ''
+  }
+  return String(value).trim().slice(0, maxLength)
+}
+
+const normalizeEndpointKey = (value) => {
+  const endpoint = normalizeString(value, MODEL_ENDPOINT_LIMITS.maxEndpointKeyLength)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+  return endpoint || null
+}
+
+const cloneModelEndpointConfigs = (configs) =>
+  Object.fromEntries(
+    Object.entries(configs || {}).map(([endpoint, config]) => [
+      endpoint,
+      {
+        label: config.label,
+        whitelistModels: [...(config.whitelistModels || [])],
+        mappingPresets: [...(config.mappingPresets || [])]
+      }
+    ])
+  )
+
 // 内存缓存（避免频繁 Redis 查询）
 let configCache = null
 let configCacheTime = 0
@@ -61,6 +104,7 @@ class ClaudeRelayConfigService {
    */
   async getConfig() {
     try {
+      const defaultConfig = createDefaultConfig()
       // 检查缓存
       if (configCache && Date.now() - configCacheTime < CONFIG_CACHE_TTL) {
         return configCache
@@ -69,22 +113,27 @@ class ClaudeRelayConfigService {
       const client = redis.getClient()
       if (!client) {
         logger.warn('⚠️ Redis not connected, using default config')
-        return { ...DEFAULT_CONFIG }
+        return defaultConfig
       }
 
       const data = await client.get(CONFIG_KEY)
 
       if (data) {
-        configCache = { ...DEFAULT_CONFIG, ...JSON.parse(data) }
+        const savedConfig = JSON.parse(data)
+        configCache = {
+          ...defaultConfig,
+          ...savedConfig,
+          modelEndpointConfigs: this.normalizeModelEndpointConfigs(savedConfig.modelEndpointConfigs)
+        }
       } else {
-        configCache = { ...DEFAULT_CONFIG }
+        configCache = defaultConfig
       }
 
       configCacheTime = Date.now()
       return configCache
     } catch (error) {
       logger.error('❌ Failed to get Claude relay config:', error)
-      return { ...DEFAULT_CONFIG }
+      return createDefaultConfig()
     }
   }
 
@@ -98,10 +147,17 @@ class ClaudeRelayConfigService {
     try {
       const client = redis.getClientSafe()
       const currentConfig = await this.getConfig()
+      const normalizedNewConfig = { ...newConfig }
+
+      if (Object.prototype.hasOwnProperty.call(normalizedNewConfig, 'modelEndpointConfigs')) {
+        normalizedNewConfig.modelEndpointConfigs = this.normalizeModelEndpointConfigs(
+          normalizedNewConfig.modelEndpointConfigs
+        )
+      }
 
       const updatedConfig = {
         ...currentConfig,
-        ...newConfig,
+        ...normalizedNewConfig,
         updatedAt: new Date().toISOString(),
         updatedBy
       }
@@ -123,6 +179,145 @@ class ClaudeRelayConfigService {
       logger.error('❌ Failed to update Claude relay config:', error)
       throw error
     }
+  }
+
+  getDefaultModelEndpointConfigs() {
+    return modelsConfig.getDefaultModelEndpointConfigs()
+  }
+
+  normalizeModelEndpointConfigs(rawConfigs) {
+    const defaults = modelsConfig.getDefaultModelEndpointConfigs()
+    const normalized = cloneModelEndpointConfigs(defaults)
+
+    if (rawConfigs === undefined || rawConfigs === null) {
+      return normalized
+    }
+
+    if (typeof rawConfigs !== 'object' || Array.isArray(rawConfigs)) {
+      throw new Error('modelEndpointConfigs must be an object')
+    }
+
+    const entries = Object.entries(rawConfigs)
+    if (entries.length > MODEL_ENDPOINT_LIMITS.maxEndpoints) {
+      throw new Error(
+        `modelEndpointConfigs cannot contain more than ${MODEL_ENDPOINT_LIMITS.maxEndpoints} endpoints`
+      )
+    }
+
+    entries.forEach(([rawEndpoint, rawConfig]) => {
+      const endpoint = normalizeEndpointKey(rawEndpoint)
+      if (!endpoint) {
+        return
+      }
+
+      if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
+        throw new Error(`modelEndpointConfigs.${endpoint} must be an object`)
+      }
+
+      const fallback = defaults[endpoint] || {
+        label: endpoint,
+        whitelistModels: [],
+        mappingPresets: []
+      }
+
+      normalized[endpoint] = {
+        label:
+          normalizeString(rawConfig.label, MODEL_ENDPOINT_LIMITS.maxLabelLength) ||
+          fallback.label ||
+          endpoint,
+        whitelistModels: this.normalizeModelOptions(
+          rawConfig.whitelistModels,
+          fallback.whitelistModels
+        ),
+        mappingPresets: this.normalizeMappingPresets(
+          rawConfig.mappingPresets,
+          fallback.mappingPresets
+        )
+      }
+    })
+
+    return normalized
+  }
+
+  normalizeModelOptions(rawModels, fallbackModels = []) {
+    if (rawModels === undefined || rawModels === null) {
+      return [...fallbackModels]
+    }
+
+    if (!Array.isArray(rawModels)) {
+      throw new Error('whitelistModels must be an array')
+    }
+
+    if (rawModels.length > MODEL_ENDPOINT_LIMITS.maxModelsPerEndpoint) {
+      throw new Error(
+        `whitelistModels cannot contain more than ${MODEL_ENDPOINT_LIMITS.maxModelsPerEndpoint} models`
+      )
+    }
+
+    const seen = new Set()
+    const models = []
+
+    rawModels.forEach((item) => {
+      const value =
+        typeof item === 'string'
+          ? normalizeString(item)
+          : normalizeString(item?.value || item?.id || item?.model)
+
+      if (!value || seen.has(value)) {
+        return
+      }
+
+      seen.add(value)
+      const label =
+        typeof item === 'object'
+          ? normalizeString(item.label || item.name || value, MODEL_ENDPOINT_LIMITS.maxLabelLength)
+          : value
+      models.push({ value, label: label || value })
+    })
+
+    return models
+  }
+
+  normalizeMappingPresets(rawPresets, fallbackPresets = []) {
+    if (rawPresets === undefined || rawPresets === null) {
+      return [...fallbackPresets]
+    }
+
+    if (!Array.isArray(rawPresets)) {
+      throw new Error('mappingPresets must be an array')
+    }
+
+    if (rawPresets.length > MODEL_ENDPOINT_LIMITS.maxMappingsPerEndpoint) {
+      throw new Error(
+        `mappingPresets cannot contain more than ${MODEL_ENDPOINT_LIMITS.maxMappingsPerEndpoint} mappings`
+      )
+    }
+
+    const seen = new Set()
+    const presets = []
+
+    rawPresets.forEach((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return
+      }
+
+      const from = normalizeString(item.from)
+      const to = normalizeString(item.to)
+      if (!from || !to) {
+        return
+      }
+
+      const presetKey = `${from}\u0000${to}`
+      if (seen.has(presetKey)) {
+        return
+      }
+
+      seen.add(presetKey)
+      const label = normalizeString(item.label || `+ ${from}`, MODEL_ENDPOINT_LIMITS.maxLabelLength)
+      presets.push({ label: label || `+ ${from}`, from, to })
+    })
+
+    return presets
   }
 
   /**

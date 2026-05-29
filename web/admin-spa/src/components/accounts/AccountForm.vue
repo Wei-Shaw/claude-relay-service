@@ -1489,75 +1489,13 @@
                   <!-- 快捷添加按钮 -->
                   <div class="mt-3 flex flex-wrap gap-2">
                     <button
-                      class="rounded-lg bg-violet-100 px-3 py-1 text-xs text-violet-700 transition-colors hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50"
-                      type="button"
-                      @click="addPresetMapping('claude-opus-4-6', 'claude-opus-4-6')"
-                    >
-                      + Opus 4.6
-                    </button>
-                    <button
-                      class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
-                      type="button"
-                      @click="
-                        addPresetMapping('claude-opus-4-5-20251101', 'claude-opus-4-5-20251101')
-                      "
-                    >
-                      + Opus 4.5
-                    </button>
-                    <button
+                      v-for="preset in presetMappingsForCurrentEndpoint"
+                      :key="`${preset.from}:${preset.to}`"
                       class="rounded-lg bg-indigo-100 px-3 py-1 text-xs text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50"
                       type="button"
-                      @click="
-                        addPresetMapping('claude-sonnet-4-5-20250929', 'claude-sonnet-4-5-20250929')
-                      "
+                      @click="addPresetMapping(preset.from, preset.to)"
                     >
-                      + Sonnet 4.5
-                    </button>
-                    <button
-                      class="rounded-lg bg-emerald-100 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
-                      type="button"
-                      @click="
-                        addPresetMapping('claude-haiku-4-5-20251001', 'claude-haiku-4-5-20251001')
-                      "
-                    >
-                      + Haiku 4.5
-                    </button>
-                    <button
-                      class="rounded-lg bg-cyan-100 px-3 py-1 text-xs text-cyan-700 transition-colors hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:hover:bg-cyan-900/50"
-                      type="button"
-                      @click="addPresetMapping('deepseek-chat', 'deepseek-chat')"
-                    >
-                      + DeepSeek
-                    </button>
-                    <button
-                      class="rounded-lg bg-orange-100 px-3 py-1 text-xs text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
-                      type="button"
-                      @click="addPresetMapping('Qwen', 'Qwen')"
-                    >
-                      + Qwen
-                    </button>
-                    <button
-                      class="rounded-lg bg-pink-100 px-3 py-1 text-xs text-pink-700 transition-colors hover:bg-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:hover:bg-pink-900/50"
-                      type="button"
-                      @click="addPresetMapping('Kimi', 'Kimi')"
-                    >
-                      + Kimi
-                    </button>
-                    <button
-                      class="rounded-lg bg-teal-100 px-3 py-1 text-xs text-teal-700 transition-colors hover:bg-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:hover:bg-teal-900/50"
-                      type="button"
-                      @click="addPresetMapping('GLM', 'GLM')"
-                    >
-                      + GLM
-                    </button>
-                    <button
-                      class="rounded-lg bg-amber-100 px-3 py-1 text-xs text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
-                      type="button"
-                      @click="
-                        addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')
-                      "
-                    >
-                      + Opus → Sonnet
+                      {{ preset.label || `+ ${preset.from}` }}
                     </button>
                   </div>
                 </div>
@@ -3261,93 +3199,13 @@
                 <!-- 快捷添加按钮 -->
                 <div class="mt-3 flex flex-wrap gap-2">
                   <button
-                    class="rounded-lg bg-blue-100 px-3 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
-                    type="button"
-                    @click="
-                      addPresetMapping('claude-sonnet-4-20250514', 'claude-sonnet-4-20250514')
-                    "
-                  >
-                    + Sonnet 4
-                  </button>
-                  <button
+                    v-for="preset in presetMappingsForCurrentEndpoint"
+                    :key="`${preset.from}:${preset.to}`"
                     class="rounded-lg bg-indigo-100 px-3 py-1 text-xs text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50"
                     type="button"
-                    @click="
-                      addPresetMapping('claude-sonnet-4-5-20250929', 'claude-sonnet-4-5-20250929')
-                    "
+                    @click="addPresetMapping(preset.from, preset.to)"
                   >
-                    + Sonnet 4.5
-                  </button>
-                  <button
-                    class="rounded-lg bg-violet-100 px-3 py-1 text-xs text-violet-700 transition-colors hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50"
-                    type="button"
-                    @click="addPresetMapping('claude-opus-4-6', 'claude-opus-4-6')"
-                  >
-                    + Opus 4.6
-                  </button>
-                  <button
-                    class="rounded-lg bg-purple-100 px-3 py-1 text-xs text-purple-700 transition-colors hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50"
-                    type="button"
-                    @click="
-                      addPresetMapping('claude-opus-4-1-20250805', 'claude-opus-4-1-20250805')
-                    "
-                  >
-                    + Opus 4.1
-                  </button>
-                  <button
-                    class="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition-colors hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
-                    type="button"
-                    @click="
-                      addPresetMapping('claude-3-5-haiku-20241022', 'claude-3-5-haiku-20241022')
-                    "
-                  >
-                    + Haiku 3.5
-                  </button>
-                  <button
-                    class="rounded-lg bg-emerald-100 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
-                    type="button"
-                    @click="
-                      addPresetMapping('claude-haiku-4-5-20251001', 'claude-haiku-4-5-20251001')
-                    "
-                  >
-                    + Haiku 4.5
-                  </button>
-                  <button
-                    class="rounded-lg bg-cyan-100 px-3 py-1 text-xs text-cyan-700 transition-colors hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:hover:bg-cyan-900/50"
-                    type="button"
-                    @click="addPresetMapping('deepseek-chat', 'deepseek-chat')"
-                  >
-                    + DeepSeek
-                  </button>
-                  <button
-                    class="rounded-lg bg-orange-100 px-3 py-1 text-xs text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
-                    type="button"
-                    @click="addPresetMapping('Qwen', 'Qwen')"
-                  >
-                    + Qwen
-                  </button>
-                  <button
-                    class="rounded-lg bg-pink-100 px-3 py-1 text-xs text-pink-700 transition-colors hover:bg-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:hover:bg-pink-900/50"
-                    type="button"
-                    @click="addPresetMapping('Kimi', 'Kimi')"
-                  >
-                    + Kimi
-                  </button>
-                  <button
-                    class="rounded-lg bg-teal-100 px-3 py-1 text-xs text-teal-700 transition-colors hover:bg-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:hover:bg-teal-900/50"
-                    type="button"
-                    @click="addPresetMapping('GLM', 'GLM')"
-                  >
-                    + GLM
-                  </button>
-                  <button
-                    class="rounded-lg bg-amber-100 px-3 py-1 text-xs text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
-                    type="button"
-                    @click="
-                      addPresetMapping('claude-opus-4-1-20250805', 'claude-sonnet-4-20250514')
-                    "
-                  >
-                    + Opus → Sonnet
+                    {{ preset.label || `+ ${preset.from}` }}
                   </button>
                 </div>
               </div>
@@ -4422,20 +4280,64 @@ const buildClaudeTempUnavailablePolicyPayload = () => ({
 const modelRestrictionMode = ref('whitelist') // 'whitelist' 或 'mapping'
 const allowedModels = ref([
   // 默认勾选所有 Sonnet 和 Haiku 模型
-  'claude-sonnet-4-20250514',
-  'claude-sonnet-4-5-20250929',
-  'claude-3-5-haiku-20241022'
+  'claude-sonnet-4-6',
+  'claude-haiku-4-5'
 ]) // 白名单模式下选中的模型列表
 
+const platformModelEndpointMap = {
+  claude: 'claude',
+  'claude-console': 'claude',
+  ccr: 'ccr',
+  bedrock: 'bedrock',
+  droid: 'droid',
+  openai: 'openai',
+  'openai-responses': 'openai-responses',
+  azure_openai: 'azure-openai',
+  'azure-openai': 'azure-openai',
+  gemini: 'gemini',
+  'gemini-api': 'gemini',
+  'gemini-antigravity': 'gemini'
+}
+
 // 常用模型列表（从 API 获取）
-const commonModels = ref([])
+const modelCatalog = ref({ all: [], endpointConfigs: {} })
+
+const currentModelEndpointKey = computed(
+  () => platformModelEndpointMap[form.value.platform] || form.value.platform || 'claude'
+)
+
+const currentModelEndpointConfig = computed(
+  () =>
+    modelCatalog.value.endpointConfigs?.[currentModelEndpointKey.value] ||
+    modelCatalog.value.endpointConfigs?.claude ||
+    {}
+)
+
+const commonModels = computed(() => {
+  const endpointModels = currentModelEndpointConfig.value.whitelistModels
+  if (Array.isArray(endpointModels) && endpointModels.length > 0) {
+    return endpointModels
+  }
+  return modelCatalog.value.all || []
+})
+
+const presetMappingsForCurrentEndpoint = computed(() => {
+  const presets = currentModelEndpointConfig.value.mappingPresets
+  if (Array.isArray(presets)) {
+    return presets
+  }
+  return []
+})
 
 // 加载模型列表
 const loadCommonModels = async () => {
   try {
     const result = await httpApis.getModelsApi()
     if (result.success && result.data?.all) {
-      commonModels.value = result.data.all
+      modelCatalog.value = {
+        ...result.data,
+        endpointConfigs: result.data.endpointConfigs || {}
+      }
     }
   } catch (error) {
     console.error('Failed to load models:', error)

@@ -418,7 +418,8 @@ router.get('/models/pricing', authenticateAdmin, async (req, res) => {
     if (!pricingService.pricingData || Object.keys(pricingService.pricingData).length === 0) {
       await pricingService.loadPricingData()
     }
-    const data = pricingService.pricingData
+    await pricingService.loadCustomPricingData({ keepExistingOnError: true })
+    const data = pricingService.getEffectivePricingData()
     res.json({
       success: true,
       data: data || {}
@@ -426,6 +427,56 @@ router.get('/models/pricing', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Failed to get model pricing:', error)
     res.status(500).json({ error: 'Failed to get model pricing', message: error.message })
+  }
+})
+
+// 获取自定义模型价格数据
+router.get('/models/pricing/custom', authenticateAdmin, async (req, res) => {
+  try {
+    await pricingService.loadCustomPricingData({ keepExistingOnError: true })
+    res.json({
+      success: true,
+      data: pricingService.getCustomPricingData()
+    })
+  } catch (error) {
+    logger.error('Failed to get custom model pricing:', error)
+    res.status(500).json({ error: 'Failed to get custom model pricing', message: error.message })
+  }
+})
+
+// 新增或更新自定义模型价格
+router.put('/models/pricing/custom', authenticateAdmin, async (req, res) => {
+  try {
+    const { model, pricing } = req.body || {}
+    const result = await pricingService.saveCustomModelPricing(model, pricing)
+
+    res.json({
+      success: true,
+      message: 'Custom model pricing saved successfully',
+      data: result
+    })
+  } catch (error) {
+    logger.error('Failed to save custom model pricing:', error)
+    res.status(400).json({ error: 'Failed to save custom model pricing', message: error.message })
+  }
+})
+
+// 删除自定义模型价格，恢复系统价格
+router.delete('/models/pricing/custom', authenticateAdmin, async (req, res) => {
+  try {
+    const model = req.body?.model || req.query?.model
+    const result = await pricingService.deleteCustomModelPricing(model)
+
+    res.json({
+      success: true,
+      message: result.deleted
+        ? 'Custom model pricing deleted successfully'
+        : 'Custom model pricing not found',
+      data: result
+    })
+  } catch (error) {
+    logger.error('Failed to delete custom model pricing:', error)
+    res.status(400).json({ error: 'Failed to delete custom model pricing', message: error.message })
   }
 })
 

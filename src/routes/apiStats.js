@@ -6,6 +6,7 @@ const CostCalculator = require('../utils/costCalculator')
 const claudeAccountService = require('../services/account/claudeAccountService')
 const openaiAccountService = require('../services/account/openaiAccountService')
 const serviceRatesService = require('../services/serviceRatesService')
+const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const {
   createClaudeTestPayload,
   extractErrorMessage,
@@ -16,31 +17,112 @@ const { getSafeMessage } = require('../utils/errorSanitizer')
 
 const router = express.Router()
 
-// 📋 获取可用模型列表（公开接口）
-router.get('/models', (req, res) => {
-  const { service } = req.query
+const MODEL_ENDPOINT_ALIASES = {
+  'claude-console': 'claude',
+  droid: 'droid',
+  ccr: 'ccr',
+  azure_openai: 'azure-openai',
+  'gemini-api': 'gemini',
+  'gemini-antigravity': 'gemini'
+}
 
-  if (service) {
-    // 返回指定服务的模型
-    const models = modelsConfig.getModelsByService(service)
+const mergeModelOptions = (...groups) => {
+  const seen = new Set()
+  const merged = []
+
+  groups.flat().forEach((model) => {
+    if (!model?.value || seen.has(model.value)) {
+      return
+    }
+    seen.add(model.value)
+    merged.push({ value: model.value, label: model.label || model.value })
+  })
+
+  return merged
+}
+
+const resolveModelEndpointKey = (service, endpointConfigs = {}) => {
+  if (!service) {
+    return null
+  }
+  if (endpointConfigs[service]) {
+    return service
+  }
+  return MODEL_ENDPOINT_ALIASES[service] || service
+}
+
+const buildConfiguredModelData = async () => {
+  const config = await claudeRelayConfigService.getConfig()
+  const endpointConfigs =
+    config.modelEndpointConfigs || claudeRelayConfigService.getDefaultModelEndpointConfigs()
+
+  const claudeModels = endpointConfigs.claude?.whitelistModels || modelsConfig.CLAUDE_MODELS
+  const geminiModels = endpointConfigs.gemini?.whitelistModels || modelsConfig.GEMINI_MODELS
+  const openaiModels = endpointConfigs.openai?.whitelistModels || modelsConfig.OPENAI_MODELS
+  const openaiResponsesModels = endpointConfigs['openai-responses']?.whitelistModels || openaiModels
+  const azureOpenaiModels = endpointConfigs['azure-openai']?.whitelistModels || openaiModels
+  const bedrockModels = endpointConfigs.bedrock?.whitelistModels || modelsConfig.BEDROCK_MODELS
+  const droidModels = endpointConfigs.droid?.whitelistModels || claudeModels
+  const ccrModels = endpointConfigs.ccr?.whitelistModels || claudeModels
+
+  return {
+    claude: claudeModels,
+    gemini: geminiModels,
+    openai: openaiModels,
+    other: modelsConfig.OTHER_MODELS,
+    all: mergeModelOptions(
+      ...Object.values(endpointConfigs).map(
+        (endpointConfig) => endpointConfig.whitelistModels || []
+      ),
+      modelsConfig.OTHER_MODELS
+    ),
+    platforms: {
+      ...modelsConfig.PLATFORM_TEST_MODELS,
+      claude: claudeModels,
+      'claude-console': claudeModels,
+      bedrock: bedrockModels,
+      gemini: geminiModels,
+      'gemini-api': geminiModels,
+      'gemini-antigravity': geminiModels,
+      openai: openaiModels,
+      'openai-responses': openaiResponsesModels,
+      'azure-openai': azureOpenaiModels,
+      azure_openai: azureOpenaiModels,
+      droid: droidModels,
+      ccr: ccrModels
+    },
+    endpointConfigs
+  }
+}
+
+// 📋 获取可用模型列表（公开接口）
+router.get('/models', async (req, res) => {
+  try {
+    const { service } = req.query
+    const modelData = await buildConfiguredModelData()
+
+    if (service) {
+      const endpointKey = resolveModelEndpointKey(service, modelData.endpointConfigs)
+      const models =
+        modelData.endpointConfigs[endpointKey]?.whitelistModels ||
+        modelsConfig.getModelsByService(service)
+      return res.json({
+        success: true,
+        data: models
+      })
+    }
+
     return res.json({
       success: true,
-      data: models
+      data: modelData
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get model list:', error)
+    return res.status(500).json({
+      error: 'Failed to get model list',
+      message: error.message
     })
   }
-
-  // 返回所有模型（按服务分组 + 平台维度）
-  res.json({
-    success: true,
-    data: {
-      claude: modelsConfig.CLAUDE_MODELS,
-      gemini: modelsConfig.GEMINI_MODELS,
-      openai: modelsConfig.OPENAI_MODELS,
-      other: modelsConfig.OTHER_MODELS,
-      all: modelsConfig.getAllModels(),
-      platforms: modelsConfig.PLATFORM_TEST_MODELS
-    }
-  })
 })
 
 // 🏠 重定向页面请求到新版 admin-spa

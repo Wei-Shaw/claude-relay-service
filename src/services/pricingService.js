@@ -9,6 +9,7 @@ class PricingService {
   constructor() {
     this.dataDir = path.join(process.cwd(), 'data')
     this.pricingFile = path.join(this.dataDir, 'model_pricing.json')
+    this.customPricingFile = path.join(this.dataDir, 'custom_model_pricing.json')
     this.pricingUrl = pricingSource.pricingUrl
     this.hashUrl = pricingSource.hashUrl
     this.fallbackFile = path.join(
@@ -19,13 +20,17 @@ class PricingService {
     )
     this.localHashFile = path.join(this.dataDir, 'model_pricing.sha256')
     this.pricingData = null
+    this.customPricingData = {}
     this.lastUpdated = null
+    this.customPricingLastUpdated = null
     this.updateInterval = 24 * 60 * 60 * 1000 // 24小时
     this.hashCheckInterval = 10 * 60 * 1000 // 10分钟哈希校验
     this.fileWatcher = null // 文件监听器
     this.reloadDebounceTimer = null // 防抖定时器
     this.hashCheckTimer = null // 哈希轮询定时器
     this.updateTimer = null // 定时更新任务句柄
+    this.customFileWatcher = null // 自定义价格文件监听器
+    this.customReloadDebounceTimer = null // 自定义价格重载防抖定时器
     this.hashSyncInProgress = false // 哈希同步状态
 
     // Claude Prompt Caching 官方倍率（基于输入价格）— 仅作为 model_pricing.json 缺失字段时的兜底
@@ -54,6 +59,9 @@ class PricingService {
 
       // 检查是否需要下载或更新价格数据
       await this.checkAndUpdatePricing()
+
+      // 自定义价格独立加载，不参与远端下载/哈希同步
+      await this.loadCustomPricingData()
 
       // 初次启动时执行一次哈希校验，确保与远端保持一致
       await this.syncWithRemoteHash()
@@ -311,6 +319,40 @@ class PricingService {
     }
   }
 
+  // 加载本地自定义价格数据。该文件不参与远端更新，优先级高于系统价格。
+  async loadCustomPricingData({ keepExistingOnError = false } = {}) {
+    try {
+      if (!fs.existsSync(this.customPricingFile)) {
+        this.customPricingData = {}
+        this.customPricingLastUpdated = null
+        logger.info('💰 No custom pricing file found, using system pricing only')
+        return
+      }
+
+      const data = fs.readFileSync(this.customPricingFile, 'utf8')
+      const jsonData = JSON.parse(data)
+
+      if (!jsonData || typeof jsonData !== 'object' || Array.isArray(jsonData)) {
+        throw new Error('Invalid custom pricing data structure')
+      }
+
+      this.customPricingData = jsonData
+
+      const stats = fs.statSync(this.customPricingFile)
+      this.customPricingLastUpdated = stats.mtime
+
+      logger.info(
+        `💰 Loaded custom pricing data for ${Object.keys(jsonData).length} models from cache`
+      )
+    } catch (error) {
+      logger.error('❌ Failed to load custom pricing data:', error)
+      if (!keepExistingOnError) {
+        this.customPricingData = {}
+        this.customPricingLastUpdated = null
+      }
+    }
+  }
+
   // 使用fallback价格数据
   async useFallbackPricing() {
     try {
@@ -353,21 +395,240 @@ class PricingService {
 
   // 获取模型价格信息
   getModelPricing(modelName) {
-    if (!this.pricingData || !modelName) {
+    if (!modelName) {
+      return null
+    }
+
+    const customPricing = this.findPricingInData(
+      this.customPricingData,
+      modelName,
+      'custom_model_pricing.json'
+    )
+    if (customPricing) {
+      return customPricing
+    }
+
+    const systemPricing = this.findPricingInData(this.pricingData, modelName, 'model_pricing.json')
+    if (systemPricing) {
+      return systemPricing
+    }
+
+    logger.debug(`💰 No pricing found for model: ${modelName}`)
+    return null
+  }
+
+  getEffectivePricingData() {
+    const systemData = this.pricingData || {}
+    const customData = this.customPricingData || {}
+    const merged = {}
+
+    for (const [modelName, pricing] of Object.entries(systemData)) {
+      merged[modelName] = {
+        ...pricing,
+        __pricingSource: 'system',
+        __hasSystemPricing: true,
+        __hasCustomPricing: false
+      }
+    }
+
+    for (const [modelName, pricing] of Object.entries(customData)) {
+      merged[modelName] = {
+        ...pricing,
+        __pricingSource: systemData[modelName] ? 'custom-override' : 'custom',
+        __hasSystemPricing: !!systemData[modelName],
+        __hasCustomPricing: true
+      }
+    }
+
+    return merged
+  }
+
+  getCustomPricingData() {
+    return { ...(this.customPricingData || {}) }
+  }
+
+  normalizeCustomPricingEntry(modelName, pricing) {
+    const normalizedModelName = this.normalizeCustomPricingModelName(modelName)
+
+    if (!pricing || typeof pricing !== 'object' || Array.isArray(pricing)) {
+      throw new Error('pricing must be an object')
+    }
+
+    const normalized = { ...pricing }
+    const requiredNumberFields = ['input_cost_per_token', 'output_cost_per_token']
+    const optionalNumberFields = [
+      'cache_creation_input_token_cost',
+      'cache_read_input_token_cost',
+      'input_cost_per_token_above_200k_tokens',
+      'output_cost_per_token_above_200k_tokens',
+      'cache_creation_input_token_cost_above_200k_tokens',
+      'cache_read_input_token_cost_above_200k_tokens',
+      'cache_creation_input_token_cost_above_1hr',
+      'cache_creation_input_token_cost_above_1hr_above_200k_tokens'
+    ]
+    const integerFields = ['max_tokens', 'max_input_tokens', 'max_output_tokens']
+    const stringFields = [
+      'litellm_provider',
+      'mode',
+      'source_url',
+      'source_model',
+      'source_currency',
+      'pricing_source'
+    ]
+
+    for (const field of requiredNumberFields) {
+      normalized[field] = this.normalizePricingNumber(normalized[field], field, {
+        required: true
+      })
+    }
+
+    for (const field of optionalNumberFields) {
+      const value = this.normalizePricingNumber(normalized[field], field)
+      if (value === null) {
+        delete normalized[field]
+      } else {
+        normalized[field] = value
+      }
+    }
+
+    for (const field of integerFields) {
+      const value = this.normalizePricingInteger(normalized[field], field)
+      if (value === null) {
+        delete normalized[field]
+      } else {
+        normalized[field] = value
+      }
+    }
+
+    for (const field of stringFields) {
+      if (normalized[field] === undefined || normalized[field] === null) {
+        delete normalized[field]
+        continue
+      }
+      const value = String(normalized[field]).trim()
+      if (value) {
+        normalized[field] = value.slice(0, 500)
+      } else {
+        delete normalized[field]
+      }
+    }
+
+    if (normalized.supports_prompt_caching !== undefined) {
+      normalized.supports_prompt_caching = normalized.supports_prompt_caching === true
+    }
+
+    normalized.pricing_source = normalized.pricing_source || 'custom'
+
+    return {
+      modelName: normalizedModelName,
+      pricing: normalized
+    }
+  }
+
+  normalizeCustomPricingModelName(modelName) {
+    const normalized = String(modelName || '').trim()
+    if (!normalized) {
+      throw new Error('model name is required')
+    }
+    if (normalized.length > 200) {
+      throw new Error('model name must be less than 200 characters')
+    }
+    return normalized
+  }
+
+  normalizePricingNumber(value, field, { required = false } = {}) {
+    if (value === undefined || value === null || value === '') {
+      if (required) {
+        throw new Error(`${field} is required`)
+      }
+      return null
+    }
+
+    const normalized = Number(value)
+    if (!Number.isFinite(normalized) || normalized < 0) {
+      throw new Error(`${field} must be a non-negative finite number`)
+    }
+    return normalized
+  }
+
+  normalizePricingInteger(value, field) {
+    if (value === undefined || value === null || value === '') {
+      return null
+    }
+
+    const normalized = Number(value)
+    if (!Number.isInteger(normalized) || normalized < 0) {
+      throw new Error(`${field} must be a non-negative integer`)
+    }
+    return normalized
+  }
+
+  async saveCustomModelPricing(modelName, pricing) {
+    const normalized = this.normalizeCustomPricingEntry(modelName, pricing)
+    const updatedData = {
+      ...(this.customPricingData || {}),
+      [normalized.modelName]: normalized.pricing
+    }
+
+    await this.writeCustomPricingData(updatedData)
+
+    return {
+      modelName: normalized.modelName,
+      pricing: normalized.pricing
+    }
+  }
+
+  async deleteCustomModelPricing(modelName) {
+    const normalizedModelName = this.normalizeCustomPricingModelName(modelName)
+    const currentData = this.customPricingData || {}
+
+    if (!currentData[normalizedModelName]) {
+      return { deleted: false, modelName: normalizedModelName }
+    }
+
+    const updatedData = { ...currentData }
+    delete updatedData[normalizedModelName]
+    await this.writeCustomPricingData(updatedData)
+
+    return { deleted: true, modelName: normalizedModelName }
+  }
+
+  async writeCustomPricingData(customPricingData) {
+    if (!fs.existsSync(this.dataDir)) {
+      fs.mkdirSync(this.dataDir, { recursive: true })
+    }
+
+    const sortedData = Object.fromEntries(
+      Object.entries(customPricingData || {}).sort(([left], [right]) => left.localeCompare(right))
+    )
+    fs.writeFileSync(this.customPricingFile, `${JSON.stringify(sortedData, null, 2)}\n`)
+
+    this.customPricingData = sortedData
+    this.customPricingLastUpdated = new Date()
+    this.setupSinglePricingFileWatcher({
+      filePath: this.customPricingFile,
+      watcherKey: 'customFileWatcher',
+      label: 'custom_model_pricing.json',
+      onChange: () => this.handleCustomFileChange()
+    })
+  }
+
+  findPricingInData(pricingData, modelName, sourceName) {
+    if (!pricingData || typeof pricingData !== 'object') {
       return null
     }
 
     // 尝试直接匹配
-    if (this.pricingData[modelName]) {
-      logger.debug(`💰 Found exact pricing match for ${modelName}`)
-      return this.pricingData[modelName]
+    if (pricingData[modelName]) {
+      logger.debug(`💰 Found exact pricing match for ${modelName} in ${sourceName}`)
+      return pricingData[modelName]
     }
 
     // 特殊处理：gpt-5-codex 回退到 gpt-5
-    if (modelName === 'gpt-5-codex' && !this.pricingData['gpt-5-codex']) {
-      const fallbackPricing = this.pricingData['gpt-5']
+    if (modelName === 'gpt-5-codex' && !pricingData['gpt-5-codex']) {
+      const fallbackPricing = pricingData['gpt-5']
       if (fallbackPricing) {
-        logger.info(`💰 Using gpt-5 pricing as fallback for ${modelName}`)
+        logger.info(`💰 Using gpt-5 pricing from ${sourceName} as fallback for ${modelName}`)
         return fallbackPricing
       }
     }
@@ -377,21 +638,21 @@ class PricingService {
     if (modelName.includes('.anthropic.') || modelName.includes('.claude')) {
       // 提取不带区域前缀的模型名
       const withoutRegion = modelName.replace(/^(us|eu|apac)\./, '')
-      if (this.pricingData[withoutRegion]) {
+      if (pricingData[withoutRegion]) {
         logger.debug(
-          `💰 Found pricing for ${modelName} by removing region prefix: ${withoutRegion}`
+          `💰 Found pricing for ${modelName} in ${sourceName} by removing region prefix: ${withoutRegion}`
         )
-        return this.pricingData[withoutRegion]
+        return pricingData[withoutRegion]
       }
     }
 
     // 尝试模糊匹配（处理版本号等变化）
     const normalizedModel = modelName.toLowerCase().replace(/[_-]/g, '')
 
-    for (const [key, value] of Object.entries(this.pricingData)) {
+    for (const [key, value] of Object.entries(pricingData)) {
       const normalizedKey = key.toLowerCase().replace(/[_-]/g, '')
       if (normalizedKey.includes(normalizedModel) || normalizedModel.includes(normalizedKey)) {
-        logger.debug(`💰 Found pricing for ${modelName} using fuzzy match: ${key}`)
+        logger.debug(`💰 Found pricing for ${modelName} in ${sourceName} using fuzzy match: ${key}`)
         return value
       }
     }
@@ -401,15 +662,16 @@ class PricingService {
       // 提取核心模型名部分（去掉区域和前缀）
       const coreModel = modelName.replace(/^(us|eu|apac)\./, '').replace('anthropic.', '')
 
-      for (const [key, value] of Object.entries(this.pricingData)) {
+      for (const [key, value] of Object.entries(pricingData)) {
         if (key.includes(coreModel) || key.replace('anthropic.', '').includes(coreModel)) {
-          logger.debug(`💰 Found pricing for ${modelName} using Bedrock core model match: ${key}`)
+          logger.debug(
+            `💰 Found pricing for ${modelName} in ${sourceName} using Bedrock core model match: ${key}`
+          )
           return value
         }
       }
     }
 
-    logger.debug(`💰 No pricing found for model: ${modelName}`)
     return null
   }
 
@@ -737,6 +999,8 @@ class PricingService {
       initialized: this.pricingData !== null,
       lastUpdated: this.lastUpdated,
       modelCount: this.pricingData ? Object.keys(this.pricingData).length : 0,
+      customLastUpdated: this.customPricingLastUpdated,
+      customModelCount: this.customPricingData ? Object.keys(this.customPricingData).length : 0,
       nextUpdate: this.lastUpdated
         ? new Date(this.lastUpdated.getTime() + this.updateInterval)
         : null
@@ -761,16 +1025,31 @@ class PricingService {
 
   // 设置文件监听器
   setupFileWatcher() {
+    this.setupSinglePricingFileWatcher({
+      filePath: this.pricingFile,
+      watcherKey: 'fileWatcher',
+      label: 'model_pricing.json',
+      onChange: () => this.handleFileChange()
+    })
+    this.setupSinglePricingFileWatcher({
+      filePath: this.customPricingFile,
+      watcherKey: 'customFileWatcher',
+      label: 'custom_model_pricing.json',
+      onChange: () => this.handleCustomFileChange()
+    })
+  }
+
+  setupSinglePricingFileWatcher({ filePath, watcherKey, label, onChange }) {
     try {
       // 如果已有监听器，先关闭
-      if (this.fileWatcher) {
-        this.fileWatcher.close()
-        this.fileWatcher = null
+      if (this[watcherKey]) {
+        this[watcherKey].close()
+        this[watcherKey] = null
       }
 
       // 只有文件存在时才设置监听器
-      if (!fs.existsSync(this.pricingFile)) {
-        logger.debug('💰 Pricing file does not exist yet, skipping file watcher setup')
+      if (!fs.existsSync(filePath)) {
+        logger.debug(`💰 ${label} does not exist yet, skipping file watcher setup`)
         return
       }
 
@@ -782,27 +1061,27 @@ class PricingService {
       }
 
       // 记录初始的修改时间
-      let lastMtime = fs.statSync(this.pricingFile).mtimeMs
+      let lastMtime = fs.statSync(filePath).mtimeMs
 
-      fs.watchFile(this.pricingFile, watchOptions, (curr, _prev) => {
+      fs.watchFile(filePath, watchOptions, (curr, _prev) => {
         // 检查文件是否真的被修改了（不仅仅是访问）
         if (curr.mtimeMs !== lastMtime) {
           lastMtime = curr.mtimeMs
           logger.debug(
-            `💰 Detected change in pricing file (mtime: ${new Date(curr.mtime).toISOString()})`
+            `💰 Detected change in ${label} (mtime: ${new Date(curr.mtime).toISOString()})`
           )
-          this.handleFileChange()
+          onChange()
         }
       })
 
       // 保存引用以便清理
-      this.fileWatcher = {
-        close: () => fs.unwatchFile(this.pricingFile)
+      this[watcherKey] = {
+        close: () => fs.unwatchFile(filePath)
       }
 
-      logger.info('👁️  File watcher set up for model_pricing.json (polling every 60s)')
+      logger.info(`👁️  File watcher set up for ${label} (polling every 60s)`)
     } catch (error) {
-      logger.error('❌ Failed to setup file watcher:', error)
+      logger.error(`❌ Failed to setup file watcher for ${label}:`, error)
     }
   }
 
@@ -817,6 +1096,18 @@ class PricingService {
     this.reloadDebounceTimer = setTimeout(async () => {
       logger.info('🔄 Reloading pricing data due to file change...')
       await this.reloadPricingData()
+    }, 500)
+  }
+
+  // 处理自定义价格文件变化（带防抖）
+  handleCustomFileChange() {
+    if (this.customReloadDebounceTimer) {
+      clearTimeout(this.customReloadDebounceTimer)
+    }
+
+    this.customReloadDebounceTimer = setTimeout(async () => {
+      logger.info('🔄 Reloading custom pricing data due to file change...')
+      await this.reloadCustomPricingData()
     }, 500)
   }
 
@@ -864,6 +1155,31 @@ class PricingService {
     }
   }
 
+  // 重新加载自定义价格数据
+  async reloadCustomPricingData() {
+    try {
+      if (!fs.existsSync(this.customPricingFile)) {
+        this.customPricingData = {}
+        this.customPricingLastUpdated = null
+        logger.warn('💰 Custom pricing file was deleted, using system pricing only')
+        return
+      }
+
+      await this.loadCustomPricingData({ keepExistingOnError: true })
+    } catch (error) {
+      logger.error('❌ Failed to reload custom pricing data:', error)
+      logger.warn('💰 Keeping existing custom pricing data in memory')
+    }
+  }
+
+  closeFileWatcher(watcherKey, logMessage) {
+    if (this[watcherKey]) {
+      this[watcherKey].close()
+      this[watcherKey] = null
+      logger.debug(logMessage)
+    }
+  }
+
   // 清理资源
   cleanup() {
     if (this.updateTimer) {
@@ -871,14 +1187,15 @@ class PricingService {
       this.updateTimer = null
       logger.debug('💰 Pricing update timer cleared')
     }
-    if (this.fileWatcher) {
-      this.fileWatcher.close()
-      this.fileWatcher = null
-      logger.debug('💰 File watcher closed')
-    }
+    this.closeFileWatcher('fileWatcher', '💰 File watcher closed')
+    this.closeFileWatcher('customFileWatcher', '💰 Custom pricing file watcher closed')
     if (this.reloadDebounceTimer) {
       clearTimeout(this.reloadDebounceTimer)
       this.reloadDebounceTimer = null
+    }
+    if (this.customReloadDebounceTimer) {
+      clearTimeout(this.customReloadDebounceTimer)
+      this.customReloadDebounceTimer = null
     }
     if (this.hashCheckTimer) {
       clearInterval(this.hashCheckTimer)

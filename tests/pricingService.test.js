@@ -67,6 +67,7 @@ describe('PricingService - Long Context Pricing', () => {
 
     // 直接设置真实价格数据（绕过网络初始化）
     pricingService.pricingData = pricingData
+    pricingService.customPricingData = {}
     pricingService.lastUpdated = new Date()
   })
 
@@ -275,6 +276,143 @@ describe('PricingService - Long Context Pricing', () => {
       expect(result.pricing.output).toBeCloseTo(0.000025, 12)
       expect(result.pricing.cacheCreate).toBeCloseTo(0.00000625, 12)
       expect(result.pricing.cacheRead).toBeCloseTo(0.0000005, 12)
+    })
+  })
+
+  describe('自定义价格优先级', () => {
+    it('自定义价格应优先于系统价格', () => {
+      pricingService.pricingData = {
+        'glm-5.1': {
+          input_cost_per_token: 0.0000001,
+          cache_creation_input_token_cost: 0.0000001,
+          cache_read_input_token_cost: 0.00000001,
+          output_cost_per_token: 0.0000002,
+          litellm_provider: 'system'
+        }
+      }
+      pricingService.customPricingData = {
+        'glm-5.1': {
+          input_cost_per_token: 0.0000014,
+          cache_creation_input_token_cost: 0.0000014,
+          cache_read_input_token_cost: 0.00000026,
+          output_cost_per_token: 0.0000044,
+          litellm_provider: 'z_ai'
+        }
+      }
+
+      const pricing = pricingService.getModelPricing('glm-5.1')
+      const result = pricingService.calculateCost(
+        {
+          input_tokens: 1000000,
+          output_tokens: 1000000,
+          cache_creation_input_tokens: 100000,
+          cache_read_input_tokens: 100000
+        },
+        'glm-5.1'
+      )
+
+      expect(pricing.litellm_provider).toBe('z_ai')
+      expect(result.inputCost).toBeCloseTo(1.4, 10)
+      expect(result.outputCost).toBeCloseTo(4.4, 10)
+      expect(result.cacheCreateCost).toBeCloseTo(0.14, 10)
+      expect(result.cacheReadCost).toBeCloseTo(0.026, 10)
+    })
+
+    it('系统价格缺失时应命中自定义新增模型', () => {
+      pricingService.pricingData = {}
+      pricingService.customPricingData = {
+        'kimi-for-coding': {
+          input_cost_per_token: 0.00000095,
+          cache_creation_input_token_cost: 0.00000095,
+          cache_read_input_token_cost: 0.00000016,
+          output_cost_per_token: 0.000004,
+          litellm_provider: 'moonshot'
+        }
+      }
+
+      const result = pricingService.calculateCost(
+        {
+          input_tokens: 1000000,
+          output_tokens: 1000000,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 100000
+        },
+        'kimi-for-coding'
+      )
+
+      expect(result.hasPricing).toBe(true)
+      expect(result.inputCost).toBeCloseTo(0.95, 10)
+      expect(result.outputCost).toBeCloseTo(4, 10)
+      expect(result.cacheReadCost).toBeCloseTo(0.016, 10)
+    })
+
+    it('自定义价格缺失时应回退到系统价格', () => {
+      pricingService.pricingData = {
+        'system-only-model': {
+          input_cost_per_token: 0.0000003,
+          output_cost_per_token: 0.0000007,
+          litellm_provider: 'system'
+        }
+      }
+      pricingService.customPricingData = {}
+
+      const pricing = pricingService.getModelPricing('system-only-model')
+
+      expect(pricing.litellm_provider).toBe('system')
+    })
+
+    it('effective pricing data should mark custom overrides and custom-only models', () => {
+      pricingService.pricingData = {
+        'glm-5.1': {
+          input_cost_per_token: 0.0000001,
+          output_cost_per_token: 0.0000002,
+          litellm_provider: 'system'
+        }
+      }
+      pricingService.customPricingData = {
+        'glm-5.1': {
+          input_cost_per_token: 0.0000014,
+          output_cost_per_token: 0.0000044,
+          litellm_provider: 'z_ai'
+        },
+        'custom-only-model': {
+          input_cost_per_token: 0.0000005,
+          output_cost_per_token: 0.000001,
+          litellm_provider: 'custom'
+        }
+      }
+
+      const data = pricingService.getEffectivePricingData()
+
+      expect(data['glm-5.1'].input_cost_per_token).toBe(0.0000014)
+      expect(data['glm-5.1'].__pricingSource).toBe('custom-override')
+      expect(data['glm-5.1'].__hasSystemPricing).toBe(true)
+      expect(data['custom-only-model'].__pricingSource).toBe('custom')
+      expect(data['custom-only-model'].__hasSystemPricing).toBe(false)
+    })
+
+    it('saveCustomModelPricing should validate, persist and update memory', async () => {
+      pricingService.customPricingData = {}
+
+      await pricingService.saveCustomModelPricing('custom-model', {
+        input_cost_per_token: 0.0000005,
+        output_cost_per_token: 0.000001,
+        litellm_provider: 'custom'
+      })
+
+      expect(pricingService.customPricingData['custom-model']).toEqual(
+        expect.objectContaining({
+          input_cost_per_token: 0.0000005,
+          output_cost_per_token: 0.000001,
+          litellm_provider: 'custom',
+          pricing_source: 'custom'
+        })
+      )
+      const currentFsMock = require('fs')
+      expect(currentFsMock.writeFileSync).toHaveBeenCalledWith(
+        pricingService.customPricingFile,
+        expect.stringContaining('"custom-model"')
+      )
     })
   })
 
