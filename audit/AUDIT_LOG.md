@@ -121,3 +121,22 @@ Updates made:
 
 - Marked `BUG-005`, `BUG-006`, and `BUG-029` as fixed in `audit/BUG_MAP.md`.
 - Updated `audit/VERIFICATION_REPORT.md` with the final fixing order, verification commands, and remaining unresolved bugs.
+
+## 2026-05-31 - Remaining Probable Verification
+
+Scope:
+
+- Verified the remaining high-priority probable bugs after the confirmed quota/webhook fixes.
+- Kept source code read-only. Only audit documents were updated.
+
+Verification performed:
+
+- `BUG-031`: ran a controlled Express harness using the real `authenticateApiKey` middleware. Two concurrent requests both read `dailyCost=0` against `dailyCostLimit=1`, both returned `200`, and post-auth usage recording raised final daily cost to `1.5`.
+- `BUG-020`: ran a controlled route harness using the real `/users/api-keys` handler with `maxApiKeysPerUser=1`. Two concurrent requests both returned `201` and created keys `one` and `two`.
+- `BUG-017`: ran a disposable production install with `npm ci --omit=dev --ignore-scripts` and then `npm start`. Startup exited `127` before app boot because `eslint` was not installed.
+- `BUG-008`: started the admin SPA dev server and used Playwright with `localStorage.authToken` set and `/web/auth/user` mocked as successful. Loading `/admin/dashboard` did not preserve the protected route; final URL was `http://127.0.0.1:5177/admin/api-stats#/login` with the token still present.
+
+Updates made:
+
+- Marked `BUG-008`, `BUG-017`, `BUG-020`, and `BUG-031` as confirmed/proven and open in `audit/BUG_MAP.md`.
+- Updated `audit/VERIFICATION_REPORT.md` recommended fixing order and remaining unresolved bug status.

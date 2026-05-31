@@ -64,11 +64,7 @@ These were the confirmed bugs at the start of the fixing phase. Current per-bug 
 
 | ID | Severity | What Is Missing |
 | --- | --- | --- |
-| BUG-008 | High | Needs browser refresh timing proof for protected admin routes. |
 | BUG-015 | Low | Build warnings are proven, but actual user performance impact needs measurement. |
-| BUG-017 | High | Startup script risk is code-proven, but production install failure was not reproduced. |
-| BUG-020 | High | Needs a concurrent user API-key create reproduction. |
-| BUG-031 | High | Needs concurrent relay requests proving cost-limit overspend. |
 
 ## Confirmed After Probable Verification
 
@@ -79,6 +75,17 @@ These were confirmed after the first confirmed-fix commit and fixed in the follo
 | BUG-005 | Critical | Controlled in-memory `redeemCard` harness returned two successes, two redemption records, and `totalAdded: 20` for one 10-credit card. |
 | BUG-006 | High | Controlled in-memory `addTotalCostLimit` harness ended with `finalTotalCostLimit: 7` for concurrent `+5` and `+7` updates, where atomic behavior should end at `12`. |
 | BUG-029 | High | Controlled local `127.0.0.1` listener received a POST from `webhookService.sendHttpRequest`, proving loopback egress through the webhook sender. |
+
+## Confirmed In Current Verification Pass
+
+These are verified and still open. No source code was changed in this pass.
+
+| ID | Severity | Evidence |
+| --- | --- | --- |
+| BUG-031 | High | Controlled Express harness using the real `authenticateApiKey` middleware forced two concurrent requests to read `dailyCost=0` against `dailyCostLimit=1`; both returned `200`, then final daily cost became `1.5`. |
+| BUG-020 | High | Controlled route harness using the real `/users/api-keys` handler and `maxApiKeysPerUser=1` returned two `201` responses and created keys `one` and `two`. |
+| BUG-017 | High | Disposable production install with `npm ci --omit=dev --ignore-scripts` followed by `npm start` exited `127` because `eslint` was not installed. |
+| BUG-008 | High | Playwright loaded `/admin/dashboard` with `localStorage.authToken` and mocked successful `/web/auth/user`; the route did not land on dashboard and ended at `http://127.0.0.1:5177/admin/api-stats#/login` with the token still present. |
 
 ## Needs Verification
 
@@ -102,19 +109,14 @@ None verified in this pass.
 
 | ID | Manual Test Needed |
 | --- | --- |
-| BUG-008 | Hard-refresh protected admin routes with a valid stored token. |
 | BUG-014 | Manually open both create-key modals and search for auto-registered usage. |
 | BUG-015 | Lighthouse or throttled-network measurement for initial admin SPA load. |
-| BUG-017 | Disposable production install with `npm ci --omit=dev && npm start`. |
-| BUG-020 | Concurrent user key creation with max key limit set to 1. |
-| BUG-031 | Concurrent relay requests with a deliberately low cost limit. |
 
 ## Bugs Needing Logs, Screenshots, Or User Input
 
 | ID | Artifact Needed |
 | --- | --- |
 | BUG-015 | Build output and performance trace if this becomes a release blocker. |
-| BUG-031 | Usage/cost logs showing post-response overspend under concurrency. |
 
 ## Final Fixing Order
 
@@ -126,7 +128,7 @@ None verified in this pass.
 
 ## Recommended Next Fixing Order
 
-1. Verify before fixing: BUG-031, BUG-020, BUG-017, then BUG-008.
+1. Fix confirmed open bugs: BUG-031, BUG-020, BUG-017, then BUG-008.
 2. Investigate BUG-014 manually only if the duplicate component-name build warning becomes user-visible.
 3. Treat BUG-015 as performance work unless measurements prove user impact.
 
@@ -137,6 +139,10 @@ None verified in this pass.
 | `npx jest tests/quotaCardConcurrency.test.js tests/webhookOutboundPolicy.test.js --runInBand` | Passed: 2 suites, 8 tests. |
 | `npm test -- --runInBand` | Passed: 32 suites, 281 tests passed, 8 skipped. |
 | `npm run lint:check` | Passed. |
+| Controlled `BUG-031` middleware harness | Reproduced overspend: statuses `[200, 200]`, final daily cost `1.5`, daily limit `1`. |
+| Controlled `BUG-020` route harness | Reproduced max-key bypass: statuses `[201, 201]`, created 2 keys with max `1`. |
+| Disposable production install startup check | Reproduced startup failure: `npm start` exited `127` with `sh: eslint: command not found`. |
+| Playwright admin refresh check | Reproduced protected-route loss with a stored token and successful auth-user mock. |
 | `cd web/admin-spa && npm run build -- --outDir /tmp/mighty-admin-spa-vite8-dist --emptyOutDir` | Passed on Vite 8 with warnings: stale Browserslist data, duplicate `CreateApiKeyModal` auto-registration warning, 90 no-console warnings, large chunks, Rolldown pure-annotation warnings from `@vueuse/core`. |
 | `npm audit --json` | Passed: zero vulnerabilities. |
 | `npm audit --omit=dev --json` | Passed: zero vulnerabilities. |
@@ -148,6 +154,6 @@ None verified in this pass.
 
 | ID | Status | Reason |
 | --- | --- | --- |
-| BUG-008, BUG-017, BUG-020, BUG-031 | Probable | Still need browser timing, disposable production install, user-key concurrency integration, or relay-cost concurrency proof before fixing. |
+| BUG-008, BUG-017, BUG-020, BUG-031 | Confirmed | Verified in the current pass and not fixed yet. |
 | BUG-014 | Needs Verification | Build warning is real, but no broken user flow is proven. |
 | BUG-015 | Probable | Build/performance warning is real, but user impact needs measurement before treating it as a bug fix target. |
