@@ -1,21 +1,48 @@
 const path = require('path')
 require('dotenv').config()
 
+const nodeEnv = process.env.NODE_ENV || 'development'
+const isProduction = nodeEnv === 'production'
+
+const validateProductionSecret = (name, value, placeholders, minLength = 32) => {
+  if (
+    isProduction &&
+    (!value || value.length < minLength || placeholders.includes(value))
+  ) {
+    throw new Error(
+      `${name} must be set to a strong non-placeholder value in production`
+    )
+  }
+  return value
+}
+
+const jwtSecret = validateProductionSecret(
+  'JWT_SECRET',
+  process.env.JWT_SECRET || 'CHANGE-THIS-JWT-SECRET-IN-PRODUCTION',
+  ['CHANGE-THIS-JWT-SECRET-IN-PRODUCTION', 'your-jwt-secret-here']
+)
+
+const encryptionKey = validateProductionSecret(
+  'ENCRYPTION_KEY',
+  process.env.ENCRYPTION_KEY || 'CHANGE-THIS-32-CHARACTER-KEY-NOW',
+  ['CHANGE-THIS-32-CHARACTER-KEY-NOW', 'your-encryption-key-here']
+)
+
 const config = {
   // 🌐 服务器配置
   server: {
     port: parseInt(process.env.PORT) || 3000,
     host: process.env.HOST || '0.0.0.0',
-    nodeEnv: process.env.NODE_ENV || 'development',
+    nodeEnv,
     trustProxy: process.env.TRUST_PROXY === 'true'
   },
 
   // 🔐 安全配置
   security: {
-    jwtSecret: process.env.JWT_SECRET || 'CHANGE-THIS-JWT-SECRET-IN-PRODUCTION',
+    jwtSecret,
     adminSessionTimeout: parseInt(process.env.ADMIN_SESSION_TIMEOUT) || 86400000, // 24小时
     apiKeyPrefix: process.env.API_KEY_PREFIX || 'cr_',
-    encryptionKey: process.env.ENCRYPTION_KEY || 'CHANGE-THIS-32-CHARACTER-KEY-NOW'
+    encryptionKey
   },
 
   // 📊 Redis配置
@@ -210,8 +237,8 @@ const config = {
   accountBalance: {
     // 是否允许执行自定义余额脚本（安全开关）
     // 说明：脚本能力可发起任意 HTTP 请求并在服务端执行 extractor 逻辑，建议仅在受控环境开启
-    // 默认保持开启；如需禁用请显式设置：BALANCE_SCRIPT_ENABLED=false
-    enableBalanceScript: process.env.BALANCE_SCRIPT_ENABLED !== 'false'
+    // 默认禁用；如需启用请显式设置：BALANCE_SCRIPT_ENABLED=true
+    enableBalanceScript: process.env.BALANCE_SCRIPT_ENABLED === 'true'
   },
 
   // 📬 用户消息队列配置

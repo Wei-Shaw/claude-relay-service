@@ -168,8 +168,7 @@ function extractApiKey(req) {
     req.headers['x-api-key'],
     req.headers['x-goog-api-key'],
     req.headers['authorization'],
-    req.headers['api-key'],
-    req.query?.key
+    req.headers['api-key']
   ]
 
   for (const candidate of candidates) {
@@ -223,6 +222,14 @@ function isTokenCountRequest(req) {
     return true
   }
   return false
+}
+
+const getLogSafeUrl = (originalUrl) => {
+  const queryIdx = originalUrl.indexOf('?')
+  if (queryIdx === -1) {
+    return originalUrl
+  }
+  return `${originalUrl.slice(0, queryIdx)}?[query]`
 }
 
 /**
@@ -1775,21 +1782,14 @@ const requestLogger = (req, res, next) => {
   const clientIP = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown'
   const userAgent = req.get('User-Agent') || 'unknown'
   const referer = req.get('Referer') || 'none'
+  const logSafeUrl = getLogSafeUrl(req.originalUrl)
 
   // 请求开始 → debug 级别（减少正常请求的日志量）
   const isDebugRoute = req.originalUrl.includes('event_logging')
   if (req.originalUrl !== '/health') {
-    logger.debug(`▶ [${requestId}] ${req.method} ${req.originalUrl}`, {
-      ip: clientIP,
-      body: req.body && Object.keys(req.body).length > 0 ? req.body : undefined
+    logger.debug(`▶ [${requestId}] ${req.method} ${logSafeUrl}`, {
+      ip: clientIP
     })
-  }
-
-  // 拦截 res.json() 捕获响应体
-  const originalJson = res.json.bind(res)
-  res.json = (body) => {
-    res._responseBody = body
-    return originalJson(body)
   }
 
   res.on('finish', () => {
@@ -1805,26 +1805,10 @@ const requestLogger = (req, res, next) => {
     const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info'
 
     // 主消息行
-    const msg = `${emoji} ${status} ${req.method} ${req.originalUrl}  ${duration}ms ${contentLength}B`
+    const msg = `${emoji} ${status} ${req.method} ${logSafeUrl}  ${duration}ms ${contentLength}B`
 
     // 构建树形 metadata
     const meta = { requestId }
-
-    // 请求体（非 GET 且有内容时显示）
-    if (req.method !== 'GET' && req.body && Object.keys(req.body).length > 0) {
-      meta.req = req.body
-    }
-
-    // 查询参数（GET 请求且有查询参数时单独显示）
-    const queryIdx = req.originalUrl.indexOf('?')
-    if (queryIdx > -1) {
-      meta.query = req.originalUrl.substring(queryIdx + 1)
-    }
-
-    // 响应体
-    if (res._responseBody) {
-      meta.res = res._responseBody
-    }
 
     // API Key 信息（合并到同一条日志）
     if (req.apiKey) {
@@ -1849,7 +1833,7 @@ const requestLogger = (req, res, next) => {
 
     // 慢请求警告
     if (duration > 5000) {
-      logger.warn(`🐌 Slow request: ${duration}ms ${req.method} ${req.originalUrl}`)
+      logger.warn(`🐌 Slow request: ${duration}ms ${req.method} ${logSafeUrl}`)
     }
   })
 
@@ -1887,7 +1871,9 @@ const securityMiddleware = (req, res, next) => {
   }
 
   // Content Security Policy (适用于web界面)
-  if (req.path.startsWith('/web') || req.path === '/') {
+  if (req.path.startsWith('/admin-next')) {
+    setAdminSpaSecurityHeaders(res)
+  } else if (req.path.startsWith('/web') || req.path === '/') {
     res.setHeader(
       'Content-Security-Policy',
       [
@@ -2075,6 +2061,23 @@ const globalRateLimit = async (req, res, next) =>
   }
   */
 
+const ADMIN_SPA_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  "img-src 'self' data: blob:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'"
+].join('; ')
+
+const setAdminSpaSecurityHeaders = (res) => {
+  res.setHeader('Content-Security-Policy', ADMIN_SPA_CSP)
+}
+
 // 📊 请求大小限制中间件
 const requestSizeLimit = (req, res, next) => {
   const MAX_SIZE_MB = parseInt(process.env.REQUEST_MAX_SIZE_MB || '100', 10)
@@ -2103,6 +2106,7 @@ module.exports = {
   corsMiddleware,
   requestLogger,
   securityMiddleware,
+  setAdminSpaSecurityHeaders,
   errorHandler,
   globalRateLimit,
   requestSizeLimit

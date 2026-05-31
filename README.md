@@ -8,7 +8,7 @@
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-24+-green.svg)](https://nodejs.org/)
 [![Redis](https://img.shields.io/badge/Redis-6+-red.svg)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![Docker Build](https://github.com/Wei-Shaw/claude-relay-service/actions/workflows/auto-release-pipeline.yml/badge.svg)](https://github.com/Wei-Shaw/claude-relay-service/actions/workflows/auto-release-pipeline.yml)
@@ -111,7 +111,7 @@
 
 ### 软件要求
 
-- **Node.js** 18或更高版本
+- **Node.js** 24或更高版本
 - **Redis** 6或更高版本
 - **操作系统**: 建议Linux
 
@@ -135,7 +135,7 @@ curl -fsSL https://pincc.ai/manage.sh -o manage.sh && chmod +x manage.sh && ./ma
 
 ### 脚本功能
 
-- ✅ **一键安装**: 自动检测系统环境，安装 Node.js 18+、Redis 等依赖
+- ✅ **一键安装**: 自动检测系统环境，安装 Node.js 24+、Redis 等依赖
 - ✅ **交互式配置**: 友好的配置向导，设置端口、Redis 连接等
 - ✅ **自动启动**: 安装完成后自动启动服务并显示访问地址
 - ✅ **便捷管理**: 通过 `crs` 命令随时管理服务状态
@@ -177,7 +177,7 @@ Redis 密码 (默认: 无密码):
 ### 系统要求
 
 - 支持系统: Ubuntu/Debian、CentOS/RedHat、Arch Linux、macOS
-- 自动安装 Node.js 18+ 和 Redis
+- 自动安装 Node.js 24+ 和 Redis
 - Redis 使用系统默认位置，数据独立于应用
 
 ---
@@ -190,7 +190,7 @@ Redis 密码 (默认: 无密码):
 
 ```bash
 # 安装Node.js
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # 安装Redis
@@ -203,7 +203,7 @@ sudo systemctl start redis-server
 
 ```bash
 # 安装Node.js
-curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
 sudo yum install -y nodejs
 
 # 安装Redis

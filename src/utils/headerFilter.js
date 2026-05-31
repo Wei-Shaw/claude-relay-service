@@ -73,8 +73,8 @@ function filterForClaude(headers) {
     'anthropic-beta',
     'accept-language',
     'sec-fetch-mode',
-    // 注意：不透传 accept-encoding，避免客户端发送的 zstd 等 Node.js 不支持的编码
-    // 被转发到上游，导致 axios 无法解压响应（Node 18 zlib 不支持 zstd）
+    // 注意：不透传 accept-encoding，避免客户端发送的编码被转发到上游后
+    // 返回 axios 当前运行环境无法解压的响应
     'user-agent',
     'content-type',
     'connection'

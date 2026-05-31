@@ -3,11 +3,72 @@ const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 const path = require('path')
 const fs = require('fs')
+const { RateLimiterRedis } = require('rate-limiter-flexible')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const {
+  loadAdminCredentialsFromInitFile,
+  updateAdminCredentialsInInitFile
+} = require('../utils/adminCredentials')
 
 const router = express.Router()
+
+let adminLoginIpRateLimiter = null
+let adminLoginUserRateLimiter = null
+
+function initAdminLoginRateLimiters() {
+  if (!adminLoginIpRateLimiter || !adminLoginUserRateLimiter) {
+    try {
+      const redisClient = redis.getClientSafe()
+
+      adminLoginIpRateLimiter = new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: 'admin_login_ip_limiter',
+        points: 20,
+        duration: 900,
+        blockDuration: 900
+      })
+
+      adminLoginUserRateLimiter = new RateLimiterRedis({
+        storeClient: redisClient,
+        keyPrefix: 'admin_login_user_limiter',
+        points: 10,
+        duration: 900,
+        blockDuration: 900
+      })
+    } catch (error) {
+      logger.error('❌ 初始化管理员登录速率限制器失败:', error)
+    }
+  }
+
+  return { adminLoginIpRateLimiter, adminLoginUserRateLimiter }
+}
+
+async function consumeAdminLoginLimit(limiter, key, fallbackRetryAfter, logMessage, res) {
+  if (!limiter) {
+    return false
+  }
+
+  try {
+    await limiter.consume(key)
+    return false
+  } catch (rateLimiterRes) {
+    if (!rateLimiterRes || typeof rateLimiterRes.msBeforeNext !== 'number') {
+      logger.error('❌ Admin login rate limiter error:', rateLimiterRes)
+      return false
+    }
+
+    const retryAfter = Math.round(rateLimiterRes.msBeforeNext / 1000) || fallbackRetryAfter
+    logger.security(logMessage)
+    res.set('Retry-After', String(retryAfter))
+    res.status(429).json({
+      error: 'Too many requests',
+      message: 'Too many admin login attempts. Please try again later.'
+    })
+    return true
+  }
+}
 
 // 🏠 服务静态文件
 router.use('/assets', express.static(path.join(__dirname, '../../web/assets')))
@@ -21,6 +82,37 @@ router.get('/', (req, res) => {
 router.post('/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body
+    const clientIp = req.ip || req.connection.remoteAddress || 'unknown'
+    const normalizedUsername =
+      String(username || 'missing')
+        .trim()
+        .toLowerCase() || 'missing'
+    const usernameHash = crypto.createHash('sha256').update(normalizedUsername).digest('hex')
+    const limiters = initAdminLoginRateLimiters()
+
+    if (
+      await consumeAdminLoginLimit(
+        limiters.adminLoginIpRateLimiter,
+        clientIp,
+        900,
+        `🚫 Admin login rate limit exceeded for IP: ${clientIp}`,
+        res
+      )
+    ) {
+      return
+    }
+
+    if (
+      await consumeAdminLoginLimit(
+        limiters.adminLoginUserRateLimiter,
+        `${clientIp}:${usernameHash}`,
+        900,
+        `🚫 Admin login rate limit exceeded for username from IP: ${clientIp}`,
+        res
+      )
+    ) {
+      return
+    }
 
     if (!username || !password) {
       return res.status(400).json({
@@ -38,17 +130,7 @@ router.post('/auth/login', async (req, res) => {
 
       if (fs.existsSync(initFilePath)) {
         try {
-          const initData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'))
-          const saltRounds = 10
-          const passwordHash = await bcrypt.hash(initData.adminPassword, saltRounds)
-
-          adminData = {
-            username: initData.adminUsername,
-            passwordHash,
-            createdAt: initData.initializedAt || new Date().toISOString(),
-            lastLogin: null,
-            updatedAt: initData.updatedAt || null
-          }
+          adminData = await loadAdminCredentialsFromInitFile(initFilePath)
 
           // 重新存储到Redis，不设置过期时间
           await redis.getClient().hset('session:admin_credentials', adminData)
@@ -218,28 +300,13 @@ router.post('/auth/change-password', async (req, res) => {
     }
 
     try {
-      const initData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'))
-      // const oldData = { ...initData }; // 备份旧数据
-
-      // 更新 init.json
-      initData.adminUsername = updatedUsername
-      initData.adminPassword = newPassword // 保存明文密码到init.json
-      initData.updatedAt = new Date().toISOString()
-
       // 先写入文件（如果失败则不会影响 Redis）
-      fs.writeFileSync(initFilePath, JSON.stringify(initData, null, 2))
-
-      // 文件写入成功后，更新 Redis 缓存
-      const saltRounds = 10
-      const newPasswordHash = await bcrypt.hash(newPassword, saltRounds)
-
-      const updatedAdminData = {
-        username: updatedUsername,
-        passwordHash: newPasswordHash,
-        createdAt: adminData.createdAt,
-        lastLogin: adminData.lastLogin,
-        updatedAt: new Date().toISOString()
-      }
+      const updatedAdminData = await updateAdminCredentialsInInitFile(initFilePath, {
+        adminUsername: updatedUsername,
+        adminPassword: newPassword
+      })
+      updatedAdminData.createdAt = adminData.createdAt
+      updatedAdminData.lastLogin = adminData.lastLogin
 
       await redis.setSession('admin_credentials', updatedAdminData)
     } catch (fileError) {

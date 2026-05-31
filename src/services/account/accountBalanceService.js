@@ -105,7 +105,7 @@ class AccountBalanceService {
         } catch (error) {
           this.logger.error(`批量获取余额失败: ${normalizedPlatform}:${acc?.id}`, error)
           return {
-            success: true,
+            success: false,
             data: {
               accountId: acc?.id,
               platform: normalizedPlatform,
@@ -705,6 +705,7 @@ class AccountBalanceService {
 
     const amount = typeof balanceData.balance === 'number' ? balanceData.balance : null
     const currency = balanceData.currency || 'USD'
+    const status = balanceData.status || 'success'
 
     let cacheExpiresAt = null
     if (source === 'cache') {
@@ -714,7 +715,7 @@ class AccountBalanceService {
     }
 
     return {
-      success: true,
+      success: status === 'success',
       data: {
         accountId,
         platform,
@@ -731,7 +732,7 @@ class AccountBalanceService {
         source,
         lastRefreshAt: balanceData.lastRefreshAt || now.toISOString(),
         cacheExpiresAt,
-        status: balanceData.status || 'success',
+        status,
         error: balanceData.errorMessage || null,
         ...(extraData && typeof extraData === 'object' ? extraData : {})
       }

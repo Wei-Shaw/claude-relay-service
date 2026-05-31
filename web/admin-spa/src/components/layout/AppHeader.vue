@@ -288,7 +288,6 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { showToast } from '@/utils/tools'
 
@@ -297,7 +296,6 @@ import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
-const router = useRouter()
 const authStore = useAuthStore()
 
 // 当前用户信息
@@ -470,7 +468,6 @@ const changePassword = async () => {
       // 延迟后退出登录
       setTimeout(() => {
         authStore.logout()
-        router.push('/login')
       }, 1500)
     } else {
       showToast(data.message || '修改失败', 'error')
@@ -492,8 +489,7 @@ const logout = async () => {
     'warning'
   )
   if (confirmed) {
-    authStore.logout()
-    router.push('/login')
+    await authStore.logout()
     showToast('已安全退出', 'success')
   }
   userMenuOpen.value = false

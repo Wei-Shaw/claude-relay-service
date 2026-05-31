@@ -49,8 +49,8 @@
     "test:pricing-fallback": "node scripts/test-pricing-fallback.js"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.861.0",
-    "@aws-sdk/credential-providers": "^3.859.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1057.0",
+    "@aws-sdk/credential-providers": "^3.1057.0",
     "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
     "chalk": "^4.1.2",
@@ -67,13 +67,13 @@
     "ldapjs": "^3.0.7",
     "morgan": "^1.10.0",
     "node-cron": "^4.2.1",
-    "nodemailer": "^7.0.6",
+    "nodemailer": "^8.0.10",
     "ora": "^5.4.1",
     "rate-limiter-flexible": "^5.0.5",
     "socks-proxy-agent": "^8.0.2",
     "string-similarity": "^4.0.4",
     "table": "^6.8.1",
-    "uuid": "^9.0.1",
+    "uuid": "^11.1.1",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1"
   },
@@ -89,7 +89,7 @@
     "supertest": "^6.3.3"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "keywords": [
     "claude",

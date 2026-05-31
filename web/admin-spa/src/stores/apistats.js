@@ -151,8 +151,8 @@ export const useApiStatsStore = defineStore('apistats', () => {
           // 更新 URL
           updateURL()
 
-          // 保存 API Key 到 localStorage
-          saveApiKeyToStorage()
+          // 保存 API Key ID 到 localStorage，避免持久化完整密钥
+          saveApiIdToStorage()
         } else {
           throw new Error(statsResult.message || '查询失败')
         }
@@ -410,16 +410,18 @@ export const useApiStatsStore = defineStore('apistats', () => {
     }
   }
 
-  // 保存 API Key 到 localStorage
-  function saveApiKeyToStorage() {
-    if (apiKey.value) {
-      localStorage.setItem('lastApiKey', apiKey.value)
+  // 保存 API Key ID 到 localStorage
+  function saveApiIdToStorage() {
+    localStorage.removeItem('lastApiKey')
+    if (apiId.value) {
+      localStorage.setItem('lastApiId', apiId.value)
     }
   }
 
-  // 从 localStorage 加载 API Key
-  function loadApiKeyFromStorage() {
-    return localStorage.getItem('lastApiKey')
+  // 从 localStorage 加载 API Key ID
+  function loadApiIdFromStorage() {
+    localStorage.removeItem('lastApiKey')
+    return localStorage.getItem('lastApiId')
   }
 
   // 批量查询统计数据
@@ -617,7 +619,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
     loadStatsWithApiId,
     loadOemSettings,
     loadServiceRates,
-    loadApiKeyFromStorage,
+    loadApiIdFromStorage,
     clearData,
     clearInput,
     reset

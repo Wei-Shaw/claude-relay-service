@@ -8,7 +8,7 @@
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-24+-green.svg)](https://nodejs.org/)
 [![Redis](https://img.shields.io/badge/Redis-6+-red.svg)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
@@ -108,7 +108,7 @@ If you have any of these concerns, this project might be suitable for you.
 - **Recommendation**: 2 cores 4GB is basically enough, choose network with good return routes to your country (to improve speed, recommend not using proxy or setting server IP for direct connection)
 
 ### Software Requirements
-- **Node.js** 18 or higher
+- **Node.js** 24 or higher
 - **Redis** 6 or higher
 - **Operating System**: Linux recommended
 
@@ -126,7 +126,7 @@ If you have any of these concerns, this project might be suitable for you.
 **Ubuntu/Debian users:**
 ```bash
 # Install Node.js
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Install Redis
@@ -138,7 +138,7 @@ sudo systemctl start redis-server
 **CentOS/RHEL users:**
 ```bash
 # Install Node.js
-curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
 sudo yum install -y nodejs
 
 # Install Redis

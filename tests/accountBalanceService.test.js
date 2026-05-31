@@ -118,6 +118,7 @@ describe('AccountBalanceService', () => {
     })
 
     expect(mockRedis.setAccountBalance).not.toHaveBeenCalled()
+    expect(result.success).toBe(false)
     expect(result.data.source).toBe('local')
     expect(result.data.status).toBe('error')
     expect(result.data.error).toBe('boom')

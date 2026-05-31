@@ -19,7 +19,8 @@ jest.mock('../src/middleware/auth', () => ({
 }))
 
 jest.mock('../src/services/apiKeyService', () => ({
-  updateApiKey: jest.fn()
+  updateApiKey: jest.fn(),
+  generateApiKey: jest.fn()
 }))
 
 jest.mock('../src/models/redis', () => ({}))
@@ -77,10 +78,17 @@ function findPutHandler(path) {
   return route?.[2]
 }
 
+function findPostHandler(path) {
+  const route = mockRouter.post.mock.calls.find((call) => call[0] === path)
+  return route?.[2]
+}
+
 describe('admin api keys route payload rule updates', () => {
   beforeEach(() => {
     apiKeyService.updateApiKey.mockReset()
     apiKeyService.updateApiKey.mockResolvedValue()
+    apiKeyService.generateApiKey.mockReset()
+    apiKeyService.generateApiKey.mockResolvedValue({ id: 'key-1', apiKey: 'sk-test' })
 
     requestBodyRuleService.validateAndNormalizeRules.mockReset()
     requestBodyRuleService.validateAndNormalizeRules.mockImplementation((rules) => ({
@@ -167,5 +175,63 @@ describe('admin api keys route payload rule updates', () => {
 
     expect(res.status).not.toHaveBeenCalled()
     expect(res.body.success).toBe(true)
+  })
+
+  test('rejects invalid cost limits on single API key creation', async () => {
+    const handler = findPostHandler('/api-keys')
+    const res = createResponse()
+
+    await handler(
+      {
+        body: {
+          name: 'Bad Key',
+          dailyCostLimit: -1
+        }
+      },
+      res
+    )
+
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(res.body).toEqual({ error: 'Daily cost limit must be a non-negative number' })
+    expect(apiKeyService.generateApiKey).not.toHaveBeenCalled()
+  })
+
+  test('rejects invalid rate cost limits on single API key creation', async () => {
+    const handler = findPostHandler('/api-keys')
+    const res = createResponse()
+
+    await handler(
+      {
+        body: {
+          name: 'Bad Key',
+          rateLimitCost: 'not-a-number'
+        }
+      },
+      res
+    )
+
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(res.body).toEqual({ error: 'Rate limit cost must be a non-negative number' })
+    expect(apiKeyService.generateApiKey).not.toHaveBeenCalled()
+  })
+
+  test('rejects invalid numeric limits on batch API key creation', async () => {
+    const handler = findPostHandler('/api-keys/batch')
+    const res = createResponse()
+
+    await handler(
+      {
+        body: {
+          baseName: 'Batch Key',
+          count: 2,
+          weeklyOpusCostLimit: -1
+        }
+      },
+      res
+    )
+
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(res.body).toEqual({ error: 'Weekly Opus cost limit must be a non-negative number' })
+    expect(apiKeyService.generateApiKey).not.toHaveBeenCalled()
   })
 })

@@ -573,7 +573,7 @@ const {
   loadStatsWithApiId,
   loadOemSettings,
   loadServiceRates,
-  loadApiKeyFromStorage,
+  loadApiIdFromStorage,
   reset
 } = apiStatsStore
 
@@ -786,7 +786,11 @@ onMounted(async () => {
 
   // 检查 URL 参数
   const urlApiId = route.query.apiId
-  const urlApiKey = route.query.apiKey
+  if (route.query.apiKey) {
+    const url = new URL(window.location)
+    url.searchParams.delete('apiKey')
+    window.history.replaceState({}, '', url)
+  }
 
   if (
     urlApiId &&
@@ -794,21 +798,16 @@ onMounted(async () => {
   ) {
     // 如果 URL 中有 apiId，直接使用 apiId 加载数据
     apiId.value = urlApiId
-    // 同时从 localStorage 填充 API Key 到输入框
-    const savedApiKey = loadApiKeyFromStorage()
-    if (savedApiKey) {
-      apiKey.value = savedApiKey
-    }
     loadStatsWithApiId()
-  } else if (urlApiKey && urlApiKey.length > 10) {
-    // 向后兼容，支持 apiKey 参数
-    apiKey.value = urlApiKey
   } else {
-    // 没有 URL 参数，检查 localStorage
-    const savedApiKey = loadApiKeyFromStorage()
-    if (savedApiKey && savedApiKey.length > 10) {
-      apiKey.value = savedApiKey
-      queryStats()
+    // 没有 URL 参数，检查 localStorage 中的非敏感 API Key ID
+    const savedApiId = loadApiIdFromStorage()
+    if (
+      savedApiId &&
+      savedApiId.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i)
+    ) {
+      apiId.value = savedApiId
+      loadStatsWithApiId()
     }
   }
 

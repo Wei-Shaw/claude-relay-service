@@ -5,6 +5,7 @@ const chalk = require('chalk')
 const ora = require('ora')
 
 const config = require('../config/config')
+const { createAdminInitData } = require('../src/utils/adminCredentials')
 
 async function setup() {
   console.log(chalk.blue.bold('\n🚀 Claude Relay Service 初始化设置\n'))
@@ -54,12 +55,12 @@ async function setup() {
     }
 
     // 4. 创建初始化完成标记文件
-    const initData = {
-      initializedAt: new Date().toISOString(),
+    const initData = await createAdminInitData({
       adminUsername,
       adminPassword,
+      initializedAt: new Date().toISOString(),
       version: '1.0.0'
-    }
+    })
 
     fs.writeFileSync(
       path.join(__dirname, '..', 'data', 'init.json'),

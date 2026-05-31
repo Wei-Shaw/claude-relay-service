@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import router from '@/router'
 
-import { loginApi, getAuthUserApi, getOemSettingsApi } from '@/utils/http_apis'
+import { loginApi, logoutApi, getAuthUserApi, getOemSettingsApi } from '@/utils/http_apis'
 
 export const useAuthStore = defineStore('auth', () => {
   // 状态
@@ -49,12 +49,21 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function logout() {
-    isLoggedIn.value = false
-    authToken.value = ''
-    username.value = ''
-    localStorage.removeItem('authToken')
-    router.push('/login')
+  async function logout() {
+    const tokenToInvalidate = authToken.value
+    try {
+      if (tokenToInvalidate) {
+        await logoutApi()
+      }
+    } catch {
+      // Backend session may already be gone; local logout must still complete.
+    } finally {
+      isLoggedIn.value = false
+      authToken.value = ''
+      username.value = ''
+      localStorage.removeItem('authToken')
+      router.push('/login')
+    }
   }
 
   function checkAuth() {
@@ -69,12 +78,12 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const userResult = await getAuthUserApi()
       if (!userResult.success || !userResult.user) {
-        logout()
+        await logout()
         return
       }
       username.value = userResult.user.username
     } catch (error) {
-      logout()
+      await logout()
     }
   }
 

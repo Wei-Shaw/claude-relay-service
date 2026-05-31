@@ -67,6 +67,39 @@ function validateServiceRates(serviceRates) {
   return null
 }
 
+const hasLimitValue = (value) => value !== undefined && value !== null && value !== ''
+
+function validateNonNegativeCostLimit(value, label) {
+  if (!hasLimitValue(value)) {
+    return null
+  }
+
+  const limit = Number(value)
+  if (!Number.isFinite(limit) || limit < 0) {
+    return `${label} must be a non-negative number`
+  }
+
+  return null
+}
+
+function validateApiKeyCostLimits(limits) {
+  const validations = [
+    ['rateLimitCost', 'Rate limit cost'],
+    ['dailyCostLimit', 'Daily cost limit'],
+    ['totalCostLimit', 'Total cost limit'],
+    ['weeklyOpusCostLimit', 'Weekly Opus cost limit']
+  ]
+
+  for (const [field, label] of validations) {
+    const error = validateNonNegativeCostLimit(limits[field], label)
+    if (error) {
+      return error
+    }
+  }
+
+  return null
+}
+
 // 👥 用户管理 (用于API Key分配)
 
 // 获取所有用户列表（用于API Key分配）
@@ -1575,13 +1608,14 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'All tags must be non-empty strings' })
     }
 
-    if (
-      totalCostLimit !== undefined &&
-      totalCostLimit !== null &&
-      totalCostLimit !== '' &&
-      (Number.isNaN(Number(totalCostLimit)) || Number(totalCostLimit) < 0)
-    ) {
-      return res.status(400).json({ error: 'Total cost limit must be a non-negative number' })
+    const costLimitError = validateApiKeyCostLimits({
+      rateLimitCost,
+      dailyCostLimit,
+      totalCostLimit,
+      weeklyOpusCostLimit
+    })
+    if (costLimitError) {
+      return res.status(400).json({ error: costLimitError })
     }
 
     // 验证激活相关字段
@@ -1771,6 +1805,49 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       return res
         .status(400)
         .json({ error: 'Base name must be less than 90 characters to allow for numbering' })
+    }
+
+    if (tokenLimit && (!Number.isInteger(Number(tokenLimit)) || Number(tokenLimit) < 0)) {
+      return res.status(400).json({ error: 'Token limit must be a non-negative integer' })
+    }
+
+    if (
+      concurrencyLimit !== undefined &&
+      concurrencyLimit !== null &&
+      concurrencyLimit !== '' &&
+      (!Number.isInteger(Number(concurrencyLimit)) || Number(concurrencyLimit) < 0)
+    ) {
+      return res.status(400).json({ error: 'Concurrency limit must be a non-negative integer' })
+    }
+
+    if (
+      rateLimitWindow !== undefined &&
+      rateLimitWindow !== null &&
+      rateLimitWindow !== '' &&
+      (!Number.isInteger(Number(rateLimitWindow)) || Number(rateLimitWindow) < 1)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'Rate limit window must be a positive integer (minutes)' })
+    }
+
+    if (
+      rateLimitRequests !== undefined &&
+      rateLimitRequests !== null &&
+      rateLimitRequests !== '' &&
+      (!Number.isInteger(Number(rateLimitRequests)) || Number(rateLimitRequests) < 1)
+    ) {
+      return res.status(400).json({ error: 'Rate limit requests must be a positive integer' })
+    }
+
+    const batchCostLimitError = validateApiKeyCostLimits({
+      rateLimitCost,
+      dailyCostLimit,
+      totalCostLimit,
+      weeklyOpusCostLimit
+    })
+    if (batchCostLimitError) {
+      return res.status(400).json({ error: batchCostLimitError })
     }
 
     // 验证服务权限字段（支持数组格式）

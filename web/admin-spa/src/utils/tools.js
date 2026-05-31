@@ -43,21 +43,47 @@ export const showToast = (message, type = 'info', title = '', duration = 3000) =
     info: 'fas fa-info-circle'
   }
 
-  toast.innerHTML = `
-    <div class="flex items-start gap-3">
-      <div class="flex-shrink-0 mt-0.5">
-        <i class="${iconMap[type]} text-lg"></i>
-      </div>
-      <div class="flex-1 min-w-0">
-        ${title ? `<h4 class="font-semibold text-sm mb-1">${title}</h4>` : ''}
-        <p class="text-sm opacity-90 leading-relaxed">${message.replace(/\n/g, '<br>')}</p>
-      </div>
-      <button onclick="this.parentElement.parentElement.remove()"
-              class="flex-shrink-0 text-white/70 hover:text-white transition-colors ml-2">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-  `
+  const row = document.createElement('div')
+  row.className = 'flex items-start gap-3'
+
+  const iconWrapper = document.createElement('div')
+  iconWrapper.className = 'flex-shrink-0 mt-0.5'
+  const icon = document.createElement('i')
+  icon.className = `${iconMap[type] || iconMap.info} text-lg`
+  iconWrapper.appendChild(icon)
+
+  const content = document.createElement('div')
+  content.className = 'flex-1 min-w-0'
+
+  if (title) {
+    const heading = document.createElement('h4')
+    heading.className = 'font-semibold text-sm mb-1'
+    heading.textContent = title
+    content.appendChild(heading)
+  }
+
+  const messageNode = document.createElement('p')
+  messageNode.className = 'text-sm opacity-90 leading-relaxed'
+  String(message ?? '')
+    .split('\n')
+    .forEach((line, index) => {
+      if (index > 0) messageNode.appendChild(document.createElement('br'))
+      messageNode.appendChild(document.createTextNode(line))
+    })
+  content.appendChild(messageNode)
+
+  const closeButton = document.createElement('button')
+  closeButton.type = 'button'
+  closeButton.className = 'flex-shrink-0 text-white/70 hover:text-white transition-colors ml-2'
+  closeButton.addEventListener('click', () => toast.remove())
+  const closeIcon = document.createElement('i')
+  closeIcon.className = 'fas fa-times'
+  closeButton.appendChild(closeIcon)
+
+  row.appendChild(iconWrapper)
+  row.appendChild(content)
+  row.appendChild(closeButton)
+  toast.appendChild(row)
 
   toastContainer.appendChild(toast)
   setTimeout(() => (toast.style.transform = 'translateX(0)'), 10)

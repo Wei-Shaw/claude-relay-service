@@ -154,25 +154,25 @@ check_node_version() {
     local node_version=$(node -v | sed 's/v//')
     local major_version=$(echo $node_version | cut -d. -f1)
     
-    if [ "$major_version" -lt 18 ]; then
+    if [ "$major_version" -lt 24 ]; then
         return 1
     fi
     
     return 0
 }
 
-# 安装Node.js 18+
+# 安装Node.js 24+
 install_nodejs() {
-    print_info "开始安装 Node.js 18+"
+    print_info "开始安装 Node.js 24+"
     
     case $OS in
         "debian")
             # 使用 NodeSource 仓库
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
             sudo $PACKAGE_MANAGER install -y nodejs
             ;;
         "redhat")
-            curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+            curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
             sudo $PACKAGE_MANAGER install -y nodejs
             ;;
         "arch")
@@ -183,10 +183,10 @@ install_nodejs() {
                 print_error "请先安装 Homebrew: https://brew.sh"
                 return 1
             fi
-            brew install node@18
+            brew install node@24
             ;;
         *)
-            print_error "不支持的操作系统，请手动安装 Node.js 18+"
+            print_error "不支持的操作系统，请手动安装 Node.js 24+"
             return 1
             ;;
     esac
@@ -249,7 +249,7 @@ install_dependencies() {
     
     # 检查 Node.js
     if ! check_node_version; then
-        print_warning "未检测到 Node.js 18+ 版本"
+        print_warning "未检测到 Node.js 24+ 版本"
         install_nodejs || return 1
     else
         print_success "Node.js 版本检查通过: $(node -v)"

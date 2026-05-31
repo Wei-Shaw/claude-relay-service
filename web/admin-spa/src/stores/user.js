@@ -4,6 +4,14 @@ import { showToast } from '@/utils/tools'
 import { APP_CONFIG } from '@/utils/tools'
 
 const API_BASE = `${APP_CONFIG.apiPrefix}/users`
+const USER_LOGIN_PATH = '/user-login'
+
+const getUserLoginUrl = () => {
+  const basePath = APP_CONFIG.basePath.endsWith('/')
+    ? APP_CONFIG.basePath.slice(0, -1)
+    : APP_CONFIG.basePath
+  return `${basePath}${USER_LOGIN_PATH}`
+}
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -205,8 +213,9 @@ export const useUserStore = defineStore('user', {
               this.clearAuth()
               showToast(message, 'error')
               // Redirect to login page
-              if (window.location.pathname !== '/user-login') {
-                window.location.href = '/user-login'
+              const userLoginUrl = getUserLoginUrl()
+              if (window.location.pathname !== userLoginUrl) {
+                window.location.href = userLoginUrl
               }
             }
           }

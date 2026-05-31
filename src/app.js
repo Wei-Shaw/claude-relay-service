@@ -1,10 +1,8 @@
 const express = require('express')
-const cors = require('cors')
 const helmet = require('helmet')
 const compression = require('compression')
 const path = require('path')
 const fs = require('fs')
-const bcrypt = require('bcryptjs')
 
 const config = require('../config/config')
 const logger = require('./utils/logger')
@@ -12,6 +10,7 @@ const redis = require('./models/redis')
 const pricingService = require('./services/pricingService')
 const cacheMonitor = require('./utils/cacheMonitor')
 const { getSafeMessage } = require('./utils/errorSanitizer')
+const { loadAdminCredentialsFromInitFile } = require('./utils/adminCredentials')
 
 // Import routes
 const apiRoutes = require('./routes/api')
@@ -31,9 +30,11 @@ const webhookRoutes = require('./routes/webhook')
 
 // Import middleware
 const {
+  authenticateAdmin,
   corsMiddleware,
   requestLogger,
   securityMiddleware,
+  setAdminSpaSecurityHeaders,
   errorHandler,
   globalRateLimit,
   requestSizeLimit
@@ -165,6 +166,7 @@ class Application {
           const indexPath = path.join(adminSpaPath, 'index.html')
 
           if (fs.existsSync(indexPath)) {
+            setAdminSpaSecurityHeaders(res)
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
             return res.sendFile(indexPath)
           } else {
@@ -184,11 +186,7 @@ class Application {
       )
 
       // 🌐 CORS
-      if (config.web.enableCors) {
-        this.app.use(cors())
-      } else {
-        this.app.use(corsMiddleware)
-      }
+      this.app.use(corsMiddleware)
 
       // 🆕 兜底中间件：处理Chrome插件兼容性（必须在认证之前）
       this.app.use(browserFallbackMiddleware)
@@ -437,7 +435,7 @@ class Application {
       })
 
       // 📊 指标端点
-      this.app.get('/metrics', async (req, res) => {
+      this.app.get('/metrics', authenticateAdmin, async (req, res) => {
         try {
           const stats = await redis.getSystemStats()
           const metrics = {
@@ -484,20 +482,7 @@ class Application {
       }
 
       // 从 init.json 读取管理员凭据（作为唯一真实数据源）
-      const initData = JSON.parse(fs.readFileSync(initFilePath, 'utf8'))
-
-      // 将明文密码哈希化
-      const saltRounds = 10
-      const passwordHash = await bcrypt.hash(initData.adminPassword, saltRounds)
-
-      // 存储到Redis（每次启动都覆盖，确保与 init.json 同步）
-      const adminCredentials = {
-        username: initData.adminUsername,
-        passwordHash,
-        createdAt: initData.initializedAt || new Date().toISOString(),
-        lastLogin: null,
-        updatedAt: initData.updatedAt || null
-      }
+      const adminCredentials = await loadAdminCredentialsFromInitFile(initFilePath)
 
       await redis.setSession('admin_credentials', adminCredentials)
 

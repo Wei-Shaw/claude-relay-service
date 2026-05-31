@@ -11,6 +11,7 @@ const {
   extractErrorMessage,
   sanitizeErrorMsg
 } = require('../utils/testPayloadHelper')
+const { parsePaginationQuery } = require('../utils/pagination')
 const modelsConfig = require('../../config/models')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 
@@ -1625,7 +1626,7 @@ router.get('/api/redemption-history', async (req, res) => {
   const quotaCardService = require('../services/quotaCardService')
 
   try {
-    const { apiId, limit = 50, offset = 0 } = req.query
+    const { apiId } = req.query
 
     if (!apiId) {
       return res.status(400).json({
@@ -1645,6 +1646,14 @@ router.get('/api/redemption-history', async (req, res) => {
       })
     }
 
+    const pagination = parsePaginationQuery(req.query)
+    if (!pagination.ok) {
+      return res.status(400).json({
+        success: false,
+        error: pagination.error
+      })
+    }
+
     // 验证 API Key 存在
     const keyData = await redis.getApiKey(apiId)
     if (!keyData || Object.keys(keyData).length === 0) {
@@ -1657,8 +1666,8 @@ router.get('/api/redemption-history', async (req, res) => {
     // 获取该 API Key 的兑换记录
     const result = await quotaCardService.getRedemptions({
       apiKeyId: apiId,
-      limit: parseInt(limit),
-      offset: parseInt(offset)
+      limit: pagination.limit,
+      offset: pagination.offset
     })
 
     res.json({

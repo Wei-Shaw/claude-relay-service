@@ -6,9 +6,18 @@ const apiKeyService = require('../services/apiKeyService')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const inputValidator = require('../utils/inputValidator')
+const { parsePaginationQuery } = require('../utils/pagination')
 const { RateLimiterRedis } = require('rate-limiter-flexible')
 const redis = require('../models/redis')
 const { authenticateUser, authenticateUserOrAdmin, requireAdmin } = require('../middleware/auth')
+const RESERVED_USER_DETAIL_ROUTES = new Set(['redemption-history', 'quota-info'])
+
+const skipReservedUserDetailRoute = (req, res, next) => {
+  if (RESERVED_USER_DETAIL_ROUTES.has(req.params.userId)) {
+    return next('route')
+  }
+  return next()
+}
 
 // 🚦 配置登录速率限制
 // 只基于IP地址限制，避免攻击者恶意锁定特定账户
@@ -496,66 +505,72 @@ router.get('/', authenticateUserOrAdmin, requireAdmin, async (req, res) => {
 })
 
 // 👤 获取特定用户信息（管理员）
-router.get('/:userId', authenticateUserOrAdmin, requireAdmin, async (req, res) => {
-  try {
-    const { userId } = req.params
+router.get(
+  '/:userId',
+  skipReservedUserDetailRoute,
+  authenticateUserOrAdmin,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params
 
-    const user = await userService.getUserById(userId)
-    if (!user) {
-      return res.status(404).json({
-        error: 'User not found',
-        message: 'User not found'
-      })
-    }
-
-    // 获取用户的API Keys（包括已删除的以保留统计数据）
-    const apiKeys = await apiKeyService.getUserApiKeys(userId, true)
-
-    res.json({
-      success: true,
-      user: {
-        ...user,
-        apiKeys: apiKeys.map((key) => {
-          // Flatten usage structure for frontend compatibility
-          let flatUsage = {
-            requests: 0,
-            inputTokens: 0,
-            outputTokens: 0,
-            totalCost: 0
-          }
-
-          if (key.usage && key.usage.total) {
-            flatUsage = {
-              requests: key.usage.total.requests || 0,
-              inputTokens: key.usage.total.inputTokens || 0,
-              outputTokens: key.usage.total.outputTokens || 0,
-              totalCost: key.totalCost || 0
-            }
-          }
-
-          return {
-            id: key.id,
-            name: key.name,
-            description: key.description,
-            isActive: key.isActive,
-            createdAt: key.createdAt,
-            lastUsedAt: key.lastUsedAt,
-            usage: flatUsage,
-            keyPreview: key.key
-              ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
-              : null
-          }
+      const user = await userService.getUserById(userId)
+      if (!user) {
+        return res.status(404).json({
+          error: 'User not found',
+          message: 'User not found'
         })
       }
-    })
-  } catch (error) {
-    logger.error('❌ Get user details error:', error)
-    res.status(500).json({
-      error: 'User details error',
-      message: 'Failed to retrieve user details'
-    })
+
+      // 获取用户的API Keys（包括已删除的以保留统计数据）
+      const apiKeys = await apiKeyService.getUserApiKeys(userId, true)
+
+      res.json({
+        success: true,
+        user: {
+          ...user,
+          apiKeys: apiKeys.map((key) => {
+            // Flatten usage structure for frontend compatibility
+            let flatUsage = {
+              requests: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              totalCost: 0
+            }
+
+            if (key.usage && key.usage.total) {
+              flatUsage = {
+                requests: key.usage.total.requests || 0,
+                inputTokens: key.usage.total.inputTokens || 0,
+                outputTokens: key.usage.total.outputTokens || 0,
+                totalCost: key.totalCost || 0
+              }
+            }
+
+            return {
+              id: key.id,
+              name: key.name,
+              description: key.description,
+              isActive: key.isActive,
+              createdAt: key.createdAt,
+              lastUsedAt: key.lastUsedAt,
+              usage: flatUsage,
+              keyPreview: key.key
+                ? `${key.key.substring(0, 8)}...${key.key.substring(key.key.length - 4)}`
+                : null
+            }
+          })
+        }
+      })
+    } catch (error) {
+      logger.error('❌ Get user details error:', error)
+      res.status(500).json({
+        error: 'User details error',
+        message: 'Failed to retrieve user details'
+      })
+    }
   }
-})
+)
 
 // 🔄 更新用户状态（管理员）
 router.patch('/:userId/status', authenticateUserOrAdmin, requireAdmin, async (req, res) => {
@@ -823,12 +838,18 @@ router.post('/redeem-card', authenticateUser, async (req, res) => {
 // 📋 获取用户的核销历史
 router.get('/redemption-history', authenticateUser, async (req, res) => {
   try {
-    const { limit = 50, offset = 0 } = req.query
+    const pagination = parsePaginationQuery(req.query)
+    if (!pagination.ok) {
+      return res.status(400).json({
+        error: 'Invalid pagination',
+        message: pagination.error
+      })
+    }
 
     const result = await quotaCardService.getRedemptions({
       userId: req.user.id,
-      limit: parseInt(limit),
-      offset: parseInt(offset)
+      limit: pagination.limit,
+      offset: pagination.offset
     })
 
     res.json({

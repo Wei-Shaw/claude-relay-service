@@ -160,7 +160,7 @@ jobs:
       if: steps.check.outputs.needs_bump == 'true'
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '24'
         cache: 'npm'
         cache-dependency-path: web/admin-spa/package-lock.json
 
