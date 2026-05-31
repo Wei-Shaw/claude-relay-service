@@ -76,3 +76,24 @@ Verification:
 
 - No application tests were run in this adversarial pass.
 - Markdown table pipe counts were checked after edits.
+
+## 2026-05-31 - Post-Fix Probable Verification
+
+Scope:
+
+- Rechecked the highest-risk `Probable` findings after the confirmed-bug fix commit.
+- Kept application source read-only; updated audit documents only.
+- Used controlled in-memory or loopback harnesses where possible instead of live Redis/provider traffic.
+
+Verification performed:
+
+- `BUG-005`: ran an in-memory `quotaCardService.redeemCard` concurrency harness. Two concurrent calls against the same unused card both succeeded, wrote two redemption records, and applied `totalAdded: 20` for one 10-credit card.
+- `BUG-006`: ran an in-memory `apiKeyService.addTotalCostLimit` concurrency harness. Concurrent `+5` and `+7` updates ended with `finalTotalCostLimit: 7` instead of the atomic expected `12`.
+- `BUG-029`: started a local `127.0.0.1` listener and called `webhookService.sendHttpRequest` to it. The listener received the POST, proving loopback egress through the webhook sender.
+- `BUG-017`, `BUG-020`, and `BUG-031`: re-read the relevant code paths and kept them as `Probable` because disposable production install, user-key concurrency integration, and concurrent relay-cost proof were not executed.
+
+Updates made:
+
+- Marked `BUG-005`, `BUG-006`, and `BUG-029` as confirmed/proven but still open.
+- Added a confirmed-after-probable-verification section and next fixing order to `audit/VERIFICATION_REPORT.md`.
+- Updated `audit/BUG_MAP.md` verification rows with exact harness outcomes.

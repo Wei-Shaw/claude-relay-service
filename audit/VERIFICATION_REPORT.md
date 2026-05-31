@@ -61,14 +61,21 @@ These were the confirmed bugs at the start of the fixing phase. Current per-bug 
 
 | ID | Severity | What Is Missing |
 | --- | --- | --- |
-| BUG-005 | High | Needs a concurrent redeem or injected Redis-failure reproduction. |
-| BUG-006 | High | Needs a concurrent multi-card redemption reproduction against one API key. |
 | BUG-008 | High | Needs browser refresh timing proof for protected admin routes. |
 | BUG-015 | Low | Build warnings are proven, but actual user performance impact needs measurement. |
 | BUG-017 | High | Startup script risk is code-proven, but production install failure was not reproduced. |
 | BUG-020 | High | Needs a concurrent user API-key create reproduction. |
-| BUG-029 | High | Needs live SSRF/outbound egress proof in a controlled environment. |
 | BUG-031 | High | Needs concurrent relay requests proving cost-limit overspend. |
+
+## Confirmed After Probable Verification
+
+These were not fixed in this pass. They were confirmed after the confirmed-fix commit and should be handled next.
+
+| ID | Severity | Evidence |
+| --- | --- | --- |
+| BUG-005 | Critical | Controlled in-memory `redeemCard` harness returned two successes, two redemption records, and `totalAdded: 20` for one 10-credit card. |
+| BUG-006 | High | Controlled in-memory `addTotalCostLimit` harness ended with `finalTotalCostLimit: 7` for concurrent `+5` and `+7` updates, where atomic behavior should end at `12`. |
+| BUG-029 | High | Controlled local `127.0.0.1` listener received a POST from `webhookService.sendHttpRequest`, proving loopback egress through the webhook sender. |
 
 ## Needs Verification
 
@@ -92,14 +99,11 @@ None verified in this pass.
 
 | ID | Manual Test Needed |
 | --- | --- |
-| BUG-005 | Two simultaneous redeem requests for one card. |
-| BUG-006 | Two simultaneous quota/time card redemptions against one API key. |
 | BUG-008 | Hard-refresh protected admin routes with a valid stored token. |
 | BUG-014 | Manually open both create-key modals and search for auto-registered usage. |
 | BUG-015 | Lighthouse or throttled-network measurement for initial admin SPA load. |
 | BUG-017 | Disposable production install with `npm ci --omit=dev && npm start`. |
 | BUG-020 | Concurrent user key creation with max key limit set to 1. |
-| BUG-029 | Controlled internal listener and webhook test to prove outbound SSRF reachability. |
 | BUG-031 | Concurrent relay requests with a deliberately low cost limit. |
 
 ## Bugs Needing Logs, Screenshots, Or User Input
@@ -107,7 +111,6 @@ None verified in this pass.
 | ID | Artifact Needed |
 | --- | --- |
 | BUG-015 | Build output and performance trace if this becomes a release blocker. |
-| BUG-029 | Listener logs showing server-side outbound request to a controlled internal target. |
 | BUG-031 | Usage/cost logs showing post-response overspend under concurrency. |
 
 ## Final Fixing Order
@@ -117,6 +120,13 @@ None verified in this pass.
 3. High fixed: BUG-007, BUG-009, BUG-010, BUG-027, BUG-028.
 4. Medium fixed: BUG-011, BUG-016, BUG-023, BUG-025, BUG-030.
 5. Low fixed: BUG-012.
+
+## Recommended Next Fixing Order
+
+1. BUG-005: same-card redemption double-credit; confirmed critical data-integrity issue.
+2. BUG-006: concurrent quota/time card lost update; confirmed high data-integrity issue.
+3. BUG-029: webhook outbound egress/SSRF policy; confirmed high security issue.
+4. Verify before fixing: BUG-031, BUG-020, BUG-017, then BUG-008.
 
 ## Final Verification
 
@@ -135,6 +145,7 @@ None verified in this pass.
 
 | ID | Status | Reason |
 | --- | --- | --- |
-| BUG-005, BUG-006, BUG-008, BUG-017, BUG-020, BUG-029, BUG-031 | Probable | Not fixed in this phase because the user explicitly limited scope to `Final Status = Confirmed`; each needs reproduction before confirmed fixing. |
+| BUG-005, BUG-006, BUG-029 | Confirmed | Confirmed after the confirmed-bug fixing commit; not fixed yet because this phase was verification-only for prior Probable rows. |
+| BUG-008, BUG-017, BUG-020, BUG-031 | Probable | Still need browser timing, disposable production install, user-key concurrency integration, or relay-cost concurrency proof before fixing. |
 | BUG-014 | Needs Verification | Build warning is real, but no broken user flow is proven. |
 | BUG-015 | Probable | Build/performance warning is real, but user impact needs measurement before treating it as a bug fix target. |
