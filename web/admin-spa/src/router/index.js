@@ -235,7 +235,12 @@ router.beforeEach(async (to, from, next) => {
       next()
     }
   } else if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next('/login')
+    const isAdminLoggedIn = await authStore.checkAuth()
+    if (!isAdminLoggedIn) {
+      next('/login')
+    } else {
+      next()
+    }
   } else if (to.path === '/login' && authStore.isAuthenticated) {
     next('/dashboard')
   } else {

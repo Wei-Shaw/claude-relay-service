@@ -1,4 +1,5 @@
 const express = require('express')
+const { v4: uuidv4 } = require('uuid')
 const router = express.Router()
 const ldapService = require('../services/ldapService')
 const userService = require('../services/userService')
@@ -11,12 +12,47 @@ const { RateLimiterRedis } = require('rate-limiter-flexible')
 const redis = require('../models/redis')
 const { authenticateUser, authenticateUserOrAdmin, requireAdmin } = require('../middleware/auth')
 const RESERVED_USER_DETAIL_ROUTES = new Set(['redemption-history', 'quota-info'])
+const USER_API_KEY_CREATION_LOCK_TTL_MS = 10000
+const USER_API_KEY_CREATION_LOCK_WAIT_MS = 10000
+const USER_API_KEY_CREATION_LOCK_POLL_MS = 50
 
 const skipReservedUserDetailRoute = (req, res, next) => {
   if (RESERVED_USER_DETAIL_ROUTES.has(req.params.userId)) {
     return next('route')
   }
   return next()
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function withUserApiKeyCreationLock(userId, action) {
+  const lockKey = `user:api_key_creation_lock:${userId}`
+  const lockValue = `user-api-key-create:${uuidv4()}`
+  const startTime = Date.now()
+
+  while (Date.now() - startTime < USER_API_KEY_CREATION_LOCK_WAIT_MS) {
+    const acquired = await redis.setAccountLock(
+      lockKey,
+      lockValue,
+      USER_API_KEY_CREATION_LOCK_TTL_MS
+    )
+    if (acquired) {
+      try {
+        return {
+          acquired: true,
+          result: await action()
+        }
+      } finally {
+        await redis.releaseAccountLock(lockKey, lockValue).catch((error) => {
+          logger.error(`Failed to release API key creation lock for user ${userId}:`, error)
+        })
+      }
+    }
+
+    await sleep(USER_API_KEY_CREATION_LOCK_POLL_MS)
+  }
+
+  return { acquired: false, result: null }
 }
 
 // 🚦 配置登录速率限制
@@ -319,34 +355,56 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
       })
     }
 
-    // 检查用户API Key数量限制
-    const userApiKeys = await apiKeyService.getUserApiKeys(req.user.id)
-    if (userApiKeys.length >= config.userManagement.maxApiKeysPerUser) {
+    const creation = await withUserApiKeyCreationLock(req.user.id, async () => {
+      // 检查用户API Key数量限制
+      const userApiKeys = await apiKeyService.getUserApiKeys(req.user.id)
+      if (userApiKeys.length >= config.userManagement.maxApiKeysPerUser) {
+        return {
+          limitExceeded: true,
+          currentCount: userApiKeys.length
+        }
+      }
+      const nextApiKeyCount = userApiKeys.length + 1
+
+      // 创建API Key数据
+      const apiKeyData = {
+        name: name.trim(),
+        description: description?.trim() || '',
+        userId: req.user.id,
+        userUsername: req.user.username,
+        tokenLimit: tokenLimit || null,
+        expiresAt: expiresAt || null,
+        dailyCostLimit: dailyCostLimit || null,
+        totalCostLimit: totalCostLimit || null,
+        createdBy: 'user',
+        // 设置服务权限为全部服务，确保前端显示“服务权限”为“全部服务”且具备完整访问权限
+        permissions: 'all'
+      }
+
+      const newApiKey = await apiKeyService.createApiKey(apiKeyData)
+
+      // 更新用户API Key数量
+      await userService.updateUserApiKeyCount(req.user.id, nextApiKeyCount)
+
+      return { newApiKey }
+    })
+
+    if (!creation.acquired) {
+      res.set('Retry-After', '1')
+      return res.status(429).json({
+        error: 'API key creation busy',
+        message: 'Another API key creation is in progress. Please retry shortly.'
+      })
+    }
+
+    if (creation.result.limitExceeded) {
       return res.status(400).json({
         error: 'API key limit exceeded',
         message: `You can only have up to ${config.userManagement.maxApiKeysPerUser} API keys`
       })
     }
 
-    // 创建API Key数据
-    const apiKeyData = {
-      name: name.trim(),
-      description: description?.trim() || '',
-      userId: req.user.id,
-      userUsername: req.user.username,
-      tokenLimit: tokenLimit || null,
-      expiresAt: expiresAt || null,
-      dailyCostLimit: dailyCostLimit || null,
-      totalCostLimit: totalCostLimit || null,
-      createdBy: 'user',
-      // 设置服务权限为全部服务，确保前端显示“服务权限”为“全部服务”且具备完整访问权限
-      permissions: 'all'
-    }
-
-    const newApiKey = await apiKeyService.createApiKey(apiKeyData)
-
-    // 更新用户API Key数量
-    await userService.updateUserApiKeyCount(req.user.id, userApiKeys.length + 1)
+    const { newApiKey } = creation.result
 
     logger.info(`🔑 User ${req.user.username} created API key: ${name}`)
 

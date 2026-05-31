@@ -66,12 +66,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function checkAuth() {
-    if (authToken.value) {
-      isLoggedIn.value = true
-      // 验证token有效性
-      verifyToken()
+  async function checkAuth() {
+    if (!authToken.value) {
+      isLoggedIn.value = false
+      return false
     }
+
+    isLoggedIn.value = true
+    // 验证token有效性
+    return verifyToken()
   }
 
   async function verifyToken() {
@@ -79,11 +82,13 @@ export const useAuthStore = defineStore('auth', () => {
       const userResult = await getAuthUserApi()
       if (!userResult.success || !userResult.user) {
         await logout()
-        return
+        return false
       }
       username.value = userResult.user.username
+      return true
     } catch (error) {
       await logout()
+      return false
     }
   }
 

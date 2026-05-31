@@ -4,10 +4,12 @@ const apiKeyService = require('../services/apiKeyService')
 const userService = require('../services/userService')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
+const CostCalculator = require('../utils/costCalculator')
 // const { RateLimiterRedis } = require('rate-limiter-flexible') // 暂时未使用
 const ClientValidator = require('../validators/clientValidator')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
+const serviceRatesService = require('../services/serviceRatesService')
 const { calculateWaitTimeStats } = require('../utils/statsHelper')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 
@@ -163,6 +165,11 @@ const TOKEN_COUNT_PATHS = new Set([
   '/claude/v1/messages/count_tokens'
 ])
 
+const COST_LIMIT_LOCK_TTL_MS = 30 * 60 * 1000
+const COST_LIMIT_LOCK_WAIT_MS = 30 * 1000
+const COST_LIMIT_LOCK_POLL_MS = 50
+const DEFAULT_OUTPUT_TOKENS_FOR_COST_LIMIT = 4096
+
 function extractApiKey(req) {
   const candidates = [
     req.headers['x-api-key'],
@@ -230,6 +237,132 @@ const getLogSafeUrl = (originalUrl) => {
     return originalUrl
   }
   return `${originalUrl.slice(0, queryIdx)}?[query]`
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function hasActiveCostLimit(keyData = {}) {
+  const rateLimitWindow = toFiniteNumber(keyData.rateLimitWindow)
+  const rateLimitCost = toFiniteNumber(keyData.rateLimitCost)
+
+  return (
+    (rateLimitWindow > 0 && rateLimitCost > 0) ||
+    toFiniteNumber(keyData.dailyCostLimit) > 0 ||
+    toFiniteNumber(keyData.totalCostLimit) > 0 ||
+    toFiniteNumber(keyData.weeklyOpusCostLimit) > 0
+  )
+}
+
+function estimateInputTokensFromBody(body) {
+  if (!body || typeof body !== 'object') {
+    return 0
+  }
+
+  try {
+    const serialized = JSON.stringify(body)
+    if (!serialized) {
+      return 0
+    }
+    return Math.ceil(Buffer.byteLength(serialized, 'utf8') / 4)
+  } catch (error) {
+    logger.warn('Failed to estimate request input tokens:', error.message)
+    return 0
+  }
+}
+
+function getRequestedOutputTokens(body) {
+  if (!body || typeof body !== 'object') {
+    return DEFAULT_OUTPUT_TOKENS_FOR_COST_LIMIT
+  }
+
+  const candidates = [
+    body.max_tokens,
+    body.max_completion_tokens,
+    body.max_output_tokens,
+    body.generationConfig?.maxOutputTokens
+  ]
+
+  for (const candidate of candidates) {
+    const parsed = toFiniteNumber(candidate, NaN)
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.ceil(parsed)
+    }
+  }
+
+  return DEFAULT_OUTPUT_TOKENS_FOR_COST_LIMIT
+}
+
+async function estimateRatedRequestCost(req, keyData) {
+  const body = req.body || {}
+  const model = typeof body.model === 'string' && body.model ? body.model : 'unknown'
+  const usage = {
+    input_tokens: estimateInputTokensFromBody(body),
+    output_tokens: getRequestedOutputTokens(body),
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0
+  }
+
+  try {
+    const costInfo = CostCalculator.calculateCost(usage, model)
+    const costs = costInfo?.costs || {}
+    const realCost = toFiniteNumber(costs.total ?? costInfo?.totalCost)
+
+    if (realCost <= 0) {
+      return 0
+    }
+
+    const service = serviceRatesService.getService(keyData.accountType, model)
+    return apiKeyService.calculateRatedCost(keyData.id, service, realCost)
+  } catch (error) {
+    logger.warn(`Failed to estimate request cost for key ${keyData?.id || 'unknown'}:`, error)
+    return 0
+  }
+}
+
+function wouldExceedCostLimit(currentCost, limit, estimatedCost) {
+  const current = toFiniteNumber(currentCost)
+  const costLimit = toFiniteNumber(limit)
+  const estimate = Math.max(toFiniteNumber(estimatedCost), 0)
+
+  if (estimate > 0) {
+    return current + estimate > costLimit
+  }
+
+  return current >= costLimit
+}
+
+async function acquireCostLimitLock(apiKeyId, apiKeyName) {
+  const lockKey = `apikey:cost_limit_lock:${apiKeyId}`
+  const lockValue = `cost-limit:${uuidv4()}`
+  const startTime = Date.now()
+
+  while (Date.now() - startTime < COST_LIMIT_LOCK_WAIT_MS) {
+    const acquired = await redis.setAccountLock(lockKey, lockValue, COST_LIMIT_LOCK_TTL_MS)
+    if (acquired) {
+      let released = false
+      return async () => {
+        if (released) {
+          return
+        }
+        released = true
+        try {
+          await redis.releaseAccountLock(lockKey, lockValue)
+        } catch (error) {
+          logger.error(
+            `Failed to release cost limit lock for key ${apiKeyId} (${apiKeyName}):`,
+            error
+          )
+        }
+      }
+    }
+
+    await sleep(COST_LIMIT_LOCK_POLL_MS)
+  }
+
+  return null
 }
 
 /**
@@ -448,6 +581,7 @@ const authenticateApiKey = async (req, res, next) => {
   const startTime = Date.now()
   let authErrored = false
   let concurrencyCleanup = null
+  let costLimitCleanup = null
   let hasConcurrencySlot = false
 
   try {
@@ -477,7 +611,7 @@ const authenticateApiKey = async (req, res, next) => {
     }
 
     // 验证API Key（带缓存优化）
-    const validation = await apiKeyService.validateApiKey(apiKey)
+    let validation = await apiKeyService.validateApiKey(apiKey)
 
     if (!validation.valid) {
       const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
@@ -1061,6 +1195,58 @@ const authenticateApiKey = async (req, res, next) => {
       }
     }
 
+    let estimatedRequestCost = 0
+    if (hasActiveCostLimit(validation.keyData)) {
+      const releaseCostLimitLock = await acquireCostLimitLock(
+        validation.keyData.id,
+        validation.keyData.name
+      )
+
+      if (!releaseCostLimitLock) {
+        logger.security(
+          `💰 Cost limit check busy for key: ${validation.keyData.id} (${validation.keyData.name})`
+        )
+        res.set('Retry-After', '1')
+        return res.status(429).json({
+          error: 'Cost limit check busy',
+          message: 'Another request is checking cost limits for this API key. Please retry shortly.'
+        })
+      }
+
+      let costLimitReleased = false
+      costLimitCleanup = async () => {
+        if (costLimitReleased) {
+          return
+        }
+        costLimitReleased = true
+        await releaseCostLimitLock()
+      }
+
+      const scheduleCostLimitCleanup = () => {
+        costLimitCleanup().catch((error) => {
+          logger.error(`Failed to cleanup cost limit lock for key ${validation.keyData.id}:`, error)
+        })
+      }
+
+      res.once('finish', scheduleCostLimitCleanup)
+      res.once('close', scheduleCostLimitCleanup)
+      req.once('aborted', scheduleCostLimitCleanup)
+      req.once('error', scheduleCostLimitCleanup)
+      res.once('error', scheduleCostLimitCleanup)
+
+      const freshValidation = await apiKeyService.validateApiKey(apiKey)
+      if (!freshValidation.valid) {
+        const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
+        logger.security(`Invalid API key attempt: ${freshValidation.error} from ${clientIP}`)
+        return res.status(401).json({
+          error: 'Invalid API key',
+          message: freshValidation.error
+        })
+      }
+      validation = freshValidation
+      estimatedRequestCost = await estimateRatedRequestCost(req, validation.keyData)
+    }
+
     // 检查时间窗口限流
     const rateLimitWindow = validation.keyData.rateLimitWindow || 0
     const rateLimitRequests = validation.keyData.rateLimitRequests || 0
@@ -1151,20 +1337,23 @@ const authenticateApiKey = async (req, res, next) => {
         }
       } else if (rateLimitCost > 0) {
         // 使用费用限制（新功能）
-        if (currentCost >= rateLimitCost) {
+        if (wouldExceedCostLimit(currentCost, rateLimitCost, estimatedRequestCost)) {
           const resetTime = new Date(windowStart + windowDuration)
           const remainingMinutes = Math.ceil((resetTime - now) / 60000)
 
           logger.security(
             `💰 Rate limit exceeded (cost) for key: ${validation.keyData.id} (${
               validation.keyData.name
-            }), cost: $${currentCost.toFixed(2)}/$${rateLimitCost}`
+            }), cost: $${currentCost.toFixed(2)} + estimated $${estimatedRequestCost.toFixed(
+              4
+            )}/$${rateLimitCost}`
           )
 
           return res.status(429).json({
             error: 'Rate limit exceeded',
             message: `已达到费用限制 ($${rateLimitCost})，将在 ${remainingMinutes} 分钟后重置`,
             currentCost,
+            estimatedRequestCost,
             costLimit: rateLimitCost,
             resetAt: resetTime.toISOString(),
             remainingMinutes
@@ -1196,11 +1385,13 @@ const authenticateApiKey = async (req, res, next) => {
     if (dailyCostLimit > 0) {
       const dailyCost = validation.keyData.dailyCost || 0
 
-      if (dailyCost >= dailyCostLimit) {
+      if (wouldExceedCostLimit(dailyCost, dailyCostLimit, estimatedRequestCost)) {
         logger.security(
           `💰 Daily cost limit exceeded for key: ${validation.keyData.id} (${
             validation.keyData.name
-          }), cost: $${dailyCost.toFixed(2)}/$${dailyCostLimit}`
+          }), cost: $${dailyCost.toFixed(2)} + estimated $${estimatedRequestCost.toFixed(
+            4
+          )}/$${dailyCostLimit}`
         )
 
         // 使用 402 Payment Required 而非 429，避免客户端自动重试
@@ -1211,6 +1402,7 @@ const authenticateApiKey = async (req, res, next) => {
             code: 'daily_cost_limit_exceeded'
           },
           currentCost: dailyCost,
+          estimatedRequestCost,
           costLimit: dailyCostLimit,
           resetAt: new Date(new Date().setHours(24, 0, 0, 0)).toISOString()
         })
@@ -1229,11 +1421,13 @@ const authenticateApiKey = async (req, res, next) => {
     if (totalCostLimit > 0) {
       const totalCost = validation.keyData.totalCost || 0
 
-      if (totalCost >= totalCostLimit) {
+      if (wouldExceedCostLimit(totalCost, totalCostLimit, estimatedRequestCost)) {
         logger.security(
           `💰 Total cost limit exceeded for key: ${validation.keyData.id} (${
             validation.keyData.name
-          }), cost: $${totalCost.toFixed(2)}/$${totalCostLimit}`
+          }), cost: $${totalCost.toFixed(2)} + estimated $${estimatedRequestCost.toFixed(
+            4
+          )}/$${totalCostLimit}`
         )
 
         // 使用 402 Payment Required 而非 429，避免客户端自动重试
@@ -1244,6 +1438,7 @@ const authenticateApiKey = async (req, res, next) => {
             code: 'total_cost_limit_exceeded'
           },
           currentCost: totalCost,
+          estimatedRequestCost,
           costLimit: totalCostLimit
         })
       }
@@ -1266,11 +1461,13 @@ const authenticateApiKey = async (req, res, next) => {
       if (isClaudeFamilyModel(model)) {
         const weeklyOpusCost = validation.keyData.weeklyOpusCost || 0
 
-        if (weeklyOpusCost >= weeklyOpusCostLimit) {
+        if (wouldExceedCostLimit(weeklyOpusCost, weeklyOpusCostLimit, estimatedRequestCost)) {
           logger.security(
             `💰 Weekly Claude cost limit exceeded for key: ${validation.keyData.id} (${
               validation.keyData.name
-            }), cost: $${weeklyOpusCost.toFixed(2)}/$${weeklyOpusCostLimit}`
+            }), cost: $${weeklyOpusCost.toFixed(
+              2
+            )} + estimated $${estimatedRequestCost.toFixed(4)}/$${weeklyOpusCostLimit}`
           )
 
           // 计算下次重置时间（基于 API Key 配置的重置日/时）
@@ -1286,6 +1483,7 @@ const authenticateApiKey = async (req, res, next) => {
               code: 'weekly_opus_cost_limit_exceeded'
             },
             currentCost: weeklyOpusCost,
+            estimatedRequestCost,
             costLimit: weeklyOpusCostLimit,
             resetAt: resetDate.toISOString()
           })
@@ -1358,6 +1556,13 @@ const authenticateApiKey = async (req, res, next) => {
         await concurrencyCleanup()
       } catch (cleanupError) {
         logger.error('Failed to cleanup concurrency after auth error:', cleanupError)
+      }
+    }
+    if (authErrored && typeof costLimitCleanup === 'function') {
+      try {
+        await costLimitCleanup()
+      } catch (cleanupError) {
+        logger.error('Failed to cleanup cost limit lock after auth error:', cleanupError)
       }
     }
   }

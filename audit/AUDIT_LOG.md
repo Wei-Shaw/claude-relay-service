@@ -140,3 +140,54 @@ Updates made:
 
 - Marked `BUG-008`, `BUG-017`, `BUG-020`, and `BUG-031` as confirmed/proven and open in `audit/BUG_MAP.md`.
 - Updated `audit/VERIFICATION_REPORT.md` recommended fixing order and remaining unresolved bug status.
+
+## 2026-05-31 - Remaining Confirmed Fixes
+
+Scope:
+
+- Fixed only the four confirmed open bugs from the remaining verification pass.
+- Preserved unrelated frontend localization/i18n work already present in the worktree.
+
+Fixes made:
+
+- `BUG-031`: added a per-key cost-limit gate for cost-limited API keys, re-read quota under the gate, estimated rated request cost, and rejected projected rate/daily/total/weekly cost overruns before relay.
+- `BUG-020`: wrapped user API-key count check, creation, and count update in a per-user Redis lock.
+- `BUG-017`: changed runtime and nodemon startup to run `node src/app.js` directly instead of mutating dev-only lint.
+- `BUG-008`: made admin `checkAuth()` await backend token verification and made the protected-route guard await that result before redirecting.
+
+Verification performed:
+
+- `npx jest tests/costLimitConcurrencyLock.test.js tests/userApiKeyCreationLock.test.js --runInBand` passed with 2 suites and 2 tests.
+- `npm test -- --runInBand` passed with 34 suites, 283 passing tests, and 8 skipped.
+- `npm run lint:check` passed.
+- Disposable production install with `npm ci --omit=dev --ignore-scripts` ran `npm start` successfully against a dummy `src/app.js`.
+- Admin SPA build passed with the pre-existing warnings, and Playwright kept `/admin/dashboard` on hard refresh with a stored valid token and mocked successful auth-user response.
+
+Updates made:
+
+- Marked `BUG-008`, `BUG-017`, `BUG-020`, and `BUG-031` as fixed in `audit/BUG_MAP.md`.
+- Updated `audit/VERIFICATION_REPORT.md` with the fixing order, verification commands, and remaining unresolved bug list.
+
+## 2026-05-31 - Build Hygiene Follow-Up
+
+Scope:
+
+- Expanded scope to fix the remaining `BUG-014` and `BUG-015` build hygiene findings.
+- Kept the existing unrelated admin SPA localization/i18n work intact.
+
+Fixes made:
+
+- `BUG-014`: excluded the user `CreateApiKeyModal.vue` from local component auto-registration because it is already explicitly imported where used, removing the duplicate auto-registration warning without renaming components.
+- `BUG-015`: updated Browserslist data, removed the full Element Plus plugin install in favor of existing auto-imported Element Plus components, split vendor chunks more granularly, and lazy-loaded the XLSX export library as an on-demand static asset.
+
+Verification performed:
+
+- `cd web/admin-spa && npm run build -- --outDir /tmp/mighty-admin-spa-bug01415-dist --emptyOutDir` passed.
+- The build no longer emits the stale Browserslist/caniuse-lite warning.
+- The build no longer emits the duplicate `CreateApiKeyModal` component warning.
+- The build no longer emits the chunks-over-500-kB warning; the XLSX library is emitted as a 425 kB static asset loaded only when export is invoked.
+
+Updates made:
+
+- Marked `BUG-014` and `BUG-015` as fixed in `audit/BUG_MAP.md`.
+- Updated `audit/VERIFICATION_REPORT.md` so no audit bugs remain unresolved in the current scope.

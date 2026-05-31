@@ -33,6 +33,12 @@ Verification scope: confirmed-bug fixes only, using existing audit artifacts, fo
 | BUG-030 | Fixed | Added shared create/batch-create validation for API-key cost limit fields and applied the existing integer limit validation pattern to batch creation before key generation. | `npm test -- adminApiKeysPayloadRulesRoute.test.js --runInBand` passed; `npm run lint:check` passed. | `src/routes/admin/apiKeys.js`, `tests/adminApiKeysPayloadRulesRoute.test.js`, `audit/BUG_MAP.md`, `audit/VERIFICATION_REPORT.md` |
 | BUG-012 | Fixed | Added shared pagination validation for redemption-history routes, rejecting invalid or oversized `limit`/`offset` values before history lookup. | `npm test -- userRoutesOrder.test.js apiStatsRedemptionPagination.test.js --runInBand` passed; `npm run lint:check` passed. | `src/utils/pagination.js`, `src/routes/userRoutes.js`, `src/routes/apiStats.js`, `tests/userRoutesOrder.test.js`, `tests/apiStatsRedemptionPagination.test.js`, `audit/BUG_MAP.md`, `audit/VERIFICATION_REPORT.md` |
 | BUG-016 | Fixed | Added focused regression coverage for the confirmed-risk fixes, including CSP, logger redaction, query API-key rejection, admin credential storage, route ordering, admin login throttling, secret config enforcement, balance-script default-off behavior, CORS policy, balance error signaling, API-key limit validation, redemption pagination, toast HTML-sink removal, quota-card concurrency, and webhook outbound filtering. | Focused quota/webhook suite passed with 8 tests; full backend suite passed with 32 suites, 281 passing tests, and 8 skipped; `npm run lint:check` passed. | `tests/quotaCardConcurrency.test.js`, `tests/webhookOutboundPolicy.test.js`, plus the focused tests listed in `audit/BUG_MAP.md`, `audit/BUG_MAP.md`, `audit/VERIFICATION_REPORT.md` |
+| BUG-031 | Fixed | Added a per-key cost-limit gate for cost-limited API keys, revalidated the cost snapshot under the gate, estimated rated request cost, and rejected projected rate/daily/total/weekly cost overruns before relay. | `npx jest tests/costLimitConcurrencyLock.test.js --runInBand` passed; focused two-test suite passed; full `npm test -- --runInBand` passed; `npm run lint:check` passed. | `src/middleware/auth.js`, `tests/costLimitConcurrencyLock.test.js`, `audit/BUG_MAP.md`, `audit/VERIFICATION_REPORT.md` |
+| BUG-020 | Fixed | Wrapped user API-key count check, creation, and count update in a per-user Redis lock so concurrent creates cannot exceed `maxApiKeysPerUser`. | `npx jest tests/userApiKeyCreationLock.test.js --runInBand` passed; focused two-test suite passed; full `npm test -- --runInBand` passed; `npm run lint:check` passed. | `src/routes/userRoutes.js`, `tests/userApiKeyCreationLock.test.js`, `audit/BUG_MAP.md`, `audit/VERIFICATION_REPORT.md` |
+| BUG-017 | Fixed | Removed the mutating dev-only lint gate from runtime startup; `npm start` and nodemon now run `node src/app.js` directly. | Disposable production install with `npm ci --omit=dev --ignore-scripts` ran `npm start` successfully against a dummy `src/app.js`; `npm run lint:check` passed. | `package.json`, `nodemon.json`, `audit/BUG_MAP.md`, `audit/VERIFICATION_REPORT.md` |
+| BUG-008 | Fixed | Made admin `checkAuth()` await `/web/auth/user` and return a boolean; the protected-route guard now awaits it before redirecting to login. | Admin SPA build passed with pre-existing warnings; Playwright loaded `/admin/dashboard` with stored `authToken` and mocked successful `/webapi/web/auth/user`, and final URL remained `/admin/dashboard`. | `web/admin-spa/src/stores/auth.js`, `web/admin-spa/src/router/index.js`, `audit/BUG_MAP.md`, `audit/VERIFICATION_REPORT.md` |
+| BUG-014 | Fixed | Excluded the already explicitly imported user create-key modal from local component auto-registration, removing the duplicate `CreateApiKeyModal` warning without renaming either modal file. | `cd web/admin-spa && npm run build -- --outDir /tmp/mighty-admin-spa-bug01415-dist --emptyOutDir` passed without the duplicate component warning. | `web/admin-spa/vite.config.js`, `audit/BUG_MAP.md`, `audit/VERIFICATION_REPORT.md` |
+| BUG-015 | Fixed | Updated Browserslist data, removed the full Element Plus plugin install, split vendor chunks more granularly, and loaded the XLSX export library only on demand as a static asset. | `cd web/admin-spa && npm run build -- --outDir /tmp/mighty-admin-spa-bug01415-dist --emptyOutDir` passed without stale Browserslist or chunks-over-500-kB warnings. | `web/admin-spa/vite.config.js`, `web/admin-spa/src/main.js`, `web/admin-spa/src/views/ApiKeysView.vue`, `web/admin-spa/package-lock.json`, `audit/BUG_MAP.md`, `audit/VERIFICATION_REPORT.md` |
 
 ## Confirmed Bugs
 
@@ -62,9 +68,7 @@ These were the confirmed bugs at the start of the fixing phase. Current per-bug 
 
 ## Probable Bugs
 
-| ID | Severity | What Is Missing |
-| --- | --- | --- |
-| BUG-015 | Low | Build warnings are proven, but actual user performance impact needs measurement. |
+None remaining in the current audit scope.
 
 ## Confirmed After Probable Verification
 
@@ -76,22 +80,18 @@ These were confirmed after the first confirmed-fix commit and fixed in the follo
 | BUG-006 | High | Controlled in-memory `addTotalCostLimit` harness ended with `finalTotalCostLimit: 7` for concurrent `+5` and `+7` updates, where atomic behavior should end at `12`. |
 | BUG-029 | High | Controlled local `127.0.0.1` listener received a POST from `webhookService.sendHttpRequest`, proving loopback egress through the webhook sender. |
 
-## Confirmed In Current Verification Pass
-
-These are verified and still open. No source code was changed in this pass.
+## Confirmed Then Fixed
 
 | ID | Severity | Evidence |
 | --- | --- | --- |
-| BUG-031 | High | Controlled Express harness using the real `authenticateApiKey` middleware forced two concurrent requests to read `dailyCost=0` against `dailyCostLimit=1`; both returned `200`, then final daily cost became `1.5`. |
-| BUG-020 | High | Controlled route harness using the real `/users/api-keys` handler and `maxApiKeysPerUser=1` returned two `201` responses and created keys `one` and `two`. |
-| BUG-017 | High | Disposable production install with `npm ci --omit=dev --ignore-scripts` followed by `npm start` exited `127` because `eslint` was not installed. |
-| BUG-008 | High | Playwright loaded `/admin/dashboard` with `localStorage.authToken` and mocked successful `/web/auth/user`; the route did not land on dashboard and ended at `http://127.0.0.1:5177/admin/api-stats#/login` with the token still present. |
+| BUG-031 | High | Initially reproduced with two concurrent relay requests both reading `dailyCost=0` and overspending to `1.5`; fixed test now returns one `200`, one `402`, and final cost `0.75`. |
+| BUG-020 | High | Initially reproduced with two concurrent user API-key creates both returning `201`; fixed test now creates one key and rejects the second request at the max-key check. |
+| BUG-017 | High | Initially reproduced production startup failure from missing `eslint`; fixed production-install check now starts with only production dependencies. |
+| BUG-008 | High | Initially reproduced protected-route loss on hard refresh; fixed Playwright check keeps `/admin/dashboard` with a stored valid token. |
 
 ## Needs Verification
 
-| ID | Severity | Reason |
-| --- | --- | --- |
-| BUG-014 | Low | Duplicate component-name build warning is real, but current usages appear explicitly imported, so no broken UI path is proven. |
+None remaining in the current audit scope.
 
 ## False Positives
 
@@ -107,43 +107,39 @@ None verified in this pass.
 
 ## Bugs Needing Manual Testing
 
-| ID | Manual Test Needed |
-| --- | --- |
-| BUG-014 | Manually open both create-key modals and search for auto-registered usage. |
-| BUG-015 | Lighthouse or throttled-network measurement for initial admin SPA load. |
+None remaining in the current audit scope.
 
 ## Bugs Needing Logs, Screenshots, Or User Input
 
-| ID | Artifact Needed |
-| --- | --- |
-| BUG-015 | Build output and performance trace if this becomes a release blocker. |
+None remaining in the current audit scope.
 
 ## Final Fixing Order
 
 1. Critical fixed: BUG-001, BUG-002, BUG-003, BUG-004, BUG-005, BUG-021, BUG-022, BUG-026.
 2. Critical dependency fix: BUG-013 by raising the runtime/Docker baseline to Node 24 and clearing root/frontend audits.
-3. High fixed: BUG-006, BUG-007, BUG-009, BUG-010, BUG-027, BUG-028, BUG-029.
+3. High fixed: BUG-006, BUG-007, BUG-009, BUG-010, BUG-027, BUG-028, BUG-029, then BUG-031, BUG-020, BUG-017, BUG-008.
 4. Medium fixed: BUG-011, BUG-016, BUG-023, BUG-025, BUG-030.
 5. Low fixed: BUG-012.
 
 ## Recommended Next Fixing Order
 
-1. Fix confirmed open bugs: BUG-031, BUG-020, BUG-017, then BUG-008.
-2. Investigate BUG-014 manually only if the duplicate component-name build warning becomes user-visible.
-3. Treat BUG-015 as performance work unless measurements prove user impact.
+1. No audit bugs remain open in the current scope.
 
 ## Final Verification
 
 | Command | Result |
 | --- | --- |
+| `npx jest tests/costLimitConcurrencyLock.test.js tests/userApiKeyCreationLock.test.js --runInBand` | Passed: 2 suites, 2 tests. |
 | `npx jest tests/quotaCardConcurrency.test.js tests/webhookOutboundPolicy.test.js --runInBand` | Passed: 2 suites, 8 tests. |
-| `npm test -- --runInBand` | Passed: 32 suites, 281 tests passed, 8 skipped. |
+| `npm test -- --runInBand` | Passed: 34 suites, 283 tests passed, 8 skipped. |
 | `npm run lint:check` | Passed. |
-| Controlled `BUG-031` middleware harness | Reproduced overspend: statuses `[200, 200]`, final daily cost `1.5`, daily limit `1`. |
-| Controlled `BUG-020` route harness | Reproduced max-key bypass: statuses `[201, 201]`, created 2 keys with max `1`. |
-| Disposable production install startup check | Reproduced startup failure: `npm start` exited `127` with `sh: eslint: command not found`. |
-| Playwright admin refresh check | Reproduced protected-route loss with a stored token and successful auth-user mock. |
+| Fixed `BUG-031` middleware harness | Passed: statuses `[200, 402]`, final daily cost `0.75`, daily limit `1`. |
+| Fixed `BUG-020` route harness | Passed: statuses `[201, 400]`, created 1 key with max `1`. |
+| Disposable production install startup check | Passed: `npm start` ran `node src/app.js` with production dependencies only and printed `dummy app started`. |
+| Playwright admin refresh check | Passed: hard refresh to `/admin/dashboard` with stored token and successful auth-user mock remained on `/admin/dashboard`. |
 | `cd web/admin-spa && npm run build -- --outDir /tmp/mighty-admin-spa-vite8-dist --emptyOutDir` | Passed on Vite 8 with warnings: stale Browserslist data, duplicate `CreateApiKeyModal` auto-registration warning, 90 no-console warnings, large chunks, Rolldown pure-annotation warnings from `@vueuse/core`. |
+| `cd web/admin-spa && npm run build -- --outDir /tmp/mighty-admin-spa-bug008-dist --emptyOutDir` | Passed with the same pre-existing warnings. |
+| `cd web/admin-spa && npm run build -- --outDir /tmp/mighty-admin-spa-bug01415-dist --emptyOutDir` | Passed with no stale Browserslist warning, no duplicate `CreateApiKeyModal` warning, and no chunks-over-500-kB warning. Remaining warnings were no-console lint warnings, Rolldown pure-annotation notices from `@vueuse/core`, and plugin timing diagnostics. |
 | `npm audit --json` | Passed: zero vulnerabilities. |
 | `npm audit --omit=dev --json` | Passed: zero vulnerabilities. |
 | `cd web/admin-spa && npm audit --json` | Passed: zero vulnerabilities. |
@@ -152,8 +148,4 @@ None verified in this pass.
 
 ## Remaining Unresolved Bugs
 
-| ID | Status | Reason |
-| --- | --- | --- |
-| BUG-008, BUG-017, BUG-020, BUG-031 | Confirmed | Verified in the current pass and not fixed yet. |
-| BUG-014 | Needs Verification | Build warning is real, but no broken user flow is proven. |
-| BUG-015 | Probable | Build/performance warning is real, but user impact needs measurement before treating it as a bug fix target. |
+None remaining in the current audit scope.

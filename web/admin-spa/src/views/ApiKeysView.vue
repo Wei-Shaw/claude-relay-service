@@ -2172,7 +2172,7 @@ import { showToast, copyText, formatNumber, formatDate } from '@/utils/tools'
 
 import * as httpApis from '@/utils/http_apis'
 import { useAuthStore } from '@/stores/auth'
-import * as XLSX from 'xlsx-js-style'
+import xlsxScriptUrl from 'xlsx-js-style/dist/xlsx.min.js?url'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -2190,6 +2190,34 @@ import ConfirmModal from '@/components/common/ConfirmModal.vue'
 // 响应式数据
 const router = useRouter()
 const authStore = useAuthStore()
+
+let xlsxLoadPromise = null
+
+const loadXlsx = () => {
+  if (window.XLSX) {
+    return Promise.resolve(window.XLSX)
+  }
+
+  if (!xlsxLoadPromise) {
+    xlsxLoadPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = xlsxScriptUrl
+      script.async = true
+      script.onload = () => {
+        if (window.XLSX) {
+          resolve(window.XLSX)
+        } else {
+          reject(new Error('XLSX export library failed to initialize'))
+        }
+      }
+      script.onerror = () => reject(new Error('Failed to load XLSX export library'))
+      document.head.appendChild(script)
+    })
+  }
+
+  return xlsxLoadPromise
+}
+
 const apiKeys = ref([])
 
 // 获取 LDAP 启用状态
@@ -4452,8 +4480,9 @@ const clearSearch = () => {
 }
 
 // 导出数据到Excel
-const exportToExcel = () => {
+const exportToExcel = async () => {
   try {
+    const XLSX = await loadXlsx()
     // 准备导出的数据 - 简化版本
     const exportData = sortedApiKeys.value.map((key) => {
       // 获取当前时间段的数据

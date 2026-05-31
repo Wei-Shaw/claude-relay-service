@@ -51,6 +51,7 @@ export default defineConfig(({ mode }) => {
         imports: ['vue', 'vue-router', 'pinia']
       }),
       Components({
+        globs: ['src/components/**/*.vue', '!src/components/user/CreateApiKeyModal.vue'],
         resolvers: [ElementPlusResolver()]
       })
     ],
@@ -106,18 +107,36 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
-            // 将 vue 相关的库打包到一起
             if (id.includes('node_modules')) {
+              if (id.includes('element-plus/es/components/')) {
+                const match = id.match(/element-plus\/es\/components\/([^/]+)/)
+                if (match) {
+                  return `element-plus-${match[1]}`
+                }
+              }
               if (id.includes('element-plus')) {
-                return 'element-plus'
+                return 'element-plus-core'
               }
               if (id.includes('chart.js')) {
                 return 'chart'
               }
+              if (id.includes('@fortawesome')) {
+                return 'fontawesome'
+              }
+              if (id.includes('xlsx-js-style')) {
+                return 'spreadsheet'
+              }
               if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) {
                 return 'vue-vendor'
               }
-              return 'vendor'
+
+              const packagePath = id.split('node_modules/')[1]
+              if (!packagePath) {
+                return 'vendor'
+              }
+              const parts = packagePath.split('/')
+              const packageName = parts[0].startsWith('@') ? `${parts[0]}-${parts[1]}` : parts[0]
+              return `vendor-${packageName.replace('@', '')}`
             }
           }
         }
