@@ -12,13 +12,17 @@
               <i class="fas fa-check text-lg text-white" />
             </div>
             <div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">API Key 创建成功</h3>
-              <p class="text-sm text-gray-600 dark:text-gray-400">请妥善保存您的 API Key</p>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">
+                {{ t('apiKeyResult.singleTitle') }}
+              </h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                {{ t('apiKeyResult.saveKeySubtitle') }}
+              </p>
             </div>
           </div>
           <button
             class="text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-            title="直接关闭（不推荐）"
+            :title="t('apiKeyResult.closeDirectTitle')"
             @click="handleDirectClose"
           >
             <i class="fas fa-times text-xl" />
@@ -36,10 +40,11 @@
               <i class="fas fa-exclamation-triangle text-sm text-white" />
             </div>
             <div class="ml-3">
-              <h5 class="mb-1 font-semibold text-amber-900 dark:text-amber-400">重要提醒</h5>
+              <h5 class="mb-1 font-semibold text-amber-900 dark:text-amber-400">
+                {{ t('apiKeyResult.importantReminder') }}
+              </h5>
               <p class="text-sm text-amber-800 dark:text-amber-300">
-                这是您唯一能看到完整 API Key 的机会。关闭此窗口后，系统将不再显示完整的 API
-                Key。请立即复制并妥善保存。
+                {{ t('apiKeyResult.singleWarning') }}
               </p>
             </div>
           </div>
@@ -48,9 +53,9 @@
         <!-- API Key 信息 -->
         <div class="mb-6 space-y-4">
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >API Key 名称</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeyResult.apiKeyName')
+            }}</label>
             <div
               class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800"
             >
@@ -59,14 +64,14 @@
           </div>
 
           <div v-if="apiKey.description">
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >备注</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeyResult.notes')
+            }}</label>
             <div
               class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-800"
             >
               <span class="text-gray-700 dark:text-gray-300">{{
-                apiKey.description || '无描述'
+                apiKey.description || t('apiKeyResult.noDescription')
               }}</span>
             </div>
           </div>
@@ -84,7 +89,7 @@
               <div class="absolute right-3 top-3">
                 <button
                   class="btn-icon-sm bg-gray-700 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600"
-                  :title="showFullKey ? '隐藏API Key' : '显示完整API Key'"
+                  :title="showFullKey ? t('apiKeyResult.hideApiKey') : t('apiKeyResult.showApiKey')"
                   type="button"
                   @click="toggleKeyVisibility"
                 >
@@ -93,7 +98,7 @@
               </div>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              点击眼睛图标切换显示模式，使用下方按钮复制环境变量配置
+              {{ t('apiKeyResult.visibilityHint') }}
             </p>
           </div>
         </div>
@@ -106,14 +111,14 @@
               @click="copyKeyOnly"
             >
               <i class="fas fa-key" />
-              仅复制密钥
+              {{ t('apiKeyResult.copyKeyOnly') }}
             </button>
             <button
               class="btn btn-primary flex w-full items-center justify-center gap-2 px-5 py-3 text-sm font-semibold sm:flex-1 sm:text-base"
               @click="copyFullConfig"
             >
               <i class="fas fa-copy" />
-              复制Claude配置
+              {{ t('apiKeyResult.copyClaudeConfig') }}
             </button>
           </div>
           <button
@@ -121,7 +126,7 @@
             @click="handleClose"
           >
             <i class="fas fa-check-circle" />
-            我已保存
+            {{ t('apiKeyResult.saved') }}
           </button>
         </div>
       </div>
@@ -143,6 +148,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/tools'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
@@ -155,6 +161,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
+const { t } = useI18n()
 const showFullKey = ref(false)
 
 // ConfirmModal 状态
@@ -163,16 +170,16 @@ const confirmModalConfig = ref({
   title: '',
   message: '',
   type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
+  confirmText: t('common.confirm'),
+  cancelText: t('common.cancel')
 })
 const confirmResolve = ref(null)
 
 const showConfirm = (
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText = t('common.confirm'),
+  cancelText = t('common.cancel'),
   type = 'primary'
 ) => {
   return new Promise((resolve) => {
@@ -260,7 +267,7 @@ const copyTextWithFallback = async (text, successMessage) => {
       document.execCommand('copy')
       showToast(successMessage, 'success')
     } catch (fallbackError) {
-      showToast('复制失败，请手动复制', 'error')
+      showToast(t('apiKeyResult.copyFailedManual'), 'error')
     } finally {
       document.body.removeChild(textArea)
     }
@@ -271,7 +278,7 @@ const copyTextWithFallback = async (text, successMessage) => {
 const copyFullConfig = async () => {
   const key = props.apiKey.apiKey || props.apiKey.key || ''
   if (!key) {
-    showToast('API Key 不存在', 'error')
+    showToast(t('apiKeyResult.apiKeyMissing'), 'error')
     return
   }
 
@@ -279,27 +286,27 @@ const copyFullConfig = async () => {
   const configText = `export ANTHROPIC_BASE_URL="${currentBaseUrl.value}"
 export ANTHROPIC_AUTH_TOKEN="${key}"`
 
-  await copyTextWithFallback(configText, '配置信息已复制到剪贴板')
+  await copyTextWithFallback(configText, t('apiKeyResult.configCopied'))
 }
 
 // 仅复制密钥
 const copyKeyOnly = async () => {
   const key = props.apiKey.apiKey || props.apiKey.key || ''
   if (!key) {
-    showToast('API Key 不存在', 'error')
+    showToast(t('apiKeyResult.apiKeyMissing'), 'error')
     return
   }
 
-  await copyTextWithFallback(key, 'API Key 已复制')
+  await copyTextWithFallback(key, t('apiKeyResult.apiKeyCopied'))
 }
 
 // 关闭弹窗（带确认）
 const handleClose = async () => {
   const confirmed = await showConfirm(
-    '关闭提醒',
-    '关闭后将无法再次查看完整的API Key，请确保已经妥善保存。\n\n确定要关闭吗？',
-    '确定关闭',
-    '取消',
+    t('apiKeyResult.closeReminderTitle'),
+    t('apiKeyResult.singleCloseReminder'),
+    t('apiKeyResult.confirmClose'),
+    t('common.cancel'),
     'warning'
   )
   if (confirmed) {
@@ -310,10 +317,10 @@ const handleClose = async () => {
 // 直接关闭（不带确认）
 const handleDirectClose = async () => {
   const confirmed = await showConfirm(
-    '确定要关闭吗？',
-    '您还没有保存API Key，关闭后将无法再次查看。\n\n建议您先复制API Key再关闭。',
-    '仍然关闭',
-    '返回复制',
+    t('apiKeyResult.directCloseTitle'),
+    t('apiKeyResult.singleDirectCloseWarning'),
+    t('apiKeyResult.closeAnyway'),
+    t('apiKeyResult.backToCopy'),
     'warning'
   )
   if (confirmed) {

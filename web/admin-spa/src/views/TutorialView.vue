@@ -5,10 +5,10 @@
         class="mb-3 flex items-center text-xl font-bold text-gray-900 dark:text-gray-100 sm:mb-4 sm:text-2xl"
       >
         <i class="fas fa-graduation-cap mr-2 text-blue-600 sm:mr-3" />
-        {{ currentToolTitle }} 使用教程
+        {{ currentToolTitle }} {{ t('tutorial.auto.auto001') }}
       </h3>
       <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-lg">
-        跟着这个教程，你可以轻松在自己的电脑上安装并使用 {{ currentToolTitle }}。
+        {{ t('tutorial.auto.auto002') }} {{ currentToolTitle }}。
       </p>
     </div>
 
@@ -63,7 +63,9 @@ import ClaudeCodeTutorial from '@/components/tutorial/ClaudeCodeTutorial.vue'
 import GeminiCliTutorial from '@/components/tutorial/GeminiCliTutorial.vue'
 import CodexTutorial from '@/components/tutorial/CodexTutorial.vue'
 import DroidCliTutorial from '@/components/tutorial/DroidCliTutorial.vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 // 当前系统选择
 const activeTutorialSystem = ref('windows')
 
@@ -88,7 +90,7 @@ const cliTools = [
 // 当前工具标题
 const currentToolTitle = computed(() => {
   const tool = cliTools.find((t) => t.key === activeCliTool.value)
-  return tool ? tool.name : 'CLI 工具'
+  return tool ? tool.name : t('tutorial.auto.auto003')
 })
 
 // 当前教程组件

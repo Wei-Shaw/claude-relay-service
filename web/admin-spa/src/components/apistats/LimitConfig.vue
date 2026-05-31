@@ -6,7 +6,11 @@
         class="mb-2 flex items-center text-base font-bold text-gray-900 dark:text-gray-100 sm:mb-3 sm:text-lg md:mb-4 md:text-xl"
       >
         <i class="fas fa-shield-alt mr-2 text-sm text-red-500 md:mr-3 md:text-base" />
-        {{ multiKeyMode ? '限制配置（聚合查询模式）' : '限制配置' }}
+        {{
+          multiKeyMode
+            ? t('apiStatsComponents.limitConfig.titleAggregate')
+            : t('apiStatsComponents.limitConfig.titleSingle')
+        }}
       </h3>
 
       <!-- 多 Key 模式下的聚合统计信息 -->
@@ -18,7 +22,7 @@
           <div class="mb-3 flex items-center justify-between">
             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
               <i class="fas fa-layer-group mr-2 text-blue-500" />
-              API Keys 概况
+              {{ t('apiStatsComponents.limitConfig.keysOverview') }}
             </span>
             <span
               class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-800 dark:text-blue-200"
@@ -31,13 +35,17 @@
               <div class="text-lg font-bold text-gray-900 dark:text-gray-100">
                 {{ aggregatedStats.totalKeys }}
               </div>
-              <div class="text-xs text-gray-600 dark:text-gray-400">总计 Keys</div>
+              <div class="text-xs text-gray-600 dark:text-gray-400">
+                {{ t('apiStatsComponents.limitConfig.totalKeys') }}
+              </div>
             </div>
             <div class="text-center">
               <div class="text-lg font-bold text-green-600">
                 {{ aggregatedStats.activeKeys }}
               </div>
-              <div class="text-xs text-gray-600 dark:text-gray-400">激活 Keys</div>
+              <div class="text-xs text-gray-600 dark:text-gray-400">
+                {{ t('apiStatsComponents.limitConfig.activeKeys') }}
+              </div>
             </div>
           </div>
         </div>
@@ -48,13 +56,15 @@
         >
           <div class="mb-3 flex items-center">
             <i class="fas fa-chart-pie mr-2 text-purple-500" />
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">聚合统计摘要</span>
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+              t('apiStatsComponents.limitConfig.aggregateSummary')
+            }}</span>
           </div>
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-xs text-gray-600 dark:text-gray-400">
                 <i class="fas fa-database mr-1 text-gray-400" />
-                总请求数
+                {{ t('apiStatsComponents.limitConfig.totalRequests') }}
               </span>
               <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {{ formatNumber(aggregatedStats.usage.requests) }}
@@ -63,7 +73,7 @@
             <div class="flex items-center justify-between">
               <span class="text-xs text-gray-600 dark:text-gray-400">
                 <i class="fas fa-coins mr-1 text-yellow-500" />
-                总 Tokens
+                {{ t('apiStatsComponents.limitConfig.totalTokens') }}
               </span>
               <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {{ formatNumber(aggregatedStats.usage.allTokens) }}
@@ -72,7 +82,7 @@
             <div class="flex items-center justify-between">
               <span class="text-xs text-gray-600 dark:text-gray-400">
                 <i class="fas fa-dollar-sign mr-1 text-green-500" />
-                总费用
+                {{ t('apiStatsComponents.limitConfig.totalCost') }}
               </span>
               <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {{ aggregatedStats.usage.formattedCost }}
@@ -88,7 +98,7 @@
         >
           <i class="fas fa-exclamation-triangle mr-2 text-red-600 dark:text-red-400" />
           <span class="text-red-700 dark:text-red-300">
-            {{ invalidKeys.length }} 个无效的 API Key
+            {{ t('apiStatsComponents.limitConfig.invalidKeyCount', { count: invalidKeys.length }) }}
           </span>
         </div>
 
@@ -97,7 +107,7 @@
           class="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400"
         >
           <i class="fas fa-info-circle mr-1" />
-          每个 API Key 有独立的限制设置，聚合模式下不显示单个限制配置
+          {{ t('apiStatsComponents.limitConfig.aggregateHelp') }}
         </div>
       </div>
 
@@ -106,9 +116,9 @@
         <!-- 每日费用限制 -->
         <div>
           <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
-              >每日费用限制</span
-            >
+            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">{{
+              t('apiStatsComponents.limitConfig.dailyCostLimit')
+            }}</span>
             <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
               <span v-if="statsData.limits.dailyCostLimit > 0">
                 ${{ statsData.limits.currentDailyCost.toFixed(4) }} / ${{
@@ -138,9 +148,9 @@
         <!-- 总费用限制 -->
         <div>
           <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
-              >总费用限制</span
-            >
+            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">{{
+              t('apiStatsComponents.limitConfig.totalCostLimit')
+            }}</span>
             <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
               <span v-if="statsData.limits.totalCostLimit > 0">
                 ${{ statsData.limits.currentTotalCost.toFixed(4) }} / ${{
@@ -170,9 +180,9 @@
         <!-- Claude 模型周费用限制 -->
         <div v-if="statsData.limits.weeklyOpusCostLimit > 0">
           <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
-              >Claude 模型周费用限制</span
-            >
+            <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base">{{
+              t('apiStatsComponents.limitConfig.weeklyCostLimit')
+            }}</span>
             <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
               ${{ statsData.limits.weeklyOpusCost.toFixed(4) }} / ${{
                 statsData.limits.weeklyOpusCostLimit.toFixed(2)
@@ -190,12 +200,12 @@
             v-if="statsData.limits.weeklyResetDay"
             class="mt-1 text-xs text-gray-400 dark:text-gray-500"
           >
-            每{{
-              ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][
-                statsData.limits.weeklyResetDay || 1
-              ]
+            {{
+              t('apiStatsComponents.limitConfig.weeklyReset', {
+                day: weekdayLabel(statsData.limits.weeklyResetDay || 1),
+                hour: String(statsData.limits.weeklyResetHour || 0).padStart(2, '0')
+              })
             }}
-            {{ String(statsData.limits.weeklyResetHour || 0).padStart(2, '0') }}:00 (UTC+8) 重置
           </p>
         </div>
 
@@ -213,7 +223,7 @@
             :current-cost="statsData.limits.currentWindowCost"
             :current-requests="statsData.limits.currentWindowRequests"
             :current-tokens="statsData.limits.currentWindowTokens"
-            label="时间窗口限制"
+            :label="t('apiStatsComponents.limitConfig.windowLimit')"
             :rate-limit-window="statsData.limits.rateLimitWindow"
             :request-limit="statsData.limits.rateLimitRequests"
             :show-progress="true"
@@ -227,19 +237,21 @@
           <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             <i class="fas fa-info-circle mr-1" />
             <span v-if="statsData.limits.rateLimitCost > 0">
-              请求次数和费用限制为"或"的关系，任一达到限制即触发限流
+              {{ t('apiStatsComponents.limitConfig.requestCostOr') }}
             </span>
             <span v-else-if="statsData.limits.tokenLimit > 0">
-              请求次数和Token使用量为"或"的关系，任一达到限制即触发限流
+              {{ t('apiStatsComponents.limitConfig.requestTokenOr') }}
             </span>
-            <span v-else> 仅限制请求次数 </span>
+            <span v-else>{{ t('apiStatsComponents.limitConfig.requestOnly') }}</span>
           </div>
         </div>
 
         <!-- 其他限制信息 -->
         <div class="space-y-4 border-t border-gray-100 pt-3 dark:border-gray-700">
           <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">并发限制</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+              t('apiStatsComponents.limitConfig.concurrencyLimit')
+            }}</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
               <span v-if="statsData.limits.concurrencyLimit > 0">
                 {{ statsData.limits.concurrencyLimit }}
@@ -250,29 +262,41 @@
             </span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">模型限制</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+              t('apiStatsComponents.limitConfig.modelLimit')
+            }}</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
               <span v-if="hasModelRestrictions" class="text-orange-600">
                 <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
-                限制 {{ statsData.restrictions.restrictedModels.length }} 个模型
+                {{
+                  t('apiStatsComponents.limitConfig.restrictedModelCount', {
+                    count: statsData.restrictions.restrictedModels.length
+                  })
+                }}
               </span>
               <span v-else class="text-green-600">
                 <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
-                允许所有模型
+                {{ t('apiStatsComponents.limitConfig.allModelsAllowed') }}
               </span>
             </span>
           </div>
           <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">客户端限制</span>
+              <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">{{
+                t('apiStatsComponents.limitConfig.clientLimit')
+              }}</span>
               <span class="text-sm font-medium text-gray-900 md:text-base">
                 <span v-if="hasClientRestrictions" class="text-orange-600">
                   <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
-                  限 {{ statsData.restrictions.allowedClients.length }} 种客户端使用
+                  {{
+                    t('apiStatsComponents.limitConfig.clientLimitCount', {
+                      count: statsData.restrictions.allowedClients.length
+                    })
+                  }}
                 </span>
                 <span v-else class="text-green-600">
                   <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
-                  允许所有客户端
+                  {{ t('apiStatsComponents.limitConfig.allClientsAllowed') }}
                 </span>
               </span>
             </div>
@@ -300,7 +324,7 @@
         class="mb-3 flex items-center text-lg font-bold text-gray-900 dark:text-gray-100 md:mb-4 md:text-xl"
       >
         <i class="fas fa-list-alt mr-2 text-sm text-amber-500 md:mr-3 md:text-base" />
-        详细限制信息
+        {{ t('apiStatsComponents.limitConfig.details') }}
       </h3>
 
       <div
@@ -310,7 +334,7 @@
           class="mb-2 flex items-center text-sm font-bold text-amber-800 dark:text-amber-300 md:mb-3 md:text-base"
         >
           <i class="fas fa-robot mr-1 text-xs md:mr-2 md:text-sm" />
-          受限模型列表
+          {{ t('apiStatsComponents.limitConfig.restrictedModels') }}
         </h4>
         <div class="max-h-64 space-y-1 overflow-y-auto pr-1 md:max-h-80 md:space-y-2">
           <div
@@ -324,7 +348,7 @@
         </div>
         <p class="mt-2 text-xs text-amber-700 dark:text-amber-400 md:mt-3">
           <i class="fas fa-info-circle mr-1" />
-          此 API Key 不能访问以上列出的模型
+          {{ t('apiStatsComponents.limitConfig.restrictedModelsHelp') }}
         </p>
       </div>
     </div>
@@ -334,12 +358,28 @@
 <script setup>
 import { formatNumber } from '@/utils/tools'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import WindowCountdown from '@/components/apikeys/WindowCountdown.vue'
 
 const apiStatsStore = useApiStatsStore()
 const { statsData, multiKeyMode, aggregatedStats, invalidKeys } = storeToRefs(apiStatsStore)
+const { t } = useI18n()
+
+const weekdayLabel = (day) => {
+  const keys = [
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday'
+  ]
+  return t(`apiStatsComponents.limitConfig.weekdays.${keys[day] || 'monday'}`)
+}
 
 const hasModelRestrictions = computed(() => {
   const restriction = statsData.value?.restrictions

@@ -2,6 +2,9 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import * as httpApis from '@/utils/http_apis'
+import i18n from '@/i18n'
+
+const t = (...args) => i18n.global.t(...args)
 
 // 平台配置映射
 const PLATFORM_CONFIG = {
@@ -134,7 +137,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 切换账户状态
   const toggleAccount = async (platform, id) => {
     const config = PLATFORM_CONFIG[platform]
-    if (!config) return { success: false, message: '未知平台' }
+    if (!config) return { success: false, message: t('adminUtility.storeMessages.unknownPlatform') }
     loading.value = true
     const res = await httpApis.toggleAccountStatusApi(`/admin/${config.endpoint}/${id}/toggle`)
     if (res.success)
@@ -152,7 +155,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   // 删除账户
   const deleteAccount = async (platform, id) => {
     const config = PLATFORM_CONFIG[platform]
-    if (!config) return { success: false, message: '未知平台' }
+    if (!config) return { success: false, message: t('adminUtility.storeMessages.unknownPlatform') }
     loading.value = true
     const res = await httpApis.deleteAccountByEndpointApi(`/admin/${config.endpoint}/${id}`)
     if (res.success) {

@@ -5,6 +5,7 @@ import './assets/fonts/inter/inter.css'
 import App from './App.vue'
 import router from './router'
 import { useUserStore } from './stores/user'
+import i18n from './i18n'
 import './assets/styles/main.css'
 import './assets/styles/global.css'
 
@@ -17,6 +18,9 @@ app.use(pinia)
 
 // 使用路由
 app.use(router)
+
+// 使用国际化
+app.use(i18n)
 
 // 设置axios拦截器
 const userStore = useUserStore()

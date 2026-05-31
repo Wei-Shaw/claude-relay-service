@@ -2,7 +2,9 @@
   <div class="min-w-[200px] space-y-1">
     <div v-if="loading" class="flex items-center gap-2">
       <i class="fas fa-spinner fa-spin text-gray-400 dark:text-gray-500"></i>
-      <span class="text-xs text-gray-500 dark:text-gray-400">加载中...</span>
+      <span class="text-xs text-gray-500 dark:text-gray-400">{{
+        t('accountModals.common.loading')
+      }}</span>
     </div>
 
     <div v-else-if="requestError" class="flex items-center gap-2">
@@ -13,7 +15,7 @@
         :disabled="refreshing"
         @click="reload"
       >
-        重试
+        {{ t('accountModals.balanceDisplay.retry') }}
       </button>
     </div>
 
@@ -54,7 +56,7 @@
       <!-- 配额（如适用） -->
       <div v-if="quotaInfo && isAntigravityQuota" class="space-y-2">
         <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-          <span>剩余</span>
+          <span>{{ t('accountModals.balanceDisplay.remaining') }}</span>
           <span>{{ formatQuotaNumber(quotaInfo.remaining) }}</span>
         </div>
 
@@ -95,8 +97,14 @@
 
       <div v-else-if="quotaInfo" class="space-y-1">
         <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-          <span>已用: {{ formatQuotaNumber(quotaInfo.used) }}</span>
-          <span>剩余: {{ formatQuotaNumber(quotaInfo.remaining) }}</span>
+          <span
+            >{{ t('accountModals.balanceDisplay.used') }}:
+            {{ formatQuotaNumber(quotaInfo.used) }}</span
+          >
+          <span
+            >{{ t('accountModals.balanceDisplay.remaining') }}:
+            {{ formatQuotaNumber(quotaInfo.remaining) }}</span
+          >
         </div>
         <div class="h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
           <div
@@ -107,33 +115,43 @@
         </div>
         <div class="flex items-center justify-between text-xs">
           <span class="text-gray-500 dark:text-gray-400">
-            {{ quotaInfo.percentage.toFixed(1) }}% 已使用
+            {{
+              t('accountModals.balanceDisplay.percentUsed', {
+                percent: quotaInfo.percentage.toFixed(1)
+              })
+            }}
           </span>
           <span v-if="quotaInfo.resetAt" class="text-gray-400 dark:text-gray-500">
-            重置: {{ formatResetTime(quotaInfo.resetAt) }}
+            {{ t('accountModals.balanceDisplay.reset') }}: {{ formatResetTime(quotaInfo.resetAt) }}
           </span>
         </div>
       </div>
 
       <div v-else-if="balanceData.quota?.unlimited" class="flex items-center gap-2">
         <i class="fas fa-infinity text-blue-500 dark:text-blue-400"></i>
-        <span class="text-xs text-gray-600 dark:text-gray-400">无限制</span>
+        <span class="text-xs text-gray-600 dark:text-gray-400">{{
+          t('accountModals.balanceDisplay.unlimited')
+        }}</span>
       </div>
 
       <div
         v-if="balanceData.cacheExpiresAt && balanceData.source === 'cache'"
         class="text-xs text-gray-400 dark:text-gray-500"
       >
-        缓存至: {{ formatCacheExpiry(balanceData.cacheExpiresAt) }}
+        {{ t('accountModals.balanceDisplay.cacheUntil') }}:
+        {{ formatCacheExpiry(balanceData.cacheExpiresAt) }}
       </div>
     </div>
 
-    <div v-else class="text-xs text-gray-400 dark:text-gray-500">暂无余额数据</div>
+    <div v-else class="text-xs text-gray-400 dark:text-gray-500">
+      {{ t('accountModals.balanceDisplay.noData') }}
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { getAccountBalanceApi, refreshAccountBalanceApi } from '@/utils/http_apis'
 import { formatNumber } from '@/utils/tools'
@@ -148,6 +166,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['refreshed', 'error'])
+const { t, locale } = useI18n()
 
 const balanceData = ref(props.initialBalance)
 const loading = ref(false)
@@ -165,7 +184,13 @@ const sourceClass = computed(() => {
 
 const sourceLabel = computed(() => {
   const source = balanceData.value?.source
-  return { api: 'API', cache: '缓存', local: '本地' }[source] || '未知'
+  return (
+    {
+      api: 'API',
+      cache: t('accountModals.balanceDisplay.sourceCache'),
+      local: t('accountModals.balanceDisplay.sourceLocal')
+    }[source] || t('accountModals.common.unknown')
+  )
 })
 
 const quotaInfo = computed(() => {
@@ -238,17 +263,17 @@ const canRefresh = computed(() => {
 })
 
 const refreshTitle = computed(() => {
-  if (refreshing.value) return '刷新中...'
+  if (refreshing.value) return t('accountModals.balanceDisplay.refreshing')
   if (!canRefresh.value) {
     if (balanceData.value?.scriptEnabled === false) {
-      return '余额脚本功能已禁用'
+      return t('accountModals.balanceDisplay.scriptDisabled')
     }
-    return '请先配置余额脚本'
+    return t('accountModals.balanceDisplay.configureScriptFirst')
   }
   if (isAntigravityQuota.value) {
-    return '刷新配额（调用 Antigravity API）'
+    return t('accountModals.balanceDisplay.refreshQuotaTitle')
   }
-  return '刷新余额（调用脚本配置的余额 API）'
+  return t('accountModals.balanceDisplay.refreshBalanceTitle')
 })
 
 const primaryText = computed(() => {
@@ -256,7 +281,7 @@ const primaryText = computed(() => {
     return balanceData.value.balance.formattedAmount
   }
   const dailyCost = Number(balanceData.value?.statistics?.dailyCost || 0)
-  return `今日成本 ${formatCurrency(dailyCost)}`
+  return t('accountModals.balanceDisplay.todayCost', { amount: formatCurrency(dailyCost) })
 })
 
 const load = async () => {
@@ -274,7 +299,7 @@ const load = async () => {
   if (response?.success) {
     balanceData.value = response.data
   } else {
-    requestError.value = response?.error || '加载失败'
+    requestError.value = response?.error || t('accountModals.common.loadFailed')
   }
   loading.value = false
 }
@@ -292,7 +317,7 @@ const refresh = async () => {
     balanceData.value = response.data
     emit('refreshed', response.data)
   } else {
-    requestError.value = response?.error || '刷新失败'
+    requestError.value = response?.error || t('accountModals.balanceDisplay.refreshFailed')
   }
   refreshing.value = false
 }
@@ -323,23 +348,26 @@ const formatResetTime = (isoString) => {
   const date = new Date(isoString)
   const now = new Date()
   const diff = date.getTime() - now.getTime()
-  if (!Number.isFinite(diff)) return '未知'
-  if (diff < 0) return '已过期'
+  if (!Number.isFinite(diff)) return t('accountModals.common.unknown')
+  if (diff < 0) return t('accountModals.balanceDisplay.expired')
 
   const minutes = Math.floor(diff / (1000 * 60))
   const hours = Math.floor(minutes / 60)
   const remainMinutes = minutes % 60
   if (hours >= 24) {
     const days = Math.floor(hours / 24)
-    return `${days}天后`
+    return t('accountModals.balanceDisplay.daysLater', { count: days })
   }
-  return `${hours}小时${remainMinutes}分钟`
+  return t('accountModals.balanceDisplay.hoursMinutesLater', {
+    hours,
+    minutes: remainMinutes
+  })
 }
 
 const formatCacheExpiry = (isoString) => {
   const date = new Date(isoString)
-  if (Number.isNaN(date.getTime())) return '未知'
-  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  if (Number.isNaN(date.getTime())) return t('accountModals.common.unknown')
+  return date.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
 }
 
 watch(

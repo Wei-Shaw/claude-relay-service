@@ -1,7 +1,7 @@
 <template>
   <div :class="resolvedContainerClass">
     <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-      账号级临时冷却覆盖
+      {{ t('tempUnavailable.title') }}
     </label>
     <label class="inline-flex cursor-pointer items-center">
       <input
@@ -11,18 +11,18 @@
         @change="handleDisableChange"
       />
       <span class="text-sm text-gray-700 dark:text-gray-300">
-        禁用该账号临时冷却（不再因 503/5xx 自动进入 TTL）
+        {{ t('tempUnavailable.disable') }}
       </span>
     </label>
     <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
       <div>
         <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-          503 冷却秒数（留空=全局，0=关闭）
+          {{ t('tempUnavailable.ttl503') }}
         </label>
         <input
           class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
           min="0"
-          placeholder="例如 30"
+          :placeholder="t('tempUnavailable.placeholder503')"
           type="number"
           :value="tempUnavailable503TtlSeconds"
           @input="handle503Input"
@@ -30,12 +30,12 @@
       </div>
       <div>
         <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-          5xx 冷却秒数（留空=全局，0=关闭）
+          {{ t('tempUnavailable.ttl5xx') }}
         </label>
         <input
           class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
           min="0"
-          placeholder="例如 120"
+          :placeholder="t('tempUnavailable.placeholder5xx')"
           type="number"
           :value="tempUnavailable5xxTtlSeconds"
           @input="handle5xxInput"
@@ -47,6 +47,9 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   disableTempUnavailable: {

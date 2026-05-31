@@ -6,7 +6,7 @@
       >
         <span class="flex items-center">
           <i class="fas fa-robot mr-2 text-sm text-indigo-500 md:mr-3 md:text-base" />
-          模型使用统计
+          {{ t('apiStatsComponents.modelUsage.title') }}
         </span>
         <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
           >({{ periodLabel }})</span
@@ -19,7 +19,9 @@
       <i
         class="fas fa-spinner loading-spinner mb-2 text-xl text-gray-600 dark:text-gray-400 md:text-2xl"
       />
-      <p class="text-sm text-gray-600 dark:text-gray-400 md:text-base">加载模型统计数据中...</p>
+      <p class="text-sm text-gray-600 dark:text-gray-400 md:text-base">
+        {{ t('apiStatsComponents.modelUsage.loading') }}
+      </p>
     </div>
 
     <!-- 模型统计数据 -->
@@ -29,31 +31,47 @@
           <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
             <h4
               class="cursor-pointer text-sm font-bold text-gray-900 hover:text-indigo-600 dark:text-gray-100 dark:hover:text-indigo-400"
-              title="点击复制"
+              :title="t('apiStatsComponents.common.copyTitle')"
               @click="copyModelName(model.model)"
             >
               {{ model.model }}
               <i class="fas fa-copy ml-1 text-xs text-gray-400" />
             </h4>
             <div class="flex flex-wrap gap-x-2 text-xs text-gray-500 dark:text-gray-400">
-              <span>{{ model.requests }}次</span>
-              <span>输入:{{ formatNumber(model.inputTokens) }}</span>
-              <span>输出:{{ formatNumber(model.outputTokens) }}</span>
-              <span v-if="model.cacheCreateTokens"
-                >缓存创建:{{ formatNumber(model.cacheCreateTokens) }}</span
-              >
-              <span v-if="model.cacheReadTokens"
-                >缓存读取:{{ formatNumber(model.cacheReadTokens) }}</span
-              >
+              <span>{{
+                t('apiStatsComponents.modelUsage.requestCount', { count: model.requests })
+              }}</span>
+              <span>{{
+                t('apiStatsComponents.modelUsage.input', {
+                  count: formatNumber(model.inputTokens)
+                })
+              }}</span>
+              <span>{{
+                t('apiStatsComponents.modelUsage.output', {
+                  count: formatNumber(model.outputTokens)
+                })
+              }}</span>
+              <span v-if="model.cacheCreateTokens">{{
+                t('apiStatsComponents.modelUsage.cacheCreate', {
+                  count: formatNumber(model.cacheCreateTokens)
+                })
+              }}</span>
+              <span v-if="model.cacheReadTokens">{{
+                t('apiStatsComponents.modelUsage.cacheRead', {
+                  count: formatNumber(model.cacheReadTokens)
+                })
+              }}</span>
             </div>
           </div>
           <div class="flex-shrink-0 text-xs sm:text-sm">
-            <span class="text-gray-500">官方API</span>
+            <span class="text-gray-500">{{ t('apiStatsComponents.modelUsage.officialApi') }}</span>
             <span class="ml-1 font-semibold text-green-600">
               {{ model.formatted?.total || '$0.00' }}
             </span>
             <template v-if="serviceRates?.rates">
-              <span class="ml-2 text-gray-500">计费</span>
+              <span class="ml-2 text-gray-500">{{
+                t('apiStatsComponents.modelUsage.billed')
+              }}</span>
               <span class="ml-1 font-semibold text-amber-600 dark:text-amber-400">
                 {{ calculateCcCost(model) }}
               </span>
@@ -66,13 +84,16 @@
     <!-- 无模型数据 -->
     <div v-else class="py-6 text-center text-gray-500 dark:text-gray-400 md:py-8">
       <i class="fas fa-chart-pie mb-3 text-2xl md:text-3xl" />
-      <p class="text-sm md:text-base">暂无{{ periodLabel }}模型使用数据</p>
+      <p class="text-sm md:text-base">
+        {{ t('apiStatsComponents.modelUsage.empty', { period: periodLabel }) }}
+      </p>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import { copyText, formatNumber } from '@/utils/tools'
@@ -88,6 +109,7 @@ const props = defineProps({
 const apiStatsStore = useApiStatsStore()
 const { dailyModelStats, monthlyModelStats, alltimeModelStats, modelStatsLoading, serviceRates } =
   storeToRefs(apiStatsStore)
+const { t } = useI18n()
 
 // 根据 period 选择对应的数据
 const stats = computed(() => {
@@ -100,14 +122,14 @@ const stats = computed(() => {
 const loading = computed(() => modelStatsLoading.value)
 
 const periodLabel = computed(() => {
-  if (props.period === 'daily') return '今日'
-  if (props.period === 'monthly') return '本月'
-  if (props.period === 'alltime') return '所有时间'
+  if (props.period === 'daily') return t('apiStatsComponents.common.today')
+  if (props.period === 'monthly') return t('apiStatsComponents.common.thisMonth')
+  if (props.period === 'alltime') return t('apiStatsComponents.common.allTime')
   return ''
 })
 
 // 复制模型名称
-const copyModelName = (name) => copyText(name, '模型名称已复制')
+const copyModelName = (name) => copyText(name, t('apiStatsComponents.common.copiedModelName'))
 
 // 根据模型名称判断服务类型
 const getServiceFromModel = (model) => {

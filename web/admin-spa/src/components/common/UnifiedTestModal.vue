@@ -74,7 +74,9 @@
           <div class="mb-4 space-y-2">
             <!-- [account] 平台类型 -->
             <div v-if="mode === 'account'" class="flex items-center justify-between text-sm">
-              <span class="text-gray-500 dark:text-gray-400">平台类型</span>
+              <span class="text-gray-500 dark:text-gray-400">{{
+                t('adminUtility.unifiedTest.platformType')
+              }}</span>
               <span
                 :class="[
                   'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -90,7 +92,9 @@
               v-if="mode === 'account' && account?.platform === 'bedrock'"
               class="flex items-center justify-between text-sm"
             >
-              <span class="text-gray-500 dark:text-gray-400">账号类型</span>
+              <span class="text-gray-500 dark:text-gray-400">{{
+                t('adminUtility.unifiedTest.accountType')
+              }}</span>
               <span
                 :class="[
                   'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -103,7 +107,9 @@
             </div>
             <!-- [apikey] 测试端点 -->
             <div v-if="mode === 'apikey'" class="flex items-center justify-between text-sm">
-              <span class="text-gray-500 dark:text-gray-400">测试端点</span>
+              <span class="text-gray-500 dark:text-gray-400">{{
+                t('adminUtility.unifiedTest.endpoint')
+              }}</span>
               <span
                 class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
               >
@@ -114,7 +120,9 @@
             <!-- 测试模型（两种模式都有） -->
             <div class="text-sm">
               <div class="mb-1 flex items-center justify-between">
-                <span class="text-gray-500 dark:text-gray-400">测试模型</span>
+                <span class="text-gray-500 dark:text-gray-400">{{
+                  t('adminUtility.unifiedTest.model')
+                }}</span>
                 <ModelSelector
                   v-model="selectedModel"
                   :disabled="state.testStatus.value === 'testing'"
@@ -128,7 +136,9 @@
             <!-- [apikey] 最大输出 Token -->
             <div v-if="mode === 'apikey'" class="text-sm">
               <div class="mb-1 flex items-center justify-between">
-                <span class="text-gray-500 dark:text-gray-400">最大输出 Token</span>
+                <span class="text-gray-500 dark:text-gray-400">{{
+                  t('adminUtility.unifiedTest.maxOutputTokens')
+                }}</span>
                 <select
                   v-model="maxTokens"
                   class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
@@ -141,7 +151,9 @@
             </div>
             <!-- [apikey] 测试服务 -->
             <div v-if="mode === 'apikey'" class="flex items-center justify-between text-sm">
-              <span class="text-gray-500 dark:text-gray-400">测试服务</span>
+              <span class="text-gray-500 dark:text-gray-400">{{
+                t('adminUtility.unifiedTest.service')
+              }}</span>
               <span class="font-medium text-gray-700 dark:text-gray-300">
                 {{ apikeyServiceConfig.name }}
               </span>
@@ -151,12 +163,12 @@
           <!-- [apikey] 提示词输入 -->
           <div v-if="mode === 'apikey'" class="mb-4">
             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              提示词
+              {{ t('adminUtility.unifiedTest.prompt') }}
             </label>
             <textarea
               v-model="testPrompt"
               class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-              placeholder="输入测试提示词..."
+              :placeholder="t('adminUtility.unifiedTest.promptPlaceholder')"
               rows="2"
             />
           </div>
@@ -194,12 +206,16 @@
             <div
               class="flex items-center justify-between border-b border-gray-200 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
             >
-              <span class="text-xs font-medium text-gray-600 dark:text-gray-400">AI 响应</span>
+              <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{
+                t('adminUtility.unifiedTest.aiResponse')
+              }}</span>
               <span
                 v-if="state.responseText.value"
                 class="text-xs text-gray-500 dark:text-gray-500"
               >
-                {{ state.responseText.value.length }} 字符
+                {{
+                  t('adminUtility.unifiedTest.chars', { count: state.responseText.value.length })
+                }}
               </span>
             </div>
             <div class="max-h-40 overflow-y-auto p-3">
@@ -218,7 +234,7 @@
                 class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
               >
                 <i class="fas fa-circle-notch fa-spin" />
-                等待响应中...
+                {{ t('adminUtility.unifiedTest.waiting') }}
               </p>
               <p
                 v-else-if="state.testStatus.value === 'error' && state.errorMessage.value"
@@ -235,7 +251,11 @@
             class="mb-4 flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-400"
           >
             <i class="fas fa-clock" />
-            <span>耗时 {{ (state.testDuration.value / 1000).toFixed(2) }} 秒</span>
+            <span>{{
+              t('adminUtility.unifiedTest.duration', {
+                seconds: (state.testDuration.value / 1000).toFixed(2)
+              })
+            }}</span>
           </div>
         </div>
 
@@ -248,7 +268,7 @@
             :disabled="state.testStatus.value === 'testing'"
             @click="handleClose"
           >
-            关闭
+            {{ t('adminUtility.unifiedTest.close') }}
           </button>
           <button
             :class="[
@@ -268,10 +288,10 @@
             />
             {{
               state.testStatus.value === 'testing'
-                ? '测试中...'
+                ? t('adminUtility.unifiedTest.testing')
                 : state.testStatus.value === 'idle'
-                  ? '开始测试'
-                  : '重新测试'
+                  ? t('adminUtility.unifiedTest.start')
+                  : t('adminUtility.unifiedTest.retest')
             }}
           </button>
         </div>
@@ -282,6 +302,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { APP_CONFIG } from '@/utils/tools'
 import { getModelsApi } from '@/utils/http_apis'
 import { useTestState } from '@/utils/useTestState'
@@ -300,6 +321,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 const state = useTestState()
+const { t } = useI18n()
 
 // ========== 模型相关 ==========
 const selectedModel = ref('')
@@ -458,7 +480,7 @@ const platformConfigs = {
 const platformConfig = computed(
   () =>
     platformConfigs[props.account?.platform] || {
-      label: '未知',
+      label: t('adminUtility.unifiedTest.unknown'),
       icon: 'fas fa-question',
       badge: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
     }
@@ -489,11 +511,15 @@ const credentialTypeBadgeClass = computed(() => {
 
 // ========== 通用计算属性 ==========
 const modalTitle = computed(() =>
-  props.mode === 'account' ? '账户连通性测试' : 'API Key 端点测试'
+  props.mode === 'account'
+    ? t('adminUtility.unifiedTest.accountTitle')
+    : t('adminUtility.unifiedTest.apiKeyTitle')
 )
 const modalSubtitle = computed(() => {
-  if (props.mode === 'account') return props.account?.name || '未知账户'
-  return props.apiKeyName || '当前 API Key'
+  if (props.mode === 'account') {
+    return props.account?.name || t('adminUtility.unifiedTest.unknownAccount')
+  }
+  return props.apiKeyName || t('adminUtility.unifiedTest.currentApiKey')
 })
 
 const headerIconBgClass = computed(() => {
@@ -508,12 +534,18 @@ const statusDescription = computed(() => {
   const apiName = props.mode === 'account' ? platformLabel.value : apikeyServiceConfig.value.name
   if (s === 'idle')
     return props.mode === 'account'
-      ? '点击下方按钮开始测试账户连通性'
-      : '点击下方按钮开始测试 API Key 连通性'
-  if (s === 'testing') return '正在发送测试请求并等待响应'
+      ? t('adminUtility.unifiedTest.idleAccount')
+      : t('adminUtility.unifiedTest.idleApiKey')
+  if (s === 'testing') return t('adminUtility.unifiedTest.testingDescription')
   if (s === 'success')
-    return props.mode === 'account' ? `账户可以正常访问 ${apiName}` : 'API Key 可以正常访问服务'
-  if (s === 'error') return state.errorMessage.value || `无法连接到 ${apiName}`
+    return props.mode === 'account'
+      ? t('adminUtility.unifiedTest.successAccount', { name: apiName })
+      : t('adminUtility.unifiedTest.successApiKey')
+  if (s === 'error') {
+    return (
+      state.errorMessage.value || t('adminUtility.unifiedTest.errorDescription', { name: apiName })
+    )
+  }
   return ''
 })
 

@@ -11,7 +11,7 @@
       <span
         class="select-none whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200"
       >
-        {{ selectedLabel || placeholder }}
+        {{ selectedLabel || resolvedPlaceholder }}
       </span>
       <i
         :class="[
@@ -71,6 +71,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   modelValue: {
@@ -83,7 +86,7 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: '请选择'
+    default: ''
   },
   icon: {
     type: String,
@@ -105,6 +108,7 @@ const isOpen = ref(false)
 const triggerRef = ref(null)
 const dropdownRef = ref(null)
 const dropdownStyle = ref({})
+const resolvedPlaceholder = computed(() => props.placeholder || t('common.selectPlaceholder'))
 
 const isSelected = (value) => {
   if (props.multiple) {
@@ -116,7 +120,7 @@ const isSelected = (value) => {
 const selectedLabel = computed(() => {
   if (props.multiple) {
     const count = Array.isArray(props.modelValue) ? props.modelValue.length : 0
-    return count > 0 ? `已选 ${count} 个` : ''
+    return count > 0 ? t('common.selectedCount', { count }) : ''
   }
   const selected = props.options.find((opt) => opt.value === props.modelValue)
   return selected ? selected.label : ''

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import router from '@/router'
+import i18n from '@/i18n'
 
 import { loginApi, logoutApi, getAuthUserApi, getOemSettingsApi } from '@/utils/http_apis'
 
@@ -40,10 +41,10 @@ export const useAuthStore = defineStore('auth', () => {
 
         await router.push('/dashboard')
       } else {
-        loginError.value = result.message || '登录失败'
+        loginError.value = result.message || i18n.global.t('auth.loginFailed')
       }
     } catch (error) {
-      loginError.value = error.message || '登录失败，请检查用户名和密码'
+      loginError.value = error.message || i18n.global.t('auth.loginFailedCheck')
     } finally {
       loginLoading.value = false
     }
@@ -108,11 +109,11 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         if (result.data.siteName) {
-          document.title = `${result.data.siteName} - 管理后台`
+          document.title = `${result.data.siteName} - ${i18n.global.t('auth.adminPanel')}`
         }
       }
     } catch (error) {
-      console.error('加载OEM设置失败:', error)
+      console.error('Failed to load OEM settings:', error)
     } finally {
       oemLoading.value = false
     }

@@ -17,7 +17,7 @@
               <i class="fas fa-chart-line text-sm text-white sm:text-base" />
             </div>
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-              使用统计详情 - {{ apiKey.name }}
+              {{ t('apiKeyUsageDetail.title', { name: apiKey.name }) }}
             </h3>
           </div>
           <button class="p-1 text-gray-400 transition-colors hover:text-gray-600" @click="close">
@@ -34,14 +34,16 @@
               class="rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 p-4 dark:border-blue-700 dark:from-blue-900/20 dark:to-blue-800/20"
             >
               <div class="mb-3 flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">总请求数</span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+                  t('apiKeyUsageDetail.totalRequests')
+                }}</span>
                 <i class="fas fa-paper-plane text-blue-500" />
               </div>
               <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {{ formatNumber(totalRequests) }}
               </div>
               <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                今日: {{ formatNumber(dailyRequests) }} 次
+                {{ t('apiKeyUsageDetail.todayRequests', { count: formatNumber(dailyRequests) }) }}
               </div>
             </div>
 
@@ -50,14 +52,16 @@
               class="rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-green-100 p-4 dark:border-green-700 dark:from-green-900/20 dark:to-green-800/20"
             >
               <div class="mb-3 flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">总Token数</span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+                  t('apiKeyUsageDetail.totalTokens')
+                }}</span>
                 <i class="fas fa-coins text-green-500" />
               </div>
               <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {{ formatTokenCount(totalTokens) }}
               </div>
               <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                今日: {{ formatTokenCount(dailyTokens) }}
+                {{ t('apiKeyUsageDetail.todayTokens', { count: formatTokenCount(dailyTokens) }) }}
               </div>
             </div>
 
@@ -66,14 +70,16 @@
               class="rounded-lg border border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 dark:border-yellow-700 dark:from-yellow-900/20 dark:to-yellow-800/20"
             >
               <div class="mb-3 flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">总费用</span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+                  t('apiKeyUsageDetail.totalCost')
+                }}</span>
                 <i class="fas fa-dollar-sign text-yellow-600" />
               </div>
               <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 ${{ totalCost.toFixed(4) }}
               </div>
               <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                今日: ${{ dailyCost.toFixed(4) }}
+                {{ t('apiKeyUsageDetail.todayCost', { cost: dailyCost.toFixed(4) }) }}
               </div>
             </div>
 
@@ -82,7 +88,9 @@
               class="rounded-lg border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 p-4 dark:border-purple-700 dark:from-purple-900/20 dark:to-purple-800/20"
             >
               <div class="mb-3 flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">平均速率</span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+                  t('apiKeyUsageDetail.averageRate')
+                }}</span>
                 <i class="fas fa-tachometer-alt text-purple-500" />
               </div>
               <div class="space-y-1 text-sm">
@@ -104,13 +112,15 @@
               class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
             >
               <i class="fas fa-chart-pie mr-2 text-indigo-500" />
-              Token 使用分布
+              {{ t('apiKeyUsageDetail.tokenDistribution') }}
             </h4>
             <div class="space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-700/50">
               <div class="flex items-center justify-between">
                 <div class="flex items-center">
                   <i class="fas fa-arrow-down mr-2 text-green-500" />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">输入 Token</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                    t('apiKeyUsageDetail.inputToken')
+                  }}</span>
                 </div>
                 <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                   {{ formatTokenCount(inputTokens) }}
@@ -119,7 +129,9 @@
               <div class="flex items-center justify-between">
                 <div class="flex items-center">
                   <i class="fas fa-arrow-up mr-2 text-blue-500" />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">输出 Token</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                    t('apiKeyUsageDetail.outputToken')
+                  }}</span>
                 </div>
                 <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                   {{ formatTokenCount(outputTokens) }}
@@ -128,7 +140,9 @@
               <div v-if="cacheCreateTokens > 0" class="flex items-center justify-between">
                 <div class="flex items-center">
                   <i class="fas fa-save mr-2 text-purple-500" />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">缓存创建 Token</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                    t('apiKeyUsageDetail.cacheCreateToken')
+                  }}</span>
                 </div>
                 <span class="text-sm font-semibold text-purple-600">
                   {{ formatTokenCount(cacheCreateTokens) }}
@@ -137,7 +151,9 @@
               <div v-if="cacheReadTokens > 0" class="flex items-center justify-between">
                 <div class="flex items-center">
                   <i class="fas fa-download mr-2 text-purple-500" />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">缓存读取 Token</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                    t('apiKeyUsageDetail.cacheReadToken')
+                  }}</span>
                 </div>
                 <span class="text-sm font-semibold text-purple-600">
                   {{ formatTokenCount(cacheReadTokens) }}
@@ -152,45 +168,57 @@
               class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
             >
               <i class="fas fa-shield-alt mr-2 text-red-500" />
-              限制设置
+              {{ t('apiKeyUsageDetail.limitSettings') }}
             </h4>
             <div class="space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-700/50">
               <div v-if="Number(apiKey.dailyCostLimit) > 0" class="space-y-1.5">
                 <LimitProgressBar
                   :current="Number(dailyCost) || 0"
-                  label="每日费用限制"
+                  :label="t('apiKeyUsageDetail.dailyCostLimit')"
                   :limit="Number(apiKey.dailyCostLimit) || 0"
                   :show-shine="true"
                   type="daily"
                 />
                 <div class="text-right text-xs text-gray-500 dark:text-gray-400">
-                  已使用 {{ Math.min(dailyCostPercentage, 100).toFixed(1) }}%
+                  {{
+                    t('apiKeyUsageDetail.usedPercentage', {
+                      percent: Math.min(dailyCostPercentage, 100).toFixed(1)
+                    })
+                  }}
                 </div>
               </div>
 
               <div v-if="Number(apiKey.weeklyOpusCostLimit) > 0" class="space-y-1.5">
                 <LimitProgressBar
                   :current="Number(weeklyOpusCost) || 0"
-                  label="Claude 周费用限制"
+                  :label="t('apiKeyUsageDetail.claudeWeeklyCostLimit')"
                   :limit="Number(apiKey.weeklyOpusCostLimit) || 0"
                   :show-shine="true"
                   type="opus"
                 />
                 <div class="text-right text-xs text-gray-500 dark:text-gray-400">
-                  已使用 {{ Math.min(opusUsagePercentage, 100).toFixed(1) }}%
+                  {{
+                    t('apiKeyUsageDetail.usedPercentage', {
+                      percent: Math.min(opusUsagePercentage, 100).toFixed(1)
+                    })
+                  }}
                 </div>
               </div>
 
               <div v-if="Number(apiKey.totalCostLimit) > 0" class="space-y-1.5">
                 <LimitProgressBar
                   :current="Number(totalCost) || 0"
-                  label="总费用限制"
+                  :label="t('apiKeyUsageDetail.totalCostLimit')"
                   :limit="Number(apiKey.totalCostLimit) || 0"
                   :show-shine="true"
                   type="total"
                 />
                 <div class="text-right text-xs text-gray-500 dark:text-gray-400">
-                  已使用 {{ Math.min(totalUsagePercentage, 100).toFixed(1) }}%
+                  {{
+                    t('apiKeyUsageDetail.usedPercentage', {
+                      percent: Math.min(totalUsagePercentage, 100).toFixed(1)
+                    })
+                  }}
                 </div>
               </div>
 
@@ -198,7 +226,9 @@
                 v-if="Number(apiKey.concurrencyLimit) > 0"
                 class="flex items-center justify-between rounded-lg border border-purple-200/70 bg-white/60 px-3 py-2 text-sm shadow-sm dark:border-purple-500/40 dark:bg-purple-950/20"
               >
-                <span class="text-gray-600 dark:text-gray-300">并发限制</span>
+                <span class="text-gray-600 dark:text-gray-300">{{
+                  t('apiKeyUsageDetail.concurrencyLimit')
+                }}</span>
                 <span class="font-semibold text-purple-600 dark:text-purple-300">
                   {{ apiKey.currentConcurrency || 0 }} / {{ apiKey.concurrencyLimit }}
                 </span>
@@ -215,20 +245,20 @@
               >
                 <h5 class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   <i class="fas fa-clock mr-1 text-blue-500" />
-                  时间窗口限制
+                  {{ t('apiKeyUsageDetail.windowLimit') }}
                 </h5>
                 <div
                   v-if="apiKey.rateLimitWindow <= 0"
                   class="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:border-yellow-700/50 dark:bg-yellow-900/20 dark:text-yellow-200"
                 >
-                  未设置窗口时长（rateLimitWindow=0），窗口限制不会生效。
+                  {{ t('apiKeyUsageDetail.windowDisabledHint') }}
                 </div>
                 <WindowCountdown
                   :cost-limit="apiKey.rateLimitCost"
                   :current-cost="apiKey.currentWindowCost"
                   :current-requests="apiKey.currentWindowRequests"
                   :current-tokens="apiKey.currentWindowTokens"
-                  label="窗口状态"
+                  :label="t('apiKeyUsageDetail.windowStatus')"
                   :rate-limit-window="apiKey.rateLimitWindow"
                   :request-limit="apiKey.rateLimitRequests"
                   :show-progress="true"
@@ -244,14 +274,16 @@
               <div v-if="hasAccessRestrictions" class="space-y-2">
                 <h5 class="text-sm font-medium text-gray-700 dark:text-gray-300">
                   <i class="fas fa-lock mr-1 text-gray-500" />
-                  访问控制
+                  {{ t('apiKeyUsageDetail.accessControl') }}
                 </h5>
 
                 <div
                   class="rounded-lg border border-gray-200 bg-white/60 px-3 py-2 text-sm shadow-sm dark:border-gray-600/50 dark:bg-gray-800/40"
                 >
                   <div class="flex items-center justify-between">
-                    <span class="text-gray-600 dark:text-gray-300">服务权限</span>
+                    <span class="text-gray-600 dark:text-gray-300">{{
+                      t('apiKeyUsageDetail.servicePermissions')
+                    }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">
                       {{ permissionsDisplay }}
                     </span>
@@ -263,7 +295,9 @@
                   class="rounded-lg border border-gray-200 bg-white/60 px-3 py-2 text-sm shadow-sm dark:border-gray-600/50 dark:bg-gray-800/40"
                 >
                   <div class="mb-1 flex items-center justify-between">
-                    <span class="text-gray-600 dark:text-gray-300">模型限制（禁用列表）</span>
+                    <span class="text-gray-600 dark:text-gray-300">{{
+                      t('apiKeyUsageDetail.modelRestriction')
+                    }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">
                       {{ restrictedModels.length }}
                     </span>
@@ -277,7 +311,9 @@
                       {{ model }}
                     </span>
                   </div>
-                  <div v-else class="text-xs text-gray-500 dark:text-gray-400">未配置具体模型</div>
+                  <div v-else class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('apiKeyUsageDetail.noModelsConfigured') }}
+                  </div>
                 </div>
 
                 <div
@@ -285,7 +321,9 @@
                   class="rounded-lg border border-gray-200 bg-white/60 px-3 py-2 text-sm shadow-sm dark:border-gray-600/50 dark:bg-gray-800/40"
                 >
                   <div class="mb-1 flex items-center justify-between">
-                    <span class="text-gray-600 dark:text-gray-300">客户端限制（允许列表）</span>
+                    <span class="text-gray-600 dark:text-gray-300">{{
+                      t('apiKeyUsageDetail.clientRestriction')
+                    }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">
                       {{ allowedClients.length }}
                     </span>
@@ -299,7 +337,9 @@
                       {{ client }}
                     </span>
                   </div>
-                  <div v-else class="text-xs text-gray-500 dark:text-gray-400">未配置客户端</div>
+                  <div v-else class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('apiKeyUsageDetail.noClientsConfigured') }}
+                  </div>
                 </div>
               </div>
             </div>
@@ -309,10 +349,10 @@
         <!-- 底部按钮 -->
         <div class="mt-4 flex justify-end gap-2 sm:mt-6 sm:gap-3">
           <button class="btn btn-primary px-4 py-2 text-sm" type="button" @click="openTimeline">
-            查看请求时间线
+            {{ t('apiKeyUsageDetail.viewTimeline') }}
           </button>
           <button class="btn btn-secondary px-4 py-2 text-sm" type="button" @click="close">
-            关闭
+            {{ t('common.close') }}
           </button>
         </div>
       </div>
@@ -322,6 +362,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import LimitProgressBar from './LimitProgressBar.vue'
 import WindowCountdown from './WindowCountdown.vue'
 
@@ -339,6 +380,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'open-timeline'])
+const { t } = useI18n()
 
 // 计算属性
 const totalRequests = computed(() => props.apiKey.usage?.total?.requests || 0)
@@ -375,7 +417,7 @@ const permissions = computed(() => props.apiKey.permissions || [])
 
 const permissionsDisplay = computed(() => {
   if (!Array.isArray(permissions.value) || permissions.value.length === 0) {
-    return '全部'
+    return t('apiKeys.allServices')
   }
   return permissions.value.join(', ')
 })

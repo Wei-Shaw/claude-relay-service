@@ -4,9 +4,11 @@
       <div class="glass-strong flex-1 rounded-2xl p-4 shadow-lg">
         <div class="mb-3 flex items-center justify-between">
           <div>
-            <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">脚本余额配置</div>
+            <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {{ t('adminUtility.balanceScripts.title') }}
+            </div>
             <div class="text-xs text-gray-500 dark:text-gray-400">
-              使用自定义脚本 + 模板变量适配任意余额接口
+              {{ t('adminUtility.balanceScripts.subtitle') }}
             </div>
           </div>
           <div class="flex gap-2">
@@ -14,15 +16,15 @@
               class="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
               @click="loadConfig"
             >
-              重新加载
+              {{ t('adminUtility.balanceScripts.reload') }}
             </button>
             <button
               class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
               :disabled="saving"
               @click="saveConfig"
             >
-              <span v-if="saving">保存中...</span>
-              <span v-else>保存配置</span>
+              <span v-if="saving">{{ t('adminUtility.balanceScripts.saving') }}</span>
+              <span v-else>{{ t('adminUtility.balanceScripts.save') }}</span>
             </button>
           </div>
         </div>
@@ -34,7 +36,7 @@
           </div>
           <div class="space-y-2">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-200">
-              请求地址（baseUrl）
+              {{ t('adminUtility.balanceScripts.requestUrl') }}
             </label>
             <input
               v-model="form.baseUrl"
@@ -44,16 +46,16 @@
             />
           </div>
           <div class="space-y-2">
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-200"
-              >Token（可选）</label
-            >
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+              t('adminUtility.balanceScripts.tokenOptional')
+            }}</label>
             <input v-model="form.token" class="input-text" placeholder="Bearer token" type="text" />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-2">
-              <label class="text-sm font-medium text-gray-700 dark:text-gray-200"
-                >超时时间(秒)</label
-              >
+              <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+                t('adminUtility.balanceScripts.timeoutSeconds')
+              }}</label>
               <input
                 v-model.number="form.timeoutSeconds"
                 class="input-text"
@@ -63,7 +65,7 @@
             </div>
             <div class="space-y-2">
               <label class="text-sm font-medium text-gray-700 dark:text-gray-200">
-                自动查询间隔(分钟)
+                {{ t('adminUtility.balanceScripts.autoInterval') }}
               </label>
               <input
                 v-model.number="form.autoIntervalMinutes"
@@ -74,14 +76,16 @@
             </div>
           </div>
           <div class="md:col-span-2">
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-200">模板变量</label>
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+              t('adminUtility.balanceScripts.templateVariables')
+            }}</label>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              可用变量：{{ '{' }}{{ '{' }}baseUrl{{ '}' }}{{ '}' }}、{{ '{' }}{{ '{' }}apiKey{{ '}'
-              }}{{ '}' }}、{{ '{' }}{{ '{' }}token{{ '}' }}{{ '}' }}、{{ '{' }}{{ '{' }}accountId{{
+              {{ t('adminUtility.balanceScripts.availableVariables') }} {{ '{' }}{{ '{' }}baseUrl{{
                 '}'
-              }}{{ '}' }}、{{ '{' }}{{ '{' }}platform{{ '}' }}{{ '}' }}、{{ '{' }}{{ '{' }}extra{{
+              }}{{ '}' }}, {{ '{' }}{{ '{' }}apiKey{{ '}' }}{{ '}' }}, {{ '{' }}{{ '{' }}token{{
                 '}'
-              }}{{ '}' }}
+              }}{{ '}' }}, {{ '{' }}{{ '{' }}accountId{{ '}' }}{{ '}' }}, {{ '{'
+              }}{{ '{' }}platform{{ '}' }}{{ '}' }}, {{ '{' }}{{ '{' }}extra{{ '}' }}{{ '}' }}
             </p>
           </div>
         </div>
@@ -90,9 +94,11 @@
       <div class="glass-strong w-full max-w-xl rounded-2xl p-4 shadow-lg">
         <div class="mb-3 flex items-center justify-between">
           <div>
-            <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">测试脚本</div>
+            <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {{ t('adminUtility.balanceScripts.testTitle') }}
+            </div>
             <div class="text-xs text-gray-500 dark:text-gray-400">
-              填入账号上下文（可选），调试 extractor 输出
+              {{ t('adminUtility.balanceScripts.testSubtitle') }}
             </div>
           </div>
           <button
@@ -100,30 +106,48 @@
             :disabled="testing"
             @click="testScript"
           >
-            <span v-if="testing">测试中...</span>
-            <span v-else>测试脚本</span>
+            <span v-if="testing">{{ t('adminUtility.balanceScripts.testing') }}</span>
+            <span v-else>{{ t('adminUtility.balanceScripts.testScript') }}</span>
           </button>
         </div>
         <div class="grid gap-3">
           <div class="space-y-1">
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-200">平台</label>
-            <input v-model="testForm.platform" class="input-text" placeholder="例如 claude" />
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+              t('adminUtility.balanceScripts.platform')
+            }}</label>
+            <input
+              v-model="testForm.platform"
+              class="input-text"
+              :placeholder="t('adminUtility.balanceScripts.platformPlaceholder')"
+            />
           </div>
           <div class="space-y-1">
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-200">账号ID</label>
-            <input v-model="testForm.accountId" class="input-text" placeholder="账号标识，可选" />
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+              t('adminUtility.balanceScripts.accountId')
+            }}</label>
+            <input
+              v-model="testForm.accountId"
+              class="input-text"
+              :placeholder="t('adminUtility.balanceScripts.accountIdPlaceholder')"
+            />
           </div>
           <div class="space-y-1">
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-200"
-              >额外参数 (extra)</label
-            >
-            <input v-model="testForm.extra" class="input-text" placeholder="可选" />
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+              t('adminUtility.balanceScripts.extra')
+            }}</label>
+            <input
+              v-model="testForm.extra"
+              class="input-text"
+              :placeholder="t('adminUtility.balanceScripts.optional')"
+            />
           </div>
         </div>
 
         <div v-if="testResult" class="mt-4 space-y-2 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/60">
           <div class="flex items-center justify-between text-sm">
-            <span class="font-semibold text-gray-800 dark:text-gray-100">测试结果</span>
+            <span class="font-semibold text-gray-800 dark:text-gray-100">{{
+              t('adminUtility.balanceScripts.testResult')
+            }}</span>
             <span
               :class="[
                 'rounded px-2 py-0.5 text-xs',
@@ -136,25 +160,45 @@
             </span>
           </div>
           <div class="text-xs text-gray-600 dark:text-gray-300">
-            <div>余额: {{ displayAmount(testResult.mapped?.balance) }}</div>
-            <div>单位: {{ testResult.mapped?.currency || '—' }}</div>
-            <div v-if="testResult.mapped?.planName">套餐: {{ testResult.mapped.planName }}</div>
+            <div>
+              {{
+                t('adminUtility.balanceScripts.balance', {
+                  value: displayAmount(testResult.mapped?.balance)
+                })
+              }}
+            </div>
+            <div>
+              {{
+                t('adminUtility.balanceScripts.unit', { value: testResult.mapped?.currency || '—' })
+              }}
+            </div>
+            <div v-if="testResult.mapped?.planName">
+              {{ t('adminUtility.balanceScripts.plan', { value: testResult.mapped.planName }) }}
+            </div>
             <div v-if="testResult.mapped?.errorMessage" class="text-red-500">
-              错误: {{ testResult.mapped.errorMessage }}
+              {{
+                t('adminUtility.balanceScripts.error', { value: testResult.mapped.errorMessage })
+              }}
             </div>
             <div v-if="testResult.mapped?.quota">
-              配额: {{ JSON.stringify(testResult.mapped.quota) }}
+              {{
+                t('adminUtility.balanceScripts.quota', {
+                  value: JSON.stringify(testResult.mapped.quota)
+                })
+              }}
             </div>
           </div>
           <details class="text-xs text-gray-500 dark:text-gray-400">
-            <summary class="cursor-pointer">查看 extractor 输出</summary>
+            <summary class="cursor-pointer">
+              {{ t('adminUtility.balanceScripts.viewExtractor') }}
+            </summary>
             <pre class="mt-2 overflow-auto rounded bg-black/70 p-2 text-[11px] text-gray-100"
               >{{ formatJson(testResult.extracted) }}
 </pre
             >
           </details>
           <details class="text-xs text-gray-500 dark:text-gray-400">
-            <summary class="cursor-pointer">查看原始响应</summary>
+            <summary class="cursor-pointer">{{ t('adminUtility.balanceScripts.viewRaw') }}</summary>
             <pre class="mt-2 overflow-auto rounded bg-black/70 p-2 text-[11px] text-gray-100"
               >{{ formatJson(testResult.response) }}
 </pre
@@ -167,16 +211,18 @@
     <div class="glass-strong rounded-2xl p-4 shadow-lg">
       <div class="mb-2 flex items-center justify-between">
         <div>
-          <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">提取器代码</div>
+          <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {{ t('adminUtility.balanceScripts.extractorCode') }}
+          </div>
           <div class="text-xs text-gray-500 dark:text-gray-400">
-            返回对象需包含 request、extractor；支持模板变量替换
+            {{ t('adminUtility.balanceScripts.extractorSubtitle') }}
           </div>
         </div>
         <button
           class="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
           @click="applyPreset"
         >
-          使用示例模板
+          {{ t('adminUtility.balanceScripts.useExample') }}
         </button>
       </div>
       <textarea
@@ -185,8 +231,7 @@
         spellcheck="false"
       ></textarea>
       <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-        extractor
-        返回字段（可选）：isValid、invalidMessage、remaining、unit、planName、total、used、extra
+        {{ t('adminUtility.balanceScripts.returnFields') }}
       </div>
     </div>
   </div>
@@ -194,6 +239,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   getDefaultBalanceScriptApi,
@@ -201,6 +247,8 @@ import {
   testDefaultBalanceScriptApi
 } from '@/utils/http_apis'
 import { showToast } from '@/utils/tools'
+
+const { t } = useI18n()
 
 const form = reactive({
   baseUrl: '',
@@ -235,7 +283,7 @@ const presetScript = `({
       isValid: response.is_active || true,
       remaining: response.balance,
       unit: "USD",
-      planName: response.plan || "默认套餐"
+      planName: response.plan || "${t('adminUtility.balanceScripts.defaultPlan')}"
     };
   }
 })`
@@ -251,9 +299,9 @@ const saveConfig = async () => {
   saving.value = true
   const res = await updateDefaultBalanceScriptApi({ ...form })
   if (res?.success) {
-    showToast('配置已保存', 'success')
+    showToast(t('adminUtility.balanceScripts.saved'), 'success')
   } else {
-    showToast(res?.message || '保存失败', 'error')
+    showToast(res?.message || t('adminUtility.balanceScripts.saveFailed'), 'error')
   }
   saving.value = false
 }
@@ -265,9 +313,9 @@ const testScript = async () => {
   const res = await testDefaultBalanceScriptApi(payload)
   if (res?.success) {
     testResult.value = res.data
-    showToast('测试完成', 'success')
+    showToast(t('adminUtility.balanceScripts.testDone'), 'success')
   } else {
-    showToast(res?.error || '测试失败', 'error')
+    showToast(res?.error || t('adminUtility.balanceScripts.testFailed'), 'error')
   }
   testing.value = false
 }

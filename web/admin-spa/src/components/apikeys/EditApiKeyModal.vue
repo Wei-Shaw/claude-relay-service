@@ -12,7 +12,7 @@
               <i class="fas fa-edit text-sm text-white sm:text-base" />
             </div>
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-              编辑 API Key
+              {{ t('apiKeyForm.editTitle') }}
             </h3>
           </div>
           <button
@@ -30,20 +30,20 @@
           <div>
             <label
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
-              >名称</label
+              >{{ t('apiKeyForm.name') }}</label
             >
             <div>
               <input
                 v-model="form.name"
                 class="form-input flex-1 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 maxlength="100"
-                placeholder="请输入API Key名称"
+                :placeholder="t('apiKeyForm.nameRequiredPlaceholder')"
                 required
                 type="text"
               />
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
-              用于识别此 API Key 的用途
+              {{ t('apiKeyForm.nameHelp') }}
             </p>
           </div>
 
@@ -63,11 +63,11 @@
                   class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
                   for="editEnableServiceRates"
                 >
-                  自定义服务倍率
+                  {{ t('apiKeyForm.customServiceRates') }}
                 </label>
               </div>
               <span class="text-xs text-gray-500 dark:text-gray-400">
-                与全局倍率相乘，用于 VIP 折扣等（如全局1.5 × Key倍率0.8 = 1.2）
+                {{ t('apiKeyForm.serviceRatesHint') }}
               </span>
             </div>
             <div v-if="enableServiceRates" class="mt-3 space-y-2">
@@ -87,7 +87,7 @@
                   step="0.1"
                   type="number"
                 />
-                <span class="text-xs text-gray-400">默认 1.0</span>
+                <span class="text-xs text-gray-400">{{ t('apiKeyForm.defaultRate') }}</span>
               </div>
             </div>
           </div>
@@ -96,7 +96,7 @@
           <div>
             <label
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
-              >所有者</label
+              >{{ t('apiKeyForm.owner') }}</label
             >
             <select
               v-model="form.ownerId"
@@ -104,11 +104,13 @@
             >
               <option v-for="user in availableUsers" :key="user.id" :value="user.id">
                 {{ user.displayName }} ({{ user.username }})
-                <span v-if="user.role === 'admin'" class="text-gray-500">- 管理员</span>
+                <span v-if="user.role === 'admin'" class="text-gray-500"
+                  >- {{ t('apiKeys.admin') }}</span
+                >
               </option>
             </select>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
-              分配此 API Key 给指定用户或管理员，管理员分配时不受用户 API Key 数量限制
+              {{ t('apiKeyForm.ownerHint') }}
             </p>
           </div>
 
@@ -116,13 +118,13 @@
           <div>
             <label
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
-              >标签</label
+              >{{ t('apiKeyForm.tags') }}</label
             >
             <div class="space-y-4">
               <!-- 已选择的标签 -->
               <div v-if="form.tags.length > 0">
                 <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                  已选择的标签:
+                  {{ t('apiKeyForm.selectedTags') }}
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <span
@@ -145,7 +147,7 @@
               <!-- 可选择的已有标签 -->
               <div v-if="unselectedTags.length > 0">
                 <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                  点击选择已有标签:
+                  {{ t('apiKeyForm.selectExistingTags') }}
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <button
@@ -164,13 +166,13 @@
               <!-- 创建新标签 -->
               <div>
                 <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                  创建新标签:
+                  {{ t('apiKeyForm.createNewTag') }}
                 </div>
                 <div class="flex gap-2">
                   <input
                     v-model="newTag"
                     class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                    placeholder="输入新标签名称"
+                    :placeholder="t('apiKeyForm.newTagPlaceholder')"
                     type="text"
                     @keypress.enter.prevent="addTag"
                   />
@@ -185,7 +187,7 @@
               </div>
 
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                用于标记不同团队或用途，方便筛选管理
+                {{ t('apiKeyForm.tagsHint') }}
               </p>
             </div>
           </div>
@@ -201,68 +203,79 @@
                 <i class="fas fa-tachometer-alt text-xs text-white" />
               </div>
               <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                速率限制设置 (可选)
+                {{ t('apiKeyForm.rateLimitSettings') }}
               </h4>
             </div>
 
             <div class="space-y-2">
               <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >时间窗口 (分钟)</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    t('apiKeyForm.timeWindowMinutes')
+                  }}</label>
                   <input
                     v-model="form.rateLimitWindow"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
-                    placeholder="无限制"
+                    :placeholder="t('apiKeys.unlimited')"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">时间段单位</p>
+                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('apiKeyForm.timeWindowHelp') }}
+                  </p>
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >请求次数限制</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    t('apiKeyForm.requestLimit')
+                  }}</label>
                   <input
                     v-model="form.rateLimitRequests"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="1"
-                    placeholder="无限制"
+                    :placeholder="t('apiKeys.unlimited')"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">窗口内最大请求</p>
+                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('apiKeyForm.maxRequestsInWindow') }}
+                  </p>
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
-                    >费用限制 (美元)</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    t('apiKeyForm.costLimitUsd')
+                  }}</label>
                   <input
                     v-model="form.rateLimitCost"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                     min="0"
-                    placeholder="无限制"
+                    :placeholder="t('apiKeys.unlimited')"
                     step="0.01"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">窗口内最大费用</p>
+                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('apiKeyForm.maxCostInWindow') }}
+                  </p>
                 </div>
               </div>
 
               <!-- 示例说明 -->
               <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
                 <h5 class="mb-1 text-xs font-semibold text-blue-800 dark:text-blue-400">
-                  💡 使用示例
+                  {{ t('apiKeyForm.examplesTitle') }}
                 </h5>
                 <div class="space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
                   <div>
-                    <strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求
+                    <strong>{{ t('apiKeyForm.example1Label') }}</strong>
+                    {{ t('apiKeyForm.example1') }}
                   </div>
-                  <div><strong>示例2:</strong> 时间窗口=1，费用=0.1 → 每分钟最多$0.1费用</div>
                   <div>
-                    <strong>示例3:</strong> 窗口=30，请求=50，费用=5 → 每30分钟50次请求且不超$5费用
+                    <strong>{{ t('apiKeyForm.example2Label') }}</strong>
+                    {{ t('apiKeyForm.example2') }}
+                  </div>
+                  <div>
+                    <strong>{{ t('apiKeyForm.example3Label') }}</strong>
+                    {{ t('apiKeyForm.example3') }}
                   </div>
                 </div>
               </div>
@@ -270,9 +283,9 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >每日费用限制 (美元)</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeyForm.dailyCostLimitUsd')
+            }}</label>
             <div class="space-y-3">
               <div class="flex gap-2">
                 <button
@@ -301,27 +314,27 @@
                   type="button"
                   @click="form.dailyCostLimit = ''"
                 >
-                  自定义
+                  {{ t('apiKeyForm.custom') }}
                 </button>
               </div>
               <input
                 v-model="form.dailyCostLimit"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
-                placeholder="0 表示无限制"
+                :placeholder="t('apiKeyForm.zeroMeansUnlimited')"
                 step="0.01"
                 type="number"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置此 API Key 每日的费用限制，超过限制将拒绝请求，0 或留空表示无限制
+                {{ t('apiKeyForm.dailyCostHelp') }}
               </p>
             </div>
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >总费用限制 (美元)</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeyForm.totalCostLimitUsd')
+            }}</label>
             <div class="space-y-3">
               <div class="flex gap-2">
                 <button
@@ -350,27 +363,27 @@
                   type="button"
                   @click="form.totalCostLimit = ''"
                 >
-                  自定义
+                  {{ t('apiKeyForm.custom') }}
                 </button>
               </div>
               <input
                 v-model="form.totalCostLimit"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
-                placeholder="0 表示无限制"
+                :placeholder="t('apiKeyForm.zeroMeansUnlimited')"
                 step="0.01"
                 type="number"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置此 API Key 的累计总费用限制，达到限制后将拒绝所有后续请求，0 或留空表示无限制
+                {{ t('apiKeyForm.totalCostHelp') }}
               </p>
             </div>
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >Claude 模型周费用限制 (美元)</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeyForm.weeklyClaudeCostLimitUsd')
+            }}</label>
             <div class="space-y-3">
               <div class="flex gap-2">
                 <button
@@ -399,45 +412,45 @@
                   type="button"
                   @click="form.weeklyOpusCostLimit = ''"
                 >
-                  自定义
+                  {{ t('apiKeyForm.custom') }}
                 </button>
               </div>
               <input
                 v-model="form.weeklyOpusCostLimit"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                 min="0"
-                placeholder="0 表示无限制"
+                :placeholder="t('apiKeyForm.zeroMeansUnlimited')"
                 step="0.01"
                 type="number"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                设置 Claude 模型的周费用限制，仅对 Claude 模型请求生效，0 或留空表示无限制
+                {{ t('apiKeyForm.weeklyClaudeCostHelp') }}
               </p>
               <div
                 v-if="form.weeklyOpusCostLimit && Number(form.weeklyOpusCostLimit) > 0"
                 class="mt-3 flex gap-3"
               >
                 <div class="flex-1">
-                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
-                    >重置日</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{
+                    t('apiKeyForm.resetDay')
+                  }}</label>
                   <select
                     v-model="form.weeklyResetDay"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                   >
-                    <option :value="1">周一</option>
-                    <option :value="2">周二</option>
-                    <option :value="3">周三</option>
-                    <option :value="4">周四</option>
-                    <option :value="5">周五</option>
-                    <option :value="6">周六</option>
-                    <option :value="7">周日</option>
+                    <option :value="1">{{ t('apiKeyForm.weekdays.mon') }}</option>
+                    <option :value="2">{{ t('apiKeyForm.weekdays.tue') }}</option>
+                    <option :value="3">{{ t('apiKeyForm.weekdays.wed') }}</option>
+                    <option :value="4">{{ t('apiKeyForm.weekdays.thu') }}</option>
+                    <option :value="5">{{ t('apiKeyForm.weekdays.fri') }}</option>
+                    <option :value="6">{{ t('apiKeyForm.weekdays.sat') }}</option>
+                    <option :value="7">{{ t('apiKeyForm.weekdays.sun') }}</option>
                   </select>
                 </div>
                 <div class="flex-1">
-                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
-                    >重置时间 (UTC+8)</label
-                  >
+                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{
+                    t('apiKeyForm.resetTimeUtc8')
+                  }}</label>
                   <select
                     v-model="form.weeklyResetHour"
                     class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
@@ -452,18 +465,18 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >并发限制</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeyForm.concurrencyLimitShort')
+            }}</label>
             <input
               v-model="form.concurrencyLimit"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
               min="0"
-              placeholder="0 表示无限制"
+              :placeholder="t('apiKeyForm.zeroMeansUnlimited')"
               type="number"
             />
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              设置此 API Key 可同时处理的最大请求数
+              {{ t('apiKeyForm.concurrencyHelpShort') }}
             </p>
           </div>
 
@@ -480,18 +493,18 @@
                 class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
                 for="editIsActive"
               >
-                激活账号
+                {{ t('apiKeyForm.activeAccount') }}
               </label>
             </div>
             <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">
-              取消勾选将禁用此 API Key，暂停所有请求，客户端返回 401 错误
+              {{ t('apiKeyForm.activeAccountHint') }}
             </p>
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >服务权限</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeyForm.servicePermissions')
+            }}</label>
             <div class="flex flex-wrap gap-4">
               <label class="flex cursor-pointer items-center">
                 <input
@@ -535,7 +548,7 @@
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              不选择任何服务表示允许访问全部服务
+              {{ t('apiKeyForm.servicePermissionsHint') }}
             </p>
           </div>
 
@@ -549,7 +562,7 @@
                 <i class="fas fa-sliders-h text-xs text-white" />
               </div>
               <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                OpenAI Responses 请求处理
+                {{ t('apiKeyForm.openaiResponsesHandling') }}
               </h4>
             </div>
 
@@ -563,18 +576,16 @@
                 <span class="flex-1">
                   <span class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     <span class="inline-flex items-center gap-1">
-                      <span>非 Codex 请求兼容为 Codex 风格</span>
+                      <span>{{ t('apiKeyForm.codexAdaptation') }}</span>
                       <el-tooltip placement="top">
                         <template #content>
                           <div class="w-[250px] space-y-2 text-xs leading-relaxed">
-                            <div>只对 `/openai/responses` 和 `/openai/v1/responses` 生效。</div>
+                            <div>{{ t('apiKeyForm.codexAdaptationTip1') }}</div>
                             <div>
-                              关闭后不再做 Codex 风格字段改写，会保留原始 `text`、`service_tier`
-                              等字段。
+                              {{ t('apiKeyForm.codexAdaptationTip2') }}
                             </div>
                             <div>
-                              普通 OpenAI 账号仍会保留必要的 `gpt-5-*` 模型名兼容，
-                              方便调度和上游请求继续命中 `gpt-5`。
+                              {{ t('apiKeyForm.codexAdaptationTip3') }}
                             </div>
                           </div>
                         </template>
@@ -598,12 +609,12 @@
                 <span class="flex-1">
                   <span class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     <span class="inline-flex items-center gap-1">
-                      <span>启用 Payload 规则</span>
+                      <span>{{ t('apiKeyForm.enablePayloadRules') }}</span>
                       <el-tooltip placement="top">
                         <template #content>
                           <div class="w-[240px] space-y-2 text-xs leading-relaxed">
-                            <div>开启后会按顺序写入字段。</div>
-                            <div>只填字段不填值时，会把该字段写成空字符串。</div>
+                            <div>{{ t('apiKeyForm.payloadRulesTip1') }}</div>
+                            <div>{{ t('apiKeyForm.payloadRulesTip2') }}</div>
                           </div>
                         </template>
                         <span class="inline-flex" @click.stop.prevent>
@@ -625,12 +636,12 @@
                   <div
                     class="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    <span>Payload 规则</span>
+                    <span>{{ t('apiKeyForm.payloadRules') }}</span>
                     <el-tooltip placement="top">
                       <template #content>
                         <div class="w-[240px] space-y-2 text-xs leading-relaxed">
-                          <div>规则会按列表顺序依次执行，后面的规则可以覆盖前面的结果。</div>
-                          <div>两个开关都开启时，先做 Codex 风格兼容，再应用这里的规则。</div>
+                          <div>{{ t('apiKeyForm.payloadRulesOrderTip') }}</div>
+                          <div>{{ t('apiKeyForm.payloadRulesCombinedTip') }}</div>
                         </div>
                       </template>
                       <span class="inline-flex" @click.stop.prevent>
@@ -646,7 +657,7 @@
                     @click="addPayloadRule"
                   >
                     <i class="fas fa-plus mr-1" />
-                    新增规则
+                    {{ t('apiKeyForm.addRule') }}
                   </button>
                 </div>
 
@@ -658,7 +669,7 @@
                   >
                     <div class="mb-3 flex items-center justify-between">
                       <span class="text-xs font-medium uppercase tracking-wide text-gray-500">
-                        规则 {{ index + 1 }}
+                        {{ t('apiKeyForm.ruleNumber', { count: index + 1 }) }}
                       </span>
                       <button
                         class="text-sm text-red-500 transition-colors hover:text-red-600"
@@ -674,12 +685,12 @@
                         <label
                           class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
                         >
-                          字段路径
+                          {{ t('apiKeyForm.fieldPath') }}
                         </label>
                         <input
                           v-model="rule.path"
                           class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                          placeholder="例如 text.format.type"
+                          :placeholder="t('apiKeyForm.fieldPathPlaceholder')"
                           type="text"
                         />
                       </div>
@@ -688,7 +699,7 @@
                         <label
                           class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
                         >
-                          值类型
+                          {{ t('apiKeyForm.valueType') }}
                         </label>
                         <select
                           v-model="rule.valueType"
@@ -709,13 +720,13 @@
                       <label
                         class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
                       >
-                        值
+                        {{ t('apiKeyForm.value') }}
                       </label>
                       <textarea
                         v-if="rule.valueType === 'json'"
                         v-model="rule.value"
                         class="form-input w-full resize-y border-gray-300 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                        placeholder='例如 {"type":"json_schema"}'
+                        :placeholder="t('apiKeyForm.jsonValuePlaceholder')"
                         rows="4"
                       />
                       <input
@@ -724,10 +735,10 @@
                         class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
                         :placeholder="
                           rule.valueType === 'boolean'
-                            ? 'true 或 false'
+                            ? t('apiKeyForm.booleanValuePlaceholder')
                             : rule.valueType === 'number'
-                              ? '例如 123'
-                              : '留空则写入空字符串'
+                              ? t('apiKeyForm.numberValuePlaceholder')
+                              : t('apiKeyForm.emptyStringPlaceholder')
                         "
                         type="text"
                       />
@@ -738,7 +749,7 @@
                     v-if="form.openaiResponsesPayloadRules.length === 0"
                     class="rounded-lg border border-dashed border-emerald-200 px-4 py-6 text-center text-sm text-gray-500 dark:border-emerald-800 dark:text-gray-400"
                   >
-                    还没有规则，点右上角新增一条。
+                    {{ t('apiKeyForm.noPayloadRules') }}
                   </div>
                 </div>
               </div>
@@ -747,13 +758,13 @@
 
           <div>
             <div class="mb-3 flex items-center justify-between">
-              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >专属账号绑定</label
-              >
+              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('apiKeyForm.dedicatedAccountBindingShort')
+              }}</label>
               <button
                 class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                 :disabled="accountsLoading"
-                title="刷新账号列表"
+                :title="t('apiKeyForm.refreshAccounts')"
                 type="button"
                 @click="refreshAccounts"
               >
@@ -764,83 +775,87 @@
                     'text-xs'
                   ]"
                 />
-                <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
+                <span>{{
+                  accountsLoading
+                    ? t('apiKeyForm.refreshingAccounts')
+                    : t('apiKeyForm.refreshAccounts')
+                }}</span>
               </button>
             </div>
             <div class="grid grid-cols-1 gap-3">
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Claude 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  t('apiKeyForm.claudeDedicatedAccount')
+                }}</label>
                 <AccountSelector
                   v-model="form.claudeAccountId"
                   :accounts="localAccounts.claude"
-                  default-option-text="使用共享账号池"
+                  :default-option-text="t('apiKeys.useSharedPool')"
                   :disabled="form.permissions.length > 0 && !form.permissions.includes('claude')"
                   :groups="localAccounts.claudeGroups"
-                  placeholder="请选择Claude账号"
+                  :placeholder="t('apiKeyForm.selectClaudeAccount')"
                   platform="claude"
                 />
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Gemini 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  t('apiKeyForm.geminiDedicatedAccount')
+                }}</label>
                 <AccountSelector
                   v-model="form.geminiAccountId"
                   :accounts="localAccounts.gemini"
-                  default-option-text="使用共享账号池"
+                  :default-option-text="t('apiKeys.useSharedPool')"
                   :disabled="form.permissions.length > 0 && !form.permissions.includes('gemini')"
                   :groups="localAccounts.geminiGroups"
-                  placeholder="请选择Gemini账号"
+                  :placeholder="t('apiKeyForm.selectGeminiAccount')"
                   platform="gemini"
                 />
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >OpenAI 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  t('apiKeyForm.openaiDedicatedAccount')
+                }}</label>
                 <AccountSelector
                   v-model="form.openaiAccountId"
                   :accounts="localAccounts.openai"
-                  default-option-text="使用共享账号池"
+                  :default-option-text="t('apiKeys.useSharedPool')"
                   :disabled="form.permissions.length > 0 && !form.permissions.includes('openai')"
                   :groups="localAccounts.openaiGroups"
-                  placeholder="请选择OpenAI账号"
+                  :placeholder="t('apiKeyForm.selectOpenAIAccount')"
                   platform="openai"
                 />
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Bedrock 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  t('apiKeyForm.bedrockDedicatedAccount')
+                }}</label>
                 <AccountSelector
                   v-model="form.bedrockAccountId"
                   :accounts="localAccounts.bedrock"
-                  default-option-text="使用共享账号池"
+                  :default-option-text="t('apiKeys.useSharedPool')"
                   :disabled="form.permissions.length > 0 && !form.permissions.includes('claude')"
                   :groups="[]"
-                  placeholder="请选择Bedrock账号"
+                  :placeholder="t('apiKeyForm.selectBedrockAccount')"
                   platform="bedrock"
                 />
               </div>
               <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Droid 专属账号</label
-                >
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  t('apiKeyForm.droidDedicatedAccount')
+                }}</label>
                 <AccountSelector
                   v-model="form.droidAccountId"
                   :accounts="localAccounts.droid"
-                  default-option-text="使用共享账号池"
+                  :default-option-text="t('apiKeys.useSharedPool')"
                   :disabled="form.permissions.length > 0 && !form.permissions.includes('droid')"
                   :groups="localAccounts.droidGroups"
-                  placeholder="请选择Droid账号"
+                  :placeholder="t('apiKeyForm.selectDroidAccount')"
                   platform="droid"
                 />
               </div>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              修改绑定账号将影响此API Key的请求路由
+              {{ t('apiKeyForm.bindingRouteHint') }}
             </p>
           </div>
 
@@ -856,15 +871,15 @@
                 class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
                 for="editEnableModelRestriction"
               >
-                启用模型限制
+                {{ t('apiKeyForm.enableModelRestriction') }}
               </label>
             </div>
 
             <div v-if="form.enableModelRestriction" class="space-y-3">
               <div>
-                <label class="mb-2 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >限制的模型列表</label
-                >
+                <label class="mb-2 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  t('apiKeyForm.restrictedModels')
+                }}</label>
                 <div
                   class="mb-3 flex min-h-[32px] flex-wrap gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700"
                 >
@@ -886,7 +901,7 @@
                     v-if="form.restrictedModels.length === 0"
                     class="text-sm text-gray-400 dark:text-gray-500"
                   >
-                    暂无限制的模型
+                    {{ t('apiKeyForm.noRestrictedModels') }}
                   </span>
                 </div>
                 <div class="space-y-3">
@@ -905,7 +920,7 @@
                       v-if="availableQuickModels.length === 0"
                       class="text-sm italic text-gray-400 dark:text-gray-500"
                     >
-                      所有常用模型已在限制列表中
+                      {{ t('apiKeyForm.allCommonModelsRestricted') }}
                     </span>
                   </div>
 
@@ -914,7 +929,7 @@
                     <input
                       v-model="form.modelInput"
                       class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                      placeholder="输入模型名称，按回车添加"
+                      :placeholder="t('apiKeyForm.modelInputPlaceholder')"
                       type="text"
                       @keydown.enter.prevent="addRestrictedModel"
                     />
@@ -928,7 +943,7 @@
                   </div>
                 </div>
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  设置此API Key无法访问的模型，例如：claude-opus-4-20250514
+                  {{ t('apiKeyForm.modelRestrictionHint') }}
                 </p>
               </div>
             </div>
@@ -947,17 +962,17 @@
                 class="ml-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300"
                 for="editEnableClientRestriction"
               >
-                启用客户端限制
+                {{ t('apiKeyForm.enableClientRestriction') }}
               </label>
             </div>
 
             <div v-if="form.enableClientRestriction" class="space-y-3">
               <div>
-                <label class="mb-2 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >允许的客户端</label
-                >
+                <label class="mb-2 block text-sm font-medium text-gray-600 dark:text-gray-400">{{
+                  t('apiKeyForm.allowedClients')
+                }}</label>
                 <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                  勾选允许使用此API Key的客户端
+                  {{ t('apiKeyForm.allowedClientsHint') }}
                 </p>
                 <div class="space-y-2">
                   <div v-for="client in supportedClients" :key="client.id" class="flex items-start">
@@ -988,7 +1003,7 @@
               type="button"
               @click="$emit('close')"
             >
-              取消
+              {{ t('common.cancel') }}
             </button>
             <button
               class="btn btn-primary flex-1 px-6 py-3 font-semibold"
@@ -997,7 +1012,7 @@
             >
               <div v-if="loading" class="loading-spinner mr-2" />
               <i v-else class="fas fa-save mr-2" />
-              {{ loading ? '保存中...' : '保存修改' }}
+              {{ loading ? t('common.saving') : t('apiKeyForm.saveChanges') }}
             </button>
           </div>
         </form>
@@ -1020,6 +1035,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/tools'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
@@ -1051,6 +1067,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success'])
 
+const { t } = useI18n()
 // const authStore = useAuthStore()
 const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
@@ -1063,16 +1080,16 @@ const confirmModalConfig = ref({
   title: '',
   message: '',
   type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
+  confirmText: t('common.confirm'),
+  cancelText: t('common.cancel')
 })
 const confirmResolve = ref(null)
 
 const showConfirm = (
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText = t('common.confirm'),
+  cancelText = t('common.cancel'),
   type = 'primary'
 ) => {
   return new Promise((resolve) => {
@@ -1130,9 +1147,9 @@ const availableServices = [
 ]
 
 const payloadRuleValueTypeOptions = [
-  { value: 'string', label: '字符串' },
-  { value: 'number', label: '数字' },
-  { value: 'boolean', label: '布尔' },
+  { value: 'string', label: t('apiKeyForm.valueTypes.string') },
+  { value: 'number', label: t('apiKeyForm.valueTypes.number') },
+  { value: 'boolean', label: t('apiKeyForm.valueTypes.boolean') },
   { value: 'json', label: 'JSON' }
 ]
 
@@ -1259,7 +1276,7 @@ const buildPayloadRulesForSubmit = () => {
 
     if (rule.valueType === 'number') {
       if (!Number.isFinite(Number(rule.value))) {
-        showToast(`字段 ${rule.path} 的值不是合法数字`, 'error')
+        showToast(t('apiKeyForm.errors.invalidNumber', { path: rule.path }), 'error')
         return null
       }
       continue
@@ -1268,7 +1285,7 @@ const buildPayloadRulesForSubmit = () => {
     if (rule.valueType === 'boolean') {
       const normalized = rule.value.trim().toLowerCase()
       if (normalized !== 'true' && normalized !== 'false') {
-        showToast(`字段 ${rule.path} 的值必须是 true 或 false`, 'error')
+        showToast(t('apiKeyForm.errors.invalidBoolean', { path: rule.path }), 'error')
         return null
       }
       continue
@@ -1278,7 +1295,7 @@ const buildPayloadRulesForSubmit = () => {
       try {
         JSON.parse(rule.value)
       } catch (error) {
-        showToast(`字段 ${rule.path} 的值不是合法 JSON`, 'error')
+        showToast(t('apiKeyForm.errors.invalidJson', { path: rule.path }), 'error')
         return null
       }
     }
@@ -1301,10 +1318,10 @@ const updateApiKey = async () => {
   // 检查是否设置了时间窗口但费用限制为0
   if (form.rateLimitWindow && (!form.rateLimitCost || parseFloat(form.rateLimitCost) === 0)) {
     const confirmed = await showConfirm(
-      '费用限制提醒',
-      '您设置了时间窗口但费用限制为0，这意味着不会有费用限制。\n\n是否继续？',
-      '继续保存',
-      '返回修改',
+      t('apiKeyForm.confirm.costLimitTitle'),
+      t('apiKeyForm.confirm.costLimitMessage'),
+      t('apiKeyForm.confirm.continueSave'),
+      t('apiKeyForm.confirm.backToEdit'),
       'warning'
     )
     if (!confirmed) {
@@ -1444,10 +1461,10 @@ const updateApiKey = async () => {
       emit('success')
       emit('close')
     } else {
-      showToast(result.message || '更新失败', 'error')
+      showToast(result.message || t('apiKeyForm.toast.updateFailed'), 'error')
     }
   } catch (error) {
-    showToast('更新失败', 'error')
+    showToast(t('apiKeyForm.toast.updateFailed'), 'error')
   } finally {
     loading.value = false
   }
@@ -1578,9 +1595,9 @@ const refreshAccounts = async () => {
       localAccounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
     }
 
-    showToast('账号列表已刷新', 'success')
+    showToast(t('apiKeyForm.toast.accountsRefreshed'), 'success')
   } catch (error) {
-    showToast('刷新账号列表失败', 'error')
+    showToast(t('apiKeyForm.toast.refreshAccountsFailed'), 'error')
   } finally {
     accountsLoading.value = false
   }

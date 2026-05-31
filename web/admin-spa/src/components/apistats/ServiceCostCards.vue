@@ -5,10 +5,10 @@
     >
       <span class="flex items-center">
         <i class="fas fa-coins mr-2 text-sm text-amber-500 md:mr-3 md:text-base" />
-        服务费用统计
+        {{ t('apiStatsComponents.serviceCost.title') }}
       </span>
       <span class="text-xs font-normal text-gray-500 dark:text-gray-400">
-        计费 = 官方费用 × 全局倍率 × Key倍率
+        {{ t('apiStatsComponents.serviceCost.formula') }}
       </span>
     </h3>
 
@@ -26,14 +26,14 @@
           <div class="flex items-center gap-1">
             <span
               class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-              title="全局倍率"
+              :title="t('apiStatsComponents.serviceCost.globalRateTitle')"
             >
-              全局 {{ service.globalRate }}x
+              {{ t('apiStatsComponents.serviceCost.globalRate', { rate: service.globalRate }) }}
             </span>
             <span
               v-if="!multiKeyMode"
               class="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-              title="Key倍率"
+              :title="t('apiStatsComponents.serviceCost.keyRateTitle')"
             >
               Key {{ service.keyRate }}x
             </span>
@@ -43,25 +43,25 @@
         <!-- Token 详情 -->
         <div class="mb-2 space-y-0.5 text-xs text-gray-600 dark:text-gray-400">
           <div class="flex justify-between">
-            <span>输入</span>
+            <span>{{ t('apiStatsComponents.serviceCost.input') }}</span>
             <span class="text-gray-900 dark:text-gray-200">{{
               formatNumber(service.inputTokens)
             }}</span>
           </div>
           <div class="flex justify-between">
-            <span>输出</span>
+            <span>{{ t('apiStatsComponents.serviceCost.output') }}</span>
             <span class="text-gray-900 dark:text-gray-200">{{
               formatNumber(service.outputTokens)
             }}</span>
           </div>
           <div v-if="service.cacheCreateTokens" class="flex justify-between">
-            <span>缓存创建</span>
+            <span>{{ t('apiStatsComponents.serviceCost.cacheCreate') }}</span>
             <span class="text-gray-900 dark:text-gray-200">{{
               formatNumber(service.cacheCreateTokens)
             }}</span>
           </div>
           <div v-if="service.cacheReadTokens" class="flex justify-between">
-            <span>缓存读取</span>
+            <span>{{ t('apiStatsComponents.serviceCost.cacheRead') }}</span>
             <span class="text-gray-900 dark:text-gray-200">{{
               formatNumber(service.cacheReadTokens)
             }}</span>
@@ -71,13 +71,17 @@
         <!-- 费用 -->
         <div class="mb-2 space-y-0.5 border-t border-gray-200 pt-2 text-xs dark:border-gray-700">
           <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">官方API</span>
+            <span class="text-gray-600 dark:text-gray-400">{{
+              t('apiStatsComponents.serviceCost.officialApi')
+            }}</span>
             <span class="font-semibold text-green-600 dark:text-green-400">
               {{ service.officialCost }}
             </span>
           </div>
           <div class="flex justify-between">
-            <span class="text-gray-600 dark:text-gray-400">计费费用</span>
+            <span class="text-gray-600 dark:text-gray-400">{{
+              t('apiStatsComponents.serviceCost.billedCost')
+            }}</span>
             <span class="font-semibold text-amber-600 dark:text-amber-400">
               {{ service.ccCost }}
             </span>
@@ -90,19 +94,19 @@
           class="space-y-0.5 border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-500"
         >
           <div class="flex justify-between">
-            <span>输入</span>
+            <span>{{ t('apiStatsComponents.serviceCost.input') }}</span>
             <span>{{ service.pricing.input }}/M</span>
           </div>
           <div class="flex justify-between">
-            <span>输出</span>
+            <span>{{ t('apiStatsComponents.serviceCost.output') }}</span>
             <span>{{ service.pricing.output }}/M</span>
           </div>
           <div v-if="service.pricing.cacheCreate" class="flex justify-between">
-            <span>缓存创建</span>
+            <span>{{ t('apiStatsComponents.serviceCost.cacheCreate') }}</span>
             <span>{{ service.pricing.cacheCreate }}/M</span>
           </div>
           <div v-if="service.pricing.cacheRead" class="flex justify-between">
-            <span>缓存读取</span>
+            <span>{{ t('apiStatsComponents.serviceCost.cacheRead') }}</span>
             <span>{{ service.pricing.cacheRead }}/M</span>
           </div>
         </div>
@@ -114,11 +118,13 @@
 <script setup>
 import { formatNumber } from '@/utils/tools'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 
 const apiStatsStore = useApiStatsStore()
 const { modelStats, serviceRates, keyServiceRates, multiKeyMode } = storeToRefs(apiStatsStore)
+const { t } = useI18n()
 
 // 服务标签映射
 const serviceLabels = {

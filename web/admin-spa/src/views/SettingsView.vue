@@ -4,9 +4,11 @@
       <!-- 页面标题 -->
       <div class="mb-4 sm:mb-6">
         <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
-          系统设置
+          {{ t('settings.auto.auto001') }}
         </h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">网站定制和通知配置</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
+          {{ t('settings.auto.auto002') }}
+        </p>
       </div>
 
       <!-- 设置分类导航 -->
@@ -21,8 +23,7 @@
             ]"
             @click="activeSection = 'branding'"
           >
-            <i class="fas fa-palette mr-2"></i>
-            品牌设置
+            <i class="fas fa-palette mr-2"></i> {{ t('settings.auto.auto003') }}
           </button>
           <button
             :class="[
@@ -33,8 +34,7 @@
             ]"
             @click="activeSection = 'webhook'"
           >
-            <i class="fas fa-bell mr-2"></i>
-            通知设置
+            <i class="fas fa-bell mr-2"></i> {{ t('settings.auto.auto004') }}
           </button>
           <button
             :class="[
@@ -45,8 +45,7 @@
             ]"
             @click="activeSection = 'claude'"
           >
-            <i class="fas fa-robot mr-2"></i>
-            Claude 转发
+            <i class="fas fa-robot mr-2"></i> {{ t('settings.auto.auto005') }}
           </button>
           <button
             :class="[
@@ -57,8 +56,7 @@
             ]"
             @click="activeSection = 'serviceRates'"
           >
-            <i class="fas fa-balance-scale mr-2"></i>
-            服务倍率
+            <i class="fas fa-balance-scale mr-2"></i> {{ t('settings.auto.auto006') }}
           </button>
           <button
             :class="[
@@ -69,8 +67,7 @@
             ]"
             @click="activeSection = 'modelPricing'"
           >
-            <i class="fas fa-coins mr-2"></i>
-            模型价格
+            <i class="fas fa-coins mr-2"></i> {{ t('settings.auto.auto007') }}
           </button>
         </nav>
       </div>
@@ -78,7 +75,7 @@
       <!-- 加载状态 -->
       <div v-if="loading" class="py-12 text-center">
         <div class="loading-spinner mx-auto mb-4"></div>
-        <p class="text-gray-500 dark:text-gray-400">正在加载设置...</p>
+        <p class="text-gray-500 dark:text-gray-400">{{ t('settings.auto.auto008') }}</p>
       </div>
 
       <!-- 内容区域 -->
@@ -100,9 +97,11 @@
                       </div>
                       <div>
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          网站名称
+                          {{ t('settings.auto.auto009') }}
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">品牌标识</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                          {{ t('settings.auto.auto010') }}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -115,7 +114,7 @@
                       type="text"
                     />
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      将显示在浏览器标题和页面头部
+                      {{ t('settings.auto.auto011') }}
                     </p>
                   </td>
                 </tr>
@@ -131,7 +130,7 @@
                       </div>
                       <div>
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          网站图标
+                          {{ t('settings.auto.auto012') }}
                         </div>
                         <div class="text-xs text-gray-500 dark:text-gray-400">Favicon</div>
                       </div>
@@ -145,17 +144,19 @@
                         class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
                       >
                         <img
-                          alt="图标预览"
+                          :alt="t('settings.auto.auto013')"
                           class="h-8 w-8"
                           :src="oemSettings.siteIconData || oemSettings.siteIcon"
                           @error="handleIconError"
                         />
-                        <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                          t('settings.auto.auto014')
+                        }}</span>
                         <button
                           class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
                           @click="removeIcon"
                         >
-                          <i class="fas fa-trash mr-1" />删除
+                          <i class="fas fa-trash mr-1" />{{ t('settings.auto.auto015') }}
                         </button>
                       </div>
 
@@ -172,12 +173,11 @@
                           class="btn btn-success px-4 py-2"
                           @click="$refs.iconFileInput.click()"
                         >
-                          <i class="fas fa-upload mr-2" />
-                          上传图标
+                          <i class="fas fa-upload mr-2" /> {{ t('settings.auto.auto016') }}
                         </button>
-                        <span class="ml-3 text-xs text-gray-500 dark:text-gray-400"
-                          >支持 .ico, .png, .jpg, .svg 格式，最大 350KB</span
-                        >
+                        <span class="ml-3 text-xs text-gray-500 dark:text-gray-400">{{
+                          t('settings.auto.auto017')
+                        }}</span>
                       </div>
                     </div>
                   </td>
@@ -194,9 +194,11 @@
                       </div>
                       <div>
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          管理入口
+                          {{ t('settings.auto.auto018') }}
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">登录按钮显示</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                          {{ t('settings.auto.auto019') }}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -208,12 +210,14 @@
                           class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
                         ></div>
                         <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
-                          hideAdminButton ? '隐藏登录按钮' : '显示登录按钮'
+                          hideAdminButton
+                            ? t('settings.manual.hideLoginButton')
+                            : t('settings.manual.showLoginButton')
                         }}</span>
                       </label>
                     </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      隐藏后，用户需要直接访问 /admin/login 页面登录
+                      {{ t('settings.auto.auto020') }}
                     </p>
                   </td>
                 </tr>
@@ -229,7 +233,7 @@
                       </div>
                       <div>
                         <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          统计页通知
+                          {{ t('settings.auto.auto021') }}
                         </div>
                         <div class="text-xs text-gray-500 dark:text-gray-400">API Stats</div>
                       </div>
@@ -247,32 +251,34 @@
                           class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
                         ></div>
                         <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
-                          oemSettings.apiStatsNotice.enabled ? '已启用' : '已禁用'
+                          oemSettings.apiStatsNotice.enabled
+                            ? t('settings.manual.enabled')
+                            : t('settings.manual.disabled')
                         }}</span>
                       </label>
                     </div>
                     <div v-if="oemSettings.apiStatsNotice.enabled" class="mt-3 space-y-3">
                       <div>
                         <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">
-                          标题
+                          {{ t('settings.auto.auto022') }}
                         </label>
                         <input
                           v-model="oemSettings.apiStatsNotice.title"
                           class="form-input w-full max-w-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                           maxlength="100"
-                          placeholder="通知标题"
+                          :placeholder="t('settings.auto.auto023')"
                           type="text"
                         />
                       </div>
                       <div>
                         <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">
-                          内容
+                          {{ t('settings.auto.auto024') }}
                         </label>
                         <textarea
                           v-model="oemSettings.apiStatsNotice.content"
                           class="form-input w-full max-w-md resize-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                           maxlength="2000"
-                          placeholder="通知内容（支持换行）"
+                          :placeholder="t('settings.auto.auto025')"
                           rows="3"
                         ></textarea>
                       </div>
@@ -293,7 +299,7 @@
                         >
                           <div v-if="saving" class="loading-spinner mr-2"></div>
                           <i v-else class="fas fa-save mr-2" />
-                          {{ saving ? '保存中...' : '保存设置' }}
+                          {{ saving ? t('common.saving') : t('settings.manual.saveSettings') }}
                         </button>
 
                         <button
@@ -301,8 +307,7 @@
                           :disabled="saving"
                           @click="resetOemSettings"
                         >
-                          <i class="fas fa-undo mr-2" />
-                          重置为默认
+                          <i class="fas fa-undo mr-2" /> {{ t('settings.auto.auto026') }}
                         </button>
                       </div>
 
@@ -310,8 +315,8 @@
                         v-if="oemSettings.updatedAt"
                         class="text-sm text-gray-500 dark:text-gray-400"
                       >
-                        <i class="fas fa-clock mr-1" />
-                        最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
+                        <i class="fas fa-clock mr-1" /> {{ t('settings.auto.auto027')
+                        }}{{ formatDateTime(oemSettings.updatedAt) }}
                       </div>
                     </div>
                   </td>
@@ -331,8 +336,12 @@
                   <i class="fas fa-tag"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">站点名称</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">自定义您的站点品牌名称</p>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    {{ t('settings.auto.auto028') }}
+                  </h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('settings.auto.auto029') }}
+                  </p>
                 </div>
               </div>
               <input
@@ -353,9 +362,11 @@
                   <i class="fas fa-image"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">站点图标</h3>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    {{ t('settings.auto.auto030') }}
+                  </h3>
                   <p class="text-sm text-gray-500 dark:text-gray-400">
-                    上传自定义图标或输入图标URL
+                    {{ t('settings.auto.auto031') }}
                   </p>
                 </div>
               </div>
@@ -366,17 +377,19 @@
                   class="inline-flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
                 >
                   <img
-                    alt="图标预览"
+                    :alt="t('settings.auto.auto013')"
                     class="h-8 w-8"
                     :src="oemSettings.siteIconData || oemSettings.siteIcon"
                     @error="handleIconError"
                   />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">当前图标</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                    t('settings.auto.auto014')
+                  }}</span>
                   <button
                     class="rounded-lg px-3 py-1 font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-900"
                     @click="removeIcon"
                   >
-                    删除
+                    {{ t('settings.auto.auto015') }}
                   </button>
                 </div>
 
@@ -393,11 +406,10 @@
                     class="btn btn-success px-4 py-2"
                     @click="$refs.iconFileInputMobile.click()"
                   >
-                    <i class="fas fa-upload mr-2" />
-                    上传图标
+                    <i class="fas fa-upload mr-2" /> {{ t('settings.auto.auto016') }}
                   </button>
                   <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    支持 .ico, .png, .jpg, .svg 格式，最大 350KB
+                    {{ t('settings.auto.auto017') }}
                   </p>
                 </div>
               </div>
@@ -412,8 +424,12 @@
                   <i class="fas fa-eye-slash"></i>
                 </div>
                 <div>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">管理入口</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">控制登录按钮在首页的显示</p>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    {{ t('settings.auto.auto018') }}
+                  </h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('settings.auto.auto032') }}
+                  </p>
                 </div>
               </div>
               <div class="space-y-2">
@@ -423,11 +439,13 @@
                     class="peer relative h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
                   ></div>
                   <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">{{
-                    hideAdminButton ? '隐藏登录按钮' : '显示登录按钮'
+                    hideAdminButton
+                      ? t('settings.manual.hideLoginButton')
+                      : t('settings.manual.showLoginButton')
                   }}</span>
                 </label>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  隐藏后，用户需要直接访问 /admin/login 页面登录
+                  {{ t('settings.auto.auto020') }}
                 </p>
               </div>
             </div>
@@ -443,7 +461,7 @@
                 >
                   <div v-if="saving" class="loading-spinner mr-2"></div>
                   <i v-else class="fas fa-save mr-2" />
-                  {{ saving ? '保存中...' : '保存设置' }}
+                  {{ saving ? t('common.saving') : t('settings.manual.saveSettings') }}
                 </button>
 
                 <button
@@ -451,16 +469,15 @@
                   :disabled="saving"
                   @click="resetOemSettings"
                 >
-                  <i class="fas fa-undo mr-2" />
-                  重置为默认
+                  <i class="fas fa-undo mr-2" /> {{ t('settings.auto.auto026') }}
                 </button>
 
                 <div
                   v-if="oemSettings.updatedAt"
                   class="text-center text-sm text-gray-500 dark:text-gray-400"
                 >
-                  <i class="fas fa-clock mr-1" />
-                  上次更新: {{ formatDateTime(oemSettings.updatedAt) }}
+                  <i class="fas fa-clock mr-1" /> {{ t('settings.auto.auto033') }}
+                  {{ formatDateTime(oemSettings.updatedAt) }}
                 </div>
               </div>
             </div>
@@ -475,9 +492,11 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">启用通知</h2>
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                  {{ t('settings.auto.auto034') }}
+                </h2>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  开启后，系统将按配置发送通知到指定平台
+                  {{ t('settings.auto.auto035') }}
                 </p>
               </div>
               <label class="relative inline-flex cursor-pointer items-center">
@@ -498,7 +517,9 @@
           <div
             class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80"
           >
-            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">通知类型</h2>
+            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">
+              {{ t('settings.auto.auto036') }}
+            </h2>
             <div class="space-y-3">
               <div
                 v-for="(enabled, type) in webhookConfig.notificationTypes"
@@ -533,13 +554,14 @@
             class="mb-6 rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80"
           >
             <div class="mb-4 flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">通知平台</h2>
+              <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                {{ t('settings.auto.auto037') }}
+              </h2>
               <button
                 class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                 @click="showAddPlatformModal = true"
               >
-                <i class="fas fa-plus mr-2"></i>
-                添加平台
+                <i class="fas fa-plus mr-2"></i> {{ t('settings.auto.auto038') }}
               </button>
             </div>
 
@@ -579,7 +601,10 @@
                         class="flex items-center text-gray-600 dark:text-gray-400"
                       >
                         <i class="fas fa-comments mr-2"></i>
-                        <span class="truncate">Chat ID: {{ platform.chatId || '未配置' }}</span>
+                        <span class="truncate"
+                          >Chat ID:
+                          {{ platform.chatId || t('settings.manual.notConfigured') }}</span
+                        >
                       </div>
                       <div
                         v-if="platform.type === 'telegram' && platform.botToken"
@@ -602,7 +627,9 @@
                         class="flex items-center text-gray-600 dark:text-gray-400"
                       >
                         <i class="fas fa-route mr-2"></i>
-                        <span class="truncate">代理: {{ platform.proxyUrl }}</span>
+                        <span class="truncate"
+                          >{{ t('settings.auto.auto039') }} {{ platform.proxyUrl }}</span
+                        >
                       </div>
                       <div
                         v-if="platform.type === 'smtp' && platform.to"
@@ -618,7 +645,7 @@
                         class="flex items-center text-gray-600 dark:text-gray-400"
                       >
                         <i class="fas fa-shield-alt mr-2"></i>
-                        <span>已启用签名验证</span>
+                        <span>{{ t('settings.auto.auto040') }}</span>
                       </div>
                     </div>
                   </div>
@@ -638,7 +665,7 @@
                     <!-- 测试按钮 -->
                     <button
                       class="rounded-lg bg-blue-100 p-2 text-blue-600 transition-colors hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-400 dark:hover:bg-blue-800"
-                      title="测试连接"
+                      :title="t('settings.auto.auto041')"
                       @click="testPlatform(platform)"
                     >
                       <i class="fas fa-vial"></i>
@@ -646,7 +673,7 @@
                     <!-- 编辑按钮 -->
                     <button
                       class="rounded-lg bg-gray-100 p-2 text-gray-600 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600"
-                      title="编辑"
+                      :title="t('settings.auto.auto042')"
                       @click="editPlatform(platform)"
                     >
                       <i class="fas fa-edit"></i>
@@ -654,7 +681,7 @@
                     <!-- 删除按钮 -->
                     <button
                       class="rounded-lg bg-red-100 p-2 text-red-600 transition-colors hover:bg-red-200 dark:bg-red-900 dark:text-red-400 dark:hover:bg-red-800"
-                      title="删除"
+                      :title="t('settings.auto.auto015')"
                       @click="deletePlatform(platform.id)"
                     >
                       <i class="fas fa-trash"></i>
@@ -664,17 +691,19 @@
               </div>
             </div>
             <div v-else class="py-8 text-center text-gray-500 dark:text-gray-400">
-              暂无配置的通知平台，请点击"添加平台"按钮添加
+              {{ t('settings.auto.auto043') }}
             </div>
           </div>
 
           <!-- 高级设置 -->
           <div class="rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80">
-            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">高级设置</h2>
+            <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">
+              {{ t('settings.auto.auto044') }}
+            </h2>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  最大重试次数
+                  {{ t('settings.auto.auto045') }}
                 </label>
                 <input
                   v-model.number="webhookConfig.retrySettings.maxRetries"
@@ -687,7 +716,7 @@
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  重试延迟 (毫秒)
+                  {{ t('settings.auto.auto046') }}
                 </label>
                 <input
                   v-model.number="webhookConfig.retrySettings.retryDelay"
@@ -701,7 +730,7 @@
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  超时时间 (毫秒)
+                  {{ t('settings.auto.auto047') }}
                 </label>
                 <input
                   v-model.number="webhookConfig.retrySettings.timeout"
@@ -722,8 +751,7 @@
               class="rounded-lg bg-green-600 px-6 py-3 text-white shadow-lg transition-all hover:bg-green-700 hover:shadow-xl"
               @click="sendTestNotification"
             >
-              <i class="fas fa-paper-plane mr-2"></i>
-              发送测试通知
+              <i class="fas fa-paper-plane mr-2"></i> {{ t('settings.auto.auto048') }}
             </button>
           </div>
         </div>
@@ -733,7 +761,7 @@
           <!-- 加载状态 -->
           <div v-if="claudeConfigLoading" class="py-12 text-center">
             <div class="loading-spinner mx-auto mb-4"></div>
-            <p class="text-gray-500 dark:text-gray-400">正在加载配置...</p>
+            <p class="text-gray-500 dark:text-gray-400">{{ t('settings.auto.auto049') }}</p>
           </div>
 
           <div v-else>
@@ -751,18 +779,18 @@
                     </div>
                     <div>
                       <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                        仅允许 Claude Code 客户端
+                        {{ t('settings.auto.auto050') }}
                       </h2>
                       <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        启用后，所有
+                        {{ t('settings.auto.auto051') }}
                         <code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
                           >/api/v1/messages</code
                         >
-                        和
+                        {{ t('settings.auto.auto052') }}
                         <code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
                           >/claude/v1/messages</code
                         >
-                        端点将强制验证 Claude Code CLI 客户端
+                        {{ t('settings.auto.auto053') }}
                       </p>
                     </div>
                   </div>
@@ -784,8 +812,9 @@
                   <i class="fas fa-info-circle mt-0.5 text-amber-500"></i>
                   <div class="ml-3">
                     <p class="text-sm text-amber-700 dark:text-amber-300">
-                      此设置与 API Key 级别的客户端限制是 <strong>OR 逻辑</strong>：全局启用或 API
-                      Key 设置中启用，都会执行 Claude Code 验证。
+                      {{ t('settings.auto.auto054') }}
+                      <strong>{{ t('settings.auto.auto055') }}</strong
+                      >{{ t('settings.auto.auto056') }}
                     </p>
                   </div>
                 </div>
@@ -806,10 +835,10 @@
                     </div>
                     <div>
                       <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                        强制会话绑定
+                        {{ t('settings.auto.auto057') }}
                       </h2>
                       <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        启用后，系统会将原始会话 ID 绑定到首次使用的账户，确保上下文的一致性
+                        {{ t('settings.auto.auto058') }}
                       </p>
                     </div>
                   </div>
@@ -832,8 +861,7 @@
                 <!-- 绑定有效期 -->
                 <div>
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <i class="fas fa-clock mr-2 text-gray-400"></i>
-                    绑定有效期（天）
+                    <i class="fas fa-clock mr-2 text-gray-400"></i> {{ t('settings.auto.auto059') }}
                   </label>
                   <input
                     v-model.number="claudeConfig.sessionBindingTtlDays"
@@ -845,7 +873,7 @@
                     @change="saveClaudeConfig"
                   />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    会话绑定到账户后的有效时间，过期后会自动解除绑定
+                    {{ t('settings.auto.auto060') }}
                   </p>
                 </div>
 
@@ -853,17 +881,17 @@
                 <div>
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     <i class="fas fa-exclamation-triangle mr-2 text-gray-400"></i>
-                    旧会话污染提示
+                    {{ t('settings.auto.auto061') }}
                   </label>
                   <textarea
                     v-model="claudeConfig.sessionBindingErrorMessage"
                     class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-gray-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                    placeholder="你的本地session已污染，请清理后使用。"
+                    :placeholder="t('settings.auto.auto062')"
                     rows="2"
                     @change="saveClaudeConfig"
                   ></textarea>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    当检测到为旧的sessionId且未在系统中有调度记录时提示，返回给客户端的错误消息
+                    {{ t('settings.auto.auto063') }}
                   </p>
                 </div>
               </div>
@@ -873,17 +901,18 @@
                   <i class="fas fa-lightbulb mt-0.5 text-purple-500"></i>
                   <div class="ml-3">
                     <p class="text-sm text-purple-700 dark:text-purple-300">
-                      <strong>工作原理：</strong>系统会提取请求中的原始 session ID （来自
+                      <strong>{{ t('settings.auto.auto064') }}</strong
+                      >{{ t('settings.auto.auto065') }}
                       <code class="rounded bg-purple-100 px-1 dark:bg-purple-800"
                         >metadata.user_id</code
-                      >）， 并将其与首次调度的账户绑定。后续使用相同 session ID
-                      的请求将自动路由到同一账户。
+                      >{{ t('settings.auto.auto066') }}
                     </p>
                     <p class="mt-2 text-sm text-purple-700 dark:text-purple-300">
-                      <strong>新会话识别：</strong>如果绑定会话历史中没有该sessionId但请求中
+                      <strong>{{ t('settings.auto.auto067') }}</strong
+                      >{{ t('settings.auto.auto068') }}
                       <code class="rounded bg-purple-100 px-1 dark:bg-purple-800"
                         >messages.length > 1</code
-                      >， 系统会认为这是一个污染的会话并拒绝请求。
+                      >{{ t('settings.auto.auto069') }}
                     </p>
                   </div>
                 </div>
@@ -904,10 +933,10 @@
                     </div>
                     <div>
                       <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                        用户消息串行队列
+                        {{ t('settings.auto.auto070') }}
                       </h2>
                       <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        启用后，同一账户的用户消息请求将串行执行，并在请求之间添加延迟，防止触发上游限流
+                        {{ t('settings.auto.auto071') }}
                       </p>
                     </div>
                   </div>
@@ -931,7 +960,7 @@
                 <div>
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     <i class="fas fa-hourglass-half mr-2 text-gray-400"></i>
-                    请求间隔（毫秒）
+                    {{ t('settings.auto.auto072') }}
                   </label>
                   <input
                     v-model.number="claudeConfig.userMessageQueueDelayMs"
@@ -943,7 +972,7 @@
                     @change="saveClaudeConfig"
                   />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    同一账户的用户消息请求之间的最小间隔时间（0-10000毫秒）
+                    {{ t('settings.auto.auto073') }}
                   </p>
                 </div>
 
@@ -951,7 +980,7 @@
                 <div>
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     <i class="fas fa-stopwatch mr-2 text-gray-400"></i>
-                    队列超时（毫秒）
+                    {{ t('settings.auto.auto074') }}
                   </label>
                   <input
                     v-model.number="claudeConfig.userMessageQueueTimeoutMs"
@@ -963,7 +992,7 @@
                     @change="saveClaudeConfig"
                   />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    请求在队列中等待的最大时间，超时将返回 503 错误（1000-300000毫秒）
+                    {{ t('settings.auto.auto075') }}
                   </p>
                 </div>
               </div>
@@ -973,11 +1002,12 @@
                   <i class="fas fa-info-circle mt-0.5 text-teal-500"></i>
                   <div class="ml-3">
                     <p class="text-sm text-teal-700 dark:text-teal-300">
-                      <strong>工作原理：</strong>系统检测请求中最后一条消息的
+                      <strong>{{ t('settings.auto.auto064') }}</strong
+                      >{{ t('settings.auto.auto076') }}
                       <code class="rounded bg-teal-100 px-1 dark:bg-teal-800">role</code>
-                      是否为
+                      {{ t('settings.auto.auto077') }}
                       <code class="rounded bg-teal-100 px-1 dark:bg-teal-800">user</code
-                      >。用户消息请求需要排队串行执行，而工具调用结果、助手消息续传等不受此限制。
+                      >{{ t('settings.auto.auto078') }}
                     </p>
                   </div>
                 </div>
@@ -997,10 +1027,10 @@
                   </div>
                   <div class="ml-4">
                     <h4 class="text-lg font-semibold text-gray-900 dark:text-white">
-                      并发请求排队
+                      {{ t('settings.auto.auto079') }}
                     </h4>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
-                      当 API Key 并发请求超限时进入队列等待，而非直接拒绝
+                      {{ t('settings.auto.auto080') }}
                     </p>
                   </div>
                 </div>
@@ -1023,7 +1053,7 @@
                 <div>
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     <i class="fas fa-list-ol mr-2 text-gray-400"></i>
-                    固定最小排队数
+                    {{ t('settings.auto.auto081') }}
                   </label>
                   <input
                     v-model.number="claudeConfig.concurrentRequestQueueMaxSize"
@@ -1035,15 +1065,14 @@
                     @change="saveClaudeConfig"
                   />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    最大排队数的固定最小值（1-100）
+                    {{ t('settings.auto.auto082') }}
                   </p>
                 </div>
 
                 <!-- 排队数倍数 -->
                 <div>
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <i class="fas fa-times mr-2 text-gray-400"></i>
-                    排队数倍数
+                    <i class="fas fa-times mr-2 text-gray-400"></i> {{ t('settings.auto.auto083') }}
                   </label>
                   <input
                     v-model.number="claudeConfig.concurrentRequestQueueMaxSizeMultiplier"
@@ -1056,7 +1085,7 @@
                     @change="saveClaudeConfig"
                   />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    最大排队数 = MAX(倍数 × 并发限制, 固定值)，设为 0 则仅使用固定值
+                    {{ t('settings.auto.auto084') }}
                   </p>
                 </div>
 
@@ -1064,7 +1093,7 @@
                 <div>
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     <i class="fas fa-stopwatch mr-2 text-gray-400"></i>
-                    排队超时时间（毫秒）
+                    {{ t('settings.auto.auto085') }}
                   </label>
                   <input
                     v-model.number="claudeConfig.concurrentRequestQueueTimeoutMs"
@@ -1076,7 +1105,7 @@
                     @change="saveClaudeConfig"
                   />
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    请求在排队中等待的最大时间，超时将返回 429 错误（5秒-5分钟，默认10秒）
+                    {{ t('settings.auto.auto086') }}
                   </p>
                 </div>
               </div>
@@ -1086,12 +1115,12 @@
                   <i class="fas fa-info-circle mt-0.5 text-blue-500"></i>
                   <div class="ml-3">
                     <p class="text-sm text-blue-700 dark:text-blue-300">
-                      <strong>工作原理：</strong>当 API Key 的并发请求超过
+                      <strong>{{ t('settings.auto.auto064') }}</strong
+                      >{{ t('settings.auto.auto087') }}
                       <code class="rounded bg-blue-100 px-1 dark:bg-blue-800"
                         >concurrencyLimit</code
                       >
-                      时，超限请求会进入队列等待而非直接返回 429。适合 Claude Code Agent
-                      并行工具调用场景。
+                      {{ t('settings.auto.auto088') }}
                     </p>
                   </div>
                 </div>
@@ -1111,10 +1140,10 @@
                   </div>
                   <div class="ml-4">
                     <h4 class="text-lg font-semibold text-gray-900 dark:text-white">
-                      请求明细采集
+                      {{ t('settings.auto.auto089') }}
                     </h4>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
-                      采集后台请求摘要，供“请求明细”标签页按时间、API Key、账户、模型和接口检索
+                      {{ t('settings.auto.auto090') }}
                     </p>
                   </div>
                 </div>
@@ -1135,14 +1164,14 @@
                 <div>
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     <i class="fas fa-calendar-day mr-2 text-gray-400"></i>
-                    请求明细保留时间
+                    {{ t('settings.auto.auto091') }}
                   </label>
                   <div class="mt-1 flex max-w-md flex-col gap-3 sm:flex-row sm:items-end">
                     <div class="flex-1">
                       <label
                         class="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
                       >
-                        天
+                        {{ t('settings.auto.auto092') }}
                       </label>
                       <input
                         v-model.number="requestDetailRetentionInput.days"
@@ -1158,7 +1187,7 @@
                       <label
                         class="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
                       >
-                        小时
+                        {{ t('settings.auto.auto093') }}
                       </label>
                       <input
                         v-model.number="requestDetailRetentionInput.hours"
@@ -1185,8 +1214,7 @@
                     {{ requestDetailRetentionWarning }}
                   </p>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    新请求明细按小时保留，支持 0-30 天与 0-23 小时组合，总保留时间为 1-720
-                    小时；关闭采集不会删除已保留的数据，直到自然过期
+                    {{ t('settings.auto.auto094') }}
                   </p>
                 </div>
 
@@ -1197,17 +1225,17 @@
                     <div class="flex-1">
                       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                         <i class="fas fa-eye mr-2 text-gray-400"></i>
-                        请求体预览
+                        {{ t('settings.auto.auto095') }}
                       </label>
                       <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        关闭后，仅影响后续新请求不再保存请求体预览；历史预览可在「请求明细」页面手动清理。
+                        {{ t('settings.auto.auto096') }}
                       </p>
                       <p
                         v-if="claudeConfig.requestDetailBodyPreviewEnabled"
                         class="mt-2 text-xs text-amber-600 dark:text-amber-400"
                       >
                         <i class="fas fa-exclamation-triangle mr-1"></i>
-                        开启请求体预览会增加 Redis 存储压力
+                        {{ t('settings.auto.auto097') }}
                       </p>
                     </div>
 
@@ -1224,7 +1252,7 @@
                       type="button"
                       @click="handleRequestDetailBodyPreviewToggle"
                     >
-                      <span class="sr-only">切换请求体预览</span>
+                      <span class="sr-only">{{ t('settings.auto.auto098') }}</span>
                       <span
                         class="absolute left-[2px] top-[2px] h-5 w-5 rounded-full border bg-white transition-transform"
                         :class="
@@ -1243,11 +1271,11 @@
                   <i class="fas fa-shield-alt mt-0.5 text-cyan-500"></i>
                   <div class="ml-3">
                     <p class="text-sm text-cyan-700 dark:text-cyan-300">
-                      <strong>采集内容：</strong>
+                      <strong>{{ t('settings.auto.auto099') }}</strong>
                       {{
                         claudeConfig.requestDetailBodyPreviewEnabled
-                          ? '保存脱敏且截断后的请求体预览，以及 Token、费用、耗时和缓存指标，不保存完整原始提示词正文。'
-                          : '仅保存请求摘要字段、Token、费用、耗时和缓存指标，不保存请求体预览与完整原始提示词正文。'
+                          ? t('settings.manual.captureWithBodyPreview')
+                          : t('settings.manual.captureWithoutBodyPreview')
                       }}
                     </p>
                   </div>
@@ -1260,10 +1288,11 @@
               v-if="claudeConfig.updatedAt"
               class="rounded-lg bg-gray-50 p-4 text-sm text-gray-500 dark:bg-gray-700/50 dark:text-gray-400"
             >
-              <i class="fas fa-history mr-2"></i>
-              最后更新：{{ formatDateTime(claudeConfig.updatedAt) }}
+              <i class="fas fa-history mr-2"></i> {{ t('settings.auto.auto027')
+              }}{{ formatDateTime(claudeConfig.updatedAt) }}
               <span v-if="claudeConfig.updatedBy" class="ml-2">
-                由 <strong>{{ claudeConfig.updatedBy }}</strong> 修改
+                {{ t('settings.auto.auto100') }} <strong>{{ claudeConfig.updatedBy }}</strong>
+                {{ t('settings.auto.auto101') }}
               </span>
             </div>
           </div>
@@ -1274,7 +1303,7 @@
           <!-- 加载状态 -->
           <div v-if="serviceRatesLoading" class="py-12 text-center">
             <div class="loading-spinner mx-auto mb-4"></div>
-            <p class="text-gray-500 dark:text-gray-400">正在加载配置...</p>
+            <p class="text-gray-500 dark:text-gray-400">{{ t('settings.auto.auto049') }}</p>
           </div>
 
           <div v-else>
@@ -1290,13 +1319,12 @@
                 </div>
                 <div>
                   <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                    服务倍率说明
+                    {{ t('settings.auto.auto102') }}
                   </h3>
                   <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    服务倍率用于计算不同服务的计费费用。以
+                    {{ t('settings.auto.auto103') }}
                     <strong>{{ serviceRates.baseService || 'claude' }}</strong>
-                    为基准（倍率 1.0），其他服务按倍率换算。例如：Gemini 倍率 0.5 表示消耗 $1 只扣除
-                    $0.5 额度。
+                    {{ t('settings.auto.auto104') }}
                   </p>
                 </div>
               </div>
@@ -1307,7 +1335,7 @@
               <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
                   <i class="fas fa-sliders-h mr-2 text-blue-500"></i>
-                  倍率配置
+                  {{ t('settings.auto.auto105') }}
                 </h2>
                 <button
                   class="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
@@ -1315,7 +1343,7 @@
                   @click="saveServiceRates"
                 >
                   <i class="fas fa-save mr-2"></i>
-                  {{ serviceRatesSaving ? '保存中...' : '保存配置' }}
+                  {{ serviceRatesSaving ? t('common.saving') : t('settings.manual.saveConfig') }}
                 </button>
               </div>
 
@@ -1342,7 +1370,7 @@
                           v-if="service === serviceRates.baseService"
                           class="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                         >
-                          基准服务
+                          {{ t('settings.auto.auto106') }}
                         </span>
                       </div>
                     </div>
@@ -1356,7 +1384,9 @@
                       step="0.1"
                       type="number"
                     />
-                    <span class="text-sm text-gray-500 dark:text-gray-400">倍</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{
+                      t('settings.auto.auto107')
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -1366,10 +1396,11 @@
                 v-if="serviceRates.updatedAt"
                 class="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-500 dark:bg-gray-700/50 dark:text-gray-400"
               >
-                <i class="fas fa-history mr-2"></i>
-                最后更新：{{ formatDateTime(serviceRates.updatedAt) }}
+                <i class="fas fa-history mr-2"></i> {{ t('settings.auto.auto027')
+                }}{{ formatDateTime(serviceRates.updatedAt) }}
                 <span v-if="serviceRates.updatedBy" class="ml-2">
-                  由 <strong>{{ serviceRates.updatedBy }}</strong> 修改
+                  {{ t('settings.auto.auto100') }} <strong>{{ serviceRates.updatedBy }}</strong>
+                  {{ t('settings.auto.auto101') }}
                 </span>
               </div>
             </div>
@@ -1407,10 +1438,22 @@
             </div>
             <div>
               <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
-                {{ editingPlatform ? '编辑' : '添加' }}通知平台
+                {{
+                  t(
+                    editingPlatform
+                      ? 'settings.manual.editNotificationPlatform'
+                      : 'settings.manual.addNotificationPlatform'
+                  )
+                }}
               </h3>
               <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
-                配置{{ editingPlatform ? '并更新' : '新的' }}Webhook通知渠道
+                {{
+                  t(
+                    editingPlatform
+                      ? 'settings.manual.editWebhookChannel'
+                      : 'settings.manual.addWebhookChannel'
+                  )
+                }}
               </p>
             </div>
           </div>
@@ -1431,8 +1474,7 @@
             <label
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              <i class="fas fa-layer-group mr-2 text-gray-400"></i>
-              平台类型
+              <i class="fas fa-layer-group mr-2 text-gray-400"></i> {{ t('settings.auto.auto110') }}
             </label>
             <div class="relative">
               <select
@@ -1440,23 +1482,22 @@
                 class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 :disabled="editingPlatform"
               >
-                <option value="wechat_work">🟢 企业微信</option>
-                <option value="dingtalk">🔵 钉钉</option>
-                <option value="feishu">🟦 飞书</option>
+                <option value="wechat_work">{{ t('settings.auto.auto111') }}</option>
+                <option value="dingtalk">{{ t('settings.auto.auto112') }}</option>
+                <option value="feishu">{{ t('settings.auto.auto113') }}</option>
                 <option value="slack">🟣 Slack</option>
                 <option value="discord">🟪 Discord</option>
                 <option value="telegram">✈️ Telegram</option>
                 <option value="bark">🔔 Bark</option>
-                <option value="smtp">📧 邮件通知</option>
-                <option value="custom">⚙️ 自定义</option>
+                <option value="smtp">{{ t('settings.auto.auto114') }}</option>
+                <option value="custom">{{ t('settings.auto.auto115') }}</option>
               </select>
               <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                 <i class="fas fa-chevron-down text-gray-400"></i>
               </div>
             </div>
             <p v-if="editingPlatform" class="mt-1 text-xs text-amber-600 dark:text-amber-400">
-              <i class="fas fa-info-circle mr-1"></i>
-              编辑模式下不能更改平台类型
+              <i class="fas fa-info-circle mr-1"></i> {{ t('settings.auto.auto116') }}
             </p>
           </div>
 
@@ -1465,14 +1506,13 @@
             <label
               class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              <i class="fas fa-tag mr-2 text-gray-400"></i>
-              名称
-              <span class="ml-2 text-xs text-gray-500">(可选)</span>
+              <i class="fas fa-tag mr-2 text-gray-400"></i> {{ t('settings.auto.auto117') }}
+              <span class="ml-2 text-xs text-gray-500">{{ t('settings.auto.auto118') }}</span>
             </label>
             <input
               v-model="platformForm.name"
               class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-              placeholder="例如：运维群通知、开发测试群"
+              :placeholder="t('settings.auto.auto119')"
               type="text"
             />
           </div>
@@ -1536,12 +1576,12 @@
               <input
                 v-model="platformForm.botToken"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="例如：123456789:ABCDEFghijk-xyz"
+                :placeholder="t('settings.auto.auto120')"
                 required
                 type="text"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                在 Telegram 的 @BotFather 中创建机器人后获得的 Token
+                {{ t('settings.auto.auto121') }}
               </p>
             </div>
 
@@ -1556,12 +1596,12 @@
               <input
                 v-model="platformForm.chatId"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="例如：123456789 或 -1001234567890"
+                :placeholder="t('settings.auto.auto122')"
                 required
                 type="text"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                可使用 @userinfobot、@RawDataBot 或 API 获取聊天/频道的 Chat ID
+                {{ t('settings.auto.auto123') }}
               </p>
             </div>
 
@@ -1569,18 +1609,17 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-globe mr-2 text-gray-400"></i>
-                API 基础地址
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                <i class="fas fa-globe mr-2 text-gray-400"></i> {{ t('settings.auto.auto124') }}
+                <span class="ml-2 text-xs text-gray-500">{{ t('settings.auto.auto118') }}</span>
               </label>
               <input
                 v-model="platformForm.apiBaseUrl"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="默认: https://api.telegram.org"
+                :placeholder="t('settings.auto.auto125')"
                 type="url"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                使用自建 Bot API 时可覆盖默认域名，需以 http 或 https 开头
+                {{ t('settings.auto.auto126') }}
               </p>
             </div>
 
@@ -1588,18 +1627,17 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-route mr-2 text-gray-400"></i>
-                代理地址
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                <i class="fas fa-route mr-2 text-gray-400"></i> {{ t('settings.auto.auto127') }}
+                <span class="ml-2 text-xs text-gray-500">{{ t('settings.auto.auto118') }}</span>
               </label>
               <input
                 v-model="platformForm.proxyUrl"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="例如：socks5://user:pass@127.0.0.1:1080"
+                :placeholder="t('settings.auto.auto128')"
                 type="text"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                支持 http、https、socks4/4a/5 代理，留空则直接连接 Telegram 官方 API
+                {{ t('settings.auto.auto129') }}
               </p>
             </div>
 
@@ -1607,7 +1645,7 @@
               class="flex items-start rounded-lg bg-blue-50 p-3 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
             >
               <i class="fas fa-info-circle mr-2 mt-0.5"></i>
-              <div>机器人需先加入对应群组或频道并授予发送消息权限，通知会以纯文本方式发送。</div>
+              <div>{{ t('settings.auto.auto130') }}</div>
             </div>
           </div>
 
@@ -1618,19 +1656,18 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-key mr-2 text-gray-400"></i>
-                设备密钥 (Device Key)
+                <i class="fas fa-key mr-2 text-gray-400"></i> {{ t('settings.auto.auto131') }}
                 <span class="ml-1 text-xs text-red-500">*</span>
               </label>
               <input
                 v-model="platformForm.deviceKey"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="例如：aBcDeFgHiJkLmNoPqRsTuVwX"
+                :placeholder="t('settings.auto.auto132')"
                 required
                 type="text"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                在Bark App中查看您的推送密钥
+                {{ t('settings.auto.auto133') }}
               </p>
             </div>
 
@@ -1639,14 +1676,13 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-server mr-2 text-gray-400"></i>
-                服务器地址
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                <i class="fas fa-server mr-2 text-gray-400"></i> {{ t('settings.auto.auto134') }}
+                <span class="ml-2 text-xs text-gray-500">{{ t('settings.auto.auto118') }}</span>
               </label>
               <input
                 v-model="platformForm.serverUrl"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="默认: https://api.day.app/push"
+                :placeholder="t('settings.auto.auto135')"
                 type="url"
               />
             </div>
@@ -1656,18 +1692,17 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-flag mr-2 text-gray-400"></i>
-                通知级别
+                <i class="fas fa-flag mr-2 text-gray-400"></i> {{ t('settings.auto.auto136') }}
               </label>
               <select
                 v-model="platformForm.level"
                 class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
-                <option value="">自动（根据通知类型）</option>
-                <option value="passive">被动</option>
-                <option value="active">默认</option>
-                <option value="timeSensitive">时效性</option>
-                <option value="critical">紧急</option>
+                <option value="">{{ t('settings.auto.auto137') }}</option>
+                <option value="passive">{{ t('settings.auto.auto138') }}</option>
+                <option value="active">{{ t('settings.auto.auto139') }}</option>
+                <option value="timeSensitive">{{ t('settings.auto.auto140') }}</option>
+                <option value="critical">{{ t('settings.auto.auto141') }}</option>
               </select>
             </div>
 
@@ -1676,22 +1711,21 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-volume-up mr-2 text-gray-400"></i>
-                通知声音
+                <i class="fas fa-volume-up mr-2 text-gray-400"></i> {{ t('settings.auto.auto142') }}
               </label>
               <select
                 v-model="platformForm.sound"
                 class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
-                <option value="">自动（根据通知类型）</option>
-                <option value="default">默认</option>
-                <option value="alarm">警报</option>
-                <option value="bell">铃声</option>
-                <option value="birdsong">鸟鸣</option>
-                <option value="electronic">电子音</option>
-                <option value="glass">玻璃</option>
-                <option value="horn">喇叭</option>
-                <option value="silence">静音</option>
+                <option value="">{{ t('settings.auto.auto137') }}</option>
+                <option value="default">{{ t('settings.auto.auto139') }}</option>
+                <option value="alarm">{{ t('settings.auto.auto143') }}</option>
+                <option value="bell">{{ t('settings.auto.auto144') }}</option>
+                <option value="birdsong">{{ t('settings.auto.auto145') }}</option>
+                <option value="electronic">{{ t('settings.auto.auto146') }}</option>
+                <option value="glass">{{ t('settings.auto.auto147') }}</option>
+                <option value="horn">{{ t('settings.auto.auto148') }}</option>
+                <option value="silence">{{ t('settings.auto.auto149') }}</option>
               </select>
             </div>
 
@@ -1700,14 +1734,13 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-folder mr-2 text-gray-400"></i>
-                通知分组
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                <i class="fas fa-folder mr-2 text-gray-400"></i> {{ t('settings.auto.auto150') }}
+                <span class="ml-2 text-xs text-gray-500">{{ t('settings.auto.auto118') }}</span>
               </label>
               <input
                 v-model="platformForm.group"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="默认: claude-relay"
+                :placeholder="t('settings.auto.auto151')"
                 type="text"
               />
             </div>
@@ -1716,9 +1749,9 @@
             <div class="mt-2 flex items-start rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
               <i class="fas fa-info-circle mr-2 mt-0.5 text-blue-600 dark:text-blue-400"></i>
               <div class="text-sm text-blue-700 dark:text-blue-300">
-                <p>1. 在iPhone上安装Bark App</p>
-                <p>2. 打开App获取您的设备密钥</p>
-                <p>3. 将密钥粘贴到上方输入框</p>
+                <p>{{ t('settings.auto.auto152') }}</p>
+                <p>{{ t('settings.auto.auto153') }}</p>
+                <p>{{ t('settings.auto.auto154') }}</p>
               </div>
             </div>
           </div>
@@ -1730,14 +1763,13 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-server mr-2 text-gray-400"></i>
-                SMTP 服务器
+                <i class="fas fa-server mr-2 text-gray-400"></i> {{ t('settings.auto.auto155') }}
                 <span class="ml-1 text-xs text-red-500">*</span>
               </label>
               <input
                 v-model="platformForm.host"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="例如: smtp.gmail.com"
+                :placeholder="t('settings.auto.auto156')"
                 required
                 type="text"
               />
@@ -1749,8 +1781,7 @@
                 <label
                   class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  <i class="fas fa-plug mr-2 text-gray-400"></i>
-                  端口
+                  <i class="fas fa-plug mr-2 text-gray-400"></i> {{ t('settings.auto.auto157') }}
                 </label>
                 <input
                   v-model.number="platformForm.port"
@@ -1761,7 +1792,7 @@
                   type="number"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  默认: 587 (TLS) 或 465 (SSL)
+                  {{ t('settings.auto.auto158') }}
                 </p>
               </div>
 
@@ -1770,14 +1801,14 @@
                   class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   <i class="fas fa-shield-alt mr-2 text-gray-400"></i>
-                  加密方式
+                  {{ t('settings.auto.auto159') }}
                 </label>
                 <select
                   v-model="platformForm.secure"
                   class="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 >
-                  <option :value="false">STARTTLS (端口587)</option>
-                  <option :value="true">SSL/TLS (端口465)</option>
+                  <option :value="false">{{ t('settings.auto.auto160') }}</option>
+                  <option :value="true">{{ t('settings.auto.auto161') }}</option>
                 </select>
               </div>
             </div>
@@ -1787,8 +1818,7 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-user mr-2 text-gray-400"></i>
-                用户名
+                <i class="fas fa-user mr-2 text-gray-400"></i> {{ t('settings.auto.auto162') }}
                 <span class="ml-1 text-xs text-red-500">*</span>
               </label>
               <input
@@ -1805,19 +1835,18 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-lock mr-2 text-gray-400"></i>
-                密码 / 应用密码
+                <i class="fas fa-lock mr-2 text-gray-400"></i> {{ t('settings.auto.auto163') }}
                 <span class="ml-1 text-xs text-red-500">*</span>
               </label>
               <input
                 v-model="platformForm.pass"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="邮箱密码或应用专用密码"
+                :placeholder="t('settings.auto.auto164')"
                 required
                 type="password"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                建议使用应用专用密码，而非邮箱登录密码
+                {{ t('settings.auto.auto165') }}
               </p>
             </div>
 
@@ -1827,13 +1856,13 @@
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 <i class="fas fa-paper-plane mr-2 text-gray-400"></i>
-                发件人邮箱
-                <span class="ml-2 text-xs text-gray-500">(可选)</span>
+                {{ t('settings.auto.auto166') }}
+                <span class="ml-2 text-xs text-gray-500">{{ t('settings.auto.auto118') }}</span>
               </label>
               <input
                 v-model="platformForm.from"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500"
-                placeholder="默认使用用户名邮箱"
+                :placeholder="t('settings.auto.auto167')"
                 type="email"
               />
             </div>
@@ -1843,8 +1872,7 @@
               <label
                 class="mb-2 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <i class="fas fa-envelope mr-2 text-gray-400"></i>
-                收件人邮箱
+                <i class="fas fa-envelope mr-2 text-gray-400"></i> {{ t('settings.auto.auto168') }}
                 <span class="ml-1 text-xs text-red-500">*</span>
               </label>
               <input
@@ -1854,7 +1882,9 @@
                 required
                 type="email"
               />
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">接收通知的邮箱地址</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('settings.auto.auto169') }}
+              </p>
             </div>
           </div>
 
@@ -1876,14 +1906,14 @@
                     class="ml-3 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     <i class="fas fa-shield-alt mr-2 text-gray-400"></i>
-                    启用签名验证
+                    {{ t('settings.auto.auto170') }}
                   </span>
                 </label>
                 <span
                   v-if="platformForm.enableSign"
                   class="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-900/50 dark:text-green-400"
                 >
-                  已启用
+                  {{ t('settings.auto.auto171') }}
                 </span>
               </div>
               <transition
@@ -1896,7 +1926,7 @@
               >
                 <div v-if="platformForm.enableSign">
                   <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    签名密钥
+                    {{ t('settings.auto.auto172') }}
                   </label>
                   <input
                     v-model="platformForm.secret"
@@ -1917,8 +1947,7 @@
       >
         <div class="flex items-center justify-between">
           <div class="text-xs text-gray-500 dark:text-gray-400">
-            <i class="fas fa-asterisk mr-1 text-red-500"></i>
-            必填项
+            <i class="fas fa-asterisk mr-1 text-red-500"></i> {{ t('settings.auto.auto173') }}
           </div>
           <div class="flex space-x-3">
             <button
@@ -1926,7 +1955,7 @@
               @click="closePlatformModal"
             >
               <i class="fas fa-times mr-2 transition-transform group-hover:scale-110"></i>
-              取消
+              {{ t('settings.auto.auto174') }}
             </button>
             <button
               class="group flex items-center rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 shadow-sm transition-all hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-300 dark:hover:bg-blue-900/70"
@@ -1939,7 +1968,7 @@
                   testingConnection ? 'fas fa-spinner fa-spin' : 'fas fa-vial group-hover:scale-110'
                 "
               ></i>
-              {{ testingConnection ? '测试中...' : '测试连接' }}
+              {{ testingConnection ? t('settings.manual.testing') : t('settings.auto.auto041') }}
             </button>
             <button
               class="group flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-500"
@@ -1952,7 +1981,13 @@
                   savingPlatform ? 'fas fa-spinner fa-spin' : 'fas fa-save group-hover:scale-110'
                 "
               ></i>
-              {{ savingPlatform ? '保存中...' : editingPlatform ? '保存修改' : '添加平台' }}
+              {{
+                savingPlatform
+                  ? t('common.saving')
+                  : editingPlatform
+                    ? t('settings.manual.saveChanges')
+                    : t('settings.auto.auto038')
+              }}
             </button>
           </div>
         </div>
@@ -1982,7 +2017,9 @@ import { useSettingsStore } from '@/stores/settings'
 import * as httpApis from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import ModelPricingSection from '@/components/settings/ModelPricingSection.vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 // 定义组件名称，用于keep-alive排除
 defineOptions({
   name: 'SettingsView'
@@ -2010,16 +2047,16 @@ const confirmModalConfig = ref({
   title: '',
   message: '',
   type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
+  confirmText: t('settings.auto.auto175'),
+  cancelText: t('settings.auto.auto174')
 })
 const confirmResolve = ref(null)
 
 const showConfirm = (
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText = t('settings.auto.auto175'),
+  cancelText = t('settings.auto.auto174'),
   type = 'primary'
 ) => {
   return new Promise((resolve) => {
@@ -2084,7 +2121,7 @@ const claudeConfigLoading = ref(false)
 const claudeConfig = ref({
   claudeCodeOnlyEnabled: false,
   globalSessionBindingEnabled: false,
-  sessionBindingErrorMessage: '你的本地session已污染，请清理后使用。',
+  sessionBindingErrorMessage: t('settings.auto.auto062'),
   sessionBindingTtlDays: 1,
   userMessageQueueEnabled: false, // 与后端默认值保持一致
   userMessageQueueDelayMs: 200,
@@ -2143,19 +2180,19 @@ const requestDetailRetentionError = computed(() => {
   const hours = normalizeRetentionPart(requestDetailRetentionInput.hours)
 
   if (days < 0 || days > 30) {
-    return '天数必须在 0 到 30 之间'
+    return t('settings.auto.auto176')
   }
 
   if (hours < 0 || hours > 23) {
-    return '小时数必须在 0 到 23 之间'
+    return t('settings.auto.auto177')
   }
 
   if (requestDetailRetentionTotalHours.value < 1) {
-    return '请求明细保留时间至少需要 1 小时'
+    return t('settings.auto.auto178')
   }
 
   if (requestDetailRetentionTotalHours.value > REQUEST_DETAIL_RETENTION_MAX_HOURS) {
-    return '请求明细保留时间不能超过 30 天'
+    return t('settings.auto.auto179')
   }
 
   return ''
@@ -2166,7 +2203,7 @@ const requestDetailRetentionWarning = computed(() => {
     !requestDetailRetentionError.value &&
     requestDetailRetentionTotalHours.value > REQUEST_DETAIL_RETENTION_WARNING_HOURS
   ) {
-    return '保留时间超过 72 小时会增加 Redis 存储压力'
+    return t('settings.auto.auto180')
   }
   return ''
 })
@@ -2191,7 +2228,7 @@ const handleRequestDetailBodyPreviewToggle = async () => {
     await saveClaudeConfig({ requestDetailBodyPreviewEnabled: nextValue })
   } catch (error) {
     if (error?.name === 'AbortError') return
-    showToast('更新请求体预览配置失败', 'error')
+    showToast(t('settings.auto.auto181'), 'error')
     console.error(error)
   } finally {
     requestDetailBodyPreviewSaving.value = false
@@ -2388,7 +2425,7 @@ onMounted(async () => {
       await loadServiceRates()
     }
   } catch (error) {
-    showToast('加载设置失败', 'error')
+    showToast(t('settings.auto.auto182'), 'error')
   }
 })
 
@@ -2439,7 +2476,7 @@ const loadWebhookConfig = async () => {
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('获取webhook配置失败', 'error')
+    showToast(t('settings.auto.auto183'), 'error')
     console.error(error)
   }
 }
@@ -2461,12 +2498,12 @@ const saveWebhookConfig = async () => {
     })
     if (response.success && isMounted.value) {
       webhookConfig.value = payload
-      showToast('配置已保存', 'success')
+      showToast(t('settings.auto.auto184'), 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('保存配置失败', 'error')
+    showToast(t('settings.auto.auto185'), 'error')
     console.error(error)
   }
 }
@@ -2484,7 +2521,7 @@ const loadClaudeConfig = async () => {
         claudeCodeOnlyEnabled: response.config?.claudeCodeOnlyEnabled ?? false,
         globalSessionBindingEnabled: response.config?.globalSessionBindingEnabled ?? false,
         sessionBindingErrorMessage:
-          response.config?.sessionBindingErrorMessage || '你的本地session已污染，请清理后使用。',
+          response.config?.sessionBindingErrorMessage || t('settings.auto.auto062'),
         sessionBindingTtlDays: response.config?.sessionBindingTtlDays ?? 1,
         userMessageQueueEnabled: response.config?.userMessageQueueEnabled ?? false, // 与后端默认值保持一致
         userMessageQueueDelayMs: response.config?.userMessageQueueDelayMs ?? 200,
@@ -2506,7 +2543,7 @@ const loadClaudeConfig = async () => {
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('获取 Claude 转发配置失败', 'error')
+    showToast(t('settings.auto.auto186'), 'error')
     console.error(error)
   } finally {
     if (isMounted.value) {
@@ -2565,22 +2602,22 @@ const saveClaudeConfig = async (options = {}) => {
       }
       syncRequestDetailRetentionInput(claudeConfig.value.requestDetailRetentionHours)
       showToast(
-        response.warning || response.message || 'Claude 转发配置已保存',
+        response.warning || response.message || t('settings.auto.auto187'),
         response.warning ? 'warning' : 'success'
       )
       return response
     }
 
     if (isMounted.value) {
-      showToast(response.message || '保存 Claude 转发配置失败', 'error')
+      showToast(response.message || t('settings.auto.auto188'), 'error')
     }
     return response
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('保存 Claude 转发配置失败', 'error')
+    showToast(t('settings.auto.auto188'), 'error')
     console.error(error)
-    return { success: false, message: error.message || '保存 Claude 转发配置失败' }
+    return { success: false, message: error.message || t('settings.auto.auto188') }
   }
 }
 
@@ -2603,7 +2640,7 @@ const loadServiceRates = async () => {
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    console.error('加载服务倍率配置失败:', error)
+    console.error(t('settings.auto.auto189'), error)
   } finally {
     if (isMounted.value) {
       serviceRatesLoading.value = false
@@ -2626,12 +2663,12 @@ const saveServiceRates = async () => {
     if (response.success && isMounted.value) {
       serviceRates.value.updatedAt = response.data?.updatedAt || new Date().toISOString()
       serviceRates.value.updatedBy = response.data?.updatedBy
-      showToast('服务倍率配置已保存', 'success')
+      showToast(t('settings.auto.auto190'), 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('保存服务倍率配置失败', 'error')
+    showToast(t('settings.auto.auto191'), 'error')
     console.error(error)
   } finally {
     if (isMounted.value) {
@@ -2715,27 +2752,27 @@ const validateUrl = () => {
 const validatePlatformForm = () => {
   if (platformForm.value.type === 'bark') {
     if (!platformForm.value.deviceKey) {
-      showToast('请输入Bark设备密钥', 'error')
+      showToast(t('settings.auto.auto192'), 'error')
       return false
     }
   } else if (platformForm.value.type === 'telegram') {
     if (!platformForm.value.botToken) {
-      showToast('请输入 Telegram 机器人 Token', 'error')
+      showToast(t('settings.auto.auto193'), 'error')
       return false
     }
     if (!platformForm.value.chatId) {
-      showToast('请输入 Telegram Chat ID', 'error')
+      showToast(t('settings.auto.auto194'), 'error')
       return false
     }
     if (platformForm.value.apiBaseUrl) {
       try {
         const parsed = new URL(platformForm.value.apiBaseUrl)
         if (!['http:', 'https:'].includes(parsed.protocol)) {
-          showToast('Telegram API 基础地址仅支持 http 或 https', 'error')
+          showToast(t('settings.auto.auto195'), 'error')
           return false
         }
       } catch (error) {
-        showToast('请输入有效的 Telegram API 基础地址', 'error')
+        showToast(t('settings.auto.auto196'), 'error')
         return false
       }
     }
@@ -2744,35 +2781,35 @@ const validatePlatformForm = () => {
         const parsed = new URL(platformForm.value.proxyUrl)
         const supportedProtocols = ['http:', 'https:', 'socks4:', 'socks4a:', 'socks5:']
         if (!supportedProtocols.includes(parsed.protocol)) {
-          showToast('Telegram 代理仅支持 http/https/socks 协议', 'error')
+          showToast(t('settings.auto.auto197'), 'error')
           return false
         }
       } catch (error) {
-        showToast('请输入有效的 Telegram 代理地址', 'error')
+        showToast(t('settings.auto.auto198'), 'error')
         return false
       }
     }
   } else if (platformForm.value.type === 'smtp') {
     const requiredFields = [
-      { field: 'host', message: 'SMTP服务器' },
-      { field: 'user', message: '用户名' },
-      { field: 'pass', message: '密码' },
-      { field: 'to', message: '收件人邮箱' }
+      { field: 'host', message: t('settings.auto.auto199') },
+      { field: 'user', message: t('settings.auto.auto162') },
+      { field: 'pass', message: t('settings.auto.auto200') },
+      { field: 'to', message: t('settings.auto.auto168') }
     ]
 
     for (const { field, message } of requiredFields) {
       if (!platformForm.value[field]) {
-        showToast(`请输入${message}`, 'error')
+        showToast(`${t('settings.auto.auto201')}${message}`, 'error')
         return false
       }
     }
   } else {
     if (!platformForm.value.url) {
-      showToast('请输入Webhook URL', 'error')
+      showToast(t('settings.auto.auto202'), 'error')
       return false
     }
     if (urlError.value) {
-      showToast('请输入有效的Webhook URL', 'error')
+      showToast(t('settings.auto.auto203'), 'error')
       return false
     }
   }
@@ -2806,14 +2843,17 @@ const savePlatform = async () => {
     }
 
     if (response.success && isMounted.value) {
-      showToast(editingPlatform.value ? '平台已更新' : '平台已添加', 'success')
+      showToast(
+        editingPlatform.value ? t('settings.auto.auto204') : t('settings.auto.auto205'),
+        'success'
+      )
       await loadWebhookConfig()
       closePlatformModal()
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast(error.message || '操作失败', 'error')
+    showToast(error.message || t('settings.auto.auto206'), 'error')
     console.error(error)
   } finally {
     if (isMounted.value) {
@@ -2860,7 +2900,15 @@ const editPlatform = (platform) => {
 const deletePlatform = async (id) => {
   if (!isMounted.value) return
 
-  if (!(await showConfirm('删除平台', '确定要删除这个平台吗？', '删除', '取消', 'danger'))) {
+  if (
+    !(await showConfirm(
+      t('settings.auto.auto207'),
+      t('settings.auto.auto208'),
+      t('settings.auto.auto015'),
+      t('settings.auto.auto174'),
+      'danger'
+    ))
+  ) {
     return
   }
 
@@ -2869,13 +2917,13 @@ const deletePlatform = async (id) => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('平台已删除', 'success')
+      showToast(t('settings.auto.auto209'), 'success')
       await loadWebhookConfig()
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('删除失败', 'error')
+    showToast(t('settings.auto.auto210'), 'error')
     console.error(error)
   }
 }
@@ -2895,7 +2943,7 @@ const togglePlatform = async (id) => {
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast('操作失败', 'error')
+    showToast(t('settings.auto.auto206'), 'error')
     console.error(error)
   }
 }
@@ -2940,12 +2988,12 @@ const testPlatform = async (platform) => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('测试成功', 'success')
+      showToast(t('settings.auto.auto211'), 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast(error.error || error.message || '测试失败', 'error')
+    showToast(error.error || error.message || t('settings.auto.auto212'), 'error')
     console.error(error)
   }
 }
@@ -2963,12 +3011,12 @@ const testPlatformForm = async () => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('测试成功', 'success')
+      showToast(t('settings.auto.auto211'), 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
-    showToast(error.error || error.message || '测试失败', 'error')
+    showToast(error.error || error.message || t('settings.auto.auto212'), 'error')
     console.error(error)
   } finally {
     if (isMounted.value) {
@@ -2986,13 +3034,16 @@ const sendTestNotification = async () => {
       signal: abortController.value.signal
     })
     if (response.success && isMounted.value) {
-      showToast('测试通知已发送', 'success')
+      showToast(t('settings.auto.auto213'), 'success')
     }
   } catch (error) {
     if (error.name === 'AbortError') return
     if (!isMounted.value) return
     const errorMessage =
-      error?.response?.data?.message || error?.response?.data?.error || error?.message || '发送失败'
+      error?.response?.data?.message ||
+      error?.response?.data?.error ||
+      error?.message ||
+      t('settings.auto.auto214')
     showToast(errorMessage, 'error')
     console.error(error)
   }
@@ -3046,15 +3097,15 @@ const closePlatformModal = () => {
 // 辅助函数
 const getPlatformName = (type) => {
   const names = {
-    wechat_work: '企业微信',
-    dingtalk: '钉钉',
-    feishu: '飞书',
+    wechat_work: t('settings.auto.auto215'),
+    dingtalk: t('settings.auto.auto216'),
+    feishu: t('settings.auto.auto217'),
     slack: 'Slack',
     discord: 'Discord',
     telegram: 'Telegram',
     bark: 'Bark',
-    smtp: '邮件通知',
-    custom: '自定义'
+    smtp: t('settings.auto.auto218'),
+    custom: t('settings.auto.auto219')
   }
   return names[type] || type
 }
@@ -3076,15 +3127,15 @@ const getPlatformIcon = (type) => {
 
 const getWebhookHint = (type) => {
   const hints = {
-    wechat_work: '请在企业微信群机器人设置中获取Webhook地址',
-    dingtalk: '请在钉钉群机器人设置中获取Webhook地址',
-    feishu: '请在飞书群机器人设置中获取Webhook地址',
-    slack: '请在Slack应用的Incoming Webhooks中获取地址',
-    discord: '请在Discord服务器的集成设置中创建Webhook',
-    telegram: '使用 @BotFather 创建机器人并复制 Token，Chat ID 可通过 @userinfobot 或相关工具获取',
-    bark: '请在Bark App中查看您的设备密钥',
-    smtp: '请配置SMTP服务器信息，支持Gmail、QQ邮箱等',
-    custom: '请输入完整的Webhook接收地址'
+    wechat_work: t('settings.auto.auto220'),
+    dingtalk: t('settings.auto.auto221'),
+    feishu: t('settings.auto.auto222'),
+    slack: t('settings.auto.auto223'),
+    discord: t('settings.auto.auto224'),
+    telegram: t('settings.auto.auto225'),
+    bark: t('settings.auto.auto226'),
+    smtp: t('settings.auto.auto227'),
+    custom: t('settings.auto.auto228')
   }
   return hints[type] || ''
 }
@@ -3097,24 +3148,24 @@ const formatTelegramToken = (token) => {
 
 const getNotificationTypeName = (type) => {
   const names = {
-    accountAnomaly: '账号异常',
-    quotaWarning: '配额警告',
-    systemError: '系统错误',
-    securityAlert: '安全警报',
-    rateLimitRecovery: '限流恢复',
-    test: '测试通知'
+    accountAnomaly: t('settings.auto.auto229'),
+    quotaWarning: t('settings.auto.auto230'),
+    systemError: t('settings.auto.auto231'),
+    securityAlert: t('settings.auto.auto232'),
+    rateLimitRecovery: t('settings.auto.auto233'),
+    test: t('settings.auto.auto234')
   }
   return names[type] || type
 }
 
 const getNotificationTypeDescription = (type) => {
   const descriptions = {
-    accountAnomaly: '账号状态异常、认证失败等',
-    quotaWarning: 'API调用配额不足警告',
-    systemError: '系统运行错误和故障',
-    securityAlert: '安全相关的警报通知',
-    rateLimitRecovery: '限流状态恢复时发送提醒',
-    test: '用于测试Webhook连接是否正常'
+    accountAnomaly: t('settings.auto.auto235'),
+    quotaWarning: t('settings.auto.auto236'),
+    systemError: t('settings.auto.auto237'),
+    securityAlert: t('settings.auto.auto238'),
+    rateLimitRecovery: t('settings.auto.auto239'),
+    test: t('settings.auto.auto240')
   }
   return descriptions[type] || ''
 }
@@ -3131,12 +3182,12 @@ const saveOemSettings = async () => {
     }
     const result = await settingsStore.saveOemSettings(settings)
     if (result && result.success) {
-      showToast('OEM设置保存成功', 'success')
+      showToast(t('settings.auto.auto241'), 'success')
     } else {
-      showToast(result?.message || '保存失败', 'error')
+      showToast(result?.message || t('settings.auto.auto242'), 'error')
     }
   } catch (error) {
-    showToast('保存OEM设置失败', 'error')
+    showToast(t('settings.auto.auto243'), 'error')
   }
 }
 
@@ -3144,10 +3195,10 @@ const saveOemSettings = async () => {
 const resetOemSettings = async () => {
   if (
     !(await showConfirm(
-      '重置设置',
-      '确定要重置为默认设置吗？\n\n这将清除所有自定义的网站名称和图标设置。',
-      '重置',
-      '取消',
+      t('settings.auto.auto244'),
+      t('settings.auto.auto245'),
+      t('settings.auto.auto246'),
+      t('settings.auto.auto174'),
       'warning'
     ))
   )
@@ -3156,12 +3207,12 @@ const resetOemSettings = async () => {
   try {
     const result = await settingsStore.resetOemSettings()
     if (result && result.success) {
-      showToast('已重置为默认设置', 'success')
+      showToast(t('settings.auto.auto247'), 'success')
     } else {
-      showToast('重置失败', 'error')
+      showToast(t('settings.auto.auto248'), 'error')
     }
   } catch (error) {
-    showToast('重置失败', 'error')
+    showToast(t('settings.auto.auto248'), 'error')
   }
 }
 
@@ -3182,7 +3233,7 @@ const handleIconUpload = async (event) => {
     const base64Data = await settingsStore.fileToBase64(file)
     oemSettings.value.siteIconData = base64Data
   } catch (error) {
-    showToast('文件读取失败', 'error')
+    showToast(t('settings.auto.auto249'), 'error')
   }
 
   // 清除input的值，允许重复选择同一文件

@@ -10,7 +10,7 @@
         :class="
           modelValue ? 'text-gray-900 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'
         "
-        >{{ selectedLabel }}</span
+        >{{ selectedLabel || selectedPlaceholder }}</span
       >
       <i
         class="fas fa-chevron-down text-gray-400 transition-transform duration-200 dark:text-gray-500"
@@ -41,7 +41,7 @@
                 ref="searchInput"
                 v-model="searchQuery"
                 class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                placeholder="搜索账号名称..."
+                :placeholder="t('accountSelector.searchPlaceholder')"
                 style="padding-left: 40px; padding-right: 36px"
                 type="text"
                 @input="handleSearch"
@@ -98,7 +98,7 @@
               <div
                 class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
-                调度分组
+                {{ t('accountSelector.schedulingGroups') }}
               </div>
               <div
                 v-for="group in filteredGroups"
@@ -109,9 +109,9 @@
               >
                 <div class="flex items-center justify-between">
                   <span class="text-gray-700 dark:text-gray-300">{{ group.name }}</span>
-                  <span class="text-xs text-gray-500 dark:text-gray-400"
-                    >{{ group.memberCount || 0 }} 个成员</span
-                  >
+                  <span class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('accountSelector.memberCount', { count: group.memberCount || 0 }) }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -121,17 +121,7 @@
               <div
                 class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
-                {{
-                  platform === 'claude'
-                    ? 'Claude OAuth 专属账号'
-                    : platform === 'openai'
-                      ? 'OpenAI 专属账号'
-                      : platform === 'droid'
-                        ? 'Droid 专属账号'
-                        : platform === 'gemini'
-                          ? 'Gemini OAuth 专属账号'
-                          : 'OAuth 专属账号'
-                }}
+                {{ oauthHeaderLabel }}
               </div>
               <div
                 v-for="account in filteredOAuthAccounts"
@@ -168,7 +158,7 @@
               <div
                 class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
-                Claude Console 专属账号
+                {{ t('accountSelector.dedicatedAccount.claudeConsole') }}
               </div>
               <div
                 v-for="account in filteredConsoleAccounts"
@@ -207,7 +197,7 @@
               <div
                 class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
-                OpenAI-Responses 专属账号
+                {{ t('accountSelector.dedicatedAccount.openaiResponses') }}
               </div>
               <div
                 v-for="account in filteredOpenAIResponsesAccounts"
@@ -246,7 +236,7 @@
               <div
                 class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
-                Gemini-API 专属账号
+                {{ t('accountSelector.dedicatedAccount.geminiApi') }}
               </div>
               <div
                 v-for="account in filteredGeminiApiAccounts"
@@ -286,7 +276,7 @@
               class="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
             >
               <i class="fas fa-search mb-2 text-2xl" />
-              <p class="text-sm">没有找到匹配的账号</p>
+              <p class="text-sm">{{ t('accountSelector.noMatches') }}</p>
             </div>
           </div>
         </div>
@@ -297,7 +287,10 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { formatDate } from '@/utils/tools'
+
+const { t } = useI18n()
 
 const props = defineProps({
   modelValue: {
@@ -323,11 +316,11 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: '请选择账号'
+    default: ''
   },
   defaultOptionText: {
     type: String,
-    default: '使用共享账号池'
+    default: ''
   },
   specialOptions: {
     type: Array,
@@ -345,6 +338,19 @@ const dropdownStyle = ref({})
 const triggerRef = ref(null)
 const lastDirection = ref('') // 记住上次的显示方向
 const specialOptionsList = computed(() => props.specialOptions || [])
+const defaultOptionText = computed(() => props.defaultOptionText || t('accountSelector.sharedPool'))
+const selectedPlaceholder = computed(
+  () => props.placeholder || t('accountSelector.defaultPlaceholder')
+)
+const oauthHeaderLabel = computed(() => {
+  const platformKeyMap = {
+    claude: 'claude',
+    openai: 'openai',
+    droid: 'droid',
+    gemini: 'gemini'
+  }
+  return t(`accountSelector.dedicatedAccount.${platformKeyMap[props.platform] || 'oauth'}`)
+})
 
 // 获取选中的标签
 const selectedLabel = computed(() => {
@@ -356,13 +362,15 @@ const selectedLabel = computed(() => {
   }
 
   // 如果没有选中值，显示默认选项文本
-  if (!props.modelValue) return props.defaultOptionText
+  if (!props.modelValue) return defaultOptionText.value
 
   // 分组
   if (props.modelValue.startsWith('group:')) {
     const groupId = props.modelValue.substring(6)
     const group = props.groups.find((g) => g.id === groupId)
-    return group ? `${group.name} (${group.memberCount || 0} 个成员)` : ''
+    return group
+      ? `${group.name} (${t('accountSelector.memberCount', { count: group.memberCount || 0 })})`
+      : ''
   }
 
   // Console 账号
@@ -397,7 +405,7 @@ const selectedLabel = computed(() => {
 
 // 获取账户状态文本
 const getAccountStatusText = (account) => {
-  if (!account) return '未知'
+  if (!account) return t('accountSelector.status.unknown')
 
   // 处理 OpenAI-Responses 账号（isActive 可能是字符串）
   const isActive = account.isActive === 'true' || account.isActive === true
@@ -407,26 +415,26 @@ const getAccountStatusText = (account) => {
     // 根据 status 提供更详细的状态信息
     switch (account.status) {
       case 'unauthorized':
-        return '未授权'
+        return t('accountSelector.status.unauthorized')
       case 'error':
-        return 'Token错误'
+        return t('accountSelector.status.tokenError')
       case 'created':
-        return '待验证'
+        return t('accountSelector.status.created')
       case 'rate_limited':
-        return '限流中'
+        return t('accountSelector.status.rateLimited')
       case 'quota_exceeded':
-        return '额度超限'
+        return t('accountSelector.status.quotaExceeded')
       default:
-        return '异常'
+        return t('accountSelector.status.abnormal')
     }
   }
 
   // 对于激活的账号，如果是限流状态也要显示
   if (account.status === 'rate_limited') {
-    return '限流中'
+    return t('accountSelector.status.rateLimited')
   }
 
-  return '正常'
+  return t('accountSelector.status.normal')
 }
 
 // 按创建时间倒序排序账号

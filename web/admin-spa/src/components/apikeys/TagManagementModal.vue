@@ -13,7 +13,7 @@
           >
             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
               <i class="fas fa-tags mr-2 text-purple-500" />
-              标签管理
+              {{ t('apiKeyTags.title') }}
             </h3>
             <button
               class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
@@ -30,7 +30,7 @@
               <input
                 v-model="newTagInput"
                 class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="输入新标签名称"
+                :placeholder="t('apiKeyTags.newTagPlaceholder')"
                 type="text"
                 @keyup.enter="createTag"
               />
@@ -41,18 +41,18 @@
               >
                 <i v-if="creating" class="fas fa-spinner fa-spin mr-1" />
                 <i v-else class="fas fa-plus mr-1" />
-                新增
+                {{ t('apiKeyTags.add') }}
               </button>
             </div>
 
             <div v-if="loading" class="py-8 text-center">
               <i class="fas fa-spinner fa-spin text-2xl text-gray-400" />
-              <p class="mt-2 text-gray-500 dark:text-gray-400">加载中...</p>
+              <p class="mt-2 text-gray-500 dark:text-gray-400">{{ t('apiKeyTags.loading') }}</p>
             </div>
 
             <div v-else-if="tags.length === 0" class="py-8 text-center">
               <i class="fas fa-tag text-4xl text-gray-300 dark:text-gray-600" />
-              <p class="mt-2 text-gray-500 dark:text-gray-400">暂无标签</p>
+              <p class="mt-2 text-gray-500 dark:text-gray-400">{{ t('apiKeyTags.noTags') }}</p>
             </div>
 
             <div v-else class="space-y-2">
@@ -67,14 +67,14 @@
                   <span
                     class="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
                   >
-                    {{ tag.count }} 个 Key
+                    {{ t('apiKeyTags.keyCount', { count: tag.count }) }}
                   </span>
                 </div>
                 <div class="flex gap-1">
                   <button
                     class="rounded-lg p-2 text-gray-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
                     :disabled="processing"
-                    title="重命名"
+                    :title="t('apiKeyTags.rename')"
                     @click="startRename(tag)"
                   >
                     <i class="fas fa-edit" />
@@ -82,7 +82,7 @@
                   <button
                     class="rounded-lg p-2 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                     :disabled="processing"
-                    title="删除标签"
+                    :title="t('apiKeyTags.delete')"
                     @click="confirmDelete(tag)"
                   >
                     <i class="fas fa-trash" />
@@ -98,7 +98,7 @@
               class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               @click="handleClose"
             >
-              关闭
+              {{ t('common.close') }}
             </button>
           </div>
         </div>
@@ -108,11 +108,11 @@
 
   <!-- 删除确认弹窗 -->
   <ConfirmModal
-    cancel-text="取消"
-    confirm-text="确定删除"
-    :message="`此操作将从 ${confirmingTag?.count || 0} 个 API Key 中移除该标签，不可恢复。`"
+    :cancel-text="t('common.cancel')"
+    :confirm-text="t('apiKeyTags.confirmDelete')"
+    :message="t('apiKeyTags.deleteMessage', { count: confirmingTag?.count || 0 })"
     :show="showDeleteConfirm"
-    :title="`删除标签「${confirmingTag?.name || ''}」`"
+    :title="t('apiKeyTags.deleteTitle', { name: confirmingTag?.name || '' })"
     type="danger"
     @cancel="showDeleteConfirm = false"
     @confirm="executeDelete"
@@ -126,15 +126,17 @@
       @click.self="showRenameModal = false"
     >
       <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
-        <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">重命名标签</h3>
+        <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+          {{ t('apiKeyTags.renameTitle') }}
+        </h3>
         <div class="mb-4">
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            新名称
+            {{ t('apiKeyTags.newName') }}
           </label>
           <input
             v-model="newTagName"
             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            placeholder="请输入新标签名称"
+            :placeholder="t('apiKeyTags.newNamePlaceholder')"
             type="text"
             @keyup.enter="executeRename"
           />
@@ -144,7 +146,7 @@
             class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             @click="showRenameModal = false"
           >
-            取消
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
@@ -152,7 +154,7 @@
             @click="executeRename"
           >
             <i v-if="processing" class="fas fa-spinner fa-spin mr-1" />
-            确定
+            {{ t('common.confirm') }}
           </button>
         </div>
       </div>
@@ -162,6 +164,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getApiKeyTagsDetailsApi,
   createApiKeyTagApi,
@@ -177,6 +180,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated'])
 
+const { t } = useI18n()
 const loading = ref(false)
 const processing = ref(false)
 const creating = ref(false)
@@ -205,12 +209,12 @@ const createTag = async () => {
   creating.value = false
 
   if (res.success) {
-    showToast('标签创建成功', 'success')
+    showToast(t('apiKeyTags.toast.createSuccess'), 'success')
     newTagInput.value = ''
     loadTags()
     emit('updated')
   } else {
-    showToast(res.error || '创建失败', 'error')
+    showToast(res.error || t('apiKeyTags.toast.createFailed'), 'error')
   }
 }
 
@@ -229,12 +233,12 @@ const executeDelete = async () => {
   processing.value = false
 
   if (res.success) {
-    showToast(`标签「${tagName}」已删除`, 'success')
+    showToast(t('apiKeyTags.toast.deleteSuccess', { name: tagName }), 'success')
     tags.value = tags.value.filter((t) => t.name !== tagName)
     confirmingTag.value = null
     emit('updated')
   } else {
-    showToast(res.error || '删除失败', 'error')
+    showToast(res.error || t('apiKeyTags.toast.deleteFailed'), 'error')
   }
 }
 
@@ -253,13 +257,13 @@ const executeRename = async () => {
   processing.value = false
 
   if (res.success) {
-    showToast('标签已重命名', 'success')
+    showToast(t('apiKeyTags.toast.renameSuccess'), 'success')
     showRenameModal.value = false
     renamingTag.value = null
     loadTags()
     emit('updated')
   } else {
-    showToast(res.error || '重命名失败', 'error')
+    showToast(res.error || t('apiKeyTags.toast.renameFailed'), 'error')
   }
 }
 

@@ -1,6 +1,9 @@
 import axios from 'axios'
 
 import { APP_CONFIG, getLoginUrl } from '@/utils/tools'
+import i18n from '@/i18n'
+
+const t = (...args) => i18n.global.t(...args)
 
 const axiosInstance = axios.create({
   baseURL: APP_CONFIG.apiPrefix,
@@ -45,12 +48,15 @@ const request = async (config) => {
     }
     const status = error.response?.status
     const messages = {
-      401: '未授权，请重新登录',
-      403: '无权限访问',
-      404: '请求的资源不存在',
-      500: '服务器内部错误'
+      401: t('adminUtility.storeMessages.unauthorized'),
+      403: t('adminUtility.storeMessages.forbidden'),
+      404: t('adminUtility.storeMessages.notFound'),
+      500: t('adminUtility.storeMessages.serverError')
     }
-    return { success: false, message: messages[status] || error.message || '请求失败' }
+    return {
+      success: false,
+      message: messages[status] || error.message || t('adminUtility.storeMessages.requestFailed')
+    }
   }
 }
 

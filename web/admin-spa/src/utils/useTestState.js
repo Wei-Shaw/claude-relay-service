@@ -1,4 +1,7 @@
 import { ref, computed, onUnmounted } from 'vue'
+import i18n from '@/i18n'
+
+const t = (...args) => i18n.global.t(...args)
 
 export const useTestState = () => {
   // ========== 状态 ==========
@@ -12,7 +15,9 @@ export const useTestState = () => {
   // ========== 状态样式计算属性 ==========
   const statusStyleMap = {
     idle: {
-      title: '准备就绪',
+      get title() {
+        return t('adminUtility.storeMessages.ready')
+      },
       card: 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50',
       iconBg: 'bg-gray-200 dark:bg-gray-700',
       icon: 'fa-hourglass-start',
@@ -20,7 +25,9 @@ export const useTestState = () => {
       text: 'text-gray-700 dark:text-gray-300'
     },
     testing: {
-      title: '正在测试...',
+      get title() {
+        return t('adminUtility.storeMessages.testing')
+      },
       card: 'border-blue-200 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-900/20',
       iconBg: 'bg-blue-100 dark:bg-blue-500/30',
       icon: 'fa-spinner fa-spin',
@@ -28,7 +35,9 @@ export const useTestState = () => {
       text: 'text-blue-700 dark:text-blue-300'
     },
     success: {
-      title: '测试成功',
+      get title() {
+        return t('adminUtility.storeMessages.testSuccess')
+      },
       card: 'border-green-200 bg-green-50 dark:border-green-500/30 dark:bg-green-900/20',
       iconBg: 'bg-green-100 dark:bg-green-500/30',
       icon: 'fa-check-circle',
@@ -36,7 +45,9 @@ export const useTestState = () => {
       text: 'text-green-700 dark:text-green-300'
     },
     error: {
-      title: '测试失败',
+      get title() {
+        return t('adminUtility.storeMessages.testFailed')
+      },
       card: 'border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-900/20',
       iconBg: 'bg-red-100 dark:bg-red-500/30',
       icon: 'fa-exclamation-circle',
@@ -69,12 +80,12 @@ export const useTestState = () => {
           testStatus.value = 'success'
         } else {
           testStatus.value = 'error'
-          errorMessage.value = data.error || '测试失败'
+          errorMessage.value = data.error || t('adminUtility.storeMessages.testFailed')
         }
         break
       case 'error':
         testStatus.value = 'error'
-        errorMessage.value = data.error || '未知错误'
+        errorMessage.value = data.error || t('adminUtility.storeMessages.unknownError')
         testDuration.value = Date.now() - testStartTime.value
         break
     }
@@ -161,13 +172,13 @@ export const useTestState = () => {
           responseText.value = data.data?.responseText || 'Test passed'
         } else {
           testStatus.value = 'error'
-          errorMessage.value = data.message || 'Test failed'
+          errorMessage.value = data.message || t('adminUtility.storeMessages.testFailed')
         }
       }
     } catch (err) {
       if (err.name === 'AbortError') return
       testStatus.value = 'error'
-      errorMessage.value = err.message || '连接失败'
+      errorMessage.value = err.message || t('adminUtility.storeMessages.connectionFailed')
       testDuration.value = Date.now() - testStartTime.value
     }
   }

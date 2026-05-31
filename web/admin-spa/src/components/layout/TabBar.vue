@@ -38,6 +38,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 
 defineProps({
@@ -50,28 +51,59 @@ defineProps({
 defineEmits(['tab-change'])
 
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 // 根据 LDAP 配置动态生成 tabs
 const tabs = computed(() => {
   const baseTabs = [
-    { key: 'dashboard', name: '仪表板', shortName: '仪表板', icon: 'fas fa-tachometer-alt' },
-    { key: 'apiKeys', name: 'API Keys', shortName: 'API', icon: 'fas fa-key' },
-    { key: 'accounts', name: '账户管理', shortName: '账户', icon: 'fas fa-user-circle' },
-    { key: 'requestDetails', name: '请求明细', shortName: '明细', icon: 'fas fa-table' },
-    { key: 'quotaCards', name: '额度卡', shortName: '额度卡', icon: 'fas fa-ticket-alt' }
+    {
+      key: 'dashboard',
+      name: t('nav.dashboard'),
+      shortName: t('nav.short.dashboard'),
+      icon: 'fas fa-tachometer-alt'
+    },
+    {
+      key: 'apiKeys',
+      name: t('nav.apiKeys'),
+      shortName: t('nav.short.apiKeys'),
+      icon: 'fas fa-key'
+    },
+    {
+      key: 'accounts',
+      name: t('nav.accounts'),
+      shortName: t('nav.short.accounts'),
+      icon: 'fas fa-user-circle'
+    },
+    {
+      key: 'requestDetails',
+      name: t('nav.requestDetails'),
+      shortName: t('nav.short.requestDetails'),
+      icon: 'fas fa-table'
+    },
+    {
+      key: 'quotaCards',
+      name: t('nav.quotaCards'),
+      shortName: t('nav.short.quotaCards'),
+      icon: 'fas fa-ticket-alt'
+    }
   ]
 
   // 只有在 LDAP 启用时才显示用户管理
   if (authStore.oemSettings?.ldapEnabled) {
     baseTabs.push({
       key: 'userManagement',
-      name: '用户管理',
-      shortName: '用户',
+      name: t('nav.userManagement'),
+      shortName: t('nav.short.userManagement'),
       icon: 'fas fa-users'
     })
   }
 
-  baseTabs.push({ key: 'settings', name: '系统设置', shortName: '设置', icon: 'fas fa-cogs' })
+  baseTabs.push({
+    key: 'settings',
+    name: t('nav.settings'),
+    shortName: t('nav.short.settings'),
+    icon: 'fas fa-cogs'
+  })
 
   return baseTabs
 })

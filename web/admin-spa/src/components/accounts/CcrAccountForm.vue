@@ -12,7 +12,7 @@
               <i class="fas fa-code-branch text-sm text-white sm:text-base" />
             </div>
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-              {{ isEdit ? '编辑 CCR 账户' : '添加 CCR 账户' }}
+              {{ isEdit ? t('accountModals.ccr.editTitle') : t('accountModals.ccr.addTitle') }}
             </h3>
           </div>
           <button
@@ -27,13 +27,13 @@
           <!-- 基本信息 -->
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >账户名称 *</label
+              >{{ t('accountForm.basic.accountName') }} *</label
             >
             <input
               v-model="form.name"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
               :class="{ 'border-red-500': errors.name }"
-              placeholder="为账户设置一个易识别的名称"
+              :placeholder="t('accountForm.basic.accountNamePlaceholder')"
               required
               type="text"
             />
@@ -41,13 +41,13 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >描述 (可选)</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.basic.description')
+            }}</label>
             <textarea
               v-model="form.description"
               class="form-input w-full resize-none border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-              placeholder="账户用途说明..."
+              :placeholder="t('accountForm.basic.descriptionPlaceholder')"
               rows="3"
             />
           </div>
@@ -61,7 +61,7 @@
                 v-model="form.apiUrl"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 :class="{ 'border-red-500': errors.apiUrl }"
-                placeholder="例如：https://api.example.com/v1/messages"
+                :placeholder="t('accountModals.ccr.apiUrlPlaceholder')"
                 required
                 type="text"
               />
@@ -69,13 +69,17 @@
             </div>
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >API Key {{ isEdit ? '(留空不更新)' : '*' }}</label
+                >API Key {{ isEdit ? t('accountModals.ccr.leaveBlankSuffix') : '*' }}</label
               >
               <input
                 v-model="form.apiKey"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 :class="{ 'border-red-500': errors.apiKey }"
-                :placeholder="isEdit ? '留空表示不更新' : '必填'"
+                :placeholder="
+                  isEdit
+                    ? t('accountModals.ccr.keepExistingPlaceholder')
+                    : t('accountModals.ccr.requiredPlaceholder')
+                "
                 :required="!isEdit"
                 type="password"
               />
@@ -85,29 +89,29 @@
 
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >优先级</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.claudeOptions.priority')
+              }}</label>
               <input
                 v-model.number="form.priority"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 max="100"
                 min="1"
-                placeholder="默认50，数字越小优先级越高"
+                :placeholder="t('accountModals.ccr.priorityPlaceholder')"
                 type="number"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                建议范围：1-100，数字越小优先级越高
+                {{ t('accountForm.claudeOptions.priorityHelp') }}
               </p>
             </div>
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >自定义 User-Agent (可选)</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.userAgent.customOptional')
+              }}</label>
               <input
                 v-model="form.userAgent"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                placeholder="留空则透传客户端 User-Agent"
+                :placeholder="t('accountForm.userAgent.passthroughPlaceholder')"
                 type="text"
               />
             </div>
@@ -115,9 +119,9 @@
 
           <!-- 限流设置 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >限流机制</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.rateLimit.label')
+            }}</label>
             <div class="mb-3">
               <label class="inline-flex cursor-pointer items-center">
                 <input
@@ -125,24 +129,24 @@
                   class="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300"
-                  >启用限流机制（429 时暂停调度）</span
-                >
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{
+                  t('accountForm.rateLimit.enableHelp')
+                }}</span>
               </label>
             </div>
             <div v-if="enableRateLimit">
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >限流时间 (分钟)</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.rateLimit.duration')
+              }}</label>
               <input
                 v-model.number="form.rateLimitDuration"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 min="1"
-                placeholder="默认60分钟"
+                :placeholder="t('accountForm.rateLimit.durationPlaceholder')"
                 type="number"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                账号被限流后暂停调度的时间（分钟）
+                {{ t('accountForm.rateLimit.durationHelp') }}
               </p>
             </div>
           </div>
@@ -150,44 +154,46 @@
           <!-- 额度管理 -->
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >每日额度限制 ($)</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.quota.dailyLimit')
+              }}</label>
               <input
                 v-model.number="form.dailyQuota"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 min="0"
-                placeholder="0 表示不限制"
+                :placeholder="t('accountForm.quota.unlimitedPlaceholder')"
                 step="0.01"
                 type="number"
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                设置每日使用额度，0 表示不限制
+                {{ t('accountForm.quota.dailyLimitHelp') }}
               </p>
             </div>
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >额度重置时间</label
-              >
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+                t('accountForm.quota.resetTime')
+              }}</label>
               <input
                 v-model="form.quotaResetTime"
                 class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                 placeholder="00:00"
                 type="time"
               />
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">每日自动重置额度的时间</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('accountForm.quota.resetTimeHelp') }}
+              </p>
             </div>
           </div>
 
           <!-- 模型映射表（可选） -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >模型映射表 (可选)</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('accountForm.modelRestrictions.mapping')
+            }}</label>
             <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
               <p class="text-xs text-blue-700 dark:text-blue-400">
                 <i class="fas fa-info-circle mr-1" />
-                留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。
+                {{ t('accountModals.ccr.modelMappingHelp') }}
               </p>
             </div>
             <div class="mb-3 space-y-2">
@@ -199,14 +205,14 @@
                 <input
                   v-model="mapping.from"
                   class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="原始模型名称"
+                  :placeholder="t('accountForm.modelRestrictions.sourceModelPlaceholder')"
                   type="text"
                 />
                 <i class="fas fa-arrow-right text-gray-400 dark:text-gray-500" />
                 <input
                   v-model="mapping.to"
                   class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="映射后的模型名称"
+                  :placeholder="t('accountForm.modelRestrictions.targetModelPlaceholder')"
                   type="text"
                 />
                 <button
@@ -223,7 +229,7 @@
               type="button"
               @click="addModelMapping"
             >
-              <i class="fas fa-plus mr-2" /> 添加模型映射
+              <i class="fas fa-plus mr-2" /> {{ t('accountForm.modelRestrictions.addMapping') }}
             </button>
           </div>
 
@@ -239,7 +245,7 @@
               type="button"
               @click="$emit('close')"
             >
-              取消
+              {{ t('common.cancel') }}
             </button>
             <button
               class="btn btn-primary flex-1 px-6 py-3 font-semibold"
@@ -248,7 +254,15 @@
               @click="submit"
             >
               <div v-if="loading" class="loading-spinner mr-2" />
-              {{ loading ? (isEdit ? '保存中...' : '创建中...') : isEdit ? '保存' : '创建' }}
+              {{
+                loading
+                  ? isEdit
+                    ? t('common.saving')
+                    : t('accountForm.modal.creating')
+                  : isEdit
+                    ? t('common.save')
+                    : t('accountForm.modal.create')
+              }}
             </button>
           </div>
         </div>
@@ -259,6 +273,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { updateCcrAccountApi, createCcrAccountApi } from '@/utils/http_apis'
 import { showToast } from '@/utils/tools'
 import ProxyConfig from '@/components/accounts/ProxyConfig.vue'
@@ -271,6 +286,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'success'])
+const { t } = useI18n()
 
 const show = ref(true)
 const isEdit = computed(() => !!props.account)
@@ -315,10 +331,12 @@ const removeModelMapping = (index) => {
 
 const validate = () => {
   const e = {}
-  if (!form.value.name || form.value.name.trim().length === 0) e.name = '名称不能为空'
-  if (!form.value.apiUrl || form.value.apiUrl.trim().length === 0) e.apiUrl = 'API URL 不能为空'
+  if (!form.value.name || form.value.name.trim().length === 0)
+    e.name = t('accountModals.ccr.validation.nameRequired')
+  if (!form.value.apiUrl || form.value.apiUrl.trim().length === 0)
+    e.apiUrl = t('accountModals.ccr.validation.apiUrlRequired')
   if (!isEdit.value && (!form.value.apiKey || form.value.apiKey.trim().length === 0))
-    e.apiKey = 'API Key 不能为空'
+    e.apiKey = t('accountModals.ccr.validation.apiKeyRequired')
   errors.value = e
   return Object.keys(e).length === 0
 }
@@ -349,7 +367,7 @@ const submit = async () => {
         // 不在这里显示 toast，由父组件统一处理
         emit('success')
       } else {
-        showToast(res.message || '保存失败', 'error')
+        showToast(res.message || t('accountModals.common.saveFailed'), 'error')
       }
     } else {
       // 创建
@@ -372,11 +390,11 @@ const submit = async () => {
         // 不在这里显示 toast，由父组件统一处理
         emit('success')
       } else {
-        showToast(res.message || '创建失败', 'error')
+        showToast(res.message || t('accountModals.common.createFailed'), 'error')
       }
     }
   } catch (err) {
-    showToast(err.message || '请求失败', 'error')
+    showToast(err.message || t('accountModals.common.requestFailed'), 'error')
   } finally {
     loading.value = false
   }

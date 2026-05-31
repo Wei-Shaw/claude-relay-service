@@ -19,9 +19,11 @@
               <i class="fas fa-clock" />
             </div>
             <div>
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">定时测试配置</h3>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {{ t('accountModals.scheduledTest.title') }}
+              </h3>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ account?.name || '未知账户' }}
+                {{ account?.name || t('accountModals.common.unknownAccount') }}
               </p>
             </div>
           </div>
@@ -39,15 +41,21 @@
           <!-- 加载状态 -->
           <div v-if="loading" class="flex items-center justify-center py-8">
             <i class="fas fa-spinner fa-spin mr-2 text-blue-500" />
-            <span class="text-gray-500 dark:text-gray-400">加载配置中...</span>
+            <span class="text-gray-500 dark:text-gray-400">{{
+              t('accountModals.scheduledTest.loadingConfig')
+            }}</span>
           </div>
 
           <template v-else>
             <!-- 启用开关 -->
             <div class="mb-5 flex items-center justify-between">
               <div>
-                <p class="font-medium text-gray-700 dark:text-gray-300">启用定时测试</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">按计划自动测试账户连通性</p>
+                <p class="font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('accountModals.scheduledTest.enable') }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('accountModals.scheduledTest.enableHelp') }}
+                </p>
               </div>
               <button
                 :class="[
@@ -68,7 +76,7 @@
             <!-- Cron 表达式配置 -->
             <div class="mb-5">
               <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Cron 表达式
+                {{ t('accountModals.scheduledTest.cronExpression') }}
               </label>
               <input
                 v-model="config.cronExpression"
@@ -78,14 +86,14 @@
                 type="text"
               />
               <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                格式: 分 时 日 月 周 (例: "0 8 * * *" = 每天8:00)
+                {{ t('accountModals.scheduledTest.cronHelp') }}
               </p>
             </div>
 
             <!-- 快捷选项 -->
             <div class="mb-5">
               <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                快捷设置
+                {{ t('accountModals.scheduledTest.quickSettings') }}
               </label>
               <div class="flex flex-wrap gap-2">
                 <button
@@ -109,20 +117,20 @@
             <!-- 测试模型选择 -->
             <div class="mb-5">
               <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                测试模型
+                {{ t('accountModals.scheduledTest.testModel') }}
               </label>
               <ModelSelector
                 v-model="config.model"
                 :disabled="!config.enabled"
                 :models="modelOptions"
-                placeholder="输入模型 ID..."
+                :placeholder="t('common.modelPlaceholder')"
               />
             </div>
 
             <!-- 测试历史 -->
             <div v-if="testHistory.length > 0" class="mb-4">
               <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                最近测试记录
+                {{ t('accountModals.scheduledTest.recentRecords') }}
               </label>
               <div
                 class="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
@@ -165,7 +173,7 @@
               class="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
             >
               <i class="fas fa-history mb-2 text-2xl text-gray-300 dark:text-gray-600" />
-              <p>暂无测试记录</p>
+              <p>{{ t('accountModals.scheduledTest.noRecords') }}</p>
             </div>
           </template>
         </div>
@@ -179,7 +187,7 @@
             :disabled="saving"
             @click="handleClose"
           >
-            取消
+            {{ t('common.cancel') }}
           </button>
           <button
             :class="[
@@ -192,7 +200,7 @@
             @click="saveConfig"
           >
             <i :class="['fas', saving ? 'fa-spinner fa-spin' : 'fa-save']" />
-            {{ saving ? '保存中...' : '保存配置' }}
+            {{ saving ? t('common.saving') : t('accountModals.scheduledTest.saveConfig') }}
           </button>
         </div>
       </div>
@@ -201,7 +209,8 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { APP_CONFIG } from '@/utils/tools'
 import { showToast } from '@/utils/tools'
 import { getModelsApi } from '@/utils/http_apis'
@@ -219,6 +228,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'saved'])
+const { t, locale } = useI18n()
 
 // 状态
 const loading = ref(false)
@@ -231,14 +241,14 @@ const config = ref({
 const testHistory = ref([])
 
 // Cron 预设选项
-const cronPresets = [
-  { label: '每天 8:00', value: '0 8 * * *' },
-  { label: '每天 12:00', value: '0 12 * * *' },
-  { label: '每天 18:00', value: '0 18 * * *' },
-  { label: '每6小时', value: '0 */6 * * *' },
-  { label: '每12小时', value: '0 */12 * * *' },
-  { label: '工作日 9:00', value: '0 9 * * 1-5' }
-]
+const cronPresets = computed(() => [
+  { label: t('accountModals.scheduledTest.presets.daily8'), value: '0 8 * * *' },
+  { label: t('accountModals.scheduledTest.presets.daily12'), value: '0 12 * * *' },
+  { label: t('accountModals.scheduledTest.presets.daily18'), value: '0 18 * * *' },
+  { label: t('accountModals.scheduledTest.presets.every6Hours'), value: '0 */6 * * *' },
+  { label: t('accountModals.scheduledTest.presets.every12Hours'), value: '0 */12 * * *' },
+  { label: t('accountModals.scheduledTest.presets.weekdays9'), value: '0 9 * * 1-5' }
+])
 
 // 模型选项（从 API 动态获取）
 const modelOptions = ref([])
@@ -255,9 +265,9 @@ onMounted(loadModels)
 
 // 格式化时间戳
 function formatTimestamp(timestamp) {
-  if (!timestamp) return '未知'
+  if (!timestamp) return t('accountModals.common.unknown')
   const date = new Date(timestamp)
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString(locale.value, {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -317,7 +327,7 @@ async function loadConfig() {
       }
     }
   } catch (err) {
-    showToast('加载配置失败: ' + err.message, 'error')
+    showToast(t('accountModals.scheduledTest.loadFailed', { message: err.message }), 'error')
   } finally {
     loading.value = false
   }
@@ -354,15 +364,18 @@ async function saveConfig() {
     })
 
     if (res.ok) {
-      showToast('配置已保存', 'success')
+      showToast(t('accountModals.scheduledTest.saveSuccess'), 'success')
       emit('saved')
       handleClose()
     } else {
       const errorData = await res.json().catch(() => ({}))
-      showToast(errorData.message || '保存失败', 'error')
+      showToast(errorData.message || t('accountModals.common.saveFailed'), 'error')
     }
   } catch (err) {
-    showToast('保存失败: ' + err.message, 'error')
+    showToast(
+      t('accountModals.scheduledTest.saveFailedWithMessage', { message: err.message }),
+      'error'
+    )
   } finally {
     saving.value = false
   }

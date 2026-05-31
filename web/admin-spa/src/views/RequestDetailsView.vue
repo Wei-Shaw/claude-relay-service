@@ -6,7 +6,7 @@
           <div>
             <div class="flex flex-wrap items-center gap-2 sm:gap-3">
               <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-                请求明细
+                {{ t('requestDetails.title') }}
               </h3>
               <span
                 :class="[
@@ -22,7 +22,11 @@
                     captureEnabled ? 'bg-green-500' : 'bg-gray-400'
                   ]"
                 />
-                {{ captureEnabled ? '采集已开启' : '采集已关闭' }}
+                {{
+                  captureEnabled
+                    ? t('requestDetails.captureEnabled')
+                    : t('requestDetails.captureDisabled')
+                }}
               </span>
               <span
                 class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
@@ -44,10 +48,10 @@
           <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
-                请求明细采集尚未开启
+                {{ t('requestDetails.notEnabledTitle') }}
               </h3>
               <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                到系统设置开启“请求明细采集”后，后台会开始记录新的请求摘要。历史请求不会回填。
+                {{ t('requestDetails.notEnabledDescription') }}
               </p>
             </div>
             <div class="flex flex-col gap-2 sm:flex-row">
@@ -59,12 +63,12 @@
                   class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
                 ></span>
                 <i class="fas fa-cog relative text-blue-500" />
-                <span class="relative">前往系统设置</span>
+                <span class="relative">{{ t('requestDetails.goToSettings') }}</span>
               </button>
               <el-tooltip placement="top">
                 <template #content>
                   <div class="max-w-xs text-xs leading-relaxed">
-                    清理所有已保存的历史请求体预览数据；仅影响历史预览，不影响当前请求体预览开关设置
+                    {{ t('requestDetails.purgeTooltip') }}
                   </div>
                 </template>
                 <button
@@ -81,7 +85,7 @@
                       requestDetailBodyPreviewPurging ? 'fa-spinner fa-spin' : 'fa-trash-alt'
                     ]"
                   />
-                  <span class="relative">清理历史预览</span>
+                  <span class="relative">{{ t('requestDetails.purgeHistory') }}</span>
                 </button>
               </el-tooltip>
             </div>
@@ -93,37 +97,40 @@
             v-if="!captureEnabled"
             class="rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
           >
-            请求明细采集已关闭，当前展示的是仍在保留期内的历史记录；不会继续写入新的请求明细。
+            {{ t('requestDetails.captureDisabledWarning') }}
           </div>
 
           <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <div class="summary-card">
-              <p class="summary-label">总请求</p>
+              <p class="summary-label">{{ t('requestDetails.summary.totalRequests') }}</p>
               <p class="summary-value">{{ formatNumber(summary.totalRequests) }}</p>
             </div>
             <div class="summary-card">
-              <p class="summary-label">输入 / 输出</p>
+              <p class="summary-label">{{ t('requestDetails.summary.inputOutput') }}</p>
               <p class="summary-value">{{ formatNumber(summary.inputTokens) }}</p>
-              <p class="summary-sub">输出 {{ formatNumber(summary.outputTokens) }}</p>
+              <p class="summary-sub">
+                {{ t('requestDetails.summary.output') }} {{ formatNumber(summary.outputTokens) }}
+              </p>
             </div>
             <div class="summary-card">
-              <p class="summary-label">缓存命中率</p>
+              <p class="summary-label">{{ t('requestDetails.summary.cacheHitRate') }}</p>
               <p class="summary-value text-cyan-600 dark:text-cyan-400">
                 {{ formatPercent(summary.cacheHitRate) }}
               </p>
               <p class="summary-sub">
-                读 / (输入 + 读 + 建)：{{ formatNumber(summary.cacheHitNumerator) }} /
+                {{ t('requestDetails.summary.cacheFormula') }}
+                {{ formatNumber(summary.cacheHitNumerator) }} /
                 {{ formatNumber(summary.cacheHitDenominator) }}
               </p>
             </div>
             <div class="summary-card">
-              <p class="summary-label">总费用</p>
+              <p class="summary-label">{{ t('requestDetails.summary.totalCost') }}</p>
               <p class="summary-value text-amber-600 dark:text-amber-400">
                 {{ formatCost(summary.totalCost) }}
               </p>
             </div>
             <div class="summary-card">
-              <p class="summary-label">平均耗时</p>
+              <p class="summary-label">{{ t('requestDetails.summary.avgDuration') }}</p>
               <p class="summary-value">{{ formatDuration(summary.avgDurationMs) }}</p>
             </div>
           </div>
@@ -142,9 +149,9 @@
                       v-model="filters.dateRange"
                       class="toolbar-element w-full"
                       clearable
-                      end-placeholder="结束时间"
+                      :end-placeholder="t('requestDetails.placeholders.endTime')"
                       format="YYYY-MM-DD HH:mm:ss"
-                      start-placeholder="开始时间"
+                      :start-placeholder="t('requestDetails.placeholders.startTime')"
                       type="datetimerange"
                       unlink-panels
                     />
@@ -158,7 +165,7 @@
                       v-model="filters.keyword"
                       class="toolbar-element w-full"
                       clearable
-                      placeholder="搜索 Request ID / API Key / 账户 / 模型 / 接口"
+                      :placeholder="t('requestDetails.placeholders.keyword')"
                     >
                       <template #prefix>
                         <i class="fas fa-search text-cyan-500" />
@@ -177,7 +184,7 @@
                       class="toolbar-element w-full"
                       clearable
                       filterable
-                      placeholder="所有 API Key"
+                      :placeholder="t('requestDetails.placeholders.allApiKeys')"
                     >
                       <el-option
                         v-for="item in availableApiKeys"
@@ -197,12 +204,12 @@
                       class="toolbar-element w-full"
                       clearable
                       filterable
-                      placeholder="所有账户"
+                      :placeholder="t('requestDetails.placeholders.allAccounts')"
                     >
                       <el-option
                         v-for="item in availableAccounts"
                         :key="item.id"
-                        :label="`${item.name}（${item.accountTypeName}）`"
+                        :label="`${item.name} (${item.accountTypeName})`"
                         :value="item.id"
                       />
                     </el-select>
@@ -217,7 +224,7 @@
                       class="toolbar-element w-full"
                       clearable
                       filterable
-                      placeholder="所有模型"
+                      :placeholder="t('requestDetails.placeholders.allModels')"
                     >
                       <el-option
                         v-for="item in availableModels"
@@ -237,7 +244,7 @@
                       class="toolbar-element w-full"
                       clearable
                       filterable
-                      placeholder="所有接口"
+                      :placeholder="t('requestDetails.placeholders.allEndpoints')"
                     >
                       <el-option
                         v-for="item in availableEndpoints"
@@ -255,10 +262,10 @@
                     <el-select
                       v-model="filters.sortOrder"
                       class="toolbar-element w-full"
-                      placeholder="时间排序"
+                      :placeholder="t('requestDetails.placeholders.sortOrder')"
                     >
-                      <el-option label="时间降序" value="desc" />
-                      <el-option label="时间升序" value="asc" />
+                      <el-option :label="t('requestDetails.sort.desc')" value="desc" />
+                      <el-option :label="t('requestDetails.sort.asc')" value="asc" />
                     </el-select>
                   </div>
                 </div>
@@ -279,7 +286,7 @@
                       loading ? 'fa-spinner fa-spin' : 'fa-sync-alt'
                     ]"
                   />
-                  <span class="relative">刷新</span>
+                  <span class="relative">{{ t('requestDetails.refresh') }}</span>
                 </button>
 
                 <button
@@ -290,7 +297,7 @@
                     class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-gray-400 to-gray-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
                   ></span>
                   <i class="fas fa-undo relative text-gray-500" />
-                  <span class="relative">重置筛选</span>
+                  <span class="relative">{{ t('requestDetails.resetFilters') }}</span>
                 </button>
 
                 <button
@@ -307,13 +314,13 @@
                       exporting ? 'fa-spinner fa-spin' : 'fa-file-export'
                     ]"
                   />
-                  <span class="relative">导出 CSV</span>
+                  <span class="relative">{{ t('requestDetails.exportCsv') }}</span>
                 </button>
 
                 <el-tooltip placement="top">
                   <template #content>
                     <div class="max-w-xs text-xs leading-relaxed">
-                      清理所有已保存的历史请求体预览数据；仅影响历史预览，不影响当前请求体预览开关设置
+                      {{ t('requestDetails.purgeTooltip') }}
                     </div>
                   </template>
                   <button
@@ -330,7 +337,7 @@
                         requestDetailBodyPreviewPurging ? 'fa-spinner fa-spin' : 'fa-trash-alt'
                       ]"
                     />
-                    <span class="relative">清理历史预览</span>
+                    <span class="relative">{{ t('requestDetails.purgeHistory') }}</span>
                   </button>
                 </el-tooltip>
               </div>
@@ -344,7 +351,7 @@
           v-if="loading"
           class="flex items-center justify-center p-12 text-gray-500 dark:text-gray-400"
         >
-          <i class="fas fa-spinner fa-spin mr-2" />加载中...
+          <i class="fas fa-spinner fa-spin mr-2" />{{ t('requestDetails.loading') }}
         </div>
 
         <div
@@ -352,7 +359,9 @@
           class="flex flex-col items-center gap-3 p-12 text-center text-gray-500 dark:text-gray-400"
         >
           <i class="fas fa-inbox text-3xl text-cyan-500" />
-          <p class="text-base font-semibold text-gray-700 dark:text-gray-200">暂无请求明细</p>
+          <p class="text-base font-semibold text-gray-700 dark:text-gray-200">
+            {{ t('requestDetails.emptyTitle') }}
+          </p>
           <p class="max-w-xl text-sm">
             {{ emptyHint }}
           </p>
@@ -368,7 +377,7 @@
                   <th
                     class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    统计时间
+                    {{ t('requestDetails.columns.timestamp') }}
                   </th>
                   <th
                     class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -378,62 +387,62 @@
                   <th
                     class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    使用账户
+                    {{ t('requestDetails.columns.account') }}
                   </th>
                   <th
                     class="min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    模型
+                    {{ t('requestDetails.columns.model') }}
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    推理
+                    {{ t('requestDetails.columns.reasoning') }}
                   </th>
                   <th
                     class="min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    接口
+                    {{ t('requestDetails.columns.endpoint') }}
                   </th>
                   <th
                     class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    输入
+                    {{ t('requestDetails.columns.input') }}
                   </th>
                   <th
                     class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    输出
+                    {{ t('requestDetails.columns.output') }}
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    缓存读取
+                    {{ t('requestDetails.columns.cacheRead') }}
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    缓存创建
+                    {{ t('requestDetails.columns.cacheCreate') }}
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    缓存命中率
+                    {{ t('requestDetails.columns.cacheHitRate') }}
                   </th>
                   <th
                     class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    费用
+                    {{ t('requestDetails.columns.cost') }}
                   </th>
                   <th
                     class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    耗时
+                    {{ t('requestDetails.columns.duration') }}
                   </th>
                   <th
                     class="min-w-[96px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    操作
+                    {{ t('requestDetails.columns.actions') }}
                   </th>
                 </tr>
               </thead>
@@ -499,7 +508,7 @@
                       class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
                       @click="openDetail(record.requestId)"
                     >
-                      详情
+                      {{ t('requestDetails.detail') }}
                     </button>
                   </td>
                 </tr>
@@ -529,25 +538,45 @@
                   class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
                   @click="openDetail(record.requestId)"
                 >
-                  详情
+                  {{ t('requestDetails.detail') }}
                 </button>
               </div>
               <div class="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <div>API Key：{{ record.apiKeyName || '-' }}</div>
-                <div>账户：{{ record.accountName || '-' }}</div>
-                <div>推理：{{ formatReasoning(record.reasoningDisplay) }}</div>
-                <div>输入：{{ formatNumber(record.inputTokens) }}</div>
-                <div>输出：{{ formatNumber(record.outputTokens) }}</div>
-                <div>缓存读：{{ formatNumber(record.cacheReadTokens) }}</div>
                 <div>
-                  缓存建：{{
+                  {{ t('requestDetails.mobileLabels.account') }}{{ record.accountName || '-' }}
+                </div>
+                <div>
+                  {{ t('requestDetails.mobileLabels.reasoning')
+                  }}{{ formatReasoning(record.reasoningDisplay) }}
+                </div>
+                <div>
+                  {{ t('requestDetails.mobileLabels.input') }}{{ formatNumber(record.inputTokens) }}
+                </div>
+                <div>
+                  {{ t('requestDetails.mobileLabels.output')
+                  }}{{ formatNumber(record.outputTokens) }}
+                </div>
+                <div>
+                  {{ t('requestDetails.mobileLabels.cacheRead')
+                  }}{{ formatNumber(record.cacheReadTokens) }}
+                </div>
+                <div>
+                  {{ t('requestDetails.mobileLabels.cacheCreate')
+                  }}{{
                     formatCacheCreate(record.cacheCreateTokens, record.cacheCreateNotApplicable)
                   }}
                 </div>
-                <div>命中率：{{ formatPercent(record.cacheHitRate) }}</div>
-                <div>耗时：{{ formatDuration(record.durationMs) }}</div>
+                <div>
+                  {{ t('requestDetails.mobileLabels.cacheHitRate')
+                  }}{{ formatPercent(record.cacheHitRate) }}
+                </div>
+                <div>
+                  {{ t('requestDetails.mobileLabels.duration')
+                  }}{{ formatDuration(record.durationMs) }}
+                </div>
                 <div class="text-amber-600 dark:text-amber-400">
-                  费用：{{ formatCost(record.cost) }}
+                  {{ t('requestDetails.mobileLabels.cost') }}{{ formatCost(record.cost) }}
                 </div>
                 <div class="text-xs text-gray-500 dark:text-gray-400">{{ record.requestId }}</div>
               </div>
@@ -558,7 +587,7 @@
             class="flex flex-col gap-3 border-t border-gray-200 px-4 pb-4 pt-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between"
           >
             <div class="text-sm text-gray-500 dark:text-gray-400">
-              共 {{ pagination.totalRecords }} 条记录
+              {{ t('requestDetails.recordsTotal', { count: pagination.totalRecords }) }}
             </div>
             <el-pagination
               background
@@ -588,6 +617,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { debounce } from 'lodash-es'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   getRequestDetailsApi,
   getRequestDetailBodyPreviewStatsApi,
@@ -597,6 +627,7 @@ import { showToast, formatDate, formatNumber } from '@/utils/tools'
 import RequestDetailModal from '@/components/admin/RequestDetailModal.vue'
 
 const router = useRouter()
+const { t } = useI18n()
 
 let fetchVersion = 0
 const loading = ref(false)
@@ -658,8 +689,8 @@ const summary = reactive({
 
 const pageDescription = computed(() =>
   bodyPreviewEnabled.value
-    ? '搜索每次请求的 API Key、使用账户、模型、接口、Token、费用、耗时与脱敏后的请求快照'
-    : '搜索每次请求的 API Key、使用账户、模型、接口、Token、费用、耗时与请求摘要'
+    ? t('requestDetails.descriptionWithPreview')
+    : t('requestDetails.descriptionSummary')
 )
 
 const emptyHint = computed(() => {
@@ -670,9 +701,9 @@ const emptyHint = computed(() => {
     filters.model ||
     filters.endpoint
   ) {
-    return '当前筛选条件下没有结果，请尝试放宽搜索条件。'
+    return t('requestDetails.emptyFiltered')
   }
-  return '这里只展示开启请求明细采集之后的新请求记录。'
+  return t('requestDetails.emptyDefault')
 })
 
 const toPickerDate = (value) => {
@@ -794,13 +825,18 @@ const fetchRecords = async (page = pagination.currentPage) => {
     const response = await getRequestDetailsApi(buildParams(page))
     if (version !== fetchVersion) return
     if (response?.success === false) {
-      showToast(response.message || '加载请求明细失败', 'error')
+      showToast(response.message || t('requestDetails.loadFailed'), 'error')
       return
     }
     syncResponseState(response.data || {})
   } catch (error) {
     if (version !== fetchVersion) return
-    showToast(`加载请求明细失败：${error.message || '未知错误'}`, 'error')
+    showToast(
+      t('requestDetails.loadFailedWithError', {
+        message: error.message || t('requestDetails.unknownError')
+      }),
+      'error'
+    )
   } finally {
     if (version === fetchVersion) {
       loading.value = false
@@ -847,32 +883,30 @@ const handleRequestDetailBodyPreviewPurge = async () => {
     const statsResponse = await getRequestDetailBodyPreviewStatsApi()
 
     if (statsResponse?.success === false) {
-      showToast(statsResponse.message || '检查历史请求体预览失败', 'error')
+      showToast(statsResponse.message || t('requestDetails.previewStatsFailed'), 'error')
       return
     }
 
     const snapshotCount = Number(statsResponse?.data?.snapshotCount || 0)
     if (snapshotCount <= 0) {
-      showToast('暂无历史请求体预览需要清理', 'success')
+      showToast(t('requestDetails.previewNothingToPurge'), 'success')
       return
     }
 
-    const confirmed = window.confirm(
-      `检测到当前仍有 ${snapshotCount} 条请求明细保存了请求体预览。\n清理后将仅移除历史请求体预览，保留请求明细摘要字段。\n\n是否继续？`
-    )
+    const confirmed = window.confirm(t('requestDetails.purgeConfirm', { count: snapshotCount }))
     if (!confirmed) return
 
     requestDetailBodyPreviewPurging.value = true
     const purgeResponse = await purgeRequestDetailBodyPreviewApi()
 
     if (purgeResponse?.success === false) {
-      showToast(purgeResponse.message || '清理历史请求体预览失败', 'error')
+      showToast(purgeResponse.message || t('requestDetails.purgeFailed'), 'error')
       return
     }
 
-    showToast(purgeResponse?.message || '清理完毕', 'success')
+    showToast(purgeResponse?.message || t('requestDetails.purgeDone'), 'success')
   } catch (error) {
-    showToast('清理历史请求体预览失败', 'error')
+    showToast(t('requestDetails.purgeFailed'), 'error')
     console.error(error)
   } finally {
     requestDetailBodyPreviewPurging.value = false
@@ -917,32 +951,32 @@ const exportCsv = async () => {
 
     if (totalPages > maxPages) {
       showToast(
-        `数据量超过导出上限（已导出 ${aggregated.length} 条，共 ${totalRecords} 条），建议缩小筛选范围后重试`,
+        t('requestDetails.exportLimit', { exported: aggregated.length, total: totalRecords }),
         'warning'
       )
     }
 
     if (aggregated.length === 0) {
-      showToast('没有可导出的记录', 'info')
+      showToast(t('requestDetails.exportEmpty'), 'info')
       return
     }
 
     const headers = [
-      '统计时间',
+      t('requestDetails.columns.timestamp'),
       'Request ID',
-      'API Key',
-      '使用账户',
-      '消费类型',
-      '模型',
-      '推理',
-      '接口',
-      '输入',
-      '输出',
-      '缓存读取',
-      '缓存创建',
-      '缓存命中率',
-      '费用',
-      '耗时(ms)'
+      t('requestDetails.columns.apiKey'),
+      t('requestDetails.columns.account'),
+      t('requestDetails.columns.accountType'),
+      t('requestDetails.columns.model'),
+      t('requestDetails.columns.reasoning'),
+      t('requestDetails.columns.endpoint'),
+      t('requestDetails.columns.input'),
+      t('requestDetails.columns.output'),
+      t('requestDetails.columns.cacheRead'),
+      t('requestDetails.columns.cacheCreate'),
+      t('requestDetails.columns.cacheHitRate'),
+      t('requestDetails.columns.cost'),
+      t('requestDetails.columns.durationMs')
     ]
 
     const rows = [headers.join(',')]
@@ -974,9 +1008,14 @@ const exportCsv = async () => {
     link.download = 'request-details.csv'
     link.click()
     URL.revokeObjectURL(url)
-    showToast('导出 CSV 成功', 'success')
+    showToast(t('requestDetails.exportSuccess'), 'success')
   } catch (error) {
-    showToast(`导出失败：${error.message || '未知错误'}`, 'error')
+    showToast(
+      t('requestDetails.exportFailed', {
+        message: error.message || t('requestDetails.unknownError')
+      }),
+      'error'
+    )
   } finally {
     exporting.value = false
   }
@@ -992,20 +1031,20 @@ const formatCacheCreate = (value, notApplicable = false) =>
   notApplicable ? '-' : formatNumber(value)
 const formatRetentionHours = (value) => {
   const totalHours = Number(value || 0)
-  if (totalHours <= 0) return '保留 6 小时'
+  if (totalHours <= 0) return t('requestDetails.retentionDefault')
 
   const days = Math.floor(totalHours / 24)
   const hours = totalHours % 24
 
   if (days > 0 && hours > 0) {
-    return `保留 ${days} 天 ${hours} 小时`
+    return t('requestDetails.retentionDaysHours', { days, hours })
   }
 
   if (days > 0) {
-    return `保留 ${days} 天`
+    return t('requestDetails.retentionDays', { days })
   }
 
-  return `保留 ${hours} 小时`
+  return t('requestDetails.retentionHours', { hours })
 }
 const formatDuration = (value) => `${Number(value || 0)}ms`
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`

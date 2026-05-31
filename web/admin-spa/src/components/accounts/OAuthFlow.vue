@@ -12,12 +12,14 @@
             <i class="fas fa-link text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-blue-900 dark:text-blue-200">Claude 账户授权</h4>
+            <h4 class="mb-3 font-semibold text-blue-900 dark:text-blue-200">
+              {{ t('accountModals.oauth.title', { platform: 'Claude' }) }}
+            </h4>
 
             <!-- 授权方式选择 -->
             <div class="mb-4">
               <label class="mb-2 block text-sm font-medium text-blue-800 dark:text-blue-300">
-                选择授权方式
+                {{ t('accountModals.oauth.selectAuthMethod') }}
               </label>
               <div class="flex gap-4">
                 <label class="flex cursor-pointer items-center gap-2">
@@ -29,7 +31,9 @@
                     value="manual"
                     @change="onAuthMethodChange"
                   />
-                  <span class="text-sm text-blue-900 dark:text-blue-200">手动授权</span>
+                  <span class="text-sm text-blue-900 dark:text-blue-200">{{
+                    t('accountModals.oauth.manualAuth')
+                  }}</span>
                 </label>
                 <label class="flex cursor-pointer items-center gap-2">
                   <input
@@ -40,7 +44,9 @@
                     value="cookie"
                     @change="onAuthMethodChange"
                   />
-                  <span class="text-sm text-blue-900 dark:text-blue-200">Cookie自动授权</span>
+                  <span class="text-sm text-blue-900 dark:text-blue-200">{{
+                    t('accountModals.oauth.cookieAutoAuth')
+                  }}</span>
                 </label>
               </div>
             </div>
@@ -51,7 +57,7 @@
                 class="rounded-lg border border-blue-300 bg-white/80 p-4 dark:border-blue-600 dark:bg-gray-800/80"
               >
                 <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
-                  使用 claude.ai 的 sessionKey 自动完成 OAuth 授权流程，无需手动打开浏览器。
+                  {{ t('accountModals.oauth.cookieDescription') }}
                 </p>
 
                 <!-- sessionKey输入 -->
@@ -65,7 +71,9 @@
                       v-if="parsedSessionKeyCount > 1"
                       class="rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
                     >
-                      {{ parsedSessionKeyCount }} 个
+                      {{
+                        t('accountModals.oauth.sessionKeyCount', { count: parsedSessionKeyCount })
+                      }}
                     </span>
                     <button
                       class="text-blue-500 hover:text-blue-600"
@@ -78,7 +86,7 @@
                   <textarea
                     v-model="sessionKey"
                     class="form-input w-full resize-y font-mono text-sm"
-                    placeholder="每行一个 sessionKey，例如：&#10;sk-ant-sid01-xxxxx...&#10;sk-ant-sid01-yyyyy..."
+                    :placeholder="t('accountModals.oauth.sessionKeyPlaceholder')"
                     rows="3"
                   />
                   <p
@@ -86,7 +94,9 @@
                     class="mt-1 text-xs text-blue-600 dark:text-blue-400"
                   >
                     <i class="fas fa-info-circle mr-1" />
-                    将批量创建 {{ parsedSessionKeyCount }} 个账户
+                    {{
+                      t('accountModals.oauth.batchCreateCount', { count: parsedSessionKeyCount })
+                    }}
                   </p>
                 </div>
 
@@ -96,29 +106,31 @@
                   class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/30"
                 >
                   <h5 class="mb-2 font-semibold text-amber-800 dark:text-amber-200">
-                    <i class="fas fa-lightbulb mr-1" />如何获取 sessionKey
+                    <i class="fas fa-lightbulb mr-1" />{{
+                      t('accountModals.oauth.howToGetSessionKey')
+                    }}
                   </h5>
                   <ol
                     class="list-inside list-decimal space-y-1 text-xs text-amber-700 dark:text-amber-300"
                   >
-                    <li>在浏览器中登录 <strong>claude.ai</strong></li>
+                    <li v-html="t('accountModals.oauth.sessionKeyHelp.login')"></li>
                     <li>
-                      按
+                      {{ t('accountModals.oauth.sessionKeyHelp.press') }}
                       <kbd class="rounded bg-gray-200 px-1 dark:bg-gray-700">F12</kbd>
-                      打开开发者工具
+                      {{ t('accountModals.oauth.sessionKeyHelp.openDevTools') }}
                     </li>
-                    <li>切换到 <strong>Application</strong>（应用）标签页</li>
+                    <li v-html="t('accountModals.oauth.sessionKeyHelp.applicationTab')"></li>
                     <li>
-                      在左侧找到 <strong>Cookies</strong> → <strong>https://claude.ai</strong>
+                      <span v-html="t('accountModals.oauth.sessionKeyHelp.cookies')" />
                     </li>
-                    <li>找到键为 <strong>sessionKey</strong> 的那一行</li>
-                    <li>复制其 <strong>Value</strong>（值）列的内容</li>
+                    <li v-html="t('accountModals.oauth.sessionKeyHelp.findSessionKey')"></li>
+                    <li v-html="t('accountModals.oauth.sessionKeyHelp.copyValue')"></li>
                   </ol>
                   <p class="mt-2 text-xs text-amber-600 dark:text-amber-400">
                     <i class="fas fa-info-circle mr-1" />
-                    sessionKey 通常以
+                    {{ t('accountModals.oauth.sessionKeyUsuallyStarts') }}
                     <code class="rounded bg-gray-200 px-1 dark:bg-gray-700">sk-ant-sid01-</code>
-                    开头
+                    {{ t('accountModals.oauth.startsWithSuffix') }}
                   </p>
                 </div>
 
@@ -143,10 +155,17 @@
                   <div v-if="cookieAuthLoading" class="loading-spinner mr-2" />
                   <i v-else class="fas fa-magic mr-2" />
                   <template v-if="cookieAuthLoading && batchProgress.total > 1">
-                    正在授权 {{ batchProgress.current }}/{{ batchProgress.total }}...
+                    {{
+                      t('accountModals.oauth.authorizingProgress', {
+                        current: batchProgress.current,
+                        total: batchProgress.total
+                      })
+                    }}
                   </template>
-                  <template v-else-if="cookieAuthLoading"> 正在授权... </template>
-                  <template v-else> 开始自动授权 </template>
+                  <template v-else-if="cookieAuthLoading">
+                    {{ t('accountModals.oauth.authorizing') }}
+                  </template>
+                  <template v-else> {{ t('accountModals.oauth.startAutoAuth') }} </template>
                 </button>
               </div>
             </div>
@@ -154,7 +173,7 @@
             <!-- 手动授权流程 -->
             <div v-else>
               <p class="mb-4 text-sm text-blue-800 dark:text-blue-300">
-                请按照以下步骤完成 Claude 账户的授权：
+                {{ t('accountModals.oauth.instructions', { platform: 'Claude' }) }}
               </p>
 
               <div class="space-y-4">
@@ -170,7 +189,7 @@
                     </div>
                     <div class="flex-1">
                       <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                        点击下方按钮生成授权链接
+                        {{ t('accountModals.oauth.generateLinkStep') }}
                       </p>
                       <button
                         v-if="!authUrl"
@@ -180,7 +199,11 @@
                       >
                         <i v-if="!loading" class="fas fa-link mr-2" />
                         <div v-else class="loading-spinner mr-2" />
-                        {{ loading ? '生成中...' : '生成授权链接' }}
+                        {{
+                          loading
+                            ? t('accountModals.oauth.generating')
+                            : t('accountModals.oauth.generateAuthLink')
+                        }}
                       </button>
                       <div v-else class="space-y-3">
                         <div class="flex items-center gap-2">
@@ -192,7 +215,7 @@
                           />
                           <button
                             class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                            title="复制链接"
+                            :title="t('accountModals.oauth.copyLink')"
                             @click="copyAuthUrl"
                           >
                             <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
@@ -202,7 +225,9 @@
                           class="text-xs text-blue-600 hover:text-blue-700"
                           @click="regenerateAuthUrl"
                         >
-                          <i class="fas fa-sync-alt mr-1" />重新生成
+                          <i class="fas fa-sync-alt mr-1" />{{
+                            t('accountModals.oauth.regenerate')
+                          }}
                         </button>
                       </div>
                     </div>
@@ -221,18 +246,18 @@
                     </div>
                     <div class="flex-1">
                       <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                        在浏览器中打开链接并完成授权
+                        {{ t('accountModals.oauth.openLinkStep') }}
                       </p>
                       <p class="mb-2 text-sm text-blue-700 dark:text-blue-300">
-                        请在新标签页中打开授权链接，登录您的 Claude 账户并授权。
+                        {{ t('accountModals.oauth.openLinkDescription', { platform: 'Claude' }) }}
                       </p>
                       <div
                         class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
                       >
                         <p class="text-xs text-yellow-800 dark:text-yellow-300">
                           <i class="fas fa-exclamation-triangle mr-1" />
-                          <strong>注意：</strong
-                          >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
+                          <strong>{{ t('accountModals.oauth.note') }}</strong
+                          >{{ t('accountModals.oauth.proxyNote') }}
                         </p>
                       </div>
                     </div>
@@ -251,11 +276,12 @@
                     </div>
                     <div class="flex-1">
                       <p class="mb-2 font-medium text-blue-900 dark:text-blue-200">
-                        输入 Authorization Code
+                        {{ t('accountModals.oauth.enterAuthorizationCode') }}
                       </p>
                       <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
-                        授权完成后，页面会显示一个
-                        <strong>Authorization Code</strong>，请将其复制并粘贴到下方输入框：
+                        {{ t('accountModals.oauth.codeDescriptionPrefix') }}
+                        <strong>Authorization Code</strong
+                        >{{ t('accountModals.oauth.codeDescriptionSuffix') }}
                       </p>
                       <div class="space-y-3">
                         <div>
@@ -267,13 +293,15 @@
                           <textarea
                             v-model="authCode"
                             class="form-input w-full resize-none font-mono text-sm"
-                            placeholder="粘贴从Claude页面获取的Authorization Code..."
+                            :placeholder="
+                              t('accountModals.oauth.codePlaceholder', { platform: 'Claude' })
+                            "
                             rows="3"
                           />
                         </div>
                         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                           <i class="fas fa-info-circle mr-1" />
-                          请粘贴从Claude页面复制的Authorization Code
+                          {{ t('accountModals.oauth.pasteCodeHelp', { platform: 'Claude' }) }}
                         </p>
                       </div>
                     </div>
@@ -298,16 +326,19 @@
             <i class="fas fa-robot text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-green-900 dark:text-green-200">Gemini 账户授权</h4>
+            <h4 class="mb-3 font-semibold text-green-900 dark:text-green-200">
+              {{ t('accountModals.oauth.title', { platform: 'Gemini' }) }}
+            </h4>
             <p class="mb-4 text-sm text-green-800 dark:text-green-300">
-              请按照以下步骤完成 Gemini 账户的授权：
+              {{ t('accountModals.oauth.instructions', { platform: 'Gemini' }) }}
             </p>
 
             <!-- 授权来源显示（由平台类型决定） -->
             <div class="mb-4">
               <p class="text-sm text-green-800 dark:text-green-300">
                 <i class="fas fa-info-circle mr-1"></i>
-                授权类型：<span class="font-semibold">{{
+                {{ t('accountModals.oauth.authType')
+                }}<span class="font-semibold">{{
                   platform === 'gemini-antigravity' ? 'Antigravity OAuth' : 'Gemini CLI OAuth'
                 }}</span>
               </p>
@@ -326,7 +357,7 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-green-900 dark:text-green-200">
-                      点击下方按钮生成授权链接
+                      {{ t('accountModals.oauth.generateLinkStep') }}
                     </p>
                     <button
                       v-if="!authUrl"
@@ -336,7 +367,11 @@
                     >
                       <i v-if="!loading" class="fas fa-link mr-2" />
                       <div v-else class="loading-spinner mr-2" />
-                      {{ loading ? '生成中...' : '生成授权链接' }}
+                      {{
+                        loading
+                          ? t('accountModals.oauth.generating')
+                          : t('accountModals.oauth.generateAuthLink')
+                      }}
                     </button>
                     <div v-else class="space-y-3">
                       <div class="flex items-center gap-2">
@@ -348,7 +383,7 @@
                         />
                         <button
                           class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                          title="复制链接"
+                          :title="t('accountModals.oauth.copyLink')"
                           @click="copyAuthUrl"
                         >
                           <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
@@ -358,7 +393,7 @@
                         class="text-xs text-green-600 hover:text-green-700"
                         @click="regenerateAuthUrl"
                       >
-                        <i class="fas fa-sync-alt mr-1" />重新生成
+                        <i class="fas fa-sync-alt mr-1" />{{ t('accountModals.oauth.regenerate') }}
                       </button>
                     </div>
                   </div>
@@ -377,18 +412,18 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-green-900 dark:text-green-200">
-                      在浏览器中打开链接并完成授权
+                      {{ t('accountModals.oauth.openLinkStep') }}
                     </p>
                     <p class="mb-2 text-sm text-green-700 dark:text-green-300">
-                      请在新标签页中打开授权链接，登录您的 Gemini 账户并授权。
+                      {{ t('accountModals.oauth.openLinkDescription', { platform: 'Gemini' }) }}
                     </p>
                     <div
                       class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
                     >
                       <p class="text-xs text-yellow-800 dark:text-yellow-300">
                         <i class="fas fa-exclamation-triangle mr-1" />
-                        <strong>注意：</strong
-                        >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
+                        <strong>{{ t('accountModals.oauth.note') }}</strong
+                        >{{ t('accountModals.oauth.proxyNote') }}
                       </p>
                     </div>
                   </div>
@@ -407,10 +442,10 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-green-900 dark:text-green-200">
-                      输入 Authorization Code
+                      {{ t('accountModals.oauth.enterAuthorizationCode') }}
                     </p>
                     <p class="mb-3 text-sm text-green-700 dark:text-green-300">
-                      授权完成后，页面会显示一个 Authorization Code，请将其复制并粘贴到下方输入框：
+                      {{ t('accountModals.oauth.codeDescriptionPlain') }}
                     </p>
                     <div class="space-y-3">
                       <div>
@@ -422,14 +457,16 @@
                         <textarea
                           v-model="authCode"
                           class="form-input w-full resize-none font-mono text-sm"
-                          placeholder="粘贴从Gemini页面获取的Authorization Code..."
+                          :placeholder="
+                            t('accountModals.oauth.codePlaceholder', { platform: 'Gemini' })
+                          "
                           rows="3"
                         />
                       </div>
                       <div class="mt-2 space-y-1">
                         <p class="text-xs text-gray-600 dark:text-gray-400">
                           <i class="fas fa-check-circle mr-1 text-green-500" />
-                          请粘贴从Gemini页面复制的Authorization Code
+                          {{ t('accountModals.oauth.pasteCodeHelp', { platform: 'Gemini' }) }}
                         </p>
                       </div>
                     </div>
@@ -454,9 +491,11 @@
             <i class="fas fa-brain text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-orange-900 dark:text-orange-200">OpenAI 账户授权</h4>
+            <h4 class="mb-3 font-semibold text-orange-900 dark:text-orange-200">
+              {{ t('accountModals.oauth.title', { platform: 'OpenAI' }) }}
+            </h4>
             <p class="mb-4 text-sm text-orange-800 dark:text-orange-300">
-              请按照以下步骤完成 OpenAI 账户的授权：
+              {{ t('accountModals.oauth.instructions', { platform: 'OpenAI' }) }}
             </p>
 
             <div class="space-y-4">
@@ -472,7 +511,7 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-orange-900 dark:text-orange-200">
-                      点击下方按钮生成授权链接
+                      {{ t('accountModals.oauth.generateLinkStep') }}
                     </p>
                     <button
                       v-if="!authUrl"
@@ -482,7 +521,11 @@
                     >
                       <i v-if="!loading" class="fas fa-link mr-2" />
                       <div v-else class="loading-spinner mr-2" />
-                      {{ loading ? '生成中...' : '生成授权链接' }}
+                      {{
+                        loading
+                          ? t('accountModals.oauth.generating')
+                          : t('accountModals.oauth.generateAuthLink')
+                      }}
                     </button>
                     <div v-else class="space-y-3">
                       <div class="flex items-center gap-2">
@@ -494,7 +537,7 @@
                         />
                         <button
                           class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                          title="复制链接"
+                          :title="t('accountModals.oauth.copyLink')"
                           @click="copyAuthUrl"
                         >
                           <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
@@ -504,7 +547,7 @@
                         class="text-xs text-orange-600 hover:text-orange-700"
                         @click="regenerateAuthUrl"
                       >
-                        <i class="fas fa-sync-alt mr-1" />重新生成
+                        <i class="fas fa-sync-alt mr-1" />{{ t('accountModals.oauth.regenerate') }}
                       </button>
                     </div>
                   </div>
@@ -523,22 +566,23 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-orange-900 dark:text-orange-200">
-                      在浏览器中打开链接并完成授权
+                      {{ t('accountModals.oauth.openLinkStep') }}
                     </p>
                     <p class="mb-2 text-sm text-orange-700 dark:text-orange-300">
-                      请在新标签页中打开授权链接，登录您的 OpenAI 账户并授权。
+                      {{ t('accountModals.oauth.openLinkDescription', { platform: 'OpenAI' }) }}
                     </p>
                     <div
                       class="mb-3 rounded border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/30"
                     >
                       <p class="text-xs text-amber-800 dark:text-amber-300">
                         <i class="fas fa-clock mr-1" />
-                        <strong>重要提示：</strong>授权后页面可能会加载较长时间，请耐心等待。
+                        <strong>{{ t('accountModals.oauth.importantTip') }}</strong
+                        >{{ t('accountModals.oauth.openaiWaitTip') }}
                       </p>
                       <p class="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                        当浏览器地址栏变为
+                        {{ t('accountModals.oauth.openaiAddressBefore') }}
                         <strong class="font-mono">http://localhost:1455/...</strong>
-                        开头时，表示授权已完成。
+                        {{ t('accountModals.oauth.openaiAddressAfter') }}
                       </p>
                     </div>
                     <div
@@ -546,8 +590,8 @@
                     >
                       <p class="text-xs text-yellow-800 dark:text-yellow-300">
                         <i class="fas fa-exclamation-triangle mr-1" />
-                        <strong>注意：</strong
-                        >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
+                        <strong>{{ t('accountModals.oauth.note') }}</strong
+                        >{{ t('accountModals.oauth.proxyNote') }}
                       </p>
                     </div>
                   </div>
@@ -566,23 +610,26 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-orange-900 dark:text-orange-200">
-                      输入授权链接或 Code
+                      {{ t('accountModals.oauth.enterAuthLinkOrCode') }}
                     </p>
                     <p class="mb-3 text-sm text-orange-700 dark:text-orange-300">
-                      授权完成后，当页面地址变为
-                      <strong class="font-mono">http://localhost:1455/...</strong> 时：
+                      {{ t('accountModals.oauth.openaiCodeInstructionBefore') }}
+                      <strong class="font-mono">http://localhost:1455/...</strong
+                      >{{ t('accountModals.oauth.openaiCodeInstructionAfter') }}
                     </p>
                     <div class="space-y-3">
                       <div>
                         <label
                           class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                         >
-                          <i class="fas fa-link mr-2 text-orange-500" />授权链接或 Code
+                          <i class="fas fa-link mr-2 text-orange-500" />{{
+                            t('accountModals.oauth.authLinkOrCode')
+                          }}
                         </label>
                         <textarea
                           v-model="authCode"
                           class="form-input w-full resize-none font-mono text-sm"
-                          placeholder="方式1：复制完整的链接（http://localhost:1455/auth/callback?code=...）&#10;方式2：仅复制 code 参数的值&#10;系统会自动识别并提取所需信息"
+                          :placeholder="t('accountModals.oauth.openaiCodePlaceholder')"
                           rows="3"
                         />
                       </div>
@@ -591,18 +638,18 @@
                       >
                         <p class="text-xs text-blue-700 dark:text-blue-300">
                           <i class="fas fa-lightbulb mr-1" />
-                          <strong>提示：</strong>您可以直接复制整个链接或仅复制 code
-                          参数值，系统会自动识别。
+                          <strong>{{ t('accountModals.oauth.tip') }}</strong
+                          >{{ t('accountModals.oauth.openaiCodeTip') }}
                         </p>
                         <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                          • 完整链接示例：<span class="font-mono"
+                          {{ t('accountModals.oauth.fullLinkExample')
+                          }}<span class="font-mono"
                             >http://localhost:1455/auth/callback?code=ac_4hm8...</span
                           >
                         </p>
                         <p class="text-xs text-blue-600">
-                          • 仅 Code 示例：<span class="font-mono"
-                            >ac_4hm8iqmx9A2fzMy_cwye7U3W7...</span
-                          >
+                          {{ t('accountModals.oauth.codeOnlyExample')
+                          }}<span class="font-mono">ac_4hm8iqmx9A2fzMy_cwye7U3W7...</span>
                         </p>
                       </div>
                     </div>
@@ -627,9 +674,11 @@
             <i class="fas fa-robot text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-cyan-900 dark:text-cyan-200">Droid 账户授权</h4>
+            <h4 class="mb-3 font-semibold text-cyan-900 dark:text-cyan-200">
+              {{ t('accountModals.oauth.title', { platform: 'Droid' }) }}
+            </h4>
             <p class="mb-4 text-sm text-cyan-800 dark:text-cyan-300">
-              请按照以下步骤完成 Factory (Droid) 账户的授权：
+              {{ t('accountModals.oauth.instructions', { platform: 'Factory (Droid)' }) }}
             </p>
 
             <div class="space-y-4">
@@ -645,7 +694,7 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-cyan-900 dark:text-cyan-200">
-                      点击下方按钮生成授权链接
+                      {{ t('accountModals.oauth.generateLinkStep') }}
                     </p>
                     <button
                       v-if="!authUrl"
@@ -655,13 +704,17 @@
                     >
                       <i v-if="!loading" class="fas fa-link mr-2" />
                       <div v-else class="loading-spinner mr-2" />
-                      {{ loading ? '生成中...' : '生成授权链接' }}
+                      {{
+                        loading
+                          ? t('accountModals.oauth.generating')
+                          : t('accountModals.oauth.generateAuthLink')
+                      }}
                     </button>
                     <div v-else class="space-y-4">
                       <div class="space-y-2">
-                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300"
-                          >授权链接</label
-                        >
+                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{
+                          t('accountModals.oauth.authLink')
+                        }}</label>
                         <div
                           class="flex flex-col gap-2 rounded-md border border-cyan-200 bg-white p-3 dark:border-cyan-700 dark:bg-gray-800"
                         >
@@ -674,7 +727,7 @@
                             />
                             <button
                               class="rounded-lg bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-                              title="复制链接"
+                              :title="t('accountModals.oauth.copyLink')"
                               @click="copyAuthUrl"
                             >
                               <i :class="copied ? 'fas fa-check text-green-500' : 'fas fa-copy'" />
@@ -685,21 +738,24 @@
                               class="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-white px-3 py-1.5 text-xs font-medium text-cyan-600 shadow-sm transition-colors hover:border-cyan-300 hover:bg-cyan-50 dark:border-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/60"
                               @click="openVerificationPage"
                             >
-                              <i class="fas fa-external-link-alt text-xs" /> 在新标签中打开
+                              <i class="fas fa-external-link-alt text-xs" />
+                              {{ t('accountModals.oauth.openInNewTab') }}
                             </button>
                             <button
                               class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-cyan-600 transition-colors hover:text-cyan-700 dark:text-cyan-300 dark:hover:text-cyan-200"
                               @click="regenerateAuthUrl"
                             >
-                              <i class="fas fa-sync-alt text-xs" />重新生成
+                              <i class="fas fa-sync-alt text-xs" />{{
+                                t('accountModals.oauth.regenerate')
+                              }}
                             </button>
                           </div>
                         </div>
                       </div>
                       <div class="space-y-2">
-                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300"
-                          >授权验证码</label
-                        >
+                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{
+                          t('accountModals.oauth.userCode')
+                        }}</label>
                         <div
                           class="flex items-center justify-between rounded-md border border-cyan-200 bg-cyan-50 px-4 py-3 dark:border-cyan-700 dark:bg-cyan-900/30"
                         >
@@ -712,7 +768,7 @@
                             class="rounded-lg bg-white px-3 py-1 text-sm text-cyan-600 transition-colors hover:bg-cyan-100 dark:bg-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-700"
                             @click="copyUserCode"
                           >
-                            <i class="fas fa-copy mr-1" />复制
+                            <i class="fas fa-copy mr-1" />{{ t('accountModals.oauth.copy') }}
                           </button>
                         </div>
                       </div>
@@ -721,7 +777,7 @@
                       >
                         <span>
                           <i class="fas fa-hourglass-half mr-1 text-cyan-500" />
-                          剩余有效期：{{ formattedCountdown }}
+                          {{ t('accountModals.oauth.remainingValidity') }}: {{ formattedCountdown }}
                         </span>
                       </div>
                     </div>
@@ -741,12 +797,11 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-cyan-900 dark:text-cyan-200">
-                      在浏览器中打开链接并完成授权
+                      {{ t('accountModals.oauth.openLinkStep') }}
                     </p>
                     <div class="space-y-2 text-sm text-cyan-700 dark:text-cyan-300">
                       <p>
-                        在浏览器中打开授权页面，输入上方验证码并登录 Factory / Droid
-                        账户，最后点击允许授权。
+                        {{ t('accountModals.oauth.droidOpenDescription') }}
                       </p>
                     </div>
                   </div>
@@ -765,10 +820,10 @@
                   </div>
                   <div class="flex-1">
                     <p class="mb-2 font-medium text-cyan-900 dark:text-cyan-200">
-                      完成授权后点击下方“完成授权”按钮，系统会自动获取访问令牌。
+                      {{ t('accountModals.oauth.droidFinishDescription') }}
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
-                      若提示授权仍在等待确认，请稍候片刻后系统会自动重试。
+                      {{ t('accountModals.oauth.droidPendingHelp') }}
                     </p>
                   </div>
                 </div>
@@ -785,7 +840,7 @@
         type="button"
         @click="$emit('back')"
       >
-        上一步
+        {{ t('accountForm.modal.previous') }}
       </button>
       <!-- Cookie自动授权模式不显示此按钮（Claude平台） -->
       <button
@@ -796,7 +851,9 @@
         @click="exchangeCode"
       >
         <div v-if="exchanging" class="loading-spinner mr-2" />
-        {{ exchanging ? '验证中...' : '完成授权' }}
+        {{
+          exchanging ? t('accountModals.oauth.verifying') : t('accountModals.oauth.completeAuth')
+        }}
       </button>
     </div>
   </div>
@@ -804,6 +861,7 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/tools'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -821,6 +879,7 @@ const props = defineProps({
 const emit = defineEmits(['success', 'back'])
 
 const accountsStore = useAccountsStore()
+const { t } = useI18n()
 
 // 状态
 const loading = ref(false)
@@ -927,16 +986,16 @@ watch(authCode, (newValue) => {
         if (code) {
           // 成功提取授权码
           authCode.value = code
-          showToast('成功提取授权码！', 'success')
+          showToast(t('accountModals.oauth.extractCodeSuccess'), 'success')
           console.log('Successfully extracted authorization code from URL')
         } else {
           // URL 中没有 code 参数
-          showToast('URL 中未找到授权码参数，请检查链接是否正确', 'error')
+          showToast(t('accountModals.oauth.codeParamNotFound'), 'error')
         }
       } catch (error) {
         // URL 解析失败
         console.error('Failed to parse URL:', error)
-        showToast('链接格式错误，请检查是否为完整的 URL', 'error')
+        showToast(t('accountModals.oauth.invalidLinkFormat'), 'error')
       }
     } else if (
       props.platform === 'gemini' ||
@@ -951,14 +1010,14 @@ watch(authCode, (newValue) => {
 
         if (code) {
           authCode.value = code
-          showToast('成功提取授权码！', 'success')
+          showToast(t('accountModals.oauth.extractCodeSuccess'), 'success')
         }
       } catch (error) {
         // 不是有效的URL，保持原值
       }
     } else {
       // 错误的 URL（不是正确的 localhost 回调地址）
-      showToast('请粘贴以 http://localhost:1455 或 http://localhost:45462 开头的链接', 'error')
+      showToast(t('accountModals.oauth.invalidCallbackUrl'), 'error')
     }
   }
   // 如果不是 URL，保持原值（兼容直接输入授权码）
@@ -1014,7 +1073,7 @@ const generateAuthUrl = async () => {
       sessionId.value = result.sessionId
     }
   } catch (error) {
-    showToast(error.message || '生成授权链接失败', 'error')
+    showToast(error.message || t('accountModals.oauth.generateAuthLinkFailed'), 'error')
   } finally {
     loading.value = false
   }
@@ -1038,13 +1097,13 @@ const regenerateAuthUrl = () => {
 // 复制授权URL
 const copyAuthUrl = async () => {
   if (!authUrl.value) {
-    showToast('请先生成授权链接', 'warning')
+    showToast(t('accountModals.oauth.generateLinkFirst'), 'warning')
     return
   }
   try {
     await navigator.clipboard.writeText(authUrl.value)
     copied.value = true
-    showToast('链接已复制', 'success')
+    showToast(t('accountModals.oauth.linkCopied'), 'success')
     setTimeout(() => {
       copied.value = false
     }, 2000)
@@ -1057,7 +1116,7 @@ const copyAuthUrl = async () => {
     document.execCommand('copy')
     document.body.removeChild(input)
     copied.value = true
-    showToast('链接已复制', 'success')
+    showToast(t('accountModals.oauth.linkCopied'), 'success')
     setTimeout(() => {
       copied.value = false
     }, 2000)
@@ -1066,12 +1125,12 @@ const copyAuthUrl = async () => {
 
 const copyUserCode = async () => {
   if (!userCode.value) {
-    showToast('请先生成授权验证码', 'warning')
+    showToast(t('accountModals.oauth.generateUserCodeFirst'), 'warning')
     return
   }
   try {
     await navigator.clipboard.writeText(userCode.value)
-    showToast('验证码已复制', 'success')
+    showToast(t('accountModals.oauth.userCodeCopied'), 'success')
   } catch (error) {
     const input = document.createElement('input')
     input.value = userCode.value
@@ -1079,7 +1138,7 @@ const copyUserCode = async () => {
     input.select()
     document.execCommand('copy')
     document.body.removeChild(input)
-    showToast('验证码已复制', 'success')
+    showToast(t('accountModals.oauth.userCodeCopied'), 'success')
   }
 }
 
@@ -1150,14 +1209,14 @@ const exchangeCode = async () => {
       const response = await accountsStore.exchangeDroidCode(data)
       if (!response.success) {
         if (response.pending) {
-          const message = response.message || '授权尚未完成，请在浏览器确认后稍候再次尝试。'
+          const message = response.message || t('accountModals.oauth.pendingMessage')
           showToast(message, 'info')
           if (typeof response.expiresIn === 'number' && response.expiresIn >= 0) {
             startCountdown(response.expiresIn)
           }
           return
         }
-        throw new Error(response.message || '授权失败，请重试')
+        throw new Error(response.message || t('accountModals.oauth.authFailedRetry'))
       }
       tokenInfo = response.data
       stopCountdown()
@@ -1165,7 +1224,7 @@ const exchangeCode = async () => {
 
     emit('success', tokenInfo)
   } catch (error) {
-    showToast(error.message || '授权失败，请检查授权码是否正确', 'error')
+    showToast(error.message || t('accountModals.oauth.authFailedCheckCode'), 'error')
   } finally {
     exchanging.value = false
   }
@@ -1184,7 +1243,7 @@ const handleCookieAuth = async () => {
     .filter((s) => s.length > 0)
 
   if (sessionKeys.length === 0) {
-    cookieAuthError.value = '请输入至少一个 sessionKey'
+    cookieAuthError.value = t('accountModals.oauth.enterAtLeastOneSessionKey')
     return
   }
 
@@ -1237,9 +1296,9 @@ const handleCookieAuth = async () => {
   }
 
   if (errors.length > 0 && results.length === 0) {
-    cookieAuthError.value = '全部授权失败，请检查 sessionKey 是否有效'
+    cookieAuthError.value = t('accountModals.oauth.allAuthFailed')
   } else if (errors.length > 0) {
-    cookieAuthError.value = `${errors.length} 个授权失败`
+    cookieAuthError.value = t('accountModals.oauth.partialAuthFailed', { count: errors.length })
   }
 }
 

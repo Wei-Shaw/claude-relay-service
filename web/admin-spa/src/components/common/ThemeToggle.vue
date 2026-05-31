@@ -6,7 +6,7 @@
       <div class="relative">
         <button
           class="color-scheme-button"
-          :title="`色系: ${themeStore.currentColorScheme.name}`"
+          :title="t('theme.colorScheme', { name: currentColorSchemeName })"
           @click="toggleColorMenu"
         >
           <span class="color-dot" :style="{ background: themeStore.currentColorScheme.primary }" />
@@ -19,7 +19,7 @@
               :key="key"
               class="color-option"
               :class="{ active: themeStore.colorScheme === key }"
-              :title="scheme.name"
+              :title="getColorSchemeName(key)"
               @click="selectColorScheme(key)"
             >
               <span
@@ -28,7 +28,7 @@
                   background: `linear-gradient(135deg, ${scheme.primary} 0%, ${scheme.secondary} 100%)`
                 }"
               />
-              <span class="color-name">{{ scheme.name }}</span>
+              <span class="color-name">{{ getColorSchemeName(key) }}</span>
             </button>
           </div>
         </transition>
@@ -49,7 +49,7 @@
       <div class="relative mr-3">
         <button
           class="color-scheme-button-lg"
-          :title="`色系: ${themeStore.currentColorScheme.name}`"
+          :title="t('theme.colorScheme', { name: currentColorSchemeName })"
           @click="toggleColorMenu"
         >
           <span
@@ -68,7 +68,7 @@
               :key="key"
               class="color-option"
               :class="{ active: themeStore.colorScheme === key }"
-              :title="scheme.name"
+              :title="getColorSchemeName(key)"
               @click="selectColorScheme(key)"
             >
               <span
@@ -77,7 +77,7 @@
                   background: `linear-gradient(135deg, ${scheme.primary} 0%, ${scheme.secondary} 100%)`
                 }"
               />
-              <span class="color-name">{{ scheme.name }}</span>
+              <span class="color-name">{{ getColorSchemeName(key) }}</span>
             </button>
           </div>
         </transition>
@@ -134,6 +134,7 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 
 // Props
@@ -153,37 +154,42 @@ defineProps({
 
 // Store
 const themeStore = useThemeStore()
+const { t } = useI18n()
 
 // 色系菜单状态
 const showColorMenu = ref(false)
 
 // 主题选项配置
-const themeOptions = [
+const themeOptions = computed(() => [
   {
     value: 'light',
-    label: '浅色模式',
-    shortLabel: '浅色',
+    label: t('theme.light'),
+    shortLabel: t('theme.lightShort'),
     icon: 'fas fa-sun'
   },
   {
     value: 'dark',
-    label: '深色模式',
-    shortLabel: '深色',
+    label: t('theme.dark'),
+    shortLabel: t('theme.darkShort'),
     icon: 'fas fa-moon'
   },
   {
     value: 'auto',
-    label: '跟随系统',
-    shortLabel: '自动',
+    label: t('theme.auto'),
+    shortLabel: t('theme.autoShort'),
     icon: 'fas fa-circle-half-stroke'
   }
-]
+])
 
 // 计算属性
 const themeTooltip = computed(() => {
-  const current = themeOptions.find((opt) => opt.value === themeStore.themeMode)
-  return current ? `点击切换主题 - ${current.label}` : '切换主题'
+  const current = themeOptions.value.find((opt) => opt.value === themeStore.themeMode)
+  return current ? t('theme.switchThemeCurrent', { mode: current.label }) : t('theme.switchTheme')
 })
+
+const currentColorSchemeName = computed(() => getColorSchemeName(themeStore.colorScheme))
+
+const getColorSchemeName = (key) => (key ? t(`theme.schemes.${key}`) : '')
 
 // 方法
 const handleCycleTheme = () => {

@@ -9,7 +9,7 @@
             >
               <i class="fas fa-clock text-white" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900">续期 API Key</h3>
+            <h3 class="text-xl font-bold text-gray-900">{{ t('apiKeyExpiry.renewTitle') }}</h3>
           </div>
           <button
             class="text-gray-400 transition-colors hover:text-gray-600"
@@ -28,13 +28,19 @@
                 <i class="fas fa-info text-sm text-white" />
               </div>
               <div>
-                <h4 class="mb-1 font-semibold text-gray-800">API Key 信息</h4>
+                <h4 class="mb-1 font-semibold text-gray-800">
+                  {{ t('apiKeyExpiry.apiKeyInfo') }}
+                </h4>
                 <p class="text-sm text-gray-700">
                   {{ apiKey.name }}
                 </p>
                 <p class="mt-1 text-xs text-gray-600">
-                  当前过期时间：{{
-                    apiKey.expiresAt ? formatExpireDate(apiKey.expiresAt) : '永不过期'
+                  {{
+                    t('apiKeyExpiry.currentExpiry', {
+                      date: apiKey.expiresAt
+                        ? formatExpireDate(apiKey.expiresAt)
+                        : t('apiKeys.neverExpires')
+                    })
                   }}
                 </p>
               </div>
@@ -42,19 +48,21 @@
           </div>
 
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700">续期时长</label>
+            <label class="mb-3 block text-sm font-semibold text-gray-700">{{
+              t('apiKeyExpiry.renewDuration')
+            }}</label>
             <select
               v-model="form.renewDuration"
               class="form-input w-full"
               @change="updateRenewExpireAt"
             >
-              <option value="7d">延长 7 天</option>
-              <option value="30d">延长 30 天</option>
-              <option value="90d">延长 90 天</option>
-              <option value="180d">延长 180 天</option>
-              <option value="365d">延长 365 天</option>
-              <option value="custom">自定义日期</option>
-              <option value="permanent">设为永不过期</option>
+              <option value="7d">{{ t('apiKeyExpiry.extend7d') }}</option>
+              <option value="30d">{{ t('apiKeyExpiry.extend30d') }}</option>
+              <option value="90d">{{ t('apiKeyExpiry.extend90d') }}</option>
+              <option value="180d">{{ t('apiKeyExpiry.extend180d') }}</option>
+              <option value="365d">{{ t('apiKeyExpiry.extend365d') }}</option>
+              <option value="custom">{{ t('apiKeyForm.customDate') }}</option>
+              <option value="permanent">{{ t('apiKeyExpiry.setNeverExpires') }}</option>
             </select>
             <div v-if="form.renewDuration === 'custom'" class="mt-3">
               <input
@@ -66,7 +74,7 @@
               />
             </div>
             <p v-if="form.newExpiresAt" class="mt-2 text-xs text-gray-500">
-              新的过期时间：{{ formatExpireDate(form.newExpiresAt) }}
+              {{ t('apiKeyExpiry.newExpiry', { date: formatExpireDate(form.newExpiresAt) }) }}
             </p>
           </div>
         </div>
@@ -77,7 +85,7 @@
             type="button"
             @click="$emit('close')"
           >
-            取消
+            {{ t('common.cancel') }}
           </button>
           <button
             class="btn btn-primary flex-1 px-6 py-3 font-semibold"
@@ -87,7 +95,7 @@
           >
             <div v-if="loading" class="loading-spinner mr-2" />
             <i v-else class="fas fa-clock mr-2" />
-            {{ loading ? '续期中...' : '确认续期' }}
+            {{ loading ? t('apiKeyExpiry.renewing') : t('apiKeyExpiry.confirmRenew') }}
           </button>
         </div>
       </div>
@@ -97,6 +105,7 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/tools'
 import * as httpApis from '@/utils/http_apis'
 
@@ -109,6 +118,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success'])
 
+const { t, locale } = useI18n()
 const loading = ref(false)
 
 // 表单数据
@@ -133,7 +143,7 @@ const minDateTime = computed(() => {
 // 格式化过期日期
 const formatExpireDate = (dateString) => {
   const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString(locale.value, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -209,14 +219,14 @@ const renewApiKey = async () => {
     const result = await httpApis.updateApiKeyApi(props.apiKey.id, data)
 
     if (result.success) {
-      showToast('API Key 续期成功', 'success')
+      showToast(t('apiKeyExpiry.renewSuccess'), 'success')
       emit('success')
       emit('close')
     } else {
-      showToast(result.message || '续期失败', 'error')
+      showToast(result.message || t('apiKeyExpiry.renewFailed'), 'error')
     }
   } catch (error) {
-    showToast('续期失败', 'error')
+    showToast(t('apiKeyExpiry.renewFailed'), 'error')
   } finally {
     loading.value = false
   }

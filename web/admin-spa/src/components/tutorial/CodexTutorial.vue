@@ -12,10 +12,10 @@
           class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
           >2</span
         >
-        配置 Codex
+        {{ t('tutorial.auto.auto069') }}
       </h4>
       <p class="mb-3 text-sm text-gray-700 dark:text-gray-300 sm:mb-4 sm:text-base">
-        配置 Codex 以连接到中转服务：
+        {{ t('tutorial.auto.auto070') }}
       </p>
 
       <div class="space-y-4">
@@ -24,12 +24,12 @@
           class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-500/40 dark:bg-yellow-950/30 sm:p-4"
         >
           <h6 class="mb-2 font-medium text-yellow-800 dark:text-yellow-300">
-            1. 配置文件 config.toml
+            {{ t('tutorial.auto.auto071') }}
           </h6>
           <p class="mb-3 text-sm text-yellow-700 dark:text-yellow-300">
-            在
+            {{ t('tutorial.auto.auto072') }}
             <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">{{ configPath }}</code>
-            文件开头添加以下配置：
+            {{ t('tutorial.auto.auto073') }}
           </p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
@@ -43,7 +43,9 @@
               {{ line || '&nbsp;' }}
             </div>
           </div>
-          <p class="mt-3 text-sm text-yellow-600 dark:text-yellow-400">一键写入命令：</p>
+          <p class="mt-3 text-sm text-yellow-600 dark:text-yellow-400">
+            {{ t('tutorial.auto.auto074') }}
+          </p>
           <div
             class="mt-2 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
           >
@@ -56,26 +58,28 @@
           class="rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-500/40 dark:bg-orange-950/30 sm:p-4"
         >
           <h6 class="mb-2 font-medium text-orange-800 dark:text-orange-300">
-            2. 认证文件 auth.json
+            {{ t('tutorial.auto.auto075') }}
           </h6>
           <p class="mb-3 text-sm text-orange-700 dark:text-orange-300">
-            在
+            {{ t('tutorial.auto.auto072') }}
             <code class="rounded bg-orange-100 px-1 dark:bg-orange-900">{{ authPath }}</code>
-            文件中配置：
+            {{ t('tutorial.auto.auto076') }}
           </p>
           <div
             class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
           >
             <div class="whitespace-nowrap text-gray-300">{</div>
             <div class="whitespace-nowrap text-gray-300">
-              &nbsp;&nbsp;"OPENAI_API_KEY": "后台创建的API密钥"
+              &nbsp;&nbsp;{{ t('tutorial.auto.auto077') }}
             </div>
             <div class="whitespace-nowrap text-gray-300">}</div>
           </div>
           <div
             class="mt-3 rounded border border-red-200 bg-red-50 p-2 dark:border-red-500/40 dark:bg-red-950/30"
           ></div>
-          <p class="mt-3 text-sm text-orange-600 dark:text-orange-400">一键写入命令：</p>
+          <p class="mt-3 text-sm text-orange-600 dark:text-orange-400">
+            {{ t('tutorial.auto.auto074') }}
+          </p>
           <div
             class="mt-2 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
           >
@@ -88,9 +92,9 @@
           class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-500/40 dark:bg-yellow-950/30 sm:p-4"
         >
           <p class="text-sm text-yellow-700 dark:text-yellow-300">
-            💡 请将示例中的
+            {{ t('tutorial.auto.auto078') }}
             <code class="rounded bg-yellow-100 px-1 dark:bg-yellow-900">cr_xxxxxxxxxx</code>
-            替换为您的实际 API 密钥
+            {{ t('tutorial.auto.auto079') }}
           </p>
         </div>
       </div>
@@ -102,7 +106,9 @@
 import { computed } from 'vue'
 import { useTutorialUrls } from '@/utils/useTutorialUrls'
 import NodeInstallTutorial from './NodeInstallTutorial.vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const props = defineProps({
   platform: {
     type: String,

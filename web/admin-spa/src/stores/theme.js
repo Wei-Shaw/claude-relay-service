@@ -11,8 +11,7 @@ export const ThemeMode = {
 // 中国传统色系预设
 export const ColorSchemes = {
   purple: {
-    name: '默认紫',
-    nameEn: 'Purple',
+    name: 'Purple',
     primary: '#667eea',
     secondary: '#764ba2',
     accent: '#f093fb',
@@ -33,8 +32,7 @@ export const ColorSchemes = {
     darkGlass: 'rgba(0, 0, 0, 0.2)'
   },
   celadon: {
-    name: '青瓷',
-    nameEn: 'Celadon',
+    name: 'Celadon',
     primary: '#7faaaf',
     secondary: '#5d8a8e',
     accent: '#a8d8dc',
@@ -53,8 +51,7 @@ export const ColorSchemes = {
     darkGlass: 'rgba(0, 20, 20, 0.2)'
   },
   cinnabar: {
-    name: '朱砂',
-    nameEn: 'Cinnabar',
+    name: 'Cinnabar',
     primary: '#c45a5a',
     secondary: '#8b3a3a',
     accent: '#e8a0a0',
@@ -73,8 +70,7 @@ export const ColorSchemes = {
     darkGlass: 'rgba(20, 0, 0, 0.2)'
   },
   jade: {
-    name: '墨玉',
-    nameEn: 'Jade',
+    name: 'Jade',
     primary: '#4a7c59',
     secondary: '#2d5a3d',
     accent: '#7eb08c',
@@ -93,8 +89,7 @@ export const ColorSchemes = {
     darkGlass: 'rgba(0, 20, 10, 0.2)'
   },
   indigo: {
-    name: '藏蓝',
-    nameEn: 'Indigo',
+    name: 'Indigo',
     primary: '#3a5a8c',
     secondary: '#2a4066',
     accent: '#6a8ab8',
@@ -113,8 +108,7 @@ export const ColorSchemes = {
     darkGlass: 'rgba(0, 0, 20, 0.2)'
   },
   amber: {
-    name: '琥珀',
-    nameEn: 'Amber',
+    name: 'Amber',
     primary: '#c49a3a',
     secondary: '#8b6914',
     accent: '#e8c86a',
@@ -133,8 +127,7 @@ export const ColorSchemes = {
     darkGlass: 'rgba(20, 20, 0, 0.2)'
   },
   rouge: {
-    name: '胭脂',
-    nameEn: 'Rouge',
+    name: 'Rouge',
     primary: '#b85a6a',
     secondary: '#8a3a4a',
     accent: '#e8a0b0',

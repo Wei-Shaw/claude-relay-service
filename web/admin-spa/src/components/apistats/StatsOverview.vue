@@ -14,42 +14,54 @@
                 : 'fas fa-info-circle text-blue-500'
             "
           />
-          <h3 class="header-title">{{ multiKeyMode ? '批量查询概要' : 'API Key 信息' }}</h3>
+          <h3 class="header-title">
+            {{
+              multiKeyMode
+                ? t('apiStatsComponents.statsOverview.summaryTitleMulti')
+                : t('apiStatsComponents.statsOverview.summaryTitleSingle')
+            }}
+          </h3>
         </header>
 
         <div v-if="multiKeyMode && aggregatedStats" class="info-grid">
           <div class="info-item">
-            <p class="info-label">查询 Keys 数</p>
-            <p class="info-value">{{ aggregatedStats.totalKeys }} 个</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.queriedKeys') }}</p>
+            <p class="info-value">
+              {{ t('apiStatsComponents.common.count', { count: aggregatedStats.totalKeys }) }}
+            </p>
           </div>
           <div class="info-item">
-            <p class="info-label">有效 Keys 数</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.activeKeys') }}</p>
             <p class="info-value text-green-600 dark:text-emerald-400">
-              <i class="fas fa-check-circle mr-1" />{{ aggregatedStats.activeKeys }} 个
+              <i class="fas fa-check-circle mr-1" />{{
+                t('apiStatsComponents.common.count', { count: aggregatedStats.activeKeys })
+              }}
             </p>
           </div>
           <div v-if="invalidKeys.length > 0" class="info-item">
-            <p class="info-label">无效 Keys 数</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.invalidKeys') }}</p>
             <p class="info-value text-red-500 dark:text-red-400">
-              <i class="fas fa-times-circle mr-1" />{{ invalidKeys.length }} 个
+              <i class="fas fa-times-circle mr-1" />{{
+                t('apiStatsComponents.common.count', { count: invalidKeys.length })
+              }}
             </p>
           </div>
           <div class="info-item">
-            <p class="info-label">总请求数</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.totalRequests') }}</p>
             <p class="info-value">{{ formatNumber(aggregatedStats.usage.requests) }}</p>
           </div>
           <div class="info-item">
-            <p class="info-label">总 Token 数</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.totalTokens') }}</p>
             <p class="info-value">{{ formatNumber(aggregatedStats.usage.allTokens) }}</p>
           </div>
           <div class="info-item">
-            <p class="info-label">总费用</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.totalCost') }}</p>
             <p class="info-value text-indigo-600 dark:text-indigo-300">
               {{ aggregatedStats.usage.formattedCost }}
             </p>
           </div>
           <div v-if="individualStats.length > 1" class="info-item xl:col-span-2">
-            <p class="info-label">Top 3 贡献占比</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.top3Contribution') }}</p>
             <div class="space-y-2">
               <div v-for="stat in topContributors" :key="stat.apiId" class="contributor-item">
                 <span class="truncate">{{ stat.name }}</span>
@@ -62,17 +74,17 @@
         <div v-else class="info-grid">
           <div
             class="info-item cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-            title="点击复制"
+            :title="t('apiStatsComponents.common.copyTitle')"
             @click="copyText(statsData.name)"
           >
-            <p class="info-label">名称</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.name') }}</p>
             <p class="info-value flex items-center gap-1 break-all">
               {{ statsData.name }}
               <i class="fas fa-copy text-xs text-gray-400" />
             </p>
           </div>
           <div class="info-item">
-            <p class="info-label">状态</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.status') }}</p>
             <p
               class="info-value font-semibold"
               :class="
@@ -85,15 +97,19 @@
                 class="mr-1"
                 :class="statsData.isActive ? 'fas fa-check-circle' : 'fas fa-times-circle'"
               />
-              {{ statsData.isActive ? '活跃' : '已停用' }}
+              {{
+                statsData.isActive
+                  ? t('apiStatsComponents.statsOverview.active')
+                  : t('apiStatsComponents.statsOverview.disabled')
+              }}
             </p>
           </div>
           <div class="info-item">
-            <p class="info-label">权限</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.permissions') }}</p>
             <p class="info-value">{{ formatPermissions(statsData.permissions) }}</p>
           </div>
           <div v-if="hasServiceRates" class="info-item xl:col-span-2">
-            <p class="info-label">服务倍率</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.serviceRates') }}</p>
             <div class="flex flex-wrap gap-2">
               <span
                 v-for="(rate, service) in statsData.serviceRates"
@@ -105,20 +121,30 @@
             </div>
           </div>
           <div class="info-item">
-            <p class="info-label">创建时间</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.createdAt') }}</p>
             <p class="info-value break-all">{{ formatDate(statsData.createdAt) }}</p>
           </div>
           <div class="info-item xl:col-span-2">
-            <p class="info-label">过期时间</p>
+            <p class="info-label">{{ t('apiStatsComponents.statsOverview.expiresAt') }}</p>
             <div class="info-value">
               <template v-if="statsData.expirationMode === 'activation' && !statsData.isActivated">
                 <span class="text-amber-600 dark:text-amber-400">
-                  <i class="fas fa-pause-circle mr-1" />未激活
+                  <i class="fas fa-pause-circle mr-1" />{{
+                    t('apiStatsComponents.statsOverview.notActivated')
+                  }}
                 </span>
                 <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  首次使用后
-                  {{ statsData.activationDays || (statsData.activationUnit === 'hours' ? 24 : 30) }}
-                  {{ statsData.activationUnit === 'hours' ? '小时' : '天' }}过期
+                  {{
+                    t('apiStatsComponents.statsOverview.expiresAfterFirstUse', {
+                      count:
+                        statsData.activationDays ||
+                        (statsData.activationUnit === 'hours' ? 24 : 30),
+                      unit:
+                        statsData.activationUnit === 'hours'
+                          ? t('apiStatsComponents.common.hourUnit')
+                          : t('apiStatsComponents.common.dayUnit')
+                    })
+                  }}
                 </span>
               </template>
               <template v-else-if="statsData.expiresAt">
@@ -126,7 +152,9 @@
                   v-if="isApiKeyExpired(statsData.expiresAt)"
                   class="text-red-500 dark:text-red-400"
                 >
-                  <i class="fas fa-exclamation-circle mr-1" />已过期
+                  <i class="fas fa-exclamation-circle mr-1" />{{
+                    t('apiStatsComponents.statsOverview.expired')
+                  }}
                 </span>
                 <span
                   v-else-if="isApiKeyExpiringSoon(statsData.expiresAt)"
@@ -138,7 +166,9 @@
               </template>
               <template v-else>
                 <span class="text-gray-400 dark:text-gray-500">
-                  <i class="fas fa-infinity mr-1" />永不过期
+                  <i class="fas fa-infinity mr-1" />{{
+                    t('apiStatsComponents.statsOverview.neverExpires')
+                  }}
                 </span>
               </template>
             </div>
@@ -150,33 +180,41 @@
       <div class="card-section">
         <header class="section-header">
           <i class="header-icon fas fa-chart-bar text-green-500" />
-          <h3 class="header-title">使用统计概览</h3>
-          <span class="header-tag">{{ statsPeriod === 'daily' ? '今日' : '本月' }}</span>
+          <h3 class="header-title">{{ t('apiStatsComponents.statsOverview.usageOverview') }}</h3>
+          <span class="header-tag">{{ periodLabel }}</span>
         </header>
         <div class="metric-grid">
           <div class="metric-card">
             <p class="metric-value text-green-600 dark:text-emerald-300">
               {{ formatNumber(currentPeriodData.requests) }}
             </p>
-            <p class="metric-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}请求数</p>
+            <p class="metric-label">
+              {{ t('apiStatsComponents.statsOverview.periodRequests', { period: periodLabel }) }}
+            </p>
           </div>
           <div class="metric-card">
             <p class="metric-value text-blue-600 dark:text-sky-300">
               {{ formatNumber(currentPeriodData.allTokens) }}
             </p>
-            <p class="metric-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}Token 数</p>
+            <p class="metric-label">
+              {{ t('apiStatsComponents.statsOverview.periodTokens', { period: periodLabel }) }}
+            </p>
           </div>
           <div class="metric-card">
             <p class="metric-value text-purple-600 dark:text-violet-300">
               {{ currentPeriodData.formattedCost || '$0.000000' }}
             </p>
-            <p class="metric-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}费用</p>
+            <p class="metric-label">
+              {{ t('apiStatsComponents.statsOverview.periodCost', { period: periodLabel }) }}
+            </p>
           </div>
           <div class="metric-card">
             <p class="metric-value text-amber-500 dark:text-amber-300">
               {{ formatNumber(currentPeriodData.inputTokens) }}
             </p>
-            <p class="metric-label">{{ statsPeriod === 'daily' ? '今日' : '本月' }}输入 Token</p>
+            <p class="metric-label">
+              {{ t('apiStatsComponents.statsOverview.periodInputTokens', { period: periodLabel }) }}
+            </p>
           </div>
         </div>
       </div>
@@ -186,8 +224,8 @@
     <div v-if="!multiKeyMode && boundAccountList.length > 0" class="card-section">
       <header class="section-header">
         <i class="header-icon fas fa-plug text-indigo-500" />
-        <h3 class="header-title">专属账号运行状态</h3>
-        <span class="header-tag">实时更新</span>
+        <h3 class="header-title">{{ t('apiStatsComponents.statsOverview.dedicatedStatus') }}</h3>
+        <span class="header-tag">{{ t('apiStatsComponents.statsOverview.realtimeUpdate') }}</span>
       </header>
 
       <div class="grid grid-cols-1 gap-4" :class="accountGridClass">
@@ -207,7 +245,11 @@
               <div>
                 <p class="account-name">{{ getAccountLabel(account) }}</p>
                 <p class="account-sub">
-                  {{ account.platform === 'claude' ? '会话窗口' : '额度窗口' }}
+                  {{
+                    account.platform === 'claude'
+                      ? t('apiStatsComponents.statsOverview.sessionWindow')
+                      : t('apiStatsComponents.statsOverview.quotaWindow')
+                  }}
                 </p>
               </div>
             </div>
@@ -250,7 +292,11 @@
                 v-if="account.sessionWindow?.remainingTime > 0"
                 class="font-medium text-indigo-600 dark:text-indigo-400"
               >
-                剩余 {{ formatSessionRemaining(account.sessionWindow.remainingTime) }}
+                {{
+                  t('apiStatsComponents.statsOverview.remaining', {
+                    time: formatSessionRemaining(account.sessionWindow.remainingTime)
+                  })
+                }}
               </span>
             </div>
           </div>
@@ -278,7 +324,11 @@
                   />
                 </div>
                 <div class="quota-foot">
-                  重置剩余 {{ formatCodexRemaining(account.codexUsage?.[type]) }}
+                  {{
+                    t('apiStatsComponents.statsOverview.resetRemaining', {
+                      time: formatCodexRemaining(account.codexUsage?.[type])
+                    })
+                  }}
                 </div>
               </div>
             </div>
@@ -286,7 +336,7 @@
               v-else
               class="rounded-xl bg-gray-100 px-3 py-2 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-300"
             >
-              暂无额度使用数据
+              {{ t('apiStatsComponents.statsOverview.noQuotaData') }}
             </p>
           </div>
         </div>
@@ -298,12 +348,14 @@
 <script setup>
 /* eslint-disable no-unused-vars */
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import dayjs from 'dayjs'
 import { useApiStatsStore } from '@/stores/apistats'
 import { copyText, formatNumber, formatDate } from '@/utils/tools'
 
 const apiStatsStore = useApiStatsStore()
+const { t, locale } = useI18n()
 const {
   statsData,
   statsPeriod,
@@ -313,6 +365,12 @@ const {
   individualStats,
   invalidKeys
 } = storeToRefs(apiStatsStore)
+
+const periodLabel = computed(() =>
+  statsPeriod.value === 'daily'
+    ? t('apiStatsComponents.common.today')
+    : t('apiStatsComponents.common.thisMonth')
+)
 
 const topContributors = computed(() => {
   if (!individualStats.value || individualStats.value.length === 0) return []
@@ -335,7 +393,7 @@ const calculateContribution = (stat) => {
 const formatExpireDate = (dateString) => {
   if (!dateString) return ''
   const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString(locale.value === 'zh-CN' ? 'zh-CN' : 'en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -368,11 +426,13 @@ const formatPermissions = (permissions) => {
     ccr: 'CCR'
   }
   // 空值 = 全部服务
-  if (!permissions) return '全部服务'
+  if (!permissions) return t('apiStatsComponents.common.allServices')
   // 尝试解析字符串格式的数组
   let parsed = permissions
   if (typeof permissions === 'string') {
-    if (permissions === 'all' || permissions === '[]') return '全部服务'
+    if (permissions === 'all' || permissions === '[]') {
+      return t('apiStatsComponents.common.allServices')
+    }
     try {
       parsed = JSON.parse(permissions)
     } catch {
@@ -380,7 +440,8 @@ const formatPermissions = (permissions) => {
     }
   }
   // 空数组 = 全部服务
-  if (Array.isArray(parsed) && parsed.length === 0) return '全部服务'
+  if (Array.isArray(parsed) && parsed.length === 0)
+    return t('apiStatsComponents.common.allServices')
   // 数组格式
   if (Array.isArray(parsed)) {
     return parsed.map((p) => map[p] || p).join(', ')
@@ -413,8 +474,10 @@ const accountGridClass = computed(() => {
 })
 
 const getAccountLabel = (account) => {
-  if (!account) return '专属账号'
-  return account.platform === 'openai' ? 'OpenAI 专属账号' : 'Claude 专属账号'
+  if (!account) return t('apiStatsComponents.statsOverview.dedicatedAccount')
+  return account.platform === 'openai'
+    ? t('apiStatsComponents.statsOverview.openaiDedicatedAccount')
+    : t('apiStatsComponents.statsOverview.claudeDedicatedAccount')
 }
 
 const formatRateLimitTime = (minutes) => {
@@ -423,34 +486,44 @@ const formatRateLimitTime = (minutes) => {
   const days = Math.floor(total / 1440)
   const hours = Math.floor((total % 1440) / 60)
   const mins = total % 60
-  if (days > 0) return hours > 0 ? `${days}天${hours}小时` : `${days}天`
-  if (hours > 0) return mins > 0 ? `${hours}小时${mins}分钟` : `${hours}小时`
-  return `${mins}分钟`
+  if (days > 0) {
+    return hours > 0
+      ? t('apiStatsComponents.common.daysHours', { days, hours })
+      : t('apiStatsComponents.common.days', { count: days })
+  }
+  if (hours > 0) {
+    return mins > 0
+      ? t('apiStatsComponents.common.hoursMinutes', { hours, minutes: mins })
+      : t('apiStatsComponents.common.hours', { count: hours })
+  }
+  return t('apiStatsComponents.common.minutes', { count: mins })
 }
 
 const getRateLimitDisplay = (status) => {
   if (!status) {
     return {
-      text: '状态未知',
+      text: t('apiStatsComponents.statsOverview.statusUnknown'),
       class: 'text-gray-400'
     }
   }
   if (status.isRateLimited) {
     const remaining = formatRateLimitTime(status.minutesRemaining)
-    const suffix = remaining ? ` · 剩余约 ${remaining}` : ''
+    const suffix = remaining
+      ? t('apiStatsComponents.statsOverview.remainingApprox', { time: remaining })
+      : ''
     return {
-      text: `限流中${suffix}`,
+      text: t('apiStatsComponents.statsOverview.rateLimited', { suffix }),
       class: 'text-red-500 dark:text-red-400'
     }
   }
   return {
-    text: '未限流',
+    text: t('apiStatsComponents.statsOverview.notRateLimited'),
     class: 'text-green-600 dark:text-emerald-400'
   }
 }
 
 const formatSessionWindowRange = (start, end) => {
-  if (!start || !end) return '暂无时间窗口信息'
+  if (!start || !end) return t('apiStatsComponents.statsOverview.noWindowInfo')
   const s = new Date(start)
   const e = new Date(end)
   const fmt = (d) => `${`${d.getHours()}`.padStart(2, '0')}:${`${d.getMinutes()}`.padStart(2, '0')}`
@@ -461,7 +534,9 @@ const formatSessionRemaining = (minutes) => {
   if (!minutes || minutes <= 0) return ''
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
-  return hours > 0 ? `${hours}小时${mins}分钟` : `${mins}分钟`
+  return hours > 0
+    ? t('apiStatsComponents.common.hoursMinutes', { hours, minutes: mins })
+    : t('apiStatsComponents.common.minutes', { count: mins })
 }
 
 const getSessionProgressBarClass = (status, account) => {
@@ -529,13 +604,24 @@ const formatCodexRemaining = (usageItem) => {
   const hours = Math.floor((seconds % 86400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   const secs = seconds % 60
-  if (days > 0) return hours > 0 ? `${days}天${hours}小时` : `${days}天`
-  if (hours > 0) return minutes > 0 ? `${hours}小时${minutes}分钟` : `${hours}小时`
-  if (minutes > 0) return `${minutes}分钟`
-  return `${secs}秒`
+  if (days > 0) {
+    return hours > 0
+      ? t('apiStatsComponents.common.daysHours', { days, hours })
+      : t('apiStatsComponents.common.days', { count: days })
+  }
+  if (hours > 0) {
+    return minutes > 0
+      ? t('apiStatsComponents.common.hoursMinutes', { hours, minutes })
+      : t('apiStatsComponents.common.hours', { count: hours })
+  }
+  if (minutes > 0) return t('apiStatsComponents.common.minutes', { count: minutes })
+  return t('apiStatsComponents.common.seconds', { count: secs })
 }
 
-const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
+const getCodexWindowLabel = (type) =>
+  type === 'secondary'
+    ? t('apiStatsComponents.statsOverview.weeklyLimit')
+    : t('apiStatsComponents.statsOverview.fiveHourLimit')
 </script>
 
 <style scoped>

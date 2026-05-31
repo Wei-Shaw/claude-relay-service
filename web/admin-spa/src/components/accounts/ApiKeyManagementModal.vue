@@ -13,7 +13,7 @@
             </div>
             <div>
               <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-                API Key 管理
+                {{ t('accountModals.apiKeys.title') }}
               </h3>
               <p class="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                 {{ accountName }}
@@ -32,11 +32,11 @@
                   copyingAll ? 'fas fa-spinner fa-spin' : 'fas fa-clipboard-list'
                 ]"
               />
-              <span>复制全部 Key</span>
+              <span>{{ t('accountModals.apiKeys.copyAllKeys') }}</span>
             </button>
             <button
               class="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-400 transition-colors hover:text-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-200 sm:h-10 sm:w-10"
-              title="关闭"
+              :title="t('common.close')"
               @click="$emit('close')"
             >
               <i class="fas fa-times text-base sm:text-lg" />
@@ -47,7 +47,7 @@
         <!-- 加载状态 -->
         <div v-if="loading" class="py-8 text-center">
           <div class="loading-spinner-lg mx-auto mb-4" />
-          <p class="text-gray-500 dark:text-gray-400">加载中...</p>
+          <p class="text-gray-500 dark:text-gray-400">{{ t('accountModals.common.loading') }}</p>
         </div>
 
         <!-- 空状态：没有加载且没有 API Key -->
@@ -56,7 +56,7 @@
           class="rounded-lg bg-gray-50 py-8 text-center dark:bg-gray-800"
         >
           <i class="fas fa-key mb-4 text-4xl text-gray-300 dark:text-gray-600" />
-          <p class="text-gray-500 dark:text-gray-400">暂无 API Key</p>
+          <p class="text-gray-500 dark:text-gray-400">{{ t('accountModals.apiKeys.empty') }}</p>
         </div>
 
         <!-- 有 API Key 时显示菜单和列表 -->
@@ -72,7 +72,9 @@
                 <!-- 左侧：状态筛选 -->
                 <div class="flex items-center gap-2">
                   <i class="fas fa-filter text-gray-400 dark:text-gray-500" />
-                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">筛选：</span>
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+                    t('accountModals.apiKeys.filterLabel')
+                  }}</span>
                   <div class="flex gap-1">
                     <button
                       :class="[
@@ -83,7 +85,7 @@
                       ]"
                       @click="statusFilter = 'all'"
                     >
-                      全部 ({{ apiKeys.length }})
+                      {{ t('accountModals.apiKeys.allCount', { count: apiKeys.length }) }}
                     </button>
                     <button
                       :class="[
@@ -95,7 +97,7 @@
                       @click="statusFilter = 'active'"
                     >
                       <i class="fas fa-check-circle mr-1" />
-                      正常 ({{ activeKeysCount }})
+                      {{ t('accountModals.apiKeys.activeCount', { count: activeKeysCount }) }}
                     </button>
                     <button
                       :class="[
@@ -107,7 +109,7 @@
                       @click="statusFilter = 'error'"
                     >
                       <i class="fas fa-exclamation-triangle mr-1" />
-                      异常 ({{ errorKeysCount }})
+                      {{ t('accountModals.apiKeys.errorCount', { count: errorKeysCount }) }}
                     </button>
                   </div>
                 </div>
@@ -118,7 +120,7 @@
                     <input
                       v-model="searchQuery"
                       class="w-full rounded-md border border-gray-300 bg-gray-50 py-2 pl-10 pr-3 text-sm text-gray-700 transition-colors placeholder:text-gray-400 focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:placeholder:text-gray-500 dark:focus:border-purple-400 dark:focus:bg-gray-800"
-                      placeholder="搜索 API Key..."
+                      :placeholder="t('accountModals.apiKeys.searchPlaceholder')"
                       type="text"
                     />
                     <i
@@ -133,11 +135,11 @@
                           ? 'bg-purple-500 text-white shadow-sm'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
                       ]"
-                      title="模糊搜索：包含查询字符串即可"
+                      :title="t('accountModals.apiKeys.fuzzyTitle')"
                       @click="searchMode = 'fuzzy'"
                     >
                       <i class="fas fa-search mr-1" />
-                      模糊
+                      {{ t('accountModals.apiKeys.fuzzy') }}
                     </button>
                     <button
                       :class="[
@@ -146,11 +148,11 @@
                           ? 'bg-purple-500 text-white shadow-sm'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
                       ]"
-                      title="精确搜索：完全匹配完整 Key"
+                      :title="t('accountModals.apiKeys.exactTitle')"
                       @click="searchMode = 'exact'"
                     >
                       <i class="fas fa-equals mr-1" />
-                      精确
+                      {{ t('accountModals.apiKeys.exact') }}
                     </button>
                   </div>
                 </div>
@@ -163,45 +165,45 @@
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <!-- 左侧：操作按钮 -->
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-xs font-medium text-gray-500 dark:text-gray-400"
-                    >批量操作：</span
-                  >
+                  <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{
+                    t('accountModals.apiKeys.batchActions')
+                  }}</span>
                   <button
                     class="group rounded-md bg-gradient-to-r from-red-500 to-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-600 hover:to-red-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="errorKeysCount === 0 || batchDeleting"
-                    title="删除所有异常状态的 API Key"
+                    :title="t('accountModals.apiKeys.deleteErrorTitle')"
                     @click="deleteAllErrorKeys"
                   >
                     <i class="fas fa-trash-alt mr-1" />
-                    删除异常
+                    {{ t('accountModals.apiKeys.deleteError') }}
                   </button>
                   <button
                     class="group rounded-md bg-gradient-to-r from-red-600 to-red-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-700 hover:to-red-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="apiKeys.length === 0 || batchDeleting"
-                    title="删除所有 API Key"
+                    :title="t('accountModals.apiKeys.deleteAllTitle')"
                     @click="deleteAllKeys"
                   >
                     <i class="fas fa-trash mr-1" />
-                    删除全部
+                    {{ t('accountModals.apiKeys.deleteAll') }}
                   </button>
                   <div class="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600"></div>
                   <button
                     class="rounded-md bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-600 hover:to-blue-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="errorKeysCount === 0"
-                    title="导出所有异常状态的 API Key"
+                    :title="t('accountModals.apiKeys.exportErrorTitle')"
                     @click="exportKeys('error')"
                   >
                     <i class="fas fa-download mr-1" />
-                    导出异常
+                    {{ t('accountModals.apiKeys.exportError') }}
                   </button>
                   <button
                     class="rounded-md bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="apiKeys.length === 0"
-                    title="导出所有 API Key"
+                    :title="t('accountModals.apiKeys.exportAllTitle')"
                     @click="exportKeys('all')"
                   >
                     <i class="fas fa-file-export mr-1" />
-                    导出全部
+                    {{ t('accountModals.apiKeys.exportAll') }}
                   </button>
                 </div>
 
@@ -211,7 +213,9 @@
                 >
                   <i class="fas fa-info-circle text-purple-500 dark:text-purple-400" />
                   <span class="text-xs font-medium text-purple-700 dark:text-purple-300">
-                    显示 <strong>{{ filteredApiKeys.length }}</strong> 个
+                    {{ t('accountModals.apiKeys.visibleCountPrefix') }}
+                    <strong>{{ filteredApiKeys.length }}</strong>
+                    {{ t('accountModals.apiKeys.visibleCountSuffix') }}
                   </span>
                 </div>
               </div>
@@ -238,7 +242,9 @@
                       ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                       : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                   ]"
-                  :title="`错误状态码: ${apiKey.errorMessage}`"
+                  :title="
+                    t('accountModals.apiKeys.errorStatusTitle', { message: apiKey.errorMessage })
+                  "
                 >
                   {{ apiKey.errorMessage }}
                 </span>
@@ -256,7 +262,7 @@
                   <div class="flex items-center gap-1">
                     <button
                       class="text-xs text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                      title="复制 API Key"
+                      :title="t('accountModals.apiKeys.copyApiKeyTitle')"
                       @click="copyApiKey(apiKey.key)"
                     >
                       <i class="fas fa-copy" />
@@ -270,7 +276,7 @@
                           : 'text-yellow-500 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300'
                       ]"
                       :disabled="resetting === apiKey.key"
-                      title="重置状态"
+                      :title="t('accountModals.apiKeys.resetStatusTitle')"
                       @click="resetApiKeyStatus(apiKey)"
                     >
                       <div v-if="resetting === apiKey.key" class="loading-spinner-sm" />
@@ -313,19 +319,20 @@
                       />
                       {{
                         apiKey.status === 'active'
-                          ? '正常'
+                          ? t('accountModals.apiKeys.statusActive')
                           : apiKey.status === 'error'
-                            ? '异常'
+                            ? t('accountModals.apiKeys.statusError')
                             : apiKey.status === 'disabled'
-                              ? '禁用'
-                              : apiKey.status || '未知'
+                              ? t('accountModals.apiKeys.statusDisabled')
+                              : apiKey.status || t('accountModals.common.unknown')
                       }}
                     </span>
                   </div>
                   <div>
                     <span
-                      >使用: <strong>{{ apiKey.usageCount || 0 }}</strong
-                      >次</span
+                      >{{ t('accountModals.apiKeys.usagePrefix') }}
+                      <strong>{{ apiKey.usageCount || 0 }}</strong>
+                      {{ t('accountModals.apiKeys.usageSuffix') }}</span
                     >
                   </div>
                   <div v-if="apiKey.lastUsedAt">
@@ -339,10 +346,13 @@
           <!-- 分页控制（底部） -->
           <div v-if="totalPages > 1" class="mt-4 flex items-center justify-between">
             <div class="text-sm text-gray-600 dark:text-gray-400">
-              显示 {{ (currentPage - 1) * pageSize + 1 }}-{{
-                Math.min(currentPage * pageSize, totalItems)
+              {{
+                t('accountModals.apiKeys.pageRange', {
+                  start: (currentPage - 1) * pageSize + 1,
+                  end: Math.min(currentPage * pageSize, totalItems),
+                  total: totalItems
+                })
               }}
-              项，共 {{ totalItems }} 项
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -396,6 +406,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { showToast } from '@/utils/tools'
 import { getDroidAccountByIdApi, updateDroidAccountApi } from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -412,6 +423,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'refresh'])
+const { t, locale } = useI18n()
 
 const show = ref(true)
 const loading = ref(false)
@@ -434,16 +446,16 @@ const confirmModalConfig = ref({
   title: '',
   message: '',
   type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
+  confirmText: t('common.confirm'),
+  cancelText: t('common.cancel')
 })
 const confirmResolve = ref(null)
 
 const showConfirm = (
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText = t('common.confirm'),
+  cancelText = t('common.cancel'),
   type = 'primary'
 ) => {
   return new Promise((resolve) => {
@@ -583,7 +595,7 @@ const loadApiKeys = async () => {
     })
   } catch (error) {
     console.error('Failed to load API keys:', error)
-    showToast('加载 API Key 失败', 'error')
+    showToast(t('accountModals.apiKeys.loadFailed'), 'error')
   } finally {
     loading.value = false
     // 重置到第一页
@@ -595,10 +607,10 @@ const loadApiKeys = async () => {
 const deleteApiKey = async (apiKey) => {
   if (
     !(await showConfirm(
-      '删除 API Key',
-      `确定要删除 API Key "${maskApiKey(apiKey.key)}" 吗？`,
-      '删除',
-      '取消',
+      t('accountModals.apiKeys.deleteOneTitle'),
+      t('accountModals.apiKeys.deleteOneMessage', { key: maskApiKey(apiKey.key) }),
+      t('common.delete'),
+      t('common.cancel'),
       'danger'
     ))
   ) {
@@ -615,12 +627,12 @@ const deleteApiKey = async (apiKey) => {
 
     await updateDroidAccountApi(props.accountId, updateData)
 
-    showToast('API Key 已删除', 'success')
+    showToast(t('accountModals.apiKeys.deleteSuccess'), 'success')
     await loadApiKeys()
     emit('refresh')
   } catch (error) {
     console.error('Failed to delete API key:', error)
-    showToast(error.response?.data?.error || '删除 API Key 失败', 'error')
+    showToast(error.response?.data?.error || t('accountModals.apiKeys.deleteFailed'), 'error')
   } finally {
     deleting.value = null
   }
@@ -630,10 +642,10 @@ const deleteApiKey = async (apiKey) => {
 const resetApiKeyStatus = async (apiKey) => {
   if (
     !(await showConfirm(
-      '重置状态',
-      `确定要重置 API Key "${maskApiKey(apiKey.key)}" 的状态吗？这将清除错误信息并恢复为正常状态。`,
-      '重置',
-      '取消',
+      t('accountModals.apiKeys.resetStatusTitle'),
+      t('accountModals.apiKeys.resetStatusMessage', { key: maskApiKey(apiKey.key) }),
+      t('accountModals.apiKeys.reset'),
+      t('common.cancel'),
       'warning'
     ))
   ) {
@@ -656,12 +668,12 @@ const resetApiKeyStatus = async (apiKey) => {
 
     await updateDroidAccountApi(props.accountId, updateData)
 
-    showToast('API Key 状态已重置', 'success')
+    showToast(t('accountModals.apiKeys.resetSuccess'), 'success')
     await loadApiKeys()
     emit('refresh')
   } catch (error) {
     console.error('Failed to reset API key status:', error)
-    showToast(error.response?.data?.error || '重置 API Key 状态失败', 'error')
+    showToast(error.response?.data?.error || t('accountModals.apiKeys.resetFailed'), 'error')
   } finally {
     resetting.value = null
   }
@@ -671,16 +683,16 @@ const resetApiKeyStatus = async (apiKey) => {
 const deleteAllErrorKeys = async () => {
   const errorKeys = apiKeys.value.filter((key) => key.status === 'error')
   if (errorKeys.length === 0) {
-    showToast('没有异常状态的 API Key', 'warning')
+    showToast(t('accountModals.apiKeys.noErrorKeys'), 'warning')
     return
   }
 
   if (
     !(await showConfirm(
-      '删除异常 API Key',
-      `确定要删除所有 ${errorKeys.length} 个异常状态的 API Key 吗？此操作不可恢复！`,
-      '删除',
-      '取消',
+      t('accountModals.apiKeys.deleteErrorConfirmTitle'),
+      t('accountModals.apiKeys.deleteErrorConfirmMessage', { count: errorKeys.length }),
+      t('common.delete'),
+      t('common.cancel'),
       'danger'
     ))
   ) {
@@ -697,12 +709,12 @@ const deleteAllErrorKeys = async () => {
 
     await updateDroidAccountApi(props.accountId, updateData)
 
-    showToast(`成功删除 ${errorKeys.length} 个异常 API Key`, 'success')
+    showToast(t('accountModals.apiKeys.deleteErrorSuccess', { count: errorKeys.length }), 'success')
     await loadApiKeys()
     emit('refresh')
   } catch (error) {
     console.error('Failed to delete error API keys:', error)
-    showToast(error.response?.data?.error || '批量删除失败', 'error')
+    showToast(error.response?.data?.error || t('accountModals.apiKeys.batchDeleteFailed'), 'error')
   } finally {
     batchDeleting.value = false
   }
@@ -711,16 +723,16 @@ const deleteAllErrorKeys = async () => {
 // 批量删除所有 Key
 const deleteAllKeys = async () => {
   if (apiKeys.value.length === 0) {
-    showToast('没有可删除的 API Key', 'warning')
+    showToast(t('accountModals.apiKeys.noKeysToDelete'), 'warning')
     return
   }
 
   if (
     !(await showConfirm(
-      '删除全部 API Key',
-      `确定要删除所有 ${apiKeys.value.length} 个 API Key 吗？此操作不可恢复！\n\n请再次确认：这将删除该账户下的所有 API Key。`,
-      '删除',
-      '取消',
+      t('accountModals.apiKeys.deleteAllConfirmTitle'),
+      t('accountModals.apiKeys.deleteAllConfirmMessage', { count: apiKeys.value.length }),
+      t('common.delete'),
+      t('common.cancel'),
       'danger'
     ))
   ) {
@@ -729,7 +741,13 @@ const deleteAllKeys = async () => {
 
   // 二次确认
   if (
-    !(await showConfirm('最后确认', '真的要删除所有 API Key 吗？', '确认删除', '取消', 'danger'))
+    !(await showConfirm(
+      t('accountModals.apiKeys.finalConfirmTitle'),
+      t('accountModals.apiKeys.finalConfirmMessage'),
+      t('accountModals.apiKeys.confirmDelete'),
+      t('common.cancel'),
+      'danger'
+    ))
   ) {
     return
   }
@@ -744,12 +762,15 @@ const deleteAllKeys = async () => {
 
     await updateDroidAccountApi(props.accountId, updateData)
 
-    showToast(`成功删除所有 ${keysToDelete.length} 个 API Key`, 'success')
+    showToast(
+      t('accountModals.apiKeys.deleteAllSuccess', { count: keysToDelete.length }),
+      'success'
+    )
     await loadApiKeys()
     emit('refresh')
   } catch (error) {
     console.error('Failed to delete all API keys:', error)
-    showToast(error.response?.data?.error || '批量删除失败', 'error')
+    showToast(error.response?.data?.error || t('accountModals.apiKeys.batchDeleteFailed'), 'error')
   } finally {
     batchDeleting.value = false
   }
@@ -769,7 +790,7 @@ const exportKeys = (type) => {
   }
 
   if (keysToExport.length === 0) {
-    showToast('没有可导出的 API Key', 'warning')
+    showToast(t('accountModals.apiKeys.noKeysToExport'), 'warning')
     return
   }
 
@@ -787,7 +808,7 @@ const exportKeys = (type) => {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 
-  showToast(`成功导出 ${keysToExport.length} 个 API Key`, 'success')
+  showToast(t('accountModals.apiKeys.exportSuccess', { count: keysToExport.length }), 'success')
 }
 
 // 写入剪贴板（带回退逻辑）
@@ -832,10 +853,10 @@ const writeToClipboard = async (text) => {
 const copyApiKey = async (key) => {
   try {
     await writeToClipboard(key)
-    showToast('API Key 已复制', 'success')
+    showToast(t('accountModals.apiKeys.copySuccess'), 'success')
   } catch (error) {
     console.error('Failed to copy:', error)
-    showToast('复制失败，请手动复制', 'error')
+    showToast(t('accountModals.apiKeys.copyFailedManual'), 'error')
   }
 }
 
@@ -849,10 +870,10 @@ const copyAllApiKeys = async () => {
   try {
     const allKeysText = apiKeys.value.map((item) => item.key).join('\n')
     await writeToClipboard(allKeysText)
-    showToast(`已复制 ${apiKeys.value.length} 条 API Key`, 'success')
+    showToast(t('accountModals.apiKeys.copyAllSuccess', { count: apiKeys.value.length }), 'success')
   } catch (error) {
     console.error('Failed to copy all keys:', error)
-    showToast('复制全部 API Key 失败，请手动复制', 'error')
+    showToast(t('accountModals.apiKeys.copyAllFailedManual'), 'error')
   } finally {
     copyingAll.value = false
   }
@@ -863,7 +884,7 @@ const formatTime = (timestamp) => {
   if (!timestamp) return '-'
   try {
     const date = new Date(timestamp)
-    return date.toLocaleString('zh-CN', {
+    return date.toLocaleString(locale.value, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

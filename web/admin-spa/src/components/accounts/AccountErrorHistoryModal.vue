@@ -22,7 +22,9 @@
               <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {{ accountName }}
               </h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400">错误历史 (最近 3 天)</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t('accountModals.errorHistory.subtitle') }}
+              </p>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -31,7 +33,7 @@
               class="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
               @click="handleClear"
             >
-              清除历史
+              {{ t('accountModals.errorHistory.clearHistory') }}
             </button>
             <button
               class="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -47,7 +49,9 @@
           <!-- 加载中 -->
           <div v-if="loading" class="flex items-center justify-center py-12">
             <i class="fas fa-spinner fa-spin mr-2 text-gray-400" />
-            <span class="text-sm text-gray-500 dark:text-gray-400">加载中...</span>
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{
+              t('accountModals.common.loading')
+            }}</span>
           </div>
 
           <!-- 空状态 -->
@@ -56,7 +60,7 @@
             class="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500"
           >
             <i class="fas fa-check-circle mb-3 text-3xl text-green-400" />
-            <span class="text-sm">暂无错误记录</span>
+            <span class="text-sm">{{ t('accountModals.errorHistory.empty') }}</span>
           </div>
 
           <!-- 错误列表 -->
@@ -107,7 +111,11 @@
                   class="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400"
                   @click="toggleDetail(idx)"
                 >
-                  {{ expandedIdx === idx ? '收起详情' : '查看详情' }}
+                  {{
+                    expandedIdx === idx
+                      ? t('accountModals.errorHistory.collapseDetails')
+                      : t('accountModals.errorHistory.viewDetails')
+                  }}
                   <i
                     class="ml-1"
                     :class="expandedIdx === idx ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"
@@ -129,7 +137,11 @@
                 @click="loadMore"
               >
                 <i v-if="loadingMore" class="fas fa-spinner fa-spin mr-1" />
-                {{ loadingMore ? '加载中...' : '加载更多' }}
+                {{
+                  loadingMore
+                    ? t('accountModals.common.loading')
+                    : t('accountModals.errorHistory.loadMore')
+                }}
               </button>
             </div>
           </div>
@@ -141,6 +153,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import dayjs from 'dayjs'
 
 import * as httpApis from '@/utils/http_apis'
@@ -155,6 +168,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+const { t } = useI18n()
 
 const loading = ref(false)
 const loadingMore = ref(false)

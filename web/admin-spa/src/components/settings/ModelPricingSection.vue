@@ -13,10 +13,12 @@
           </div>
           <div>
             <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-              模型总数:
+              {{ t('adminUtility.modelPricing.modelCount') }}
               <span class="font-bold text-blue-600 dark:text-blue-400">{{ modelCount }}</span>
             </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">上次更新: {{ lastUpdated }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t('adminUtility.modelPricing.lastUpdated', { time: lastUpdated }) }}
+            </p>
           </div>
         </div>
         <button
@@ -30,7 +32,11 @@
           @click="handleRefresh"
         >
           <i :class="['fas', refreshing ? 'fa-spinner fa-spin' : 'fa-sync-alt']" />
-          {{ refreshing ? '刷新中...' : '立即刷新' }}
+          {{
+            refreshing
+              ? t('adminUtility.modelPricing.refreshing')
+              : t('adminUtility.modelPricing.refreshNow')
+          }}
         </button>
       </div>
     </div>
@@ -42,13 +48,13 @@
         <input
           v-model="searchQuery"
           class="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-700 placeholder-gray-400 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-          placeholder="搜索模型名称..."
+          :placeholder="t('adminUtility.modelPricing.searchPlaceholder')"
           type="text"
         />
       </div>
       <div class="flex gap-1">
         <button
-          v-for="tab in platformTabs"
+          v-for="tab in localizedPlatformTabs"
           :key="tab.key"
           :class="[
             'rounded-lg px-3 py-2 text-xs font-medium transition',
@@ -66,7 +72,9 @@
     <!-- 加载状态 -->
     <div v-if="loading" class="py-12 text-center">
       <i class="fas fa-spinner fa-spin mb-4 text-2xl text-blue-500" />
-      <p class="text-gray-500 dark:text-gray-400">加载价格数据中...</p>
+      <p class="text-gray-500 dark:text-gray-400">
+        {{ t('adminUtility.modelPricing.loading') }}
+      </p>
     </div>
 
     <!-- 表格 -->
@@ -78,7 +86,7 @@
               class="cursor-pointer px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               @click="toggleSort('name')"
             >
-              模型名称
+              {{ t('adminUtility.modelPricing.modelName') }}
               <i
                 v-if="sortField === 'name'"
                 :class="['fas ml-1', sortAsc ? 'fa-sort-up' : 'fa-sort-down']"
@@ -88,7 +96,7 @@
               class="cursor-pointer px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               @click="toggleSort('input')"
             >
-              输入 $/MTok
+              {{ t('adminUtility.modelPricing.inputPrice') }}
               <i
                 v-if="sortField === 'input'"
                 :class="['fas ml-1', sortAsc ? 'fa-sort-up' : 'fa-sort-down']"
@@ -98,7 +106,7 @@
               class="cursor-pointer px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               @click="toggleSort('output')"
             >
-              输出 $/MTok
+              {{ t('adminUtility.modelPricing.outputPrice') }}
               <i
                 v-if="sortField === 'output'"
                 :class="['fas ml-1', sortAsc ? 'fa-sort-up' : 'fa-sort-down']"
@@ -107,17 +115,17 @@
             <th
               class="hidden px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 md:table-cell"
             >
-              缓存创建
+              {{ t('adminUtility.modelPricing.cacheCreate') }}
             </th>
             <th
               class="hidden px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 md:table-cell"
             >
-              缓存读取
+              {{ t('adminUtility.modelPricing.cacheRead') }}
             </th>
             <th
               class="hidden px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 lg:table-cell"
             >
-              上下文窗口
+              {{ t('adminUtility.modelPricing.contextWindow') }}
             </th>
           </tr>
         </thead>
@@ -160,7 +168,7 @@
           <tr v-if="sortedModels.length === 0">
             <td class="px-3 py-8 text-center text-gray-500 dark:text-gray-400" colspan="6">
               <i class="fas fa-search mb-2 text-2xl text-gray-300 dark:text-gray-600" />
-              <p>没有匹配的模型</p>
+              <p>{{ t('adminUtility.modelPricing.noMatches') }}</p>
             </td>
           </tr>
         </tbody>
@@ -169,19 +177,27 @@
 
     <!-- 模型数量统计 -->
     <div v-if="!loading" class="mt-3 text-right text-xs text-gray-400 dark:text-gray-500">
-      显示 {{ sortedModels.length }} / {{ allModels.length }} 个模型
+      {{
+        t('adminUtility.modelPricing.showing', {
+          shown: sortedModels.length,
+          total: allModels.length
+        })
+      }}
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getModelPricingApi,
   getModelPricingStatusApi,
   refreshModelPricingApi
 } from '@/utils/http_apis'
 import { showToast } from '@/utils/tools'
+
+const { t, locale } = useI18n()
 
 // ========== 状态 ==========
 const loading = ref(false)
@@ -194,19 +210,28 @@ const sortField = ref('name')
 const sortAsc = ref(true)
 
 const platformTabs = [
-  { key: 'all', label: '全部' },
+  { key: 'all', labelKey: 'adminUtility.modelPricing.all' },
   { key: 'claude', label: 'Claude' },
   { key: 'gemini', label: 'Gemini' },
   { key: 'openai', label: 'OpenAI' },
-  { key: 'other', label: '其他' }
+  { key: 'other', labelKey: 'adminUtility.modelPricing.other' }
 ]
+
+const localizedPlatformTabs = computed(() =>
+  platformTabs.map((tab) => ({
+    ...tab,
+    label: tab.labelKey ? t(tab.labelKey) : tab.label
+  }))
+)
 
 // ========== 计算属性 ==========
 const modelCount = computed(() => Object.keys(pricingData.value).length)
 
 const lastUpdated = computed(() => {
-  if (!pricingStatus.value.lastUpdated) return '未知'
-  return new Date(pricingStatus.value.lastUpdated).toLocaleString('zh-CN')
+  if (!pricingStatus.value.lastUpdated) return t('adminUtility.modelPricing.unknown')
+  return new Date(pricingStatus.value.lastUpdated).toLocaleString(
+    locale.value === 'zh-CN' ? 'zh-CN' : 'en-US'
+  )
 })
 
 const allModels = computed(() =>
@@ -327,12 +352,12 @@ const loadData = async () => {
   if (pricingResult.success) {
     pricingData.value = pricingResult.data
   } else {
-    showToast(pricingResult.message || '加载模型价格失败', 'error')
+    showToast(pricingResult.message || t('adminUtility.modelPricing.loadFailed'), 'error')
   }
   if (statusResult.success) {
     pricingStatus.value = statusResult.data
   } else {
-    showToast(statusResult.message || '获取价格状态失败', 'error')
+    showToast(statusResult.message || t('adminUtility.modelPricing.statusFailed'), 'error')
   }
   loading.value = false
 }
@@ -341,10 +366,10 @@ const handleRefresh = async () => {
   refreshing.value = true
   const result = await refreshModelPricingApi()
   if (result.success) {
-    showToast('价格数据已刷新', 'success')
+    showToast(t('adminUtility.modelPricing.refreshed'), 'success')
     await loadData()
   } else {
-    showToast(result.message || '刷新失败', 'error')
+    showToast(result.message || t('adminUtility.modelPricing.refreshFailed'), 'error')
   }
   refreshing.value = false
 }

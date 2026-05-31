@@ -1,0 +1,73 @@
+export default {
+  accountProxy: {
+    title: 'Proxy Settings (optional)',
+    enable: 'Enable proxy',
+    description:
+      'Configure a proxy to access restricted network resources. SOCKS5 and HTTP proxies are supported.',
+    stabilityWarning:
+      'Make sure the proxy server is stable, otherwise normal account usage may be affected.',
+    quickConfig: 'Quick config',
+    quickConfigHint: '(paste a full proxy URL to fill automatically)',
+    quickConfigPlaceholder: 'Example: socks5://username:password@host:port or http://host:port',
+    autoFilled: 'Proxy settings filled automatically',
+    proxyType: 'Proxy type',
+    host: 'Host',
+    hostPlaceholder: 'Example: 192.168.1.100',
+    port: 'Port',
+    portPlaceholder: 'Example: 1080',
+    authRequired: 'Authentication required',
+    username: 'Username',
+    usernamePlaceholder: 'Proxy username',
+    password: 'Password',
+    passwordPlaceholder: 'Proxy password',
+    tipLabel: 'Tip:',
+    tipText:
+      'Proxy settings are used for all API requests related to this account. Make sure the proxy server supports HTTPS traffic forwarding.',
+    invalidUrl: 'Invalid proxy URL format. Check your input.',
+    parseFailed: 'Parse failed. Check the URL format.'
+  },
+  tempUnavailable: {
+    title: 'Account-Level Temporary Cooldown Override',
+    disable:
+      'Disable temporary cooldown for this account (do not enter TTL automatically on 503/5xx)',
+    ttl503: '503 cooldown seconds (blank = global, 0 = off)',
+    placeholder503: 'Example 30',
+    ttl5xx: '5xx cooldown seconds (blank = global, 0 = off)',
+    placeholder5xx: 'Example 120'
+  },
+  accountGroups: {
+    title: 'Account Group Management',
+    all: 'All',
+    createNew: 'Create group',
+    loading: 'Loading...',
+    empty: 'No groups',
+    noDescription: 'No description',
+    memberCount: '{count} members',
+    editTitle: 'Edit group',
+    createTitle: 'Create group',
+    nameRequired: 'Group name *',
+    nameRequiredToast: 'Please enter a group name',
+    namePlaceholder: 'Enter group name',
+    platformType: 'Platform type',
+    platformTypeRequired: 'Platform type *',
+    notEditable: '(cannot be changed)',
+    descriptionOptional: 'Description (optional)',
+    descriptionPlaceholder: 'Group description...',
+    update: 'Update',
+    updating: 'Updating...',
+    create: 'Create',
+    creating: 'Creating...',
+    confirmDelete: 'Delete',
+    deleteTitle: 'Confirm delete',
+    deleteMessage: 'Delete group "{name}"? This action cannot be undone.',
+    loadFailed: 'Failed to load group list',
+    requiredFields: 'Please fill in required fields',
+    createSuccess: 'Group created successfully',
+    createFailed: 'Failed to create group',
+    updateSuccess: 'Group updated successfully',
+    updateFailed: 'Failed to update group',
+    deleteBlocked: 'This group still has members and cannot be deleted',
+    deleteSuccess: 'Group deleted successfully',
+    deleteFailed: 'Failed to delete group'
+  }
+}

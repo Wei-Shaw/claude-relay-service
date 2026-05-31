@@ -8,7 +8,7 @@
         isOpen &&
           'border-blue-400 bg-blue-50 text-blue-600 dark:border-blue-500 dark:bg-blue-900/30 dark:text-blue-400'
       ]"
-      title="更多操作"
+      :title="t('common.moreActions')"
       @click.stop="toggleDropdown"
     >
       <i class="fas fa-ellipsis-v text-sm"></i>
@@ -48,6 +48,9 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 defineProps({
   actions: {

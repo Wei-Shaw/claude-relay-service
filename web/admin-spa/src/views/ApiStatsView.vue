@@ -11,16 +11,12 @@
         <LogoTitle
           :loading="oemLoading"
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          :subtitle="
-            currentTab === 'stats'
-              ? 'API Key 使用统计'
-              : currentTab === 'quota'
-                ? '额度卡'
-                : '使用教程'
-          "
+          :subtitle="apiStatsSubtitle"
           :title="oemSettings.siteName"
         />
         <div class="flex items-center gap-2 md:gap-4">
+          <LanguageSwitcher />
+
           <!-- 主题切换按钮 -->
           <div class="flex items-center">
             <ThemeToggle mode="dropdown" />
@@ -39,7 +35,9 @@
             to="/user-login"
           >
             <i class="fas fa-user text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">用户登录</span>
+            <span class="text-xs font-semibold tracking-wide md:text-sm">
+              {{ t('apiStats.userLogin') }}
+            </span>
           </router-link>
           <!-- 管理后台按钮 -->
           <router-link
@@ -48,7 +46,9 @@
             to="/dashboard"
           >
             <i class="fas fa-shield-alt text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">管理后台</span>
+            <span class="text-xs font-semibold tracking-wide md:text-sm">
+              {{ t('auth.adminPanel') }}
+            </span>
           </router-link>
         </div>
       </div>
@@ -65,21 +65,21 @@
             @click="currentTab = 'stats'"
           >
             <i class="fas fa-chart-line mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">统计查询</span>
+            <span class="text-sm md:text-base">{{ t('apiStats.statsQuery') }}</span>
           </button>
           <button
             :class="['tab-pill-button', currentTab === 'quota' ? 'active' : '']"
             @click="switchToQuota"
           >
             <i class="fas fa-ticket-alt mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">额度卡</span>
+            <span class="text-sm md:text-base">{{ t('apiStats.subtitleQuota') }}</span>
           </button>
           <button
             :class="['tab-pill-button', currentTab === 'tutorial' ? 'active' : '']"
             @click="currentTab = 'tutorial'"
           >
             <i class="fas fa-graduation-cap mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">使用教程</span>
+            <span class="text-sm md:text-base">{{ t('apiStats.subtitleTutorial') }}</span>
           </button>
         </div>
       </div>
@@ -112,9 +112,9 @@
             >
               <div class="flex items-center gap-2 md:gap-3">
                 <i class="fas fa-clock text-base text-blue-500 md:text-lg" />
-                <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg"
-                  >统计时间范围</span
-                >
+                <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg">{{
+                  t('apiStats.timeRange')
+                }}</span>
               </div>
               <div class="flex w-full items-center gap-2 md:w-auto">
                 <button
@@ -124,7 +124,7 @@
                   @click="switchPeriod('daily')"
                 >
                   <i class="fas fa-calendar-day text-xs md:text-sm" />
-                  今日
+                  {{ t('apiStats.today') }}
                 </button>
                 <button
                   class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
@@ -133,7 +133,7 @@
                   @click="switchPeriod('monthly')"
                 >
                   <i class="fas fa-calendar-alt text-xs md:text-sm" />
-                  本月
+                  {{ t('apiStats.thisMonth') }}
                 </button>
                 <button
                   class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
@@ -142,7 +142,7 @@
                   @click="switchPeriod('alltime')"
                 >
                   <i class="fas fa-infinity text-xs md:text-sm" />
-                  全部
+                  {{ t('apiStats.all') }}
                 </button>
                 <!-- 测试按钮下拉菜单 - 仅在单Key模式下显示 -->
                 <div v-if="!multiKeyMode" class="relative">
@@ -154,13 +154,13 @@
                     :disabled="loading || !hasAnyTestPermission"
                     :title="
                       hasAnyTestPermission
-                        ? '测试 API'
-                        : `当前 Key 可用服务: ${availableServicesText}`
+                        ? t('apiStats.testApi')
+                        : t('apiStats.availableServices', { services: availableServicesText })
                     "
                     @click="toggleTestMenu"
                   >
                     <i class="fas fa-vial text-xs md:text-sm" />
-                    测试
+                    {{ t('apiStats.test') }}
                     <i class="fas fa-chevron-down ml-1 text-xs" />
                   </button>
                   <!-- 下拉菜单 -->
@@ -251,7 +251,7 @@
             @click="quotaSubTab = 'redeem'"
           >
             <i class="fas fa-ticket-alt mr-2" />
-            兑换额度卡
+            {{ t('apiStats.redeemQuotaCard') }}
           </button>
           <button
             :class="[
@@ -263,7 +263,7 @@
             @click="switchToHistorySubTab"
           >
             <i class="fas fa-history mr-2" />
-            兑换记录
+            {{ t('apiStats.redemptionHistory') }}
           </button>
         </div>
 
@@ -273,13 +273,13 @@
           <div v-if="!apiId" class="py-8 text-center">
             <div class="mb-4 text-gray-500 dark:text-gray-400">
               <i class="fas fa-key mb-4 block text-4xl opacity-50" />
-              <p>请先在「统计查询」页面输入您的 API Key</p>
+              <p>{{ t('apiStats.enterApiKeyFirst') }}</p>
             </div>
             <button
               class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
               @click="currentTab = 'stats'"
             >
-              前往输入 API Key
+              {{ t('apiStats.goEnterApiKey') }}
             </button>
           </div>
 
@@ -288,19 +288,20 @@
             <div class="mb-6 rounded-xl bg-blue-50 p-4 dark:bg-blue-900/20">
               <p class="text-sm text-blue-700 dark:text-blue-300">
                 <i class="fas fa-info-circle mr-2" />
-                当前 API Key: <span class="font-medium">{{ statsData?.name || apiId }}</span>
+                {{ t('apiStats.currentApiKey') }}
+                <span class="font-medium">{{ statsData?.name || apiId }}</span>
               </p>
             </div>
 
             <div class="space-y-4">
               <div>
                 <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  额度卡卡号
+                  {{ t('apiStats.quotaCardCode') }}
                 </label>
                 <input
                   v-model="redeemCode"
                   class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500"
-                  placeholder="请输入额度卡卡号"
+                  :placeholder="t('apiStats.quotaCardCodePlaceholder')"
                   type="text"
                   @keyup.enter="handleRedeem"
                 />
@@ -313,7 +314,7 @@
               >
                 <i v-if="redeemLoading" class="fas fa-spinner fa-spin mr-2" />
                 <i v-else class="fas fa-check-circle mr-2" />
-                {{ redeemLoading ? '兑换中...' : '立即兑换' }}
+                {{ redeemLoading ? t('apiStats.redeeming') : t('apiStats.redeemNow') }}
               </button>
             </div>
 
@@ -345,28 +346,22 @@
                       {{
                         redeemResult.success
                           ? redeemResult.hasWarnings
-                            ? '兑换成功（部分截断）'
-                            : '兑换成功'
-                          : '兑换失败'
+                            ? t('apiStats.redeemSuccessPartial')
+                            : t('apiStats.redeemSuccess')
+                          : t('apiStats.redeemFailed')
                       }}
                     </p>
                     <p class="mt-1 text-sm opacity-90">{{ redeemResult.message }}</p>
                     <div v-if="redeemResult.success && redeemResult.data" class="mt-2 text-sm">
                       <p v-if="redeemResult.data.quotaAdded">
-                        额度增加:
+                        {{ t('apiStats.quotaAdded') }}
                         <span class="font-medium">${{ redeemResult.data.quotaAdded }}</span>
                       </p>
                       <p v-if="redeemResult.data.timeAdded">
-                        有效期延长:
+                        {{ t('apiStats.timeAdded') }}
                         <span class="font-medium"
                           >{{ redeemResult.data.timeAdded
-                          }}{{
-                            redeemResult.data.timeUnit === 'days'
-                              ? '天'
-                              : redeemResult.data.timeUnit === 'hours'
-                                ? '小时'
-                                : '月'
-                          }}</span
+                          }}{{ timeUnitLabel(redeemResult.data.timeUnit) }}</span
                         >
                       </p>
                     </div>
@@ -383,13 +378,13 @@
           <div v-if="!apiId" class="py-8 text-center">
             <div class="mb-4 text-gray-500 dark:text-gray-400">
               <i class="fas fa-key mb-4 block text-4xl opacity-50" />
-              <p>请先在「统计查询」页面输入您的 API Key</p>
+              <p>{{ t('apiStats.enterApiKeyFirst') }}</p>
             </div>
             <button
               class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
               @click="currentTab = 'stats'"
             >
-              前往输入 API Key
+              {{ t('apiStats.goEnterApiKey') }}
             </button>
           </div>
 
@@ -397,12 +392,16 @@
           <div v-else>
             <div v-if="historyLoading" class="py-8 text-center">
               <i class="fas fa-spinner fa-spin text-2xl text-gray-400" />
-              <p class="mt-2 text-gray-500 dark:text-gray-400">加载中...</p>
+              <p class="mt-2 text-gray-500 dark:text-gray-400">
+                {{ t('apiStats.loading') }}
+              </p>
             </div>
 
             <div v-else-if="redemptionHistory.length === 0" class="py-8 text-center">
               <i class="fas fa-inbox text-4xl text-gray-300 dark:text-gray-600" />
-              <p class="mt-2 text-gray-500 dark:text-gray-400">暂无兑换记录</p>
+              <p class="mt-2 text-gray-500 dark:text-gray-400">
+                {{ t('apiStats.noRedemptionHistory') }}
+              </p>
             </div>
 
             <div v-else class="space-y-3">
@@ -424,33 +423,23 @@
                               : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                         ]"
                       >
-                        {{
-                          record.cardType === 'quota'
-                            ? '额度卡'
-                            : record.cardType === 'time'
-                              ? '时间卡'
-                              : '组合卡'
-                        }}
+                        {{ cardTypeLabel(record.cardType) }}
                       </span>
                       <span
                         v-if="record.status === 'revoked'"
                         class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300"
                       >
-                        已撤销
+                        {{ t('apiStats.revoked') }}
                       </span>
                     </div>
                     <p class="text-sm text-gray-600 dark:text-gray-300">
-                      <span v-if="record.quotaAdded">额度 +${{ record.quotaAdded }}</span>
+                      <span v-if="record.quotaAdded"
+                        >{{ t('apiStats.quota') }} +${{ record.quotaAdded }}</span
+                      >
                       <span v-if="record.quotaAdded && record.timeAdded"> · </span>
                       <span v-if="record.timeAdded"
-                        >有效期 +{{ record.timeAmount
-                        }}{{
-                          record.timeUnit === 'days'
-                            ? '天'
-                            : record.timeUnit === 'hours'
-                              ? '小时'
-                              : '月'
-                        }}</span
+                        >{{ t('apiStats.validUntil') }} +{{ record.timeAmount
+                        }}{{ timeUnitLabel(record.timeUnit) }}</span
                       >
                     </p>
                   </div>
@@ -496,7 +485,7 @@
                 <i class="fas fa-bell" />
               </div>
               <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {{ oemSettings.apiStatsNotice?.title || '通知' }}
+                {{ oemSettings.apiStatsNotice?.title || t('apiStats.notice') }}
               </h3>
             </div>
             <p
@@ -510,13 +499,15 @@
                 class="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
                 type="checkbox"
               />
-              <span class="text-sm text-gray-600 dark:text-gray-400">本次会话不再显示</span>
+              <span class="text-sm text-gray-600 dark:text-gray-400">
+                {{ t('apiStats.dontShowAgain') }}
+              </span>
             </label>
             <button
               class="w-full rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
               @click="dismissNotice"
             >
-              知道了
+              {{ t('apiStats.gotIt') }}
             </button>
           </div>
         </div>
@@ -528,12 +519,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 import { useThemeStore } from '@/stores/theme'
 import { redeemCardByApiIdApi, getRedemptionHistoryByApiIdApi } from '@/utils/http_apis'
 import { formatDateTime, showToast } from '@/utils/tools'
 import LogoTitle from '@/components/common/LogoTitle.vue'
+import LanguageSwitcher from '@/components/common/LanguageSwitcher.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
 import StatsOverview from '@/components/apistats/StatsOverview.vue'
@@ -548,12 +541,19 @@ import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 const route = useRoute()
 const apiStatsStore = useApiStatsStore()
 const themeStore = useThemeStore()
+const { t } = useI18n()
 
 // 当前标签页
 const currentTab = ref('stats')
 
 // 主题相关
 const isDarkMode = computed(() => themeStore.isDarkMode)
+
+const apiStatsSubtitle = computed(() => {
+  if (currentTab.value === 'quota') return t('apiStats.subtitleQuota')
+  if (currentTab.value === 'tutorial') return t('apiStats.subtitleTutorial')
+  return t('apiStats.subtitleStats')
+})
 
 const {
   apiKey,
@@ -614,13 +614,13 @@ const handleRedeem = async () => {
     const hasWarnings = warnings.length > 0
     redeemResult.value = {
       success: true,
-      message: hasWarnings ? warnings.join('；') : '额度卡兑换成功！',
+      message: hasWarnings ? warnings.join('；') : t('apiStats.redeemSuccessMessage'),
       data: res.data,
       hasWarnings
     }
     redeemCode.value = ''
     showToast(
-      hasWarnings ? '兑换成功（部分截断）' : '兑换成功',
+      hasWarnings ? t('apiStats.redeemSuccessPartial') : t('apiStats.redeemSuccess'),
       hasWarnings ? 'warning' : 'success'
     )
     // 刷新统计数据
@@ -628,9 +628,9 @@ const handleRedeem = async () => {
   } else {
     redeemResult.value = {
       success: false,
-      message: res.error || res.message || '兑换失败'
+      message: res.error || res.message || t('apiStats.redeemFailed')
     }
-    showToast(res.error || res.message || '兑换失败', 'error')
+    showToast(res.error || res.message || t('apiStats.redeemFailed'), 'error')
   }
 }
 
@@ -707,7 +707,7 @@ const hasAnyTestPermission = computed(() => {
 // 可用服务文本
 const availableServicesText = computed(() => {
   const permissions = parsePermissions(statsData.value?.permissions)
-  if (permissions.length === 0) return '全部服务'
+  if (permissions.length === 0) return t('apiStats.allServices')
   const serviceNames = {
     claude: 'Claude',
     gemini: 'Gemini',
@@ -716,6 +716,18 @@ const availableServicesText = computed(() => {
   }
   return permissions.map((s) => serviceNames[s] || s).join(', ')
 })
+
+const timeUnitLabel = (unit) => {
+  if (unit === 'days') return t('apiStats.days')
+  if (unit === 'hours') return t('apiStats.hours')
+  return t('apiStats.months')
+}
+
+const cardTypeLabel = (type) => {
+  if (type === 'quota') return t('apiStats.quotaCard')
+  if (type === 'time') return t('apiStats.timeCard')
+  return t('apiStats.comboCard')
+}
 
 // 切换测试菜单
 const toggleTestMenu = () => {

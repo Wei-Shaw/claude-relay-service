@@ -6,23 +6,25 @@
           class="rounded-full border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
           @click="goBack"
         >
-          ← 返回
+          ← {{ t('adminUtility.records.back') }}
         </button>
         <div>
           <p class="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
-            账户请求详情时间线
+            {{ t('adminUtility.records.accountTimeline') }}
           </p>
           <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">
             {{ accountDisplayName }}
           </h2>
           <p class="text-xs text-gray-500 dark:text-gray-400">ID: {{ accountId }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">渠道：{{ platformDisplayName }}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t('adminUtility.records.channel', { name: platformDisplayName }) }}
+          </p>
         </div>
       </div>
       <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
         <i class="fas fa-clock text-blue-500" />
         <span v-if="dateRangeHint">{{ dateRangeHint }}</span>
-        <span v-else>显示近 5000 条记录</span>
+        <span v-else>{{ t('adminUtility.records.recentRecords') }}</span>
       </div>
     </div>
 
@@ -30,7 +32,9 @@
       <div
         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
-        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总请求</p>
+        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">
+          {{ t('adminUtility.records.totalRequests') }}
+        </p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
           {{ formatNumber(summary.totalRequests) }}
         </p>
@@ -38,7 +42,9 @@
       <div
         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
-        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总 Token</p>
+        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">
+          {{ t('adminUtility.records.totalTokens') }}
+        </p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
           {{ formatNumber(summary.totalTokens) }}
         </p>
@@ -46,7 +52,9 @@
       <div
         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
-        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总费用</p>
+        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">
+          {{ t('adminUtility.records.totalCost') }}
+        </p>
         <p class="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
           {{ formatCost(summary.totalCost) }}
         </p>
@@ -54,7 +62,9 @@
       <div
         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
-        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">平均费用/次</p>
+        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">
+          {{ t('adminUtility.records.avgCost') }}
+        </p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
           {{ formatCost(summary.avgCost) }}
         </p>
@@ -69,9 +79,9 @@
           v-model="filters.dateRange"
           class="max-w-[320px]"
           clearable
-          end-placeholder="结束时间"
+          :end-placeholder="t('adminUtility.records.endTime')"
           format="YYYY-MM-DD HH:mm:ss"
-          start-placeholder="开始时间"
+          :start-placeholder="t('adminUtility.records.startTime')"
           type="datetimerange"
           unlink-panels
           value-format="YYYY-MM-DDTHH:mm:ss[Z]"
@@ -82,7 +92,7 @@
           class="w-[180px]"
           clearable
           filterable
-          placeholder="所有模型"
+          :placeholder="t('adminUtility.records.allModels')"
         >
           <el-option
             v-for="modelOption in availableModels"
@@ -97,7 +107,7 @@
           class="w-[220px]"
           clearable
           filterable
-          placeholder="所有 API Key"
+          :placeholder="t('adminUtility.records.allApiKeys')"
         >
           <el-option
             v-for="apiKey in availableApiKeys"
@@ -107,14 +117,20 @@
           />
         </el-select>
 
-        <el-select v-model="filters.sortOrder" class="w-[140px]" placeholder="排序">
-          <el-option label="时间降序" value="desc" />
-          <el-option label="时间升序" value="asc" />
+        <el-select
+          v-model="filters.sortOrder"
+          class="w-[140px]"
+          :placeholder="t('adminUtility.records.sort')"
+        >
+          <el-option :label="t('adminUtility.records.sortDesc')" value="desc" />
+          <el-option :label="t('adminUtility.records.sortAsc')" value="asc" />
         </el-select>
 
-        <el-button @click="resetFilters"> <i class="fas fa-undo mr-2" /> 重置 </el-button>
+        <el-button @click="resetFilters">
+          <i class="fas fa-undo mr-2" /> {{ t('adminUtility.records.reset') }}
+        </el-button>
         <el-button :loading="exporting" type="primary" @click="exportCsv">
-          <i class="fas fa-file-export mr-2" /> 导出 CSV
+          <i class="fas fa-file-export mr-2" /> {{ t('adminUtility.records.exportCsv') }}
         </el-button>
       </div>
     </div>
@@ -126,7 +142,7 @@
         v-if="loading"
         class="flex items-center justify-center p-10 text-gray-500 dark:text-gray-400"
       >
-        <i class="fas fa-spinner fa-spin mr-2" /> 加载中...
+        <i class="fas fa-spinner fa-spin mr-2" /> {{ t('adminUtility.records.loading') }}
       </div>
       <div v-else>
         <div
@@ -134,7 +150,7 @@
           class="flex flex-col items-center gap-2 p-10 text-gray-500 dark:text-gray-400"
         >
           <i class="fas fa-inbox text-2xl" />
-          <p>暂无记录</p>
+          <p>{{ t('adminUtility.records.noRecords') }}</p>
         </div>
         <div v-else class="space-y-4">
           <div class="hidden overflow-x-auto md:block">
@@ -144,47 +160,47 @@
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    时间
+                    {{ t('adminUtility.records.time') }}
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    API Key
+                    {{ t('adminUtility.records.apiKey') }}
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    模型
+                    {{ t('adminUtility.records.model') }}
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    输入
+                    {{ t('adminUtility.records.input') }}
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    输出
+                    {{ t('adminUtility.records.output') }}
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    缓存(创/读)
+                    {{ t('adminUtility.records.cache') }}
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    总 Token
+                    {{ t('adminUtility.records.totalToken') }}
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    费用
+                    {{ t('adminUtility.records.cost') }}
                   </th>
                   <th
                     class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    操作
+                    {{ t('adminUtility.records.actions') }}
                   </th>
                 </tr>
               </thead>
@@ -198,7 +214,11 @@
                   <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-100">
                     <div class="flex flex-col">
                       <span class="font-semibold">
-                        {{ record.apiKeyName || record.apiKeyId || '未知 Key' }}
+                        {{
+                          record.apiKeyName ||
+                          record.apiKeyId ||
+                          t('adminUtility.records.unknownKey')
+                        }}
                       </span>
                       <span class="text-xs text-gray-500 dark:text-gray-400">
                         ID: {{ record.apiKeyId }}
@@ -231,7 +251,9 @@
                     {{ record.costFormatted || formatCost(record.cost) }}
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 text-right text-sm">
-                    <el-button size="small" @click="openDetail(record)">详情</el-button>
+                    <el-button size="small" @click="openDetail(record)">{{
+                      t('adminUtility.records.details')
+                    }}</el-button>
                   </td>
                 </tr>
               </tbody>
@@ -247,28 +269,58 @@
               <div class="flex items-center justify-between">
                 <div>
                   <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {{ record.apiKeyName || record.apiKeyId || '未知 Key' }}
+                    {{
+                      record.apiKeyName || record.apiKeyId || t('adminUtility.records.unknownKey')
+                    }}
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     ID: {{ record.apiKeyId }} · {{ formatDate(record.timestamp) }}
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    渠道：{{ platformDisplayName }}
+                    {{ t('adminUtility.records.channel', { name: platformDisplayName }) }}
                   </p>
                 </div>
-                <el-button size="small" @click="openDetail(record)">详情</el-button>
+                <el-button size="small" @click="openDetail(record)">{{
+                  t('adminUtility.records.details')
+                }}</el-button>
               </div>
               <div class="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <div>模型：{{ record.model }}</div>
-                <div>总 Token：{{ formatNumber(record.totalTokens) }}</div>
-                <div>输入：{{ formatNumber(record.inputTokens) }}</div>
-                <div>输出：{{ formatNumber(record.outputTokens) }}</div>
+                <div>{{ t('adminUtility.records.modelField', { value: record.model }) }}</div>
                 <div>
-                  缓存创/读：{{ formatNumber(record.cacheCreateTokens) }} /
-                  {{ formatNumber(record.cacheReadTokens) }}
+                  {{
+                    t('adminUtility.records.totalTokenField', {
+                      value: formatNumber(record.totalTokens)
+                    })
+                  }}
+                </div>
+                <div>
+                  {{
+                    t('adminUtility.records.inputField', {
+                      value: formatNumber(record.inputTokens)
+                    })
+                  }}
+                </div>
+                <div>
+                  {{
+                    t('adminUtility.records.outputField', {
+                      value: formatNumber(record.outputTokens)
+                    })
+                  }}
+                </div>
+                <div>
+                  {{
+                    t('adminUtility.records.cacheField', {
+                      create: formatNumber(record.cacheCreateTokens),
+                      read: formatNumber(record.cacheReadTokens)
+                    })
+                  }}
                 </div>
                 <div class="text-yellow-600 dark:text-yellow-400">
-                  费用：{{ record.costFormatted || formatCost(record.cost) }}
+                  {{
+                    t('adminUtility.records.costField', {
+                      value: record.costFormatted || formatCost(record.cost)
+                    })
+                  }}
                 </div>
               </div>
             </div>
@@ -276,7 +328,7 @@
 
           <div class="flex items-center justify-between px-4 pb-4">
             <div class="text-sm text-gray-500 dark:text-gray-400">
-              共 {{ pagination.totalRecords }} 条记录
+              {{ t('adminUtility.records.totalRecords', { count: pagination.totalRecords }) }}
             </div>
             <el-pagination
               background
@@ -299,6 +351,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { getAccountUsageRecordsByIdApi } from '@/utils/http_apis'
@@ -307,6 +360,7 @@ import RecordDetailModal from '@/components/apikeys/RecordDetailModal.vue'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 const accountId = computed(() => route.params.accountId)
 const platform = computed(() => route.query.platform)
@@ -348,7 +402,7 @@ const activeRecord = ref(null)
 const accountDisplayName = computed(() => accountInfo.name || accountInfo.id || accountId.value)
 const platformDisplayName = computed(() => {
   const map = {
-    claude: 'Claude官方',
+    claude: t('adminUtility.platformLabels.claudeOfficial'),
     'claude-console': 'Claude Console',
     ccr: 'Claude Console Relay',
     openai: 'OpenAI',
@@ -356,10 +410,10 @@ const platformDisplayName = computed(() => {
     gemini: 'Gemini',
     'gemini-api': 'Gemini API',
     droid: 'Droid',
-    unknown: '未知渠道'
+    unknown: t('adminUtility.records.unknownChannel')
   }
   const key = accountInfo.platform || platform.value || 'unknown'
-  return map[key] || '未知渠道'
+  return map[key] || t('adminUtility.records.unknownChannel')
 })
 
 const dateRangeHint = computed(() => {
@@ -434,7 +488,12 @@ const fetchRecords = async (page = pagination.currentPage) => {
     const response = await getAccountUsageRecordsByIdApi(accountId.value, buildParams(page))
     syncResponseState(response.data || {})
   } catch (error) {
-    showToast(`加载请求记录失败：${error.message || '未知错误'}`, 'error')
+    showToast(
+      t('adminUtility.records.fetchFailed', {
+        message: error.message || t('adminUtility.records.unknownError')
+      }),
+      'error'
+    )
   } finally {
     loading.value = false
   }
@@ -495,20 +554,20 @@ const exportCsv = async () => {
     }
 
     if (aggregated.length === 0) {
-      showToast('没有可导出的记录', 'info')
+      showToast(t('adminUtility.records.noExportRecords'), 'info')
       return
     }
 
     const headers = [
-      '时间',
-      'API Key',
-      '模型',
-      '输入Token',
-      '输出Token',
-      '缓存创建Token',
-      '缓存读取Token',
-      '总Token',
-      '费用'
+      t('adminUtility.records.csvTime'),
+      t('adminUtility.records.csvApiKey'),
+      t('adminUtility.records.csvModel'),
+      t('adminUtility.records.csvInputTokens'),
+      t('adminUtility.records.csvOutputTokens'),
+      t('adminUtility.records.csvCacheCreateTokens'),
+      t('adminUtility.records.csvCacheReadTokens'),
+      t('adminUtility.records.csvTotalTokens'),
+      t('adminUtility.records.csvCost')
     ]
 
     const csvRows = [headers.join(',')]
@@ -536,9 +595,14 @@ const exportCsv = async () => {
     link.download = `account-${accountId.value}-usage-records.csv`
     link.click()
     URL.revokeObjectURL(url)
-    showToast('导出 CSV 成功', 'success')
+    showToast(t('adminUtility.records.exportSuccess'), 'success')
   } catch (error) {
-    showToast(`导出失败：${error.message || '未知错误'}`, 'error')
+    showToast(
+      t('adminUtility.records.exportFailed', {
+        message: error.message || t('adminUtility.records.unknownError')
+      }),
+      'error'
+    )
   } finally {
     exporting.value = false
   }

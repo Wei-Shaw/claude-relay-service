@@ -15,17 +15,22 @@
       <div class="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap sm:items-center">
         <div class="min-w-0 flex-1">
           <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
-            {{ detail?.model || '加载中...' }}
+            {{ detail?.model || t('requestDetailModal.loading') }}
           </h3>
           <p class="mt-1 break-all text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-            Request ID: {{ requestId || '未知' }}
+            Request ID: {{ requestId || t('requestDetailModal.unknown') }}
           </p>
         </div>
         <div class="flex items-center gap-2 self-start sm:self-center">
           <el-tag v-if="detail" effect="dark" :type="statusTagType(detail.statusCode)">
             {{ detail.statusCode || 200 }}
           </el-tag>
-          <button aria-label="关闭" class="modal-close-button" type="button" @click="emitClose">
+          <button
+            :aria-label="t('requestDetailModal.close')"
+            class="modal-close-button"
+            type="button"
+            @click="emitClose"
+          >
             <i class="fas fa-times" />
           </button>
         </div>
@@ -37,34 +42,42 @@
         v-if="!loading && !detail"
         class="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"
       >
-        未找到该请求详情
+        {{ t('requestDetailModal.notFound') }}
       </div>
 
       <template v-else-if="detail">
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div class="info-card">
-            <p class="info-label">接口</p>
+            <p class="info-label">{{ t('requestDetails.columns.endpoint') }}</p>
             <p class="info-value">{{ detail.endpoint || '-' }}</p>
             <p class="info-sub">{{ detail.method || 'POST' }}</p>
           </div>
           <div class="info-card">
-            <p class="info-label">耗时</p>
+            <p class="info-label">{{ t('requestDetails.columns.duration') }}</p>
             <p class="info-value">{{ formatDuration(detail.durationMs) }}</p>
-            <p class="info-sub">{{ detail.stream ? '流式请求' : '非流式请求' }}</p>
+            <p class="info-sub">
+              {{
+                detail.stream ? t('requestDetailModal.stream') : t('requestDetailModal.nonStream')
+              }}
+            </p>
           </div>
           <div class="info-card">
-            <p class="info-label">费用</p>
+            <p class="info-label">{{ t('requestDetails.columns.cost') }}</p>
             <p class="info-value text-amber-600 dark:text-amber-400">
               {{ formatCost(detail.cost) }}
             </p>
             <p class="info-sub">
-              {{ detail.costRecomputed ? '估算成本' : '真实成本' }}
+              {{
+                detail.costRecomputed
+                  ? t('requestDetailModal.estimatedCost')
+                  : t('requestDetailModal.realCost')
+              }}
               {{ formatCost(detail.realCost) }}
               <span v-if="detail.usedFallbackPricing">unknown fallback</span>
             </p>
           </div>
           <div class="info-card">
-            <p class="info-label">缓存命中率</p>
+            <p class="info-label">{{ t('requestDetails.columns.cacheHitRate') }}</p>
             <p class="info-value text-cyan-600 dark:text-cyan-400">
               {{ formatPercent(detail.cacheHitRate) }}
             </p>
@@ -76,10 +89,10 @@
           <div
             class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
           >
-            <h4 class="section-title">基础信息</h4>
+            <h4 class="section-title">{{ t('requestDetailModal.baseInfo') }}</h4>
             <div class="grid gap-3 md:grid-cols-2">
               <div>
-                <p class="field-label">时间</p>
+                <p class="field-label">{{ t('requestDetailModal.time') }}</p>
                 <p class="field-value">{{ formatDate(detail.timestamp) }}</p>
               </div>
               <div>
@@ -88,22 +101,30 @@
                 <p class="field-sub">{{ detail.apiKeyId || '-' }}</p>
               </div>
               <div>
-                <p class="field-label">使用账户</p>
+                <p class="field-label">{{ t('requestDetails.columns.account') }}</p>
                 <p class="field-value">{{ detail.accountName || detail.accountId || '-' }}</p>
                 <p class="field-sub">{{ detail.accountTypeName || detail.accountType || '-' }}</p>
               </div>
               <div>
-                <p class="field-label">模型</p>
+                <p class="field-label">{{ t('requestDetails.columns.model') }}</p>
                 <p class="field-value">{{ detail.model || '-' }}</p>
                 <p class="field-sub">
-                  {{ detail.isLongContextRequest ? '长上下文请求' : '标准上下文' }}
+                  {{
+                    detail.isLongContextRequest
+                      ? t('requestDetailModal.longContext')
+                      : t('requestDetailModal.standardContext')
+                  }}
                 </p>
               </div>
               <div>
-                <p class="field-label">推理</p>
+                <p class="field-label">{{ t('requestDetails.columns.reasoning') }}</p>
                 <p class="field-value">{{ formatReasoning(detail.reasoningDisplay) }}</p>
                 <p class="field-sub">
-                  {{ detail.reasoningSource ? `来源：${detail.reasoningSource}` : '未指定' }}
+                  {{
+                    detail.reasoningSource
+                      ? `${t('requestDetailModal.source')}${detail.reasoningSource}`
+                      : t('requestDetailModal.unspecified')
+                  }}
                 </p>
               </div>
             </div>
@@ -112,28 +133,28 @@
           <div
             class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
           >
-            <h4 class="section-title">Token 明细</h4>
+            <h4 class="section-title">{{ t('requestDetailModal.tokenDetails') }}</h4>
             <div class="space-y-2 text-sm">
               <div class="metric-row">
-                <span>输入</span>
+                <span>{{ t('requestDetails.columns.input') }}</span>
                 <span class="font-semibold text-blue-600 dark:text-blue-400">{{
                   formatNumber(detail.inputTokens)
                 }}</span>
               </div>
               <div class="metric-row">
-                <span>输出</span>
+                <span>{{ t('requestDetails.columns.output') }}</span>
                 <span class="font-semibold text-green-600 dark:text-green-400">{{
                   formatNumber(detail.outputTokens)
                 }}</span>
               </div>
               <div class="metric-row">
-                <span>缓存读取</span>
+                <span>{{ t('requestDetails.columns.cacheRead') }}</span>
                 <span class="font-semibold text-cyan-600 dark:text-cyan-400">{{
                   formatNumber(detail.cacheReadTokens)
                 }}</span>
               </div>
               <div class="metric-row">
-                <span>缓存创建</span>
+                <span>{{ t('requestDetails.columns.cacheCreate') }}</span>
                 <span class="font-semibold text-purple-600 dark:text-purple-400">{{
                   formatCacheCreate(detail.cacheCreateTokens, detail.cacheCreateNotApplicable)
                 }}</span>
@@ -141,7 +162,7 @@
               <div
                 class="metric-row border-t border-dashed border-gray-200 pt-2 dark:border-gray-700"
               >
-                <span>总 Token</span>
+                <span>{{ t('requestDetailModal.totalToken') }}</span>
                 <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                   formatNumber(detail.totalTokens)
                 }}</span>
@@ -153,28 +174,28 @@
         <div
           class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
         >
-          <h4 class="section-title">费用拆分</h4>
+          <h4 class="section-title">{{ t('requestDetailModal.costBreakdown') }}</h4>
           <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <div class="cost-chip">
-              <span>输入</span>
+              <span>{{ t('requestDetails.columns.input') }}</span>
               <strong>{{ formatCost(costBreakdown.input) }}</strong>
             </div>
             <div class="cost-chip">
-              <span>输出</span>
+              <span>{{ t('requestDetails.columns.output') }}</span>
               <strong>{{ formatCost(costBreakdown.output) }}</strong>
             </div>
             <div class="cost-chip">
-              <span>缓存创建</span>
+              <span>{{ t('requestDetails.columns.cacheCreate') }}</span>
               <strong>{{
                 formatCacheCreateCost(costBreakdown.cacheCreate, detail.cacheCreateNotApplicable)
               }}</strong>
             </div>
             <div class="cost-chip">
-              <span>缓存读取</span>
+              <span>{{ t('requestDetails.columns.cacheRead') }}</span>
               <strong>{{ formatCost(costBreakdown.cacheRead) }}</strong>
             </div>
             <div class="cost-chip">
-              <span>总计</span>
+              <span>{{ t('requestDetailModal.total') }}</span>
               <strong>{{ formatCost(costBreakdown.total || detail.cost) }}</strong>
             </div>
           </div>
@@ -184,9 +205,9 @@
           class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
         >
           <div class="mb-3 flex items-center justify-between gap-3">
-            <h4 class="section-title mb-0">Request Body 快照</h4>
+            <h4 class="section-title mb-0">{{ t('requestDetailModal.requestBodySnapshot') }}</h4>
             <el-button v-if="hasRequestBodySnapshot" size="small" @click="copySnapshot">
-              复制 JSON
+              {{ t('requestDetailModal.copyJson') }}
             </el-button>
           </div>
           <div v-if="hasRequestBodySnapshot" class="snapshot-panel">
@@ -196,13 +217,13 @@
             v-else-if="!bodyPreviewEnabled"
             class="rounded-lg border border-dashed border-amber-300 bg-amber-50/70 px-4 py-6 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300"
           >
-            请求体预览已关闭，当前仅保留请求摘要字段，不展示请求体快照。
+            {{ t('requestDetailModal.bodyPreviewDisabled') }}
           </div>
           <div
             v-else
             class="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"
           >
-            未保存请求体快照
+            {{ t('requestDetailModal.noSnapshot') }}
           </div>
         </div>
       </template>
@@ -213,6 +234,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
+import { useI18n } from 'vue-i18n'
 import { getRequestDetailApi } from '@/utils/http_apis'
 import { showToast, formatNumber } from '@/utils/tools'
 
@@ -228,6 +250,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+const { t } = useI18n()
 
 const loading = ref(false)
 const detail = ref(null)
@@ -369,7 +392,7 @@ const formattedSnapshot = computed(() => {
   return JSON.stringify(snapshotSource, null, 2)
 })
 
-const cacheHitRateLabel = computed(() => '读 / (输入 + 读 + 建)')
+const cacheHitRateLabel = computed(() => t('requestDetailModal.cacheHitFormula'))
 
 const emitClose = () => emit('close')
 
@@ -386,7 +409,7 @@ const fetchDetail = async () => {
     const response = await getRequestDetailApi(targetRequestId)
     if (targetRequestId !== props.requestId || !props.show) return
     if (response?.success === false) {
-      showToast(response.message || '加载请求详情失败', 'error')
+      showToast(response.message || t('requestDetailModal.loadFailed'), 'error')
       return
     }
     bodyPreviewEnabled.value = response.data?.bodyPreviewEnabled === true
@@ -395,7 +418,12 @@ const fetchDetail = async () => {
     if (targetRequestId !== props.requestId || !props.show) return
     detail.value = null
     bodyPreviewEnabled.value = false
-    showToast(`加载请求详情失败：${error.message || '未知错误'}`, 'error')
+    showToast(
+      t('requestDetailModal.loadFailedWithError', {
+        message: error.message || t('requestDetails.unknownError')
+      }),
+      'error'
+    )
   } finally {
     if (targetRequestId === props.requestId) {
       loading.value = false
@@ -405,15 +433,15 @@ const fetchDetail = async () => {
 
 const copySnapshot = async () => {
   if (!formattedSnapshot.value) {
-    showToast('没有可复制的快照', 'info')
+    showToast(t('requestDetailModal.noSnapshotToCopy'), 'info')
     return
   }
 
   try {
     await navigator.clipboard.writeText(formattedSnapshot.value)
-    showToast('已复制请求快照', 'success')
+    showToast(t('requestDetailModal.snapshotCopied'), 'success')
   } catch (error) {
-    showToast('复制失败，请手动复制', 'error')
+    showToast(t('requestDetailModal.copyFailed'), 'error')
   }
 }
 

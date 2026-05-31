@@ -1,14 +1,19 @@
 <template>
-  <div id="app">
-    <router-view />
+  <ElConfigProvider :locale="elementLocale">
+    <div id="app">
+      <router-view />
 
-    <!-- 全局组件 -->
-    <ToastNotification ref="toastRef" />
-  </div>
+      <!-- 全局组件 -->
+      <ToastNotification ref="toastRef" />
+    </div>
+  </ElConfigProvider>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import elementEn from 'element-plus/dist/locale/en.mjs'
+import elementZhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import ToastNotification from '@/components/common/ToastNotification.vue'
@@ -16,6 +21,18 @@ import ToastNotification from '@/components/common/ToastNotification.vue'
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
 const toastRef = ref()
+const { locale, t } = useI18n()
+
+const elementLocale = computed(() => (locale.value === 'zh-CN' ? elementZhCn : elementEn))
+
+watch(
+  () => [locale.value, authStore.oemSettings.siteName],
+  () => {
+    if (authStore.oemSettings.siteName) {
+      document.title = `${authStore.oemSettings.siteName} - ${t('auth.adminPanel')}`
+    }
+  }
+)
 
 onMounted(() => {
   // 初始化主题

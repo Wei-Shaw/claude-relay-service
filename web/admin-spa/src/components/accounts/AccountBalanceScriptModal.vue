@@ -5,7 +5,7 @@
     :close-on-click-modal="false"
     :destroy-on-close="true"
     :model-value="show"
-    :title="`配置余额脚本 - ${account?.name || ''}`"
+    :title="t('accountModals.balanceScript.title', { name: account?.name || '' })"
     top="5vh"
     width="720px"
     @close="emitClose"
@@ -17,53 +17,63 @@
           <input v-model="form.apiKey" class="input-text" placeholder="access token / key" />
         </div>
         <div class="space-y-2">
-          <label class="text-sm font-medium text-gray-700 dark:text-gray-200"
-            >请求地址（baseUrl）</label
-          >
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+            t('accountModals.balanceScript.baseUrl')
+          }}</label>
           <input v-model="form.baseUrl" class="input-text" placeholder="https://api.example.com" />
         </div>
         <div class="space-y-2">
-          <label class="text-sm font-medium text-gray-700 dark:text-gray-200">Token（可选）</label>
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+            t('accountModals.balanceScript.tokenOptional')
+          }}</label>
           <input v-model="form.token" class="input-text" placeholder="Bearer token" />
         </div>
         <div class="space-y-2">
-          <label class="text-sm font-medium text-gray-700 dark:text-gray-200"
-            >额外参数 (extra / userId)</label
-          >
-          <input v-model="form.extra" class="input-text" placeholder="用户ID等" />
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+            t('accountModals.balanceScript.extra')
+          }}</label>
+          <input
+            v-model="form.extra"
+            class="input-text"
+            :placeholder="t('accountModals.balanceScript.extraPlaceholder')"
+          />
         </div>
         <div class="space-y-2">
-          <label class="text-sm font-medium text-gray-700 dark:text-gray-200">超时时间(秒)</label>
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+            t('accountModals.balanceScript.timeoutSeconds')
+          }}</label>
           <input v-model.number="form.timeoutSeconds" class="input-text" min="1" type="number" />
         </div>
         <div class="space-y-2">
-          <label class="text-sm font-medium text-gray-700 dark:text-gray-200"
-            >自动查询间隔(分钟)</label
-          >
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{
+            t('accountModals.balanceScript.autoIntervalMinutes')
+          }}</label>
           <input
             v-model.number="form.autoIntervalMinutes"
             class="input-text"
             min="0"
             type="number"
           />
-          <p class="text-xs text-gray-500 dark:text-gray-400">0 表示仅手动刷新</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t('accountModals.balanceScript.manualOnlyHint') }}
+          </p>
         </div>
         <div class="text-xs text-gray-500 dark:text-gray-400 md:col-span-2">
-          可用变量：{{ '{' }}{{ '{' }}baseUrl{{ '}' }}{{ '}' }}、{{ '{' }}{{ '{' }}apiKey{{ '}'
-          }}{{ '}' }}、{{ '{' }}{{ '{' }}token{{ '}' }}{{ '}' }}、{{ '{' }}{{ '{' }}accountId{{ '}'
-          }}{{ '}' }}、{{ '{' }}{{ '{' }}platform{{ '}' }}{{ '}' }}、{{ '{' }}{{ '{' }}extra{{ '}'
-          }}{{ '}' }}
+          {{ t('accountModals.balanceScript.availableVariables') }}
+          {{ balanceScriptVariables.join(t('accountModals.balanceScript.variableSeparator')) }}
         </div>
       </div>
 
       <div>
         <div class="mb-2 flex items-center justify-between">
-          <div class="text-sm font-semibold text-gray-800 dark:text-gray-100">提取器代码</div>
+          <div class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+            {{ t('accountModals.balanceScript.extractorCode') }}
+          </div>
           <button
             class="rounded bg-gray-200 px-2 py-1 text-xs dark:bg-gray-700"
             @click="applyPreset"
           >
-            使用示例
+            {{ t('accountModals.balanceScript.useExample') }}
           </button>
         </div>
         <textarea
@@ -72,13 +82,13 @@
           spellcheck="false"
         ></textarea>
         <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          extractor 可返回：isValid、invalidMessage、remaining、unit、planName、total、used、extra
+          {{ t('accountModals.balanceScript.extractorReturnHint') }}
         </div>
       </div>
 
       <div v-if="testResult" class="rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-800/60">
         <div class="flex items-center justify-between">
-          <span class="font-semibold">测试结果</span>
+          <span class="font-semibold">{{ t('accountModals.balanceScript.testResult') }}</span>
           <span
             :class="[
               'rounded px-2 py-0.5 text-xs',
@@ -91,21 +101,33 @@
           </span>
         </div>
         <div class="mt-2 text-xs text-gray-600 dark:text-gray-300">
-          <div>余额: {{ displayAmount(testResult.mapped?.balance) }}</div>
-          <div>单位: {{ testResult.mapped?.currency || '—' }}</div>
-          <div v-if="testResult.mapped?.planName">套餐: {{ testResult.mapped.planName }}</div>
+          <div>
+            {{ t('accountModals.balanceScript.balance') }}:
+            {{ displayAmount(testResult.mapped?.balance) }}
+          </div>
+          <div>
+            {{ t('accountModals.balanceScript.unit') }}:
+            {{ testResult.mapped?.currency || '—' }}
+          </div>
+          <div v-if="testResult.mapped?.planName">
+            {{ t('accountModals.balanceScript.plan') }}: {{ testResult.mapped.planName }}
+          </div>
           <div v-if="testResult.mapped?.errorMessage" class="text-red-500">
-            错误: {{ testResult.mapped.errorMessage }}
+            {{ t('accountModals.balanceScript.error') }}: {{ testResult.mapped.errorMessage }}
           </div>
         </div>
         <details class="text-xs text-gray-500 dark:text-gray-400">
-          <summary class="cursor-pointer">查看 extractor 输出</summary>
+          <summary class="cursor-pointer">
+            {{ t('accountModals.balanceScript.viewExtractorOutput') }}
+          </summary>
           <pre class="mt-1 whitespace-pre-wrap break-all">{{
             formatJson(testResult.extracted)
           }}</pre>
         </details>
         <details class="text-xs text-gray-500 dark:text-gray-400">
-          <summary class="cursor-pointer">查看原始响应</summary>
+          <summary class="cursor-pointer">
+            {{ t('accountModals.balanceScript.viewRawResponse') }}
+          </summary>
           <pre class="mt-1 whitespace-pre-wrap break-all">{{
             formatJson(testResult.response)
           }}</pre>
@@ -115,16 +137,21 @@
 
     <template #footer>
       <div class="flex items-center gap-2">
-        <el-button :loading="testing" @click="testScript">测试脚本</el-button>
-        <el-button :loading="saving" type="primary" @click="saveConfig">保存配置</el-button>
-        <el-button @click="emitClose">取消</el-button>
+        <el-button :loading="testing" @click="testScript">{{
+          t('accountModals.balanceScript.testScript')
+        }}</el-button>
+        <el-button :loading="saving" type="primary" @click="saveConfig">{{
+          t('accountModals.scheduledTest.saveConfig')
+        }}</el-button>
+        <el-button @click="emitClose">{{ t('common.cancel') }}</el-button>
       </div>
     </template>
   </el-dialog>
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   getAccountBalanceScriptApi,
@@ -139,12 +166,22 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'saved'])
+const { t } = useI18n()
 
 const saving = ref(false)
 const testing = ref(false)
 const testResult = ref(null)
+const balanceScriptVariables = [
+  '{{baseUrl}}',
+  '{{apiKey}}',
+  '{{token}}',
+  '{{accountId}}',
+  '{{platform}}',
+  '{{extra}}'
+]
 
-const presetScript = `({
+const presetScript = computed(
+  () => `({
   request: {
     url: "{{baseUrl}}/api/user/self",
     method: "GET",
@@ -159,7 +196,7 @@ const presetScript = `({
       const quota = response.data.quota || 0;
       const used = response.data.used_quota || 0;
       return {
-        planName: response.data.group || "默认套餐",
+        planName: response.data.group || "${t('accountModals.balanceScript.defaultPlan')}",
         remaining: quota / 500000,
         used: used / 500000,
         total: (quota + used) / 500000,
@@ -168,10 +205,11 @@ const presetScript = `({
     }
     return {
       isValid: false,
-      invalidMessage: (response && response.message) || "查询失败"
+      invalidMessage: (response && response.message) || "${t('accountModals.balanceScript.queryFailed')}"
     };
   }
 })`
+)
 
 const form = reactive({
   baseUrl: '',
@@ -191,7 +229,7 @@ const buildDefaultForm = () => ({
   timeoutSeconds: 10,
   autoIntervalMinutes: 0,
   // 默认给出示例脚本，字段保持清空，避免“上一个账户的配置污染当前账户”
-  scriptBody: presetScript
+  scriptBody: presetScript.value
 })
 
 const emitClose = () => emit('close')
@@ -218,10 +256,10 @@ const saveConfig = async () => {
     ...form
   })
   if (res?.success) {
-    showToast('已保存', 'success')
+    showToast(t('accountModals.balanceScript.saved'), 'success')
     emit('saved')
   } else {
-    showToast(res?.message || '保存失败', 'error')
+    showToast(res?.message || t('accountModals.common.saveFailed'), 'error')
   }
   saving.value = false
 }
@@ -235,15 +273,15 @@ const testScript = async () => {
   })
   if (res?.success) {
     testResult.value = res.data
-    showToast('测试完成', 'success')
+    showToast(t('accountModals.balanceScript.testComplete'), 'success')
   } else {
-    showToast(res?.error || '测试失败', 'error')
+    showToast(res?.error || t('accountModals.balanceScript.testFailed'), 'error')
   }
   testing.value = false
 }
 
 const applyPreset = () => {
-  form.scriptBody = presetScript
+  form.scriptBody = presetScript.value
 }
 
 const displayAmount = (val) => {

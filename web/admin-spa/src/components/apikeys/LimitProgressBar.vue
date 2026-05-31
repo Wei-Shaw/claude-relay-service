@@ -7,7 +7,7 @@
     >
       <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
         <i class="fas fa-infinity text-sm text-gray-500 dark:text-gray-400" />
-        <span class="font-medium">无限制</span>
+        <span class="font-medium">{{ t('apiKeyLimits.unlimited') }}</span>
       </div>
     </div>
     <div v-else-if="isCompact" class="space-y-1.5">
@@ -78,6 +78,9 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   type: {

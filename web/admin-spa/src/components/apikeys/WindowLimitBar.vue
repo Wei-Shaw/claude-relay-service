@@ -15,7 +15,7 @@
         <div class="flex items-center gap-1.5">
           <i class="fas fa-clock text-xs text-blue-600 dark:text-blue-400" />
           <span class="text-xs font-medium text-gray-700 dark:text-gray-200">
-            {{ rateLimitWindow }}分钟窗口
+            {{ t('apiKeyLimits.minuteWindow', { count: rateLimitWindow }) }}
           </span>
         </div>
         <span
@@ -26,7 +26,7 @@
               : 'text-gray-400 dark:text-gray-500'
           "
         >
-          {{ remainingSeconds > 0 ? formatTime(remainingSeconds) : '未激活' }}
+          {{ remainingSeconds > 0 ? formatTime(remainingSeconds) : t('apiKeyLimits.inactive') }}
         </span>
       </div>
     </div>
@@ -48,7 +48,9 @@
 
         <!-- 文字 -->
         <div class="relative z-10 flex h-full items-center justify-between px-2">
-          <span class="text-[10px] font-medium" :class="getCostTextClass()">费用</span>
+          <span class="text-[10px] font-medium" :class="getCostTextClass()">{{
+            t('apiKeyLimits.cost')
+          }}</span>
           <span class="text-[10px] font-bold" :class="getCostValueTextClass()">
             ${{ currentCost.toFixed(1) }}/${{ costLimit.toFixed(0) }}
           </span>
@@ -70,7 +72,9 @@
 
         <!-- 文字 -->
         <div class="relative z-10 flex h-full items-center justify-between px-2">
-          <span class="text-[10px] font-medium" :class="getRequestTextClass()">请求</span>
+          <span class="text-[10px] font-medium" :class="getRequestTextClass()">{{
+            t('apiKeyLimits.requests')
+          }}</span>
           <span class="text-[10px] font-bold" :class="getRequestValueTextClass()">
             {{ currentRequests }}/{{ requestLimit }}
           </span>
@@ -82,6 +86,9 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   rateLimitWindow: {

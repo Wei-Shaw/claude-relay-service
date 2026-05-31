@@ -18,9 +18,11 @@
               <i class="fas fa-clock text-white" />
             </div>
             <div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">修改过期时间</h3>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">
+                {{ t('apiKeyExpiry.editTitle') }}
+              </h3>
               <p class="text-sm text-gray-600 dark:text-gray-400">
-                为 "{{ apiKey.name || 'API Key' }}" 设置新的过期时间
+                {{ t('apiKeyExpiry.editSubtitle', { name: apiKey.name || 'API Key' }) }}
               </p>
             </div>
           </div>
@@ -39,16 +41,25 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">当前状态</p>
+                <p class="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {{ t('apiKeyExpiry.currentStatus') }}
+                </p>
                 <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
                   <!-- 未激活状态 -->
                   <template v-if="apiKey.expirationMode === 'activation' && !apiKey.isActivated">
                     <i class="fas fa-pause-circle mr-1 text-blue-500" />
-                    未激活
+                    {{ t('apiKeys.inactive') }}
                     <span class="ml-2 text-xs font-normal text-gray-600">
-                      (激活后
-                      {{ apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30) }}
-                      {{ apiKey.activationUnit === 'hours' ? '小时' : '天' }}过期)
+                      {{
+                        t('apiKeyExpiry.afterActivationExpires', {
+                          value:
+                            apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30),
+                          unit:
+                            apiKey.activationUnit === 'hours'
+                              ? t('apiKeys.hours')
+                              : t('apiKeys.days')
+                        })
+                      }}
                     </span>
                   </template>
                   <!-- 已设置过期时间 -->
@@ -65,7 +76,7 @@
                   <!-- 永不过期 -->
                   <template v-else>
                     <i class="fas fa-infinity mr-1 text-gray-500" />
-                    永不过期
+                    {{ t('apiKeys.neverExpires') }}
                   </template>
                 </p>
               </div>
@@ -91,23 +102,29 @@
               @click="handleActivateNow"
             >
               <i class="fas fa-rocket mr-2" />
-              立即激活 (激活后
-              {{ apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30) }}
-              {{ apiKey.activationUnit === 'hours' ? '小时' : '天' }}过期)
+              {{
+                t('apiKeyExpiry.activateNowButton', {
+                  value: apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30),
+                  unit: apiKey.activationUnit === 'hours' ? t('apiKeys.hours') : t('apiKeys.days')
+                })
+              }}
             </button>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               <i class="fas fa-info-circle mr-1" />
-              点击立即激活此 API Key，激活后将在
-              {{ apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30) }}
-              {{ apiKey.activationUnit === 'hours' ? '小时' : '天' }}后过期
+              {{
+                t('apiKeyExpiry.activateNowHint', {
+                  value: apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30),
+                  unit: apiKey.activationUnit === 'hours' ? t('apiKeys.hours') : t('apiKeys.days')
+                })
+              }}
             </p>
           </div>
 
           <!-- 快捷选项 -->
           <div>
-            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >选择新的期限</label
-            >
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeyExpiry.selectNewDuration')
+            }}</label>
             <div class="mb-3 grid grid-cols-3 gap-2">
               <button
                 v-for="option in quickOptions"
@@ -132,16 +149,16 @@
                 @click="selectQuickOption('custom')"
               >
                 <i class="fas fa-calendar-alt mr-1" />
-                自定义
+                {{ t('apiKeyForm.custom') }}
               </button>
             </div>
           </div>
 
           <!-- 自定义日期选择 -->
           <div v-if="localForm.expireDuration === 'custom'" class="animate-fadeIn">
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >选择日期和时间</label
-            >
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+              t('apiKeyExpiry.selectDateTime')
+            }}</label>
             <input
               v-model="localForm.customExpireDate"
               class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
@@ -150,7 +167,7 @@
               @change="updateCustomExpiryPreview"
             />
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              选择一个未来的日期和时间作为过期时间
+              {{ t('apiKeyExpiry.futureDateHint') }}
             </p>
           </div>
 
@@ -163,7 +180,7 @@
               <div>
                 <p class="mb-1 text-xs font-medium text-blue-700 dark:text-blue-400">
                   <i class="fas fa-arrow-right mr-1" />
-                  新的过期时间
+                  {{ t('apiKeyExpiry.newExpiryLabel') }}
                 </p>
                 <p class="text-sm font-semibold text-blue-900 dark:text-blue-200">
                   <template v-if="localForm.expiresAt">
@@ -178,7 +195,7 @@
                   </template>
                   <template v-else>
                     <i class="fas fa-infinity mr-1" />
-                    永不过期
+                    {{ t('apiKeys.neverExpires') }}
                   </template>
                 </p>
               </div>
@@ -196,7 +213,7 @@
               class="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               @click="$emit('close')"
             >
-              取消
+              {{ t('common.cancel') }}
             </button>
             <button
               class="btn btn-primary flex-1 px-4 py-2.5 font-semibold"
@@ -205,7 +222,7 @@
             >
               <div v-if="saving" class="loading-spinner mr-2" />
               <i v-else class="fas fa-save mr-2" />
-              {{ saving ? '保存中...' : '保存更改' }}
+              {{ saving ? t('common.saving') : t('apiKeyForm.saveChanges') }}
             </button>
           </div>
         </div>
@@ -228,6 +245,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const props = defineProps({
@@ -243,6 +261,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'save'])
 
+const { t, locale } = useI18n()
 const saving = ref(false)
 
 // ConfirmModal 状态
@@ -251,16 +270,16 @@ const confirmModalConfig = ref({
   title: '',
   message: '',
   type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
+  confirmText: t('common.confirm'),
+  cancelText: t('common.cancel')
 })
 const confirmResolve = ref(null)
 
 const showConfirm = (
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText = t('common.confirm'),
+  cancelText = t('common.cancel'),
   type = 'primary'
 ) => {
   return new Promise((resolve) => {
@@ -286,16 +305,16 @@ const localForm = reactive({
 })
 
 // 快捷选项
-const quickOptions = [
-  { value: '', label: '永不过期' },
-  { value: '1d', label: '1 天' },
-  { value: '7d', label: '7 天' },
-  { value: '30d', label: '30 天' },
-  { value: '90d', label: '90 天' },
-  { value: '180d', label: '180 天' },
-  { value: '365d', label: '1 年' },
-  { value: '730d', label: '2 年' }
-]
+const quickOptions = computed(() => [
+  { value: '', label: t('apiKeys.neverExpires') },
+  { value: '1d', label: t('apiKeyForm.duration.d1') },
+  { value: '7d', label: t('apiKeyForm.duration.d7') },
+  { value: '30d', label: t('apiKeyForm.duration.d30') },
+  { value: '90d', label: t('apiKeyForm.duration.d90') },
+  { value: '180d', label: t('apiKeyForm.duration.d180') },
+  { value: '365d', label: t('apiKeyExpiry.oneYear') },
+  { value: '730d', label: t('apiKeyExpiry.twoYears') }
+])
 
 // 计算最小日期时间
 const minDateTime = computed(() => {
@@ -389,7 +408,7 @@ const updateCustomExpiryPreview = () => {
 const formatExpireDate = (dateString) => {
   if (!dateString) return ''
   const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString(locale.value, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -415,22 +434,22 @@ const getExpiryStatus = (expiresAt) => {
 
   if (diffMs < 0) {
     return {
-      text: '已过期',
+      text: t('apiKeyExpiry.expired'),
       class: 'text-red-600'
     }
   } else if (diffDays <= 7) {
     return {
-      text: `${diffDays} 天后过期`,
+      text: t('apiKeyExpiry.daysUntilExpiry', { count: diffDays }),
       class: 'text-orange-600'
     }
   } else if (diffDays <= 30) {
     return {
-      text: `${diffDays} 天后过期`,
+      text: t('apiKeyExpiry.daysUntilExpiry', { count: diffDays }),
       class: 'text-yellow-600'
     }
   } else {
     return {
-      text: `${Math.ceil(diffDays / 30)} 个月后过期`,
+      text: t('apiKeyExpiry.monthsUntilExpiry', { count: Math.ceil(diffDays / 30) }),
       class: 'text-green-600'
     }
   }
@@ -448,10 +467,13 @@ const handleSave = () => {
 // 立即激活
 const handleActivateNow = async () => {
   const confirmed = await showConfirm(
-    '激活 API Key',
-    `确定要立即激活此 API Key 吗？激活后将在 ${props.apiKey.activationDays || (props.apiKey.activationUnit === 'hours' ? 24 : 30)} ${props.apiKey.activationUnit === 'hours' ? '小时' : '天'}后自动过期。`,
-    '确定激活',
-    '取消',
+    t('apiKeyExpiry.activateTitle'),
+    t('apiKeyExpiry.activateConfirmMessage', {
+      value: props.apiKey.activationDays || (props.apiKey.activationUnit === 'hours' ? 24 : 30),
+      unit: props.apiKey.activationUnit === 'hours' ? t('apiKeys.hours') : t('apiKeys.days')
+    }),
+    t('apiKeyExpiry.activateConfirm'),
+    t('common.cancel'),
     'warning'
   )
 

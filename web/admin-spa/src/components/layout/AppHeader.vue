@@ -11,7 +11,7 @@
         <LogoTitle
           :loading="oemLoading"
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          subtitle="管理后台"
+          :subtitle="t('auth.adminPanel')"
           :title="oemSettings.siteName"
           title-class="text-white dark:text-gray-100"
         >
@@ -27,10 +27,10 @@
                 class="inline-flex animate-pulse items-center gap-1 rounded-full border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-colors hover:bg-green-600"
                 :href="versionInfo.releaseInfo?.htmlUrl || '#'"
                 target="_blank"
-                title="有新版本可用"
+                :title="t('header.newVersionAvailable')"
               >
                 <i class="fas fa-arrow-up text-[10px]" />
-                <span>新版本</span>
+                <span>{{ t('header.newVersion') }}</span>
               </a>
             </div>
           </template>
@@ -38,6 +38,8 @@
       </div>
       <!-- 主题切换和用户菜单 -->
       <div class="flex items-center gap-2 sm:gap-4">
+        <LanguageSwitcher />
+
         <!-- 主题切换按钮 -->
         <div class="flex items-center">
           <ThemeToggle mode="dropdown" />
@@ -72,7 +74,9 @@
             <!-- 版本信息 -->
             <div class="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
               <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-500 dark:text-gray-400">当前版本</span>
+                <span class="text-gray-500 dark:text-gray-400">{{
+                  t('header.currentVersion')
+                }}</span>
                 <span class="font-mono text-gray-700 dark:text-gray-300"
                   >v{{ versionInfo.current || '...' }}</span
                 >
@@ -80,7 +84,7 @@
               <div v-if="versionInfo.hasUpdate" class="mt-2">
                 <div class="mb-2 flex items-center justify-between text-sm">
                   <span class="font-medium text-green-600 dark:text-green-400">
-                    <i class="fas fa-arrow-up mr-1" />有新版本
+                    <i class="fas fa-arrow-up mr-1" />{{ t('header.newVersionAvailable') }}
                   </span>
                   <span class="font-mono text-green-600 dark:text-green-400"
                     >v{{ versionInfo.latest }}</span
@@ -91,14 +95,14 @@
                   :href="versionInfo.releaseInfo?.htmlUrl || '#'"
                   target="_blank"
                 >
-                  <i class="fas fa-external-link-alt mr-1" />查看更新
+                  <i class="fas fa-external-link-alt mr-1" />{{ t('header.viewUpdate') }}
                 </a>
               </div>
               <div
                 v-else-if="versionInfo.checkingUpdate"
                 class="mt-2 text-center text-xs text-gray-500 dark:text-gray-400"
               >
-                <i class="fas fa-spinner fa-spin mr-1" />检查更新中...
+                <i class="fas fa-spinner fa-spin mr-1" />{{ t('header.checkingUpdates') }}
               </div>
               <div v-else class="mt-2 text-center">
                 <!-- 已是最新版提醒 -->
@@ -109,7 +113,7 @@
                     class="inline-block rounded-lg border border-green-200 bg-green-100 px-3 py-1.5 dark:border-green-800 dark:bg-green-900/30"
                   >
                     <p class="text-xs font-medium text-green-700 dark:text-green-400">
-                      <i class="fas fa-check-circle mr-1" />当前已是最新版本
+                      <i class="fas fa-check-circle mr-1" />{{ t('header.alreadyLatest') }}
                     </p>
                   </div>
                   <button
@@ -118,7 +122,7 @@
                     class="text-xs text-blue-500 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                     @click="checkForUpdates()"
                   >
-                    <i class="fas fa-sync-alt mr-1" />检查更新
+                    <i class="fas fa-sync-alt mr-1" />{{ t('header.checkUpdates') }}
                   </button>
                 </transition>
               </div>
@@ -129,7 +133,7 @@
               @click="openChangePasswordModal"
             >
               <i class="fas fa-key text-blue-500" />
-              <span>修改账户信息</span>
+              <span>{{ t('header.changeAccount') }}</span>
             </button>
 
             <hr class="my-2 border-gray-200 dark:border-gray-700" />
@@ -139,7 +143,7 @@
               @click="logout"
             >
               <i class="fas fa-sign-out-alt text-red-500" />
-              <span>退出登录</span>
+              <span>{{ t('header.logout') }}</span>
             </button>
           </div>
         </div>
@@ -160,7 +164,9 @@
           >
             <i class="fas fa-key text-white" />
           </div>
-          <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">修改账户信息</h3>
+          <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">
+            {{ t('header.changeAccountTitle') }}
+          </h3>
         </div>
         <button
           class="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
@@ -175,9 +181,9 @@
         @submit.prevent="changePassword"
       >
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >当前用户名</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.currentUsername')
+          }}</label>
           <input
             class="form-input w-full cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
             disabled
@@ -185,32 +191,34 @@
             :value="currentUser.username || 'Admin'"
           />
           <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            当前用户名，输入新用户名以修改
+            {{ t('header.currentUsernameHelp') }}
           </p>
         </div>
 
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >新用户名</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.newUsername')
+          }}</label>
           <input
             v-model="changePasswordForm.newUsername"
             class="form-input w-full"
-            placeholder="输入新用户名（留空保持不变）"
+            :placeholder="t('header.newUsernamePlaceholder')"
             type="text"
           />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">留空表示不修改用户名</p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('header.newUsernameHelp') }}
+          </p>
         </div>
 
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >当前密码</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.currentPassword')
+          }}</label>
           <div class="relative">
             <input
               v-model="changePasswordForm.currentPassword"
               class="form-input w-full pr-10"
-              placeholder="请输入当前密码"
+              :placeholder="t('header.currentPasswordPlaceholder')"
               required
               :type="showCurrentPassword ? 'text' : 'password'"
             />
@@ -225,27 +233,29 @@
         </div>
 
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >新密码</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.newPassword')
+          }}</label>
           <input
             v-model="changePasswordForm.newPassword"
             class="form-input w-full"
-            placeholder="请输入新密码"
+            :placeholder="t('header.newPasswordPlaceholder')"
             required
             type="password"
           />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">密码长度至少8位</p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('header.newPasswordHelp') }}
+          </p>
         </div>
 
         <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >确认新密码</label
-          >
+          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{
+            t('header.confirmPassword')
+          }}</label>
           <input
             v-model="changePasswordForm.confirmPassword"
             class="form-input w-full"
-            placeholder="请再次输入新密码"
+            :placeholder="t('header.confirmPasswordPlaceholder')"
             required
             type="password"
           />
@@ -257,7 +267,7 @@
             type="button"
             @click="closeChangePasswordModal"
           >
-            取消
+            {{ t('common.cancel') }}
           </button>
           <button
             class="btn btn-primary flex-1 px-6 py-3 font-semibold"
@@ -266,7 +276,7 @@
           >
             <div v-if="changePasswordLoading" class="loading-spinner mr-2" />
             <i v-else class="fas fa-save mr-2" />
-            {{ changePasswordLoading ? '保存中...' : '保存修改' }}
+            {{ changePasswordLoading ? t('common.saving') : t('header.saveChanges') }}
           </button>
         </div>
       </form>
@@ -288,15 +298,18 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { showToast } from '@/utils/tools'
 
 import { checkUpdatesApi, changePasswordApi } from '@/utils/http_apis'
 import LogoTitle from '@/components/common/LogoTitle.vue'
+import LanguageSwitcher from '@/components/common/LanguageSwitcher.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 // 当前用户信息
 const currentUser = computed(() => authStore.user || { username: 'Admin' })
@@ -336,16 +349,16 @@ const confirmModalConfig = ref({
   title: '',
   message: '',
   type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
+  confirmText: t('common.confirm'),
+  cancelText: t('common.cancel')
 })
 const confirmResolve = ref(null)
 
 const showConfirm = (
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText = t('common.confirm'),
+  cancelText = t('common.cancel'),
   type = 'primary'
 ) => {
   return new Promise((resolve) => {
@@ -440,12 +453,12 @@ const closeChangePasswordModal = () => {
 // 修改密码
 const changePassword = async () => {
   if (changePasswordForm.newPassword !== changePasswordForm.confirmPassword) {
-    showToast('两次输入的密码不一致', 'error')
+    showToast(t('messages.passwordMismatch'), 'error')
     return
   }
 
   if (changePasswordForm.newPassword.length < 8) {
-    showToast('新密码长度至少8位', 'error')
+    showToast(t('messages.passwordMinLength'), 'error')
     return
   }
 
@@ -460,8 +473,8 @@ const changePassword = async () => {
 
     if (data.success) {
       const message = changePasswordForm.newUsername
-        ? '账户信息修改成功，请重新登录'
-        : '密码修改成功，请重新登录'
+        ? t('messages.accountUpdatedRelogin')
+        : t('messages.passwordUpdatedRelogin')
       showToast(message, 'success')
       closeChangePasswordModal()
 
@@ -470,10 +483,10 @@ const changePassword = async () => {
         authStore.logout()
       }, 1500)
     } else {
-      showToast(data.message || '修改失败', 'error')
+      showToast(data.message || t('messages.updateFailed'), 'error')
     }
   } catch (error) {
-    showToast('修改密码失败', 'error')
+    showToast(t('messages.passwordUpdateFailed'), 'error')
   } finally {
     changePasswordLoading.value = false
   }
@@ -482,15 +495,15 @@ const changePassword = async () => {
 // 退出登录
 const logout = async () => {
   const confirmed = await showConfirm(
-    '退出登录',
-    '确定要退出登录吗？',
-    '确定退出',
-    '取消',
+    t('header.logoutTitle'),
+    t('header.logoutMessage'),
+    t('header.logoutConfirm'),
+    t('common.cancel'),
     'warning'
   )
   if (confirmed) {
     await authStore.logout()
-    showToast('已安全退出', 'success')
+    showToast(t('header.logoutSuccess'), 'success')
   }
   userMenuOpen.value = false
 }

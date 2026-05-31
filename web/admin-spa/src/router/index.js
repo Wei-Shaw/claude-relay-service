@@ -189,7 +189,7 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const userStore = useUserStore()
 
-  console.log('路由导航:', {
+  console.log('Route navigation:', {
     to: to.path,
     from: from.path,
     fullPath: to.fullPath,

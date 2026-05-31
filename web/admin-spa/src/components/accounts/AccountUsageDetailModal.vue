@@ -21,7 +21,7 @@
             <div class="space-y-1">
               <div class="flex flex-wrap items-center gap-2">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-xl">
-                  {{ account?.name || account?.email || '账号使用详情' }}
+                  {{ account?.name || account?.email || t('accountModals.usageDetail.title') }}
                 </h3>
                 <span
                   v-if="account?.platform"
@@ -37,9 +37,11 @@
                 </span>
               </div>
               <p class="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-                近 {{ summary?.days || 30 }} 天内的费用与请求趋势
+                {{ t('accountModals.usageDetail.subtitle', { days: summary?.days || 30 }) }}
                 <span v-if="summary?.actualDaysUsed && summary?.actualDaysUsed < summary?.days">
-                  (日均基于实际使用 {{ summary.actualDaysUsed }} 天)
+                  {{
+                    t('accountModals.usageDetail.actualDaysNote', { days: summary.actualDaysUsed })
+                  }}
                 </span>
               </p>
             </div>
@@ -49,7 +51,7 @@
               class="flex items-center gap-2 rounded-full bg-purple-100 px-3 py-2 text-xs font-semibold text-purple-700 transition hover:bg-purple-200 dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
               @click="goTimeline"
             >
-              <i class="fas fa-clock" /> 请求时间线
+              <i class="fas fa-clock" /> {{ t('accountModals.usageDetail.requestTimeline') }}
             </button>
             <button
               class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
@@ -105,19 +107,19 @@
                   class="flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300"
                 >
                   <i class="fas fa-sun" />
-                  今日概览
+                  {{ t('accountModals.usageDetail.todayOverview') }}
                 </div>
                 <div
                   class="rounded-xl bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-blue-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-blue-500/20"
                 >
                   <div class="flex items-center justify-between">
-                    <span>费用</span>
+                    <span>{{ t('accountModals.usageDetail.cost') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       summary?.today?.costFormatted || '$0.000000'
                     }}</span>
                   </div>
                   <div class="mt-2 flex items-center justify-between">
-                    <span>请求</span>
+                    <span>{{ t('accountModals.usageDetail.requests') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       formatNumber(summary?.today?.requests || 0)
                     }}</span>
@@ -138,19 +140,19 @@
                   class="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300"
                 >
                   <i class="fas fa-crown" />
-                  最高费用日
+                  {{ t('accountModals.usageDetail.highestCostDay') }}
                 </div>
                 <div
                   class="rounded-xl bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-amber-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-amber-500/20"
                 >
                   <div class="flex items-center justify-between">
-                    <span>日期</span>
+                    <span>{{ t('accountModals.usageDetail.date') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       formatDate(summary?.highestCostDay?.date)
                     }}</span>
                   </div>
                   <div class="mt-2 flex items-center justify-between">
-                    <span>费用</span>
+                    <span>{{ t('accountModals.usageDetail.cost') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       summary?.highestCostDay?.formattedCost || '$0.000000'
                     }}</span>
@@ -158,7 +160,7 @@
                   <div
                     class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
                   >
-                    <span>请求</span>
+                    <span>{{ t('accountModals.usageDetail.requests') }}</span>
                     <span>{{
                       formatNumber(findHistoryValue(summary?.highestCostDay?.date, 'requests'))
                     }}</span>
@@ -173,19 +175,19 @@
                   class="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300"
                 >
                   <i class="fas fa-chart-bar" />
-                  最高请求日
+                  {{ t('accountModals.usageDetail.highestRequestDay') }}
                 </div>
                 <div
                   class="rounded-xl bg-white/80 p-3 text-sm text-gray-600 shadow-sm ring-1 ring-emerald-100 dark:bg-gray-900/80 dark:text-gray-300 dark:ring-emerald-500/20"
                 >
                   <div class="flex items-center justify-between">
-                    <span>日期</span>
+                    <span>{{ t('accountModals.usageDetail.date') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       formatDate(summary?.highestRequestDay?.date)
                     }}</span>
                   </div>
                   <div class="mt-2 flex items-center justify-between">
-                    <span>请求</span>
+                    <span>{{ t('accountModals.usageDetail.requests') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       formatNumber(summary?.highestRequestDay?.requests || 0)
                     }}</span>
@@ -193,7 +195,7 @@
                   <div
                     class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
                   >
-                    <span>费用</span>
+                    <span>{{ t('accountModals.usageDetail.cost') }}</span>
                     <span>{{
                       formatCost(findHistoryValue(summary?.highestRequestDay?.date, 'cost'))
                     }}</span>
@@ -210,17 +212,18 @@
                 <h4
                   class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >
-                  <i class="fas fa-database mr-2 text-indigo-500" /> 累计 Token
+                  <i class="fas fa-database mr-2 text-indigo-500" />
+                  {{ t('accountModals.usageDetail.totalTokensTitle') }}
                 </h4>
                 <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
                   <div class="flex items-center justify-between">
-                    <span>30天总计</span>
+                    <span>{{ t('accountModals.usageDetail.total30Days') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       formatNumber(totalTokens)
                     }}</span>
                   </div>
                   <div class="flex items-center justify-between">
-                    <span>日均 Token</span>
+                    <span>{{ t('accountModals.usageDetail.avgDailyToken') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       formatNumber(Math.round(summary?.avgDailyTokens || 0))
                     }}</span>
@@ -228,7 +231,7 @@
                   <div
                     class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
                   >
-                    <span>输入 / 输出</span>
+                    <span>{{ t('accountModals.usageDetail.inputOutput') }}</span>
                     <span
                       >{{ formatNumber(overviewInputTokens) }} /
                       {{ formatNumber(overviewOutputTokens) }}</span
@@ -242,7 +245,8 @@
                 <h4
                   class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >
-                  <i class="fas fa-tachometer-alt mr-2 text-purple-500" /> 平均速率
+                  <i class="fas fa-tachometer-alt mr-2 text-purple-500" />
+                  {{ t('accountModals.usageDetail.averageRate') }}
                 </h4>
                 <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
                   <div class="flex items-center justify-between">
@@ -260,7 +264,7 @@
                   <div
                     class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
                   >
-                    <span>日均请求 / Token</span>
+                    <span>{{ t('accountModals.usageDetail.avgDailyRequestsToken') }}</span>
                     <span
                       >{{
                         formatNumber(
@@ -281,17 +285,18 @@
                 <h4
                   class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >
-                  <i class="fas fa-layer-group mr-2 text-teal-500" /> 最近统计
+                  <i class="fas fa-layer-group mr-2 text-teal-500" />
+                  {{ t('accountModals.usageDetail.recentStats') }}
                 </h4>
                 <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
                   <div class="flex items-center justify-between">
-                    <span>今日请求</span>
+                    <span>{{ t('accountModals.usageDetail.todayRequests') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       formatNumber(overview?.daily?.requests || 0)
                     }}</span>
                   </div>
                   <div class="flex items-center justify-between">
-                    <span>今日 Token</span>
+                    <span>{{ t('accountModals.usageDetail.todayToken') }}</span>
                     <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                       formatNumber(overview?.daily?.allTokens || 0)
                     }}</span>
@@ -299,7 +304,7 @@
                   <div
                     class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
                   >
-                    <span>今日费用</span>
+                    <span>{{ t('accountModals.usageDetail.todayCost') }}</span>
                     <span>{{ formatCost(overview?.daily?.cost || 0) }}</span>
                   </div>
                 </div>
@@ -314,10 +319,12 @@
                 <h4
                   class="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
                 >
-                  <i class="fas fa-chart-line mr-2 text-blue-500" /> 30天费用与请求趋势
+                  <i class="fas fa-chart-line mr-2 text-blue-500" />
+                  {{ t('accountModals.usageDetail.trendTitle') }}
                 </h4>
                 <span class="text-xs text-gray-400 dark:text-gray-500">
-                  最新更新时间：{{ formatDateTime(generatedAtDisplay) }}
+                  {{ t('accountModals.usageDetail.updatedAt') }}:
+                  {{ formatDateTime(generatedAtDisplay) }}
                 </span>
               </div>
               <div class="h-[260px] sm:h-[300px]">
@@ -333,6 +340,7 @@
 
 <script setup>
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
@@ -355,6 +363,7 @@ const emit = defineEmits(['close'])
 const themeStore = useThemeStore()
 const { isDarkMode } = storeToRefs(themeStore)
 const router = useRouter()
+const { t } = useI18n()
 
 const chartCanvas = ref(null)
 let chartInstance = null
@@ -370,13 +379,15 @@ const platformLabelMap = {
   bedrock: 'Claude AWS Bedrock'
 }
 
-const platformLabel = computed(() => platformLabelMap[props.account?.platform] || '未知平台')
+const platformLabel = computed(
+  () => platformLabelMap[props.account?.platform] || t('accountModals.usageDetail.unknownPlatform')
+)
 
 const accountTypeLabel = computed(() => {
-  if (!props.account?.accountType) return '共享'
-  if (props.account.accountType === 'dedicated') return '专属'
-  if (props.account.accountType === 'group') return '分组'
-  return '共享'
+  if (!props.account?.accountType) return t('accountModals.usageDetail.shared')
+  if (props.account.accountType === 'dedicated') return t('accountModals.usageDetail.dedicated')
+  if (props.account.accountType === 'group') return t('accountModals.usageDetail.group')
+  return t('accountModals.usageDetail.shared')
 })
 
 const chartColors = computed(() => ({
@@ -415,7 +426,7 @@ const formatDate = (value) => {
 }
 
 const formatDateTime = (value) => {
-  if (!value) return '暂无'
+  if (!value) return t('accountModals.common.none')
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
@@ -434,36 +445,38 @@ const generatedAtDisplay = computed(
 const primaryMetrics = computed(() => [
   {
     key: 'totalCost',
-    label: '30天总费用',
+    label: t('accountModals.usageDetail.totalCost30Days'),
     value: props.summary?.totalCostFormatted || '$0.000000',
-    subtitle: '累计成本',
+    subtitle: t('accountModals.usageDetail.cumulativeCost'),
     icon: 'fa-file-invoice-dollar',
     iconClass: 'text-emerald-500'
   },
   {
     key: 'totalRequests',
-    label: '30天总请求',
+    label: t('accountModals.usageDetail.totalRequests30Days'),
     value: formatNumber(props.summary?.totalRequests || 0),
-    subtitle: '调用次数',
+    subtitle: t('accountModals.usageDetail.callCount'),
     icon: 'fa-paper-plane',
     iconClass: 'text-blue-500'
   },
   {
     key: 'avgCost',
-    label: '日均费用',
+    label: t('accountModals.usageDetail.avgDailyCost'),
     value: props.summary?.avgDailyCostFormatted || formatCost(props.summary?.avgDailyCost || 0),
     subtitle:
       props.summary?.actualDaysUsed && props.summary?.actualDaysUsed < props.summary?.days
-        ? `基于 ${props.summary.actualDaysUsed} 天实际使用`
-        : '平均每日成本',
+        ? t('accountModals.usageDetail.basedOnActualDays', {
+            days: props.summary.actualDaysUsed
+          })
+        : t('accountModals.usageDetail.avgDailyCostSubtitle'),
     icon: 'fa-wave-square',
     iconClass: 'text-purple-500'
   },
   {
     key: 'avgRequests',
-    label: '日均请求',
+    label: t('accountModals.usageDetail.avgDailyRequests'),
     value: formatNumber(roundToTwo(props.summary?.avgDailyRequests || 0)),
-    subtitle: '平均每日调用',
+    subtitle: t('accountModals.usageDetail.avgDailyCalls'),
     icon: 'fa-chart-line',
     iconClass: 'text-orange-500'
   }
@@ -495,7 +508,7 @@ const renderChart = async () => {
       labels,
       datasets: [
         {
-          label: '费用 (USD)',
+          label: t('accountModals.usageDetail.costUsd'),
           data: costs,
           borderColor: chartColors.value.cost,
           backgroundColor: chartColors.value.costFill,
@@ -504,7 +517,7 @@ const renderChart = async () => {
           yAxisID: 'y'
         },
         {
-          label: '请求次数',
+          label: t('accountModals.usageDetail.requestCount'),
           data: requests,
           borderColor: chartColors.value.requests,
           backgroundColor: 'transparent',
@@ -529,10 +542,13 @@ const renderChart = async () => {
         tooltip: {
           callbacks: {
             label(context) {
-              if (context.dataset.label === '费用 (USD)') {
+              if (context.dataset.label === t('accountModals.usageDetail.costUsd')) {
                 return `${context.dataset.label}: ${formatCost(context.parsed.y)}`
               }
-              return `${context.dataset.label}: ${formatNumber(context.parsed.y)} 次`
+              return t('accountModals.usageDetail.tooltipCount', {
+                label: context.dataset.label,
+                count: formatNumber(context.parsed.y)
+              })
             }
           }
         }

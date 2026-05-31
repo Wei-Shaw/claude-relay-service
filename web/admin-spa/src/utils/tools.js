@@ -1,3 +1,5 @@
+import i18n, { getCurrentLocale } from '@/i18n'
+
 // App 配置
 export const APP_CONFIG = {
   basePath: import.meta.env.VITE_APP_BASE_URL || (import.meta.env.DEV ? '/admin/' : '/web/admin/'),
@@ -99,7 +101,7 @@ export const showToast = (message, type = 'info', title = '', duration = 3000) =
 }
 
 // 复制文本到剪贴板
-export const copyText = async (text, successMsg = '已复制') => {
+export const copyText = async (text, successMsg = '') => {
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text)
@@ -111,11 +113,11 @@ export const copyText = async (text, successMsg = '已复制') => {
       document.execCommand('copy')
       document.body.removeChild(textarea)
     }
-    showToast(successMsg, 'success')
+    showToast(successMsg || i18n.global.t('common.copied'), 'success')
     return true
   } catch (error) {
     console.error('Failed to copy:', error)
-    showToast('复制失败', 'error')
+    showToast(i18n.global.t('common.copyFailed'), 'error')
     return false
   }
 }
@@ -152,11 +154,11 @@ export const formatRelativeTime = (date) => {
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMins / 60)
   const diffDays = Math.floor(diffHours / 24)
-  if (diffDays >= 7) return d.toLocaleDateString('zh-CN')
-  if (diffDays > 0) return `${diffDays}天前`
-  if (diffHours > 0) return `${diffHours}小时前`
-  if (diffMins > 0) return `${diffMins}分钟前`
-  return '刚刚'
+  if (diffDays >= 7) return d.toLocaleDateString(getCurrentLocale())
+  if (diffDays > 0) return i18n.global.t('common.daysAgo', { count: diffDays })
+  if (diffHours > 0) return i18n.global.t('common.hoursAgo', { count: diffHours })
+  if (diffMins > 0) return i18n.global.t('common.minutesAgo', { count: diffMins })
+  return i18n.global.t('common.justNow')
 }
 
 // 字节格式化
@@ -171,7 +173,7 @@ export const formatBytes = (bytes, decimals = 2) => {
 // 日期时间格式化 (简化版)
 export const formatDateTime = (date) => {
   if (!date) return ''
-  return new Date(date).toLocaleString('zh-CN', {
+  return new Date(date).toLocaleString(getCurrentLocale(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

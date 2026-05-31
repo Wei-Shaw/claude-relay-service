@@ -2,8 +2,10 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { getOemSettingsApi, updateOemSettingsApi } from '@/utils/http_apis'
+import i18n from '@/i18n'
 
 export const useSettingsStore = defineStore('settings', () => {
+  const t = (...args) => i18n.global.t(...args)
   // 状态
   const oemSettings = ref({
     siteName: 'Claude Relay Service',
@@ -58,7 +60,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const applyOemSettings = () => {
     // 更新页面标题
     if (oemSettings.value.siteName) {
-      document.title = `${oemSettings.value.siteName} - 管理后台`
+      document.title = `${oemSettings.value.siteName} - ${t('adminUtility.storeMessages.adminConsole')}`
     }
 
     // 更新favicon
@@ -75,14 +77,17 @@ export const useSettingsStore = defineStore('settings', () => {
   // 格式化日期时间
   const formatDateTime = (dateString) => {
     if (!dateString) return ''
-    return new Date(dateString).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
+    return new Date(dateString).toLocaleString(
+      i18n.global.locale.value === 'zh-CN' ? 'zh-CN' : 'en-US',
+      {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }
+    )
   }
 
   // 验证文件上传
@@ -91,13 +96,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
     // 检查文件大小 (350KB)
     if (file.size > 350 * 1024) {
-      errors.push('图标文件大小不能超过 350KB')
+      errors.push(t('adminUtility.storeMessages.iconTooLarge'))
     }
 
     // 检查文件类型
     const allowedTypes = ['image/x-icon', 'image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml']
     if (!allowedTypes.includes(file.type)) {
-      errors.push('不支持的文件类型，请选择 .ico, .png, .jpg 或 .svg 文件')
+      errors.push(t('adminUtility.storeMessages.unsupportedIconType'))
     }
 
     return {
