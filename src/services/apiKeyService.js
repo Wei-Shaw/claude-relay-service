@@ -2735,27 +2735,102 @@ class ApiKeyService {
     }
   }
 
+  async _sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  async _withApiKeyMutationLock(keyId, action) {
+    const lockKey = `apikey:mutation_lock:${keyId}`
+    const lockValue = `apikey-mutation:${uuidv4()}`
+    const ttlMs = 10000
+
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const acquired = await redis.setAccountLock(lockKey, lockValue, ttlMs)
+      if (acquired) {
+        try {
+          return await action()
+        } finally {
+          await redis.releaseAccountLock(lockKey, lockValue)
+        }
+      }
+
+      await this._sleep(50)
+    }
+
+    throw new Error('API key update is busy, please retry')
+  }
+
   /**
    * 增加 API Key 费用限制（用于核销额度卡）
    * @param {string} keyId - API Key ID
    * @param {number} amount - 要增加的金额（USD）
+   * @param {Object} options - 更新选项
+   * @param {number} options.maxTotalCostLimit - 最大总额度，0 表示不限制
    * @returns {Promise<Object>} { success: boolean, newTotalCostLimit: number }
    */
-  async addTotalCostLimit(keyId, amount) {
+  async addTotalCostLimit(keyId, amount, options = {}) {
     try {
-      const keyData = await redis.getApiKey(keyId)
-      if (!keyData || Object.keys(keyData).length === 0) {
+      const amountToAdd = parseFloat(amount)
+      if (Number.isNaN(amountToAdd) || amountToAdd < 0) {
+        throw new Error('Invalid amount')
+      }
+
+      const maxTotalCostLimit = parseFloat(options.maxTotalCostLimit || 0)
+      const script = `
+        if redis.call("EXISTS", KEYS[1]) == 0 then
+          return {0, "0", "0", "0", 0}
+        end
+
+        local currentLimit = tonumber(redis.call("HGET", KEYS[1], "totalCostLimit") or "0") or 0
+        local requestedAdd = tonumber(ARGV[1]) or 0
+        local maxLimit = tonumber(ARGV[2]) or 0
+        local actualAdd = requestedAdd
+
+        if maxLimit > 0 and currentLimit + actualAdd > maxLimit then
+          actualAdd = maxLimit - currentLimit
+          if actualAdd < 0 then
+            actualAdd = 0
+          end
+        end
+
+        local newLimit = currentLimit + actualAdd
+        redis.call("HSET", KEYS[1], "totalCostLimit", tostring(newLimit), "updatedAt", ARGV[3])
+
+        local capped = 0
+        if actualAdd < requestedAdd then
+          capped = 1
+        end
+
+        return {1, tostring(currentLimit), tostring(newLimit), tostring(actualAdd), capped}
+      `
+
+      const result = await redis.client.eval(
+        script,
+        1,
+        `apikey:${keyId}`,
+        String(amountToAdd),
+        String(Number.isNaN(maxTotalCostLimit) ? 0 : maxTotalCostLimit),
+        new Date().toISOString()
+      )
+
+      if (!result || Number(result[0]) !== 1) {
         throw new Error('API key not found')
       }
 
-      const currentLimit = parseFloat(keyData.totalCostLimit || 0)
-      const newLimit = currentLimit + amount
+      const previousLimit = parseFloat(result[1] || 0)
+      const newTotalCostLimit = parseFloat(result[2] || 0)
+      const actualAdded = parseFloat(result[3] || 0)
+      const capped = Number(result[4]) === 1
 
-      await redis.client.hset(`apikey:${keyId}`, 'totalCostLimit', String(newLimit))
+      logger.success(`💰 Added $${actualAdded} to key ${keyId}, new limit: $${newTotalCostLimit}`)
 
-      logger.success(`💰 Added $${amount} to key ${keyId}, new limit: $${newLimit}`)
-
-      return { success: true, previousLimit: currentLimit, newTotalCostLimit: newLimit }
+      return {
+        success: true,
+        previousLimit,
+        newTotalCostLimit,
+        actualAdded,
+        capped
+      }
     } catch (error) {
       logger.error('❌ Failed to add total cost limit:', error)
       throw error
@@ -2805,45 +2880,82 @@ class ApiKeyService {
    * @param {string} keyId - API Key ID
    * @param {number} amount - 时间数量
    * @param {string} unit - 时间单位 'hours' | 'days' | 'months'
+   * @param {Object} options - 更新选项
+   * @param {number} options.maxExpiryDays - 最大有效期天数，0 表示不限制
    * @returns {Promise<Object>} { success: boolean, newExpiresAt: string }
    */
-  async extendExpiry(keyId, amount, unit = 'days') {
+  async extendExpiry(keyId, amount, unit = 'days', options = {}) {
     try {
-      const keyData = await redis.getApiKey(keyId)
-      if (!keyData || Object.keys(keyData).length === 0) {
-        throw new Error('API key not found')
-      }
+      return await this._withApiKeyMutationLock(keyId, async () => {
+        const keyData = await redis.getApiKey(keyId)
+        if (!keyData || Object.keys(keyData).length === 0) {
+          throw new Error('API key not found')
+        }
 
-      // 计算新的过期时间
-      let baseDate = keyData.expiresAt ? new Date(keyData.expiresAt) : new Date()
-      // 如果已过期，从当前时间开始计算
-      if (baseDate < new Date()) {
-        baseDate = new Date()
-      }
+        const amountToAdd = parseInt(amount)
+        if (Number.isNaN(amountToAdd) || amountToAdd < 0) {
+          throw new Error('Invalid amount')
+        }
 
-      let milliseconds
-      switch (unit) {
-        case 'hours':
-          milliseconds = amount * 60 * 60 * 1000
-          break
-        case 'months':
-          // 简化处理：1个月 = 30天
-          milliseconds = amount * 30 * 24 * 60 * 60 * 1000
-          break
-        case 'days':
-        default:
-          milliseconds = amount * 24 * 60 * 60 * 1000
-      }
+        const now = new Date()
+        let baseDate = keyData.expiresAt ? new Date(keyData.expiresAt) : now
+        if (Number.isNaN(baseDate.getTime()) || baseDate < now) {
+          baseDate = now
+        }
 
-      const newExpiresAt = new Date(baseDate.getTime() + milliseconds).toISOString()
+        let milliseconds
+        switch (unit) {
+          case 'hours':
+            milliseconds = amountToAdd * 60 * 60 * 1000
+            break
+          case 'months':
+            // 简化处理：1个月 = 30天
+            milliseconds = amountToAdd * 30 * 24 * 60 * 60 * 1000
+            break
+          case 'days':
+          default:
+            milliseconds = amountToAdd * 24 * 60 * 60 * 1000
+        }
 
-      await this.updateApiKey(keyId, { expiresAt: newExpiresAt })
+        const dayMs = 24 * 60 * 60 * 1000
+        const maxExpiryDays = parseInt(options.maxExpiryDays || 0)
+        let newExpiry = new Date(baseDate.getTime() + milliseconds)
+        let actualTimeAmount = amountToAdd
+        let actualTimeUnit = unit
+        let capped = false
 
-      logger.success(
-        `⏰ Extended key ${keyId} expiry by ${amount} ${unit}, new expiry: ${newExpiresAt}`
-      )
+        if (!Number.isNaN(maxExpiryDays) && maxExpiryDays > 0) {
+          const maxExpiry = new Date(now.getTime() + maxExpiryDays * dayMs)
+          if (newExpiry > maxExpiry) {
+            newExpiry = maxExpiry
+            actualTimeAmount = Math.max(0, Math.ceil((maxExpiry - baseDate) / dayMs))
+            actualTimeUnit = 'days'
+            capped = true
+          }
+        }
 
-      return { success: true, previousExpiresAt: keyData.expiresAt, newExpiresAt }
+        const newExpiresAt = newExpiry.toISOString()
+        await redis.client.hset(
+          `apikey:${keyId}`,
+          'expiresAt',
+          newExpiresAt,
+          'updatedAt',
+          now.toISOString()
+        )
+
+        logger.success(
+          `⏰ Extended key ${keyId} expiry by ${actualTimeAmount} ${actualTimeUnit}, new expiry: ${newExpiresAt}`
+        )
+
+        return {
+          success: true,
+          previousExpiresAt: keyData.expiresAt,
+          newExpiresAt,
+          actualTimeAmount,
+          actualTimeUnit,
+          capped
+        }
+      })
     } catch (error) {
       logger.error('❌ Failed to extend expiry:', error)
       throw error

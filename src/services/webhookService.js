@@ -7,6 +7,7 @@ const logger = require('../utils/logger')
 const webhookConfigService = require('./webhookConfigService')
 const { getISOStringWithTimezone } = require('../utils/dateHelper')
 const appConfig = require('../../config/config')
+const { assertSafeOutboundHost, assertSafeOutboundUrl } = require('../utils/outboundNetworkPolicy')
 
 class WebhookService {
   constructor() {
@@ -240,7 +241,7 @@ class WebhookService {
       disable_web_page_preview: true
     }
 
-    const axiosOptions = this.buildTelegramAxiosOptions(platform)
+    const axiosOptions = await this.buildTelegramAxiosOptions(platform)
 
     const response = await this.sendHttpRequest(
       apiUrl,
@@ -285,6 +286,8 @@ class WebhookService {
    */
   async sendToSMTP(platform, type, data) {
     try {
+      await assertSafeOutboundHost(platform.host, { target: 'SMTP host' })
+
       // 创建SMTP传输器
       const transporter = nodemailer.createTransport({
         host: platform.host,
@@ -329,16 +332,19 @@ class WebhookService {
    * 发送HTTP请求
    */
   async sendHttpRequest(url, payload, timeout, axiosOptions = {}) {
+    const urlValidation = await assertSafeOutboundUrl(url, { target: 'Webhook URL' })
     const headers = {
       'Content-Type': 'application/json',
       'User-Agent': 'claude-relay-service/2.0',
       ...(axiosOptions.headers || {})
     }
 
-    const response = await axios.post(url, payload, {
+    const response = await axios.post(urlValidation.url, payload, {
       timeout,
       ...axiosOptions,
-      headers
+      headers,
+      lookup: urlValidation.lookup,
+      maxRedirects: 0
     })
 
     if (response.status < 200 || response.status >= 300) {
@@ -459,11 +465,16 @@ class WebhookService {
   /**
    * 构建 Telegram 请求的 axios 选项（代理等）
    */
-  buildTelegramAxiosOptions(platform) {
+  async buildTelegramAxiosOptions(platform) {
     const options = {}
 
     if (platform.proxyUrl) {
       try {
+        await assertSafeOutboundUrl(platform.proxyUrl, {
+          allowedProtocols: ['http:', 'https:', 'socks4:', 'socks4a:', 'socks5:'],
+          target: 'Telegram proxy URL'
+        })
+
         const proxyUrl = new URL(platform.proxyUrl)
         const { protocol } = proxyUrl
 
@@ -481,7 +492,8 @@ class WebhookService {
           logger.warn(`⚠️ 不支持的Telegram代理协议: ${protocol}`)
         }
       } catch (error) {
-        logger.warn(`⚠️ Telegram代理配置无效，将忽略: ${error.message}`)
+        logger.warn(`⚠️ Telegram代理配置无效: ${error.message}`)
+        throw error
       }
     }
 

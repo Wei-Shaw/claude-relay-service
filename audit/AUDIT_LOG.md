@@ -97,3 +97,27 @@ Updates made:
 - Marked `BUG-005`, `BUG-006`, and `BUG-029` as confirmed/proven but still open.
 - Added a confirmed-after-probable-verification section and next fixing order to `audit/VERIFICATION_REPORT.md`.
 - Updated `audit/BUG_MAP.md` verification rows with exact harness outcomes.
+
+## 2026-05-31 - Confirmed Probable Fix Follow-Up
+
+Scope:
+
+- Fixed only the newly confirmed `BUG-005`, `BUG-006`, and `BUG-029` rows.
+- Preserved remaining `Probable`, `Needs Verification`, `False Positive`, and `Duplicate` rows for later verification.
+
+Fixes made:
+
+- `BUG-005`: added a per-card Redis redemption lock and re-read card state inside the lock before applying quota/time side effects.
+- `BUG-006`: replaced quota increments with a Redis Lua mutation and serialized expiry extension calculations through a per-key Redis lock.
+- `BUG-029`: added outbound URL/host policy checks, private/special IP blocking after DNS resolution, HTTP(S) DNS pinning, redirect blocking, SMTP host validation, and Telegram proxy validation.
+
+Verification performed:
+
+- `npx jest tests/quotaCardConcurrency.test.js tests/webhookOutboundPolicy.test.js --runInBand` passed with 2 suites and 8 tests.
+- `npm test -- --runInBand` passed with 32 suites, 281 passing tests, and 8 skipped.
+- `npm run lint:check` passed.
+
+Updates made:
+
+- Marked `BUG-005`, `BUG-006`, and `BUG-029` as fixed in `audit/BUG_MAP.md`.
+- Updated `audit/VERIFICATION_REPORT.md` with the final fixing order, verification commands, and remaining unresolved bugs.
