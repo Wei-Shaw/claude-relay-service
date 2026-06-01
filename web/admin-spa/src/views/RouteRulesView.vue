@@ -183,9 +183,19 @@
                     {{ account.platformLabel }} · {{ normalizeAccountKind(account.accountKind) }}
                   </div>
                 </div>
-                <span :class="['status-badge', routeStatusClass(account.routeStatus)]">
-                  {{ routeStatusLabel(account.routeStatus) }}
-                </span>
+                <div class="flex flex-shrink-0 items-center gap-2">
+                  <span :class="['status-badge', routeStatusClass(account.routeStatus)]">
+                    {{ routeStatusLabel(account.routeStatus) }}
+                  </span>
+                  <button
+                    class="icon-action-btn"
+                    title="编辑账户"
+                    type="button"
+                    @click="openAccountEditor(account)"
+                  >
+                    <i class="fas fa-edit" />
+                  </button>
+                </div>
               </div>
 
               <div class="mt-3 flex flex-wrap gap-2">
@@ -253,6 +263,19 @@
         </div>
       </section>
     </div>
+
+    <CcrAccountForm
+      v-if="showEditAccountModal && editingAccount && editingAccount.platform === 'ccr'"
+      :account="editingAccount"
+      @close="closeAccountEditor"
+      @success="handleAccountEditSuccess"
+    />
+    <AccountForm
+      v-else-if="showEditAccountModal"
+      :account="editingAccount"
+      @close="closeAccountEditor"
+      @success="handleAccountEditSuccess"
+    />
   </div>
 </template>
 
@@ -264,6 +287,8 @@ import {
   getRouteRuleLiveApi
 } from '@/utils/http_apis'
 import { showToast } from '@/utils/tools'
+import AccountForm from '@/components/accounts/AccountForm.vue'
+import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 
 const endpointOptions = ref([])
 const apiKeyOptions = ref([])
@@ -275,6 +300,8 @@ const live = ref(null)
 const loading = ref(false)
 const liveLoading = ref(false)
 const errorMessage = ref('')
+const showEditAccountModal = ref(false)
+const editingAccount = ref(null)
 let refreshTimer = null
 
 const selectedEndpointMeta = computed(
@@ -534,6 +561,22 @@ const selectModel = async (modelId) => {
   await loadExplain()
 }
 
+const openAccountEditor = (account) => {
+  editingAccount.value = account.editAccount || account
+  showEditAccountModal.value = true
+}
+
+const closeAccountEditor = () => {
+  showEditAccountModal.value = false
+  editingAccount.value = null
+}
+
+const handleAccountEditSuccess = async () => {
+  closeAccountEditor()
+  showToast('账户更新成功', 'success')
+  await refreshAll()
+}
+
 onMounted(async () => {
   try {
     await loadEndpoints()
@@ -624,6 +667,38 @@ onBeforeUnmount(() => {
 .action-btn:disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+
+.icon-action-btn {
+  display: inline-flex;
+  height: 30px;
+  width: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(199, 210, 254, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: rgb(37, 99, 235);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.icon-action-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(239, 246, 255, 0.98);
+  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.14);
+}
+
+:global(.dark) .icon-action-btn {
+  border-color: rgba(55, 65, 81, 0.9);
+  background: rgba(17, 24, 39, 0.9);
+  color: rgb(147, 197, 253);
+}
+
+:global(.dark) .icon-action-btn:hover {
+  background: rgba(30, 41, 59, 0.95);
 }
 
 .panel-card {

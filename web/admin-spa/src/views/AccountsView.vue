@@ -188,6 +188,19 @@
               </el-tooltip>
             </div>
 
+            <!-- 批量编辑按钮 -->
+            <button
+              v-if="selectedAccounts.length > 0"
+              class="group relative flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 sm:w-auto"
+              @click="openBatchEditAccounts"
+            >
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <i class="fas fa-edit relative text-blue-600 dark:text-blue-400" />
+              <span class="relative">编辑选中 ({{ selectedAccounts.length }})</span>
+            </button>
+
             <!-- 批量删除按钮 -->
             <button
               v-if="selectedAccounts.length > 0"
@@ -2253,6 +2266,16 @@
       @close="showGroupManagementModal = false"
       @refresh="loadAccountGroups"
     />
+
+    <!-- 批量编辑账户弹窗 -->
+    <BatchAccountEditModal
+      v-if="showBatchEditModal"
+      :account-groups="accountGroups"
+      :accounts="selectedAccountObjects"
+      :saving="batchEditSaving"
+      @close="showBatchEditModal = false"
+      @submit="handleBatchEditSubmit"
+    />
   </div>
 </template>
 
@@ -2274,6 +2297,7 @@ import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import GroupManagementModal from '@/components/accounts/GroupManagementModal.vue'
 import BalanceDisplay from '@/components/accounts/BalanceDisplay.vue'
 import AccountBalanceScriptModal from '@/components/accounts/AccountBalanceScriptModal.vue'
+import BatchAccountEditModal from '@/components/accounts/BatchAccountEditModal.vue'
 
 // 确认弹窗状态
 const showConfirmModal = ref(false)
@@ -2331,6 +2355,12 @@ const selectedAccounts = ref([])
 const selectAllChecked = ref(false)
 const isIndeterminate = ref(false)
 const showCheckboxes = ref(false)
+const showBatchEditModal = ref(false)
+const batchEditSaving = ref(false)
+const selectedAccountObjects = computed(() => {
+  const accountMap = new Map(accounts.value.map((account) => [account.id, account]))
+  return selectedAccounts.value.map((id) => accountMap.get(id)).filter((account) => !!account)
+})
 
 // 错误历史弹窗状态
 const showErrorHistoryModal = ref(false)
@@ -4004,6 +4034,93 @@ const performAccountDeletion = async (account) => {
   const data = await httpApis.deleteAccountByEndpointApi(endpoint)
   if (data.success) return { success: true, data }
   return { success: false, message: data.message || '删除失败' }
+}
+
+const performAccountUpdate = async (account, patch) => {
+  const endpoint = resolveAccountDeleteEndpoint(account)
+  if (!endpoint) return { success: false, message: '不支持的账户类型' }
+
+  try {
+    const data = await httpApis.updateAccountByEndpointApi(endpoint, patch)
+    if (data.success) return { success: true, data }
+    return { success: false, message: data.message || data.error || '更新失败' }
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error.response?.data?.message || error.response?.data?.error || error.message || '更新失败'
+    }
+  }
+}
+
+const openBatchEditAccounts = async () => {
+  const targets = selectedAccountObjects.value
+  if (targets.length === 0) {
+    showToast('请先选择要编辑的账户', 'warning')
+    return
+  }
+
+  const platforms = Array.from(new Set(targets.map((account) => account.platform)))
+  if (platforms.length > 1) {
+    showToast('批量编辑暂时只支持同平台账户，请重新选择', 'warning')
+    return
+  }
+
+  await loadAccountGroups()
+  showBatchEditModal.value = true
+}
+
+const handleBatchEditSubmit = async ({ patch }) => {
+  const targets = selectedAccountObjects.value
+  if (targets.length === 0) {
+    showToast('选中的账户已不存在', 'warning')
+    showBatchEditModal.value = false
+    return
+  }
+
+  batchEditSaving.value = true
+  let successCount = 0
+  let failedCount = 0
+  const failedDetails = []
+
+  try {
+    for (const account of targets) {
+      const result = await performAccountUpdate(account, patch)
+      if (result.success) {
+        successCount += 1
+      } else {
+        failedCount += 1
+        failedDetails.push({
+          name: account.name || account.email || account.accountName || account.id,
+          message: result.message || '更新失败'
+        })
+      }
+    }
+
+    if (successCount > 0) {
+      showToast(
+        `成功更新 ${successCount} 个账户${failedCount > 0 ? `，${failedCount} 个失败` : ''}`,
+        failedCount > 0 ? 'warning' : 'success'
+      )
+      showBatchEditModal.value = false
+      selectedAccounts.value = []
+      selectAllChecked.value = false
+      isIndeterminate.value = false
+      clearCache()
+      await loadAccounts(true)
+    }
+
+    if (failedCount > 0) {
+      const detailMessage = failedDetails.map((item) => `${item.name}: ${item.message}`).join('\n')
+      showToast(
+        `有 ${failedCount} 个账户更新失败:\n${detailMessage}`,
+        successCount > 0 ? 'warning' : 'error'
+      )
+    }
+  } finally {
+    batchEditSaving.value = false
+    updateSelectAllState()
+  }
 }
 
 // 删除账户

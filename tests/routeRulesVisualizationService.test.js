@@ -202,6 +202,11 @@ describe('routeRulesVisualizationService', () => {
     expect(routable).toMatchObject({
       routeStatus: 'routable',
       priority: 49,
+      editAccount: expect.objectContaining({
+        id: 'console-a',
+        platform: 'claude-console',
+        supportedModels: ['claude-sonnet-4.5']
+      }),
       daily: expect.objectContaining({ quota: 600, usage: 215.45 }),
       modelMapping: expect.objectContaining({
         selected: expect.objectContaining({

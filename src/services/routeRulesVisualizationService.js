@@ -169,6 +169,7 @@ const ACCOUNT_LOADERS = {
     label: 'Azure OpenAI',
     routeAccountType: 'azure-openai',
     platform: 'azure-openai',
+    formPlatform: 'azure_openai',
     load: () => azureOpenaiAccountService.getAllAccounts()
   },
   gemini: {
@@ -1058,6 +1059,15 @@ function getRouteReason(status, reasons, bindingScope) {
   return reasons.map((reason) => reasonLabels[reason] || reason).join('、') || '不在候选池'
 }
 
+function buildEditableAccount(account, sourceType, loader) {
+  return {
+    ...account,
+    id: account.id,
+    platform: loader.formPlatform || account.platform || loader.platform || sourceType,
+    sourceType
+  }
+}
+
 async function normalizeAccount(account, sourceType, context) {
   const loader = ACCOUNT_LOADERS[sourceType]
   const liveStats =
@@ -1164,7 +1174,8 @@ async function normalizeAccount(account, sourceType, context) {
     },
     lastUsedAt: account.lastUsedAt || null,
     expiresAt: account.expiresAt || account.subscriptionExpiresAt || null,
-    updatedAt: account.updatedAt || null
+    updatedAt: account.updatedAt || null,
+    editAccount: buildEditableAccount(account, sourceType, loader)
   }
 }
 
