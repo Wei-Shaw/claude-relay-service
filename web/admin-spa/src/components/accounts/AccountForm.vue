@@ -4299,6 +4299,20 @@ const platformModelEndpointMap = {
   'gemini-antigravity': 'gemini'
 }
 
+const defaultMappingModelRestrictionPlatforms = new Set([
+  'claude-console',
+  'ccr',
+  'openai',
+  'openai-responses'
+])
+
+const validModelRestrictionModes = new Set(['whitelist', 'mapping'])
+
+const normalizeModelRestrictionMode = (mode) => (validModelRestrictionModes.has(mode) ? mode : '')
+
+const getDefaultModelRestrictionMode = (platform = form.value.platform) =>
+  defaultMappingModelRestrictionPlatforms.has(platform) ? 'mapping' : 'whitelist'
+
 // 常用模型列表（从 API 获取）
 const modelCatalog = ref({ all: [], endpointConfigs: {} })
 
@@ -4347,40 +4361,76 @@ const loadCommonModels = async () => {
 // 模型映射表数据
 const modelMappings = ref([])
 
+const applyDefaultModelRestrictionMode = (platform = form.value.platform) => {
+  modelRestrictionMode.value = getDefaultModelRestrictionMode(platform)
+  allowedModels.value = []
+  modelMappings.value = []
+}
+
 // 初始化模型映射表
 const initModelMappings = () => {
-  if (props.account?.supportedModels) {
-    // 如果是对象格式（新的映射表）
-    if (
-      typeof props.account.supportedModels === 'object' &&
-      !Array.isArray(props.account.supportedModels)
-    ) {
-      const entries = Object.entries(props.account.supportedModels)
+  const supportedModels = props.account?.supportedModels
+  const platform = props.account?.platform || form.value.platform
+  const storedMode = normalizeModelRestrictionMode(props.account?.modelRestrictionMode)
 
-      // 判断是白名单模式还是映射模式
-      // 如果所有映射都是"映射到自己"，则视为白名单模式
-      const isWhitelist = entries.every(([from, to]) => from === to)
-      if (isWhitelist) {
-        modelRestrictionMode.value = 'whitelist'
-        // 白名单模式：设置 allowedModels（显示勾选的模型）
-        allowedModels.value = entries.map(([from]) => from)
-        // 同时保留 modelMappings（以便用户切换到映射模式时有初始数据）
-        modelMappings.value = entries.map(([from, to]) => ({ from, to }))
-      } else {
-        modelRestrictionMode.value = 'mapping'
-        // 映射模式：设置 modelMappings（显示映射表）
-        modelMappings.value = entries.map(([from, to]) => ({ from, to }))
-        // 不填充 allowedModels，因为映射模式不使用白名单复选框
-      }
-    } else if (Array.isArray(props.account.supportedModels)) {
-      // 如果是数组格式（旧格式），转换为白名单模式
+  if (!supportedModels) {
+    modelRestrictionMode.value = storedMode || getDefaultModelRestrictionMode(platform)
+    allowedModels.value = []
+    modelMappings.value = []
+    return
+  }
+
+  if (Array.isArray(supportedModels)) {
+    if (supportedModels.length === 0) {
+      modelRestrictionMode.value = storedMode || getDefaultModelRestrictionMode(platform)
+      allowedModels.value = []
+      modelMappings.value = []
+      return
+    }
+
+    // 如果是数组格式（旧格式），转换为白名单模式
+    modelRestrictionMode.value = storedMode || 'whitelist'
+    allowedModels.value = supportedModels
+    // 同时设置 modelMappings 为自映射
+    modelMappings.value = supportedModels.map((model) => ({
+      from: model,
+      to: model
+    }))
+    return
+  }
+
+  if (typeof supportedModels === 'object') {
+    const entries = Object.entries(supportedModels)
+
+    if (entries.length === 0) {
+      modelRestrictionMode.value = storedMode || getDefaultModelRestrictionMode(platform)
+      allowedModels.value = []
+      modelMappings.value = []
+      return
+    }
+
+    // 如果是对象格式（新的映射表）
+    // 判断是白名单模式还是映射模式
+    // 如果所有映射都是"映射到自己"，则视为白名单模式
+    const inferredMode =
+      getDefaultModelRestrictionMode(platform) === 'mapping'
+        ? 'mapping'
+        : entries.every(([from, to]) => from === to)
+          ? 'whitelist'
+          : 'mapping'
+    const resolvedMode = storedMode || inferredMode
+    const isWhitelist = resolvedMode === 'whitelist'
+    if (isWhitelist) {
       modelRestrictionMode.value = 'whitelist'
-      allowedModels.value = props.account.supportedModels
-      // 同时设置 modelMappings 为自映射
-      modelMappings.value = props.account.supportedModels.map((model) => ({
-        from: model,
-        to: model
-      }))
+      // 白名单模式：设置 allowedModels（显示勾选的模型）
+      allowedModels.value = entries.map(([from]) => from)
+      // 同时保留 modelMappings（以便用户切换到映射模式时有初始数据）
+      modelMappings.value = entries.map(([from, to]) => ({ from, to }))
+    } else {
+      modelRestrictionMode.value = 'mapping'
+      // 映射模式：设置 modelMappings（显示映射表）
+      modelMappings.value = entries.map(([from, to]) => ({ from, to }))
+      // 不填充 allowedModels，因为映射模式不使用白名单复选框
     }
   }
 }
@@ -5408,6 +5458,7 @@ const createAccount = async () => {
       data.apiKey = form.value.apiKey
       data.priority = form.value.priority || 50
       data.supportedModels = convertMappingsToObject() || {}
+      data.modelRestrictionMode = modelRestrictionMode.value
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
@@ -5757,6 +5808,7 @@ const updateAccount = async () => {
       }
       data.priority = form.value.priority || 50
       data.supportedModels = convertMappingsToObject() || {}
+      data.modelRestrictionMode = modelRestrictionMode.value
       data.userAgent = form.value.userAgent || null
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
@@ -6084,6 +6136,10 @@ watch(
     if (form.value.accountType === 'group') {
       form.value.groupId = ''
       form.value.groupIds = []
+    }
+
+    if (!isEdit.value) {
+      applyDefaultModelRestrictionMode(newPlatform)
     }
   }
 )

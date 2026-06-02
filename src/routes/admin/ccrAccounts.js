@@ -119,6 +119,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
       apiKey,
       priority,
       supportedModels,
+      modelRestrictionMode,
       userAgent,
       rateLimitDuration,
       proxy,
@@ -156,6 +157,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
       apiKey,
       priority: priority || 50,
       supportedModels: supportedModels || [],
+      modelRestrictionMode,
       userAgent,
       rateLimitDuration:
         rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,

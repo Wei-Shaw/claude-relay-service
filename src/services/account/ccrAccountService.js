@@ -24,6 +24,10 @@ class CcrAccountService {
     )
   }
 
+  _normalizeModelRestrictionMode(mode) {
+    return mode === 'whitelist' || mode === 'mapping' ? mode : 'mapping'
+  }
+
   // 🏢 创建CCR账户
   async createAccount(options = {}) {
     const {
@@ -41,6 +45,7 @@ class CcrAccountService {
       schedulable = true, // 是否可被调度
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
+      modelRestrictionMode = 'mapping', // 模型限制 UI 模式
       disableAutoProtection = false // 是否关闭自动防护（429/401/400/529 不自动禁用）
     } = options
 
@@ -52,7 +57,11 @@ class CcrAccountService {
     const accountId = uuidv4()
 
     // 处理 supportedModels，确保向后兼容
-    const processedModels = this._processModelMapping(supportedModels)
+    const normalizedModelRestrictionMode = this._normalizeModelRestrictionMode(modelRestrictionMode)
+    const processedModels = this._processModelMapping(
+      supportedModels,
+      normalizedModelRestrictionMode
+    )
 
     const accountData = {
       id: accountId,
@@ -63,6 +72,7 @@ class CcrAccountService {
       apiKey: this._encryptSensitiveData(apiKey),
       priority: priority.toString(),
       supportedModels: JSON.stringify(processedModels),
+      modelRestrictionMode: normalizedModelRestrictionMode,
       userAgent,
       rateLimitDuration: rateLimitDuration.toString(),
       proxy: proxy ? JSON.stringify(proxy) : '',
@@ -115,6 +125,7 @@ class CcrAccountService {
       apiUrl,
       priority,
       supportedModels,
+      modelRestrictionMode: normalizedModelRestrictionMode,
       userAgent,
       rateLimitDuration,
       isActive,
@@ -156,6 +167,7 @@ class CcrAccountService {
             apiUrl: accountData.apiUrl,
             priority: parseInt(accountData.priority) || 50,
             supportedModels: JSON.parse(accountData.supportedModels || '[]'),
+            modelRestrictionMode: accountData.modelRestrictionMode || '',
             userAgent: accountData.userAgent,
             rateLimitDuration: Number.isNaN(parseInt(accountData.rateLimitDuration))
               ? 60
@@ -218,6 +230,7 @@ class CcrAccountService {
     logger.debug(`[DEBUG] Parsed supportedModels: ${JSON.stringify(parsedModels)}`)
 
     accountData.supportedModels = parsedModels
+    accountData.modelRestrictionMode = accountData.modelRestrictionMode || ''
     accountData.priority = parseInt(accountData.priority) || 50
     {
       const _parsedDuration = parseInt(accountData.rateLimitDuration)
@@ -270,11 +283,22 @@ class CcrAccountService {
       if (updates.priority !== undefined) {
         updatedData.priority = updates.priority.toString()
       }
+      const modelRestrictionModeForUpdate =
+        updates.modelRestrictionMode !== undefined
+          ? this._normalizeModelRestrictionMode(updates.modelRestrictionMode)
+          : existingAccount.modelRestrictionMode || 'mapping'
+
       if (updates.supportedModels !== undefined) {
         logger.debug(`[DEBUG] Updating supportedModels: ${JSON.stringify(updates.supportedModels)}`)
         // 处理 supportedModels，确保向后兼容
-        const processedModels = this._processModelMapping(updates.supportedModels)
+        const processedModels = this._processModelMapping(
+          updates.supportedModels,
+          modelRestrictionModeForUpdate
+        )
         updatedData.supportedModels = JSON.stringify(processedModels)
+      }
+      if (updates.modelRestrictionMode !== undefined) {
+        updatedData.modelRestrictionMode = modelRestrictionModeForUpdate
       }
       if (updates.userAgent !== undefined) {
         updatedData.userAgent = updates.userAgent
@@ -568,14 +592,25 @@ class CcrAccountService {
   }
 
   // 🔄 处理模型映射
-  _processModelMapping(supportedModels) {
+  _processModelMapping(supportedModels, modelRestrictionMode = 'mapping') {
+    const normalizedMode = this._normalizeModelRestrictionMode(modelRestrictionMode)
+
     // 如果是空值，返回空对象（支持所有模型）
     if (!supportedModels || (Array.isArray(supportedModels) && supportedModels.length === 0)) {
       return {}
     }
 
-    // 如果已经是对象格式（新的映射表格式），直接返回
+    // 如果已经是对象格式（新的映射表格式），按模式归一化
     if (typeof supportedModels === 'object' && !Array.isArray(supportedModels)) {
+      if (normalizedMode === 'whitelist') {
+        const mapping = {}
+        Object.keys(supportedModels).forEach((model) => {
+          if (model && typeof model === 'string') {
+            mapping[model] = model
+          }
+        })
+        return mapping
+      }
       return supportedModels
     }
 
