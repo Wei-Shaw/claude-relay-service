@@ -180,7 +180,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
     const {
       // 分页参数
       page = 1,
-      pageSize = 20,
+      pageSize = 200,
       // 搜索参数
       searchMode = 'apiKey',
       search = '',
@@ -204,7 +204,9 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
 
     // 验证分页参数
     const pageNum = Math.max(1, parseInt(page) || 1)
-    const pageSizeNum = [10, 20, 50, 100].includes(parseInt(pageSize)) ? parseInt(pageSize) : 20
+    const pageSizeNum = [10, 20, 50, 100, 200].includes(parseInt(pageSize))
+      ? parseInt(pageSize)
+      : 200
 
     // 验证排序参数（新增 cost 排序）
     const validSortFields = [
@@ -363,6 +365,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       })
     }
 
+    const secretInfoMap = await apiKeyService.getApiKeySecretInfoMap(
+      result.items.map((apiKey) => apiKey.id)
+    )
+
     for (const apiKey of result.items) {
       if (apiKey.userId && userMap.has(apiKey.userId)) {
         const user = userMap.get(apiKey.userId)
@@ -378,6 +384,13 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
       if (!apiKey.usage) {
         apiKey.usage = { total: { requests: 0, tokens: 0, cost: 0, formattedCost: '$0.00' } }
       }
+
+      const secretInfo = secretInfoMap.get(apiKey.id)
+      apiKey.secretCaptured = Boolean(secretInfo)
+      apiKey.keyPreview =
+        secretInfo?.keyPreview || apiKey.maskedKey || `${config.security.apiKeyPrefix}****`
+      apiKey.secretCapturedAt = secretInfo?.capturedAt || null
+      apiKey.secretLastVerifiedAt = secretInfo?.lastVerifiedAt || null
     }
 
     // 返回分页数据
@@ -1864,6 +1877,49 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       success: false,
       error: 'Failed to batch create API keys',
       message: error.message
+    })
+  }
+})
+
+// 查询加密保存的完整 API Key（仅管理端，操作会写审计日志）
+router.post('/api-keys/:keyId/reveal-secret', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const secret = await apiKeyService.revealApiKeySecret(keyId, {
+      adminUsername: req.admin?.username || 'unknown',
+      ip: req.ip || '',
+      userAgent: req.get('user-agent') || ''
+    })
+
+    return res.json({
+      success: true,
+      data: {
+        apiKey: secret.apiKey,
+        keyPreview: secret.keyPreview,
+        capturedAt: secret.capturedAt,
+        lastVerifiedAt: secret.lastVerifiedAt
+      }
+    })
+  } catch (error) {
+    const message = error.message || 'Failed to reveal API key secret'
+    logger.warn(
+      `🔐 Admin ${req.admin?.username || 'unknown'} failed to reveal API key secret ${
+        req.params.keyId
+      }: ${message}`
+    )
+
+    const status = message.includes('not found')
+      ? 404
+      : message.includes('not been captured')
+        ? 404
+        : message.includes('stale') || message.includes('mismatch')
+          ? 409
+          : 400
+
+    return res.status(status).json({
+      success: false,
+      error: 'Failed to reveal API key secret',
+      message
     })
   }
 })

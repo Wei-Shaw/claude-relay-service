@@ -42,16 +42,6 @@
         </select>
       </label>
 
-      <label class="filter-control">
-        <span>API Key</span>
-        <select v-model="selectedApiKeyId" @change="reloadExplain">
-          <option value="">全部 / 未指定</option>
-          <option v-for="apiKey in apiKeyOptions" :key="apiKey.id" :value="apiKey.id">
-            {{ apiKey.name }}
-          </option>
-        </select>
-      </label>
-
       <div class="filter-pill">
         <span class="live-dot bg-emerald-500" />
         <span>Live: {{ liveWindowLabel }}</span>
@@ -291,9 +281,7 @@ import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
 
 const endpointOptions = ref([])
-const apiKeyOptions = ref([])
 const selectedEndpoint = ref('claude')
-const selectedApiKeyId = ref('')
 const selectedModel = ref('')
 const explain = ref(null)
 const live = ref(null)
@@ -339,35 +327,62 @@ const explainSummary = computed(
     }
 )
 
+const accountRouteStatusRank = {
+  routable: 0,
+  degraded: 1,
+  excluded: 2
+}
+
 const displayAccounts = computed(() => {
   const liveAccounts = live.value?.accounts || {}
-  return (explain.value?.accounts || []).map((account) => {
-    const liveStats =
-      liveAccounts[account.id] || liveAccounts[`${account.sourceType}:${account.id}`]
-    if (!liveStats) {
-      return account
-    }
-    return {
-      ...account,
-      live: {
-        ...account.live,
-        ...liveStats
-      },
-      health: {
-        ...account.health,
-        availabilityPercent:
-          liveStats.totalCount > 0
-            ? Number(((liveStats.successCount / liveStats.totalCount) * 100).toFixed(2))
-            : account.health.availabilityPercent
+  return (explain.value?.accounts || [])
+    .map((account) => {
+      const liveStats =
+        liveAccounts[account.id] || liveAccounts[`${account.sourceType}:${account.id}`]
+      if (!liveStats) {
+        return account
       }
-    }
-  })
+      return {
+        ...account,
+        live: {
+          ...account.live,
+          ...liveStats
+        },
+        health: {
+          ...account.health,
+          availabilityPercent:
+            liveStats.totalCount > 0
+              ? Number(((liveStats.successCount / liveStats.totalCount) * 100).toFixed(2))
+              : account.health.availabilityPercent
+        }
+      }
+    })
+    .sort((a, b) => {
+      const modelMatchedDiff = Number(!!b.modelSupported) - Number(!!a.modelSupported)
+      if (modelMatchedDiff !== 0) {
+        return modelMatchedDiff
+      }
+
+      const routeDiff =
+        (accountRouteStatusRank[a.routeStatus] ?? 9) - (accountRouteStatusRank[b.routeStatus] ?? 9)
+      if (routeDiff !== 0) {
+        return routeDiff
+      }
+
+      const priorityDiff = Number(b.priority || 0) - Number(a.priority || 0)
+      if (priorityDiff !== 0) {
+        return priorityDiff
+      }
+
+      const nameA = a.name || a.email || a.accountName || a.id || ''
+      const nameB = b.name || b.email || b.accountName || b.id || ''
+      return nameA.localeCompare(nameB)
+    })
 })
 
 const getQueryParams = () => ({
   endpoint: selectedEndpoint.value,
   model: selectedModel.value,
-  apiKeyId: selectedApiKeyId.value || undefined,
   windowSeconds: 300
 })
 
@@ -493,7 +508,6 @@ const loadEndpoints = async () => {
   }
 
   endpointOptions.value = response.data.endpoints || []
-  apiKeyOptions.value = response.data.apiKeys || []
   selectedEndpoint.value = response.data.defaultEndpoint || 'claude'
 
   const endpoint = endpointOptions.value.find((item) => item.id === selectedEndpoint.value)
@@ -536,10 +550,6 @@ const refreshLive = async () => {
   } finally {
     liveLoading.value = false
   }
-}
-
-const reloadExplain = () => {
-  loadExplain()
 }
 
 const refreshAll = async () => {

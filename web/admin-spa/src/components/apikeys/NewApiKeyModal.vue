@@ -38,8 +38,7 @@
             <div class="ml-3">
               <h5 class="mb-1 font-semibold text-amber-900 dark:text-amber-400">重要提醒</h5>
               <p class="text-sm text-amber-800 dark:text-amber-300">
-                这是您唯一能看到完整 API Key 的机会。关闭此窗口后，系统将不再显示完整的 API
-                Key。请立即复制并妥善保存。
+                系统会将完整 API Key 加密保存用于管理端找回，但请仍然立即复制并妥善保存。
               </p>
             </div>
           </div>

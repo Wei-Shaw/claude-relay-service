@@ -481,6 +481,34 @@
                             <i class="fas fa-user mr-1" />
                             {{ key.ownerDisplayName }}
                           </div>
+                          <div class="mt-1 flex items-center gap-1.5 text-xs">
+                            <span
+                              class="font-mono"
+                              :class="
+                                key.secretCaptured
+                                  ? 'text-gray-500 dark:text-gray-400'
+                                  : 'text-gray-400 dark:text-gray-500'
+                              "
+                            >
+                              {{ key.keyPreview || '未捕获完整 Key' }}
+                            </span>
+                            <button
+                              v-if="key.secretCaptured"
+                              class="inline-flex h-5 w-5 items-center justify-center rounded text-blue-500 transition-colors hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/30"
+                              title="复制完整 API Key"
+                              type="button"
+                              @click.stop="copyApiKeySecret(key)"
+                            >
+                              <i class="fas fa-copy text-[10px]" />
+                            </button>
+                            <span
+                              v-else
+                              class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                              title="该 Key 还没有在创建、重新生成或验证通过时被加密捕获"
+                            >
+                              未捕获
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <!-- 所属账号列 -->
@@ -946,6 +974,15 @@
                             <span class="ml-1">编辑</span>
                           </button>
                           <button
+                            v-if="key.secretCaptured"
+                            class="rounded px-2 py-1 text-xs font-medium text-sky-600 transition-colors hover:bg-sky-50 hover:text-sky-900 dark:hover:bg-sky-900/20"
+                            title="复制完整 API Key"
+                            @click="copyApiKeySecret(key)"
+                          >
+                            <i class="fas fa-copy" />
+                            <span class="ml-1">复制 Key</span>
+                          </button>
+                          <button
                             v-if="
                               key.expiresAt &&
                               (isApiKeyExpired(key.expiresAt) ||
@@ -1301,6 +1338,20 @@
                     <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                       {{ key.id }}
                     </p>
+                    <div class="mt-1 flex items-center gap-1.5">
+                      <span class="font-mono text-xs text-gray-500 dark:text-gray-400">
+                        {{ key.keyPreview || '未捕获完整 Key' }}
+                      </span>
+                      <button
+                        v-if="key.secretCaptured"
+                        class="inline-flex h-5 w-5 items-center justify-center rounded text-blue-500 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/30"
+                        title="复制完整 API Key"
+                        type="button"
+                        @click.stop="copyApiKeySecret(key)"
+                      >
+                        <i class="fas fa-copy text-[10px]" />
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <span
@@ -2251,7 +2302,7 @@ const costSortStatus = ref({}) // 各时间范围的索引状态
 // 后端分页相关状态
 const serverPagination = ref({
   page: 1,
-  pageSize: 20,
+  pageSize: 200,
   total: 0,
   totalPages: 0
 })
@@ -2328,20 +2379,21 @@ const selectedTagCount = computed(() => {
 
 // 分页相关
 const currentPage = ref(1)
-// 从 localStorage 读取保存的每页显示条数，默认为 10
+const allowedPageSizes = [10, 20, 50, 100, 200]
+// 从 localStorage 读取保存的每页显示条数，默认为 200
 const getInitialPageSize = () => {
   const saved = localStorage.getItem('apiKeysPageSize')
   if (saved) {
     const parsedSize = parseInt(saved, 10)
     // 验证保存的值是否在允许的选项中
-    if ([10, 20, 50, 100].includes(parsedSize)) {
+    if (allowedPageSizes.includes(parsedSize)) {
       return parsedSize
     }
   }
-  return 10
+  return 200
 }
 const pageSize = ref(getInitialPageSize())
-const pageSizeOptions = [10, 20, 50, 100]
+const pageSizeOptions = allowedPageSizes
 
 // 模态框状态
 const showCreateApiKeyModal = ref(false)
@@ -3872,6 +3924,42 @@ const handleRenewSuccess = () => {
   loadApiKeys()
 }
 
+const copyApiKeySecret = async (key) => {
+  if (!key?.id || !key.secretCaptured) {
+    showToast('该 API Key 还没有捕获完整密钥', 'warning')
+    return
+  }
+
+  const confirmed = await showConfirm(
+    '复制完整 API Key',
+    `确定要复制 "${key.name}" 的完整 API Key 吗？本次操作会记录审计日志。`,
+    '复制',
+    '取消',
+    'warning'
+  )
+
+  if (!confirmed) return
+
+  try {
+    const data = await httpApis.revealApiKeySecretApi(key.id)
+    if (!data.success || !data.data?.apiKey) {
+      showToast(data.message || '无法查询完整 API Key', 'error')
+      return
+    }
+
+    await copyText(data.data.apiKey, '完整 API Key 已复制')
+
+    const localKey = apiKeys.value.find((item) => item.id === key.id)
+    if (localKey) {
+      localKey.keyPreview = data.data.keyPreview || localKey.keyPreview
+      localKey.secretCaptured = true
+      localKey.secretLastVerifiedAt = data.data.lastVerifiedAt || localKey.secretLastVerifiedAt
+    }
+  } catch (error) {
+    showToast(error.response?.data?.message || '查询完整 API Key 失败', 'error')
+  }
+}
+
 // 获取API Key的操作菜单项（用于ActionDropdown）
 const getApiKeyActions = (key) => {
   const actions = [
@@ -3883,6 +3971,16 @@ const getApiKeyActions = (key) => {
       handler: () => openEditApiKeyModal(key)
     }
   ]
+
+  if (key.secretCaptured) {
+    actions.push({
+      key: 'copy-secret',
+      label: '复制真实 Key',
+      icon: 'fa-copy',
+      color: 'indigo',
+      handler: () => copyApiKeySecret(key)
+    })
+  }
 
   // 如果需要续期
   if (key.expiresAt && (isApiKeyExpired(key.expiresAt) || isApiKeyExpiringSoon(key.expiresAt))) {

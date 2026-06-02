@@ -6,6 +6,7 @@ const logger = require('../utils/logger')
 const serviceRatesService = require('./serviceRatesService')
 const requestDetailService = require('./requestDetailService')
 const usageStatsService = require('./usageStatsService')
+const apiKeySecretService = require('./apiKeySecretService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 const { finalizeRequestDetailMeta } = require('../utils/requestDetailHelper')
 const requestBodyRuleService = require('./requestBodyRuleService')
@@ -274,6 +275,7 @@ class ApiKeyService {
 
     // 保存API Key数据并建立哈希映射
     await redis.setApiKey(keyId, keyData, hashedKey)
+    await this._captureApiKeySecret(apiKey, keyData, hashedKey, 'create')
 
     // 同步添加到费用排序索引
     try {
@@ -371,6 +373,13 @@ class ApiKeyService {
         )
         return { valid: false, error: 'API key not found' }
       }
+
+      if (keyData.apiKey && keyData.apiKey !== hashedKey) {
+        logger.warn(`⚠️ API key hash map mismatch for key ${keyData.id}`)
+        return { valid: false, error: 'API key hash mismatch' }
+      }
+
+      this._captureApiKeySecret(apiKey, keyData, hashedKey, 'validation')
 
       // 检查是否激活
       if (keyData.isActive !== 'true') {
@@ -569,6 +578,13 @@ class ApiKeyService {
       if (!keyData) {
         return { valid: false, error: 'API key not found' }
       }
+
+      if (keyData.apiKey && keyData.apiKey !== hashedKey) {
+        logger.warn(`⚠️ API key hash map mismatch for stats query key ${keyData.id}`)
+        return { valid: false, error: 'API key hash mismatch' }
+      }
+
+      this._captureApiKeySecret(apiKey, keyData, hashedKey, 'validation')
 
       // 检查是否激活
       if (keyData.isActive !== 'true') {
@@ -1610,6 +1626,9 @@ class ApiKeyService {
 
       // 删除API Key本身
       await redis.deleteApiKey(keyId)
+      await apiKeySecretService.deleteSecret(keyId).catch((err) => {
+        logger.warn(`Failed to delete captured secret for ${keyId}:`, err.message)
+      })
 
       logger.success(`🗑️ Permanently deleted API key: ${keyId}`)
 
@@ -2383,6 +2402,54 @@ class ApiKeyService {
       .digest('hex')
   }
 
+  async _captureApiKeySecret(apiKey, keyData, hashedKey, source) {
+    if (!apiKey || !keyData?.id || !hashedKey) {
+      return null
+    }
+
+    try {
+      return await apiKeySecretService.captureSecret({
+        apiKeyId: keyData.id,
+        apiKey,
+        keyHash: hashedKey,
+        source
+      })
+    } catch (error) {
+      logger.warn(`Failed to capture API key secret for ${keyData.id}:`, error.message)
+      return null
+    }
+  }
+
+  async getApiKeySecretInfoMap(keyIds = []) {
+    try {
+      return await apiKeySecretService.getSecretInfoMap(keyIds)
+    } catch (error) {
+      logger.warn('Failed to load API key secret info:', error.message)
+      return new Map()
+    }
+  }
+
+  async revealApiKeySecret(keyId, context = {}) {
+    const keyData = await redis.getApiKey(keyId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      throw new Error('API key not found')
+    }
+    if (keyData.isDeleted === 'true') {
+      throw new Error('Cannot reveal a deleted API key')
+    }
+    if (!keyData.apiKey) {
+      throw new Error('API key hash is missing')
+    }
+
+    return await apiKeySecretService.revealSecret({
+      apiKeyId: keyId,
+      currentKeyHash: keyData.apiKey,
+      adminUsername: context.adminUsername,
+      ip: context.ip,
+      userAgent: context.userAgent
+    })
+  }
+
   // 📈 获取使用统计
   async getUsageStats(keyId, options = {}) {
     return await usageStatsService.getUsageStatsWithRecords(keyId, options)
@@ -2538,6 +2605,7 @@ class ApiKeyService {
 
       // 保存新数据并建立新的哈希映射
       await redis.setApiKey(keyId, updatedKeyData, newHashedKey)
+      await this._captureApiKeySecret(newApiKey, updatedKeyData, newHashedKey, 'regenerate')
 
       logger.info(`🔄 Regenerated API key: ${existingKey.name} (${keyId})`)
 
@@ -2564,6 +2632,9 @@ class ApiKeyService {
       // 删除key数据和哈希映射
       await redis.deleteApiKey(keyId)
       await redis.deleteApiKeyHash(keyData.apiKey)
+      await apiKeySecretService.deleteSecret(keyId).catch((err) => {
+        logger.warn(`Failed to delete captured secret for ${keyId}:`, err.message)
+      })
 
       logger.info(`🗑️ Deleted API key: ${keyData.name} (${keyId})`)
       return true

@@ -119,6 +119,8 @@ export const getApiKeysBatchStatsApi = (data) =>
   request({ url: '/admin/api-keys/batch-stats', method: 'POST', data })
 export const getApiKeysBatchLastUsageApi = (data) =>
   request({ url: '/admin/api-keys/batch-last-usage', method: 'POST', data })
+export const revealApiKeySecretApi = (id) =>
+  request({ url: `/admin/api-keys/${id}/reveal-secret`, method: 'POST' })
 export const getDeletedApiKeysApi = () => request({ url: '/admin/api-keys/deleted', method: 'GET' })
 export const getApiKeysCostSortStatusApi = () =>
   request({ url: '/admin/api-keys/cost-sort-status', method: 'GET' })
