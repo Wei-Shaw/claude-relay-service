@@ -788,9 +788,12 @@ class ClaudeConsoleRelayService {
       let aborted = false
       let settled = false
       let responseFinished = false
+      let responseEndRequested = false
       const abortController = new AbortController()
       let upstreamStream = null
       let maxLifetimeTimer = null
+      let responseEndFallbackTimer = null
+      const responseEndFallbackMs = parseInt(process.env.CONSOLE_STREAM_END_FALLBACK_MS) || 1000
 
       const settleResolve = () => {
         if (settled) {
@@ -800,6 +803,10 @@ class ClaudeConsoleRelayService {
         if (maxLifetimeTimer) {
           clearTimeout(maxLifetimeTimer)
           maxLifetimeTimer = null
+        }
+        if (responseEndFallbackTimer) {
+          clearTimeout(responseEndFallbackTimer)
+          responseEndFallbackTimer = null
         }
         resolve()
       }
@@ -813,7 +820,54 @@ class ClaudeConsoleRelayService {
           clearTimeout(maxLifetimeTimer)
           maxLifetimeTimer = null
         }
+        if (responseEndFallbackTimer) {
+          clearTimeout(responseEndFallbackTimer)
+          responseEndFallbackTimer = null
+        }
         reject(error)
+      }
+
+      const endResponseAndResolve = () => {
+        responseEndRequested = true
+
+        if (!isStreamWritable(responseStream)) {
+          logger.warn(
+            `⚠️ [Console] Client disconnected before stream end, data may not have been received | account: ${account?.name || accountId}`
+          )
+          settleResolve()
+          return
+        }
+
+        // 📊 诊断日志：流结束前状态
+        logger.info(
+          `📤 [STREAM] Ending response | destroyed: ${responseStream.destroyed}, ` +
+            `socketDestroyed: ${responseStream.socket?.destroyed}, ` +
+            `socketBytesWritten: ${responseStream.socket?.bytesWritten || 0}`
+        )
+
+        // 禁用 Nagle 算法确保数据立即发送
+        if (responseStream.socket && !responseStream.socket.destroyed) {
+          responseStream.socket.setNoDelay(true)
+        }
+
+        responseEndFallbackTimer = setTimeout(() => {
+          logger.warn(
+            `⚠️ [STREAM] Response end callback did not fire within ${responseEndFallbackMs}ms; settling stream request | account: ${account?.name || accountId}`
+          )
+          settleResolve()
+        }, responseEndFallbackMs)
+        if (typeof responseEndFallbackTimer.unref === 'function') {
+          responseEndFallbackTimer.unref()
+        }
+
+        // 等待数据完全 flush 到客户端后再 resolve；部分 Node/代理组合下 callback 可能不触发，
+        // 因此上面有兜底定时器避免 account 并发槽一直占用。
+        responseStream.end(() => {
+          logger.info(
+            `✅ [STREAM] Response ended and flushed | socketBytesWritten: ${responseStream.socket?.bytesWritten || 'unknown'}`
+          )
+          settleResolve()
+        })
       }
 
       const abortUpstream = (reason, error = new Error('Client disconnected')) => {
@@ -855,10 +909,17 @@ class ClaudeConsoleRelayService {
 
       responseStream.once('finish', () => {
         responseFinished = true
+        if (responseEndRequested) {
+          settleResolve()
+        }
       })
 
       responseStream.once('close', () => {
         if (responseFinished || settled) {
+          return
+        }
+        if (responseEndRequested) {
+          settleResolve()
           return
         }
         abortUpstream('Client disconnected')
@@ -1341,33 +1402,7 @@ class ClaudeConsoleRelayService {
               }
 
               // 确保流正确结束
-              if (isStreamWritable(responseStream)) {
-                // 📊 诊断日志：流结束前状态
-                logger.info(
-                  `📤 [STREAM] Ending response | destroyed: ${responseStream.destroyed}, ` +
-                    `socketDestroyed: ${responseStream.socket?.destroyed}, ` +
-                    `socketBytesWritten: ${responseStream.socket?.bytesWritten || 0}`
-                )
-
-                // 禁用 Nagle 算法确保数据立即发送
-                if (responseStream.socket && !responseStream.socket.destroyed) {
-                  responseStream.socket.setNoDelay(true)
-                }
-
-                // 等待数据完全 flush 到客户端后再 resolve
-                responseStream.end(() => {
-                  logger.info(
-                    `✅ [STREAM] Response ended and flushed | socketBytesWritten: ${responseStream.socket?.bytesWritten || 'unknown'}`
-                  )
-                  settleResolve()
-                })
-              } else {
-                // 连接已断开，记录警告
-                logger.warn(
-                  `⚠️ [Console] Client disconnected before stream end, data may not have been received | account: ${account?.name || accountId}`
-                )
-                settleResolve()
-              }
+              endResponseAndResolve()
             } catch (error) {
               logger.error('❌ Error processing stream end:', error)
               settleReject(error)

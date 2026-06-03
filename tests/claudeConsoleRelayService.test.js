@@ -130,11 +130,13 @@ describe('claudeConsoleRelayService.testAccountConnection', () => {
 
 describe('claudeConsoleRelayService._makeClaudeConsoleStreamRequest', () => {
   const originalMaxLifetime = process.env.CONCURRENCY_MAX_LIFETIME_MINUTES
+  const originalEndFallback = process.env.CONSOLE_STREAM_END_FALLBACK_MS
 
   beforeEach(() => {
     jest.clearAllMocks()
     jest.useRealTimers()
     delete process.env.CONCURRENCY_MAX_LIFETIME_MINUTES
+    delete process.env.CONSOLE_STREAM_END_FALLBACK_MS
   })
 
   afterEach(() => {
@@ -143,6 +145,11 @@ describe('claudeConsoleRelayService._makeClaudeConsoleStreamRequest', () => {
       delete process.env.CONCURRENCY_MAX_LIFETIME_MINUTES
     } else {
       process.env.CONCURRENCY_MAX_LIFETIME_MINUTES = originalMaxLifetime
+    }
+    if (originalEndFallback === undefined) {
+      delete process.env.CONSOLE_STREAM_END_FALLBACK_MS
+    } else {
+      process.env.CONSOLE_STREAM_END_FALLBACK_MS = originalEndFallback
     }
   })
 
@@ -207,5 +214,41 @@ describe('claudeConsoleRelayService._makeClaudeConsoleStreamRequest', () => {
 
     await expect(promise).rejects.toThrow('Claude Console stream exceeded max lifetime')
     expect(upstreamStream.destroyed).toBe(true)
+  })
+
+  it('settles when response end callback is not fired', async () => {
+    process.env.CONSOLE_STREAM_END_FALLBACK_MS = '5'
+    const upstreamStream = new PassThrough()
+    axios.mockResolvedValue({
+      status: 200,
+      data: upstreamStream,
+      headers: {}
+    })
+
+    const responseStream = createResponseStream()
+    responseStream.end = jest.fn(() => {
+      responseStream.writableEnded = true
+    })
+
+    const promise = claudeConsoleRelayService._makeClaudeConsoleStreamRequest(
+      { model: 'claude-sonnet-4-6' },
+      {
+        name: 'Console A1',
+        apiUrl: 'https://console.example.com',
+        apiKey: 'test-key'
+      },
+      null,
+      {},
+      responseStream,
+      'a1',
+      jest.fn()
+    )
+
+    await new Promise((resolve) => setImmediate(resolve))
+    upstreamStream.end('event: message_stop\ndata: {"type":"message_stop"}\n\n')
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(responseStream.end).toHaveBeenCalledTimes(1)
+
+    await expect(promise).resolves.toBeUndefined()
   })
 })
