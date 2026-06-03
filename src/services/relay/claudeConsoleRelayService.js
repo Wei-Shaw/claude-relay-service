@@ -606,22 +606,53 @@ class ClaudeConsoleRelayService {
         )
 
         // 🔄 启动租约刷新定时器（每5分钟刷新一次，防止长连接租约过期）
-        leaseRefreshInterval = setInterval(
-          async () => {
-            try {
-              await redis.refreshConsoleAccountConcurrencyLease(accountId, requestId, 600)
-              logger.debug(
-                `🔄 Refreshed concurrency lease for stream account ${account.name} (${accountId}), request: ${requestId}`
-              )
-            } catch (refreshError) {
-              logger.error(
-                `❌ Failed to refresh concurrency lease for account ${accountId}, request: ${requestId}:`,
-                refreshError.message
-              )
+        const refreshIntervalMs = 5 * 60 * 1000
+        const maxLifetimeMinutes = parseInt(process.env.CONCURRENCY_MAX_LIFETIME_MINUTES) || 10
+        const maxRefreshCount = Math.ceil((maxLifetimeMinutes * 60 * 1000) / refreshIntervalMs)
+        let refreshCount = 0
+        leaseRefreshInterval = setInterval(async () => {
+          refreshCount += 1
+
+          if (refreshCount > maxRefreshCount) {
+            logger.warn(
+              `⚠️ Console stream concurrency lease exceeded max lifetime (${maxLifetimeMinutes} minutes) for account ${account.name} (${accountId}), request: ${requestId}`
+            )
+            clearInterval(leaseRefreshInterval)
+            leaseRefreshInterval = null
+
+            if (concurrencyAcquired) {
+              try {
+                await redis.decrConsoleAccountConcurrency(accountId, requestId)
+                concurrencyAcquired = false
+                logger.warn(
+                  `🧹 Force released stale stream concurrency slot for account ${account.name} (${accountId}), request: ${requestId}`
+                )
+              } catch (releaseError) {
+                logger.error(
+                  `❌ Failed to force release stale stream concurrency slot for account ${accountId}, request: ${requestId}:`,
+                  releaseError.message
+                )
+              }
             }
-          },
-          5 * 60 * 1000
-        ) // 5分钟刷新一次
+            return
+          }
+
+          try {
+            await redis.refreshConsoleAccountConcurrencyLease(accountId, requestId, 600)
+            logger.debug(
+              `🔄 Refreshed concurrency lease for stream account ${account.name} (${accountId}), request: ${requestId}`
+            )
+          } catch (refreshError) {
+            logger.error(
+              `❌ Failed to refresh concurrency lease for account ${accountId}, request: ${requestId}:`,
+              refreshError.message
+            )
+          }
+        }, refreshIntervalMs) // 5分钟刷新一次
+
+        if (typeof leaseRefreshInterval.unref === 'function') {
+          leaseRefreshInterval.unref()
+        }
       }
 
       logger.debug(`🌐 Account API URL: ${account.apiUrl}`)
@@ -755,6 +786,64 @@ class ClaudeConsoleRelayService {
   ) {
     return new Promise((resolve, reject) => {
       let aborted = false
+      let settled = false
+      let responseFinished = false
+      let upstreamStream = null
+      const abortController = new AbortController()
+
+      const settleResolve = () => {
+        if (settled) {
+          return
+        }
+        settled = true
+        resolve()
+      }
+
+      const settleReject = (error) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        reject(error)
+      }
+
+      const abortUpstream = (reason, error = new Error('Client disconnected')) => {
+        if (aborted) {
+          return
+        }
+
+        aborted = true
+        logger.debug(`🔌 ${reason}, cleaning up Claude Console stream`)
+
+        if (!abortController.signal.aborted) {
+          abortController.abort()
+        }
+
+        if (
+          upstreamStream &&
+          typeof upstreamStream.destroy === 'function' &&
+          !upstreamStream.destroyed
+        ) {
+          upstreamStream.destroy(error)
+        }
+
+        settleReject(error)
+      }
+
+      responseStream.once('finish', () => {
+        responseFinished = true
+      })
+
+      responseStream.once('close', () => {
+        if (responseFinished || settled) {
+          return
+        }
+        abortUpstream('Client disconnected')
+      })
+
+      responseStream.once('error', (error) => {
+        abortUpstream('Response stream error', error)
+      })
 
       // 构建完整的API URL
       const cleanUrl = account.apiUrl.replace(/\/$/, '') // 移除末尾斜杠
@@ -786,7 +875,8 @@ class ClaudeConsoleRelayService {
         },
         timeout: config.requestTimeout || 600000,
         responseType: 'stream',
-        validateStatus: () => true // 接受所有状态码
+        validateStatus: () => true, // 接受所有状态码
+        signal: abortController.signal
       }
 
       if (proxyAgent) {
@@ -819,6 +909,14 @@ class ClaudeConsoleRelayService {
       // - queueLockAcquired = false 的赋值会在 finally 执行前完成（JS 单线程保证）
       request
         .then(async (response) => {
+          if (aborted) {
+            if (response.data && typeof response.data.destroy === 'function') {
+              response.data.destroy()
+            }
+            return
+          }
+
+          upstreamStream = response.data
           logger.debug(`🌊 Claude Console Claude stream response status: ${response.status}`)
 
           // 错误响应处理
@@ -941,7 +1039,7 @@ class ClaudeConsoleRelayService {
                   responseStream.end()
                 }
               }
-              resolve() // 不抛出异常，正常完成流处理
+              settleResolve() // 不抛出异常，正常完成流处理
             })
 
             return
@@ -1238,22 +1336,25 @@ class ClaudeConsoleRelayService {
                   logger.info(
                     `✅ [STREAM] Response ended and flushed | socketBytesWritten: ${responseStream.socket?.bytesWritten || 'unknown'}`
                   )
-                  resolve()
+                  settleResolve()
                 })
               } else {
                 // 连接已断开，记录警告
                 logger.warn(
                   `⚠️ [Console] Client disconnected before stream end, data may not have been received | account: ${account?.name || accountId}`
                 )
-                resolve()
+                settleResolve()
               }
             } catch (error) {
               logger.error('❌ Error processing stream end:', error)
-              reject(error)
+              settleReject(error)
             }
           })
 
           response.data.on('error', (error) => {
+            if (aborted) {
+              return
+            }
             logger.error(
               `❌ Claude Console stream error (Account: ${account?.name || accountId}):`,
               error
@@ -1276,11 +1377,12 @@ class ClaudeConsoleRelayService {
               }
               responseStream.end()
             }
-            reject(error)
+            settleReject(error)
           })
         })
         .catch((error) => {
           if (aborted) {
+            settleReject(new Error('Client disconnected'))
             return
           }
 
@@ -1356,14 +1458,8 @@ class ClaudeConsoleRelayService {
             responseStream.end()
           }
 
-          reject(error)
+          settleReject(error)
         })
-
-      // 处理客户端断开连接
-      responseStream.on('close', () => {
-        logger.debug('🔌 Client disconnected, cleaning up Claude Console stream')
-        aborted = true
-      })
     })
   }
 
