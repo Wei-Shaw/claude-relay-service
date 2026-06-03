@@ -1,6 +1,7 @@
 const axios = require('axios')
 const ProxyHelper = require('../../utils/proxyHelper')
 const logger = require('../../utils/logger')
+const redis = require('../../models/redis')
 const { filterForOpenAI } = require('../../utils/headerFilter')
 const openaiResponsesAccountService = require('../account/openaiResponsesAccountService')
 const apiKeyService = require('../apiKeyService')
@@ -17,6 +18,8 @@ const {
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
 const LAST_USED_AT_THROTTLE_MS = 60000
+const ACCOUNT_CONCURRENCY_LEASE_SECONDS = 600
+const ACCOUNT_CONCURRENCY_REFRESH_MS = 5 * 60 * 1000
 
 // 抽取缓存写入 token，兼容多种字段命名
 function extractCacheCreationTokens(usageData) {
@@ -49,6 +52,89 @@ class OpenAIResponsesRelayService {
     this.defaultTimeout = config.requestTimeout || 600000
   }
 
+  _getAccountConcurrencyKey(accountId) {
+    return `openai_responses_account:${accountId}`
+  }
+
+  _getMaxConcurrentTasks(account) {
+    const maxConcurrentTasks = parseInt(account?.maxConcurrentTasks, 10)
+    return Number.isInteger(maxConcurrentTasks) && maxConcurrentTasks > 0 ? maxConcurrentTasks : 0
+  }
+
+  async _acquireAccountConcurrency(account) {
+    const maxConcurrentTasks = this._getMaxConcurrentTasks(account)
+    if (maxConcurrentTasks <= 0) {
+      return null
+    }
+
+    const accountId = account.id
+    const requestId = crypto.randomUUID()
+    const concurrencyKey = this._getAccountConcurrencyKey(accountId)
+    const newConcurrency = Number(
+      await redis.incrConcurrency(concurrencyKey, requestId, ACCOUNT_CONCURRENCY_LEASE_SECONDS)
+    )
+
+    if (newConcurrency > maxConcurrentTasks) {
+      await redis.decrConcurrency(concurrencyKey, requestId)
+      const error = new Error(
+        `OpenAI-Responses account ${account.name || accountId} concurrency limit exceeded`
+      )
+      error.statusCode = 429
+      throw error
+    }
+
+    const refreshInterval = setInterval(() => {
+      redis
+        .refreshConcurrencyLease(concurrencyKey, requestId, ACCOUNT_CONCURRENCY_LEASE_SECONDS)
+        .catch((error) => {
+          logger.error(
+            `❌ Failed to refresh OpenAI-Responses account concurrency lease for ${accountId}:`,
+            error.message
+          )
+        })
+    }, ACCOUNT_CONCURRENCY_REFRESH_MS)
+    if (typeof refreshInterval.unref === 'function') {
+      refreshInterval.unref()
+    }
+
+    logger.debug(
+      `🔓 Acquired OpenAI-Responses account concurrency slot: ${account.name || accountId}, current: ${newConcurrency}/${maxConcurrentTasks}, request: ${requestId}`
+    )
+
+    return {
+      accountId,
+      accountName: account.name || accountId,
+      concurrencyKey,
+      requestId,
+      refreshInterval,
+      released: false
+    }
+  }
+
+  async _releaseAccountConcurrency(lease, reason = 'completed') {
+    if (!lease || lease.released) {
+      return
+    }
+
+    lease.released = true
+    if (lease.refreshInterval) {
+      clearInterval(lease.refreshInterval)
+      lease.refreshInterval = null
+    }
+
+    try {
+      await redis.decrConcurrency(lease.concurrencyKey, lease.requestId)
+      logger.debug(
+        `🔓 Released OpenAI-Responses account concurrency slot: ${lease.accountName}, request: ${lease.requestId}, reason: ${reason}`
+      )
+    } catch (error) {
+      logger.error(
+        `❌ Failed to release OpenAI-Responses account concurrency slot for ${lease.accountId}:`,
+        error.message
+      )
+    }
+  }
+
   // 节流更新 lastUsedAt
   async _throttledUpdateLastUsedAt(accountId) {
     const now = Date.now()
@@ -67,6 +153,8 @@ class OpenAIResponsesRelayService {
   // 处理请求转发
   async handleRequest(req, res, account, apiKeyData) {
     let abortController = null
+    let accountConcurrencyLease = null
+    let streamDelegated = false
     // 获取会话哈希（如果有的话）
     const sessionId = req.headers['session_id'] || req.body?.session_id
     const sessionHash = sessionId
@@ -79,6 +167,8 @@ class OpenAIResponsesRelayService {
       if (!fullAccount) {
         throw new Error('Account not found')
       }
+
+      accountConcurrencyLease = await this._acquireAccountConcurrency(fullAccount)
 
       // 创建 AbortController 用于取消请求
       abortController = new AbortController()
@@ -341,6 +431,7 @@ class OpenAIResponsesRelayService {
 
       // 处理流式响应
       if (req.body?.stream && response.data && typeof response.data.pipe === 'function') {
+        streamDelegated = true
         return this._handleStreamResponse(
           response,
           res,
@@ -348,7 +439,8 @@ class OpenAIResponsesRelayService {
           apiKeyData,
           req.body?.model,
           handleClientDisconnect,
-          req
+          req,
+          accountConcurrencyLease
         )
       }
 
@@ -368,6 +460,19 @@ class OpenAIResponsesRelayService {
         statusText: error.response?.statusText
       }
       logger.error('OpenAI-Responses relay error:', errorInfo)
+
+      if (error.statusCode) {
+        if (!res.headersSent) {
+          return res.status(error.statusCode).json({
+            error: {
+              message: error.message,
+              type: 'account_concurrency_limit_exceeded',
+              code: 'account_concurrency_limit_exceeded'
+            }
+          })
+        }
+        return res.end()
+      }
 
       // 检查是否是网络错误
       if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
@@ -469,6 +574,10 @@ class OpenAIResponsesRelayService {
           details: error.message
         }
       })
+    } finally {
+      if (!streamDelegated) {
+        await this._releaseAccountConcurrency(accountConcurrencyLease, 'request completed')
+      }
     }
   }
 
@@ -480,7 +589,8 @@ class OpenAIResponsesRelayService {
     apiKeyData,
     requestedModel,
     handleClientDisconnect,
-    req
+    req,
+    accountConcurrencyLease
   ) {
     // 设置 SSE 响应头
     res.setHeader('Content-Type', 'text/event-stream')
@@ -680,6 +790,8 @@ class OpenAIResponsesRelayService {
         res.end()
       }
 
+      await this._releaseAccountConcurrency(accountConcurrencyLease, 'stream end')
+
       logger.info('Stream response completed', {
         accountId: account.id,
         hasUsage: !!usageData,
@@ -687,7 +799,7 @@ class OpenAIResponsesRelayService {
       })
     })
 
-    response.data.on('error', (error) => {
+    response.data.on('error', async (error) => {
       streamEnded = true
       logger.error('Stream error:', error)
 
@@ -700,6 +812,8 @@ class OpenAIResponsesRelayService {
       } else if (!res.destroyed) {
         res.end()
       }
+
+      await this._releaseAccountConcurrency(accountConcurrencyLease, 'stream error')
     })
 
     // 处理客户端断开连接
@@ -711,6 +825,14 @@ class OpenAIResponsesRelayService {
       } catch (_) {
         // 忽略清理错误
       }
+      this._releaseAccountConcurrency(accountConcurrencyLease, 'client disconnected').catch(
+        (error) => {
+          logger.error(
+            'Failed to release OpenAI-Responses account concurrency after disconnect:',
+            error
+          )
+        }
+      )
     }
 
     req.on('close', cleanup)

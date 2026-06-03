@@ -1654,6 +1654,22 @@
                 </p>
               </div>
 
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  最大并发任务数
+                </label>
+                <input
+                  v-model.number="form.maxConcurrentTasks"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  min="0"
+                  placeholder="0 表示不限制"
+                  type="number"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  限制该账户的并发请求数量，0 表示不限制
+                </p>
+              </div>
+
               <!-- 限流时长字段 - 隐藏不显示，使用默认值60 -->
               <input v-model.number="form.rateLimitDuration" type="hidden" value="60" />
             </div>
@@ -1934,6 +1950,22 @@
               />
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 数字越小优先级越高，建议范围：1-100
+              </p>
+            </div>
+
+            <div v-if="form.platform === 'openai'">
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                最大并发任务数
+              </label>
+              <input
+                v-model.number="form.maxConcurrentTasks"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                min="0"
+                placeholder="0 表示不限制"
+                type="number"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                限制该账户的并发请求数量，0 表示不限制
               </p>
             </div>
 
@@ -2957,6 +2989,22 @@
             />
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               数字越小优先级越高，建议范围：1-100
+            </p>
+          </div>
+
+          <div v-if="form.platform === 'openai'">
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              最大并发任务数
+            </label>
+            <input
+              v-model.number="form.maxConcurrentTasks"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+              min="0"
+              placeholder="0 表示不限制"
+              type="number"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              限制该账户的并发请求数量，0 表示不限制
             </p>
           </div>
 
@@ -5059,6 +5107,7 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
       data.priority = form.value.priority || 50
+      data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0
     } else if (currentPlatform === 'droid') {
       const rawTokens = tokenInfo.tokens || tokenInfo || {}
 
@@ -5429,6 +5478,7 @@ const createAccount = async () => {
       data.needsImmediateRefresh = true
       data.requireRefreshSuccess = true // 必须刷新成功才能创建账户
       data.priority = form.value.priority || 50
+      data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0
     } else if (form.value.platform === 'droid') {
       data.priority = form.value.priority || 50
       data.endpointType = form.value.endpointType || 'anthropic'
@@ -5480,6 +5530,7 @@ const createAccount = async () => {
       data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
+      data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0
     } else if (form.value.platform === 'gemini-antigravity') {
       // Antigravity OAuth - set oauthProvider, submission happens below
       data.oauthProvider = 'antigravity'
@@ -5793,6 +5844,7 @@ const updateAccount = async () => {
     // OpenAI 账号优先级更新
     if (props.account.platform === 'openai') {
       data.priority = form.value.priority || 50
+      data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0
     }
 
     // Gemini 账号优先级更新
@@ -5833,6 +5885,7 @@ const updateAccount = async () => {
       // 编辑时不上传 rateLimitDuration，保持原值
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
+      data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0
     }
 
     // Bedrock 特定更新

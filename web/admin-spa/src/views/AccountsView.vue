@@ -1158,8 +1158,16 @@
                       </div>
                     </div>
                   </div>
-                  <div v-else-if="account.platform === 'openai'" class="space-y-2">
-                    <div v-if="account.codexUsage" class="space-y-2">
+                  <div
+                    v-else-if="
+                      account.platform === 'openai' || account.platform === 'openai-responses'
+                    "
+                    class="space-y-2"
+                  >
+                    <div
+                      v-if="account.platform === 'openai' && account.codexUsage"
+                      class="space-y-2"
+                    >
                       <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
                         <div class="flex items-center gap-2">
                           <span
@@ -1225,8 +1233,48 @@
                         </div>
                       </div>
                     </div>
-                    <div v-else class="text-sm text-gray-400">
-                      <span class="text-xs">N/A</span>
+
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-600 dark:text-gray-300">并发状态</span>
+                        <span
+                          v-if="Number(account.maxConcurrentTasks || 0) > 0"
+                          class="font-medium text-gray-700 dark:text-gray-200"
+                        >
+                          {{ getConsoleConcurrencyPercent(account).toFixed(0) }}%
+                        </span>
+                      </div>
+                      <div
+                        v-if="Number(account.maxConcurrentTasks || 0) > 0"
+                        class="flex items-center gap-2"
+                      >
+                        <div class="h-2 w-24 rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div
+                            :class="[
+                              'h-2 rounded-full transition-all duration-300',
+                              getConcurrencyBarClass(getConsoleConcurrencyPercent(account))
+                            ]"
+                            :style="{
+                              width: Math.min(100, getConsoleConcurrencyPercent(account)) + '%'
+                            }"
+                          />
+                        </div>
+                        <span
+                          :class="[
+                            'min-w-[48px] text-xs font-medium',
+                            getConcurrencyLabelClass(account)
+                          ]"
+                        >
+                          {{ Number(account.activeTaskCount || 0) }} /
+                          {{ Number(account.maxConcurrentTasks || 0) }}
+                        </span>
+                      </div>
+                      <div
+                        v-else
+                        class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-300"
+                      >
+                        <i class="fas fa-infinity mr-1" />并发无限制
+                      </div>
                     </div>
                   </div>
                   <div v-else class="text-sm text-gray-400">
@@ -1758,8 +1806,11 @@
               </div>
               <div v-else class="text-xs text-gray-400">暂无统计</div>
             </div>
-            <div v-else-if="account.platform === 'openai'" class="space-y-2">
-              <div v-if="account.codexUsage" class="space-y-2">
+            <div
+              v-else-if="account.platform === 'openai' || account.platform === 'openai-responses'"
+              class="space-y-2"
+            >
+              <div v-if="account.platform === 'openai' && account.codexUsage" class="space-y-2">
                 <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
                   <div class="flex items-center gap-2">
                     <span
@@ -1825,7 +1876,39 @@
                   </div>
                 </div>
               </div>
-              <div v-if="!account.codexUsage" class="text-xs text-gray-400">暂无统计</div>
+
+              <div class="space-y-1.5 rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-medium text-gray-600 dark:text-gray-300">并发状态</span>
+                  <span
+                    v-if="Number(account.maxConcurrentTasks || 0) > 0"
+                    class="font-medium text-gray-700 dark:text-gray-200"
+                  >
+                    {{ getConsoleConcurrencyPercent(account).toFixed(0) }}%
+                  </span>
+                </div>
+                <div v-if="Number(account.maxConcurrentTasks || 0) > 0" class="space-y-1">
+                  <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-600">
+                    <div
+                      :class="[
+                        'h-full transition-all duration-300',
+                        getConcurrencyBarClass(getConsoleConcurrencyPercent(account))
+                      ]"
+                      :style="{ width: Math.min(100, getConsoleConcurrencyPercent(account)) + '%' }"
+                    />
+                  </div>
+                  <div :class="['text-xs font-medium', getConcurrencyLabelClass(account)]">
+                    {{ Number(account.activeTaskCount || 0) }} /
+                    {{ Number(account.maxConcurrentTasks || 0) }}
+                  </div>
+                </div>
+                <div
+                  v-else
+                  class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-600 dark:text-gray-300"
+                >
+                  <i class="fas fa-infinity mr-1" />并发无限制
+                </div>
+              </div>
             </div>
 
             <!-- 最后使用时间 -->

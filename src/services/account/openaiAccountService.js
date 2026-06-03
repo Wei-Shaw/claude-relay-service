@@ -66,6 +66,11 @@ function computeResetMeta(updatedAt, resetAfterSeconds) {
   }
 }
 
+function normalizeMaxConcurrentTasks(value) {
+  const concurrent = parseInt(value, 10)
+  return Number.isInteger(concurrent) && concurrent > 0 ? concurrent : 0
+}
+
 function buildCodexUsageSnapshot(accountData) {
   const updatedAt = accountData.codexUsageUpdatedAt
 
@@ -461,6 +466,7 @@ async function createAccount(accountData) {
     accountType: accountData.accountType || 'shared',
     groupId: accountData.groupId || null,
     priority: accountData.priority || 50,
+    maxConcurrentTasks: normalizeMaxConcurrentTasks(accountData.maxConcurrentTasks).toString(),
     rateLimitDuration:
       accountData.rateLimitDuration !== undefined && accountData.rateLimitDuration !== null
         ? accountData.rateLimitDuration
@@ -566,6 +572,8 @@ async function getAccount(accountId) {
     }
   }
 
+  accountData.maxConcurrentTasks = normalizeMaxConcurrentTasks(accountData.maxConcurrentTasks)
+
   return accountData
 }
 
@@ -617,6 +625,10 @@ async function updateAccount(accountId, updates) {
       updates.disableAutoProtection === true || updates.disableAutoProtection === 'true'
         ? 'true'
         : 'false'
+  }
+
+  if (updates.maxConcurrentTasks !== undefined) {
+    updates.maxConcurrentTasks = normalizeMaxConcurrentTasks(updates.maxConcurrentTasks).toString()
   }
 
   // 更新账户类型时处理共享账户集合
@@ -723,6 +735,7 @@ async function getAllAccounts() {
 
       // 获取限流状态信息
       const rateLimitInfo = await getAccountRateLimitInfo(accountData.id)
+      const activeTaskCount = await redisClient.getConcurrency(`openai_account:${accountData.id}`)
 
       // 解析代理配置
       if (accountData.proxy) {
@@ -760,6 +773,8 @@ async function getAllAccounts() {
           accountData.scopes && accountData.scopes.trim() ? accountData.scopes.split(' ') : [],
         // 添加 hasRefreshToken 标记
         hasRefreshToken: hasRefreshTokenFlag,
+        maxConcurrentTasks: normalizeMaxConcurrentTasks(accountData.maxConcurrentTasks),
+        activeTaskCount,
         // 添加限流状态信息（统一格式）
         rateLimitStatus: rateLimitInfo
           ? {

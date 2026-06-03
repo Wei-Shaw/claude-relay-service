@@ -11,6 +11,36 @@ class UnifiedOpenAIScheduler {
     this.SESSION_MAPPING_PREFIX = 'unified_openai_session_mapping:'
   }
 
+  _getAccountConcurrencyKey(accountId, accountType) {
+    return accountType === 'openai-responses'
+      ? `openai_responses_account:${accountId}`
+      : `openai_account:${accountId}`
+  }
+
+  _getMaxConcurrentTasks(account) {
+    const maxConcurrentTasks = parseInt(account?.maxConcurrentTasks, 10)
+    return Number.isInteger(maxConcurrentTasks) && maxConcurrentTasks > 0 ? maxConcurrentTasks : 0
+  }
+
+  async _isAccountConcurrencyFull(account, accountType) {
+    const maxConcurrentTasks = this._getMaxConcurrentTasks(account)
+    if (maxConcurrentTasks <= 0) {
+      return false
+    }
+
+    const accountId = account.id || account.accountId
+    const currentConcurrency = await redis.getConcurrency(
+      this._getAccountConcurrencyKey(accountId, accountType)
+    )
+    const isFull = currentConcurrency >= maxConcurrentTasks
+    if (isFull) {
+      logger.warn(
+        `🚫 ${accountType} account ${account.name || accountId} reached concurrency limit: ${currentConcurrency}/${maxConcurrentTasks}`
+      )
+    }
+    return isFull
+  }
+
   // 🔧 辅助方法：检查账户是否被限流（兼容字符串和对象格式）
   _isRateLimited(rateLimitStatus) {
     if (!rateLimitStatus) {
@@ -241,6 +271,13 @@ class UnifiedOpenAIScheduler {
               }
             }
 
+            if (await this._isAccountConcurrencyFull(boundAccount, accountType)) {
+              const errorMsg = `Dedicated account ${boundAccount.name} reached concurrency limit`
+              const error = new Error(errorMsg)
+              error.statusCode = 429
+              throw error
+            }
+
             logger.info(
               `🎯 Using bound dedicated ${accountType} account: ${boundAccount.name} (${boundAccount.id}) for API key ${apiKeyData.name}`
             )
@@ -423,6 +460,10 @@ class UnifiedOpenAIScheduler {
           }
         }
 
+        if (await this._isAccountConcurrencyFull(account, 'openai')) {
+          continue
+        }
+
         availableAccounts.push({
           ...account,
           accountId: account.id,
@@ -505,6 +546,10 @@ class UnifiedOpenAIScheduler {
         // OpenAI-Responses 账户默认支持所有模型
         // 因为它们是第三方兼容 API，模型支持由第三方决定
 
+        if (await this._isAccountConcurrencyFull(account, 'openai-responses')) {
+          continue
+        }
+
         availableAccounts.push({
           ...account,
           accountId: account.id,
@@ -555,6 +600,10 @@ class UnifiedOpenAIScheduler {
           return false
         }
 
+        if (await this._isAccountConcurrencyFull(account, accountType)) {
+          return false
+        }
+
         return true
       } else if (accountType === 'openai-responses') {
         const account = await openaiResponsesAccountService.getAccount(accountId)
@@ -589,6 +638,10 @@ class UnifiedOpenAIScheduler {
         )
         if (isTempUnavailable) {
           logger.info(`⏱️ OpenAI account ${accountId} (${accountType}) is temporarily unavailable`)
+          return false
+        }
+
+        if (await this._isAccountConcurrencyFull(account, accountType)) {
           return false
         }
 

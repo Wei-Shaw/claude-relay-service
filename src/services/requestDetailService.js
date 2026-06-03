@@ -35,6 +35,19 @@ const MAX_REQUEST_DETAIL_SNAPSHOT_POINTERS = 25000
 const MAX_REQUEST_DETAIL_SNAPSHOT_BYTES = 2 * 1024 * 1024
 const REQUEST_DETAIL_WRITE_MODES = new Set(['redis', 'dual', 'postgres'])
 const REQUEST_DETAIL_READ_MODES = new Set(['redis', 'postgres'])
+const REQUEST_DETAIL_SORT_FIELDS = new Set([
+  'timestamp',
+  'inputTokens',
+  'outputTokens',
+  'cacheReadTokens',
+  'cacheCreateTokens',
+  'totalTokens',
+  'cost',
+  'durationMs',
+  'timeToFirstByteMs',
+  'timeToFirstTokenMs',
+  'contentGenerationMs'
+])
 
 const accountTypeNames = {
   claude: 'Claude官方',
@@ -78,6 +91,10 @@ function normalizeRequestDetailWriteMode(value) {
 
 function normalizeRequestDetailReadMode(value) {
   return REQUEST_DETAIL_READ_MODES.has(value) ? value : 'redis'
+}
+
+function normalizeRequestDetailSortBy(value) {
+  return REQUEST_DETAIL_SORT_FIELDS.has(value) ? value : 'timestamp'
 }
 
 function isPlainObject(value) {
@@ -306,7 +323,8 @@ function normalizeRequestDetailFilters(filters = {}) {
     accountId: normalizeOptionalFilterValue(filters.accountId),
     model: normalizeOptionalFilterValue(filters.model),
     endpoint: normalizeOptionalFilterValue(filters.endpoint),
-    session: normalizeOptionalFilterValue(filters.session)
+    session: normalizeOptionalFilterValue(filters.session),
+    sortBy: normalizeRequestDetailSortBy(filters.sortBy)
   }
 }
 
@@ -376,6 +394,7 @@ function createRequestDetailFilterSignature(
     model: normalizeOptionalFilterValue(filters.model),
     endpoint: normalizeOptionalFilterValue(filters.endpoint),
     session: normalizeOptionalFilterValue(filters.session),
+    sortBy: normalizeRequestDetailSortBy(filters.sortBy),
     sortOrder: filters.sortOrder === 'asc' ? 'asc' : 'desc',
     retentionHours:
       retentionHours !== null && retentionHours !== undefined ? Number(retentionHours) : null,
@@ -434,6 +453,7 @@ function requestDetailFilterSignaturesMatch(snapshotSignature, currentSignature)
     normalizedSnapshot.model === normalizedCurrent.model &&
     normalizedSnapshot.endpoint === normalizedCurrent.endpoint &&
     normalizedSnapshot.session === normalizedCurrent.session &&
+    normalizedSnapshot.sortBy === normalizedCurrent.sortBy &&
     normalizedSnapshot.sortOrder === normalizedCurrent.sortOrder &&
     normalizedSnapshot.retentionHours === normalizedCurrent.retentionHours &&
     requestDetailDateBoundarySignaturesMatch(
@@ -481,6 +501,51 @@ function inflateMatchedPointers(flattened = []) {
   }
 
   return pointers
+}
+
+function getRequestDetailSortValue(record = {}, sortBy = 'timestamp') {
+  if (sortBy === 'timestamp') {
+    return toMillis(record.timestamp)
+  }
+
+  if (sortBy === 'totalTokens') {
+    return normalizeNumber(
+      record.totalTokens ||
+        normalizeNumber(record.inputTokens) +
+          normalizeNumber(record.outputTokens) +
+          normalizeNumber(record.cacheReadTokens) +
+          normalizeNumber(record.cacheCreateTokens)
+    )
+  }
+
+  return normalizeNumber(record[sortBy])
+}
+
+function sortMatchedRequestPointers(
+  matchedPointers = [],
+  sortBy = 'timestamp',
+  sortOrder = 'desc'
+) {
+  const direction = sortOrder === 'asc' ? 1 : -1
+
+  matchedPointers.sort((a, b) => {
+    const aPrimary = sortBy === 'timestamp' ? Number(a.timestampMs) : Number(a.sortValue ?? 0)
+    const bPrimary = sortBy === 'timestamp' ? Number(b.timestampMs) : Number(b.sortValue ?? 0)
+
+    if (Number.isFinite(aPrimary) && Number.isFinite(bPrimary) && aPrimary !== bPrimary) {
+      return (aPrimary - bPrimary) * direction
+    }
+
+    const aTime = Number(a.timestampMs)
+    const bTime = Number(b.timestampMs)
+    if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) {
+      return (aTime - bTime) * direction
+    }
+
+    return String(a.requestId || '').localeCompare(String(b.requestId || '')) * direction
+  })
+
+  return matchedPointers
 }
 
 class RequestDetailValidationError extends Error {
@@ -709,6 +774,7 @@ class RequestDetailService {
         endpoint: filters.endpoint || null,
         session: filters.session || null,
         hasCustomDateRange: Boolean(filters.startDate || filters.endDate),
+        sortBy: normalizeRequestDetailSortBy(filters.sortBy),
         sortOrder: filters.sortOrder === 'asc' ? 'asc' : 'desc'
       },
       availableFilters: {
@@ -1356,7 +1422,7 @@ class RequestDetailService {
     return true
   }
 
-  _buildResponseFilters(filters, effectiveStart, effectiveEnd, sortOrder) {
+  _buildResponseFilters(filters, effectiveStart, effectiveEnd, sortBy, sortOrder) {
     return {
       startDate: effectiveStart.toISOString(),
       endDate: effectiveEnd.toISOString(),
@@ -1367,6 +1433,7 @@ class RequestDetailService {
       endpoint: filters.endpoint || null,
       session: filters.session || null,
       hasCustomDateRange: Boolean(filters.startDate || filters.endDate),
+      sortBy,
       sortOrder
     }
   }
@@ -1444,7 +1511,7 @@ class RequestDetailService {
     }))
   }
 
-  async _buildListQueryData(filters, effectiveStart, effectiveEnd, sortOrder) {
+  async _buildListQueryData(filters, effectiveStart, effectiveEnd, sortBy, sortOrder) {
     const requestPointers = await this._loadRequestPointersInRange(effectiveStart, effectiveEnd)
     if (requestPointers.length === 0) {
       return {
@@ -1464,9 +1531,7 @@ class RequestDetailService {
       }
     }
 
-    requestPointers.sort((a, b) =>
-      sortOrder === 'asc' ? a.timestampMs - b.timestampMs : b.timestampMs - a.timestampMs
-    )
+    sortMatchedRequestPointers(requestPointers, 'timestamp', sortOrder)
 
     const availableFilterAccumulator = createAvailableFilterAccumulator()
     const summaryAccumulator = createSummaryAccumulator()
@@ -1504,11 +1569,14 @@ class RequestDetailService {
             return
           }
 
-          updateSummaryAccumulator(summaryAccumulator, record)
+          const displayRecord = prepareRecordForDisplay(record)
+          updateSummaryAccumulator(summaryAccumulator, displayRecord)
 
           matchedPointers.push({
-            requestId: record.requestId,
-            timestampMs: toMillis(record.timestamp) ?? recordItems[index].pointer.timestampMs
+            requestId: displayRecord.requestId,
+            timestampMs:
+              toMillis(displayRecord.timestamp) ?? recordItems[index].pointer.timestampMs,
+            sortValue: getRequestDetailSortValue(displayRecord, sortBy)
           })
         })
       }
@@ -1536,13 +1604,16 @@ class RequestDetailService {
 
           matchedPointers.push({
             requestId: displayRecord.requestId,
-            timestampMs: toMillis(displayRecord.timestamp) ?? pointer.timestampMs
+            timestampMs: toMillis(displayRecord.timestamp) ?? pointer.timestampMs,
+            sortValue: getRequestDetailSortValue(displayRecord, sortBy)
           })
         }
       }
 
       await this._resolveFilterDisplayNames(availableFilterAccumulator)
     }
+
+    sortMatchedRequestPointers(matchedPointers, sortBy, sortOrder)
 
     return {
       hasSourceRecords: true,
@@ -1725,6 +1796,7 @@ class RequestDetailService {
     filters,
     effectiveStart,
     effectiveEnd,
+    sortBy,
     sortOrder,
     page,
     pageSize
@@ -1766,6 +1838,7 @@ class RequestDetailService {
             startDate: effectiveStart,
             endDate: effectiveEnd,
             filters,
+            sortBy,
             sortOrder,
             page: currentPage,
             pageSize
@@ -1835,11 +1908,13 @@ class RequestDetailService {
 
     const page = Math.max(Number.parseInt(filters.page, 10) || 1, 1)
     const pageSize = Math.min(Math.max(Number.parseInt(filters.pageSize, 10) || 50, 1), 200)
+    const sortBy = normalizeRequestDetailSortBy(filters.sortBy)
     const sortOrder = filters.sortOrder === 'asc' ? 'asc' : 'desc'
     const responseFilters = this._buildResponseFilters(
       filters,
       effectiveStart,
       effectiveEnd,
+      sortBy,
       sortOrder
     )
     if (settings.readMode === 'postgres') {
@@ -1847,6 +1922,7 @@ class RequestDetailService {
         filters,
         effectiveStart,
         effectiveEnd,
+        sortBy,
         sortOrder,
         page,
         pageSize
@@ -1914,6 +1990,7 @@ class RequestDetailService {
       filters,
       effectiveStart,
       effectiveEnd,
+      sortBy,
       sortOrder
     )
     if (!queryData.hasSourceRecords) {
@@ -2018,6 +2095,7 @@ class RequestDetailService {
       filters,
       effectiveStart,
       effectiveEnd,
+      'timestamp',
       sortOrder
     )
 

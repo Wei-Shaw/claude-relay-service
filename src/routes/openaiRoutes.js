@@ -3,6 +3,7 @@ const axios = require('axios')
 const router = express.Router()
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const redis = require('../models/redis')
 const { authenticateApiKey } = require('../middleware/auth')
 const unifiedOpenAIScheduler = require('../services/scheduler/unifiedOpenAIScheduler')
 const openaiAccountService = require('../services/account/openaiAccountService')
@@ -55,6 +56,95 @@ function toNumberSafe(value) {
   }
   const num = Number(value)
   return Number.isFinite(num) ? num : null
+}
+
+const ACCOUNT_CONCURRENCY_LEASE_SECONDS = 600
+const ACCOUNT_CONCURRENCY_REFRESH_MS = 5 * 60 * 1000
+
+function getOpenAIAccountConcurrencyKey(accountId, accountType = 'openai') {
+  return accountType === 'openai-responses'
+    ? `openai_responses_account:${accountId}`
+    : `openai_account:${accountId}`
+}
+
+function getMaxConcurrentTasks(account) {
+  const maxConcurrentTasks = parseInt(account?.maxConcurrentTasks, 10)
+  return Number.isInteger(maxConcurrentTasks) && maxConcurrentTasks > 0 ? maxConcurrentTasks : 0
+}
+
+async function acquireOpenAIAccountConcurrency(account, accountType = 'openai') {
+  const maxConcurrentTasks = getMaxConcurrentTasks(account)
+  if (maxConcurrentTasks <= 0) {
+    return null
+  }
+
+  const accountId = account.id
+  const requestId = crypto.randomUUID()
+  const concurrencyKey = getOpenAIAccountConcurrencyKey(accountId, accountType)
+  const newConcurrency = Number(
+    await redis.incrConcurrency(concurrencyKey, requestId, ACCOUNT_CONCURRENCY_LEASE_SECONDS)
+  )
+
+  if (newConcurrency > maxConcurrentTasks) {
+    await redis.decrConcurrency(concurrencyKey, requestId)
+    const error = new Error(
+      `${accountType} account ${account.name || accountId} concurrency limit exceeded`
+    )
+    error.statusCode = 429
+    throw error
+  }
+
+  const refreshInterval = setInterval(() => {
+    redis
+      .refreshConcurrencyLease(concurrencyKey, requestId, ACCOUNT_CONCURRENCY_LEASE_SECONDS)
+      .catch((error) => {
+        logger.error(
+          `❌ Failed to refresh ${accountType} account concurrency lease for ${accountId}:`,
+          error.message
+        )
+      })
+  }, ACCOUNT_CONCURRENCY_REFRESH_MS)
+  if (typeof refreshInterval.unref === 'function') {
+    refreshInterval.unref()
+  }
+
+  logger.debug(
+    `🔓 Acquired ${accountType} account concurrency slot: ${account.name || accountId}, current: ${newConcurrency}/${maxConcurrentTasks}, request: ${requestId}`
+  )
+
+  return {
+    accountId,
+    accountName: account.name || accountId,
+    accountType,
+    concurrencyKey,
+    requestId,
+    refreshInterval,
+    released: false
+  }
+}
+
+async function releaseOpenAIAccountConcurrency(lease, reason = 'completed') {
+  if (!lease || lease.released) {
+    return
+  }
+
+  lease.released = true
+  if (lease.refreshInterval) {
+    clearInterval(lease.refreshInterval)
+    lease.refreshInterval = null
+  }
+
+  try {
+    await redis.decrConcurrency(lease.concurrencyKey, lease.requestId)
+    logger.debug(
+      `🔓 Released ${lease.accountType} account concurrency slot: ${lease.accountName}, request: ${lease.requestId}, reason: ${reason}`
+    )
+  } catch (error) {
+    logger.error(
+      `❌ Failed to release ${lease.accountType} account concurrency slot for ${lease.accountId}:`,
+      error.message
+    )
+  }
 }
 
 function extractCodexUsageHeaders(headers) {
@@ -298,6 +388,8 @@ const handleResponses = async (req, res) => {
   let account = null
   let proxy = null
   let accessToken = null
+  let accountConcurrencyLease = null
+  let streamDelegated = false
 
   try {
     // 从中间件获取 API Key 数据
@@ -396,6 +488,8 @@ const handleResponses = async (req, res) => {
       logger.info(`🔀 Using OpenAI-Responses relay service for account: ${account.name}`)
       return await openaiResponsesRelayService.handleRequest(req, res, account, apiKeyData)
     }
+
+    accountConcurrencyLease = await acquireOpenAIAccountConcurrency(account, 'openai')
 
     if (schedulerModel !== requestedModel) {
       logger.info(
@@ -753,6 +847,8 @@ const handleResponses = async (req, res) => {
       }
     }
 
+    streamDelegated = true
+
     // 使用增量 SSE 解析器
     const sseParser = new IncrementalSSEParser()
 
@@ -889,15 +985,17 @@ const handleResponses = async (req, res) => {
       }
 
       res.end()
+      await releaseOpenAIAccountConcurrency(accountConcurrencyLease, 'stream end')
     })
 
-    upstream.data.on('error', (err) => {
+    upstream.data.on('error', async (err) => {
       logger.error('Upstream stream error:', err)
       if (!res.headersSent) {
         res.status(502).json({ error: { message: 'Upstream stream error' } })
       } else {
         res.end()
       }
+      await releaseOpenAIAccountConcurrency(accountConcurrencyLease, 'stream error')
     })
 
     // 客户端断开时清理上游流
@@ -908,6 +1006,11 @@ const handleResponses = async (req, res) => {
       } catch (_) {
         //
       }
+      releaseOpenAIAccountConcurrency(accountConcurrencyLease, 'client disconnected').catch(
+        (error) => {
+          logger.error('Failed to release OpenAI account concurrency after disconnect:', error)
+        }
+      )
     }
     req.on('close', cleanup)
     req.on('aborted', cleanup)
@@ -964,6 +1067,10 @@ const handleResponses = async (req, res) => {
 
     if (!res.headersSent) {
       res.status(status).json(responsePayload)
+    }
+  } finally {
+    if (!streamDelegated) {
+      await releaseOpenAIAccountConcurrency(accountConcurrencyLease, 'request completed')
     }
   }
 }

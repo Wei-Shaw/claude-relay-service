@@ -253,12 +253,32 @@
                       class="toolbar-control-glow bg-gradient-to-r from-slate-500 to-gray-500"
                     ></div>
                     <el-select
+                      v-model="filters.sortBy"
+                      class="toolbar-element w-full"
+                      placeholder="排序字段"
+                    >
+                      <el-option label="统计时间" value="timestamp" />
+                      <el-option label="输入 Token" value="inputTokens" />
+                      <el-option label="输出 Token" value="outputTokens" />
+                      <el-option label="缓存读取" value="cacheReadTokens" />
+                      <el-option label="缓存创建" value="cacheCreateTokens" />
+                      <el-option label="费用" value="cost" />
+                      <el-option label="耗时" value="durationMs" />
+                      <el-option label="首词" value="timeToFirstTokenMs" />
+                    </el-select>
+                  </div>
+
+                  <div class="toolbar-control group">
+                    <div
+                      class="toolbar-control-glow bg-gradient-to-r from-slate-500 to-gray-500"
+                    ></div>
+                    <el-select
                       v-model="filters.sortOrder"
                       class="toolbar-element w-full"
-                      placeholder="时间排序"
+                      placeholder="排序方向"
                     >
-                      <el-option label="时间降序" value="desc" />
-                      <el-option label="时间升序" value="asc" />
+                      <el-option label="降序" value="desc" />
+                      <el-option label="升序" value="asc" />
                     </el-select>
                   </div>
                 </div>
@@ -385,7 +405,10 @@
                   <th
                     class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    统计时间
+                    <button class="sortable-th-button" type="button" @click="setSort('timestamp')">
+                      <span>统计时间</span>
+                      <i :class="getSortIcon('timestamp')" />
+                    </button>
                   </th>
                   <th
                     class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -420,22 +443,50 @@
                   <th
                     class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    输入
+                    <button
+                      class="sortable-th-button"
+                      type="button"
+                      @click="setSort('inputTokens')"
+                    >
+                      <span>输入</span>
+                      <i :class="getSortIcon('inputTokens')" />
+                    </button>
                   </th>
                   <th
                     class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    输出
+                    <button
+                      class="sortable-th-button"
+                      type="button"
+                      @click="setSort('outputTokens')"
+                    >
+                      <span>输出</span>
+                      <i :class="getSortIcon('outputTokens')" />
+                    </button>
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    缓存读取
+                    <button
+                      class="sortable-th-button"
+                      type="button"
+                      @click="setSort('cacheReadTokens')"
+                    >
+                      <span>缓存读取</span>
+                      <i :class="getSortIcon('cacheReadTokens')" />
+                    </button>
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    缓存创建
+                    <button
+                      class="sortable-th-button"
+                      type="button"
+                      @click="setSort('cacheCreateTokens')"
+                    >
+                      <span>缓存创建</span>
+                      <i :class="getSortIcon('cacheCreateTokens')" />
+                    </button>
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -445,17 +496,30 @@
                   <th
                     class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    费用
+                    <button class="sortable-th-button" type="button" @click="setSort('cost')">
+                      <span>费用</span>
+                      <i :class="getSortIcon('cost')" />
+                    </button>
                   </th>
                   <th
                     class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    耗时
+                    <button class="sortable-th-button" type="button" @click="setSort('durationMs')">
+                      <span>耗时</span>
+                      <i :class="getSortIcon('durationMs')" />
+                    </button>
                   </th>
                   <th
                     class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    首词
+                    <button
+                      class="sortable-th-button"
+                      type="button"
+                      @click="setSort('timeToFirstTokenMs')"
+                    >
+                      <span>首词</span>
+                      <i :class="getSortIcon('timeToFirstTokenMs')" />
+                    </button>
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -546,9 +610,10 @@
                   <td class="table-cell">{{ formatGenerationSpeed(record) }}</td>
                   <td class="table-cell text-right">
                     <button
-                      class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
+                      class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:border-blue-700 dark:hover:bg-blue-900/60"
                       @click="openDetail(record.requestId)"
                     >
+                      <i class="fas fa-eye" />
                       详情
                     </button>
                   </td>
@@ -576,9 +641,10 @@
                   </p>
                 </div>
                 <button
-                  class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:border-blue-700 dark:hover:bg-blue-900/60"
                   @click="openDetail(record.requestId)"
                 >
+                  <i class="fas fa-eye" />
                   详情
                 </button>
               </div>
@@ -649,7 +715,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { debounce } from 'lodash-es'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   getRequestDetailsApi,
   getRequestDetailBodyPreviewStatsApi,
@@ -659,6 +725,12 @@ import { showToast, formatDate, formatNumber } from '@/utils/tools'
 import RequestDetailModal from '@/components/admin/RequestDetailModal.vue'
 
 const router = useRouter()
+const route = useRoute()
+
+const normalizeQueryValue = (value) => {
+  const rawValue = Array.isArray(value) ? value[0] : value
+  return rawValue ? String(rawValue).trim() : ''
+}
 
 let fetchVersion = 0
 const loading = ref(false)
@@ -685,11 +757,12 @@ const pagination = reactive({
 const filters = reactive({
   dateRange: null,
   keyword: '',
-  apiKeyId: '',
+  apiKeyId: normalizeQueryValue(route.query.apiKeyId),
   accountId: '',
   model: '',
   endpoint: '',
   session: '',
+  sortBy: 'timestamp',
   sortOrder: 'desc'
 })
 
@@ -768,6 +841,7 @@ const buildParams = (page, snapshotId = activeSnapshotId.value) => {
   const params = {
     page,
     pageSize: pagination.pageSize,
+    sortBy: filters.sortBy,
     sortOrder: filters.sortOrder
   }
 
@@ -812,6 +886,7 @@ const syncResponseState = (data) => {
   filters.model = filterEcho.model || ''
   filters.endpoint = filterEcho.endpoint || ''
   filters.session = filterEcho.session || ''
+  filters.sortBy = filterEcho.sortBy || 'timestamp'
   filters.sortOrder = filterEcho.sortOrder || 'desc'
   if (filterEcho.startDate && filterEcho.endDate) {
     const nextRange = [toPickerDate(filterEcho.startDate), toPickerDate(filterEcho.endDate)]
@@ -900,6 +975,7 @@ const resetFilters = () => {
   filters.model = ''
   filters.endpoint = ''
   filters.session = ''
+  filters.sortBy = 'timestamp'
   filters.sortOrder = 'desc'
   pagination.currentPage = 1
   fetchRecords(1)
@@ -986,6 +1062,26 @@ const applySessionFilter = (record) => {
 const clearSessionFilter = () => {
   if (!filters.session) return
   filters.session = ''
+}
+
+const setSort = (field) => {
+  if (filters.sortBy === field) {
+    filters.sortOrder = filters.sortOrder === 'asc' ? 'desc' : 'asc'
+    return
+  }
+
+  filters.sortBy = field
+  filters.sortOrder = 'desc'
+}
+
+const getSortIcon = (field) => {
+  if (filters.sortBy !== field) {
+    return 'fas fa-sort text-gray-400 dark:text-gray-500'
+  }
+
+  return filters.sortOrder === 'asc'
+    ? 'fas fa-sort-up text-blue-500'
+    : 'fas fa-sort-down text-blue-500'
 }
 
 const exportCsv = async () => {
@@ -1142,6 +1238,15 @@ const debouncedKeywordFetch = debounce(() => {
 }, 300)
 
 watch(
+  () => route.query.apiKeyId,
+  (apiKeyId) => {
+    const nextApiKeyId = normalizeQueryValue(apiKeyId)
+    if (filters.apiKeyId === nextApiKeyId) return
+    filters.apiKeyId = nextApiKeyId
+  }
+)
+
+watch(
   () => filters.keyword,
   () => {
     debouncedKeywordFetch()
@@ -1155,6 +1260,7 @@ watch(
     filters.model,
     filters.endpoint,
     filters.session,
+    filters.sortBy,
     filters.sortOrder
   ],
   () => {
@@ -1308,6 +1414,28 @@ onMounted(() => {
   white-space: nowrap;
 }
 
+.sortable-th-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 4px 6px;
+  text-align: left;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.sortable-th-button:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: rgb(37 99 235);
+}
+
+.dark .sortable-th-button:hover {
+  background: rgba(59, 130, 246, 0.16);
+  color: rgb(147 197 253);
+}
+
 .table-cell {
   padding: 14px 16px;
   font-size: 13px;
@@ -1413,7 +1541,7 @@ onMounted(() => {
   }
 
   .request-filter-row-secondary {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .request-toolbar-actions {

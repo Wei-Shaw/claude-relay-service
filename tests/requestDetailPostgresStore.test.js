@@ -63,4 +63,20 @@ describe('requestDetailPostgresStore', () => {
     expect(payloadCall[1][12]).toBe('stop')
     expect(JSON.parse(payloadCall[1][14])).toEqual({ captureMode: 'full' })
   })
+
+  test('listRecordsPage orders by whitelisted request metric columns', async () => {
+    await requestDetailPostgresStore.listRecordsPage({
+      startDate: '2026-05-27T00:00:00.000Z',
+      endDate: '2026-05-28T00:00:00.000Z',
+      sortBy: 'cost',
+      sortOrder: 'asc',
+      page: 1,
+      pageSize: 20
+    })
+
+    const [sql, values] = postgres.query.mock.calls[0]
+    expect(sql).toContain('ORDER BY d.cost ASC, d.timestamp ASC, d.request_id ASC')
+    expect(sql).not.toContain('sortBy')
+    expect(values).toHaveLength(4)
+  })
 })

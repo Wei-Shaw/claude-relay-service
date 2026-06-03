@@ -34,7 +34,7 @@
     </div>
 
     <template v-else>
-      <div class="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <div class="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
         <label class="filter-field xl:col-span-2">
           <span>关键词</span>
           <input
@@ -75,9 +75,22 @@
         </label>
         <label class="filter-field">
           <span>排序</span>
+          <select v-model="filters.sortBy" class="filter-input" @change="fetchRecords(1)">
+            <option value="timestamp">统计时间</option>
+            <option value="inputTokens">输入 Token</option>
+            <option value="outputTokens">输出 Token</option>
+            <option value="cacheReadTokens">缓存读取</option>
+            <option value="cacheCreateTokens">缓存创建</option>
+            <option value="cost">费用</option>
+            <option value="durationMs">耗时</option>
+            <option value="timeToFirstTokenMs">首词</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>方向</span>
           <select v-model="filters.sortOrder" class="filter-input" @change="fetchRecords(1)">
-            <option value="desc">最新优先</option>
-            <option value="asc">最早优先</option>
+            <option value="desc">降序</option>
+            <option value="asc">升序</option>
           </select>
         </label>
       </div>
@@ -200,17 +213,69 @@
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-800/80">
               <tr>
-                <th class="detail-th min-w-[170px]">时间</th>
+                <th class="detail-th min-w-[170px]">
+                  <button class="sortable-th-button" type="button" @click="setSort('timestamp')">
+                    <span>时间</span>
+                    <i :class="getSortIcon('timestamp')" />
+                  </button>
+                </th>
                 <th class="detail-th min-w-[140px]">模型</th>
                 <th class="detail-th min-w-[180px]">接口</th>
                 <th class="detail-th min-w-[220px]">User-Agent</th>
-                <th class="detail-th min-w-[90px]">输入</th>
-                <th class="detail-th min-w-[90px]">输出</th>
-                <th class="detail-th min-w-[100px]">缓存读</th>
-                <th class="detail-th min-w-[100px]">缓存建</th>
-                <th class="detail-th min-w-[100px]">费用</th>
-                <th class="detail-th min-w-[90px]">耗时</th>
-                <th class="detail-th min-w-[90px]">首词</th>
+                <th class="detail-th min-w-[90px]">
+                  <button class="sortable-th-button" type="button" @click="setSort('inputTokens')">
+                    <span>输入</span>
+                    <i :class="getSortIcon('inputTokens')" />
+                  </button>
+                </th>
+                <th class="detail-th min-w-[90px]">
+                  <button class="sortable-th-button" type="button" @click="setSort('outputTokens')">
+                    <span>输出</span>
+                    <i :class="getSortIcon('outputTokens')" />
+                  </button>
+                </th>
+                <th class="detail-th min-w-[100px]">
+                  <button
+                    class="sortable-th-button"
+                    type="button"
+                    @click="setSort('cacheReadTokens')"
+                  >
+                    <span>缓存读</span>
+                    <i :class="getSortIcon('cacheReadTokens')" />
+                  </button>
+                </th>
+                <th class="detail-th min-w-[100px]">
+                  <button
+                    class="sortable-th-button"
+                    type="button"
+                    @click="setSort('cacheCreateTokens')"
+                  >
+                    <span>缓存建</span>
+                    <i :class="getSortIcon('cacheCreateTokens')" />
+                  </button>
+                </th>
+                <th class="detail-th min-w-[100px]">
+                  <button class="sortable-th-button" type="button" @click="setSort('cost')">
+                    <span>费用</span>
+                    <i :class="getSortIcon('cost')" />
+                  </button>
+                </th>
+                <th class="detail-th min-w-[90px]">
+                  <button class="sortable-th-button" type="button" @click="setSort('durationMs')">
+                    <span>耗时</span>
+                    <i :class="getSortIcon('durationMs')" />
+                  </button>
+                </th>
+                <th class="detail-th min-w-[90px]">
+                  <button
+                    class="sortable-th-button"
+                    type="button"
+                    @click="setSort('timeToFirstTokenMs')"
+                  >
+                    <span>首词</span>
+                    <i :class="getSortIcon('timeToFirstTokenMs')" />
+                  </button>
+                </th>
                 <th class="detail-th min-w-[110px]">生成速度</th>
                 <th class="detail-th min-w-[80px] text-right">操作</th>
               </tr>
@@ -493,6 +558,7 @@ const filters = reactive({
   session: '',
   model: '',
   endpoint: '',
+  sortBy: 'timestamp',
   sortOrder: 'desc'
 })
 
@@ -518,6 +584,7 @@ const buildPayload = (page = pagination.currentPage, snapshotId = activeSnapshot
     apiId: props.apiId,
     page,
     pageSize: pagination.pageSize,
+    sortBy: filters.sortBy,
     sortOrder: filters.sortOrder
   }
 
@@ -657,6 +724,7 @@ const syncResponseState = (data = {}) => {
   filters.model = filterEcho.model || ''
   filters.endpoint = filterEcho.endpoint || ''
   filters.session = filterEcho.session || ''
+  filters.sortBy = filterEcho.sortBy || 'timestamp'
   filters.sortOrder = filterEcho.sortOrder || 'desc'
   if (filterEcho.startDate && filterEcho.endDate) {
     suppressDateRangeWatch = true
@@ -754,6 +822,7 @@ const resetFilters = () => {
   filters.session = ''
   filters.model = ''
   filters.endpoint = ''
+  filters.sortBy = 'timestamp'
   filters.sortOrder = 'desc'
   pagination.currentPage = 1
   fetchRecords(1)
@@ -781,6 +850,26 @@ const applySessionValue = (session) => {
   pagination.currentPage = 1
   fetchRecords(1)
   nextTick(() => debouncedKeywordFetch.cancel())
+}
+
+const setSort = (field) => {
+  if (filters.sortBy === field) {
+    filters.sortOrder = filters.sortOrder === 'asc' ? 'desc' : 'asc'
+    return
+  }
+
+  filters.sortBy = field
+  filters.sortOrder = 'desc'
+}
+
+const getSortIcon = (field) => {
+  if (filters.sortBy !== field) {
+    return 'fas fa-sort text-gray-400'
+  }
+
+  return filters.sortOrder === 'asc'
+    ? 'fas fa-sort-up text-blue-500'
+    : 'fas fa-sort-down text-blue-500'
 }
 
 const getSessionSummaryValue = (session) =>
@@ -957,7 +1046,7 @@ watch(
 )
 
 watch(
-  () => [filters.model, filters.endpoint, filters.sortOrder],
+  () => [filters.model, filters.endpoint, filters.sortBy, filters.sortOrder],
   () => {
     invalidateSnapshot()
     pagination.currentPage = 1
@@ -1149,6 +1238,27 @@ watch(
 
 :global(.dark) .detail-th {
   color: rgb(203 213 225);
+}
+
+.sortable-th-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 3px 5px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.sortable-th-button:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: rgb(37 99 235);
+}
+
+:global(.dark) .sortable-th-button:hover {
+  background: rgba(59, 130, 246, 0.16);
+  color: rgb(147 197 253);
 }
 
 .detail-td {

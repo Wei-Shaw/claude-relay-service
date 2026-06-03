@@ -308,7 +308,16 @@
 
         <!-- 底部按钮 -->
         <div class="mt-4 flex justify-end gap-2 sm:mt-6 sm:gap-3">
-          <button class="btn btn-primary px-4 py-2 text-sm" type="button" @click="openTimeline">
+          <button
+            class="btn btn-primary px-4 py-2 text-sm"
+            type="button"
+            @click="openRequestDetails"
+          >
+            <i class="fas fa-list-ul mr-2" />
+            查看请求明细
+          </button>
+          <button class="btn btn-secondary px-4 py-2 text-sm" type="button" @click="openTimeline">
+            <i class="fas fa-stream mr-2" />
             查看请求时间线
           </button>
           <button class="btn btn-secondary px-4 py-2 text-sm" type="button" @click="close">
@@ -338,7 +347,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'open-timeline'])
+const emit = defineEmits(['close', 'open-timeline', 'open-request-details'])
 
 // 计算属性
 const totalRequests = computed(() => props.apiKey.usage?.total?.requests || 0)
@@ -435,5 +444,9 @@ const close = () => {
 
 const openTimeline = () => {
   emit('open-timeline', props.apiKey?.id)
+}
+
+const openRequestDetails = () => {
+  emit('open-request-details', props.apiKey?.id)
 }
 </script>

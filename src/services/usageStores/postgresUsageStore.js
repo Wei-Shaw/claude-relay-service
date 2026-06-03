@@ -807,6 +807,85 @@ async function getDailyCost(keyId) {
   return stats.daily
 }
 
+async function getKeyUsageSummary(keyId, timeRange = 'all', startDate = null, endDate = null) {
+  let result
+
+  if (timeRange === 'all') {
+    result = await postgres.query(
+      `
+        SELECT
+          SUM(request_count) AS request_count,
+          SUM(input_tokens) AS input_tokens,
+          SUM(output_tokens) AS output_tokens,
+          SUM(cache_create_tokens) AS cache_create_tokens,
+          SUM(cache_read_tokens) AS cache_read_tokens,
+          SUM(ephemeral_5m_tokens) AS ephemeral_5m_tokens,
+          SUM(ephemeral_1h_tokens) AS ephemeral_1h_tokens,
+          SUM(total_tokens) AS total_tokens,
+          SUM(cost) AS cost,
+          SUM(real_cost) AS real_cost
+        FROM usage_rollups
+        WHERE period_type = 'all'
+          AND period_start = $1
+          AND dimension_type = 'api_key'
+          AND api_key_id = $2
+          AND model = ''
+      `,
+      [getCurrentPeriodStart('all'), keyId]
+    )
+  } else {
+    let range
+    if (timeRange === 'custom') {
+      const start = normalizeDate(startDate, null)
+      const end = normalizeDate(`${endDate}T23:59:59.999`, null)
+      if (!start || !end) {
+        return {
+          ...emptyUsage(),
+          cost: 0,
+          realCost: 0
+        }
+      }
+      range = {
+        start: getPeriodStart(start, 'day'),
+        end: getPeriodStart(end, 'day')
+      }
+    } else {
+      range = getDateRange(timeRange)
+    }
+
+    result = await postgres.query(
+      `
+        SELECT
+          SUM(request_count) AS request_count,
+          SUM(input_tokens) AS input_tokens,
+          SUM(output_tokens) AS output_tokens,
+          SUM(cache_create_tokens) AS cache_create_tokens,
+          SUM(cache_read_tokens) AS cache_read_tokens,
+          SUM(ephemeral_5m_tokens) AS ephemeral_5m_tokens,
+          SUM(ephemeral_1h_tokens) AS ephemeral_1h_tokens,
+          SUM(total_tokens) AS total_tokens,
+          SUM(cost) AS cost,
+          SUM(real_cost) AS real_cost
+        FROM usage_rollups
+        WHERE period_type = 'day'
+          AND period_start >= $1
+          AND period_start <= $2
+          AND dimension_type = 'api_key'
+          AND api_key_id = $3
+          AND model = ''
+      `,
+      [range.start, range.end, keyId]
+    )
+  }
+
+  const row = result.rows[0] || {}
+  return {
+    ...rollupRowToUsage(row),
+    cost: normalizeNumber(row.cost),
+    realCost: normalizeNumber(row.real_cost)
+  }
+}
+
 async function getUsageRecords(keyId, limit = 50) {
   const result = await postgres.query(
     `
@@ -1060,6 +1139,7 @@ module.exports = {
   getUsageStats,
   getCostStats,
   getDailyCost,
+  getKeyUsageSummary,
   getUsageRecords,
   getModelStatsForKey,
   getBatchModelStats,

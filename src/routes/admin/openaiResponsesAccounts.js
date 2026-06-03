@@ -158,6 +158,17 @@ router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) =>
       })
     }
 
+    if (accountData.maxConcurrentTasks !== undefined && accountData.maxConcurrentTasks !== null) {
+      const concurrent = Number(accountData.maxConcurrentTasks)
+      if (!Number.isInteger(concurrent) || concurrent < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'maxConcurrentTasks must be a non-negative integer'
+        })
+      }
+      accountData.maxConcurrentTasks = concurrent
+    }
+
     const account = await openaiResponsesAccountService.createAccount(accountData)
 
     // 如果是分组类型，处理分组绑定
@@ -216,6 +227,20 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
         })
       }
       mappedUpdates.priority = priority.toString()
+    }
+
+    if (
+      mappedUpdates.maxConcurrentTasks !== undefined &&
+      mappedUpdates.maxConcurrentTasks !== null
+    ) {
+      const concurrent = Number(mappedUpdates.maxConcurrentTasks)
+      if (!Number.isInteger(concurrent) || concurrent < 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'maxConcurrentTasks must be a non-negative integer'
+        })
+      }
+      mappedUpdates.maxConcurrentTasks = concurrent
     }
 
     // 处理分组变更

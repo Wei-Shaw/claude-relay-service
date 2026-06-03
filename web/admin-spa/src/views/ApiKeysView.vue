@@ -2194,6 +2194,7 @@
       :api-key="selectedApiKeyForDetail || {}"
       :show="showUsageDetailModal"
       @close="showUsageDetailModal = false"
+      @open-request-details="openRequestDetails"
       @open-timeline="openTimeline"
     />
 
@@ -2315,6 +2316,14 @@ const statsLoading = ref(new Set())
 const lastUsageCache = ref(new Map())
 // 正在加载最后使用账号的 keyIds
 const lastUsageLoading = ref(new Set())
+const API_KEY_BATCH_REQUEST_SIZE = 100
+const chunkArray = (items, size = API_KEY_BATCH_REQUEST_SIZE) => {
+  const chunks = []
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size))
+  }
+  return chunks
+}
 const apiKeyModelStats = ref({})
 const apiKeyDateFilters = ref({})
 const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)])
@@ -2808,32 +2817,36 @@ const loadPageStats = async () => {
   keyIds.forEach((id) => statsLoading.value.add(id))
 
   try {
-    const requestBody = {
-      keyIds,
-      timeRange: currentTimeRange
-    }
-    if (currentTimeRange === 'custom') {
-      requestBody.startDate = startDate
-      requestBody.endDate = endDate
-    }
+    for (const keyIdBatch of chunkArray(keyIds)) {
+      try {
+        const requestBody = {
+          keyIds: keyIdBatch,
+          timeRange: currentTimeRange
+        }
+        if (currentTimeRange === 'custom') {
+          requestBody.startDate = startDate
+          requestBody.endDate = endDate
+        }
 
-    const response = await httpApis.getApiKeysBatchStatsApi(requestBody)
+        const response = await httpApis.getApiKeysBatchStatsApi(requestBody)
 
-    if (response.success && response.data) {
-      // 更新缓存
-      for (const [keyId, stats] of Object.entries(response.data)) {
-        statsCache.value.set(keyId, {
-          stats,
-          timeRange: currentTimeRange,
-          startDate,
-          endDate,
-          timestamp: Date.now()
-        })
+        if (response.success && response.data) {
+          // 更新缓存
+          for (const [keyId, stats] of Object.entries(response.data)) {
+            statsCache.value.set(keyId, {
+              stats,
+              timeRange: currentTimeRange,
+              startDate,
+              endDate,
+              timestamp: Date.now()
+            })
+          }
+        }
+      } catch (error) {
+        console.error('加载统计数据失败:', error)
+        // 不显示 toast，避免打扰用户
       }
     }
-  } catch (error) {
-    console.error('加载统计数据失败:', error)
-    // 不显示 toast，避免打扰用户
   } finally {
     keyIds.forEach((id) => statsLoading.value.delete(id))
   }
@@ -2871,17 +2884,21 @@ const loadPageLastUsage = async () => {
   keyIds.forEach((id) => lastUsageLoading.value.add(id))
 
   try {
-    const response = await httpApis.getApiKeysBatchLastUsageApi({ keyIds })
+    for (const keyIdBatch of chunkArray(keyIds)) {
+      try {
+        const response = await httpApis.getApiKeysBatchLastUsageApi({ keyIds: keyIdBatch })
 
-    if (response.success && response.data) {
-      // 更新缓存
-      for (const [keyId, lastUsage] of Object.entries(response.data)) {
-        lastUsageCache.value.set(keyId, lastUsage)
+        if (response.success && response.data) {
+          // 更新缓存
+          for (const [keyId, lastUsage] of Object.entries(response.data)) {
+            lastUsageCache.value.set(keyId, lastUsage)
+          }
+        }
+      } catch (error) {
+        console.error('加载最后使用账号数据失败:', error)
+        // 不显示 toast，避免打扰用户
       }
     }
-  } catch (error) {
-    console.error('加载最后使用账号数据失败:', error)
-    // 不显示 toast，避免打扰用户
   } finally {
     keyIds.forEach((id) => lastUsageLoading.value.delete(id))
   }
@@ -2937,6 +2954,9 @@ const sortApiKeys = (field) => {
   }
 }
 
+const isCostSortReadyStatus = (status) =>
+  status?.status === 'ready' || status?.status === 'postgres'
+
 // 计算是否可以进行费用排序
 const canSortByCost = computed(() => {
   // custom 时间范围始终允许（实时计算）
@@ -2947,7 +2967,7 @@ const canSortByCost = computed(() => {
   // 检查对应时间范围的索引状态
   const timeRange = globalDateFilter.preset
   const status = costSortStatus.value[timeRange]
-  return status?.status === 'ready'
+  return isCostSortReadyStatus(status)
 })
 
 // 费用排序提示文字
@@ -2967,7 +2987,11 @@ const costSortTooltip = computed(() => {
     return '费用排序索引正在更新中...'
   }
 
-  if (status.status === 'ready') {
+  if (status.source === 'postgres' || status.status === 'postgres') {
+    return '点击按费用排序（PostgreSQL 实时统计）'
+  }
+
+  if (isCostSortReadyStatus(status)) {
     const lastUpdate = status.lastUpdate ? new Date(status.lastUpdate).toLocaleString() : '未知'
     return `点击按费用排序（索引更新于: ${lastUpdate}）`
   }
@@ -4407,6 +4431,16 @@ const openTimeline = (keyId) => {
   if (!id) return
   showUsageDetailModal.value = false
   router.push(`/api-keys/${id}/usage-records`)
+}
+
+const openRequestDetails = (keyId) => {
+  const id = keyId || selectedApiKeyForDetail.value?.id
+  if (!id) return
+  showUsageDetailModal.value = false
+  router.push({
+    name: 'RequestDetails',
+    query: { apiKeyId: id }
+  })
 }
 
 // 格式化时间（秒转换为可读格式） - 已移到 WindowLimitBar 组件中

@@ -59,7 +59,10 @@ jest.mock('../src/services/apiKeyService', () => ({
 }))
 
 jest.mock('../src/models/redis', () => ({
-  getUsageStats: jest.fn()
+  getUsageStats: jest.fn(),
+  incrConcurrency: jest.fn(),
+  decrConcurrency: jest.fn(),
+  refreshConcurrencyLease: jest.fn()
 }))
 
 jest.mock('../src/utils/logger', () => ({
@@ -99,6 +102,7 @@ jest.mock('../src/utils/requestDetailHelper', () => ({
 const unifiedOpenAIScheduler = require('../src/services/scheduler/unifiedOpenAIScheduler')
 const axios = require('axios')
 const apiKeyService = require('../src/services/apiKeyService')
+const redis = require('../src/models/redis')
 const openaiAccountService = require('../src/services/account/openaiAccountService')
 const openaiResponsesAccountService = require('../src/services/account/openaiResponsesAccountService')
 const openaiResponsesRelayService = require('../src/services/relay/openaiResponsesRelayService')
@@ -178,6 +182,9 @@ describe('openai responses payload toggles', () => {
 
     openaiResponsesRelayService.handleRequest.mockResolvedValue({ ok: true })
     openaiAccountService.decrypt.mockReturnValue('decrypted-token')
+    redis.incrConcurrency.mockResolvedValue(1)
+    redis.decrConcurrency.mockResolvedValue(0)
+    redis.refreshConcurrencyLease.mockResolvedValue(true)
   })
 
   test('keeps standard responses payload unchanged for openai-responses when both toggles are off', async () => {
@@ -457,6 +464,54 @@ describe('openai responses payload toggles', () => {
     expect(req._serviceTier).toBe('priority')
     expect(apiKeyService.recordUsage).toHaveBeenCalled()
     expect(apiKeyService.recordUsage.mock.calls[0][8]).toBe('priority')
+  })
+
+  test('acquires and releases account concurrency for openai accounts', async () => {
+    unifiedOpenAIScheduler.selectAccountForApiKey.mockResolvedValue({
+      accountId: 'openai-1',
+      accountType: 'openai'
+    })
+    openaiAccountService.getAccount.mockResolvedValue({
+      id: 'openai-1',
+      name: 'OpenAI Account',
+      accessToken: 'encrypted-token',
+      accountId: 'chatgpt-account-1',
+      maxConcurrentTasks: 2
+    })
+    axios.post.mockResolvedValue({
+      status: 200,
+      data: {
+        model: 'gpt-4.1',
+        usage: {
+          input_tokens: 6,
+          output_tokens: 2,
+          total_tokens: 8
+        }
+      },
+      headers: {}
+    })
+
+    const req = createReq({
+      body: {
+        model: 'gpt-4.1',
+        prompt_cache_key: 'concurrency-key',
+        stream: false
+      },
+      apiKeyOverrides: {
+        enableOpenAIResponsesCodexAdaptation: false,
+        enableOpenAIResponsesPayloadRules: false
+      }
+    })
+
+    await openaiRoutes.handleResponses(req, createRes())
+
+    expect(redis.incrConcurrency).toHaveBeenCalledWith(
+      'openai_account:openai-1',
+      expect.any(String),
+      600
+    )
+    const requestId = redis.incrConcurrency.mock.calls[0][1]
+    expect(redis.decrConcurrency).toHaveBeenCalledWith('openai_account:openai-1', requestId)
   })
 
   test('records null service_tier after Codex adaptation removes it for openai accounts', async () => {

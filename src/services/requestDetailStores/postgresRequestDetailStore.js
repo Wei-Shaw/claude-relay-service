@@ -660,6 +660,36 @@ function normalizeSortOrder(sortOrder) {
   return sortOrder === 'asc' ? 'ASC' : 'DESC'
 }
 
+const REQUEST_DETAIL_SORT_COLUMNS = {
+  timestamp: 'd.timestamp',
+  inputTokens: 'd.input_tokens',
+  outputTokens: 'd.output_tokens',
+  cacheReadTokens: 'd.cache_read_tokens',
+  cacheCreateTokens: 'd.cache_create_tokens',
+  totalTokens: 'd.total_tokens',
+  cost: 'd.cost',
+  durationMs: 'COALESCE(d.duration_ms, 0)',
+  timeToFirstByteMs: 'COALESCE(d.time_to_first_byte_ms, 0)',
+  timeToFirstTokenMs: 'COALESCE(d.time_to_first_token_ms, 0)',
+  contentGenerationMs: 'COALESCE(d.content_generation_ms, 0)'
+}
+
+function normalizeSortBy(sortBy) {
+  return REQUEST_DETAIL_SORT_COLUMNS[sortBy] ? sortBy : 'timestamp'
+}
+
+function buildRequestDetailOrderBy(sortBy = 'timestamp', sortOrder = 'desc') {
+  const normalizedSortBy = normalizeSortBy(sortBy)
+  const column = REQUEST_DETAIL_SORT_COLUMNS[normalizedSortBy]
+  const order = normalizeSortOrder(sortOrder)
+
+  if (normalizedSortBy === 'timestamp') {
+    return `d.timestamp ${order}, d.request_id ${order}`
+  }
+
+  return `${column} ${order}, d.timestamp ${order}, d.request_id ${order}`
+}
+
 function createBoundedTextSearch(value) {
   const normalized = normalizeText(value)
   if (!normalized) {
@@ -946,6 +976,7 @@ async function listRecordsPage({
   startDate,
   endDate,
   filters = {},
+  sortBy = 'timestamp',
   sortOrder = 'desc',
   page = 1,
   pageSize = 50
@@ -958,7 +989,7 @@ async function listRecordsPage({
   const currentPage = Math.max(normalizeInteger(page, 1), 1)
   const limit = Math.min(Math.max(normalizeInteger(pageSize, 50), 1), 200)
   const offset = (currentPage - 1) * limit
-  const order = normalizeSortOrder(sortOrder)
+  const orderBy = buildRequestDetailOrderBy(sortBy, sortOrder)
   const values = [...where.values, limit, offset]
 
   const result = await postgres.query(
@@ -966,7 +997,7 @@ async function listRecordsPage({
       SELECT d.*
       FROM request_details d
       WHERE ${where.whereSql}
-      ORDER BY d.timestamp ${order}, d.request_id ${order}
+      ORDER BY ${orderBy}
       LIMIT $${values.length - 1}
       OFFSET $${values.length}
     `,

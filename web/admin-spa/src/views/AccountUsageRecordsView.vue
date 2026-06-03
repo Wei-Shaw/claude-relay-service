@@ -107,9 +107,19 @@
           />
         </el-select>
 
-        <el-select v-model="filters.sortOrder" class="w-[140px]" placeholder="排序">
-          <el-option label="时间降序" value="desc" />
-          <el-option label="时间升序" value="asc" />
+        <el-select v-model="filters.sortBy" class="w-[150px]" placeholder="排序字段">
+          <el-option label="统计时间" value="timestamp" />
+          <el-option label="输入 Token" value="inputTokens" />
+          <el-option label="输出 Token" value="outputTokens" />
+          <el-option label="缓存创建" value="cacheCreateTokens" />
+          <el-option label="缓存读取" value="cacheReadTokens" />
+          <el-option label="总 Token" value="totalTokens" />
+          <el-option label="费用" value="cost" />
+        </el-select>
+
+        <el-select v-model="filters.sortOrder" class="w-[120px]" placeholder="方向">
+          <el-option label="降序" value="desc" />
+          <el-option label="升序" value="asc" />
         </el-select>
 
         <el-button @click="resetFilters"> <i class="fas fa-undo mr-2" /> 重置 </el-button>
@@ -144,7 +154,14 @@
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    时间
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1 py-0.5 transition hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+                      type="button"
+                      @click="setSort('timestamp')"
+                    >
+                      <span>时间</span>
+                      <i :class="getSortIcon('timestamp')" />
+                    </button>
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
@@ -159,27 +176,62 @@
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    输入
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1 py-0.5 transition hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+                      type="button"
+                      @click="setSort('inputTokens')"
+                    >
+                      <span>输入</span>
+                      <i :class="getSortIcon('inputTokens')" />
+                    </button>
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    输出
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1 py-0.5 transition hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+                      type="button"
+                      @click="setSort('outputTokens')"
+                    >
+                      <span>输出</span>
+                      <i :class="getSortIcon('outputTokens')" />
+                    </button>
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    缓存(创/读)
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1 py-0.5 transition hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+                      type="button"
+                      @click="setSort('cacheCreateTokens')"
+                    >
+                      <span>缓存(创/读)</span>
+                      <i :class="getSortIcon('cacheCreateTokens')" />
+                    </button>
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    总 Token
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1 py-0.5 transition hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+                      type="button"
+                      @click="setSort('totalTokens')"
+                    >
+                      <span>总 Token</span>
+                      <i :class="getSortIcon('totalTokens')" />
+                    </button>
                   </th>
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
-                    费用
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1 py-0.5 transition hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+                      type="button"
+                      @click="setSort('cost')"
+                    >
+                      <span>费用</span>
+                      <i :class="getSortIcon('cost')" />
+                    </button>
                   </th>
                   <th
                     class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
@@ -326,6 +378,7 @@ const filters = reactive({
   dateRange: null,
   model: '',
   apiKeyId: '',
+  sortBy: 'timestamp',
   sortOrder: 'desc'
 })
 
@@ -378,6 +431,7 @@ const buildParams = (page) => {
   const params = {
     page,
     pageSize: pagination.pageSize,
+    sortBy: filters.sortBy,
     sortOrder: filters.sortOrder
   }
 
@@ -405,6 +459,7 @@ const syncResponseState = (data) => {
   const filterEcho = data.filters || {}
   if (filterEcho.model !== undefined) filters.model = filterEcho.model || ''
   if (filterEcho.apiKeyId !== undefined) filters.apiKeyId = filterEcho.apiKeyId || ''
+  if (filterEcho.sortBy) filters.sortBy = filterEcho.sortBy
   if (filterEcho.sortOrder) filters.sortOrder = filterEcho.sortOrder
   if (filterEcho.startDate && filterEcho.endDate) {
     const nextRange = [filterEcho.startDate, filterEcho.endDate]
@@ -455,9 +510,30 @@ const resetFilters = () => {
   filters.model = ''
   filters.apiKeyId = ''
   filters.dateRange = null
+  filters.sortBy = 'timestamp'
   filters.sortOrder = 'desc'
   pagination.currentPage = 1
   fetchRecords(1)
+}
+
+const setSort = (field) => {
+  if (filters.sortBy === field) {
+    filters.sortOrder = filters.sortOrder === 'asc' ? 'desc' : 'asc'
+    return
+  }
+
+  filters.sortBy = field
+  filters.sortOrder = 'desc'
+}
+
+const getSortIcon = (field) => {
+  if (filters.sortBy !== field) {
+    return 'fas fa-sort text-gray-400 dark:text-gray-500'
+  }
+
+  return filters.sortOrder === 'asc'
+    ? 'fas fa-sort-up text-blue-500'
+    : 'fas fa-sort-down text-blue-500'
 }
 
 const openDetail = (record) => {
@@ -545,7 +621,7 @@ const exportCsv = async () => {
 }
 
 watch(
-  () => [filters.model, filters.apiKeyId, filters.sortOrder],
+  () => [filters.model, filters.apiKeyId, filters.sortBy, filters.sortOrder],
   () => {
     pagination.currentPage = 1
     fetchRecords(1)

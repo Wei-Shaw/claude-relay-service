@@ -22,6 +22,7 @@ const loadService = ({ writeMode = 'redis', readMode = 'redis' } = {}) => {
       .mockResolvedValue([{ requestId: 'req_1', costBreakdown: { total: 1 } }]),
     getDailyCost: jest.fn().mockResolvedValue(3.4),
     getCostStats: jest.fn().mockResolvedValue({ total: 4.5 }),
+    getKeyUsageSummary: jest.fn().mockResolvedValue({ requests: 3, cost: 1.23 }),
     getModelStatsForKey: jest.fn().mockResolvedValue([]),
     getBatchModelStats: jest.fn().mockResolvedValue([]),
     getAllUsedModels: jest.fn().mockResolvedValue(['glm-5.1']),
@@ -66,6 +67,21 @@ describe('usageStatsService', () => {
     expect(redisMock.getDailyCost).toHaveBeenCalledWith('key_1')
     expect(redisMock.getCostStats).toHaveBeenCalledWith('key_1')
     expect(pgStoreMock.getDailyCost).not.toHaveBeenCalled()
+  })
+
+  test('postgres read mode delegates key usage summaries to PostgreSQL store', async () => {
+    const { service, redisMock, pgStoreMock } = loadService({ readMode: 'postgres' })
+
+    const summary = await service.getKeyUsageSummary('key_1', 'custom', '2026-06-01', '2026-06-03')
+
+    expect(summary).toEqual({ requests: 3, cost: 1.23 })
+    expect(pgStoreMock.getKeyUsageSummary).toHaveBeenCalledWith(
+      'key_1',
+      'custom',
+      '2026-06-01',
+      '2026-06-03'
+    )
+    expect(redisMock.getUsageStats).not.toHaveBeenCalled()
   })
 
   test('postgres read mode delegates usage stats and records to PostgreSQL store', async () => {

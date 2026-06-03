@@ -1045,6 +1045,65 @@ describe('requestDetailService', () => {
     )
   })
 
+  test('listRequestDetails sorts redis records by cost before pagination', async () => {
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: true
+    })
+
+    redis.getApiKey.mockResolvedValue({ name: 'Primary Key' })
+    openaiAccountService.getAccount.mockResolvedValue({ name: 'OpenAI Main' })
+
+    const recordsByKey = {}
+    const pointerEntries = []
+    const fixtures = [
+      { id: 'req_low', ts: 1775563200000, cost: 0.1 },
+      { id: 'req_high', ts: 1775566800000, cost: 0.9 },
+      { id: 'req_mid', ts: 1775570400000, cost: 0.3 }
+    ]
+
+    for (const fixture of fixtures) {
+      pointerEntries.push(fixture.id, String(fixture.ts))
+      recordsByKey[`request_detail:item:${fixture.id}`] = JSON.stringify({
+        requestId: fixture.id,
+        timestamp: new Date(fixture.ts).toISOString(),
+        endpoint: '/openai/v1/responses',
+        method: 'POST',
+        apiKeyId: 'key_1',
+        accountId: 'acct_1',
+        accountType: 'openai',
+        model: 'gpt-5.4',
+        inputTokens: 100,
+        outputTokens: 50,
+        totalTokens: 150,
+        cost: fixture.cost,
+        durationMs: 1200
+      })
+    }
+
+    const client = {
+      zrangebyscore: jest.fn().mockResolvedValue(pointerEntries),
+      mget: jest.fn(async (keys) => keys.map((key) => recordsByKey[key] || null)),
+      set: jest.fn().mockResolvedValue('OK')
+    }
+    redis.getClient.mockReturnValue(client)
+
+    const result = await requestDetailService.listRequestDetails({
+      startDate: '2026-04-07T00:00:00.000Z',
+      endDate: '2026-04-08T23:59:59.000Z',
+      sortBy: 'cost',
+      sortOrder: 'desc',
+      pageSize: 2,
+      page: 1
+    })
+
+    expect(result.filters.sortBy).toBe('cost')
+    expect(result.filters.sortOrder).toBe('desc')
+    expect(result.records.map((record) => record.requestId)).toEqual(['req_high', 'req_mid'])
+    expect(result.pagination.totalRecords).toBe(3)
+  })
+
   test('listRequestDetails rebuilds the snapshot when filters change', async () => {
     claudeRelayConfigService.getConfig.mockResolvedValue({
       requestDetailCaptureEnabled: true,
@@ -2011,7 +2070,9 @@ describe('requestDetailService', () => {
       startDate: '2026-04-07T00:00:00.000Z',
       endDate: '2026-04-07T23:59:59.000Z',
       keyword: 'conv-1',
-      session: 'conv-1'
+      session: 'conv-1',
+      sortBy: 'cost',
+      sortOrder: 'asc'
     })
 
     expect(result.readMode).toBe('postgres')
@@ -2033,7 +2094,8 @@ describe('requestDetailService', () => {
       startDate: expect.any(Date),
       endDate: expect.any(Date),
       filters: expect.objectContaining({ keyword: 'conv-1', session: 'conv-1' }),
-      sortOrder: 'desc',
+      sortBy: 'cost',
+      sortOrder: 'asc',
       page: 1,
       pageSize: 50
     })

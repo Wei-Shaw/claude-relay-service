@@ -163,6 +163,14 @@ async function getCostStats(keyId) {
   return postgresUsageStore.getCostStats(keyId)
 }
 
+async function getKeyUsageSummary(keyId, timeRange = 'all', startDate = null, endDate = null) {
+  if (!shouldReadPostgres()) {
+    return null
+  }
+
+  return postgresUsageStore.getKeyUsageSummary(keyId, timeRange, startDate, endDate)
+}
+
 async function getModelStatsForKey(keyId, period = 'monthly') {
   if (shouldReadPostgres()) {
     const rows = await postgresUsageStore.getModelStatsForKey(keyId, period)
@@ -224,6 +232,7 @@ module.exports = {
   getUsageStatsWithRecords,
   getDailyCost,
   getCostStats,
+  getKeyUsageSummary,
   getModelStatsForKey,
   getBatchModelStats,
   getAllUsedModels,

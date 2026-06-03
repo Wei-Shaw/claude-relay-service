@@ -436,8 +436,10 @@ class CostRankService {
         status[timeRange] = {
           lastUpdate: null,
           keyCount: keyIds.length,
-          status: 'postgres',
-          updateDuration: 0
+          status: 'ready',
+          source: 'postgres',
+          updateDuration: 0,
+          isQueryTimeCalculation: true
         }
       }
       return status

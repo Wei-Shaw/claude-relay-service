@@ -18,6 +18,103 @@ const pricingService = require('../../services/pricingService')
 
 const router = express.Router()
 
+const USAGE_RECORD_SORT_FIELDS = new Set([
+  'timestamp',
+  'inputTokens',
+  'outputTokens',
+  'cacheCreateTokens',
+  'cacheReadTokens',
+  'totalTokens',
+  'cost'
+])
+
+function normalizeUsageRecordSortBy(value) {
+  return USAGE_RECORD_SORT_FIELDS.has(value) ? value : 'timestamp'
+}
+
+function buildUsageObjectFromRecord(record = {}) {
+  const usage = {
+    input_tokens: record.inputTokens || 0,
+    output_tokens: record.outputTokens || 0,
+    cache_creation_input_tokens: record.cacheCreateTokens || 0,
+    cache_read_input_tokens: record.cacheReadTokens || 0,
+    cache_creation: record.cacheCreation || record.cache_creation || null
+  }
+
+  if (!usage.cache_creation) {
+    const eph5m = parseInt(record.ephemeral5mTokens) || 0
+    const eph1h = parseInt(record.ephemeral1hTokens) || 0
+    if (eph5m > 0 || eph1h > 0) {
+      usage.cache_creation = {
+        ephemeral_5m_input_tokens: eph5m,
+        ephemeral_1h_input_tokens: eph1h
+      }
+    }
+  }
+
+  return usage
+}
+
+function getUsageRecordTotalTokens(record = {}) {
+  const usage = buildUsageObjectFromRecord(record)
+  return (
+    record.totalTokens ||
+    usage.input_tokens +
+      usage.output_tokens +
+      usage.cache_creation_input_tokens +
+      usage.cache_read_input_tokens
+  )
+}
+
+function getUsageRecordCost(record = {}) {
+  if (typeof record.cost === 'number') {
+    return record.cost
+  }
+
+  const usage = buildUsageObjectFromRecord(record)
+  const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+  return costData?.costs?.total || 0
+}
+
+function getUsageRecordSortValue(record = {}, sortBy = 'timestamp') {
+  if (sortBy === 'timestamp') {
+    const timestamp = new Date(record.timestamp).getTime()
+    return Number.isNaN(timestamp) ? 0 : timestamp
+  }
+
+  if (sortBy === 'totalTokens') {
+    return Number(getUsageRecordTotalTokens(record) || 0)
+  }
+
+  if (sortBy === 'cost') {
+    return Number(getUsageRecordCost(record) || 0)
+  }
+
+  return Number(record[sortBy] || 0)
+}
+
+function sortUsageRecords(records = [], sortBy = 'timestamp', sortOrder = 'desc') {
+  const direction = sortOrder === 'asc' ? 1 : -1
+
+  records.sort((a, b) => {
+    const aPrimary = getUsageRecordSortValue(a, sortBy)
+    const bPrimary = getUsageRecordSortValue(b, sortBy)
+    if (aPrimary !== bPrimary) {
+      return (aPrimary - bPrimary) * direction
+    }
+
+    const aTime = getUsageRecordSortValue(a, 'timestamp')
+    const bTime = getUsageRecordSortValue(b, 'timestamp')
+    if (aTime !== bTime) {
+      return (aTime - bTime) * direction
+    }
+
+    return String(a.model || '').localeCompare(String(b.model || '')) * direction
+  })
+
+  return records
+}
+
 // 辅助函数：通过索引获取数据，回退到 SCAN
 // keyPattern 支持占位符：{id}、{keyId}+{model}、{accountId}+{model}
 async function getUsageDataByIndex(indexKey, keyPattern, scanPattern) {
@@ -2696,11 +2793,13 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
       endDate,
       model,
       accountId,
+      sortBy = 'timestamp',
       sortOrder = 'desc'
     } = req.query
 
     const pageNumber = Math.max(parseInt(page, 10) || 1, 1)
     const pageSizeNumber = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200)
+    const normalizedSortBy = normalizeUsageRecordSortBy(sortBy)
     const normalizedSortOrder = sortOrder === 'asc' ? 'asc' : 'desc'
 
     const startTime = startDate ? new Date(startDate) : null
@@ -2834,14 +2933,7 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
       return true
     })
 
-    filteredRecords.sort((a, b) => {
-      const aTime = new Date(a.timestamp).getTime()
-      const bTime = new Date(b.timestamp).getTime()
-      if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
-        return 0
-      }
-      return normalizedSortOrder === 'asc' ? aTime - bTime : bTime - aTime
-    })
+    sortUsageRecords(filteredRecords, normalizedSortBy, normalizedSortOrder)
 
     const summary = {
       totalRequests: 0,
@@ -3013,6 +3105,7 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
           endDate: endTime ? endTime.toISOString() : null,
           model: model || null,
           accountId: accountId || null,
+          sortBy: normalizedSortBy,
           sortOrder: normalizedSortOrder
         },
         apiKeyInfo: {
@@ -3057,11 +3150,13 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       endDate,
       model,
       apiKeyId,
+      sortBy = 'timestamp',
       sortOrder = 'desc'
     } = req.query
 
     const pageNumber = Math.max(parseInt(page, 10) || 1, 1)
     const pageSizeNumber = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200)
+    const normalizedSortBy = normalizeUsageRecordSortBy(sortBy)
     const normalizedSortOrder = sortOrder === 'asc' ? 'asc' : 'desc'
 
     const startTime = startDate ? new Date(startDate) : null
@@ -3197,14 +3292,7 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       }
     }
 
-    filteredRecords.sort((a, b) => {
-      const aTime = new Date(a.timestamp).getTime()
-      const bTime = new Date(b.timestamp).getTime()
-      if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
-        return 0
-      }
-      return normalizedSortOrder === 'asc' ? aTime - bTime : bTime - aTime
-    })
+    sortUsageRecords(filteredRecords, normalizedSortBy, normalizedSortOrder)
 
     const summary = {
       totalRequests: 0,
@@ -3310,6 +3398,7 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
           model: model || null,
           apiKeyId: apiKeyId || null,
           platform: accountInfo.platform,
+          sortBy: normalizedSortBy,
           sortOrder: normalizedSortOrder
         },
         accountInfo: {

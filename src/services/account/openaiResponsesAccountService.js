@@ -35,6 +35,11 @@ class OpenAIResponsesAccountService {
     )
   }
 
+  _normalizeMaxConcurrentTasks(value) {
+    const concurrent = parseInt(value, 10)
+    return Number.isInteger(concurrent) && concurrent > 0 ? concurrent : 0
+  }
+
   // 创建账户
   async createAccount(options = {}) {
     const {
@@ -50,6 +55,7 @@ class OpenAIResponsesAccountService {
       schedulable = true, // 是否可被调度
       dailyQuota = 0, // 每日额度限制（美元），0表示不限制
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
+      maxConcurrentTasks = 0, // 最大并发任务数，0表示无限制
       rateLimitDuration = 60, // 限流时间（分钟）
       disableAutoProtection = false, // 是否关闭自动防护（429/401/400/529 不自动禁用）
       providerEndpoint = 'responses' // Provider 端点类型：responses | auto
@@ -105,6 +111,7 @@ class OpenAIResponsesAccountService {
       lastResetDate: redis.getDateStringInTimezone(),
       quotaResetTime,
       quotaStoppedAt: '',
+      maxConcurrentTasks: this._normalizeMaxConcurrentTasks(maxConcurrentTasks).toString(),
       disableAutoProtection: disableAutoProtection.toString(), // 关闭自动防护
       providerEndpoint // Provider 端点类型：responses(默认) | auto
     }
@@ -141,6 +148,10 @@ class OpenAIResponsesAccountService {
         accountData.proxy = null
       }
     }
+
+    accountData.maxConcurrentTasks = this._normalizeMaxConcurrentTasks(
+      accountData.maxConcurrentTasks
+    )
 
     return accountData
   }
@@ -188,6 +199,12 @@ class OpenAIResponsesAccountService {
     // 自动防护开关
     if (updates.disableAutoProtection !== undefined) {
       updates.disableAutoProtection = updates.disableAutoProtection.toString()
+    }
+
+    if (updates.maxConcurrentTasks !== undefined) {
+      updates.maxConcurrentTasks = this._normalizeMaxConcurrentTasks(
+        updates.maxConcurrentTasks
+      ).toString()
     }
 
     // 更新 Redis
@@ -240,18 +257,24 @@ class OpenAIResponsesAccountService {
     const results = await pipeline.exec()
 
     const accounts = []
-    results.forEach(([err, accountData]) => {
+    for (const [err, accountData] of results) {
       if (err || !accountData || !accountData.id) {
-        return
+        continue
       }
 
       // 过滤非活跃账户
       if (!includeInactive && accountData.isActive !== 'true') {
-        return
+        continue
       }
 
       // 隐藏敏感信息
       accountData.apiKey = '***'
+      accountData.maxConcurrentTasks = this._normalizeMaxConcurrentTasks(
+        accountData.maxConcurrentTasks
+      )
+      accountData.activeTaskCount = await redis.getConcurrency(
+        `openai_responses_account:${accountData.id}`
+      )
 
       // 解析 JSON 字段
       if (accountData.proxy) {
@@ -283,7 +306,7 @@ class OpenAIResponsesAccountService {
       accountData.platform = accountData.platform || 'openai-responses'
 
       accounts.push(accountData)
-    })
+    }
 
     return accounts
   }

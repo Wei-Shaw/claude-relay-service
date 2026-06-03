@@ -308,7 +308,10 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
         costSortStatus = rankStatus[effectiveCostTimeRange]
 
         // 检查索引是否就绪
-        if (!costSortStatus || costSortStatus.status !== 'ready') {
+        if (
+          !costSortStatus ||
+          (costSortStatus.status !== 'ready' && costSortStatus.status !== 'postgres')
+        ) {
           return res.status(503).json({
             success: false,
             error: 'RANK_NOT_READY',
@@ -332,7 +335,8 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
           modelFilter
         })
 
-        costSortStatus.isRealTimeCalculation = false
+        costSortStatus.isRealTimeCalculation =
+          costSortStatus.source === 'postgres' || costSortStatus.status === 'postgres'
       }
     } else {
       // 原有的非费用排序逻辑
@@ -1081,50 +1085,55 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   const client = redis.getClientSafe()
   const tzDate = redis.getDateInTimezone()
   const today = redis.getDateStringInTimezone()
+  const shouldUsePostgresStats = usageStatsService.shouldReadPostgres()
 
-  // 构建搜索模式
-  const searchPatterns = []
+  let uniqueKeys = []
+  if (!shouldUsePostgresStats) {
+    // 构建搜索模式
+    const searchPatterns = []
 
-  if (timeRange === 'custom' && startDate && endDate) {
-    // 自定义日期范围
-    const start = new Date(startDate)
-    const end = new Date(endDate)
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = redis.getDateStringInTimezone(d)
-      searchPatterns.push(`usage:${keyId}:model:daily:*:${dateStr}`)
+    if (timeRange === 'custom' && startDate && endDate) {
+      // 自定义日期范围
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = redis.getDateStringInTimezone(d)
+        searchPatterns.push(`usage:${keyId}:model:daily:*:${dateStr}`)
+      }
+    } else if (timeRange === 'today') {
+      searchPatterns.push(`usage:${keyId}:model:daily:*:${today}`)
+    } else if (timeRange === '7days' || timeRange === '30days') {
+      // 最近7/30天
+      const days = timeRange === '30days' ? 30 : 7
+      for (let i = 0; i < days; i++) {
+        const d = new Date(tzDate)
+        d.setDate(d.getDate() - i)
+        const dateStr = redis.getDateStringInTimezone(d)
+        searchPatterns.push(`usage:${keyId}:model:daily:*:${dateStr}`)
+      }
+    } else if (timeRange === 'monthly') {
+      // 当月
+      const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+      searchPatterns.push(`usage:${keyId}:model:monthly:*:${currentMonth}`)
+    } else {
+      // all - 使用 alltime key（无 TTL，数据完整），避免 daily/monthly 键过期导致数据丢失
+      searchPatterns.push(`usage:${keyId}:model:alltime:*`)
     }
-  } else if (timeRange === 'today') {
-    searchPatterns.push(`usage:${keyId}:model:daily:*:${today}`)
-  } else if (timeRange === '7days') {
-    // 最近7天
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(tzDate)
-      d.setDate(d.getDate() - i)
-      const dateStr = redis.getDateStringInTimezone(d)
-      searchPatterns.push(`usage:${keyId}:model:daily:*:${dateStr}`)
+
+    // 使用 SCAN 收集所有匹配的 keys
+    const allKeys = []
+    for (const pattern of searchPatterns) {
+      let cursor = '0'
+      do {
+        const [newCursor, keys] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
+        cursor = newCursor
+        allKeys.push(...keys)
+      } while (cursor !== '0')
     }
-  } else if (timeRange === 'monthly') {
-    // 当月
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
-    searchPatterns.push(`usage:${keyId}:model:monthly:*:${currentMonth}`)
-  } else {
-    // all - 使用 alltime key（无 TTL，数据完整），避免 daily/monthly 键过期导致数据丢失
-    searchPatterns.push(`usage:${keyId}:model:alltime:*`)
-  }
 
-  // 使用 SCAN 收集所有匹配的 keys
-  const allKeys = []
-  for (const pattern of searchPatterns) {
-    let cursor = '0'
-    do {
-      const [newCursor, keys] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
-      cursor = newCursor
-      allKeys.push(...keys)
-    } while (cursor !== '0')
+    // 去重
+    uniqueKeys = [...new Set(allKeys)]
   }
-
-  // 去重
-  const uniqueKeys = [...new Set(allKeys)]
 
   // 获取实时限制数据（窗口数据不受时间范围筛选影响，始终获取当前窗口状态）
   let dailyCost = 0
@@ -1206,6 +1215,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     windowStartTime,
     windowEndTime,
     allTimeCost
+  }
+
+  if (shouldUsePostgresStats) {
+    return calculateKeyStatsFromPostgres(keyId, timeRange, startDate, endDate, limitData)
   }
 
   // 如果没有使用数据，返回零值但包含窗口数据
@@ -1378,6 +1391,31 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     realCost: totalRealCost,
     formattedCost: CostCalculator.formatCost(totalRatedCost),
     ...limitData
+  }
+}
+
+async function calculateKeyStatsFromPostgres(keyId, timeRange, startDate, endDate, limitData) {
+  const [summary, costStats] = await Promise.all([
+    usageStatsService.getKeyUsageSummary(keyId, timeRange, startDate, endDate),
+    usageStatsService.getCostStats(keyId)
+  ])
+
+  const ratedCost = summary?.cost || 0
+  const realCost = summary?.realCost || 0
+
+  return {
+    requests: summary?.requests || 0,
+    tokens: summary?.tokens || 0,
+    inputTokens: summary?.inputTokens || 0,
+    outputTokens: summary?.outputTokens || 0,
+    cacheCreateTokens: summary?.cacheCreateTokens || 0,
+    cacheReadTokens: summary?.cacheReadTokens || 0,
+    cost: ratedCost,
+    realCost,
+    formattedCost: CostCalculator.formatCost(ratedCost),
+    ...limitData,
+    dailyCost: limitData.dailyCost || costStats?.daily || 0,
+    allTimeCost: costStats?.total || 0
   }
 }
 

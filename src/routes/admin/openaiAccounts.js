@@ -330,6 +330,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
       groupIds, // 支持多分组
       rateLimitDuration,
       priority,
+      maxConcurrentTasks,
       needsImmediateRefresh, // 是否需要立即刷新
       requireRefreshSuccess // 是否必须刷新成功才能创建
     } = req.body
@@ -341,12 +342,26 @@ router.post('/', authenticateAdmin, async (req, res) => {
       })
     }
 
+    if (maxConcurrentTasks !== undefined && maxConcurrentTasks !== null) {
+      const concurrent = Number(maxConcurrentTasks)
+      if (!Number.isInteger(concurrent) || concurrent < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'maxConcurrentTasks must be a non-negative integer'
+        })
+      }
+    }
+
     // 准备账户数据
     const accountData = {
       name,
       description: description || '',
       accountType: accountType || 'shared',
       priority: priority || 50,
+      maxConcurrentTasks:
+        maxConcurrentTasks !== undefined && maxConcurrentTasks !== null
+          ? Number(maxConcurrentTasks)
+          : 0,
       rateLimitDuration:
         rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       openaiOauth: openaiOauth || {},
@@ -494,6 +509,20 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
       return res
         .status(400)
         .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
+    }
+
+    if (
+      mappedUpdates.maxConcurrentTasks !== undefined &&
+      mappedUpdates.maxConcurrentTasks !== null
+    ) {
+      const concurrent = Number(mappedUpdates.maxConcurrentTasks)
+      if (!Number.isInteger(concurrent) || concurrent < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'maxConcurrentTasks must be a non-negative integer'
+        })
+      }
+      mappedUpdates.maxConcurrentTasks = concurrent
     }
 
     // 如果更新为分组类型，验证groupId或groupIds
