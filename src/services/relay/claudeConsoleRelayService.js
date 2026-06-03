@@ -613,7 +613,7 @@ class ClaudeConsoleRelayService {
         leaseRefreshInterval = setInterval(async () => {
           refreshCount += 1
 
-          if (refreshCount > maxRefreshCount) {
+          if (refreshCount >= maxRefreshCount) {
             logger.warn(
               `⚠️ Console stream concurrency lease exceeded max lifetime (${maxLifetimeMinutes} minutes) for account ${account.name} (${accountId}), request: ${requestId}`
             )
@@ -788,14 +788,19 @@ class ClaudeConsoleRelayService {
       let aborted = false
       let settled = false
       let responseFinished = false
-      let upstreamStream = null
       const abortController = new AbortController()
+      let upstreamStream = null
+      let maxLifetimeTimer = null
 
       const settleResolve = () => {
         if (settled) {
           return
         }
         settled = true
+        if (maxLifetimeTimer) {
+          clearTimeout(maxLifetimeTimer)
+          maxLifetimeTimer = null
+        }
         resolve()
       }
 
@@ -804,6 +809,10 @@ class ClaudeConsoleRelayService {
           return
         }
         settled = true
+        if (maxLifetimeTimer) {
+          clearTimeout(maxLifetimeTimer)
+          maxLifetimeTimer = null
+        }
         reject(error)
       }
 
@@ -828,6 +837,20 @@ class ClaudeConsoleRelayService {
         }
 
         settleReject(error)
+      }
+
+      const maxLifetimeMinutes = parseInt(process.env.CONCURRENCY_MAX_LIFETIME_MINUTES) || 10
+      maxLifetimeTimer = setTimeout(
+        () => {
+          abortUpstream(
+            `Claude Console stream exceeded max lifetime (${maxLifetimeMinutes} minutes)`,
+            new Error('Claude Console stream exceeded max lifetime')
+          )
+        },
+        maxLifetimeMinutes * 60 * 1000
+      )
+      if (typeof maxLifetimeTimer.unref === 'function') {
+        maxLifetimeTimer.unref()
       }
 
       responseStream.once('finish', () => {

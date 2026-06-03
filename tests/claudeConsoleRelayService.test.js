@@ -129,8 +129,21 @@ describe('claudeConsoleRelayService.testAccountConnection', () => {
 })
 
 describe('claudeConsoleRelayService._makeClaudeConsoleStreamRequest', () => {
+  const originalMaxLifetime = process.env.CONCURRENCY_MAX_LIFETIME_MINUTES
+
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.useRealTimers()
+    delete process.env.CONCURRENCY_MAX_LIFETIME_MINUTES
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+    if (originalMaxLifetime === undefined) {
+      delete process.env.CONCURRENCY_MAX_LIFETIME_MINUTES
+    } else {
+      process.env.CONCURRENCY_MAX_LIFETIME_MINUTES = originalMaxLifetime
+    }
   })
 
   it('destroys upstream stream when client disconnects', async () => {
@@ -160,6 +173,39 @@ describe('claudeConsoleRelayService._makeClaudeConsoleStreamRequest', () => {
     responseStream.emit('close')
 
     await expect(promise).rejects.toThrow('Client disconnected')
+    expect(upstreamStream.destroyed).toBe(true)
+  })
+
+  it('destroys upstream stream after max lifetime', async () => {
+    jest.useFakeTimers()
+    process.env.CONCURRENCY_MAX_LIFETIME_MINUTES = '1'
+
+    const upstreamStream = new PassThrough()
+    axios.mockResolvedValue({
+      status: 200,
+      data: upstreamStream,
+      headers: {}
+    })
+
+    const responseStream = createResponseStream()
+    const promise = claudeConsoleRelayService._makeClaudeConsoleStreamRequest(
+      { model: 'claude-sonnet-4-6' },
+      {
+        name: 'Console A1',
+        apiUrl: 'https://console.example.com',
+        apiKey: 'test-key'
+      },
+      null,
+      {},
+      responseStream,
+      'a1',
+      jest.fn()
+    )
+
+    await Promise.resolve()
+    jest.advanceTimersByTime(60 * 1000)
+
+    await expect(promise).rejects.toThrow('Claude Console stream exceeded max lifetime')
     expect(upstreamStream.destroyed).toBe(true)
   })
 })
