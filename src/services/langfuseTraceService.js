@@ -1,6 +1,7 @@
 const axios = require('axios')
 const config = require('../../config/config')
 const logger = require('../utils/logger')
+const metadataUserIdHelper = require('../utils/metadataUserIdHelper')
 
 const DEFAULT_TIMEOUT_MS = 5000
 
@@ -76,6 +77,13 @@ function firstNonEmpty(...values) {
   return null
 }
 
+function buildUserId(detail = {}) {
+  const parsedMetadataUser = metadataUserIdHelper.parse(detail.metadataUserId)
+  const apiKeyName = firstNonEmpty(detail.apiKeyName, detail.apiKeyId)
+
+  return firstNonEmpty(apiKeyName, parsedMetadataUser?.deviceId, detail.metadataUserId)
+}
+
 function buildUsage(detail = {}) {
   const input = Number(detail.inputTokens) || 0
   const output = Number(detail.outputTokens) || 0
@@ -95,7 +103,52 @@ function buildUsage(detail = {}) {
   })
 }
 
+function toFiniteNumber(value) {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : 0
+}
+
+function buildUsageDetails(detail = {}) {
+  const input = toFiniteNumber(detail.inputTokens)
+  const output = toFiniteNumber(detail.outputTokens)
+  const cacheRead = toFiniteNumber(detail.cacheReadTokens)
+  const cacheCreate = toFiniteNumber(detail.cacheCreateTokens)
+  const total = toFiniteNumber(detail.totalTokens) || input + output + cacheRead + cacheCreate
+
+  return cleanObject({
+    input,
+    output,
+    cache_read_input: cacheRead,
+    cache_creation_input: cacheCreate,
+    total
+  })
+}
+
+function addPositiveNumber(target, key, value) {
+  const numberValue = toFiniteNumber(value)
+  if (numberValue > 0) {
+    target[key] = numberValue
+  }
+}
+
+function buildCostDetails(detail = {}) {
+  const source = detail.realCostBreakdown || detail.costBreakdown || {}
+  const costDetails = {}
+
+  addPositiveNumber(costDetails, 'input', source.input)
+  addPositiveNumber(costDetails, 'output', source.output)
+  addPositiveNumber(costDetails, 'cache_read_input', source.cacheRead)
+  addPositiveNumber(costDetails, 'cache_creation_input', source.cacheCreate ?? source.cacheWrite)
+  addPositiveNumber(costDetails, 'ephemeral_5m_input', source.ephemeral5m)
+  addPositiveNumber(costDetails, 'ephemeral_1h_input', source.ephemeral1h)
+  addPositiveNumber(costDetails, 'total', source.total ?? detail.realCost ?? detail.cost)
+
+  return Object.keys(costDetails).length > 0 ? costDetails : undefined
+}
+
 function buildMetadata(detail = {}, runtimeConfig = {}) {
+  const parsedMetadataUser = metadataUserIdHelper.parse(detail.metadataUserId)
+
   return cleanObject({
     source: 'claude-relay-service',
     environment: runtimeConfig.environment,
@@ -105,6 +158,7 @@ function buildMetadata(detail = {}, runtimeConfig = {}) {
     statusCode: detail.statusCode,
     stream: detail.stream,
     apiKeyId: detail.apiKeyId,
+    apiKeyName: detail.apiKeyName,
     accountId: detail.accountId,
     accountType: detail.accountType,
     model: detail.model,
@@ -113,6 +167,9 @@ function buildMetadata(detail = {}, runtimeConfig = {}) {
     conversationId: detail.conversationId,
     promptCacheKey: detail.promptCacheKey,
     metadataUserId: detail.metadataUserId,
+    metadataDeviceId: parsedMetadataUser?.deviceId,
+    metadataAccountUuid: parsedMetadataUser?.accountUuid,
+    metadataSessionId: parsedMetadataUser?.sessionId,
     serviceTier: detail.serviceTier,
     clientIp: detail.clientIp,
     userAgent: detail.userAgent,
@@ -145,8 +202,7 @@ function buildMetadata(detail = {}, runtimeConfig = {}) {
     finishReason: detail.finishReason,
     errorBody: safeJsonValue(detail.errorBody),
     responseMetadata: safeJsonValue(detail.responseMetadata),
-    metadata: safeJsonValue(detail.metadata),
-    detail: safeJsonValue(detail)
+    metadata: safeJsonValue(detail.metadata)
   })
 }
 
@@ -169,7 +225,7 @@ function buildTracePayload(detail = {}, runtimeConfig = {}) {
   const responseBody = safeJsonValue(detail.responseBody ?? detail.responseBodySnapshot)
   const metadata = buildMetadata(detail, runtimeConfig)
   const sessionId = firstNonEmpty(detail.sessionId, detail.conversationId, detail.sessionHash)
-  const userId = firstNonEmpty(detail.metadataUserId, detail.apiKeyId)
+  const userId = buildUserId(detail)
   const name = firstNonEmpty(detail.endpoint, detail.model, 'crs-request')
   const generationId = `${traceId}-generation`
 
@@ -204,6 +260,8 @@ function buildTracePayload(detail = {}, runtimeConfig = {}) {
           input: requestBody,
           output: responseBody,
           usage: buildUsage(detail),
+          usageDetails: buildUsageDetails(detail),
+          costDetails: buildCostDetails(detail),
           metadata
         })
       }
@@ -261,5 +319,7 @@ class LangfuseTraceService {
 module.exports = new LangfuseTraceService()
 module.exports._private = {
   buildTracePayload,
+  buildUsageDetails,
+  buildCostDetails,
   getRuntimeConfig
 }

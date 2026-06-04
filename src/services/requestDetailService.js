@@ -981,15 +981,20 @@ class RequestDetailService {
     await requestDetailPostgresStore.upsertRequestDetail(normalized)
   }
 
-  _queueLangfuseCapture(detail, normalized, requestId) {
+  async _queueLangfuseCapture(detail, normalized, requestId) {
     if (!langfuseTraceService.isEnabled()) {
       return
     }
 
+    const apiKeyName =
+      detail.apiKeyName ||
+      normalized.apiKeyName ||
+      (normalized.apiKeyId ? await this._getApiKeyName(normalized.apiKeyId, new Map()) : null)
     const langfuseDetail = {
       ...detail,
       ...normalized,
       requestId,
+      apiKeyName,
       requestBody:
         detail.requestBody ?? detail.requestBodySnapshot ?? normalized.requestBodySnapshot,
       responseBody:
@@ -1044,7 +1049,9 @@ class RequestDetailService {
         return { captured: false, reason: lastReason || 'write_skipped', requestId }
       }
 
-      this._queueLangfuseCapture(detail, normalized, requestId)
+      this._queueLangfuseCapture(detail, normalized, requestId).catch((error) => {
+        logger.warn(`⚠️ Failed to queue Langfuse trace for request ${requestId}: ${error.message}`)
+      })
 
       return { captured: true, requestId }
     } catch (error) {

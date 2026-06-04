@@ -46,17 +46,27 @@ describe('langfuseTraceService', () => {
       statusCode: 200,
       stream: true,
       apiKeyId: 'key_1',
+      apiKeyName: '吴满江',
       accountId: 'acct_1',
       accountType: 'claude-console',
       model: 'gpt-5.5',
       sessionHash: 'session_hash_1',
-      metadataUserId: 'user_1',
+      metadataUserId:
+        '{"device_id":"device_123","account_uuid":"","session_id":"session_from_metadata"}',
       inputTokens: 10,
       outputTokens: 5,
       cacheReadTokens: 3,
       cacheCreateTokens: 2,
       totalTokens: 20,
       cost: 0.123456,
+      realCost: 0.012345,
+      realCostBreakdown: {
+        input: 0.001,
+        output: 0.002,
+        cacheRead: 0.003,
+        cacheCreate: 0.004,
+        total: 0.012345
+      },
       requestBody: {
         apiKey: 'raw-secret',
         messages: [{ role: 'user', content: 'hello' }]
@@ -93,14 +103,16 @@ describe('langfuseTraceService', () => {
       expect.objectContaining({
         id: 'req_1',
         name: '/api/v1/messages',
-        userId: 'user_1',
+        userId: '吴满江',
         sessionId: 'session_hash_1',
         input: expect.objectContaining({ apiKey: 'raw-secret' }),
         output: expect.objectContaining({ id: 'resp_1' }),
         tags: expect.arrayContaining(['crs', 'test', 'claude-console', 'gpt-5.5', 'stream'])
       })
     )
-    expect(traceEvent.body.metadata.detail.requestBody.apiKey).toBe('raw-secret')
+    expect(traceEvent.body.metadata.detail).toBeUndefined()
+    expect(traceEvent.body.metadata.metadataDeviceId).toBe('device_123')
+    expect(traceEvent.body.metadata.metadataSessionId).toBe('session_from_metadata')
     expect(generationEvent.body).toEqual(
       expect.objectContaining({
         id: 'req_1-generation',
@@ -112,6 +124,20 @@ describe('langfuseTraceService', () => {
           total: 20,
           cacheReadTokens: 3,
           cacheCreateTokens: 2
+        }),
+        usageDetails: {
+          input: 10,
+          output: 5,
+          cache_read_input: 3,
+          cache_creation_input: 2,
+          total: 20
+        },
+        costDetails: expect.objectContaining({
+          input: 0.001,
+          output: 0.002,
+          cache_read_input: 0.003,
+          cache_creation_input: 0.004,
+          total: 0.012345
         })
       })
     )

@@ -2231,6 +2231,7 @@ class ApiKeyService {
       requestSource: requestMeta?.requestSource || usageRecord.requestSource || null,
       metadata: requestMeta?.metadata || usageRecord.metadata || null,
       apiKeyId: keyId,
+      apiKeyName: usageRecord.apiKeyName || null,
       accountId: usageRecord.accountId || null,
       accountType: usageRecord.accountType || null,
       model: usageRecord.model || 'unknown',
