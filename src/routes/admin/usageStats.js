@@ -215,6 +215,47 @@ const accountTypeNames = {
   unknown: '未知渠道'
 }
 
+function hasAccountTrendData(trendResult = {}) {
+  if (Array.isArray(trendResult.topAccounts) && trendResult.topAccounts.length > 0) {
+    return true
+  }
+
+  return (trendResult.data || []).some(
+    (point) => point.accounts && Object.keys(point.accounts).length > 0
+  )
+}
+
+function buildDailyDateInfos({ days = 7, startDate = null, endDate = null } = {}) {
+  const maxDays = 365
+  const dayInfos = []
+
+  if (startDate && endDate) {
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start <= end) {
+      const cursor = new Date(start)
+      const endDay = new Date(end)
+      cursor.setHours(0, 0, 0, 0)
+      endDay.setHours(0, 0, 0, 0)
+
+      while (cursor <= endDay && dayInfos.length < maxDays) {
+        dayInfos.push({ dateStr: redis.getDateStringInTimezone(cursor) })
+        cursor.setDate(cursor.getDate() + 1)
+      }
+      return dayInfos
+    }
+  }
+
+  const daysCount = Math.min(Math.max(parseInt(days, 10) || 7, 1), maxDays)
+  const today = new Date()
+  for (let i = 0; i < daysCount; i += 1) {
+    const date = new Date(today)
+    date.setDate(date.getDate() - i)
+    dayInfos.push({ dateStr: redis.getDateStringInTimezone(date) })
+  }
+  return dayInfos
+}
+
 const resolveAccountByPlatform = async (accountId, platform) => {
   const serviceMap = {
     claude: claudeAccountService,
@@ -625,6 +666,20 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
   try {
     const { days = 7, granularity = 'day', startDate, endDate } = req.query
 
+    if (usageStatsService.shouldReadPostgres()) {
+      try {
+        const trendData = await usageStatsService.getUsageTrend({
+          days,
+          granularity,
+          startDate,
+          endDate
+        })
+        return res.json({ success: true, data: trendData, granularity })
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read usage trend from PostgreSQL: ${error.message}`)
+      }
+    }
+
     const trendData = []
 
     if (granularity === 'hour') {
@@ -832,17 +887,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
       }
     } else {
       // 天粒度统计（按日期集合扫描）
-      const daysCount = parseInt(days) || 7
-      const today = new Date()
-
-      // 收集所有天的元数据
-      const dayInfos = []
-      for (let i = 0; i < daysCount; i++) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        const dateStr = redis.getDateStringInTimezone(date)
-        dayInfos.push({ dateStr })
-      }
+      const dayInfos = buildDailyDateInfos({ days, startDate, endDate })
 
       // 使用索引获取数据，按日期批量查询
       const modelDataMap = new Map()
@@ -1471,6 +1516,33 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
       })
     }
 
+    if (usageStatsService.shouldReadPostgres()) {
+      try {
+        const trendResult = await usageStatsService.getAccountUsageTrend({
+          accounts,
+          days,
+          granularity,
+          startDate,
+          endDate
+        })
+        if (hasAccountTrendData(trendResult)) {
+          return res.json({
+            success: true,
+            data: trendResult.data || [],
+            granularity,
+            group,
+            groupLabel: groupLabels[group],
+            topAccounts: trendResult.topAccounts || [],
+            totalAccounts: trendResult.totalAccounts || accounts.length
+          })
+        }
+
+        logger.info('📊 PostgreSQL account usage trend is empty, falling back to Redis')
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read account usage trend from PostgreSQL: ${error.message}`)
+      }
+    }
+
     const accountMap = new Map()
     const accountIdSet = new Set()
     for (const account of accounts) {
@@ -1693,17 +1765,7 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
         trendData.push(hourData)
       }
     } else {
-      const daysCount = parseInt(days) || 7
-      const today = new Date()
-
-      // 收集所有天的元数据
-      const dayInfos = []
-      for (let i = 0; i < daysCount; i++) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        const dateStr = redis.getDateStringInTimezone(date)
-        dayInfos.push({ dateStr })
-      }
+      const dayInfos = buildDailyDateInfos({ days, startDate, endDate })
 
       // 使用索引获取数据
       const usagePromises = dayInfos.map((d) =>
@@ -1914,6 +1976,28 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
     const apiKeyMap = new Map(
       apiKeyBasicData.filter((key) => !key.isDeleted).map((key) => [key.id, key])
     )
+    const activeApiKeys = Array.from(apiKeyMap.values())
+
+    if (usageStatsService.shouldReadPostgres()) {
+      try {
+        const trendResult = await usageStatsService.getApiKeysUsageTrend({
+          apiKeys: activeApiKeys,
+          days,
+          granularity,
+          startDate,
+          endDate
+        })
+        return res.json({
+          success: true,
+          data: trendResult.data || [],
+          granularity,
+          topApiKeys: trendResult.topApiKeys || [],
+          totalApiKeys: trendResult.totalApiKeys || activeApiKeys.length
+        })
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read API key usage trend from PostgreSQL: ${error.message}`)
+      }
+    }
 
     if (granularity === 'hour') {
       // 小时粒度统计
@@ -2135,17 +2219,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
       }
     } else {
       // 天粒度统计（按日期集合扫描）
-      const daysCount = parseInt(days) || 7
-      const today = new Date()
-
-      // 收集所有天的元数据
-      const dayInfos = []
-      for (let i = 0; i < daysCount; i++) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        const dateStr = redis.getDateStringInTimezone(date)
-        dayInfos.push({ dateStr })
-      }
+      const dayInfos = buildDailyDateInfos({ days, startDate, endDate })
 
       // 使用索引获取数据，按日期批量查询
       const usageDataMap = new Map()
@@ -2366,6 +2440,21 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     const { period = 'all' } = req.query // all, today, monthly, 7days
 
     logger.info(`💰 Calculating usage costs for period: ${period}`)
+
+    if (usageStatsService.shouldReadPostgres()) {
+      try {
+        const costs = await usageStatsService.getUsageCosts(period)
+        return res.json({
+          success: true,
+          data: {
+            ...costs,
+            pricingServiceStatus: pricingService.getStatus()
+          }
+        })
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read usage costs from PostgreSQL: ${error.message}`)
+      }
+    }
 
     // 模型名标准化函数（与redis.js保持一致）
     const normalizeModelName = (model) => {

@@ -4267,6 +4267,153 @@ redisClient.scanConcurrencyQueueKeys = async function () {
   }
 }
 
+const ACTIVE_REQUEST_INDEX_KEY = 'request_active:index'
+const ACTIVE_REQUEST_ITEM_PREFIX = 'request_active:item:'
+const ACTIVE_REQUEST_DEFAULT_TTL_SECONDS = 2 * 60 * 60
+
+function normalizeActiveRequestPayload(record = {}) {
+  const now = Date.now()
+  const requestId = String(record.requestId || '').trim()
+  if (!requestId) {
+    throw new Error('requestId is required for active request tracking')
+  }
+
+  const startedAtMs = Number(record.startedAtMs || now)
+  const normalizedStartedAtMs = Number.isFinite(startedAtMs) ? startedAtMs : now
+
+  return {
+    ...record,
+    requestId,
+    status: record.status || 'running',
+    startedAtMs: normalizedStartedAtMs,
+    startedAt: record.startedAt || new Date(normalizedStartedAtMs).toISOString(),
+    updatedAtMs: now,
+    updatedAt: new Date(now).toISOString()
+  }
+}
+
+redisClient.trackActiveRequest = async function (
+  record = {},
+  ttlSeconds = ACTIVE_REQUEST_DEFAULT_TTL_SECONDS
+) {
+  try {
+    const normalized = normalizeActiveRequestPayload(record)
+    const ttl = Math.max(Number(ttlSeconds) || ACTIVE_REQUEST_DEFAULT_TTL_SECONDS, 60)
+    const itemKey = `${ACTIVE_REQUEST_ITEM_PREFIX}${normalized.requestId}`
+
+    const pipeline = this.client.pipeline()
+    pipeline.set(itemKey, JSON.stringify(normalized), 'EX', ttl)
+    pipeline.zadd(ACTIVE_REQUEST_INDEX_KEY, normalized.startedAtMs, normalized.requestId)
+    pipeline.expire(ACTIVE_REQUEST_INDEX_KEY, ttl)
+    await pipeline.exec()
+
+    return normalized
+  } catch (error) {
+    logger.error('Failed to track active request:', error)
+    throw error
+  }
+}
+
+redisClient.updateActiveRequest = async function (requestId, patch = {}) {
+  if (!requestId) {
+    return null
+  }
+
+  const itemKey = `${ACTIVE_REQUEST_ITEM_PREFIX}${requestId}`
+  try {
+    const raw = await this.client.get(itemKey)
+    if (!raw) {
+      return null
+    }
+
+    let existing = {}
+    try {
+      existing = JSON.parse(raw)
+    } catch (_error) {
+      existing = { requestId }
+    }
+
+    const updated = normalizeActiveRequestPayload({
+      ...existing,
+      ...patch,
+      requestId,
+      startedAtMs: existing.startedAtMs || patch.startedAtMs,
+      startedAt: existing.startedAt || patch.startedAt
+    })
+
+    await this.client.set(itemKey, JSON.stringify(updated), 'KEEPTTL')
+    return updated
+  } catch (error) {
+    logger.error(`Failed to update active request ${requestId}:`, error)
+    return null
+  }
+}
+
+redisClient.untrackActiveRequest = async function (requestId) {
+  if (!requestId) {
+    return 0
+  }
+
+  try {
+    const itemKey = `${ACTIVE_REQUEST_ITEM_PREFIX}${requestId}`
+    const pipeline = this.client.pipeline()
+    pipeline.del(itemKey)
+    pipeline.zrem(ACTIVE_REQUEST_INDEX_KEY, requestId)
+    const results = await pipeline.exec()
+    return Number(results?.[0]?.[1] || 0)
+  } catch (error) {
+    logger.error(`Failed to untrack active request ${requestId}:`, error)
+    return 0
+  }
+}
+
+redisClient.listActiveRequests = async function (limit = 500) {
+  const maxLimit = Math.min(Math.max(Number(limit) || 500, 1), 1000)
+
+  try {
+    const requestIds = await this.client.zrevrange(ACTIVE_REQUEST_INDEX_KEY, 0, maxLimit - 1)
+    if (!requestIds || requestIds.length === 0) {
+      return []
+    }
+
+    const pipeline = this.client.pipeline()
+    requestIds.forEach((requestId) => pipeline.get(`${ACTIVE_REQUEST_ITEM_PREFIX}${requestId}`))
+    const results = await pipeline.exec()
+    const staleIds = []
+    const records = []
+
+    results.forEach(([error, raw], index) => {
+      const requestId = requestIds[index]
+      if (error || !raw) {
+        staleIds.push(requestId)
+        return
+      }
+
+      try {
+        const parsed = JSON.parse(raw)
+        if (parsed?.requestId) {
+          records.push(parsed)
+        } else {
+          staleIds.push(requestId)
+        }
+      } catch (_parseError) {
+        staleIds.push(requestId)
+      }
+    })
+
+    if (staleIds.length > 0) {
+      await this.client.zrem(ACTIVE_REQUEST_INDEX_KEY, ...staleIds).catch((error) => {
+        logger.warn('Failed to cleanup stale active request index entries:', error)
+      })
+    }
+
+    return records
+  } catch (error) {
+    logger.error('Failed to list active requests:', error)
+    return []
+  }
+}
+
 /**
  * 清理所有排队计数器（用于服务重启）
  * @returns {Promise<number>} 清理的计数器数量

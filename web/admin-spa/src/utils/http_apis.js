@@ -69,6 +69,8 @@ export const getRequestDetailsApi = (params) =>
   request({ url: '/admin/request-details', method: 'GET', params })
 export const getRequestDetailSessionsApi = (params) =>
   request({ url: '/admin/request-details/sessions', method: 'GET', params })
+export const getActiveRequestDetailsApi = (params) =>
+  request({ url: '/admin/request-details/active', method: 'GET', params })
 export const getRequestDetailBodyPreviewStatsApi = (config) =>
   request({ url: '/admin/request-details/body-preview-stats', method: 'GET', ...config })
 export const purgeRequestDetailBodyPreviewApi = (config) =>

@@ -66,6 +66,21 @@ function queueRateLimitUpdate(
     })
 }
 
+function queueActiveRequestAccountUpdate(req, accountId, accountType) {
+  if (!accountId || typeof req?.updateActiveRequest !== 'function') {
+    return
+  }
+
+  req
+    .updateActiveRequest({
+      accountId,
+      accountType
+    })
+    .catch((error) => {
+      logger.debug(`Failed to update active request account info: ${error.message}`)
+    })
+}
+
 /**
  * 判断是否为旧会话（污染的会话）
  * Claude Code 发送的请求特点：
@@ -350,6 +365,7 @@ async function handleMessagesRequest(req, res) {
           forcedAccount
         )
         ;({ accountId, accountType } = selection)
+        queueActiveRequestAccountUpdate(req, accountId, accountType)
       } catch (error) {
         // 处理会话绑定账户不可用的错误
         if (error.code === 'SESSION_BINDING_ACCOUNT_UNAVAILABLE') {
@@ -1061,6 +1077,7 @@ async function handleMessagesRequest(req, res) {
           forcedAccountNonStream
         )
         ;({ accountId, accountType } = selection)
+        queueActiveRequestAccountUpdate(req, accountId, accountType)
       } catch (error) {
         if (error.code === 'SESSION_BINDING_ACCOUNT_UNAVAILABLE') {
           const errorMessage = await claudeRelayConfigService.getSessionBindingErrorMessage()

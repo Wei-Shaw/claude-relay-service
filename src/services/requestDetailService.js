@@ -3,6 +3,7 @@ const config = require('../../config/config')
 const logger = require('../utils/logger')
 const claudeRelayConfigService = require('./claudeRelayConfigService')
 const requestDetailPostgresStore = require('./requestDetailStores/postgresRequestDetailStore')
+const langfuseTraceService = require('./langfuseTraceService')
 const claudeAccountService = require('./account/claudeAccountService')
 const claudeConsoleAccountService = require('./account/claudeConsoleAccountService')
 const ccrAccountService = require('./account/ccrAccountService')
@@ -674,6 +675,16 @@ function finalizeAvailableFilters(accumulator) {
   }
 }
 
+function getActiveRequestStatusDisplay(status) {
+  if (status === 'queued') {
+    return '排队中'
+  }
+  if (status === 'running') {
+    return '请求中'
+  }
+  return status || '请求中'
+}
+
 function createSummaryAccumulator() {
   return {
     totalRequests: 0,
@@ -970,6 +981,26 @@ class RequestDetailService {
     await requestDetailPostgresStore.upsertRequestDetail(normalized)
   }
 
+  _queueLangfuseCapture(detail, normalized, requestId) {
+    if (!langfuseTraceService.isEnabled()) {
+      return
+    }
+
+    const langfuseDetail = {
+      ...detail,
+      ...normalized,
+      requestId,
+      requestBody:
+        detail.requestBody ?? detail.requestBodySnapshot ?? normalized.requestBodySnapshot,
+      responseBody:
+        detail.responseBody ?? detail.responseBodySnapshot ?? normalized.responseBodySnapshot
+    }
+
+    langfuseTraceService.captureRequestDetail(langfuseDetail).catch((error) => {
+      logger.warn(`⚠️ Failed to capture Langfuse trace for request ${requestId}: ${error.message}`)
+    })
+  }
+
   async captureRequestDetail(detail = {}) {
     try {
       const settings = await this.getSettings()
@@ -1012,6 +1043,8 @@ class RequestDetailService {
       if (!redisCaptured && !postgresCaptured) {
         return { captured: false, reason: lastReason || 'write_skipped', requestId }
       }
+
+      this._queueLangfuseCapture(detail, normalized, requestId)
 
       return { captured: true, requestId }
     } catch (error) {
@@ -2021,6 +2054,92 @@ class RequestDetailService {
       pageSize,
       snapshotId
     })
+  }
+
+  async listActiveRequestDetails(filters = {}) {
+    filters = normalizeRequestDetailFilters(filters)
+    const limit = Math.min(Math.max(Number.parseInt(filters.limit, 10) || 500, 1), 1000)
+    const rawRecords = await redis.listActiveRequests(limit)
+    const now = Date.now()
+    const apiKeyCache = new Map()
+    const accountCache = new Map()
+    const accumulator = createAvailableFilterAccumulator()
+    const records = []
+
+    for (const rawRecord of rawRecords) {
+      const startedAtMs = Number(rawRecord.startedAtMs || toMillis(rawRecord.startedAt) || now)
+      const queuedAtMs = Number(rawRecord.queuedAtMs || toMillis(rawRecord.queuedAt) || 0)
+      const apiKeyName =
+        rawRecord.apiKeyName || (await this._getApiKeyName(rawRecord.apiKeyId, apiKeyCache))
+      const accountInfo = await this._resolveAccountInfo(
+        rawRecord.accountId,
+        rawRecord.accountType,
+        accountCache
+      )
+      const record = {
+        ...rawRecord,
+        apiKeyName: apiKeyName || rawRecord.apiKeyId || '未知 Key',
+        accountName: accountInfo?.accountName || rawRecord.accountName || rawRecord.accountId || '',
+        accountType: accountInfo?.accountType || rawRecord.accountType || 'unknown',
+        accountTypeName:
+          accountInfo?.accountTypeName ||
+          accountTypeNames[rawRecord.accountType] ||
+          accountTypeNames.unknown,
+        statusDisplay: getActiveRequestStatusDisplay(rawRecord.status),
+        startedAt: rawRecord.startedAt || new Date(startedAtMs).toISOString(),
+        startedAtMs,
+        elapsedMs: Math.max(0, now - startedAtMs),
+        queuedMs: queuedAtMs > 0 ? Math.max(0, now - queuedAtMs) : 0
+      }
+
+      updateAvailableFilterAccumulator(accumulator, record)
+
+      if (!this._matchesStructuredFilters(record, filters)) {
+        continue
+      }
+      if (!this._matchesKeyword(record, filters.keyword)) {
+        continue
+      }
+
+      records.push(record)
+    }
+
+    records.sort((a, b) => {
+      const aStatusRank = a.status === 'queued' ? 0 : 1
+      const bStatusRank = b.status === 'queued' ? 0 : 1
+      if (aStatusRank !== bStatusRank) {
+        return aStatusRank - bStatusRank
+      }
+      return Number(b.startedAtMs || 0) - Number(a.startedAtMs || 0)
+    })
+
+    await this._resolveFilterDisplayNames(accumulator)
+
+    const runningCount = records.filter((record) => record.status !== 'queued').length
+    const queuedCount = records.filter((record) => record.status === 'queued').length
+
+    return {
+      records,
+      summary: {
+        total: records.length,
+        running: runningCount,
+        queued: queuedCount,
+        oldestElapsedMs: records.reduce(
+          (max, record) => Math.max(max, Number(record.elapsedMs || 0)),
+          0
+        )
+      },
+      filters: {
+        keyword: filters.keyword || null,
+        apiKeyId: filters.apiKeyId || null,
+        accountId: filters.accountId || null,
+        model: filters.model || null,
+        endpoint: filters.endpoint || null,
+        session: filters.session || null
+      },
+      availableFilters: finalizeAvailableFilters(accumulator),
+      generatedAt: new Date(now).toISOString()
+    }
   }
 
   _emptySessionSummaryResult(settings, filters = {}) {

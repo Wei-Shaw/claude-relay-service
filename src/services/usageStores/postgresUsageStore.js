@@ -300,6 +300,129 @@ function getCurrentPeriodStart(periodType) {
   return getPeriodStart(new Date(), periodType)
 }
 
+function formatLocalDate(date) {
+  const shifted = new Date(normalizeDate(date).getTime() + getOffsetMs())
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(
+    2,
+    '0'
+  )}-${String(shifted.getUTCDate()).padStart(2, '0')}`
+}
+
+function formatLocalHourLabel(date) {
+  const shifted = new Date(normalizeDate(date).getTime() + getOffsetMs())
+  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(shifted.getUTCDate()).padStart(2, '0')
+  const hour = String(shifted.getUTCHours()).padStart(2, '0')
+  return `${month}/${day} ${hour}:00`
+}
+
+function formatCost(cost) {
+  return `$${normalizeNumber(cost).toFixed(6)}`
+}
+
+function addPeriod(date, periodType, count = 1) {
+  const current = normalizeDate(date)
+  if (periodType === 'hour') {
+    return new Date(current.getTime() + count * 3600000)
+  }
+  if (periodType === 'month') {
+    const shifted = new Date(current.getTime() + getOffsetMs())
+    shifted.setUTCMonth(shifted.getUTCMonth() + count)
+    return getPeriodStart(new Date(shifted.getTime() - getOffsetMs()), 'month')
+  }
+  return new Date(current.getTime() + count * 86400000)
+}
+
+function buildPeriodInfos({ granularity = 'day', days = 7, startDate = null, endDate = null }) {
+  const periodType = granularity === 'hour' ? 'hour' : 'day'
+
+  if (periodType === 'hour') {
+    const end = getPeriodStart(endDate ? normalizeDate(endDate) : new Date(), 'hour')
+    const fallbackStart = new Date(end.getTime() - 24 * 3600000)
+    const start = getPeriodStart(startDate ? normalizeDate(startDate) : fallbackStart, 'hour')
+    const periodInfos = []
+    for (let cursor = start; cursor <= end; cursor = addPeriod(cursor, 'hour')) {
+      periodInfos.push({
+        periodStart: cursor,
+        hour: cursor.toISOString(),
+        label: formatLocalHourLabel(cursor)
+      })
+    }
+    return { periodType, periodInfos }
+  }
+
+  if (startDate && endDate) {
+    const start = getPeriodStart(normalizeDate(startDate), 'day')
+    const end = getPeriodStart(normalizeDate(endDate), 'day')
+    const periodInfos = []
+    if (start > end) {
+      return { periodType, periodInfos }
+    }
+
+    for (let cursor = start; cursor <= end; cursor = addPeriod(cursor, 'day')) {
+      periodInfos.push({
+        periodStart: cursor,
+        date: formatLocalDate(cursor)
+      })
+    }
+    return { periodType, periodInfos }
+  }
+
+  const daysCount = Math.max(1, parseInt(days) || 7)
+  const todayStart = getCurrentPeriodStart('day')
+  const periodInfos = []
+  for (let i = daysCount - 1; i >= 0; i -= 1) {
+    const periodStart = addPeriod(todayStart, 'day', -i)
+    periodInfos.push({
+      periodStart,
+      date: formatLocalDate(periodStart)
+    })
+  }
+  return { periodType, periodInfos }
+}
+
+function rowHasUsage(row = {}) {
+  return (
+    normalizeInteger(row.request_count) > 0 ||
+    normalizeInteger(row.total_tokens) > 0 ||
+    normalizeNumber(row.cost) > 0 ||
+    normalizeNumber(row.real_cost) > 0
+  )
+}
+
+function pickPreferredRollup(rows = [], periodType) {
+  const apiKeyRow = rows.find(
+    (row) => row.period_type === periodType && row.dimension_type === 'api_key'
+  )
+  if (apiKeyRow) {
+    return apiKeyRow
+  }
+  return rows.find((row) => row.period_type === periodType && row.dimension_type === 'global') || {}
+}
+
+function buildUsagePoint(base, row = {}) {
+  const inputTokens = normalizeInteger(row.input_tokens)
+  const outputTokens = normalizeInteger(row.output_tokens)
+  const cacheCreateTokens = normalizeInteger(row.cache_create_tokens)
+  const cacheReadTokens = normalizeInteger(row.cache_read_tokens)
+  const totalTokens =
+    normalizeInteger(row.total_tokens) ||
+    inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+  const cost = normalizeNumber(row.cost)
+
+  return {
+    ...base,
+    inputTokens,
+    outputTokens,
+    requests: normalizeInteger(row.request_count),
+    cacheCreateTokens,
+    cacheReadTokens,
+    totalTokens,
+    cost,
+    formattedCost: formatCost(cost)
+  }
+}
+
 function normalizeUsageEvent(event = {}) {
   const requestId = normalizeText(event.requestId)
   const timestamp = normalizeDate(event.timestamp)
@@ -1083,6 +1206,503 @@ async function calculateCustomRangeCosts(keyIds = [], startDate, endDate) {
   return costs
 }
 
+async function getGlobalUsageSummary() {
+  const allStart = getCurrentPeriodStart('all')
+  const currentDay = getCurrentPeriodStart('day')
+  const result = await postgres.query(
+    `
+      SELECT
+        dimension_type,
+        period_type,
+        SUM(request_count) AS request_count,
+        SUM(input_tokens) AS input_tokens,
+        SUM(output_tokens) AS output_tokens,
+        SUM(cache_create_tokens) AS cache_create_tokens,
+        SUM(cache_read_tokens) AS cache_read_tokens,
+        SUM(ephemeral_5m_tokens) AS ephemeral_5m_tokens,
+        SUM(ephemeral_1h_tokens) AS ephemeral_1h_tokens,
+        SUM(total_tokens) AS total_tokens,
+        SUM(cost) AS cost,
+        SUM(real_cost) AS real_cost
+      FROM usage_rollups
+      WHERE model = ''
+        AND dimension_type IN ('api_key', 'global')
+        AND (
+          (period_type = 'all' AND period_start = $1)
+          OR (period_type = 'day' AND period_start = $2)
+        )
+      GROUP BY dimension_type, period_type
+    `,
+    [allStart, currentDay]
+  )
+
+  const firstUsageResult = await postgres.query(
+    `
+      SELECT MIN(period_start) AS first_period_start
+      FROM usage_rollups
+      WHERE model = ''
+        AND dimension_type IN ('api_key', 'global')
+        AND period_type IN ('hour', 'day', 'month')
+    `
+  )
+
+  const totalRow = pickPreferredRollup(result.rows, 'all')
+  const todayRow = pickPreferredRollup(result.rows, 'day')
+  const total = rollupRowToUsage(totalRow)
+  const daily = rollupRowToUsage(todayRow)
+  const firstPeriod = firstUsageResult.rows[0]?.first_period_start
+    ? normalizeDate(firstUsageResult.rows[0].first_period_start)
+    : new Date()
+  const totalMinutes = Math.max(1, Math.ceil((new Date() - firstPeriod) / 60000))
+
+  return {
+    total,
+    daily,
+    costs: {
+      total: normalizeNumber(totalRow.cost),
+      realTotal: normalizeNumber(totalRow.real_cost),
+      daily: normalizeNumber(todayRow.cost),
+      realDaily: normalizeNumber(todayRow.real_cost)
+    },
+    averages: {
+      rpm: Math.round((total.requests / totalMinutes) * 100) / 100,
+      tpm: Math.round((total.allTokens / totalMinutes) * 100) / 100
+    },
+    hasData: rowHasUsage(totalRow) || rowHasUsage(todayRow)
+  }
+}
+
+async function getUsageTrend({
+  days = 7,
+  granularity = 'day',
+  startDate = null,
+  endDate = null
+} = {}) {
+  const { periodType, periodInfos } = buildPeriodInfos({ days, granularity, startDate, endDate })
+  if (periodInfos.length === 0) {
+    return []
+  }
+
+  const periodStarts = periodInfos.map((info) => info.periodStart)
+  const result = await postgres.query(
+    `
+      SELECT
+        period_type,
+        dimension_type,
+        period_start,
+        SUM(request_count) AS request_count,
+        SUM(input_tokens) AS input_tokens,
+        SUM(output_tokens) AS output_tokens,
+        SUM(cache_create_tokens) AS cache_create_tokens,
+        SUM(cache_read_tokens) AS cache_read_tokens,
+        SUM(ephemeral_5m_tokens) AS ephemeral_5m_tokens,
+        SUM(ephemeral_1h_tokens) AS ephemeral_1h_tokens,
+        SUM(total_tokens) AS total_tokens,
+        SUM(cost) AS cost,
+        SUM(real_cost) AS real_cost
+      FROM usage_rollups
+      WHERE period_type = $1
+        AND period_start = ANY($2::timestamptz[])
+        AND model = ''
+        AND dimension_type IN ('api_key', 'global')
+      GROUP BY period_type, dimension_type, period_start
+    `,
+    [periodType, periodStarts]
+  )
+
+  const rowsByPeriod = new Map()
+  for (const row of result.rows) {
+    const key = new Date(row.period_start).toISOString()
+    if (!rowsByPeriod.has(key)) {
+      rowsByPeriod.set(key, [])
+    }
+    rowsByPeriod.get(key).push(row)
+  }
+
+  return periodInfos.map((info) => {
+    const row = pickPreferredRollup(
+      rowsByPeriod.get(info.periodStart.toISOString()) || [],
+      periodType
+    )
+    const base =
+      periodType === 'hour' ? { hour: info.hour, label: info.label } : { date: info.date }
+    return buildUsagePoint(base, row)
+  })
+}
+
+async function getGlobalModelStats({ period = 'daily', startDate = null, endDate = null } = {}) {
+  let periodType
+  let params
+  let whereClause
+
+  if (startDate && endDate) {
+    const start = getPeriodStart(normalizeDate(startDate), 'day')
+    const end = getPeriodStart(normalizeDate(endDate), 'day')
+    periodType = 'day'
+    whereClause = `period_type = $1 AND period_start >= $2 AND period_start <= $3`
+    params = [periodType, start, end]
+  } else {
+    periodType =
+      period === 'daily' ? 'day' : period === 'all' || period === 'alltime' ? 'all' : 'month'
+    whereClause = `period_type = $1 AND period_start = $2`
+    params = [periodType, getCurrentPeriodStart(periodType)]
+  }
+
+  const result = await postgres.query(
+    `
+      SELECT
+        model,
+        SUM(request_count) AS request_count,
+        SUM(input_tokens) AS input_tokens,
+        SUM(output_tokens) AS output_tokens,
+        SUM(cache_create_tokens) AS cache_create_tokens,
+        SUM(cache_read_tokens) AS cache_read_tokens,
+        SUM(ephemeral_5m_tokens) AS ephemeral_5m_tokens,
+        SUM(ephemeral_1h_tokens) AS ephemeral_1h_tokens,
+        SUM(total_tokens) AS total_tokens,
+        SUM(cost) AS cost,
+        SUM(real_cost) AS real_cost
+      FROM usage_rollups
+      WHERE ${whereClause}
+        AND dimension_type = 'model'
+        AND model <> ''
+      GROUP BY model
+      ORDER BY SUM(cost) DESC, SUM(total_tokens) DESC
+    `,
+    params
+  )
+
+  return result.rows
+}
+
+async function getUsageCosts(period = 'all') {
+  let periodType
+  let params
+  let whereClause
+
+  if (period === 'today') {
+    periodType = 'day'
+    whereClause = `period_type = $1 AND period_start = $2`
+    params = [periodType, getCurrentPeriodStart('day')]
+  } else if (period === 'monthly') {
+    periodType = 'month'
+    whereClause = `period_type = $1 AND period_start = $2`
+    params = [periodType, getCurrentPeriodStart('month')]
+  } else if (period === '7days') {
+    const today = getCurrentPeriodStart('day')
+    const start = addPeriod(today, 'day', -6)
+    periodType = 'day'
+    whereClause = `period_type = $1 AND period_start >= $2 AND period_start <= $3`
+    params = [periodType, start, today]
+  } else {
+    periodType = 'all'
+    whereClause = `period_type = $1 AND period_start = $2`
+    params = [periodType, getCurrentPeriodStart('all')]
+  }
+
+  const result = await postgres.query(
+    `
+      SELECT
+        model,
+        SUM(request_count) AS request_count,
+        SUM(input_tokens) AS input_tokens,
+        SUM(output_tokens) AS output_tokens,
+        SUM(cache_create_tokens) AS cache_create_tokens,
+        SUM(cache_read_tokens) AS cache_read_tokens,
+        SUM(ephemeral_5m_tokens) AS ephemeral_5m_tokens,
+        SUM(ephemeral_1h_tokens) AS ephemeral_1h_tokens,
+        SUM(total_tokens) AS total_tokens,
+        SUM(cost) AS cost,
+        SUM(real_cost) AS real_cost
+      FROM usage_rollups
+      WHERE ${whereClause}
+        AND dimension_type = 'model'
+        AND model <> ''
+      GROUP BY model
+      ORDER BY SUM(cost) DESC, SUM(total_tokens) DESC
+    `,
+    params
+  )
+
+  let totalCost = 0
+  let realTotalCost = 0
+  const modelCosts = result.rows.map((row) => {
+    const cost = normalizeNumber(row.cost)
+    const realCost = normalizeNumber(row.real_cost)
+    totalCost += cost
+    realTotalCost += realCost
+    return {
+      model: row.model || 'unknown',
+      requests: normalizeInteger(row.request_count),
+      usage: {
+        input_tokens: normalizeInteger(row.input_tokens),
+        output_tokens: normalizeInteger(row.output_tokens),
+        cache_creation_input_tokens: normalizeInteger(row.cache_create_tokens),
+        cache_read_input_tokens: normalizeInteger(row.cache_read_tokens)
+      },
+      costs: {
+        input: 0,
+        output: 0,
+        cacheWrite: 0,
+        cacheRead: 0,
+        total: cost,
+        real: realCost
+      },
+      formatted: {
+        input: formatCost(0),
+        output: formatCost(0),
+        cacheWrite: formatCost(0),
+        cacheRead: formatCost(0),
+        total: formatCost(cost),
+        real: formatCost(realCost)
+      }
+    }
+  })
+
+  return {
+    period,
+    totalCosts: {
+      inputCost: 0,
+      outputCost: 0,
+      cacheCreateCost: 0,
+      cacheReadCost: 0,
+      totalCost,
+      realTotalCost,
+      formatted: {
+        inputCost: formatCost(0),
+        outputCost: formatCost(0),
+        cacheCreateCost: formatCost(0),
+        cacheReadCost: formatCost(0),
+        totalCost: formatCost(totalCost),
+        realTotalCost: formatCost(realTotalCost)
+      }
+    },
+    modelCosts
+  }
+}
+
+async function getApiKeysUsageTrend({
+  apiKeys = [],
+  days = 7,
+  granularity = 'day',
+  startDate = null,
+  endDate = null
+} = {}) {
+  const apiKeyIds = apiKeys.map((key) => key.id).filter(Boolean)
+  const apiKeyMap = new Map(apiKeys.map((key) => [key.id, key]))
+  const { periodType, periodInfos } = buildPeriodInfos({ days, granularity, startDate, endDate })
+  const trendData = periodInfos.map((info) =>
+    periodType === 'hour'
+      ? { hour: info.hour, label: info.label, apiKeys: {} }
+      : { date: info.date, apiKeys: {} }
+  )
+
+  if (apiKeyIds.length === 0 || periodInfos.length === 0) {
+    return { data: trendData, topApiKeys: [], totalApiKeys: apiKeyIds.length }
+  }
+
+  const periodStarts = periodInfos.map((info) => info.periodStart)
+  const result = await postgres.query(
+    `
+      SELECT
+        period_start,
+        api_key_id,
+        SUM(request_count) AS request_count,
+        SUM(total_tokens) AS total_tokens,
+        SUM(cost) AS cost
+      FROM usage_rollups
+      WHERE period_type = $1
+        AND period_start = ANY($2::timestamptz[])
+        AND dimension_type = 'api_key'
+        AND api_key_id = ANY($3)
+        AND model = ''
+      GROUP BY period_start, api_key_id
+    `,
+    [periodType, periodStarts, apiKeyIds]
+  )
+
+  const pointByPeriod = new Map(
+    periodInfos.map((info, index) => [info.periodStart.toISOString(), trendData[index]])
+  )
+  const apiKeyTotals = new Map()
+  for (const row of result.rows) {
+    const apiKeyId = row.api_key_id
+    const point = pointByPeriod.get(new Date(row.period_start).toISOString())
+    if (!point || !apiKeyMap.has(apiKeyId)) {
+      continue
+    }
+
+    const tokens = normalizeInteger(row.total_tokens)
+    const cost = normalizeNumber(row.cost)
+    point.apiKeys[apiKeyId] = {
+      name: apiKeyMap.get(apiKeyId).name || `API Key ${apiKeyId}`,
+      tokens,
+      requests: normalizeInteger(row.request_count),
+      cost,
+      formattedCost: formatCost(cost)
+    }
+    apiKeyTotals.set(apiKeyId, (apiKeyTotals.get(apiKeyId) || 0) + tokens)
+  }
+
+  const topApiKeys = Array.from(apiKeyTotals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([apiKeyId]) => apiKeyId)
+
+  return {
+    data: trendData,
+    topApiKeys,
+    totalApiKeys: apiKeyIds.length
+  }
+}
+
+async function getAccountUsageTrend({
+  accounts = [],
+  days = 7,
+  granularity = 'day',
+  startDate = null,
+  endDate = null
+} = {}) {
+  const accountIds = accounts.map((account) => account.id).filter(Boolean)
+  const accountMap = new Map(accounts.map((account) => [account.id, account]))
+  const { periodType, periodInfos } = buildPeriodInfos({ days, granularity, startDate, endDate })
+  const trendData = periodInfos.map((info) =>
+    periodType === 'hour'
+      ? { hour: info.hour, label: info.label, accounts: {} }
+      : { date: info.date, accounts: {} }
+  )
+
+  if (accountIds.length === 0 || periodInfos.length === 0) {
+    return { data: trendData, topAccounts: [], totalAccounts: accountIds.length }
+  }
+
+  const start = periodInfos[0].periodStart
+  const endExclusive = addPeriod(periodInfos[periodInfos.length - 1].periodStart, periodType)
+  const bucketExpression =
+    periodType === 'hour'
+      ? "date_trunc('hour', timestamp + make_interval(secs => $1)) - make_interval(secs => $1)"
+      : "date_trunc('day', timestamp + make_interval(secs => $1)) - make_interval(secs => $1)"
+
+  const result = await postgres.query(
+    `
+      SELECT
+        ${bucketExpression} AS period_start,
+        account_id,
+        SUM(request_count) AS request_count,
+        SUM(cost) AS cost
+      FROM (
+        SELECT
+          timestamp,
+          account_id,
+          1 AS request_count,
+          cost
+        FROM usage_events
+        WHERE timestamp >= $2
+          AND timestamp < $3
+          AND account_id = ANY($4)
+      ) AS usage_rows
+      GROUP BY period_start, account_id
+    `,
+    [Math.trunc(getOffsetMs() / 1000), start, endExclusive, accountIds]
+  )
+
+  const pointByPeriod = new Map(
+    periodInfos.map((info, index) => [info.periodStart.toISOString(), trendData[index]])
+  )
+  const accountCostTotals = new Map()
+  for (const row of result.rows) {
+    const accountId = row.account_id
+    const point = pointByPeriod.get(new Date(row.period_start).toISOString())
+    if (!point || !accountMap.has(accountId)) {
+      continue
+    }
+
+    const cost = normalizeNumber(row.cost)
+    const accountInfo = accountMap.get(accountId)
+    point.accounts[accountId] = {
+      name: accountInfo.name || `账号 ${accountId.slice(0, 8)}`,
+      cost,
+      formattedCost: formatCost(cost),
+      requests: normalizeInteger(row.request_count)
+    }
+    accountCostTotals.set(accountId, (accountCostTotals.get(accountId) || 0) + cost)
+  }
+
+  const topAccounts = Array.from(accountCostTotals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([accountId]) => accountId)
+
+  return {
+    data: trendData,
+    topAccounts,
+    totalAccounts: accountIds.length
+  }
+}
+
+async function getAccountUsageSummary(accountId) {
+  if (!accountId) {
+    return {
+      totalCost: 0,
+      dailyCost: 0,
+      monthlyCost: 0,
+      totalRequests: 0,
+      dailyRequests: 0,
+      monthlyRequests: 0
+    }
+  }
+
+  const currentDay = getCurrentPeriodStart('day')
+  const currentMonth = getCurrentPeriodStart('month')
+  const result = await postgres.query(
+    `
+      SELECT
+        period_type,
+        COUNT(*) AS request_count,
+        SUM(cost) AS cost
+      FROM (
+        SELECT
+          CASE
+            WHEN timestamp >= $2 THEN 'day'
+            ELSE 'month'
+          END AS period_type,
+          cost
+        FROM usage_events
+        WHERE account_id = $1
+          AND timestamp >= $3
+      ) AS scoped
+      GROUP BY period_type
+
+      UNION ALL
+
+      SELECT 'all' AS period_type, COUNT(*) AS request_count, SUM(cost) AS cost
+      FROM usage_events
+      WHERE account_id = $1
+    `,
+    [accountId, currentDay, currentMonth]
+  )
+
+  const rowsByPeriod = new Map()
+  for (const row of result.rows) {
+    const existing = rowsByPeriod.get(row.period_type) || { request_count: 0, cost: 0 }
+    existing.request_count += normalizeInteger(row.request_count)
+    existing.cost += normalizeNumber(row.cost)
+    rowsByPeriod.set(row.period_type, existing)
+  }
+
+  const daily = rowsByPeriod.get('day') || {}
+  const monthly = rowsByPeriod.get('month') || {}
+  const total = rowsByPeriod.get('all') || {}
+  return {
+    totalCost: normalizeNumber(total.cost),
+    dailyCost: normalizeNumber(daily.cost),
+    monthlyCost: normalizeNumber(daily.cost) + normalizeNumber(monthly.cost),
+    totalRequests: normalizeInteger(total.request_count),
+    dailyRequests: normalizeInteger(daily.request_count),
+    monthlyRequests: normalizeInteger(daily.request_count) + normalizeInteger(monthly.request_count)
+  }
+}
+
 async function recordBackfillRunStart({ runId = uuidv4(), source = 'request_details' } = {}) {
   await postgres.query(
     `
@@ -1147,6 +1767,13 @@ module.exports = {
   getKeyIdsWithModels,
   getBatchKeyCosts,
   calculateCustomRangeCosts,
+  getGlobalUsageSummary,
+  getUsageTrend,
+  getGlobalModelStats,
+  getUsageCosts,
+  getApiKeysUsageTrend,
+  getAccountUsageTrend,
+  getAccountUsageSummary,
   normalizeModelName,
   getPeriodStart,
   recordBackfillRunStart,

@@ -7,6 +7,7 @@ const ccrAccountService = require('../../services/account/ccrAccountService')
 const geminiAccountService = require('../../services/account/geminiAccountService')
 const droidAccountService = require('../../services/account/droidAccountService')
 const openaiResponsesAccountService = require('../../services/account/openaiResponsesAccountService')
+const usageStatsService = require('../../services/usageStatsService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
@@ -22,7 +23,18 @@ const router = express.Router()
 router.get('/dashboard', authenticateAdmin, async (req, res) => {
   try {
     // 先检查是否有全局预聚合数据
-    const globalStats = await redis.getGlobalStats()
+    const [globalStats, postgresUsageSummary] = await Promise.all([
+      redis.getGlobalStats(),
+      usageStatsService.shouldReadPostgres()
+        ? usageStatsService.getGlobalUsageSummary().catch((error) => {
+            logger.warn(
+              `⚠️ Failed to read dashboard usage summary from PostgreSQL: ${error.message}`
+            )
+            return null
+          })
+        : null
+    ])
+    const postgresUsageReady = postgresUsageSummary && postgresUsageSummary.hasData
 
     // 根据是否有全局统计决定查询策略
     let apiKeys = null
@@ -55,7 +67,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
     ])
 
     // 有全局统计时只获取计数，否则拉全量
-    if (globalStats) {
+    if (postgresUsageReady || globalStats) {
       apiKeyCount = await redis.getApiKeyCount()
     } else {
       apiKeys = await apiKeyService.getAllApiKeysFast()
@@ -146,7 +158,17 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       activeApiKeys = 0,
       totalApiKeys = 0
 
-    if (globalStats) {
+    if (postgresUsageReady) {
+      totalRequestsUsed = postgresUsageSummary.total.requests
+      totalInputTokensUsed = postgresUsageSummary.total.inputTokens
+      totalOutputTokensUsed = postgresUsageSummary.total.outputTokens
+      totalCacheCreateTokensUsed = postgresUsageSummary.total.cacheCreateTokens
+      totalCacheReadTokensUsed = postgresUsageSummary.total.cacheReadTokens
+      totalAllTokensUsed = postgresUsageSummary.total.allTokens
+      totalTokensUsed = totalAllTokensUsed
+      totalApiKeys = apiKeyCount.total
+      activeApiKeys = apiKeyCount.active
+    } else if (globalStats) {
       // 使用预聚合数据（快速路径）
       totalRequestsUsed = globalStats.requests
       totalInputTokensUsed = globalStats.inputTokens
@@ -319,16 +341,28 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       },
       recentActivity: {
         apiKeysCreatedToday: todayStats.apiKeysCreatedToday,
-        requestsToday: todayStats.requestsToday,
-        tokensToday: todayStats.tokensToday,
-        inputTokensToday: todayStats.inputTokensToday,
-        outputTokensToday: todayStats.outputTokensToday,
-        cacheCreateTokensToday: todayStats.cacheCreateTokensToday || 0,
-        cacheReadTokensToday: todayStats.cacheReadTokensToday || 0
+        requestsToday: postgresUsageReady
+          ? postgresUsageSummary.daily.requests
+          : todayStats.requestsToday,
+        tokensToday: postgresUsageReady
+          ? postgresUsageSummary.daily.allTokens
+          : todayStats.tokensToday,
+        inputTokensToday: postgresUsageReady
+          ? postgresUsageSummary.daily.inputTokens
+          : todayStats.inputTokensToday,
+        outputTokensToday: postgresUsageReady
+          ? postgresUsageSummary.daily.outputTokens
+          : todayStats.outputTokensToday,
+        cacheCreateTokensToday: postgresUsageReady
+          ? postgresUsageSummary.daily.cacheCreateTokens
+          : todayStats.cacheCreateTokensToday || 0,
+        cacheReadTokensToday: postgresUsageReady
+          ? postgresUsageSummary.daily.cacheReadTokens
+          : todayStats.cacheReadTokensToday || 0
       },
       systemAverages: {
-        rpm: systemAverages.systemRPM,
-        tpm: systemAverages.systemTPM
+        rpm: postgresUsageReady ? postgresUsageSummary.averages.rpm : systemAverages.systemRPM,
+        tpm: postgresUsageReady ? postgresUsageSummary.averages.tpm : systemAverages.systemTPM
       },
       realtimeMetrics: {
         rpm: realtimeMetrics.realtimeRPM,
@@ -343,7 +377,12 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
         droidAccountsHealthy: normalDroidAccounts > 0,
         uptime: process.uptime()
       },
-      systemTimezone: config.system.timezoneOffset || 8
+      systemTimezone: config.system.timezoneOffset || 8,
+      storage: {
+        usageReadMode: usageStatsService.getReadMode(),
+        usageWriteMode: usageStatsService.getWriteMode(),
+        maxDashboardDayRange: usageStatsService.shouldReadPostgres() ? 365 : 31
+      }
     }
 
     return res.json({ success: true, data: dashboard })
@@ -399,6 +438,25 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
     logger.info(
       `📊 Getting global model stats, period: ${period}, startDate: ${startDate}, endDate: ${endDate}, today: ${today}, currentMonth: ${currentMonth}`
     )
+
+    if (usageStatsService.shouldReadPostgres()) {
+      try {
+        const modelStats = await usageStatsService.getGlobalModelStats({
+          period,
+          startDate,
+          endDate
+        })
+        return res.json({
+          success: true,
+          data: modelStats.map((stat) => ({
+            ...stat,
+            period: startDate && endDate ? 'custom' : period
+          }))
+        })
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read global model stats from PostgreSQL: ${error.message}`)
+      }
+    }
 
     // 收集所有需要扫描的日期
     const datePatterns = []

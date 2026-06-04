@@ -72,24 +72,73 @@ export const showToast = (message, type = 'info', title = '', duration = 3000) =
   return id
 }
 
-// 复制文本到剪贴板
-export const copyText = async (text, successMsg = '已复制') => {
+const copyTextWithTextarea = (text) => {
+  if (typeof document === 'undefined') {
+    throw new Error('document is not available')
+  }
+
+  const textarea = document.createElement('textarea')
+  const activeElement = document.activeElement
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.top = '0'
+  textarea.style.left = '-9999px'
+  textarea.style.opacity = '0'
+  textarea.style.pointerEvents = 'none'
+  document.body.appendChild(textarea)
+
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-    } else {
-      const textarea = document.createElement('textarea')
-      textarea.value = text
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
+    textarea.focus({ preventScroll: true })
+    textarea.select()
+    textarea.setSelectionRange(0, textarea.value.length)
+    const copied = document.execCommand('copy')
+    if (!copied) {
+      throw new Error('execCommand copy returned false')
     }
+  } finally {
+    document.body.removeChild(textarea)
+    activeElement?.focus?.({ preventScroll: true })
+  }
+}
+
+const writeClipboardText = async (text) => {
+  const normalizedText = text === null || text === undefined ? '' : String(text)
+
+  try {
+    copyTextWithTextarea(normalizedText)
+    return
+  } catch (fallbackError) {
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.clipboard?.writeText &&
+      (typeof window === 'undefined' || window.isSecureContext !== false)
+    ) {
+      try {
+        await navigator.clipboard.writeText(normalizedText)
+        return
+      } catch (clipboardError) {
+        throw clipboardError || fallbackError
+      }
+    }
+
+    throw fallbackError
+  }
+}
+
+// 复制文本到剪贴板
+export const copyText = async (text, successMsg = '已复制', options = {}) => {
+  const { showFailureToast = true } = options
+
+  try {
+    await writeClipboardText(text)
     showToast(successMsg, 'success')
     return true
   } catch (error) {
     console.error('Failed to copy:', error)
-    showToast('复制失败', 'error')
+    if (showFailureToast) {
+      showToast('复制失败，请手动复制', 'error')
+    }
     return false
   }
 }

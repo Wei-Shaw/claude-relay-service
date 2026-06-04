@@ -1,5 +1,6 @@
 const redis = require('../../models/redis')
 const balanceScriptService = require('../balanceScriptService')
+const usageStatsService = require('../usageStatsService')
 const logger = require('../../utils/logger')
 const CostCalculator = require('../../utils/costCalculator')
 const { isBalanceScriptEnabled } = require('../../utils/featureFlags')
@@ -501,8 +502,13 @@ class AccountBalanceService {
   }
 
   async _getBalanceFromLocal(accountId, platform) {
+    const usePostgresUsage = usageStatsService.shouldReadPostgres()
     const cached = await this.redis.getLocalBalance(platform, accountId)
-    if (cached && cached.statistics) {
+    if (
+      cached &&
+      cached.statistics &&
+      (!usePostgresUsage || cached.statisticsSource === 'postgres')
+    ) {
       return cached
     }
 
@@ -512,7 +518,8 @@ class AccountBalanceService {
       balance: null,
       currency: 'USD',
       statistics,
-      queryMethod: 'local',
+      statisticsSource: usePostgresUsage ? 'postgres' : 'redis',
+      queryMethod: usePostgresUsage ? 'postgres-local' : 'local',
       lastCalculated: new Date().toISOString()
     }
 
@@ -527,6 +534,26 @@ class AccountBalanceService {
     }
 
     try {
+      if (usageStatsService.shouldReadPostgres()) {
+        try {
+          const postgresStats = await usageStatsService.getAccountUsageSummary(accountId)
+          if (postgresStats) {
+            return {
+              totalCost: safeNumber(postgresStats.totalCost),
+              dailyCost: safeNumber(postgresStats.dailyCost),
+              monthlyCost: safeNumber(postgresStats.monthlyCost),
+              totalRequests: safeNumber(postgresStats.totalRequests),
+              dailyRequests: safeNumber(postgresStats.dailyRequests),
+              monthlyRequests: safeNumber(postgresStats.monthlyRequests)
+            }
+          }
+        } catch (error) {
+          this.logger.warn(
+            `PostgreSQL account usage summary failed, fallback to Redis: ${accountId} - ${error.message}`
+          )
+        }
+      }
+
       const usageStats = await this.redis.getAccountUsageStats(accountId)
       const dailyCost = safeNumber(usageStats?.daily?.cost || 0)
       const monthlyCost = await this._computeMonthlyCost(accountId)

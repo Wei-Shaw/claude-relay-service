@@ -221,6 +221,63 @@ async function calculateCustomRangeCosts(keyIds = [], startDate, endDate) {
   return postgresUsageStore.calculateCustomRangeCosts(keyIds, startDate, endDate)
 }
 
+async function getGlobalUsageSummary() {
+  if (!shouldReadPostgres()) {
+    return null
+  }
+
+  return postgresUsageStore.getGlobalUsageSummary()
+}
+
+async function getUsageTrend(options = {}) {
+  if (!shouldReadPostgres()) {
+    return null
+  }
+
+  return postgresUsageStore.getUsageTrend(options)
+}
+
+async function getGlobalModelStats(options = {}) {
+  if (!shouldReadPostgres()) {
+    return null
+  }
+
+  const rows = await postgresUsageStore.getGlobalModelStats(options)
+  return decorateModelStats(rows)
+}
+
+async function getUsageCosts(period = 'all') {
+  if (!shouldReadPostgres()) {
+    return null
+  }
+
+  return postgresUsageStore.getUsageCosts(period)
+}
+
+async function getApiKeysUsageTrend(options = {}) {
+  if (!shouldReadPostgres()) {
+    return null
+  }
+
+  return postgresUsageStore.getApiKeysUsageTrend(options)
+}
+
+async function getAccountUsageTrend(options = {}) {
+  if (!shouldReadPostgres()) {
+    return null
+  }
+
+  return postgresUsageStore.getAccountUsageTrend(options)
+}
+
+async function getAccountUsageSummary(accountId) {
+  if (!shouldReadPostgres()) {
+    return null
+  }
+
+  return postgresUsageStore.getAccountUsageSummary(accountId)
+}
+
 module.exports = {
   getWriteMode,
   getReadMode,
@@ -239,5 +296,12 @@ module.exports = {
   getKeyIdsWithModels,
   getBatchKeyCosts,
   calculateCustomRangeCosts,
+  getGlobalUsageSummary,
+  getUsageTrend,
+  getGlobalModelStats,
+  getUsageCosts,
+  getApiKeysUsageTrend,
+  getAccountUsageTrend,
+  getAccountUsageSummary,
   decorateModelStats
 }

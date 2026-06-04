@@ -17,6 +17,13 @@
           <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
             {{ detail?.model || '加载中...' }}
           </h3>
+          <p
+            v-if="detail?.requestId || props.requestId"
+            class="request-detail-id-line"
+            :title="detail?.requestId || props.requestId"
+          >
+            Request ID {{ formatShortRequestId(detail?.requestId || props.requestId) }}
+          </p>
         </div>
         <div class="flex items-center gap-2 self-start sm:self-center">
           <el-tag v-if="detail" effect="dark" :type="statusTagType(detail.statusCode)">
@@ -86,7 +93,16 @@
           <div
             class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
           >
-            <h4 class="section-title">基础信息</h4>
+            <div class="section-title-row">
+              <h4 class="section-title mb-0">基础信息</h4>
+              <span
+                v-if="detail.requestId || props.requestId"
+                class="request-detail-id-chip"
+                :title="detail.requestId || props.requestId"
+              >
+                Request ID {{ formatShortRequestId(detail.requestId || props.requestId) }}
+              </span>
+            </div>
             <div class="grid gap-3 md:grid-cols-2">
               <div>
                 <p class="field-label">时间</p>
@@ -199,9 +215,14 @@
         >
           <div class="mb-3 flex items-center justify-between gap-3">
             <h4 class="section-title mb-0">Request Body 快照</h4>
-            <el-button v-if="hasRequestBodySnapshot" size="small" @click="copySnapshot">
-              复制 JSON
-            </el-button>
+            <div class="flex flex-wrap items-center gap-2">
+              <el-button v-if="hasRequestBodySnapshot" size="small" @click="copySnapshot">
+                {{ snapshotCanRenderAsJson ? '复制 JSON' : '复制文本' }}
+              </el-button>
+              <el-button v-if="hasRequestBodySnapshot" size="small" @click="downloadSnapshot">
+                {{ snapshotCanRenderAsJson ? '下载 JSON' : '下载文本' }}
+              </el-button>
+            </div>
           </div>
           <div v-if="hasRequestBodySnapshot" class="snapshot-panel">
             <VueJsonPretty
@@ -247,6 +268,9 @@
               </el-tag>
               <el-button v-if="hasResponsePayload" size="small" @click="copyResponseSnapshot">
                 {{ responseSnapshotCanRenderAsJson ? '复制 JSON' : '复制文本' }}
+              </el-button>
+              <el-button v-if="hasResponsePayload" size="small" @click="downloadResponseSnapshot">
+                {{ responseSnapshotCanRenderAsJson ? '下载 JSON' : '下载文本' }}
               </el-button>
             </div>
           </div>
@@ -310,15 +334,39 @@
       </template>
     </div>
   </el-dialog>
+
+  <el-dialog
+    v-model="manualCopyVisible"
+    :append-to-body="true"
+    class="manual-copy-modal"
+    :destroy-on-close="true"
+    :title="manualCopyTitle"
+    width="720px"
+  >
+    <p class="mb-3 text-sm text-gray-600 dark:text-gray-300">
+      浏览器拒绝直接写入剪贴板，内容已自动选中，可按 Cmd+C / Ctrl+C 复制。
+    </p>
+    <textarea
+      ref="manualCopyTextareaRef"
+      class="manual-copy-textarea"
+      readonly
+      :value="manualCopyText"
+      @focus="selectManualCopyText"
+    />
+    <template #footer>
+      <el-button @click="selectManualCopyText">重新选中</el-button>
+      <el-button type="primary" @click="manualCopyVisible = false">关闭</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import VueJsonPretty from 'vue-json-pretty'
 import 'vue-json-pretty/lib/styles.css'
 import { getRequestDetailApi } from '@/utils/http_apis'
-import { showToast, formatNumber } from '@/utils/tools'
+import { showToast, formatNumber, copyText as copyTextToClipboard } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -341,6 +389,10 @@ const loading = ref(false)
 const detail = ref(null)
 const bodyPreviewEnabled = ref(false)
 const isMobileViewport = ref(false)
+const manualCopyVisible = ref(false)
+const manualCopyTitle = ref('手动复制')
+const manualCopyText = ref('')
+const manualCopyTextareaRef = ref(null)
 
 const costBreakdown = computed(() => {
   const breakdown = detail.value?.realCostBreakdown || detail.value?.costBreakdown || {}
@@ -655,16 +707,69 @@ const copyText = async (text, label) => {
     return
   }
 
-  try {
-    await navigator.clipboard.writeText(text)
-    showToast(`已复制${label}`, 'success')
-  } catch (error) {
-    showToast('复制失败，请手动复制', 'error')
+  const copied = await copyTextToClipboard(text, `已复制${label}`, { showFailureToast: false })
+  if (!copied) {
+    openManualCopyDialog(text, label)
   }
 }
 
 const copySnapshot = () => copyText(formattedSnapshot.value, '请求快照')
 const copyResponseSnapshot = () => copyText(formattedResponseSnapshot.value, '响应快照')
+
+const selectManualCopyText = () => {
+  const textarea = manualCopyTextareaRef.value
+  if (!textarea) {
+    return
+  }
+  textarea.focus()
+  textarea.select()
+}
+
+const openManualCopyDialog = async (text, label) => {
+  manualCopyTitle.value = `手动复制${label}`
+  manualCopyText.value = text
+  manualCopyVisible.value = true
+  await nextTick()
+  selectManualCopyText()
+}
+
+const sanitizeFileNamePart = (value) => {
+  const cleaned = String(value || 'unknown')
+    .replace(/[^\w.-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return cleaned || 'unknown'
+}
+
+const downloadText = (text, label, type, canRenderAsJson) => {
+  if (!text) {
+    showToast(`没有可下载的${label}`, 'info')
+    return
+  }
+
+  const extension = canRenderAsJson ? 'json' : 'txt'
+  const mimeType = canRenderAsJson ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8'
+  const requestId = sanitizeFileNamePart(detail.value?.requestId || props.requestId)
+  const blob = new Blob([text], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${requestId}-${type}-body.${extension}`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  showToast(`已下载${label}`, 'success')
+}
+
+const downloadSnapshot = () =>
+  downloadText(formattedSnapshot.value, '请求快照', 'request', snapshotCanRenderAsJson.value)
+const downloadResponseSnapshot = () =>
+  downloadText(
+    formattedResponseSnapshot.value,
+    '响应快照',
+    'response',
+    responseSnapshotCanRenderAsJson.value
+  )
 
 const formatDate = (value) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-')
 const formatDuration = (value) => `${Number(value || 0)}ms`
@@ -687,6 +792,10 @@ const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
 const formatCacheCreate = (value, notApplicable = false) =>
   notApplicable ? '-' : formatNumber(value)
 const formatReasoning = (value) => value || '-'
+const formatShortRequestId = (value) => {
+  if (!value) return '-'
+  return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value
+}
 const formatCost = (value) => {
   const num = Number(value || 0)
   if (num >= 1) return `$${num.toFixed(2)}`
@@ -826,6 +935,46 @@ onBeforeUnmount(() => {
 .dark .modal-close-button:hover {
   background: rgba(71, 85, 105, 0.35);
   color: rgb(248 250 252);
+}
+
+.request-detail-id-line,
+.request-detail-id-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
+.request-detail-id-line {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(100 116 139);
+}
+
+.dark .request-detail-id-line {
+  color: rgb(148 163 184);
+}
+
+.section-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.request-detail-id-chip {
+  min-width: 0;
+  border-radius: 999px;
+  background: rgba(238, 242, 255, 0.9);
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  color: rgb(67 56 202);
+  overflow-wrap: anywhere;
+}
+
+.dark .request-detail-id-chip {
+  background: rgba(49, 46, 129, 0.42);
+  color: rgb(199 210 254);
 }
 
 .info-card {
@@ -1006,6 +1155,28 @@ onBeforeUnmount(() => {
 .snapshot-panel :deep(.vjs-carets:hover),
 .snapshot-panel :deep(.vjs-tree-brackets:hover) {
   color: rgb(96 165 250);
+}
+
+.manual-copy-textarea {
+  min-height: 360px;
+  width: 100%;
+  resize: vertical;
+  border-radius: 12px;
+  border: 1px solid rgb(203 213 225);
+  background: rgb(15 23 42);
+  padding: 14px;
+  color: rgb(226 232 240);
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  outline: none;
+}
+
+.manual-copy-textarea:focus {
+  border-color: rgb(59 130 246);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
 }
 
 @media (max-width: 767px) {

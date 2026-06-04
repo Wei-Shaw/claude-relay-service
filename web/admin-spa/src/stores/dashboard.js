@@ -44,7 +44,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     isHistoricalMetrics: false,
     systemStatus: '正常',
     uptime: 0,
-    systemTimezone: 8 // 默认 UTC+8
+    systemTimezone: 8, // 默认 UTC+8
+    usageReadMode: 'redis',
+    usageWriteMode: 'redis',
+    dashboardDayRangeLimit: 31
   })
 
   const costsData = ref({
@@ -219,6 +222,26 @@ export const useDashboardStore = defineStore('dashboard', () => {
       ? 'hour'
       : trendGranularity.value
 
+  const getDashboardDayRangeLimit = () =>
+    dashboardData.value.dashboardDayRangeLimit ||
+    (dashboardData.value.usageReadMode === 'postgres' ? 365 : 31)
+
+  const hasCustomRange = () =>
+    dateFilter.value.type === 'custom' &&
+    dateFilter.value.customRange &&
+    dateFilter.value.customRange.length === 2
+
+  const appendCustomRangeParams = (url) => {
+    if (!hasCustomRange()) {
+      return url
+    }
+
+    return (
+      `${url}&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}` +
+      `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
+    )
+  }
+
   // 方法
   async function loadDashboardData(timeRange = null) {
     loading.value = true
@@ -248,6 +271,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         const systemAverages = dashboardResponse.data.systemAverages || {}
         const realtimeMetrics = dashboardResponse.data.realtimeMetrics || {}
         const systemHealth = dashboardResponse.data.systemHealth || {}
+        const storage = dashboardResponse.data.storage || {}
 
         dashboardData.value = {
           totalApiKeys: overview.totalApiKeys || 0,
@@ -289,7 +313,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
           isHistoricalMetrics: realtimeMetrics.isHistorical || false,
           systemStatus: systemHealth.redisConnected ? '正常' : '异常',
           uptime: systemHealth.uptime || 0,
-          systemTimezone: dashboardResponse.data.systemTimezone || 8
+          systemTimezone: dashboardResponse.data.systemTimezone || 8,
+          usageReadMode: storage.usageReadMode || 'redis',
+          usageWriteMode: storage.usageWriteMode || 'redis',
+          dashboardDayRangeLimit:
+            storage.maxDashboardDayRange || (storage.usageReadMode === 'postgres' ? 365 : 31)
         }
       }
 
@@ -334,6 +362,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         }
       } else {
         url += `granularity=day&days=${days}`
+        url = appendCustomRangeParams(url)
       }
 
       const response = await getUsageStatsApi(url)
@@ -420,6 +449,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
                 : 30
             : calculateDaysBetween(dateFilter.value.customStart, dateFilter.value.customEnd)
         url += `granularity=day&days=${days}`
+        url = appendCustomRangeParams(url)
       }
 
       url += `&metric=${metric}`
@@ -468,6 +498,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
                 : 30
             : calculateDaysBetween(dateFilter.value.customStart, dateFilter.value.customEnd)
         url += `granularity=day&days=${days}`
+        url = appendCustomRangeParams(url)
       }
 
       url += `&group=${group}`
@@ -573,10 +604,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
           return
         }
       } else {
-        // 天粒度：限制 31 天
+        // 天粒度：PostgreSQL 读模式可放宽，Redis 模式保留保护
         const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
-        if (daysDiff > 31) {
-          showToast('日期范围不能超过 31 天', 'warning')
+        const maxDays = getDashboardDayRangeLimit()
+        if (daysDiff > maxDays) {
+          showToast(`日期范围不能超过 ${maxDays} 天`, 'warning')
           return
         }
       }
@@ -699,9 +731,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
     if (!start || !end) return 7
     const startDate = new Date(start)
     const endDate = new Date(end)
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return 7
+    }
+
+    startDate.setHours(0, 0, 0, 0)
+    endDate.setHours(0, 0, 0, 0)
     const diffTime = Math.abs(endDate - startDate)
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays || 7
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1
   }
 
   function disabledDate(date) {

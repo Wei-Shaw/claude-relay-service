@@ -17,6 +17,7 @@ jest.mock('../src/middleware/auth', () => ({
 
 jest.mock('../src/services/requestDetailService', () => ({
   listRequestDetails: jest.fn(),
+  listActiveRequestDetails: jest.fn(),
   getRequestDetail: jest.fn(),
   getRequestBodyPreviewStats: jest.fn(),
   purgeRequestBodySnapshots: jest.fn()
@@ -62,6 +63,7 @@ function findPostHandler(path) {
 describe('requestDetails admin routes', () => {
   beforeEach(() => {
     requestDetailService.listRequestDetails.mockReset()
+    requestDetailService.listActiveRequestDetails.mockReset()
     requestDetailService.getRequestDetail.mockReset()
     requestDetailService.getRequestBodyPreviewStats.mockReset()
     requestDetailService.purgeRequestBodySnapshots.mockReset()
@@ -101,6 +103,36 @@ describe('requestDetails admin routes', () => {
     expect(res.body.success).toBe(true)
     expect(res.body.data.captureEnabled).toBe(false)
     expect(res.body.data.record.requestId).toBe('req_1')
+  })
+
+  test('returns active request details', async () => {
+    requestDetailService.listActiveRequestDetails.mockResolvedValue({
+      records: [
+        {
+          requestId: 'req_active_1',
+          status: 'running',
+          apiKeyId: 'key_1'
+        }
+      ],
+      summary: {
+        total: 1,
+        running: 1,
+        queued: 0
+      }
+    })
+
+    const handler = findGetHandler('/request-details/active')
+    const res = createResponse()
+
+    await handler({ query: { apiKeyId: 'key_1' } }, res)
+
+    expect(requestDetailService.listActiveRequestDetails).toHaveBeenCalledWith({
+      apiKeyId: 'key_1'
+    })
+    expect(res.status).not.toHaveBeenCalled()
+    expect(res.body.success).toBe(true)
+    expect(res.body.data.records).toHaveLength(1)
+    expect(res.body.data.summary.running).toBe(1)
   })
 
   test('returns request body preview stats', async () => {

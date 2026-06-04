@@ -200,6 +200,16 @@ const config = {
     retries: parseInt(process.env.WEBHOOK_RETRIES) || 3 // 重试3次
   },
 
+  // 🧵 Langfuse trace 采集（旁路投递，不影响请求返回）
+  langfuse: {
+    enabled: process.env.LANGFUSE_ENABLED === 'true',
+    baseUrl: process.env.LANGFUSE_BASE_URL || '',
+    publicKey: process.env.LANGFUSE_PUBLIC_KEY || '',
+    secretKey: process.env.LANGFUSE_SECRET_KEY || '',
+    timeoutMs: parseInt(process.env.LANGFUSE_TIMEOUT_MS) || 5000,
+    environment: process.env.LANGFUSE_ENVIRONMENT || 'default'
+  },
+
   // 🛠️ 开发配置
   development: {
     debug: process.env.DEBUG === 'true',

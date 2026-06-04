@@ -37,8 +37,36 @@
           </div>
         </div>
 
+        <div class="request-view-tabs">
+          <button
+            :class="['request-view-tab', activeTab === 'history' ? 'request-view-tab-active' : '']"
+            type="button"
+            @click="switchTab('history')"
+          >
+            <i class="fas fa-table" />
+            历史记录
+          </button>
+          <button
+            :class="['request-view-tab', activeTab === 'active' ? 'request-view-tab-active' : '']"
+            type="button"
+            @click="switchTab('active')"
+          >
+            <i class="fas fa-bolt" />
+            当前活跃
+            <span v-if="activeSummary.total > 0" class="request-view-tab-count">
+              {{ activeSummary.total }}
+            </span>
+          </button>
+        </div>
+
         <div
-          v-if="!captureEnabled && !loading && records.length === 0 && !hasActiveFilters"
+          v-if="
+            activeTab === 'history' &&
+            !captureEnabled &&
+            !loading &&
+            records.length === 0 &&
+            !hasActiveFilters
+          "
           class="rounded-2xl border border-dashed border-gray-300 bg-gray-50/80 p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800/50"
         >
           <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -90,13 +118,13 @@
 
         <template v-else>
           <div
-            v-if="!captureEnabled"
+            v-if="activeTab === 'history' && !captureEnabled"
             class="rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
           >
             请求明细采集已关闭，当前展示的是仍在保留期内的历史记录；不会继续写入新的请求明细。
           </div>
 
-          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div v-if="activeTab === 'history'" class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <div class="summary-card">
               <p class="summary-label">总请求</p>
               <p class="summary-value">{{ formatNumber(summary.totalRequests) }}</p>
@@ -127,14 +155,47 @@
               <p class="summary-value">{{ formatDuration(summary.avgDurationMs) }}</p>
             </div>
           </div>
+          <div v-else class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class="summary-card">
+              <p class="summary-label">当前总数</p>
+              <p class="summary-value">{{ formatNumber(activeSummary.total) }}</p>
+              <p class="summary-sub">请求中 + 排队中</p>
+            </div>
+            <div class="summary-card">
+              <p class="summary-label">请求中</p>
+              <p class="summary-value text-green-600 dark:text-green-400">
+                {{ formatNumber(activeSummary.running) }}
+              </p>
+            </div>
+            <div class="summary-card">
+              <p class="summary-label">排队中</p>
+              <p class="summary-value text-amber-600 dark:text-amber-400">
+                {{ formatNumber(activeSummary.queued) }}
+              </p>
+            </div>
+            <div class="summary-card">
+              <p class="summary-label">最长持续</p>
+              <p class="summary-value">
+                {{ formatElapsedDuration(activeSummary.oldestElapsedMs) }}
+              </p>
+              <p v-if="activeGeneratedAt" class="summary-sub">
+                更新 {{ formatDate(activeGeneratedAt) }}
+              </p>
+            </div>
+          </div>
 
           <div
             class="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-800/40"
           >
             <div class="request-toolbar">
               <div class="request-filters">
-                <div class="request-filter-row request-filter-row-primary">
-                  <div class="toolbar-control group">
+                <div
+                  :class="[
+                    'request-filter-row request-filter-row-primary',
+                    activeTab === 'active' ? 'request-filter-row-active-primary' : ''
+                  ]"
+                >
+                  <div v-if="activeTab === 'history'" class="toolbar-control group">
                     <div
                       class="toolbar-control-glow bg-gradient-to-r from-blue-500 to-purple-500"
                     ></div>
@@ -248,7 +309,7 @@
                     </el-select>
                   </div>
 
-                  <div class="toolbar-control group">
+                  <div v-if="activeTab === 'history'" class="toolbar-control group">
                     <div
                       class="toolbar-control-glow bg-gradient-to-r from-slate-500 to-gray-500"
                     ></div>
@@ -268,7 +329,7 @@
                     </el-select>
                   </div>
 
-                  <div class="toolbar-control group">
+                  <div v-if="activeTab === 'history'" class="toolbar-control group">
                     <div
                       class="toolbar-control-glow bg-gradient-to-r from-slate-500 to-gray-500"
                     ></div>
@@ -314,6 +375,7 @@
                 </button>
 
                 <button
+                  v-if="activeTab === 'history'"
                   class="toolbar-action-button group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500"
                   :disabled="exporting"
                   @click="exportCsv"
@@ -330,7 +392,7 @@
                   <span class="relative">导出 CSV</span>
                 </button>
 
-                <el-tooltip placement="top">
+                <el-tooltip v-if="activeTab === 'history'" placement="top">
                   <template #content>
                     <div class="max-w-xs text-xs leading-relaxed">
                       清理所有已保存的历史请求体预览数据；仅影响历史预览，不影响当前请求体预览开关设置
@@ -377,329 +439,453 @@
       </div>
 
       <div class="table-wrapper">
-        <div
-          v-if="loading"
-          class="flex items-center justify-center p-12 text-gray-500 dark:text-gray-400"
-        >
-          <i class="fas fa-spinner fa-spin mr-2" />加载中...
-        </div>
-
-        <div
-          v-else-if="records.length === 0"
-          class="flex flex-col items-center gap-3 p-12 text-center text-gray-500 dark:text-gray-400"
-        >
-          <i class="fas fa-inbox text-3xl text-cyan-500" />
-          <p class="text-base font-semibold text-gray-700 dark:text-gray-200">暂无请求明细</p>
-          <p class="max-w-xl text-sm">
-            {{ emptyHint }}
-          </p>
-        </div>
-
-        <div v-else class="space-y-4">
-          <div class="table-container hidden xl:block">
-            <table class="request-table w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead
-                class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100/90 backdrop-blur-sm dark:from-gray-700 dark:to-gray-800/90"
-              >
-                <tr>
-                  <th
-                    class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    <button class="sortable-th-button" type="button" @click="setSort('timestamp')">
-                      <span>统计时间</span>
-                      <i :class="getSortIcon('timestamp')" />
-                    </button>
-                  </th>
-                  <th
-                    class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    API Key
-                  </th>
-                  <th
-                    class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    使用账户
-                  </th>
-                  <th
-                    class="min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    模型
-                  </th>
-                  <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    推理
-                  </th>
-                  <th
-                    class="min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    接口
-                  </th>
-                  <th
-                    class="min-w-[220px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    User-Agent
-                  </th>
-                  <th
-                    class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    <button
-                      class="sortable-th-button"
-                      type="button"
-                      @click="setSort('inputTokens')"
-                    >
-                      <span>输入</span>
-                      <i :class="getSortIcon('inputTokens')" />
-                    </button>
-                  </th>
-                  <th
-                    class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    <button
-                      class="sortable-th-button"
-                      type="button"
-                      @click="setSort('outputTokens')"
-                    >
-                      <span>输出</span>
-                      <i :class="getSortIcon('outputTokens')" />
-                    </button>
-                  </th>
-                  <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    <button
-                      class="sortable-th-button"
-                      type="button"
-                      @click="setSort('cacheReadTokens')"
-                    >
-                      <span>缓存读取</span>
-                      <i :class="getSortIcon('cacheReadTokens')" />
-                    </button>
-                  </th>
-                  <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    <button
-                      class="sortable-th-button"
-                      type="button"
-                      @click="setSort('cacheCreateTokens')"
-                    >
-                      <span>缓存创建</span>
-                      <i :class="getSortIcon('cacheCreateTokens')" />
-                    </button>
-                  </th>
-                  <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    缓存命中率
-                  </th>
-                  <th
-                    class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    <button class="sortable-th-button" type="button" @click="setSort('cost')">
-                      <span>费用</span>
-                      <i :class="getSortIcon('cost')" />
-                    </button>
-                  </th>
-                  <th
-                    class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    <button class="sortable-th-button" type="button" @click="setSort('durationMs')">
-                      <span>耗时</span>
-                      <i :class="getSortIcon('durationMs')" />
-                    </button>
-                  </th>
-                  <th
-                    class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    <button
-                      class="sortable-th-button"
-                      type="button"
-                      @click="setSort('timeToFirstTokenMs')"
-                    >
-                      <span>首词</span>
-                      <i :class="getSortIcon('timeToFirstTokenMs')" />
-                    </button>
-                  </th>
-                  <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    生成速度
-                  </th>
-                  <th
-                    class="min-w-[96px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    操作
-                  </th>
-                </tr>
-              </thead>
-              <tbody
-                class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900"
-              >
-                <tr
-                  v-for="record in records"
-                  :key="record.requestId"
-                  class="request-row hover:bg-gray-50/90 dark:hover:bg-gray-800/70"
-                >
-                  <td class="table-cell">
-                    <div class="font-medium">{{ formatDate(record.timestamp) }}</div>
-                    <button
-                      v-if="getSessionValue(record)"
-                      class="mt-1 block whitespace-normal break-all text-left text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-                      :title="getSessionValue(record)"
-                      type="button"
-                      @click="applySessionFilter(record)"
-                    >
-                      {{ getSessionValue(record) }}
-                    </button>
-                  </td>
-                  <td class="table-cell">
-                    <div class="font-semibold">
-                      {{ record.apiKeyName || record.apiKeyId || '-' }}
-                    </div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ record.apiKeyId || '-' }}
-                    </div>
-                  </td>
-                  <td class="table-cell">
-                    <div class="font-semibold">
-                      {{ record.accountName || record.accountId || '-' }}
-                    </div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ record.accountTypeName || record.accountType || '-' }}
-                    </div>
-                  </td>
-                  <td class="table-cell">{{ record.model }}</td>
-                  <td class="table-cell">{{ formatReasoning(record.reasoningDisplay) }}</td>
-                  <td class="table-cell">
-                    <div>{{ record.endpoint || '-' }}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ record.method || 'POST' }}
-                    </div>
-                  </td>
-                  <td class="table-cell">
-                    <div
-                      class="max-w-[260px] truncate text-xs text-gray-600 dark:text-gray-300"
-                      :title="record.userAgent || '-'"
-                    >
-                      {{ record.userAgent || '-' }}
-                    </div>
-                  </td>
-                  <td class="table-cell text-blue-600 dark:text-blue-400">
-                    {{ formatNumber(record.inputTokens) }}
-                  </td>
-                  <td class="table-cell text-green-600 dark:text-green-400">
-                    {{ formatNumber(record.outputTokens) }}
-                  </td>
-                  <td class="table-cell text-cyan-600 dark:text-cyan-400">
-                    {{ formatNumber(record.cacheReadTokens) }}
-                  </td>
-                  <td class="table-cell text-purple-600 dark:text-purple-400">
-                    {{
-                      formatCacheCreate(record.cacheCreateTokens, record.cacheCreateNotApplicable)
-                    }}
-                  </td>
-                  <td class="table-cell">{{ formatPercent(record.cacheHitRate) }}</td>
-                  <td class="table-cell text-amber-600 dark:text-amber-400">
-                    {{ formatCost(record.cost) }}
-                  </td>
-                  <td class="table-cell">{{ formatDuration(record.durationMs) }}</td>
-                  <td class="table-cell">
-                    {{ formatNullableDuration(record.timeToFirstTokenMs) }}
-                  </td>
-                  <td class="table-cell">{{ formatGenerationSpeed(record) }}</td>
-                  <td class="table-cell text-right">
-                    <button
-                      class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:border-blue-700 dark:hover:bg-blue-900/60"
-                      @click="openDetail(record.requestId)"
-                    >
-                      <i class="fas fa-eye" />
-                      详情
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="space-y-3 xl:hidden">
-            <div
-              v-for="record in records"
-              :key="record.requestId"
-              class="card p-4 transition-shadow hover:shadow-lg"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <p class="text-sm font-bold text-gray-900 dark:text-gray-100">
-                    {{ record.model }}
-                  </p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ formatDate(record.timestamp) }}
-                  </p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
-                    {{ record.endpoint || '-' }}
-                  </p>
-                </div>
-                <button
-                  class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:border-blue-700 dark:hover:bg-blue-900/60"
-                  @click="openDetail(record.requestId)"
-                >
-                  <i class="fas fa-eye" />
-                  详情
-                </button>
-              </div>
-              <div class="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <div>API Key：{{ record.apiKeyName || '-' }}</div>
-                <div>账户：{{ record.accountName || '-' }}</div>
-                <div>推理：{{ formatReasoning(record.reasoningDisplay) }}</div>
-                <div class="col-span-2 break-all text-xs">
-                  User-Agent：{{ record.userAgent || '-' }}
-                </div>
-                <button
-                  v-if="getSessionValue(record)"
-                  class="col-span-2 break-all text-left text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-                  type="button"
-                  @click="applySessionFilter(record)"
-                >
-                  {{ getSessionValue(record) }}
-                </button>
-                <div>输入：{{ formatNumber(record.inputTokens) }}</div>
-                <div>输出：{{ formatNumber(record.outputTokens) }}</div>
-                <div>缓存读：{{ formatNumber(record.cacheReadTokens) }}</div>
-                <div>
-                  缓存建：{{
-                    formatCacheCreate(record.cacheCreateTokens, record.cacheCreateNotApplicable)
-                  }}
-                </div>
-                <div>命中率：{{ formatPercent(record.cacheHitRate) }}</div>
-                <div>耗时：{{ formatDuration(record.durationMs) }}</div>
-                <div>首词：{{ formatNullableDuration(record.timeToFirstTokenMs) }}</div>
-                <div>速度：{{ formatGenerationSpeed(record) }}</div>
-                <div class="text-amber-600 dark:text-amber-400">
-                  费用：{{ formatCost(record.cost) }}
-                </div>
-              </div>
-            </div>
+        <template v-if="activeTab === 'history'">
+          <div
+            v-if="loading"
+            class="flex items-center justify-center p-12 text-gray-500 dark:text-gray-400"
+          >
+            <i class="fas fa-spinner fa-spin mr-2" />加载中...
           </div>
 
           <div
-            class="flex flex-col gap-3 border-t border-gray-200 px-4 pb-4 pt-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between"
+            v-else-if="records.length === 0"
+            class="flex flex-col items-center gap-3 p-12 text-center text-gray-500 dark:text-gray-400"
           >
-            <div class="text-sm text-gray-500 dark:text-gray-400">
-              共 {{ pagination.totalRecords }} 条记录
-            </div>
-            <el-pagination
-              background
-              :current-page="pagination.currentPage"
-              layout="prev, pager, next, sizes"
-              :page-size="pagination.pageSize"
-              :page-sizes="[20, 50, 100, 200]"
-              :total="pagination.totalRecords"
-              @current-change="handlePageChange"
-              @size-change="handleSizeChange"
-            />
+            <i class="fas fa-inbox text-3xl text-cyan-500" />
+            <p class="text-base font-semibold text-gray-700 dark:text-gray-200">暂无请求明细</p>
+            <p class="max-w-xl text-sm">
+              {{ emptyHint }}
+            </p>
           </div>
-        </div>
+
+          <div v-else class="space-y-4">
+            <div class="table-container hidden xl:block">
+              <table class="request-table w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <colgroup>
+                  <col style="width: 10%" />
+                  <col style="width: 7%" />
+                  <col style="width: 6%" />
+                  <col style="width: 9%" />
+                  <col style="width: 8%" />
+                  <col style="width: 5%" />
+                  <col style="width: 5%" />
+                  <col style="width: 5%" />
+                  <col style="width: 6%" />
+                  <col style="width: 6%" />
+                  <col style="width: 6%" />
+                  <col style="width: 5%" />
+                  <col style="width: 5%" />
+                  <col style="width: 5%" />
+                  <col style="width: 6%" />
+                  <col style="width: 6%" />
+                </colgroup>
+                <thead
+                  class="sticky top-0 z-10 bg-gradient-to-b from-gray-50 to-gray-100/90 backdrop-blur-sm dark:from-gray-700 dark:to-gray-800/90"
+                >
+                  <tr>
+                    <th
+                      class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      <button
+                        class="sortable-th-button"
+                        type="button"
+                        @click="setSort('timestamp')"
+                      >
+                        <span>统计时间</span>
+                        <i :class="getSortIcon('timestamp')" />
+                      </button>
+                    </th>
+                    <th
+                      class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      请求 ID
+                    </th>
+                    <th
+                      class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      API Key
+                    </th>
+                    <th
+                      class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      使用账户
+                    </th>
+                    <th
+                      class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      模型
+                    </th>
+                    <th
+                      class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      推理
+                    </th>
+                    <th
+                      class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      <button
+                        class="sortable-th-button"
+                        type="button"
+                        @click="setSort('inputTokens')"
+                      >
+                        <span>输入</span>
+                        <i :class="getSortIcon('inputTokens')" />
+                      </button>
+                    </th>
+                    <th
+                      class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      <button
+                        class="sortable-th-button"
+                        type="button"
+                        @click="setSort('outputTokens')"
+                      >
+                        <span>输出</span>
+                        <i :class="getSortIcon('outputTokens')" />
+                      </button>
+                    </th>
+                    <th
+                      class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      <button
+                        class="sortable-th-button"
+                        type="button"
+                        @click="setSort('cacheReadTokens')"
+                      >
+                        <span>缓存读取</span>
+                        <i :class="getSortIcon('cacheReadTokens')" />
+                      </button>
+                    </th>
+                    <th
+                      class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      <button
+                        class="sortable-th-button"
+                        type="button"
+                        @click="setSort('cacheCreateTokens')"
+                      >
+                        <span>缓存创建</span>
+                        <i :class="getSortIcon('cacheCreateTokens')" />
+                      </button>
+                    </th>
+                    <th
+                      class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      缓存命中率
+                    </th>
+                    <th
+                      class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      <button class="sortable-th-button" type="button" @click="setSort('cost')">
+                        <span>费用</span>
+                        <i :class="getSortIcon('cost')" />
+                      </button>
+                    </th>
+                    <th
+                      class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      <button
+                        class="sortable-th-button"
+                        type="button"
+                        @click="setSort('durationMs')"
+                      >
+                        <span>耗时</span>
+                        <i :class="getSortIcon('durationMs')" />
+                      </button>
+                    </th>
+                    <th
+                      class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      <button
+                        class="sortable-th-button"
+                        type="button"
+                        @click="setSort('timeToFirstTokenMs')"
+                      >
+                        <span>首词</span>
+                        <i :class="getSortIcon('timeToFirstTokenMs')" />
+                      </button>
+                    </th>
+                    <th
+                      class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      生成速度
+                    </th>
+                    <th
+                      class="min-w-[96px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    >
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody
+                  class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900"
+                >
+                  <tr
+                    v-for="record in records"
+                    :key="record.requestId"
+                    class="request-row hover:bg-gray-50/90 dark:hover:bg-gray-800/70"
+                  >
+                    <td class="table-cell">
+                      <div class="font-medium">{{ formatDate(record.timestamp) }}</div>
+                      <button
+                        v-if="getSessionValue(record)"
+                        class="mt-1 block whitespace-normal break-all text-left text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                        :title="getSessionValue(record)"
+                        type="button"
+                        @click="applySessionFilter(record)"
+                      >
+                        {{ getSessionValue(record) }}
+                      </button>
+                    </td>
+                    <td class="table-cell">
+                      <span class="history-request-id" :title="record.requestId || '-'">
+                        {{ formatShortRequestId(record.requestId) }}
+                      </span>
+                    </td>
+                    <td class="table-cell">
+                      <div class="font-semibold" :title="record.apiKeyName || '-'">
+                        {{ record.apiKeyName || '-' }}
+                      </div>
+                    </td>
+                    <td class="table-cell">
+                      <div class="font-semibold">
+                        {{ record.accountName || record.accountId || '-' }}
+                      </div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ record.accountTypeName || record.accountType || '-' }}
+                      </div>
+                    </td>
+                    <td class="table-cell">{{ record.model }}</td>
+                    <td class="table-cell">{{ formatReasoning(record.reasoningDisplay) }}</td>
+                    <td class="table-cell text-blue-600 dark:text-blue-400">
+                      {{ formatNumber(record.inputTokens) }}
+                    </td>
+                    <td class="table-cell text-green-600 dark:text-green-400">
+                      {{ formatNumber(record.outputTokens) }}
+                    </td>
+                    <td class="table-cell text-cyan-600 dark:text-cyan-400">
+                      {{ formatNumber(record.cacheReadTokens) }}
+                    </td>
+                    <td class="table-cell text-purple-600 dark:text-purple-400">
+                      {{
+                        formatCacheCreate(record.cacheCreateTokens, record.cacheCreateNotApplicable)
+                      }}
+                    </td>
+                    <td class="table-cell">{{ formatPercent(record.cacheHitRate) }}</td>
+                    <td class="table-cell text-amber-600 dark:text-amber-400">
+                      {{ formatCost(record.cost) }}
+                    </td>
+                    <td class="table-cell">{{ formatDuration(record.durationMs) }}</td>
+                    <td class="table-cell">
+                      {{ formatNullableDuration(record.timeToFirstTokenMs) }}
+                    </td>
+                    <td class="table-cell">{{ formatGenerationSpeed(record) }}</td>
+                    <td class="table-cell text-right">
+                      <button
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:border-blue-700 dark:hover:bg-blue-900/60"
+                        @click="openDetail(record.requestId)"
+                      >
+                        <i class="fas fa-eye" />
+                        详情
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="space-y-3 xl:hidden">
+              <div
+                v-for="record in records"
+                :key="record.requestId"
+                class="card p-4 transition-shadow hover:shadow-lg"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-bold text-gray-900 dark:text-gray-100">
+                      {{ record.model }}
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ formatDate(record.timestamp) }}
+                    </p>
+                    <p
+                      class="mt-1 font-mono text-xs font-semibold text-slate-500 dark:text-slate-400"
+                      :title="record.requestId || '-'"
+                    >
+                      ID {{ formatShortRequestId(record.requestId) }}
+                    </p>
+                  </div>
+                  <button
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:border-blue-700 dark:hover:bg-blue-900/60"
+                    @click="openDetail(record.requestId)"
+                  >
+                    <i class="fas fa-eye" />
+                    详情
+                  </button>
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <div class="col-span-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+                    Request ID：{{ record.requestId || '-' }}
+                  </div>
+                  <div>API Key：{{ record.apiKeyName || '-' }}</div>
+                  <div>账户：{{ record.accountName || '-' }}</div>
+                  <div>推理：{{ formatReasoning(record.reasoningDisplay) }}</div>
+                  <button
+                    v-if="getSessionValue(record)"
+                    class="col-span-2 break-all text-left text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                    type="button"
+                    @click="applySessionFilter(record)"
+                  >
+                    {{ getSessionValue(record) }}
+                  </button>
+                  <div>输入：{{ formatNumber(record.inputTokens) }}</div>
+                  <div>输出：{{ formatNumber(record.outputTokens) }}</div>
+                  <div>缓存读：{{ formatNumber(record.cacheReadTokens) }}</div>
+                  <div>
+                    缓存建：{{
+                      formatCacheCreate(record.cacheCreateTokens, record.cacheCreateNotApplicable)
+                    }}
+                  </div>
+                  <div>命中率：{{ formatPercent(record.cacheHitRate) }}</div>
+                  <div>耗时：{{ formatDuration(record.durationMs) }}</div>
+                  <div>首词：{{ formatNullableDuration(record.timeToFirstTokenMs) }}</div>
+                  <div>速度：{{ formatGenerationSpeed(record) }}</div>
+                  <div class="text-amber-600 dark:text-amber-400">
+                    费用：{{ formatCost(record.cost) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="flex flex-col gap-3 border-t border-gray-200 px-4 pb-4 pt-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="text-sm text-gray-500 dark:text-gray-400">
+                共 {{ pagination.totalRecords }} 条记录
+              </div>
+              <el-pagination
+                background
+                :current-page="pagination.currentPage"
+                layout="prev, pager, next, sizes"
+                :page-size="pagination.pageSize"
+                :page-sizes="[20, 50, 100, 200]"
+                :total="pagination.totalRecords"
+                @current-change="handlePageChange"
+                @size-change="handleSizeChange"
+              />
+            </div>
+          </div>
+        </template>
+
+        <template v-else>
+          <div
+            v-if="loading"
+            class="flex items-center justify-center p-12 text-gray-500 dark:text-gray-400"
+          >
+            <i class="fas fa-spinner fa-spin mr-2" />加载中...
+          </div>
+
+          <div
+            v-else-if="activeRecords.length === 0"
+            class="flex flex-col items-center gap-3 p-12 text-center text-gray-500 dark:text-gray-400"
+          >
+            <i class="fas fa-bolt text-3xl text-cyan-500" />
+            <p class="text-base font-semibold text-gray-700 dark:text-gray-200">暂无当前活跃请求</p>
+            <p class="max-w-xl text-sm">
+              {{ emptyHint }}
+            </p>
+          </div>
+
+          <div v-else class="active-request-list">
+            <div
+              v-for="record in activeRecords"
+              :key="record.requestId"
+              class="active-request-card"
+            >
+              <div
+                class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
+              >
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span :class="['active-status-badge', getActiveStatusClass(record)]">
+                      <i
+                        :class="
+                          record.status === 'queued' ? 'fas fa-hourglass-half' : 'fas fa-circle'
+                        "
+                      />
+                      {{ record.statusDisplay || '请求中' }}
+                    </span>
+                    <span class="active-chip">{{ record.method || 'POST' }}</span>
+                    <span v-if="record.stream" class="active-chip">stream</span>
+                    <span
+                      v-if="record.requestId"
+                      class="active-chip active-request-id-chip"
+                      :title="record.requestId"
+                    >
+                      ID {{ formatShortRequestId(record.requestId) }}
+                    </span>
+                  </div>
+                  <div class="mt-3 flex min-w-0 flex-col gap-1">
+                    <p class="truncate text-base font-bold text-gray-900 dark:text-gray-100">
+                      {{ record.model || '-' }}
+                    </p>
+                    <p class="break-all text-xs text-gray-500 dark:text-gray-400">
+                      {{ record.endpoint || '-' }}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="active-time-block">
+                  <p class="summary-label">持续</p>
+                  <p class="text-lg font-extrabold text-gray-900 dark:text-gray-100">
+                    {{ formatElapsedDuration(record.elapsedMs) }}
+                  </p>
+                  <p v-if="record.status === 'queued'" class="summary-sub">
+                    排队 {{ formatElapsedDuration(record.queuedMs) }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-4 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+                <div class="active-field">
+                  <span class="active-field-label">API Key</span>
+                  <span class="active-field-value">{{ record.apiKeyName || '-' }}</span>
+                </div>
+                <div class="active-field">
+                  <span class="active-field-label">账户</span>
+                  <span class="active-field-value">
+                    {{ record.accountName || record.accountId || '-' }}
+                  </span>
+                  <span class="active-field-sub">{{ record.accountTypeName || '-' }}</span>
+                </div>
+                <div class="active-field">
+                  <span class="active-field-label">开始时间</span>
+                  <span class="active-field-value">{{ formatDate(record.startedAt) }}</span>
+                </div>
+                <div class="active-field">
+                  <span class="active-field-label">User-Agent</span>
+                  <span class="active-field-value">{{ record.userAgent || '-' }}</span>
+                </div>
+                <div v-if="record.queuePosition" class="active-field">
+                  <span class="active-field-label">队列位置</span>
+                  <span class="active-field-value">{{ record.queuePosition }}</span>
+                </div>
+                <div v-if="record.concurrencyLimit" class="active-field">
+                  <span class="active-field-label">并发限制</span>
+                  <span class="active-field-value">{{ record.concurrencyLimit }}</span>
+                </div>
+                <button
+                  v-if="getSessionValue(record)"
+                  class="active-session-link md:col-span-2 xl:col-span-4"
+                  type="button"
+                  @click="applySessionFilter(record)"
+                >
+                  Session：{{ getSessionValue(record) }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
 
       <RequestDetailModal
@@ -717,6 +903,7 @@ import dayjs from 'dayjs'
 import { debounce } from 'lodash-es'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  getActiveRequestDetailsApi,
   getRequestDetailsApi,
   getRequestDetailBodyPreviewStatsApi,
   purgeRequestDetailBodyPreviewApi
@@ -743,6 +930,9 @@ const captureEnabled = ref(false)
 const retentionHours = ref(6)
 const bodyPreviewEnabled = ref(false)
 const records = ref([])
+const activeTab = ref('history')
+const activeRecords = ref([])
+const activeGeneratedAt = ref('')
 const availableApiKeys = ref([])
 const availableAccounts = ref([])
 const availableModels = ref([])
@@ -767,15 +957,20 @@ const filters = reactive({
 })
 
 const hasActiveFilters = computed(() => {
-  return !!(
+  const hasSharedFilters = !!(
     filters.keyword ||
     filters.apiKeyId ||
     filters.accountId ||
     filters.model ||
     filters.endpoint ||
-    filters.session ||
-    (filters.dateRange && filters.dateRange.length === 2)
+    filters.session
   )
+
+  if (activeTab.value === 'active') {
+    return hasSharedFilters
+  }
+
+  return !!(hasSharedFilters || (filters.dateRange && filters.dateRange.length === 2))
 })
 
 const summary = reactive({
@@ -793,13 +988,30 @@ const summary = reactive({
   cacheCreateNotApplicable: false
 })
 
-const pageDescription = computed(() =>
-  bodyPreviewEnabled.value
+const activeSummary = reactive({
+  total: 0,
+  running: 0,
+  queued: 0,
+  oldestElapsedMs: 0
+})
+
+const pageDescription = computed(() => {
+  if (activeTab.value === 'active') {
+    return '查看当前请求中和排队中的调用，复用 API Key、账户、模型、接口和 Session 筛选定位问题'
+  }
+
+  return bodyPreviewEnabled.value
     ? '搜索每次请求的 API Key、使用账户、模型、接口、Token、费用、耗时与脱敏后的请求快照'
     : '搜索每次请求的 API Key、使用账户、模型、接口、Token、费用、耗时与请求摘要'
-)
+})
 
 const emptyHint = computed(() => {
+  if (activeTab.value === 'active') {
+    return hasActiveFilters.value
+      ? '当前筛选条件下没有请求中或排队中的调用。'
+      : '当前没有请求中或排队中的调用。'
+  }
+
   if (
     filters.keyword ||
     filters.apiKeyId ||
@@ -867,6 +1079,40 @@ const buildParams = (page, snapshotId = activeSnapshotId.value) => {
   return params
 }
 
+const buildActiveParams = () => {
+  const params = {
+    limit: 500
+  }
+
+  if (filters.keyword) params.keyword = filters.keyword
+  if (filters.apiKeyId) params.apiKeyId = filters.apiKeyId
+  if (filters.accountId) params.accountId = filters.accountId
+  if (filters.model) params.model = filters.model
+  if (filters.endpoint) params.endpoint = filters.endpoint
+  if (filters.session) params.session = filters.session
+
+  return params
+}
+
+const mergeOptionObjects = (currentItems = [], nextItems = []) => {
+  const optionMap = new Map()
+  currentItems.forEach((item) => {
+    if (item?.id) optionMap.set(item.id, item)
+  })
+  nextItems.forEach((item) => {
+    if (item?.id) optionMap.set(item.id, item)
+  })
+
+  return Array.from(optionMap.values()).sort((a, b) =>
+    String(a.name || '').localeCompare(String(b.name || ''))
+  )
+}
+
+const mergeStringOptions = (currentItems = [], nextItems = []) =>
+  Array.from(new Set([...currentItems, ...nextItems].filter(Boolean))).sort((a, b) =>
+    String(a).localeCompare(String(b))
+  )
+
 const syncResponseState = (data) => {
   captureEnabled.value = data.captureEnabled === true
   retentionHours.value = data.retentionHours || 6
@@ -922,6 +1168,32 @@ const syncResponseState = (data) => {
   summary.cacheCreateNotApplicable = summaryData.cacheCreateNotApplicable === true
 }
 
+const syncActiveResponseState = (data) => {
+  activeRecords.value = data.records || []
+  activeGeneratedAt.value = data.generatedAt || ''
+
+  const summaryData = data.summary || {}
+  activeSummary.total = summaryData.total || activeRecords.value.length || 0
+  activeSummary.running = summaryData.running || 0
+  activeSummary.queued = summaryData.queued || 0
+  activeSummary.oldestElapsedMs = summaryData.oldestElapsedMs || 0
+
+  const availableFilters = data.availableFilters || {}
+  availableApiKeys.value = mergeOptionObjects(
+    availableApiKeys.value,
+    availableFilters.apiKeys || []
+  )
+  availableAccounts.value = mergeOptionObjects(
+    availableAccounts.value,
+    availableFilters.accounts || []
+  )
+  availableModels.value = mergeStringOptions(availableModels.value, availableFilters.models || [])
+  availableEndpoints.value = mergeStringOptions(
+    availableEndpoints.value,
+    availableFilters.endpoints || []
+  )
+}
+
 let suppressDateRangeWatch = false
 
 const invalidateSnapshot = () => {
@@ -950,20 +1222,69 @@ const fetchRecords = async (page = pagination.currentPage) => {
   }
 }
 
+const fetchActiveRequests = async () => {
+  debouncedKeywordFetch.cancel()
+  const version = ++fetchVersion
+  loading.value = true
+  try {
+    const response = await getActiveRequestDetailsApi(buildActiveParams())
+    if (version !== fetchVersion) return
+    if (response?.success === false) {
+      showToast(response.message || '加载当前活跃请求失败', 'error')
+      return
+    }
+    syncActiveResponseState(response.data || {})
+  } catch (error) {
+    if (version !== fetchVersion) return
+    showToast(`加载当前活跃请求失败：${error.message || '未知错误'}`, 'error')
+  } finally {
+    if (version === fetchVersion) {
+      loading.value = false
+    }
+  }
+}
+
+const fetchCurrentView = (page = pagination.currentPage) => {
+  if (activeTab.value === 'active') {
+    return fetchActiveRequests()
+  }
+
+  return fetchRecords(page)
+}
+
 const handlePageChange = (page) => {
   pagination.currentPage = page
-  fetchRecords(page)
+  if (activeTab.value === 'history') {
+    fetchRecords(page)
+  }
 }
 
 const handleSizeChange = (size) => {
   pagination.pageSize = size
   pagination.currentPage = 1
-  fetchRecords(1)
+  if (activeTab.value === 'history') {
+    fetchRecords(1)
+  }
 }
 
 const refreshRecords = () => {
-  invalidateSnapshot()
-  fetchRecords(pagination.currentPage)
+  if (activeTab.value === 'history') {
+    invalidateSnapshot()
+  }
+  fetchCurrentView(pagination.currentPage)
+}
+
+const switchTab = (tab) => {
+  if (activeTab.value === tab) return
+
+  activeTab.value = tab
+  debouncedKeywordFetch.cancel()
+  if (tab === 'history') {
+    fetchRecords(pagination.currentPage)
+    return
+  }
+
+  fetchActiveRequests()
 }
 
 const resetFilters = () => {
@@ -978,7 +1299,7 @@ const resetFilters = () => {
   filters.sortBy = 'timestamp'
   filters.sortOrder = 'desc'
   pagination.currentPage = 1
-  fetchRecords(1)
+  fetchCurrentView(1)
   // resetFilters 同步写 filters.keyword = '' 会触发 keyword watcher 排一个新 debounce，
   // 需要在 watcher 执行后（nextTick）取消它，避免多余请求和 loading 闪烁
   nextTick(() => debouncedKeywordFetch.cancel())
@@ -1041,12 +1362,19 @@ const formatFilterSessionValue = (value) => {
   return value.length > 72 ? `${value.slice(0, 32)}...${value.slice(-16)}` : value
 }
 
+const formatShortRequestId = (value) => {
+  if (!value) return '-'
+  return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value
+}
+
 const applySessionValue = (session) => {
   if (!session) return
   if (filters.session === session) {
     pagination.currentPage = 1
-    invalidateSnapshot()
-    fetchRecords(1)
+    if (activeTab.value === 'history') {
+      invalidateSnapshot()
+    }
+    fetchCurrentView(1)
     return
   }
 
@@ -1124,6 +1452,7 @@ const exportCsv = async () => {
 
     const headers = [
       '统计时间',
+      '请求 ID',
       'API Key',
       '使用账户',
       '消费类型',
@@ -1149,6 +1478,7 @@ const exportCsv = async () => {
     aggregated.forEach((record) => {
       const row = [
         formatDate(record.timestamp),
+        record.requestId || '',
         record.apiKeyName || record.apiKeyId || '',
         record.accountName || record.accountId || '',
         record.accountTypeName || record.accountType || '',
@@ -1213,6 +1543,22 @@ const formatRetentionHours = (value) => {
   return `保留 ${hours} 小时`
 }
 const formatDuration = (value) => `${Number(value || 0)}ms`
+const formatElapsedDuration = (value) => {
+  const totalSeconds = Math.max(0, Math.floor(Number(value || 0) / 1000))
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`
+  }
+
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  if (minutes < 60) {
+    return `${minutes}m ${String(seconds).padStart(2, '0')}s`
+  }
+
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return `${hours}h ${remainingMinutes}m`
+}
 const formatNullableDuration = (value) =>
   value === null || value === undefined || value === '' ? '-' : `${Number(value)}ms`
 const getGenerationSpeed = (record) => {
@@ -1230,11 +1576,15 @@ const formatGenerationSpeed = (record) => {
 }
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
 const formatReasoning = (value) => value || '-'
+const getActiveStatusClass = (record) =>
+  record?.status === 'queued' ? 'active-status-queued' : 'active-status-running'
 
 const debouncedKeywordFetch = debounce(() => {
   pagination.currentPage = 1
-  invalidateSnapshot()
-  fetchRecords(1)
+  if (activeTab.value === 'history') {
+    invalidateSnapshot()
+  }
+  fetchCurrentView(1)
 }, 300)
 
 watch(
@@ -1266,8 +1616,10 @@ watch(
   () => {
     debouncedKeywordFetch.cancel()
     pagination.currentPage = 1
-    invalidateSnapshot()
-    fetchRecords(1)
+    if (activeTab.value === 'history') {
+      invalidateSnapshot()
+    }
+    fetchCurrentView(1)
   }
 )
 
@@ -1279,14 +1631,16 @@ watch(
       return
     }
     pagination.currentPage = 1
-    invalidateSnapshot()
-    fetchRecords(1)
+    if (activeTab.value === 'history') {
+      invalidateSnapshot()
+      fetchRecords(1)
+    }
   },
   { deep: true }
 )
 
 onMounted(() => {
-  fetchRecords()
+  fetchCurrentView()
 })
 </script>
 
@@ -1331,6 +1685,66 @@ onMounted(() => {
   color: rgb(100 116 139);
 }
 
+.request-view-tabs {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(248, 250, 252, 0.92);
+  padding: 4px;
+}
+
+.dark .request-view-tabs {
+  border-color: rgba(75, 85, 99, 0.7);
+  background: rgba(31, 41, 55, 0.75);
+}
+
+.request-view-tab {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgb(71 85 105);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.request-view-tab:hover {
+  background: rgba(255, 255, 255, 0.75);
+  color: rgb(37 99 235);
+}
+
+.dark .request-view-tab {
+  color: rgb(203 213 225);
+}
+
+.request-view-tab-active {
+  background: linear-gradient(135deg, rgb(96 165 250), rgb(124 58 237));
+  color: white;
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.22);
+}
+
+.request-view-tab-active:hover {
+  color: white;
+}
+
+.request-view-tab-count {
+  min-width: 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 1px 6px;
+  text-align: center;
+  font-size: 12px;
+}
+
 .request-toolbar {
   display: flex;
   flex-direction: column;
@@ -1352,6 +1766,10 @@ onMounted(() => {
 
 .request-filter-row-primary,
 .request-filter-row-secondary {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.request-filter-row-active-primary {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -1437,14 +1855,26 @@ onMounted(() => {
 }
 
 .table-cell {
-  padding: 14px 16px;
+  padding: 12px 8px;
   font-size: 13px;
   color: rgb(31 41 55);
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 .dark .table-cell {
   color: rgb(226 232 240);
+}
+
+.history-request-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(71 85 105);
+}
+
+.dark .history-request-id {
+  color: rgb(203 213 225);
 }
 
 .table-wrapper {
@@ -1460,7 +1890,7 @@ onMounted(() => {
 }
 
 .table-container {
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   margin: 0;
   padding: 0;
@@ -1470,13 +1900,20 @@ onMounted(() => {
 }
 
 .table-container table {
-  min-width: 1500px;
+  min-width: 0;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
 }
 
 .request-table {
-  width: max(100%, 1500px);
+  width: 100%;
+}
+
+.request-table th {
+  min-width: 0 !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  overflow-wrap: anywhere;
 }
 
 .table-container::-webkit-scrollbar {
@@ -1513,9 +1950,153 @@ onMounted(() => {
   background: rgba(31, 41, 55, 0.55);
 }
 
+.active-request-list {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(255, 255, 255, 0.96));
+}
+
+.dark .active-request-list {
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.72), rgba(31, 41, 55, 0.94));
+}
+
+.active-request-card {
+  border-radius: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.96);
+  padding: 16px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+}
+
+.dark .active-request-card {
+  border-color: rgba(75, 85, 99, 0.65);
+  background: rgba(31, 41, 55, 0.94);
+}
+
+.active-status-badge,
+.active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.active-status-badge i {
+  font-size: 9px;
+}
+
+.active-status-running {
+  background: rgba(220, 252, 231, 0.95);
+  color: rgb(22 101 52);
+}
+
+.active-status-queued {
+  background: rgba(254, 243, 199, 0.95);
+  color: rgb(146 64 14);
+}
+
+.active-chip {
+  background: rgba(239, 246, 255, 0.95);
+  color: rgb(37 99 235);
+}
+
+.dark .active-chip {
+  background: rgba(30, 58, 138, 0.35);
+  color: rgb(191 219 254);
+}
+
+.active-request-id-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  background: rgba(241, 245, 249, 0.96);
+  color: rgb(71 85 105);
+}
+
+.dark .active-request-id-chip {
+  background: rgba(51, 65, 85, 0.52);
+  color: rgb(203 213 225);
+}
+
+.active-time-block {
+  min-width: 120px;
+  border-radius: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(248, 250, 252, 0.9);
+  padding: 10px 12px;
+}
+
+.dark .active-time-block {
+  border-color: rgba(75, 85, 99, 0.65);
+  background: rgba(17, 24, 39, 0.65);
+}
+
+.active-field {
+  min-width: 0;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.88);
+  padding: 10px 12px;
+}
+
+.dark .active-field {
+  background: rgba(17, 24, 39, 0.55);
+}
+
+.active-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(100 116 139);
+}
+
+.active-field-value {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  font-weight: 800;
+  color: rgb(30 41 59);
+}
+
+.dark .active-field-value {
+  color: rgb(226 232 240);
+}
+
+.active-field-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgb(100 116 139);
+}
+
+.active-session-link {
+  border-radius: 12px;
+  background: rgba(238, 242, 255, 0.86);
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(79 70 229);
+  overflow-wrap: anywhere;
+}
+
+.active-session-link:hover {
+  background: rgba(224, 231, 255, 0.92);
+}
+
+.dark .active-session-link {
+  background: rgba(49, 46, 129, 0.35);
+  color: rgb(199 210 254);
+}
+
 @media (min-width: 768px) {
   .request-filter-row-primary {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  }
+
+  .request-filter-row-active-primary {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .request-filter-row-secondary {
@@ -1538,6 +2119,10 @@ onMounted(() => {
 
   .request-filter-row-primary {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  }
+
+  .request-filter-row-active-primary {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .request-filter-row-secondary {

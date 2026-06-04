@@ -11,6 +11,8 @@ const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { calculateWaitTimeStats } = require('../utils/statsHelper')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 const { createResponsePayloadCapture } = require('../utils/responsePayloadCapture')
+const metadataUserIdHelper = require('../utils/metadataUserIdHelper')
+const { hashRequestDetailIdentifier } = require('../utils/requestDetailHelper')
 
 // 工具函数
 function sleep(ms) {
@@ -288,6 +290,120 @@ const FALLBACK_CONCURRENCY_CONFIG = {
   leaseSeconds: 300,
   renewIntervalSeconds: 30,
   cleanupGraceSeconds: 30
+}
+
+const ACTIVE_REQUEST_TTL_SECONDS = 2 * 60 * 60
+
+function getRequestEndpoint(req) {
+  const rawPath = req.originalUrl || req.url || req.path || '/'
+  return String(rawPath).split('?')[0] || '/'
+}
+
+function firstNonEmptyString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+  return null
+}
+
+function getActiveRequestSessionFields(req, body = {}) {
+  const metadata = body.metadata && typeof body.metadata === 'object' ? body.metadata : {}
+  const metadataUserId = firstNonEmptyString(metadata.user_id, metadata.userId)
+  const sessionId = firstNonEmptyString(
+    req.headers?.session_id,
+    req.headers?.['x-session-id'],
+    req.headers?.['session-id'],
+    req.headers?.['x-codex-session-id'],
+    body.session_id,
+    body.sessionId,
+    metadata.session_id,
+    metadata.sessionId,
+    metadataUserIdHelper.extractSessionId(metadataUserId)
+  )
+
+  return {
+    sessionId,
+    sessionHash: hashRequestDetailIdentifier(sessionId),
+    conversationId: firstNonEmptyString(
+      req.headers?.['x-conversation-id'],
+      req.headers?.['conversation-id'],
+      req.headers?.['x-thread-id'],
+      body.conversation_id,
+      body.conversationId,
+      metadata.conversation_id,
+      metadata.conversationId
+    ),
+    promptCacheKey: firstNonEmptyString(body.prompt_cache_key, body.promptCacheKey),
+    metadataUserId
+  }
+}
+
+function buildActiveRequestRecord(req, keyData, status, extra = {}) {
+  const requestId = req.requestId || extra.requestId || uuidv4()
+  req.requestId = requestId
+
+  const startedAtMs = req.requestStartedAt || extra.startedAtMs || Date.now()
+  const body = req.body && typeof req.body === 'object' ? req.body : {}
+  const sessionFields = getActiveRequestSessionFields(req, body)
+
+  return {
+    requestId,
+    status,
+    apiKeyId: keyData.id,
+    apiKeyName: keyData.name || keyData.label || keyData.id,
+    model: body.model || extra.model || null,
+    endpoint: getRequestEndpoint(req),
+    method: req.method || 'POST',
+    userAgent: req.headers?.['user-agent'] || null,
+    clientIp: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || null,
+    stream: body.stream === true,
+    startedAtMs,
+    startedAt: new Date(startedAtMs).toISOString(),
+    ...sessionFields,
+    ...extra
+  }
+}
+
+function registerActiveRequestCleanup(req, res, requestId) {
+  if (req._activeRequestCleanupRegistered || !requestId) {
+    return
+  }
+
+  req._activeRequestCleanupRegistered = true
+  let cleaned = false
+
+  const cleanup = () => {
+    if (cleaned) {
+      return
+    }
+    cleaned = true
+    redis.untrackActiveRequest(requestId).catch((error) => {
+      logger.warn(`Failed to cleanup active request ${requestId}:`, error)
+    })
+  }
+
+  req.activeRequestId = requestId
+  req.updateActiveRequest = (patch = {}) => redis.updateActiveRequest(requestId, patch)
+
+  res.once('finish', cleanup)
+  res.once('close', cleanup)
+  res.once('error', cleanup)
+  req.once('aborted', cleanup)
+  req.once('error', cleanup)
+}
+
+async function trackRequestActivity(req, res, keyData, status, extra = {}) {
+  try {
+    const record = buildActiveRequestRecord(req, keyData, status, extra)
+    await redis.trackActiveRequest(record, ACTIVE_REQUEST_TTL_SECONDS)
+    registerActiveRequestCleanup(req, res, record.requestId)
+    return record
+  } catch (error) {
+    logger.warn(`Failed to track ${status} request activity:`, error.message)
+    return null
+  }
 }
 
 const resolveConcurrencyConfig = () => {
@@ -923,6 +1039,14 @@ const authenticateApiKey = async (req, res, next) => {
             `⏳ Request entering queue for key: ${validation.keyData.id} (${validation.keyData.name}), ` +
               `queue position: ${newQueueCount}`
           )
+          await trackRequestActivity(req, res, validation.keyData, 'queued', {
+            queuedAtMs: Date.now(),
+            queuedAt: new Date().toISOString(),
+            queuePosition: newQueueCount,
+            concurrencyLimit,
+            maxQueueSize,
+            queueTimeoutMs: queueConfig.concurrentRequestQueueTimeoutMs
+          })
           redis
             .incrConcurrencyQueueStats(validation.keyData.id, 'entered')
             .catch((e) => logger.warn('Failed to record entered stat:', e))
@@ -1016,6 +1140,21 @@ const authenticateApiKey = async (req, res, next) => {
             `✅ Queue wait completed for key: ${validation.keyData.id} (${validation.keyData.name}), ` +
               `waited: ${slot.waitTimeMs}ms`
           )
+          if (typeof req.updateActiveRequest === 'function') {
+            req
+              .updateActiveRequest({
+                status: 'running',
+                waitTimeMs: slot.waitTimeMs,
+                runningAtMs: Date.now(),
+                runningAt: new Date().toISOString()
+              })
+              .catch((error) => {
+                logger.warn(
+                  'Failed to update queued request activity after slot acquisition:',
+                  error
+                )
+              })
+          }
           hasConcurrencySlot = true
           setTemporaryConcurrencyCleanup()
 
@@ -1498,6 +1637,25 @@ const authenticateApiKey = async (req, res, next) => {
       enableOpenAIResponsesCodexAdaptation: validation.keyData.enableOpenAIResponsesCodexAdaptation,
       enableOpenAIResponsesPayloadRules: validation.keyData.enableOpenAIResponsesPayloadRules,
       openaiResponsesPayloadRules: validation.keyData.openaiResponsesPayloadRules
+    }
+
+    if (req.activeRequestId && typeof req.updateActiveRequest === 'function') {
+      req
+        .updateActiveRequest({
+          status: 'running',
+          model: req.body?.model || null,
+          stream: req.body?.stream === true,
+          runningAtMs: Date.now(),
+          runningAt: new Date().toISOString()
+        })
+        .catch((error) => {
+          logger.warn('Failed to update active request activity:', error)
+        })
+    } else {
+      await trackRequestActivity(req, res, validation.keyData, 'running', {
+        runningAtMs: Date.now(),
+        runningAt: new Date().toISOString()
+      })
     }
 
     const authDuration = Date.now() - startTime

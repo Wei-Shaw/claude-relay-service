@@ -50,6 +50,11 @@ jest.mock('../src/services/requestDetailStores/postgresRequestDetailStore', () =
   purgeRequestBodySnapshots: jest.fn()
 }))
 
+jest.mock('../src/services/langfuseTraceService', () => ({
+  isEnabled: jest.fn(),
+  captureRequestDetail: jest.fn()
+}))
+
 const redis = require('../src/models/redis')
 const appConfig = require('../config/config')
 const claudeRelayConfigService = require('../src/services/claudeRelayConfigService')
@@ -59,6 +64,7 @@ const openaiAccountService = require('../src/services/account/openaiAccountServi
 const bedrockAccountService = require('../src/services/account/bedrockAccountService')
 const CostCalculator = require('../src/utils/costCalculator')
 const requestDetailPostgresStore = require('../src/services/requestDetailStores/postgresRequestDetailStore')
+const langfuseTraceService = require('../src/services/langfuseTraceService')
 const requestDetailService = require('../src/services/requestDetailService')
 
 describe('requestDetailService', () => {
@@ -66,6 +72,8 @@ describe('requestDetailService', () => {
     jest.resetAllMocks()
     appConfig.requestDetailStorage.writeMode = 'redis'
     appConfig.requestDetailStorage.readMode = 'redis'
+    langfuseTraceService.isEnabled.mockReturnValue(false)
+    langfuseTraceService.captureRequestDetail.mockResolvedValue({ captured: true })
     jest.useFakeTimers().setSystemTime(Date.parse('2026-04-07T18:00:00.000Z'))
   })
 
@@ -88,6 +96,7 @@ describe('requestDetailService', () => {
       requestDetailBodyPreviewEnabled: true
     })
     redis.getClient.mockReturnValue({ multi: jest.fn(() => multi) })
+    langfuseTraceService.isEnabled.mockReturnValue(true)
 
     const result = await requestDetailService.captureRequestDetail({
       requestId: 'req_capture_1',
@@ -154,6 +163,20 @@ describe('requestDetailService', () => {
     expect(multi.zadd).toHaveBeenCalled()
     expect(exec).toHaveBeenCalled()
     expect(requestDetailPostgresStore.upsertRequestDetail).not.toHaveBeenCalled()
+    expect(langfuseTraceService.captureRequestDetail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'req_capture_1',
+        requestBody: expect.objectContaining({
+          apiKey: 'super-secret'
+        }),
+        responseBody: expect.objectContaining({
+          id: 'resp_123'
+        }),
+        requestBodySnapshot: expect.objectContaining({
+          apiKey: expect.stringContaining('***')
+        })
+      })
+    )
   })
 
   test('captureRequestDetail dual-writes to PostgreSQL after Redis and tolerates PG failures', async () => {
