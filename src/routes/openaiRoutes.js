@@ -776,6 +776,22 @@ const handleResponses = async (req, res) => {
 
     // 使用增量 SSE 解析器
     const sseParser = new IncrementalSSEParser()
+    let upstreamEnded = false
+
+    // 客户端断开时清理上游流；res.close 可覆盖 FIN/Nginx/CDN 断开。
+    const cleanup = () => {
+      if (upstreamEnded || res.writableEnded) {
+        return
+      }
+
+      upstreamEnded = true
+      try {
+        upstream.data?.unpipe?.(res)
+        upstream.data?.destroy?.()
+      } catch (_) {
+        //
+      }
+    }
 
     // 处理解析出的事件
     const processSSEEvent = (eventData) => {
@@ -826,6 +842,9 @@ const handleResponses = async (req, res) => {
     })
 
     upstream.data.on('end', async () => {
+      upstreamEnded = true
+      res.removeListener('close', cleanup)
+
       // 处理剩余的 buffer
       const remaining = sseParser.getRemaining()
       if (remaining.trim()) {
@@ -909,29 +928,27 @@ const handleResponses = async (req, res) => {
         }
       }
 
-      res.end()
-    })
-
-    upstream.data.on('error', (err) => {
-      logger.error('Upstream stream error:', err)
-      if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
-      } else {
+      if (!res.destroyed) {
         res.end()
       }
     })
 
-    // 客户端断开时清理上游流
-    const cleanup = () => {
-      try {
-        upstream.data?.unpipe?.(res)
-        upstream.data?.destroy?.()
-      } catch (_) {
-        //
+    upstream.data.on('error', (err) => {
+      if (upstreamEnded && res.destroyed) {
+        return
       }
-    }
-    req.on('close', cleanup)
-    req.on('aborted', cleanup)
+      upstreamEnded = true
+      res.removeListener('close', cleanup)
+
+      logger.error('Upstream stream error:', err)
+      if (!res.headersSent) {
+        res.status(502).json({ error: { message: 'Upstream stream error' } })
+      } else if (!res.destroyed) {
+        res.end()
+      }
+    })
+
+    res.on('close', cleanup)
   } catch (error) {
     logger.error('Proxy to ChatGPT codex/responses failed:', error)
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500

@@ -17,11 +17,7 @@ const {
   buildOpenAIResponsesClientError,
   sanitizeOpenAIResponsesStreamEvent
 } = require('../../utils/openaiResponsesErrorAdapter')
-const {
-  createCodexTestHeaders,
-  createOpenAITestPayload,
-  extractErrorMessage
-} = require('../../utils/testPayloadHelper')
+const openaiResponsesTestService = require('../openaiResponsesTestService')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
@@ -91,6 +87,19 @@ class OpenAIResponsesRelayService {
     await unifiedOpenAIScheduler._deleteSessionMapping(sessionHash).catch(() => {})
   }
 
+  _isRootBaseApi(baseApi) {
+    if (!baseApi) {
+      return false
+    }
+
+    try {
+      const parsed = new URL(baseApi)
+      return parsed.pathname === '' || parsed.pathname === '/'
+    } catch {
+      return false
+    }
+  }
+
   _normalizeTargetPath(reqPath, fullAccount) {
     const providerEndpoint = fullAccount.providerEndpoint || 'responses'
     const originalPath = reqPath || '/v1/responses'
@@ -106,7 +115,17 @@ class OpenAIResponsesRelayService {
     }
 
     const baseApi = fullAccount.baseApi || ''
-    if (baseApi.endsWith('/v1') && targetPath.startsWith('/v1/')) {
+    const normalizedBaseApi = baseApi.replace(/\/+$/, '')
+    if (
+      providerEndpoint === 'responses' &&
+      (targetPath === '/responses' || targetPath === '/responses/compact') &&
+      this._isRootBaseApi(baseApi)
+    ) {
+      targetPath = `/v1${targetPath}`
+      logger.info(`📝 Normalized path (${originalPath}) → ${targetPath} (root baseApi)`)
+    }
+
+    if (normalizedBaseApi.endsWith('/v1') && targetPath.startsWith('/v1/')) {
       targetPath = targetPath.slice(3)
     }
 
@@ -133,7 +152,8 @@ class OpenAIResponsesRelayService {
 
   _createRequestOptions(req, fullAccount, options = {}) {
     const targetPath = this._normalizeTargetPath(req.path, fullAccount)
-    const targetUrl = `${fullAccount.baseApi || ''}${targetPath}`
+    const baseApi = (fullAccount.baseApi || '').replace(/\/+$/, '')
+    const targetUrl = `${baseApi}${targetPath}`
     logger.info(`🎯 Forwarding to: ${targetUrl}`)
 
     const headers = this._buildRequestHeaders(req.headers || {}, fullAccount)
@@ -171,142 +191,6 @@ class OpenAIResponsesRelayService {
     }
   }
 
-  _extractResponseText(outputData) {
-    const source = Array.isArray(outputData?.output)
-      ? outputData.output
-      : Array.isArray(outputData?.response?.output)
-        ? outputData.response.output
-        : Array.isArray(outputData)
-          ? outputData
-          : []
-
-    let responseText = ''
-    for (const item of source) {
-      if (item?.type === 'message' && Array.isArray(item.content)) {
-        for (const block of item.content) {
-          if (block?.type === 'output_text' && block.text) {
-            responseText += block.text
-          } else if (typeof block?.text === 'string') {
-            responseText += block.text
-          }
-        }
-      } else if (item?.type === 'output_text' && item.text) {
-        responseText += item.text
-      }
-    }
-
-    return responseText
-  }
-
-  async _readStreamBody(stream) {
-    return new Promise((resolve) => {
-      const chunks = []
-      stream.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
-      stream.on('end', () => resolve(Buffer.concat(chunks).toString()))
-      stream.on('error', () => resolve(Buffer.concat(chunks).toString()))
-    })
-  }
-
-  _parseTestStreamBody(rawBody) {
-    let responseText = ''
-    let errorMessage = ''
-    let lastParsed = null
-
-    const lines = rawBody.split('\n')
-    for (const line of lines) {
-      if (!line.startsWith('data:')) {
-        continue
-      }
-
-      const jsonStr = line.slice(5).trim()
-      if (!jsonStr || jsonStr === '[DONE]') {
-        continue
-      }
-
-      try {
-        const eventData = JSON.parse(jsonStr)
-        lastParsed = eventData
-
-        if (
-          eventData.type === 'response.output_text.delta' &&
-          typeof eventData.delta === 'string'
-        ) {
-          responseText += eventData.delta
-          continue
-        }
-
-        if (eventData.type === 'response.content_part.delta' && eventData.delta?.text) {
-          responseText += eventData.delta.text
-          continue
-        }
-
-        if (eventData.type === 'response.completed' && eventData.response && !responseText) {
-          responseText = this._extractResponseText(eventData.response)
-          continue
-        }
-
-        if ((eventData.type === 'error' || eventData.error) && !errorMessage) {
-          errorMessage = extractErrorMessage(eventData, 'Unknown error')
-        }
-      } catch {
-        // 忽略无效事件，尽量保留已解析出的文本
-      }
-    }
-
-    if (!responseText && lastParsed?.response) {
-      responseText = this._extractResponseText(lastParsed.response)
-    }
-
-    return {
-      responseText,
-      errorMessage
-    }
-  }
-
-  async _parseTestResponse(response) {
-    const fallbackError = `API Error: ${response.status}`
-
-    if (response.data && typeof response.data.pipe === 'function') {
-      const rawBody = await this._readStreamBody(response.data)
-      const { responseText, errorMessage } = this._parseTestStreamBody(rawBody)
-      let parsedData = null
-
-      try {
-        parsedData = JSON.parse(rawBody)
-      } catch {
-        parsedData = null
-      }
-
-      return {
-        responseText: responseText || this._extractResponseText(parsedData),
-        errorMessage:
-          errorMessage ||
-          extractErrorMessage(parsedData, rawBody.trim() || fallbackError) ||
-          fallbackError
-      }
-    }
-
-    if (typeof response.data === 'string') {
-      try {
-        const parsed = JSON.parse(response.data)
-        return {
-          responseText: this._extractResponseText(parsed),
-          errorMessage: extractErrorMessage(parsed, fallbackError)
-        }
-      } catch {
-        return {
-          responseText: '',
-          errorMessage: response.data || fallbackError
-        }
-      }
-    }
-
-    return {
-      responseText: this._extractResponseText(response.data),
-      errorMessage: extractErrorMessage(response.data, fallbackError)
-    }
-  }
-
   async _markOther4xxTempUnavailable(account, status, sessionHash, source = 'response') {
     if (!account?.id || !this._shouldTempPauseOther4xx(status)) {
       return false
@@ -341,6 +225,16 @@ class OpenAIResponsesRelayService {
   // 处理请求转发
   async handleRequest(req, res, account, apiKeyData) {
     let abortController = null
+    let handleClientDisconnect = null
+    const removeClientDisconnectListener = () => {
+      if (!handleClientDisconnect) {
+        return
+      }
+
+      res.removeListener('close', handleClientDisconnect)
+      handleClientDisconnect = null
+    }
+
     // 获取会话哈希（如果有的话）
     const sessionId = req.headers['session_id'] || req.body?.session_id
     const sessionHash = sessionId
@@ -358,15 +252,18 @@ class OpenAIResponsesRelayService {
       abortController = new AbortController()
 
       // 设置客户端断开监听器
-      const handleClientDisconnect = () => {
+      handleClientDisconnect = () => {
+        if (res.writableEnded) {
+          return
+        }
+
         logger.info('🔌 Client disconnected, aborting OpenAI-Responses request')
         if (abortController && !abortController.signal.aborted) {
           abortController.abort()
         }
       }
 
-      // 监听客户端断开事件。不要使用 req.close：在流式响应中它可能只表示请求体已读完。
-      req.once('aborted', handleClientDisconnect)
+      // 监听响应关闭事件；req.close 可能只表示请求体已读完，req.aborted 覆盖不全。
       res.once('close', handleClientDisconnect)
 
       const { targetUrl, headers, requestOptions } = this._createRequestOptions(req, fullAccount, {
@@ -420,6 +317,7 @@ class OpenAIResponsesRelayService {
           safeErrorResponse.body.error.resets_in_seconds = resetsInSeconds
         }
 
+        removeClientDisconnectListener()
         return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       }
 
@@ -491,8 +389,7 @@ class OpenAIResponsesRelayService {
           })
 
           // 清理监听器
-          req.removeListener('aborted', handleClientDisconnect)
-          res.removeListener('close', handleClientDisconnect)
+          removeClientDisconnectListener()
 
           return res.status(unauthorizedResponse.status).json(unauthorizedResponse.body)
         }
@@ -529,8 +426,7 @@ class OpenAIResponsesRelayService {
         }
 
         // 清理监听器
-        req.removeListener('aborted', handleClientDisconnect)
-        res.removeListener('close', handleClientDisconnect)
+        removeClientDisconnectListener()
 
         const safeErrorResponse = buildOpenAIResponsesClientError(response.status, errorData, {
           headers: response.headers
@@ -555,8 +451,11 @@ class OpenAIResponsesRelayService {
       }
 
       // 处理非流式响应
+      removeClientDisconnectListener()
       return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model, req)
     } catch (error) {
+      removeClientDisconnectListener()
+
       // 清理 AbortController
       if (abortController && !abortController.signal.aborted) {
         abortController.abort()
@@ -687,6 +586,20 @@ class OpenAIResponsesRelayService {
     let rateLimitResetsInSeconds = null
     let streamEnded = false
 
+    const cleanup = () => {
+      if (streamEnded || res.writableEnded) {
+        return
+      }
+
+      streamEnded = true
+      try {
+        response.data?.unpipe?.(res)
+        response.data?.destroy?.()
+      } catch (_) {
+        // 忽略清理错误
+      }
+    }
+
     const writeEventToClient = (event) => {
       if (!event.trim()) {
         return
@@ -780,6 +693,10 @@ class OpenAIResponsesRelayService {
     })
 
     response.data.on('end', async () => {
+      if (streamEnded) {
+        return
+      }
+
       // 处理剩余的 buffer
       if (buffer.trim()) {
         writeEventToClient(buffer)
@@ -871,8 +788,8 @@ class OpenAIResponsesRelayService {
       }
 
       // 清理监听器
-      req.removeListener('aborted', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
+      res.removeListener('close', cleanup)
 
       if (!res.destroyed) {
         res.end()
@@ -886,12 +803,15 @@ class OpenAIResponsesRelayService {
     })
 
     response.data.on('error', (error) => {
+      if (streamEnded) {
+        return
+      }
       streamEnded = true
       logger.error('Stream error:', error)
 
       // 清理监听器
-      req.removeListener('aborted', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
+      res.removeListener('close', cleanup)
 
       if (!res.headersSent) {
         const safeErrorResponse = buildOpenAIResponsesClientError(502, error, {
@@ -903,18 +823,7 @@ class OpenAIResponsesRelayService {
       }
     })
 
-    // 处理客户端断开连接
-    const cleanup = () => {
-      streamEnded = true
-      try {
-        response.data?.unpipe?.(res)
-        response.data?.destroy?.()
-      } catch (_) {
-        // 忽略清理错误
-      }
-    }
-
-    req.on('aborted', cleanup)
+    res.on('close', cleanup)
   }
 
   // 处理非流式响应
@@ -1155,16 +1064,17 @@ class OpenAIResponsesRelayService {
         throw authError
       }
 
-      const { sessionId, headers: testHeaders } = createCodexTestHeaders({ stream: true })
-      const payload = createOpenAITestPayload(model, {
-        stream: true,
-        maxTokens: 64,
-        sessionId
-      })
+      const { payload, headers: testHeaders } = openaiResponsesTestService.buildTestRequestParts(
+        model,
+        {
+          stream: true,
+          maxTokens: 64
+        }
+      )
 
       const mockReq = {
         method: 'POST',
-        path: '/v1/responses',
+        path: openaiResponsesTestService.OPENAI_RESPONSES_TEST_PATH,
         headers: testHeaders,
         body: payload
       }
@@ -1175,7 +1085,7 @@ class OpenAIResponsesRelayService {
 
       const response = await axios(requestOptions)
       const latency = Date.now() - startTime
-      const parsed = await this._parseTestResponse(response)
+      const parsed = await openaiResponsesTestService.parseOpenAITestResponse(response)
 
       if (response.status >= 400) {
         const upstreamError = new Error(parsed.errorMessage || `API Error: ${response.status}`)
