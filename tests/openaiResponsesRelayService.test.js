@@ -36,9 +36,7 @@ jest.mock('../config/config', () => ({ requestTimeout: 1000 }), {
 const crypto = require('crypto')
 const axios = require('axios')
 const openaiResponsesRelayService = require('../src/services/relay/openaiResponsesRelayService')
-const openaiResponsesAccountService = require(
-  '../src/services/account/openaiResponsesAccountService'
-)
+const openaiResponsesAccountService = require('../src/services/account/openaiResponsesAccountService')
 const unifiedOpenAIScheduler = require('../src/services/scheduler/unifiedOpenAIScheduler')
 const upstreamErrorHelper = require('../src/utils/upstreamErrorHelper')
 
@@ -66,6 +64,67 @@ function createReqRes(sessionId = 'session-123') {
 
   return { req, res }
 }
+
+describe('openaiResponsesRelayService 路径和连接清理', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+
+    openaiResponsesAccountService.getAccount.mockResolvedValue({
+      id: 'resp-1',
+      name: 'Responses 1',
+      baseApi: 'https://api.openai.com',
+      apiKey: 'test-key',
+      providerEndpoint: 'responses',
+      proxy: null,
+      userAgent: null
+    })
+  })
+
+  it('根 baseApi 转发裸 responses 路径时补 /v1', () => {
+    expect(
+      openaiResponsesRelayService._normalizeTargetPath('/responses', {
+        baseApi: 'https://api.openai.com',
+        providerEndpoint: 'responses'
+      })
+    ).toBe('/v1/responses')
+
+    expect(
+      openaiResponsesRelayService._normalizeTargetPath('/responses/compact', {
+        baseApi: 'https://api.openai.com',
+        providerEndpoint: 'responses'
+      })
+    ).toBe('/v1/responses/compact')
+
+    expect(
+      openaiResponsesRelayService._normalizeTargetPath('/v1/responses', {
+        baseApi: 'https://api.openai.com/v1',
+        providerEndpoint: 'responses'
+      })
+    ).toBe('/responses')
+  })
+
+  it('非流式成功响应结束前移除 close 监听，避免正常 close 误触发 abort', async () => {
+    axios.mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      data: { object: 'response', output_text: 'ok' },
+      headers: {}
+    })
+
+    const { req, res } = createReqRes()
+
+    await openaiResponsesRelayService.handleRequest(
+      req,
+      res,
+      { id: 'resp-1', name: 'Responses 1', disableAutoProtection: false },
+      { id: 'key-1' }
+    )
+
+    expect(res.removeListener).toHaveBeenCalledWith('close', expect.any(Function))
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(res.json).toHaveBeenCalledWith({ object: 'response', output_text: 'ok' })
+  })
+})
 
 describe('openaiResponsesRelayService 其他4xx软暂停', () => {
   beforeEach(() => {
@@ -112,8 +171,14 @@ describe('openaiResponsesRelayService 其他4xx软暂停', () => {
       expect.objectContaining({ errorTypeOverride: 'client_error' })
     )
     expect(unifiedOpenAIScheduler._deleteSessionMapping).toHaveBeenCalledWith(sessionHash)
-    expect(res.status).toHaveBeenCalledWith(403)
-    expect(res.json).toHaveBeenCalledWith({ error: { message: 'Forbidden' } })
+    expect(res.status).toHaveBeenCalledWith(503)
+    expect(res.json).toHaveBeenCalledWith({
+      error: {
+        message: 'Account temporarily unavailable',
+        type: 'server_error',
+        code: 'account_unavailable'
+      }
+    })
   })
 
   it('对catch路径中的402响应也设置3分钟软暂停', async () => {
@@ -145,7 +210,13 @@ describe('openaiResponsesRelayService 其他4xx软暂停', () => {
       expect.objectContaining({ errorTypeOverride: 'client_error' })
     )
     expect(unifiedOpenAIScheduler._deleteSessionMapping).toHaveBeenCalledWith(sessionHash)
-    expect(res.status).toHaveBeenCalledWith(402)
-    expect(res.json).toHaveBeenCalledWith({ error: { message: 'Payment Required' } })
+    expect(res.status).toHaveBeenCalledWith(503)
+    expect(res.json).toHaveBeenCalledWith({
+      error: {
+        message: 'Account temporarily unavailable',
+        type: 'server_error',
+        code: 'account_unavailable'
+      }
+    })
   })
 })

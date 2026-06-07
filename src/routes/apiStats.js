@@ -6,6 +6,7 @@ const CostCalculator = require('../utils/costCalculator')
 const claudeAccountService = require('../services/account/claudeAccountService')
 const openaiAccountService = require('../services/account/openaiAccountService')
 const serviceRatesService = require('../services/serviceRatesService')
+const openaiResponsesTestService = require('../services/openaiResponsesTestService')
 const {
   createClaudeTestPayload,
   extractErrorMessage,
@@ -944,85 +945,6 @@ const ALLOWED_MAX_TOKENS = [100, 500, 1000, 2000, 4096]
 const sanitizeMaxTokens = (value) =>
   ALLOWED_MAX_TOKENS.includes(Number(value)) ? Number(value) : 1000
 
-function extractOpenAIResponseText(outputData) {
-  const source = Array.isArray(outputData?.output)
-    ? outputData.output
-    : Array.isArray(outputData?.response?.output)
-      ? outputData.response.output
-      : Array.isArray(outputData)
-        ? outputData
-        : []
-
-  let responseText = ''
-  for (const item of source) {
-    if (item?.type === 'message' && Array.isArray(item.content)) {
-      for (const block of item.content) {
-        if (block?.type === 'output_text' && block.text) {
-          responseText += block.text
-        } else if (typeof block?.text === 'string') {
-          responseText += block.text
-        }
-      }
-    } else if (item?.type === 'output_text' && item.text) {
-      responseText += item.text
-    }
-  }
-
-  return responseText
-}
-
-function extractOpenAIStreamError(eventData) {
-  if (!eventData || typeof eventData !== 'object') {
-    return null
-  }
-
-  if (eventData.error) {
-    return eventData.error.message || eventData.message || eventData.error || 'Unknown error'
-  }
-
-  if (eventData.type === 'response.failed') {
-    return eventData.response?.error?.message || eventData.response?.error || 'Response failed'
-  }
-
-  return null
-}
-
-function summarizeOpenAIStreamEvent(eventData) {
-  if (!eventData || typeof eventData !== 'object') {
-    return null
-  }
-
-  if (eventData.type === 'response.completed' && eventData.response) {
-    const output = Array.isArray(eventData.response.output) ? eventData.response.output : []
-    return {
-      status: eventData.response.status,
-      outputTypes: output.map((item) => item?.type).filter(Boolean),
-      contentTypes: output
-        .flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
-        .map((part) => part?.type)
-        .filter(Boolean)
-    }
-  }
-
-  if (eventData.type === 'response.output_item.done' && eventData.item) {
-    return {
-      itemType: eventData.item.type,
-      contentTypes: Array.isArray(eventData.item.content)
-        ? eventData.item.content.map((part) => part?.type).filter(Boolean)
-        : []
-    }
-  }
-
-  if (Array.isArray(eventData.choices)) {
-    return {
-      object: eventData.object,
-      choiceKeys: Object.keys(eventData.choices[0] || {})
-    }
-  }
-
-  return null
-}
-
 // 🧪 API Key 端点测试接口 - 测试API Key是否能正常访问服务
 router.post('/api-key/test', async (req, res) => {
   const config = require('../../config/config')
@@ -1242,9 +1164,6 @@ router.post('/api-key/test-gemini', async (req, res) => {
 
 // 🧪 OpenAI/Codex API Key 端点测试接口
 router.post('/api-key/test-openai', async (req, res) => {
-  const config = require('../../config/config')
-  const { createCodexTestHeaders, createOpenAITestPayload } = require('../utils/testPayloadHelper')
-
   try {
     const { apiKey, model = 'gpt-5', prompt = 'hi' } = req.body
     const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
@@ -1283,182 +1202,13 @@ router.post('/api-key/test-openai', async (req, res) => {
       `🧪 OpenAI API Key test started for: ${validation.keyData.name} (${validation.keyData.id})`
     )
 
-    const port = config.server.port || 3000
-    const apiUrl = `http://127.0.0.1:${port}/openai/responses`
-
-    // 设置 SSE 响应头
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no'
+    await openaiResponsesTestService.sendApiKeyTestStream({
+      apiKey,
+      model,
+      prompt,
+      maxTokens,
+      responseStream: res
     })
-
-    res.write(`data: ${JSON.stringify({ type: 'test_start', message: 'Test started' })}\n\n`)
-
-    const axios = require('axios')
-    const payload = createOpenAITestPayload(model, { prompt, maxTokens })
-    const { headers: codexHeaders } = createCodexTestHeaders({
-      sessionId: payload.session_id,
-      stream: payload.stream !== false
-    })
-
-    try {
-      const response = await axios.post(apiUrl, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          ...codexHeaders
-        },
-        timeout: 60000,
-        responseType: 'stream',
-        validateStatus: () => true
-      })
-
-      if (response.status !== 200) {
-        const chunks = []
-        response.data.on('data', (chunk) => chunks.push(chunk))
-        response.data.on('end', () => {
-          const errorData = Buffer.concat(chunks).toString()
-          let errorMsg = `API Error: ${response.status}`
-          try {
-            const json = JSON.parse(errorData)
-            errorMsg = extractErrorMessage(json, errorMsg)
-          } catch {
-            if (errorData.length < 200) {
-              errorMsg = errorData || errorMsg
-            }
-          }
-          res.write(
-            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: sanitizeErrorMsg(errorMsg) })}\n\n`
-          )
-          res.end()
-        })
-        return
-      }
-
-      let buffer = ''
-      let responseText = ''
-      let streamError = null
-      const seenEventTypes = new Set()
-      let lastEventSummary = null
-
-      const sendContent = (text) => {
-        if (!text) {
-          return
-        }
-        responseText += text
-        res.write(`data: ${JSON.stringify({ type: 'content', text })}\n\n`)
-      }
-
-      const processOpenAIStreamLine = (line) => {
-        if (!line.startsWith('data:')) {
-          return
-        }
-
-        const jsonStr = line.substring(5).trim()
-        if (!jsonStr || jsonStr === '[DONE]') {
-          return
-        }
-
-        try {
-          const data = JSON.parse(jsonStr)
-          if (data.type) {
-            seenEventTypes.add(data.type)
-          } else if (data.object) {
-            seenEventTypes.add(data.object)
-          }
-          const summary = summarizeOpenAIStreamEvent(data)
-          if (summary) {
-            lastEventSummary = summary
-          }
-
-          const errorText = extractOpenAIStreamError(data)
-          if (errorText) {
-            streamError = errorText
-            return
-          }
-
-          if (data.type === 'response.output_text.delta' && data.delta) {
-            sendContent(data.delta)
-          } else if (data.type === 'response.content_part.delta' && data.delta?.text) {
-            sendContent(data.delta.text)
-          } else if (data.type === 'response.output_text.done' && data.text && !responseText) {
-            sendContent(data.text)
-          } else if (
-            data.type === 'response.content_part.done' &&
-            data.part?.text &&
-            !responseText
-          ) {
-            sendContent(data.part.text)
-          } else if (data.type === 'response.output_item.done' && data.item && !responseText) {
-            sendContent(extractOpenAIResponseText([data.item]))
-          } else if (data.type === 'response.completed' && data.response && !responseText) {
-            sendContent(extractOpenAIResponseText(data.response))
-          } else if (data.type === 'response.incomplete') {
-            streamError =
-              data.response?.incomplete_details?.reason ||
-              data.response?.status ||
-              'Response incomplete'
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      response.data.on('data', (chunk) => {
-        buffer += chunk.toString()
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          processOpenAIStreamLine(line)
-        }
-      })
-
-      response.data.on('end', () => {
-        if (buffer.trim()) {
-          const lines = buffer.split('\n')
-          buffer = ''
-          for (const line of lines) {
-            processOpenAIStreamLine(line)
-          }
-        }
-
-        if (streamError) {
-          res.write(
-            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: sanitizeErrorMsg(streamError) })}\n\n`
-          )
-        } else if (responseText) {
-          res.write(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
-        } else {
-          const details = {
-            events: Array.from(seenEventTypes).slice(-10),
-            lastEvent: lastEventSummary
-          }
-          res.write(
-            `data: ${JSON.stringify({
-              type: 'test_complete',
-              success: false,
-              error: `No response content received from upstream: ${JSON.stringify(details)}`
-            })}\n\n`
-          )
-        }
-        res.end()
-      })
-
-      response.data.on('error', (err) => {
-        res.write(
-          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(err) })}\n\n`
-        )
-        res.end()
-      })
-    } catch (axiosError) {
-      res.write(
-        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(axiosError) })}\n\n`
-      )
-      res.end()
-    }
   } catch (error) {
     logger.error('❌ OpenAI API Key test failed:', error)
 
