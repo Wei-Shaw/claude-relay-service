@@ -19,6 +19,66 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+const REQUEST_LOG_BODY_LIMIT_BYTES =
+  Number.parseInt(process.env.REQUEST_LOG_BODY_LIMIT_BYTES, 10) || 4096
+
+function getJsonByteLength(value) {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), 'utf8')
+  } catch (_error) {
+    return null
+  }
+}
+
+function summarizeLargeRequestBody(body) {
+  if (!body || typeof body !== 'object') {
+    return body
+  }
+
+  const sizeBytes = getJsonByteLength(body)
+  if (sizeBytes !== null && sizeBytes <= REQUEST_LOG_BODY_LIMIT_BYTES) {
+    return body
+  }
+
+  const summary = {
+    _truncated: true,
+    sizeBytes,
+    keys: Object.keys(body).slice(0, 30)
+  }
+
+  if (body.model !== undefined) {
+    summary.model = body.model
+  }
+  if (body.stream !== undefined) {
+    summary.stream = body.stream
+  }
+  if (body.max_tokens !== undefined) {
+    summary.max_tokens = body.max_tokens
+  }
+  if (body.temperature !== undefined) {
+    summary.temperature = body.temperature
+  }
+  if (Array.isArray(body.messages)) {
+    summary.messages = `${body.messages.length} messages`
+  }
+  if (Array.isArray(body.input)) {
+    summary.input = `${body.input.length} input items`
+  } else if (body.input !== undefined) {
+    summary.input = `${getJsonByteLength(body.input) || 0} bytes`
+  }
+  if (typeof body.instructions === 'string') {
+    summary.instructions = `${Buffer.byteLength(body.instructions, 'utf8')} bytes`
+  }
+  if (typeof body.system === 'string') {
+    summary.system = `${Buffer.byteLength(body.system, 'utf8')} bytes`
+  }
+  if (body.metadata !== undefined) {
+    summary.metadata = body.metadata
+  }
+
+  return summary
+}
+
 function normalizeResponseChunk(chunk, encoding) {
   if (chunk === null || chunk === undefined) {
     return ''
@@ -2180,7 +2240,7 @@ const requestLogger = (req, res, next) => {
 
     // 请求体（非 GET 且有内容时显示）
     if (req.method !== 'GET' && req.body && Object.keys(req.body).length > 0) {
-      meta.req = req.body
+      meta.req = summarizeLargeRequestBody(req.body)
     }
 
     // 查询参数（GET 请求且有查询参数时单独显示）

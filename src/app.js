@@ -931,6 +931,14 @@ class Application {
 
     // 处理未捕获异常
     process.on('uncaughtException', (error) => {
+      if (logger.isBrokenPipeError?.(error)) {
+        logger.warn('⚠️ Ignored stdout/stderr broken pipe error', {
+          code: error.code,
+          syscall: error.syscall
+        })
+        return
+      }
+
       logger.error('💥 Uncaught exception:', error)
       shutdown('uncaughtException')
     })

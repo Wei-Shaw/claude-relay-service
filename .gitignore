@@ -68,6 +68,8 @@ jspm_packages/
 
 # Optional npm cache directory
 .npm
+.npm-cache/
+web/admin-spa/.npm-cache/
 
 # Optional eslint cache
 .eslintcache
@@ -212,6 +214,8 @@ deploy/
 # Local development files
 .local/
 local/
+.qoder/
+output/
 
 # Debug files
 debug.log

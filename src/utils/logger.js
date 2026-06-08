@@ -118,6 +118,53 @@ const safeStringify = (obj, maxDepth = Infinity) => {
 
 // 控制台不显示的 metadata 字段（已在 message 中或低价值）
 const CONSOLE_SKIP_KEYS = new Set(['type', 'level', 'message', 'timestamp', 'stack'])
+const CONSOLE_VALUE_MAX_LENGTH =
+  Number.parseInt(process.env.LOG_CONSOLE_VALUE_MAX_LENGTH, 10) || 1200
+const LOG_ROTATE_CONSOLE_EVENTS = process.env.LOG_ROTATE_CONSOLE_EVENTS === 'true'
+
+const isBrokenPipeError = (error) => error?.code === 'EPIPE' && error?.syscall === 'write'
+
+const appendInternalLogError = (message, error) => {
+  try {
+    fs.appendFileSync(
+      path.join(config.logging.dirname, 'logger-internal-error.log'),
+      `${formatDateWithTimezone(new Date(), false)} ${message}: ${error?.stack || error?.message || error}\n`
+    )
+  } catch (_error) {
+    // Last-resort guard: logger diagnostics must never crash the app.
+  }
+}
+
+const installStreamErrorGuard = (stream, name) => {
+  if (!stream?.on || stream.__crsLoggerStreamGuardInstalled) {
+    return
+  }
+
+  Object.defineProperty(stream, '__crsLoggerStreamGuardInstalled', {
+    value: true,
+    enumerable: false
+  })
+
+  stream.on('error', (error) => {
+    if (isBrokenPipeError(error)) {
+      return
+    }
+    appendInternalLogError(`${name} stream error`, error)
+  })
+}
+
+const formatConsoleValue = (value) => {
+  const rendered =
+    value !== null && typeof value === 'object' ? safeStringify(value, 3) : String(value)
+
+  if (rendered.length <= CONSOLE_VALUE_MAX_LENGTH) {
+    return rendered
+  }
+
+  return `${rendered.substring(0, CONSOLE_VALUE_MAX_LENGTH)}...[truncated ${
+    rendered.length - CONSOLE_VALUE_MAX_LENGTH
+  } chars]`
+}
 
 // 控制台格式: 树形展示 metadata
 const createConsoleFormat = () =>
@@ -139,9 +186,7 @@ const createConsoleFormat = () =>
         entries.forEach(([key, value], i) => {
           const isLast = i === entries.length - 1
           const branch = isLast ? '└─' : '├─'
-          const displayValue =
-            value !== null && typeof value === 'object' ? safeStringify(value) : String(value)
-          logMessage += `\n${indent}${branch} ${key}: ${displayValue}`
+          logMessage += `\n${indent}${branch} ${key}: ${formatConsoleValue(value)}`
         })
       }
 
@@ -181,6 +226,27 @@ if (!fs.existsSync(config.logging.dirname)) {
   fs.mkdirSync(config.logging.dirname, { recursive: true, mode: 0o755 })
 }
 
+installStreamErrorGuard(process.stdout, 'stdout')
+installStreamErrorGuard(process.stderr, 'stderr')
+
+const createConsoleTransport = (options = {}) => {
+  const transport = new winston.transports.Console({
+    format: consoleFormat,
+    handleExceptions: false,
+    handleRejections: false,
+    ...options
+  })
+
+  transport.on('error', (error) => {
+    if (isBrokenPipeError(error)) {
+      return
+    }
+    appendInternalLogError('console transport error', error)
+  })
+
+  return transport
+}
+
 // 🔄 增强的日志轮转配置
 const createRotateTransport = (filename, level = null) => {
   const transport = new DailyRotateFile({
@@ -198,7 +264,7 @@ const createRotateTransport = (filename, level = null) => {
   }
 
   // 监听轮转事件（测试环境关闭以避免 Jest 退出后输出）
-  if (!isTestEnv) {
+  if (!isTestEnv && LOG_ROTATE_CONSOLE_EVENTS) {
     transport.on('rotate', (oldFilename, newFilename) => {
       console.log(`📦 Log rotated: ${oldFilename} -> ${newFilename}`)
     })
@@ -251,11 +317,7 @@ const logger = winston.createLogger({
     errorFileTransport,
 
     // 🖥️ 控制台输出
-    new winston.transports.Console({
-      format: consoleFormat,
-      handleExceptions: false,
-      handleRejections: false
-    })
+    createConsoleTransport()
   ],
 
   // 🚨 异常处理
@@ -266,9 +328,7 @@ const logger = winston.createLogger({
       maxsize: 10485760, // 10MB
       maxFiles: 5
     }),
-    new winston.transports.Console({
-      format: consoleFormat
-    })
+    createConsoleTransport()
   ],
 
   // 🔄 未捕获异常处理
@@ -279,9 +339,7 @@ const logger = winston.createLogger({
       maxsize: 10485760, // 10MB
       maxFiles: 5
     }),
-    new winston.transports.Console({
-      format: consoleFormat
-    })
+    createConsoleTransport()
   ],
 
   // 防止进程退出
@@ -404,6 +462,8 @@ logger.resetStats = () => {
   logger.stats.errors = 0
   logger.stats.warnings = 0
 }
+
+logger.isBrokenPipeError = isBrokenPipeError
 
 // 📡 健康检查
 logger.healthCheck = () => {
