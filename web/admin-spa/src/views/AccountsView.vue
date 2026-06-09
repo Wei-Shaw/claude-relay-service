@@ -192,6 +192,7 @@
               ref="openAIJsonImportInput"
               accept=".json,application/json"
               class="hidden"
+              multiple
               type="file"
               @change="handleOpenAIJsonImportFile"
             />
@@ -3673,6 +3674,30 @@ const readOpenAIJsonImportFile = (file) => {
   })
 }
 
+const collectOpenAIJsonImportRecords = (payload) => {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return []
+  }
+
+  if (Array.isArray(payload.accounts)) {
+    return payload.accounts
+  }
+
+  if (Array.isArray(payload.items)) {
+    return payload.items
+  }
+
+  if (Array.isArray(payload.data)) {
+    return payload.data
+  }
+
+  return [payload]
+}
+
 const triggerOpenAIJsonImport = () => {
   if (importingOpenAIJson.value) {
     return
@@ -3683,44 +3708,64 @@ const triggerOpenAIJsonImport = () => {
 
 const handleOpenAIJsonImportFile = async (event) => {
   const input = event.target
-  const file = input.files?.[0]
+  const files = Array.from(input.files || [])
 
-  if (!file) {
+  if (files.length === 0) {
     return
   }
 
   importingOpenAIJson.value = true
 
   try {
-    const fileText = await readOpenAIJsonImportFile(file)
-    let payload
+    const records = []
+    const localFailures = []
 
-    try {
-      payload = JSON.parse(fileText)
-    } catch (error) {
-      showToast('JSON 文件格式无效，请检查语法', 'error')
+    for (const file of files) {
+      try {
+        const fileText = await readOpenAIJsonImportFile(file)
+        const payload = JSON.parse(fileText)
+        const fileRecords = collectOpenAIJsonImportRecords(payload)
+
+        if (fileRecords.length === 0) {
+          localFailures.push(`${file.name}: 未找到账号配置`)
+        } else {
+          records.push(...fileRecords)
+        }
+      } catch (error) {
+        localFailures.push(`${file.name}: ${error?.message || 'JSON 文件格式无效'}`)
+      }
+    }
+
+    if (records.length === 0) {
+      const firstFailure = localFailures[0] ? `：${localFailures[0]}` : ''
+      showToast(`没有可导入的 OpenAI JSON 账号${firstFailure}`, 'error')
       return
     }
 
-    const response = await httpApis.importOpenAIAccountsJsonApi(payload)
+    const response = await httpApis.importOpenAIAccountsJsonApi(records)
     const summary = response.data || {}
     const imported = Number(summary.imported || 0)
     const failed = Number(summary.failed || 0)
+    const totalFailed = failed + localFailures.length
     const firstFailure = Array.isArray(summary.results)
       ? summary.results.find((item) => !item.success)
       : null
 
     if (!response.success) {
-      const detail = firstFailure ? `：第 ${firstFailure.index + 1} 个 ${firstFailure.message}` : ''
+      const detail = firstFailure
+        ? `：第 ${firstFailure.index + 1} 个 ${firstFailure.message}`
+        : localFailures[0]
+          ? `：${localFailures[0]}`
+          : ''
       showToast(`${response.message || '导入失败'}${detail}`, 'error')
       return
     }
 
     showToast(
-      failed > 0
-        ? `导入完成：成功 ${imported} 个，失败 ${failed} 个`
+      totalFailed > 0
+        ? `导入完成：成功 ${imported} 个，失败 ${totalFailed} 个`
         : `导入完成：成功 ${imported} 个`,
-      failed > 0 ? 'warning' : 'success'
+      totalFailed > 0 ? 'warning' : 'success'
     )
 
     await loadAccounts(true)
