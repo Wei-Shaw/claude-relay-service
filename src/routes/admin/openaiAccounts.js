@@ -40,6 +40,154 @@ function generateOpenAIPKCE() {
   }
 }
 
+function normalizeImportText(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeOpenAIImportRecords(payload) {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return []
+  }
+
+  if (Array.isArray(payload.accounts)) {
+    return payload.accounts
+  }
+
+  if (Array.isArray(payload.items)) {
+    return payload.items
+  }
+
+  if (Array.isArray(payload.data)) {
+    return payload.data
+  }
+
+  return [payload]
+}
+
+function parseOpenAIImportDate(value, fieldName) {
+  const text = normalizeImportText(value)
+  if (!text) {
+    return null
+  }
+
+  const timestamp = Date.parse(text)
+  if (Number.isNaN(timestamp)) {
+    throw new Error(`${fieldName} 时间格式无效`)
+  }
+
+  return new Date(timestamp).toISOString()
+}
+
+function decodeJwtPayload(token) {
+  const text = normalizeImportText(token)
+  if (!text) {
+    return null
+  }
+
+  try {
+    const parts = text.split('.')
+    if (parts.length !== 3) {
+      return null
+    }
+
+    return JSON.parse(Buffer.from(parts[1], 'base64url').toString())
+  } catch (error) {
+    return null
+  }
+}
+
+function buildImportedOpenAIAccountInfo(record) {
+  const payload = decodeJwtPayload(record.id_token || record.idToken)
+  const authClaims = payload?.['https://api.openai.com/auth'] || {}
+  const organizations = Array.isArray(authClaims.organizations) ? authClaims.organizations : []
+  const defaultOrg = organizations.find((org) => org.is_default) || organizations[0] || {}
+  const email = normalizeImportText(record.email) || normalizeImportText(payload?.email)
+
+  return {
+    accountId: authClaims.chatgpt_account_id || '',
+    chatgptUserId: authClaims.chatgpt_user_id || authClaims.user_id || '',
+    organizationId: defaultOrg.id || '',
+    organizationRole: defaultOrg.role || '',
+    organizationTitle: defaultOrg.title || '',
+    planType: authClaims.chatgpt_plan_type || '',
+    email,
+    name: payload?.name || email,
+    emailVerified: payload?.email_verified === true,
+    organizations
+  }
+}
+
+function buildOpenAIImportAccountData(record, index) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) {
+    throw new Error('账号配置必须是 JSON 对象')
+  }
+
+  const importType = normalizeImportText(record.type).toLowerCase()
+  if (importType && importType !== 'codex') {
+    throw new Error(`不支持的 OpenAI 导入类型: ${importType}`)
+  }
+
+  const refreshToken = normalizeImportText(record.refresh_token || record.refreshToken)
+  if (!refreshToken) {
+    throw new Error('缺少 refresh_token')
+  }
+
+  const accessToken = normalizeImportText(record.access_token || record.accessToken)
+  const idToken = normalizeImportText(record.id_token || record.idToken)
+  const expiresAt = parseOpenAIImportDate(
+    record.expired || record.expires_at || record.expiresAt,
+    'expired'
+  )
+  const savedAt = parseOpenAIImportDate(record.saved_at || record.savedAt, 'saved_at')
+  const tokenSource = normalizeImportText(record.token_source || record.tokenSource)
+  const accountInfo = buildImportedOpenAIAccountInfo(record)
+  const name = normalizeImportText(record.name) || accountInfo.email || `OpenAI Codex ${index + 1}`
+  const descriptionParts = ['Imported from OpenAI JSON']
+
+  if (tokenSource) {
+    descriptionParts.push(`token_source=${tokenSource}`)
+  }
+
+  if (savedAt) {
+    descriptionParts.push(`saved_at=${savedAt}`)
+  }
+
+  const openaiOauth = {
+    refreshToken
+  }
+
+  if (accessToken) {
+    openaiOauth.accessToken = accessToken
+  }
+
+  if (idToken) {
+    openaiOauth.idToken = idToken
+  }
+
+  if (expiresAt) {
+    openaiOauth.expiresAt = expiresAt
+  }
+
+  return {
+    name,
+    description: normalizeImportText(record.description) || descriptionParts.join('; '),
+    accountType: 'shared',
+    priority: 50,
+    maxConcurrentTasks: 0,
+    rateLimitDuration: 60,
+    openaiOauth,
+    accountInfo,
+    expiresAt,
+    proxy: null,
+    isActive: true,
+    schedulable: true
+  }
+}
+
 // 生成 OpenAI OAuth 授权 URL
 router.post('/generate-auth-url', authenticateAdmin, async (req, res) => {
   try {
@@ -221,6 +369,71 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: '交换授权码失败',
+      error: error.message
+    })
+  }
+})
+
+// 批量导入 OpenAI Codex JSON 账户
+router.post('/import-json', authenticateAdmin, async (req, res) => {
+  try {
+    const records = normalizeOpenAIImportRecords(req.body)
+
+    if (records.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '导入文件必须是 JSON 对象、数组，或包含 accounts/items/data 数组的对象'
+      })
+    }
+
+    const results = []
+
+    for (const [index, record] of records.entries()) {
+      try {
+        const accountData = buildOpenAIImportAccountData(record, index)
+        const createdAccount = await openaiAccountService.createAccount(accountData)
+
+        results.push({
+          index,
+          success: true,
+          id: createdAccount.id,
+          name: createdAccount.name,
+          email: accountData.accountInfo.email || ''
+        })
+      } catch (error) {
+        results.push({
+          index,
+          success: false,
+          message: error.message
+        })
+      }
+    }
+
+    const imported = results.filter((item) => item.success).length
+    const failed = results.length - imported
+    const message =
+      failed > 0
+        ? `OpenAI JSON 导入完成：成功 ${imported} 个，失败 ${failed} 个`
+        : `OpenAI JSON 导入完成：成功 ${imported} 个`
+
+    logger.success(`Imported OpenAI JSON accounts: ${imported}/${records.length}`)
+
+    return res.status(imported > 0 ? 200 : 400).json({
+      success: imported > 0,
+      message,
+      data: {
+        total: records.length,
+        imported,
+        failed,
+        skipped: 0,
+        results
+      }
+    })
+  } catch (error) {
+    logger.error('批量导入 OpenAI JSON 账户失败:', error)
+    return res.status(500).json({
+      success: false,
+      message: '批量导入 OpenAI JSON 账户失败',
       error: error.message
     })
   }

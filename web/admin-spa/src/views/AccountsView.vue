@@ -188,6 +188,40 @@
               </el-tooltip>
             </div>
 
+            <input
+              ref="openAIJsonImportInput"
+              accept=".json,application/json"
+              class="hidden"
+              type="file"
+              @change="handleOpenAIJsonImportFile"
+            />
+
+            <!-- OpenAI JSON 导入按钮 -->
+            <div class="relative">
+              <el-tooltip
+                content="批量导入 OpenAI Codex JSON 账号"
+                effect="dark"
+                placement="bottom"
+              >
+                <button
+                  class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 sm:w-auto"
+                  :disabled="importingOpenAIJson"
+                  @click="triggerOpenAIJsonImport"
+                >
+                  <div
+                    class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+                  ></div>
+                  <i
+                    :class="[
+                      'fas relative text-emerald-500',
+                      importingOpenAIJson ? 'fa-spinner fa-spin' : 'fa-file-import'
+                    ]"
+                  />
+                  <span class="relative">导入 OpenAI</span>
+                </button>
+              </el-tooltip>
+            </div>
+
             <!-- 批量编辑按钮 -->
             <button
               v-if="selectedAccounts.length > 0"
@@ -2408,6 +2442,8 @@ const handleCancel = () => {
 const accounts = ref([])
 const accountsLoading = ref(false)
 const refreshingBalances = ref(false)
+const openAIJsonImportInput = ref(null)
+const importingOpenAIJson = ref(false)
 const tempUnavailableNowTs = ref(Date.now())
 const accountsSortBy = ref('name')
 const accountsSortOrder = ref('asc')
@@ -3624,6 +3660,75 @@ const loadAccounts = async (forceReload = false) => {
     showToast('加载账户失败', 'error')
   } finally {
     accountsLoading.value = false
+  }
+}
+
+const readOpenAIJsonImportFile = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('读取 JSON 文件失败'))
+    reader.readAsText(file)
+  })
+}
+
+const triggerOpenAIJsonImport = () => {
+  if (importingOpenAIJson.value) {
+    return
+  }
+
+  openAIJsonImportInput.value?.click()
+}
+
+const handleOpenAIJsonImportFile = async (event) => {
+  const input = event.target
+  const file = input.files?.[0]
+
+  if (!file) {
+    return
+  }
+
+  importingOpenAIJson.value = true
+
+  try {
+    const fileText = await readOpenAIJsonImportFile(file)
+    let payload
+
+    try {
+      payload = JSON.parse(fileText)
+    } catch (error) {
+      showToast('JSON 文件格式无效，请检查语法', 'error')
+      return
+    }
+
+    const response = await httpApis.importOpenAIAccountsJsonApi(payload)
+    const summary = response.data || {}
+    const imported = Number(summary.imported || 0)
+    const failed = Number(summary.failed || 0)
+    const firstFailure = Array.isArray(summary.results)
+      ? summary.results.find((item) => !item.success)
+      : null
+
+    if (!response.success) {
+      const detail = firstFailure ? `：第 ${firstFailure.index + 1} 个 ${firstFailure.message}` : ''
+      showToast(`${response.message || '导入失败'}${detail}`, 'error')
+      return
+    }
+
+    showToast(
+      failed > 0
+        ? `导入完成：成功 ${imported} 个，失败 ${failed} 个`
+        : `导入完成：成功 ${imported} 个`,
+      failed > 0 ? 'warning' : 'success'
+    )
+
+    await loadAccounts(true)
+  } catch (error) {
+    showToast(error?.message || '导入 OpenAI JSON 失败', 'error')
+  } finally {
+    importingOpenAIJson.value = false
+    input.value = ''
   }
 }
 

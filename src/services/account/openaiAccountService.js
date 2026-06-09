@@ -71,6 +71,23 @@ function normalizeMaxConcurrentTasks(value) {
   return Number.isInteger(concurrent) && concurrent > 0 ? concurrent : 0
 }
 
+function resolveTokenExpiresAt(oauthData, accountData = {}) {
+  const explicitExpiresAt = accountData.expiresAt || oauthData.expiresAt || oauthData.expired
+  if (explicitExpiresAt) {
+    const timestamp = Date.parse(explicitExpiresAt)
+    if (!Number.isNaN(timestamp)) {
+      return new Date(timestamp).toISOString()
+    }
+  }
+
+  const expiresIn = Number(oauthData.expires_in)
+  if (Number.isFinite(expiresIn) && expiresIn > 0) {
+    return new Date(Date.now() + expiresIn * 1000).toISOString()
+  }
+
+  return new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+}
+
 function buildCodexUsageSnapshot(accountData) {
   const updatedAt = accountData.codexUsageUpdatedAt
 
@@ -458,6 +475,7 @@ async function createAccount(accountData) {
   // 检查邮箱是否已经是加密格式（包含冒号分隔的32位十六进制字符）
   const isEmailEncrypted =
     accountInfo.email && accountInfo.email.length >= 33 && accountInfo.email.charAt(32) === ':'
+  const tokenExpiresAt = resolveTokenExpiresAt(oauthData, accountData)
 
   const account = {
     id: accountId,
@@ -492,9 +510,7 @@ async function createAccount(accountData) {
     email: isEmailEncrypted ? accountInfo.email : encrypt(accountInfo.email || ''),
     emailVerified: accountInfo.emailVerified === true ? 'true' : 'false',
     // 过期时间
-    expiresAt: oauthData.expires_in
-      ? new Date(Date.now() + oauthData.expires_in * 1000).toISOString()
-      : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // OAuth Token 过期时间（技术字段）
+    expiresAt: tokenExpiresAt, // OAuth Token 过期时间（技术字段）
 
     // ✅ 新增：账户订阅到期时间（业务字段，手动管理）
     subscriptionExpiresAt: accountData.subscriptionExpiresAt || null,
