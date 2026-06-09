@@ -2399,6 +2399,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { showToast, copyText, formatNumber, formatRelativeTime } from '@/utils/tools'
 
 import * as httpApis from '@/utils/http_apis'
@@ -2416,6 +2417,9 @@ import GroupManagementModal from '@/components/accounts/GroupManagementModal.vue
 import BalanceDisplay from '@/components/accounts/BalanceDisplay.vue'
 import AccountBalanceScriptModal from '@/components/accounts/AccountBalanceScriptModal.vue'
 import BatchAccountEditModal from '@/components/accounts/BatchAccountEditModal.vue'
+
+const route = useRoute()
+const router = useRouter()
 
 // 确认弹窗状态
 const showConfirmModal = ref(false)
@@ -2663,6 +2667,10 @@ const getPlatformsForFilter = (filter) => {
   return allPlatformKeys
 }
 
+const ACCOUNT_FILTER_QUERY_KEYS = ['platform', 'status']
+const statusFilterValues = new Set(['all', 'normal', 'unschedulable', 'rateLimited', 'other'])
+let isApplyingRouteAccountFilters = false
+
 // 平台选项（两级结构）
 const platformOptions = computed(() => {
   const options = [{ value: 'all', label: '所有平台', icon: 'fa-globe', indent: 0 }]
@@ -2706,6 +2714,109 @@ const groupOptions = computed(() => {
   })
   return options
 })
+
+const getRouteQueryValue = (queryValue) => {
+  if (Array.isArray(queryValue)) {
+    return queryValue[0] || ''
+  }
+
+  return typeof queryValue === 'string' ? queryValue : ''
+}
+
+const normalizePlatformQuery = (value) => {
+  const text = getRouteQueryValue(value).trim()
+  if (!text || text === 'all') {
+    return 'all'
+  }
+
+  if (platformGroupMap[text] || allPlatformKeys.includes(text)) {
+    return text
+  }
+
+  return 'all'
+}
+
+const normalizeStatusQuery = (value) => {
+  const text = getRouteQueryValue(value).trim()
+  return statusFilterValues.has(text) ? text : 'all'
+}
+
+const setQueryValue = (query, key, value, defaultValue) => {
+  if (value === defaultValue) {
+    delete query[key]
+  } else {
+    query[key] = value
+  }
+}
+
+const queryValuesEqual = (left, right) => {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)])
+  for (const key of keys) {
+    if (getRouteQueryValue(left[key]) !== getRouteQueryValue(right[key])) {
+      return false
+    }
+  }
+  return true
+}
+
+const buildAccountFilterRouteQuery = () => {
+  const nextQuery = { ...route.query }
+  ACCOUNT_FILTER_QUERY_KEYS.forEach((key) => {
+    delete nextQuery[key]
+  })
+
+  setQueryValue(nextQuery, 'platform', platformFilter.value, 'all')
+  setQueryValue(nextQuery, 'status', statusFilter.value, 'all')
+
+  return nextQuery
+}
+
+const syncAccountFiltersToRoute = () => {
+  if (isApplyingRouteAccountFilters) {
+    return
+  }
+
+  const nextQuery = buildAccountFilterRouteQuery()
+  if (queryValuesEqual(route.query, nextQuery)) {
+    return
+  }
+
+  router.replace({ path: route.path, query: nextQuery })
+}
+
+const applyAccountFiltersFromRoute = () => {
+  const nextFilters = {
+    platform: normalizePlatformQuery(route.query.platform),
+    status: normalizeStatusQuery(route.query.status)
+  }
+  const platformChanged = platformFilter.value !== nextFilters.platform
+  const statusChanged = statusFilter.value !== nextFilters.status
+  const hasChanges = platformChanged || statusChanged
+
+  if (!hasChanges) {
+    return {
+      hasChanges: false,
+      needsReload: false
+    }
+  }
+
+  isApplyingRouteAccountFilters = true
+  platformFilter.value = nextFilters.platform
+  statusFilter.value = nextFilters.status
+  currentPage.value = 1
+
+  nextTick(() => {
+    isApplyingRouteAccountFilters = false
+    syncAccountFiltersToRoute()
+  })
+
+  return {
+    hasChanges: true,
+    needsReload: platformChanged
+  }
+}
+
+applyAccountFiltersFromRoute()
 
 const shouldShowCheckboxes = computed(() => showCheckboxes.value)
 
@@ -3885,7 +3996,6 @@ const clearCache = () => {
 // 按平台筛选账户
 const filterByPlatform = () => {
   currentPage.value = 1
-  loadAccounts()
 }
 
 // 按分组筛选账户
@@ -5425,6 +5535,39 @@ const calculateDailyCost = (account) => {
 // const toggleDispatch = async (account) => {
 //   await toggleSchedulable(account)
 // }
+
+watch(
+  () => route.query,
+  () => {
+    const result = applyAccountFiltersFromRoute()
+    if (result.needsReload) {
+      loadAccounts()
+    }
+    if (result.hasChanges) {
+      updateSelectAllState()
+    }
+  }
+)
+
+watch(platformFilter, () => {
+  if (isApplyingRouteAccountFilters) {
+    return
+  }
+
+  currentPage.value = 1
+  syncAccountFiltersToRoute()
+  loadAccounts()
+})
+
+watch(statusFilter, () => {
+  if (isApplyingRouteAccountFilters) {
+    return
+  }
+
+  currentPage.value = 1
+  syncAccountFiltersToRoute()
+  updateSelectAllState()
+})
 
 watch(searchKeyword, () => {
   currentPage.value = 1
