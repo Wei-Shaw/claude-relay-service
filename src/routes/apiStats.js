@@ -1733,7 +1733,7 @@ router.post('/api-key/test-openai', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
-          'User-Agent': 'codex_cli_rs/1.0.0'
+          'User-Agent': 'claude-relay-admin-test/1.0.0'
         },
         timeout: 60000,
         responseType: 'stream',

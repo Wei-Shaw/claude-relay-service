@@ -755,6 +755,7 @@
           class="mb-4 flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400 sm:text-sm"
         >
           <span>共 {{ accountUsageTrendData.totalAccounts || 0 }} 个账号</span>
+          <span v-if="(accountUsageTrendData.totalAccounts || 0) > 0">含同类型全部账号汇总</span>
           <span
             v-if="accountUsageTrendData.topAccounts && accountUsageTrendData.topAccounts.length"
           >
@@ -1477,6 +1478,17 @@ function createAccountUsageTrendChart() {
   const trend = accountUsageTrendData.value?.data || []
   const topAccounts = accountUsageTrendData.value?.topAccounts || []
 
+  const aggregateDataPoints = trend.map((item) => {
+    const accounts = Object.values(item.accounts || {})
+    return accounts.reduce(
+      (summary, account) => ({
+        cost: summary.cost + (Number(account.cost) || 0),
+        requests: summary.requests + (Number(account.requests) || 0)
+      }),
+      { cost: 0, requests: 0 }
+    )
+  })
+
   const colors = [
     '#2563EB',
     '#059669',
@@ -1490,25 +1502,43 @@ function createAccountUsageTrendChart() {
     '#22C55E'
   ]
 
-  const datasets = topAccounts.map((accountId, index) => {
-    const dataPoints = trend.map((item) => {
-      if (!item.accounts || !item.accounts[accountId]) return 0
-      return item.accounts[accountId].cost || 0
+  const aggregateColor = isDarkMode.value ? '#E5E7EB' : '#111827'
+  const datasets = [
+    {
+      label: '全部账号汇总',
+      data: aggregateDataPoints.map((item) => item.cost),
+      borderColor: aggregateColor,
+      backgroundColor: aggregateColor + '18',
+      borderWidth: 3,
+      borderDash: [6, 4],
+      pointRadius: 2,
+      pointHoverRadius: 4,
+      tension: 0.35,
+      fill: false,
+      isAggregate: true,
+      aggregateDataPoints
+    },
+    ...topAccounts.map((accountId, index) => {
+      const dataPoints = trend.map((item) => {
+        if (!item.accounts || !item.accounts[accountId]) return 0
+        return item.accounts[accountId].cost || 0
+      })
+
+      const accountName =
+        trend.find((item) => item.accounts && item.accounts[accountId])?.accounts[accountId]
+          ?.name || `账号 ${String(accountId).slice(0, 6)}`
+
+      return {
+        label: accountName,
+        data: dataPoints,
+        borderColor: colors[index % colors.length],
+        backgroundColor: colors[index % colors.length] + '20',
+        accountId,
+        tension: 0.4,
+        fill: false
+      }
     })
-
-    const accountName =
-      trend.find((item) => item.accounts && item.accounts[accountId])?.accounts[accountId]?.name ||
-      `账号 ${String(accountId).slice(0, 6)}`
-
-    return {
-      label: accountName,
-      data: dataPoints,
-      borderColor: colors[index % colors.length],
-      backgroundColor: colors[index % colors.length] + '20',
-      tension: 0.4,
-      fill: false
-    }
-  })
+  ]
 
   const labelField = trend[0]?.date ? 'date' : 'hour'
 
@@ -1537,8 +1567,6 @@ function createAccountUsageTrendChart() {
     }),
     datasets
   }
-
-  const topAccountIds = topAccounts
 
   accountUsageTrendChartInstance = new Chart(accountUsageTrendChart.value, {
     type: 'line',
@@ -1572,15 +1600,23 @@ function createAccountUsageTrendChart() {
               const value = context.parsed.y || 0
               const dataIndex = context.dataIndex
               const datasetIndex = context.datasetIndex
-              const accountId = topAccountIds[datasetIndex]
+              const dataset = context.dataset || {}
+              if (dataset.isAggregate) {
+                const aggregatePoint = dataset.aggregateDataPoints?.[dataIndex] || {}
+                return `${label}: ${formatCostValue(value)} / ${(aggregatePoint.requests || 0).toLocaleString()} 次`
+              }
+
+              const accountId = dataset.accountId
               const dataPoint = accountUsageTrendData.value.data[dataIndex]
               const accountDetail = dataPoint?.accounts?.[accountId]
 
               const allValues = context.chart.data.datasets
-                .map((dataset, idx) => ({
-                  value: dataset.data[dataIndex] || 0,
-                  index: idx
+                .map((chartDataset, idx) => ({
+                  value: chartDataset.data[dataIndex] || 0,
+                  index: idx,
+                  isAggregate: chartDataset.isAggregate
                 }))
+                .filter((item) => !item.isAggregate)
                 .sort((a, b) => b.value - a.value)
 
               const rank = allValues.findIndex((item) => item.index === datasetIndex) + 1
