@@ -284,6 +284,36 @@ const createRotateTransport = (filename, level = null) => {
 const dailyRotateFileTransport = createRotateTransport('claude-relay-%DATE%.log')
 const errorFileTransport = createRotateTransport('claude-relay-error-%DATE%.log', 'error')
 
+const guardWinstonProcessHandler = (handler, eventName) => {
+  if (!handler?.catcher || handler.__crsBrokenPipeGuardInstalled) {
+    return
+  }
+
+  const originalCatcher = handler.catcher
+  process.removeListener(eventName, originalCatcher)
+
+  const guardedCatcher = (...args) => {
+    const error = args[0]
+    if (isBrokenPipeError(error)) {
+      return
+    }
+
+    return originalCatcher(...args)
+  }
+
+  handler.catcher = guardedCatcher
+  Object.defineProperty(handler, '__crsBrokenPipeGuardInstalled', {
+    value: true,
+    enumerable: false
+  })
+  process.on(eventName, guardedCatcher)
+}
+
+const installWinstonBrokenPipeGuard = (loggerInstance) => {
+  guardWinstonProcessHandler(loggerInstance.exceptions, 'uncaughtException')
+  guardWinstonProcessHandler(loggerInstance.rejections, 'unhandledRejection')
+}
+
 // 🔒 创建专门的安全日志记录器
 const securityLogger = winston.createLogger({
   level: 'warn',
@@ -345,6 +375,8 @@ const logger = winston.createLogger({
   // 防止进程退出
   exitOnError: false
 })
+
+installWinstonBrokenPipeGuard(logger)
 
 // 🎯 增强的自定义方法
 logger.success = (message, metadata = {}) => {

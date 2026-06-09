@@ -84,7 +84,7 @@ class ServiceManager {
       // 后台运行模式 - 使用nohup实现真正的后台运行
       const { exec: execChild } = require('child_process')
 
-      const command = `nohup node "${APP_FILE}" > "${LOG_FILE}" 2> "${ERROR_LOG_FILE}" & echo $!`
+      const command = `nohup node "${APP_FILE}" >> "${LOG_FILE}" 2>> "${ERROR_LOG_FILE}" < /dev/null & echo $!`
 
       execChild(command, (error, stdout) => {
         if (error) {

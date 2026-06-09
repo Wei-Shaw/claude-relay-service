@@ -20,6 +20,33 @@ const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
 const LAST_USED_AT_THROTTLE_MS = 60000
 const ACCOUNT_CONCURRENCY_LEASE_SECONDS = 600
 const ACCOUNT_CONCURRENCY_REFRESH_MS = 5 * 60 * 1000
+const ABORT_CONTROLLER_ERROR_CODES = new Set(['ERR_CANCELED'])
+const CLOSED_SOCKET_ERROR_CODES = new Set(['ECONNRESET', 'EPIPE', 'ERR_STREAM_PREMATURE_CLOSE'])
+
+const isAbortControllerError = (error) => {
+  if (!error) {
+    return false
+  }
+
+  return (
+    error.name === 'AbortError' ||
+    error.name === 'CanceledError' ||
+    ABORT_CONTROLLER_ERROR_CODES.has(error.code)
+  )
+}
+
+const isClosedSocketError = (error) =>
+  !!error && (CLOSED_SOCKET_ERROR_CODES.has(error.code) || error.syscall === 'write')
+
+const summarizeRelayError = (error) => ({
+  name: error?.name,
+  message: error?.message,
+  code: error?.code,
+  status: error?.response?.status,
+  statusText: error?.response?.statusText
+})
+
+const isResponseWritable = (res) => !res.destroyed && !res.writableEnded && !res.closed
 
 // 抽取缓存写入 token，兼容多种字段命名
 function extractCacheCreationTokens(usageData) {
@@ -155,6 +182,8 @@ class OpenAIResponsesRelayService {
     let abortController = null
     let accountConcurrencyLease = null
     let streamDelegated = false
+    let clientDisconnected = false
+    let removeClientListeners = () => {}
     // 获取会话哈希（如果有的话）
     const sessionId = req.headers['session_id'] || req.body?.session_id
     const sessionHash = sessionId
@@ -175,15 +204,43 @@ class OpenAIResponsesRelayService {
 
       // 设置客户端断开监听器
       const handleClientDisconnect = () => {
+        if (clientDisconnected) {
+          return
+        }
+
+        clientDisconnected = true
         logger.info('🔌 Client disconnected, aborting OpenAI-Responses request')
         if (abortController && !abortController.signal.aborted) {
           abortController.abort()
         }
       }
 
+      const handleResponseError = (error) => {
+        if (
+          isAbortControllerError(error) ||
+          isClosedSocketError(error) ||
+          logger.isBrokenPipeError?.(error)
+        ) {
+          handleClientDisconnect()
+          logger.info('🔌 OpenAI-Responses client response closed with socket error', {
+            ...summarizeRelayError(error),
+            accountId: account.id
+          })
+          return
+        }
+
+        logger.error('OpenAI-Responses client response error:', summarizeRelayError(error))
+      }
+
       // 监听客户端断开事件
       req.once('close', handleClientDisconnect)
       res.once('close', handleClientDisconnect)
+      res.once('error', handleResponseError)
+      removeClientListeners = () => {
+        req.removeListener('close', handleClientDisconnect)
+        res.removeListener('close', handleClientDisconnect)
+        res.removeListener('error', handleResponseError)
+      }
 
       // 构建目标 URL（根据 providerEndpoint 配置决定端点路径）
       const providerEndpoint = fullAccount.providerEndpoint || 'responses'
@@ -299,6 +356,7 @@ class OpenAIResponsesRelayService {
             resets_in_seconds: resetsInSeconds
           }
         }
+        removeClientListeners()
         return res.status(429).json(errorResponse)
       }
 
@@ -388,8 +446,7 @@ class OpenAIResponsesRelayService {
           }
 
           // 清理监听器
-          req.removeListener('close', handleClientDisconnect)
-          res.removeListener('close', handleClientDisconnect)
+          removeClientListeners()
 
           return res.status(401).json(unauthorizedResponse)
         }
@@ -418,8 +475,7 @@ class OpenAIResponsesRelayService {
         }
 
         // 清理监听器
-        req.removeListener('close', handleClientDisconnect)
-        res.removeListener('close', handleClientDisconnect)
+        removeClientListeners()
 
         return res
           .status(response.status)
@@ -439,12 +495,15 @@ class OpenAIResponsesRelayService {
           apiKeyData,
           req.body?.model,
           handleClientDisconnect,
+          handleResponseError,
+          () => clientDisconnected,
           req,
           accountConcurrencyLease
         )
       }
 
       // 处理非流式响应
+      removeClientListeners()
       return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model, req)
     } catch (error) {
       // 清理 AbortController
@@ -452,17 +511,23 @@ class OpenAIResponsesRelayService {
         abortController.abort()
       }
 
-      // 安全地记录错误，避免循环引用
-      const errorInfo = {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        statusText: error.response?.statusText
+      // 安全地记录错误，避免循环引用和敏感 request/socket 对象
+      const errorInfo = summarizeRelayError(error)
+      if (
+        clientDisconnected ||
+        isAbortControllerError(error) ||
+        logger.isBrokenPipeError?.(error)
+      ) {
+        removeClientListeners()
+        logger.info('OpenAI-Responses relay canceled after client disconnect:', errorInfo)
+        return
       }
+
+      removeClientListeners()
       logger.error('OpenAI-Responses relay error:', errorInfo)
 
       if (error.statusCode) {
-        if (!res.headersSent) {
+        if (!res.headersSent && isResponseWritable(res)) {
           return res.status(error.statusCode).json({
             error: {
               message: error.message,
@@ -471,7 +536,10 @@ class OpenAIResponsesRelayService {
             }
           })
         }
-        return res.end()
+        if (isResponseWritable(res)) {
+          return res.end()
+        }
+        return
       }
 
       // 检查是否是网络错误
@@ -489,7 +557,10 @@ class OpenAIResponsesRelayService {
 
       // 如果已经发送了响应头，直接结束
       if (res.headersSent) {
-        return res.end()
+        if (isResponseWritable(res)) {
+          return res.end()
+        }
+        return
       }
 
       // 检查是否是axios错误并包含响应
@@ -560,20 +631,28 @@ class OpenAIResponsesRelayService {
             }
           }
 
-          return res.status(401).json(unauthorizedResponse)
+          if (isResponseWritable(res)) {
+            return res.status(401).json(unauthorizedResponse)
+          }
+          return
         }
 
-        return res.status(status).json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        if (isResponseWritable(res)) {
+          return res.status(status).json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        }
+        return
       }
 
       // 其他错误
-      return res.status(500).json({
-        error: {
-          message: 'Internal server error',
-          type: 'internal_error',
-          details: error.message
-        }
-      })
+      if (isResponseWritable(res)) {
+        return res.status(500).json({
+          error: {
+            message: 'Internal server error',
+            type: 'internal_error',
+            details: error.message
+          }
+        })
+      }
     } finally {
       if (!streamDelegated) {
         await this._releaseAccountConcurrency(accountConcurrencyLease, 'request completed')
@@ -589,6 +668,8 @@ class OpenAIResponsesRelayService {
     apiKeyData,
     requestedModel,
     handleClientDisconnect,
+    handleResponseError,
+    isClientDisconnected,
     req,
     accountConcurrencyLease
   ) {
@@ -604,6 +685,41 @@ class OpenAIResponsesRelayService {
     let rateLimitDetected = false
     let rateLimitResetsInSeconds = null
     let streamEnded = false
+    let finalized = false
+
+    const removeLifecycleListeners = () => {
+      req.removeListener('close', handleClientDisconnect)
+      res.removeListener('close', handleClientDisconnect)
+      res.removeListener('error', handleResponseError)
+      req.removeListener('close', cleanup)
+      req.removeListener('aborted', cleanup)
+    }
+
+    const finalizeStream = async (reason) => {
+      if (finalized) {
+        return
+      }
+
+      finalized = true
+      removeLifecycleListeners()
+      await this._releaseAccountConcurrency(accountConcurrencyLease, reason)
+    }
+
+    const cleanup = () => {
+      streamEnded = true
+      try {
+        response.data?.unpipe?.(res)
+        response.data?.destroy?.()
+      } catch (_) {
+        // 忽略清理错误
+      }
+      finalizeStream('client disconnected').catch((error) => {
+        logger.error(
+          'Failed to release OpenAI-Responses account concurrency after disconnect:',
+          error.message
+        )
+      })
+    }
 
     // 解析 SSE 事件以捕获 usage 数据和 model
     const parseSSEForUsage = (data) => {
@@ -668,7 +784,7 @@ class OpenAIResponsesRelayService {
         const chunkStr = chunk.toString()
 
         // 转发数据给客户端
-        if (!res.destroyed && !streamEnded) {
+        if (isResponseWritable(res) && !streamEnded) {
           res.write(chunk)
         }
 
@@ -687,7 +803,21 @@ class OpenAIResponsesRelayService {
           }
         }
       } catch (error) {
-        logger.error('Error processing stream chunk:', error)
+        if (
+          isAbortControllerError(error) ||
+          isClosedSocketError(error) ||
+          logger.isBrokenPipeError?.(error)
+        ) {
+          handleClientDisconnect()
+          logger.info('OpenAI-Responses stream write stopped after client disconnect', {
+            ...summarizeRelayError(error),
+            accountId: account.id
+          })
+          cleanup()
+          return
+        }
+
+        logger.error('Error processing stream chunk:', summarizeRelayError(error))
       }
     })
 
@@ -782,15 +912,11 @@ class OpenAIResponsesRelayService {
         )
       }
 
-      // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', handleClientDisconnect)
-
-      if (!res.destroyed) {
+      if (isResponseWritable(res)) {
         res.end()
       }
 
-      await this._releaseAccountConcurrency(accountConcurrencyLease, 'stream end')
+      await finalizeStream('stream end')
 
       logger.info('Stream response completed', {
         accountId: account.id,
@@ -801,40 +927,31 @@ class OpenAIResponsesRelayService {
 
     response.data.on('error', async (error) => {
       streamEnded = true
-      logger.error('Stream error:', error)
+      const clientClosed = isClientDisconnected()
+      const aborted =
+        isAbortControllerError(error) ||
+        (clientClosed && (isClosedSocketError(error) || logger.isBrokenPipeError?.(error)))
+      const errorInfo = {
+        ...summarizeRelayError(error),
+        accountId: account.id
+      }
 
-      // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', handleClientDisconnect)
+      if (aborted) {
+        logger.info('OpenAI-Responses stream closed after client disconnect:', errorInfo)
+      } else {
+        logger.error('Stream error:', errorInfo)
+      }
 
-      if (!res.headersSent) {
+      if (!aborted && !res.headersSent && isResponseWritable(res)) {
         res.status(502).json({ error: { message: 'Upstream stream error' } })
-      } else if (!res.destroyed) {
+      } else if (!aborted && isResponseWritable(res)) {
         res.end()
       }
 
-      await this._releaseAccountConcurrency(accountConcurrencyLease, 'stream error')
+      await finalizeStream(aborted ? 'client disconnected' : 'stream error')
     })
 
     // 处理客户端断开连接
-    const cleanup = () => {
-      streamEnded = true
-      try {
-        response.data?.unpipe?.(res)
-        response.data?.destroy?.()
-      } catch (_) {
-        // 忽略清理错误
-      }
-      this._releaseAccountConcurrency(accountConcurrencyLease, 'client disconnected').catch(
-        (error) => {
-          logger.error(
-            'Failed to release OpenAI-Responses account concurrency after disconnect:',
-            error
-          )
-        }
-      )
-    }
-
     req.on('close', cleanup)
     req.on('aborted', cleanup)
   }
