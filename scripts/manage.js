@@ -71,6 +71,26 @@ class ServiceManager {
     return { running: false, pid: null }
   }
 
+  wait(ms) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms)
+    })
+  }
+
+  async waitForProcessExit(pid, timeoutMs, intervalMs = 1000) {
+    const startedAt = Date.now()
+
+    while (Date.now() - startedAt < timeoutMs) {
+      if (!this.isProcessRunning(pid)) {
+        return true
+      }
+
+      await this.wait(intervalMs)
+    }
+
+    return !this.isProcessRunning(pid)
+  }
+
   start(daemon = false) {
     const status = this.getStatus()
     if (status.running) {
@@ -135,7 +155,7 @@ class ServiceManager {
     return true
   }
 
-  stop() {
+  async stop() {
     const status = this.getStatus()
     if (!status.running) {
       console.log('⚠️  服务未在运行')
@@ -149,49 +169,47 @@ class ServiceManager {
       // 优雅关闭：先发送SIGTERM
       process.kill(status.pid, 'SIGTERM')
 
-      // 等待进程退出
-      let attempts = 0
-      const maxAttempts = 30 // 30秒超时
+      // 等待进程退出，避免 restart 在旧进程仍存活时提前 start
+      if (await this.waitForProcessExit(status.pid, 30000)) {
+        console.log('✅ 服务已停止')
+        this.removePidFile()
+        return true
+      }
 
-      const checkExit = setInterval(() => {
-        attempts++
-        if (!this.isProcessRunning(status.pid)) {
-          clearInterval(checkExit)
-          console.log('✅ 服务已停止')
+      console.log('⚠️  优雅关闭超时，强制终止进程...')
+      try {
+        process.kill(status.pid, 'SIGKILL')
+      } catch (error) {
+        if (error.code !== 'ESRCH') {
+          console.error('❌ 强制停止失败:', error.message)
           this.removePidFile()
-          return
+          return false
         }
+      }
 
-        if (attempts >= maxAttempts) {
-          clearInterval(checkExit)
-          console.log('⚠️  优雅关闭超时，强制终止进程...')
-          try {
-            process.kill(status.pid, 'SIGKILL')
-            console.log('✅ 服务已强制停止')
-          } catch (error) {
-            console.error('❌ 强制停止失败:', error.message)
-          }
-          this.removePidFile()
-        }
-      }, 1000)
-    } catch (error) {
-      console.error('❌ 停止服务失败:', error.message)
+      if (await this.waitForProcessExit(status.pid, 5000, 250)) {
+        console.log('✅ 服务已强制停止')
+      } else {
+        console.warn(`⚠️  进程 ${status.pid} 仍可检测到，继续清理PID文件`)
+      }
+
       this.removePidFile()
-      return false
+      return true
+    } catch (error) {
+      if (error.code === 'ESRCH') {
+        console.log('✅ 服务已停止')
+      } else {
+        console.error('❌ 停止服务失败:', error.message)
+      }
+      this.removePidFile()
+      return error.code === 'ESRCH'
     }
-
-    return true
   }
 
-  restart(daemon = false) {
+  async restart(daemon = false) {
     console.log('🔄 重启服务...')
-    this.stop()
-    // 等待停止完成
-    setTimeout(() => {
-      this.start(daemon)
-    }, 2000)
-
-    return true
+    await this.stop()
+    return this.start(daemon)
   }
 
   status() {
@@ -283,7 +301,7 @@ class ServiceManager {
 }
 
 // 主程序
-function main() {
+async function main() {
   const manager = new ServiceManager()
   const args = process.argv.slice(2)
   const command = args[0]
@@ -296,11 +314,11 @@ function main() {
       break
     case 'stop':
     case 'halt':
-      manager.stop()
+      await manager.stop()
       break
     case 'restart':
     case 'r':
-      manager.restart(isDaemon)
+      await manager.restart(isDaemon)
       break
     case 'status':
     case 'st':
@@ -327,7 +345,10 @@ function main() {
 }
 
 if (require.main === module) {
-  main()
+  main().catch((error) => {
+    console.error('❌ 命令执行失败:', error.message)
+    process.exit(1)
+  })
 }
 
 module.exports = ServiceManager
