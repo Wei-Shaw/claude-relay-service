@@ -1,8 +1,12 @@
-# 本地分支 Redis 与 PostgreSQL 存储方案
+# 本 fork Redis 与 PostgreSQL 存储方案
 
 ## 背景
 
-这个 fork 用作 Claude Relay Service 的本地开发和维护分支。生产服务独立运行，本地开发使用单独的源码目录、服务端口、Redis 容器和 PostgreSQL。
+这个 fork 基于 upstream `Wei-Shaw/claude-relay-service` 维护。相对于原始 fork 前的项目，主要存储变化是增加 PostgreSQL 作为请求明细、用量统计、费用统计和审计查询的长期存储，同时继续保留 Redis 作为运行时控制面和官方镜像可回滚面。
+
+README 面向安装和运维快速入口；本文档是 Redis/PG 职责边界、迁移顺序、回滚策略和 key 迁移矩阵的详细说明。
+
+本地开发和生产服务应独立运行。本地开发使用单独的源码目录、服务端口、Redis 容器和 PostgreSQL。
 
 当前本地开发默认值：
 
@@ -29,9 +33,9 @@
 - 开发环境独立：`PORT`、`HOST`、`NODE_ENV`、`REDIS_HOST`、`REDIS_PORT`、`LOG_LEVEL`、`DEBUG`、`WEB_TITLE`、`TRUST_PROXY`。
 - 为了还原生产数据语义，应与生产一致：`ENCRYPTION_KEY`、`REDIS_DB`，可选 `JWT_SECRET`、`API_KEY_PREFIX`、`TIMEZONE_OFFSET`、上游 API/代理超时配置。
 
-## 当前 Redis 数据形态
+## 上游 Redis 数据形态
 
-当前应用把 Redis 当作主数据存储使用，不只是缓存。主运行链路里没有 SQL 数据库或 ORM 层。核心数据访问集中在 `src/models/redis.js`，业务服务读写 Redis hash、set、sorted set、string、list 和 stream。
+原始 upstream 形态把 Redis 当作主数据存储使用，不只是缓存。核心数据访问集中在 `src/models/redis.js`，业务服务读写 Redis hash、set、sorted set、string、list 和 stream。本 fork 在这个基础上增加 PostgreSQL 查询/审计存储，并保留 Redis 兼容写入。
 
 导入生产备份后的开发 Redis 样本：
 

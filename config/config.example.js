@@ -32,6 +32,50 @@ const config = {
     enableTLS: process.env.REDIS_ENABLE_TLS === 'true'
   },
 
+  // 🐘 PostgreSQL配置（本分支持久查询存储）
+  postgres: {
+    host: process.env.POSTGRES_HOST || '127.0.0.1',
+    port: parseInt(process.env.POSTGRES_PORT) || 15432,
+    database: process.env.POSTGRES_DATABASE || 'claude_relay_dev',
+    user: process.env.POSTGRES_USER || 'crs_dev',
+    password: process.env.POSTGRES_PASSWORD || 'crs_dev_password',
+    ssl: process.env.POSTGRES_SSL === 'true',
+    max: parseInt(process.env.POSTGRES_POOL_MAX) || 10
+  },
+
+  // 🧾 请求明细存储模式（部署级环境变量，不走后台配置）
+  requestDetailStorage: {
+    writeMode: ['redis', 'dual', 'postgres'].includes(process.env.REQUEST_DETAIL_WRITE_MODE)
+      ? process.env.REQUEST_DETAIL_WRITE_MODE
+      : 'dual',
+    readMode: ['redis', 'postgres'].includes(process.env.REQUEST_DETAIL_READ_MODE)
+      ? process.env.REQUEST_DETAIL_READ_MODE
+      : 'postgres'
+  },
+
+  // 📊 用量/费用长期统计存储模式（部署级环境变量，不走后台配置）
+  usageStorage: {
+    writeMode: ['redis', 'dual', 'postgres'].includes(process.env.USAGE_WRITE_MODE)
+      ? process.env.USAGE_WRITE_MODE
+      : 'dual',
+    readMode: ['redis', 'postgres'].includes(process.env.USAGE_READ_MODE)
+      ? process.env.USAGE_READ_MODE
+      : 'postgres'
+  },
+
+  // 🧾 请求明细响应报文捕获（仅影响 request detail，不影响接口返回）
+  responsePayloadCapture: {
+    mode: ['off', 'preview', 'full'].includes(process.env.RESPONSE_PAYLOAD_CAPTURE_MODE)
+      ? process.env.RESPONSE_PAYLOAD_CAPTURE_MODE
+      : 'full',
+    maxBytes: parseInt(process.env.RESPONSE_PAYLOAD_CAPTURE_MAX_BYTES) || 1024 * 1024,
+    previewChars: parseInt(process.env.RESPONSE_PAYLOAD_PREVIEW_CHARS) || 12000,
+    captureHeaders: process.env.RESPONSE_PAYLOAD_CAPTURE_HEADERS !== 'false',
+    headerAllowlist:
+      process.env.RESPONSE_PAYLOAD_HEADER_ALLOWLIST ||
+      'content-type,content-length,cache-control,retry-after,x-request-id,request-id,anthropic-request-id,openai-request-id,x-ratelimit-limit-requests,x-ratelimit-limit-tokens,x-ratelimit-remaining-requests,x-ratelimit-remaining-tokens,x-ratelimit-reset-requests,x-ratelimit-reset-tokens'
+  },
+
   // 🔗 会话管理配置
   session: {
     // 粘性会话TTL配置（小时），默认1小时

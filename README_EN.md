@@ -10,6 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![Redis](https://img.shields.io/badge/Redis-6+-red.svg)](https://redis.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
 **🔐 Self-hosted Claude API relay service with multi-account management** 
@@ -98,6 +99,32 @@ If you have any of these concerns, this project might be suitable for you.
 
 ---
 
+## 🧭 Fork-Specific Storage Changes
+
+This repository is maintained as a fork of upstream `Wei-Shaw/claude-relay-service`. Compared with the original upstream project, this fork adds PostgreSQL-backed query and audit storage while keeping Redis as the runtime control plane and rollback-compatible store.
+
+| Data Area | Upstream Project | This Fork |
+|:---|:---|:---|
+| Runtime control plane | Redis | Redis: rate limits, concurrency leases, queues, sticky sessions, OAuth temporary state and locks stay in Redis |
+| API keys / account metadata | Redis | Still Redis for hash lookup, encrypted credentials and upstream-image rollback compatibility |
+| Request details | Redis | Redis + PostgreSQL dual write; this fork reads PostgreSQL for admin/user request-detail pages |
+| Usage, cost and model stats | Redis rollups | Redis + PostgreSQL dual write; dashboards, cost ranking and model trend queries read PostgreSQL |
+| API key secret audit | No dedicated relational store | Optional encrypted PostgreSQL capture for audit and recovery |
+| Rollback strategy | Not applicable | Redis remains compatible with the upstream image; PostgreSQL query failures should be visible, not silently hidden by Redis fallback |
+
+Recommended production mode:
+
+```bash
+REQUEST_DETAIL_WRITE_MODE=dual
+REQUEST_DETAIL_READ_MODE=postgres
+USAGE_WRITE_MODE=dual
+USAGE_READ_MODE=postgres
+```
+
+For the full storage design, Redis key migration matrix and rollback boundary, see [Redis and PostgreSQL storage plan for this fork](docs/operations/local-fork-redis-and-storage-plan.md).
+
+---
+
 ## 📋 Deployment Requirements
 
 ### Hardware Requirements (Minimum Configuration)
@@ -109,7 +136,8 @@ If you have any of these concerns, this project might be suitable for you.
 
 ### Software Requirements
 - **Node.js** 18 or higher
-- **Redis** 6 or higher
+- **Redis** 6 or higher (required for the runtime control plane and upstream-compatible storage)
+- **PostgreSQL** 14 or higher (used by this fork for request details, usage stats, cost stats and audit queries)
 - **Operating System**: Linux recommended
 
 ### Cost Estimation
@@ -173,6 +201,24 @@ ENCRYPTION_KEY=32-character-encryption-key-write-randomly
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
+
+# PostgreSQL configuration (recommended for this fork)
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=15432
+POSTGRES_DATABASE=claude_relay_dev
+POSTGRES_USER=crs_dev
+POSTGRES_PASSWORD=crs_dev_password
+POSTGRES_SSL=false
+POSTGRES_POOL_MAX=10
+
+# Request-detail and usage storage modes
+REQUEST_DETAIL_WRITE_MODE=dual
+REQUEST_DETAIL_READ_MODE=postgres
+USAGE_WRITE_MODE=dual
+USAGE_READ_MODE=postgres
+
+# Encrypted API key secret audit capture in PostgreSQL
+API_KEY_SECRET_CAPTURE_ENABLED=true
 ```
 
 **Edit `config/config.js` file:**
@@ -190,7 +236,31 @@ module.exports = {
 }
 ```
 
-### Step 4: Start Service
+`config/config.example.js` and `.env.example` include the PostgreSQL templates used by this fork. In production, prefer managing `POSTGRES_*`, `REQUEST_DETAIL_*` and `USAGE_*` through `.env` instead of hard-coding environment-specific values in `config/config.js`.
+
+### Step 4: Initialize PostgreSQL (This Fork)
+
+For a fresh deployment, create the PostgreSQL schemas first:
+
+```bash
+npm run init:request-detail-pg
+npm run init:usage-pg
+```
+
+When migrating from existing Redis data, back up Redis and PostgreSQL first, then run the needed historical imports/backfills:
+
+```bash
+# Request details: backfill request_detail:item:* from Redis to PostgreSQL
+npm run backfill:request-detail-pg
+
+# Usage stats: import Redis rollups as a PostgreSQL baseline, then backfill event-level data from PostgreSQL request details
+npm run import:usage-redis-baseline
+npm run backfill:usage-pg
+```
+
+The `--reset` flag on init scripts drops the corresponding PostgreSQL schema. Use it only in development or when the data can be rebuilt.
+
+### Step 5: Start Service
 
 ```bash
 # Initialize
@@ -378,7 +448,7 @@ npm run service:status
 **Important Notes:**
 - Before upgrading, it's recommended to backup important configuration files (.env, config/config.js)
 - Check the changelog to understand if there are any breaking changes
-- Database structure changes will be migrated automatically if needed
+- If this fork changes PostgreSQL schemas, check the release notes and run the relevant `init:*:pg` / backfill scripts as needed; historical backfills are not automatic
 
 ### Common Issue Resolution
 
@@ -389,6 +459,22 @@ redis-cli ping
 
 # Should return PONG
 ```
+
+**Can't connect to PostgreSQL or Dashboard stats fail?**
+
+```bash
+# Check PostgreSQL readiness
+pg_isready -h 127.0.0.1 -p 15432
+
+# Verify the configured credentials
+psql "postgresql://crs_dev:crs_dev_password@127.0.0.1:15432/claude_relay_dev"
+
+# Initialize the schemas required by this fork
+npm run init:request-detail-pg
+npm run init:usage-pg
+```
+
+If `REQUEST_DETAIL_READ_MODE=postgres` or `USAGE_READ_MODE=postgres`, the corresponding pages depend directly on PostgreSQL. In production, PostgreSQL query failures should be fixed instead of hidden by silent Redis fallback.
 
 **OAuth authorization failed?**
 - Check if proxy settings are correct

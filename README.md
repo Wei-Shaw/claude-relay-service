@@ -10,6 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![Redis](https://img.shields.io/badge/Redis-6+-red.svg)](https://redis.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![Docker Build](https://github.com/Wei-Shaw/claude-relay-service/actions/workflows/auto-release-pipeline.yml/badge.svg)](https://github.com/Wei-Shaw/claude-relay-service/actions/workflows/auto-release-pipeline.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/weishaw/claude-relay-service)](https://hub.docker.com/r/weishaw/claude-relay-service)
@@ -98,6 +99,32 @@
 
 ---
 
+## 🧭 本 fork 与上游项目的主要差异
+
+本仓库基于 upstream `Wei-Shaw/claude-relay-service` 维护。相对于原始 fork 前的项目，本 fork 增加了 PostgreSQL 查询/审计存储，但不会把 Redis 当作临时缓存直接替换掉。
+
+| 数据面 | 上游项目 | 本 fork |
+|:---|:---|:---|
+| 运行时控制面 | Redis | Redis：限流、并发、队列、粘性会话、OAuth 临时态和锁仍保留在 Redis |
+| API Key / 账户元数据 | Redis | 目前仍保留 Redis，保持 hash 查询、加密凭据和官方镜像回滚兼容 |
+| 请求明细 | Redis | Redis + PostgreSQL 双写；本 fork 管理端/个人页查询优先读 PostgreSQL |
+| 用量、费用、模型统计 | Redis 汇总 | Redis + PostgreSQL 双写；Dashboard、费用排行、模型趋势等查询读 PostgreSQL |
+| API Key secret 审计 | 无独立关系型存储 | 可通过 PostgreSQL 加密捕获，便于审计和恢复 |
+| 回滚策略 | 不涉及 | Redis 继续作为官方镜像可回滚面；PG 查询异常应暴露错误，不静默降级 |
+
+推荐生产运行模式：
+
+```bash
+REQUEST_DETAIL_WRITE_MODE=dual
+REQUEST_DETAIL_READ_MODE=postgres
+USAGE_WRITE_MODE=dual
+USAGE_READ_MODE=postgres
+```
+
+完整设计、Redis key 迁移矩阵和回滚边界见：[本 fork Redis 与 PostgreSQL 存储方案](docs/operations/local-fork-redis-and-storage-plan.md)。
+
+---
+
 ## 📋 部署要求
 
 ### 硬件要求（最低配置）
@@ -112,7 +139,8 @@
 ### 软件要求
 
 - **Node.js** 18或更高版本
-- **Redis** 6或更高版本
+- **Redis** 6或更高版本（必需，运行时控制面和上游兼容存储）
+- **PostgreSQL** 14或更高版本（本 fork 的请求明细、用量统计、费用统计和审计查询存储）
 - **操作系统**: 建议Linux
 
 ### 费用估算
@@ -240,6 +268,23 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 
+# PostgreSQL配置（本 fork 推荐启用）
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=15432
+POSTGRES_DATABASE=claude_relay_dev
+POSTGRES_USER=crs_dev
+POSTGRES_PASSWORD=crs_dev_password
+POSTGRES_SSL=false
+POSTGRES_POOL_MAX=10
+
+# 请求明细和用量统计存储模式
+REQUEST_DETAIL_WRITE_MODE=dual
+REQUEST_DETAIL_READ_MODE=postgres
+USAGE_WRITE_MODE=dual
+USAGE_READ_MODE=postgres
+
+# API Key secret 审计捕获（加密写入 PG）
+API_KEY_SECRET_CAPTURE_ENABLED=true
 ```
 
 **编辑 `config/config.js` 文件：**
@@ -258,7 +303,31 @@ module.exports = {
 }
 ```
 
-### 第四步：安装前端依赖并构建
+`config/config.example.js` 和 `.env.example` 已包含本 fork 的 PostgreSQL 配置模板。生产环境建议通过 `.env` 管理 `POSTGRES_*`、`REQUEST_DETAIL_*` 和 `USAGE_*`，避免把环境差异写死到配置文件。
+
+### 第四步：初始化 PostgreSQL（本 fork）
+
+新部署只需要先创建表结构：
+
+```bash
+npm run init:request-detail-pg
+npm run init:usage-pg
+```
+
+从已有 Redis 数据迁移时，先备份 Redis 和 PostgreSQL，再按需要执行历史导入/回填：
+
+```bash
+# 请求明细：把 Redis 中的 request_detail:item:* 回填到 PG
+npm run backfill:request-detail-pg
+
+# 用量统计：把 Redis 历史汇总作为 PG baseline，再从 PG 请求明细回填事件级数据
+npm run import:usage-redis-baseline
+npm run backfill:usage-pg
+```
+
+初始化脚本的 `--reset` 会清空对应 PG schema，仅建议在开发或确认可重建数据时使用。
+
+### 第五步：安装前端依赖并构建
 
 ```bash
 # 安装前端依赖
@@ -268,7 +337,7 @@ npm run install:web
 npm run build:web
 ```
 
-### 第五步：启动服务
+### 第六步：启动服务
 
 ```bash
 # 初始化
@@ -309,6 +378,8 @@ docker-compose.yml 已包含：
 - ✅ Redis数据库
 - ✅ 健康检查
 - ✅ 自动重启
+
+> 本仓库当前 `docker-compose.yml` 保持上游兼容，默认只内置 Redis。启用本 fork 的 PostgreSQL 查询模式时，需要额外提供 PostgreSQL（托管数据库、系统服务或单独的 compose service 均可），并把 `POSTGRES_*`、`REQUEST_DETAIL_*`、`USAGE_*` 环境变量传入应用容器。
 
 ### 环境变量说明
 
@@ -714,7 +785,7 @@ npm run service:status
 
 - 升级前建议备份重要配置文件（.env, config/config.js）
 - 查看更新日志了解是否有破坏性变更
-- 如果有数据库结构变更，会自动迁移
+- 如果本 fork 的 PostgreSQL schema 有变化，先查看发布说明并按需运行对应 `init:*:pg` / backfill 脚本；历史数据回填不会自动执行
 
 ---
 
@@ -768,6 +839,22 @@ redis-cli ping
 
 # 应该返回 PONG
 ```
+
+**PostgreSQL连不上或 Dashboard 统计报错？**
+
+```bash
+# 检查 PostgreSQL 端口
+pg_isready -h 127.0.0.1 -p 15432
+
+# 检查当前配置是否能登录
+psql "postgresql://crs_dev:crs_dev_password@127.0.0.1:15432/claude_relay_dev"
+
+# 初始化本 fork 需要的表结构
+npm run init:request-detail-pg
+npm run init:usage-pg
+```
+
+如果 `REQUEST_DETAIL_READ_MODE=postgres` 或 `USAGE_READ_MODE=postgres`，对应页面会直接依赖 PostgreSQL。生产环境不要依赖静默回退 Redis 来掩盖 PG 查询链路问题。
 
 **OAuth授权失败？**
 
