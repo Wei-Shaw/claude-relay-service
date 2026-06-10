@@ -123,6 +123,10 @@ const CONSOLE_VALUE_MAX_LENGTH =
 const LOG_ROTATE_CONSOLE_EVENTS = process.env.LOG_ROTATE_CONSOLE_EVENTS === 'true'
 
 const isBrokenPipeError = (error) => error?.code === 'EPIPE' && error?.syscall === 'write'
+const isStreamWriteAfterEndError = (error) =>
+  error?.code === 'ERR_STREAM_WRITE_AFTER_END' || error?.message === 'write after end'
+const isIgnorableLoggerStreamError = (error) =>
+  isBrokenPipeError(error) || isStreamWriteAfterEndError(error)
 
 const appendInternalLogError = (message, error) => {
   try {
@@ -146,12 +150,57 @@ const installStreamErrorGuard = (stream, name) => {
   })
 
   stream.on('error', (error) => {
-    if (isBrokenPipeError(error)) {
+    if (isIgnorableLoggerStreamError(error)) {
       return
     }
     appendInternalLogError(`${name} stream error`, error)
   })
 }
+
+const installTransportErrorGuard = (transport, name) => {
+  if (!transport || transport.__crsLoggerTransportGuardInstalled) {
+    return transport
+  }
+
+  Object.defineProperty(transport, '__crsLoggerTransportGuardInstalled', {
+    value: true,
+    enumerable: false
+  })
+
+  const guardCurrentStream = () => installStreamErrorGuard(transport._stream, `${name} file`)
+  guardCurrentStream()
+  transport.on?.('open', guardCurrentStream)
+  transport.on?.('new', guardCurrentStream)
+
+  transport.on?.('error', (error) => {
+    if (isIgnorableLoggerStreamError(error)) {
+      return
+    }
+    appendInternalLogError(`${name} transport error`, error)
+  })
+
+  if (typeof transport.log === 'function') {
+    const originalLog = transport.log
+    transport.log = function guardedTransportLog(info, callback) {
+      try {
+        return originalLog.call(this, info, callback)
+      } catch (error) {
+        if (!isIgnorableLoggerStreamError(error)) {
+          appendInternalLogError(`${name} transport log failed`, error)
+        }
+        if (typeof callback === 'function') {
+          setImmediate(callback)
+        }
+        return true
+      }
+    }
+  }
+
+  return transport
+}
+
+const createFileTransport = (name, options) =>
+  installTransportErrorGuard(new winston.transports.File(options), name)
 
 const formatConsoleValue = (value) => {
   const rendered =
@@ -238,13 +287,13 @@ const createConsoleTransport = (options = {}) => {
   })
 
   transport.on('error', (error) => {
-    if (isBrokenPipeError(error)) {
+    if (isIgnorableLoggerStreamError(error)) {
       return
     }
     appendInternalLogError('console transport error', error)
   })
 
-  return transport
+  return installTransportErrorGuard(transport, 'console')
 }
 
 // 🔄 增强的日志轮转配置
@@ -278,7 +327,7 @@ const createRotateTransport = (filename, level = null) => {
     })
   }
 
-  return transport
+  return installTransportErrorGuard(transport, filename)
 }
 
 const dailyRotateFileTransport = createRotateTransport('claude-relay-%DATE%.log')
@@ -352,7 +401,7 @@ const logger = winston.createLogger({
 
   // 🚨 异常处理
   exceptionHandlers: [
-    new winston.transports.File({
+    createFileTransport('exceptions.log', {
       filename: path.join(config.logging.dirname, 'exceptions.log'),
       format: fileFormat,
       maxsize: 10485760, // 10MB
@@ -363,7 +412,7 @@ const logger = winston.createLogger({
 
   // 🔄 未捕获异常处理
   rejectionHandlers: [
-    new winston.transports.File({
+    createFileTransport('rejections.log', {
       filename: path.join(config.logging.dirname, 'rejections.log'),
       format: fileFormat,
       maxsize: 10485760, // 10MB
@@ -496,6 +545,7 @@ logger.resetStats = () => {
 }
 
 logger.isBrokenPipeError = isBrokenPipeError
+logger.isIgnorableLoggerStreamError = isIgnorableLoggerStreamError
 
 // 📡 健康检查
 logger.healthCheck = () => {
