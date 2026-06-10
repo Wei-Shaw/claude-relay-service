@@ -57,6 +57,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   const trendData = ref([])
   const dashboardModelStats = ref([])
+  const modelUsageTrendData = ref({
+    data: [],
+    topModels: [],
+    totalModels: 0
+  })
   const apiKeysTrendData = ref({
     data: [],
     topApiKeys: [],
@@ -136,6 +141,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   // 趋势图粒度
   const trendGranularity = ref(initialGranularity) // 'day' 或 'hour'
+  const modelUsageTrendMetric = ref('requests') // 'requests'、'cost' 或 'tokens'
   const apiKeysTrendMetric = ref('requests') // 'requests' 或 'tokens'
   const accountUsageGroup = ref('claude') // claude | openai | gemini
 
@@ -415,6 +421,55 @@ export const useDashboardStore = defineStore('dashboard', () => {
       }
     } catch (error) {
       console.error('加载模型统计失败:', error)
+    }
+  }
+
+  async function loadModelUsageTrend(metric = modelUsageTrendMetric.value, granularity = null) {
+    const currentGranularity = granularity || getEffectiveGranularity()
+    try {
+      let url = '/admin/model-usage-trend?'
+      let days = 7
+
+      if (currentGranularity === 'hour') {
+        url += `granularity=hour`
+
+        if (dateFilter.value.customRange && dateFilter.value.customRange.length === 2) {
+          url += `&startDate=${encodeURIComponent(dateFilter.value.customRange[0])}`
+          url += `&endDate=${encodeURIComponent(dateFilter.value.customRange[1])}`
+        } else if (dateFilter.value.type === 'preset') {
+          const { start, end } = getPresetTimeRange(dateFilter.value.preset)
+          url += `&startDate=${encodeURIComponent(start.toISOString())}`
+          url += `&endDate=${encodeURIComponent(end.toISOString())}`
+        } else {
+          const now = new Date()
+          url += `&startDate=${encodeURIComponent(new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString())}`
+          url += `&endDate=${encodeURIComponent(now.toISOString())}`
+        }
+      } else {
+        days =
+          dateFilter.value.type === 'preset'
+            ? dateFilter.value.preset === 'today'
+              ? 1
+              : dateFilter.value.preset === '7days'
+                ? 7
+                : 30
+            : calculateDaysBetween(dateFilter.value.customStart, dateFilter.value.customEnd)
+        url += `granularity=day&days=${days}`
+        url = appendCustomRangeParams(url)
+      }
+
+      url += `&metric=${metric}`
+
+      const response = await getUsageStatsApi(url)
+      if (response.success) {
+        modelUsageTrendData.value = {
+          data: response.data || [],
+          topModels: response.topModels || [],
+          totalModels: response.totalModels || 0
+        }
+      }
+    } catch (error) {
+      console.error('加载模型使用趋势失败:', error)
     }
   }
 
@@ -717,6 +772,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     await Promise.all([
       loadUsageTrend(days, effectiveGranularity),
       loadModelStats(modelPeriod, effectiveGranularity),
+      loadModelUsageTrend(modelUsageTrendMetric.value, effectiveGranularity),
       loadApiKeysTrend(apiKeysTrendMetric.value, effectiveGranularity),
       loadAccountUsageTrend(accountUsageGroup.value, effectiveGranularity)
     ])
@@ -756,10 +812,12 @@ export const useDashboardStore = defineStore('dashboard', () => {
     costsData,
     trendData,
     dashboardModelStats,
+    modelUsageTrendData,
     apiKeysTrendData,
     accountUsageTrendData,
     dateFilter,
     trendGranularity,
+    modelUsageTrendMetric,
     apiKeysTrendMetric,
     accountUsageGroup,
 
@@ -770,6 +828,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     loadDashboardData,
     loadUsageTrend,
     loadModelStats,
+    loadModelUsageTrend,
     loadApiKeysTrend,
     loadAccountUsageTrend,
     setDateFilterPreset,

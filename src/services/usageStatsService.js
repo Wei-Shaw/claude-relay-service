@@ -262,6 +262,14 @@ async function getApiKeysUsageTrend(options = {}) {
   return postgresUsageStore.getApiKeysUsageTrend(options)
 }
 
+async function getModelUsageTrend(options = {}) {
+  if (!shouldReadPostgres()) {
+    return null
+  }
+
+  return postgresUsageStore.getModelUsageTrend(options)
+}
+
 async function getAccountUsageTrend(options = {}) {
   if (!shouldReadPostgres()) {
     return null
@@ -301,6 +309,7 @@ module.exports = {
   getGlobalModelStats,
   getUsageCosts,
   getApiKeysUsageTrend,
+  getModelUsageTrend,
   getAccountUsageTrend,
   getAccountUsageSummary,
   decorateModelStats

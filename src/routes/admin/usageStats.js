@@ -225,6 +225,99 @@ function hasAccountTrendData(trendResult = {}) {
   )
 }
 
+function hasModelTrendData(trendResult = {}) {
+  if (Array.isArray(trendResult.topModels) && trendResult.topModels.length > 0) {
+    return true
+  }
+
+  return (trendResult.data || []).some(
+    (point) => point.models && Object.keys(point.models).length > 0
+  )
+}
+
+function normalizeModelTrendMetric(metric = 'requests') {
+  return ['requests', 'cost', 'tokens'].includes(metric) ? metric : 'requests'
+}
+
+function getModelTrendMetricValue(entry = {}, metric = 'requests') {
+  if (metric === 'cost') {
+    return Number(entry.cost) || 0
+  }
+  if (metric === 'tokens') {
+    return Number(entry.allTokens || entry.tokens) || 0
+  }
+  return Number(entry.requests) || 0
+}
+
+function buildRedisModelTrendEntry(data = {}, model = 'unknown') {
+  const inputTokens = parseInt(data.inputTokens) || 0
+  const outputTokens = parseInt(data.outputTokens) || 0
+  const cacheCreateTokens = parseInt(data.cacheCreateTokens) || 0
+  const cacheReadTokens = parseInt(data.cacheReadTokens) || 0
+  const ephemeral5mTokens = parseInt(data.ephemeral5mTokens) || 0
+  const ephemeral1hTokens = parseInt(data.ephemeral1hTokens) || 0
+  const allTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+  const hasStoredCost = 'realCostMicro' in data || 'ratedCostMicro' in data
+  let cost = 0
+  let realCost = 0
+
+  if (hasStoredCost) {
+    cost = (parseInt(data.ratedCostMicro) || 0) / 1000000
+    realCost = (parseInt(data.realCostMicro) || 0) / 1000000
+  } else if (allTokens > 0) {
+    const usage = {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cache_creation_input_tokens: cacheCreateTokens,
+      cache_read_input_tokens: cacheReadTokens
+    }
+    if (ephemeral5mTokens > 0 || ephemeral1hTokens > 0) {
+      usage.cache_creation = {
+        ephemeral_5m_input_tokens: ephemeral5mTokens,
+        ephemeral_1h_input_tokens: ephemeral1hTokens
+      }
+    }
+
+    const costResult = CostCalculator.calculateCost(usage, model)
+    cost = costResult.costs.total
+    realCost = costResult.costs.real || cost
+  }
+
+  return {
+    requests: parseInt(data.requests) || 0,
+    inputTokens,
+    outputTokens,
+    cacheCreateTokens,
+    cacheReadTokens,
+    ephemeral5mTokens,
+    ephemeral1hTokens,
+    allTokens,
+    tokens: allTokens,
+    cost,
+    realCost,
+    formattedCost: CostCalculator.formatCost(cost)
+  }
+}
+
+function mergeModelTrendEntry(current = {}, next = {}) {
+  const merged = {
+    requests: (current.requests || 0) + (next.requests || 0),
+    inputTokens: (current.inputTokens || 0) + (next.inputTokens || 0),
+    outputTokens: (current.outputTokens || 0) + (next.outputTokens || 0),
+    cacheCreateTokens: (current.cacheCreateTokens || 0) + (next.cacheCreateTokens || 0),
+    cacheReadTokens: (current.cacheReadTokens || 0) + (next.cacheReadTokens || 0),
+    ephemeral5mTokens: (current.ephemeral5mTokens || 0) + (next.ephemeral5mTokens || 0),
+    ephemeral1hTokens: (current.ephemeral1hTokens || 0) + (next.ephemeral1hTokens || 0),
+    cost: (current.cost || 0) + (next.cost || 0),
+    realCost: (current.realCost || 0) + (next.realCost || 0)
+  }
+  merged.allTokens =
+    merged.inputTokens + merged.outputTokens + merged.cacheCreateTokens + merged.cacheReadTokens
+  merged.tokens = merged.allTokens
+  merged.formattedCost = CostCalculator.formatCost(merged.cost)
+  return merged
+}
+
 function buildDailyDateInfos({ days = 7, startDate = null, endDate = null } = {}) {
   const maxDays = 365
   const dayInfos = []
@@ -1958,6 +2051,199 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
     return res
       .status(500)
       .json({ error: 'Failed to get account usage trend', message: error.message })
+  }
+})
+
+// 获取按模型分组的使用趋势
+router.get('/model-usage-trend', authenticateAdmin, async (req, res) => {
+  try {
+    const { granularity = 'day', days = 7, startDate, endDate } = req.query
+    const metric = normalizeModelTrendMetric(req.query.metric)
+
+    logger.info(
+      `📊 Getting model usage trend, granularity: ${granularity}, days: ${days}, metric: ${metric}`
+    )
+
+    if (usageStatsService.shouldReadPostgres()) {
+      try {
+        const trendResult = await usageStatsService.getModelUsageTrend({
+          days,
+          granularity,
+          startDate,
+          endDate,
+          metric
+        })
+        if (hasModelTrendData(trendResult)) {
+          return res.json({
+            success: true,
+            data: trendResult.data || [],
+            granularity,
+            metric,
+            topModels: trendResult.topModels || [],
+            totalModels: trendResult.totalModels || 0
+          })
+        }
+
+        logger.info('📊 PostgreSQL model usage trend is empty, falling back to Redis')
+      } catch (error) {
+        logger.warn(`⚠️ Failed to read model usage trend from PostgreSQL: ${error.message}`)
+      }
+    }
+
+    const trendData = []
+    const modelTotals = new Map()
+    const modelNames = new Set()
+
+    const addModelPoint = (point, model, data) => {
+      const entry = buildRedisModelTrendEntry(data, model)
+      point.models[model] = mergeModelTrendEntry(point.models[model], entry)
+      modelNames.add(model)
+    }
+
+    if (granularity === 'hour') {
+      let startTime, endTime
+
+      if (startDate && endDate) {
+        startTime = new Date(startDate)
+        endTime = new Date(endDate)
+      } else {
+        endTime = new Date()
+        startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000)
+      }
+
+      const hourInfos = []
+      const currentHour = new Date(startTime)
+      currentHour.setMinutes(0, 0, 0)
+
+      while (currentHour <= endTime) {
+        const tzCurrentHour = redis.getDateInTimezone(currentHour)
+        const dateStr = redis.getDateStringInTimezone(currentHour)
+        const hour = String(tzCurrentHour.getUTCHours()).padStart(2, '0')
+        const hourKey = `${dateStr}:${hour}`
+        const monthLabel = String(tzCurrentHour.getUTCMonth() + 1).padStart(2, '0')
+        const dayLabel = String(tzCurrentHour.getUTCDate()).padStart(2, '0')
+
+        hourInfos.push({
+          hourKey,
+          isoTime: currentHour.toISOString(),
+          label: `${monthLabel}/${dayLabel} ${hour}:00`
+        })
+
+        currentHour.setHours(currentHour.getHours() + 1)
+      }
+
+      const modelDataMap = new Map()
+      const fetchPromises = hourInfos.map(async (hourInfo) =>
+        getUsageDataByIndex(
+          `usage:model:hourly:index:${hourInfo.hourKey}`,
+          `usage:model:hourly:{id}:${hourInfo.hourKey}`,
+          `usage:model:hourly:*:${hourInfo.hourKey}`
+        )
+      )
+
+      const allResults = await Promise.all(fetchPromises)
+      allResults.forEach((modelResults) => {
+        modelResults.forEach(({ key, data }) => modelDataMap.set(key, data))
+      })
+
+      const modelKeysByHour = new Map()
+      for (const key of modelDataMap.keys()) {
+        const match = key.match(/usage:model:hourly:.+?:(\d{4}-\d{2}-\d{2}:\d{2})/)
+        if (match) {
+          const hourKey = match[1]
+          if (!modelKeysByHour.has(hourKey)) {
+            modelKeysByHour.set(hourKey, [])
+          }
+          modelKeysByHour.get(hourKey).push(key)
+        }
+      }
+
+      for (const hourInfo of hourInfos) {
+        const hourData = {
+          hour: hourInfo.isoTime,
+          label: hourInfo.label,
+          models: {}
+        }
+        const hourModelKeys = modelKeysByHour.get(hourInfo.hourKey) || []
+        for (const key of hourModelKeys) {
+          const match = key.match(/usage:model:hourly:(.+?):\d{4}-\d{2}-\d{2}:\d{2}/)
+          if (!match) {
+            continue
+          }
+          addModelPoint(hourData, match[1], modelDataMap.get(key))
+        }
+        trendData.push(hourData)
+      }
+    } else {
+      const dayInfos = buildDailyDateInfos({ days, startDate, endDate })
+      const modelDataMap = new Map()
+      const fetchPromises = dayInfos.map(async (dayInfo) =>
+        getUsageDataByIndex(
+          `usage:model:daily:index:${dayInfo.dateStr}`,
+          `usage:model:daily:{id}:${dayInfo.dateStr}`,
+          `usage:model:daily:*:${dayInfo.dateStr}`
+        )
+      )
+
+      const allResults = await Promise.all(fetchPromises)
+      allResults.forEach((modelResults) => {
+        modelResults.forEach(({ key, data }) => modelDataMap.set(key, data))
+      })
+
+      const modelKeysByDate = new Map()
+      for (const key of modelDataMap.keys()) {
+        const match = key.match(/usage:model:daily:.+?:(\d{4}-\d{2}-\d{2})/)
+        if (match) {
+          const dateStr = match[1]
+          if (!modelKeysByDate.has(dateStr)) {
+            modelKeysByDate.set(dateStr, [])
+          }
+          modelKeysByDate.get(dateStr).push(key)
+        }
+      }
+
+      for (const dayInfo of dayInfos) {
+        const dayData = {
+          date: dayInfo.dateStr,
+          models: {}
+        }
+        const dayModelKeys = modelKeysByDate.get(dayInfo.dateStr) || []
+        for (const key of dayModelKeys) {
+          const match = key.match(/usage:model:daily:(.+?):\d{4}-\d{2}-\d{2}/)
+          if (!match) {
+            continue
+          }
+          addModelPoint(dayData, match[1], modelDataMap.get(key))
+        }
+        trendData.push(dayData)
+      }
+    }
+
+    for (const point of trendData) {
+      for (const [model, entry] of Object.entries(point.models || {})) {
+        const metricValue = getModelTrendMetricValue(entry, metric)
+        modelTotals.set(model, (modelTotals.get(model) || 0) + metricValue)
+      }
+    }
+
+    const topModels = Array.from(modelTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([model]) => model)
+
+    return res.json({
+      success: true,
+      data: trendData,
+      granularity,
+      metric,
+      topModels,
+      totalModels: modelNames.size
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get model usage trend:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to get model usage trend', message: error.message })
   }
 })
 

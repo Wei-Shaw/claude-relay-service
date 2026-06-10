@@ -665,6 +665,70 @@
       </div>
     </div>
 
+    <!-- 模型使用趋势图 -->
+    <div class="mb-4 sm:mb-6 md:mb-8">
+      <div class="card p-4 sm:p-6">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
+            模型使用趋势
+          </h3>
+          <div class="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
+            <button
+              :class="[
+                'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
+                modelUsageTrendMetric === 'requests'
+                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
+              ]"
+              @click="((modelUsageTrendMetric = 'requests'), updateModelUsageTrendChart())"
+            >
+              <i class="fas fa-exchange-alt mr-1" /><span class="hidden sm:inline">调用次数</span
+              ><span class="sm:hidden">调用</span>
+            </button>
+            <button
+              :class="[
+                'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
+                modelUsageTrendMetric === 'cost'
+                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
+              ]"
+              @click="((modelUsageTrendMetric = 'cost'), updateModelUsageTrendChart())"
+            >
+              <i class="fas fa-dollar-sign mr-1" /><span>费用</span>
+            </button>
+            <button
+              :class="[
+                'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
+                modelUsageTrendMetric === 'tokens'
+                  ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
+              ]"
+              @click="((modelUsageTrendMetric = 'tokens'), updateModelUsageTrendChart())"
+            >
+              <i class="fas fa-coins mr-1" /><span class="hidden sm:inline">总 Token 数</span
+              ><span class="sm:hidden">Token</span>
+            </button>
+          </div>
+        </div>
+        <div class="mb-4 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
+          <span v-if="modelUsageTrendData.totalModels > 10">
+            共 {{ modelUsageTrendData.totalModels }} 个模型，显示当前指标前
+            {{ modelUsageTrendData.topModels.length }} 个
+          </span>
+          <span v-else> 共 {{ modelUsageTrendData.totalModels || 0 }} 个模型 </span>
+        </div>
+        <div
+          v-if="!modelUsageTrendData.data || modelUsageTrendData.data.length === 0"
+          class="py-12 text-center text-sm text-gray-500 dark:text-gray-400"
+        >
+          暂无模型使用趋势数据
+        </div>
+        <div v-else class="sm:h-[350px]" style="height: 300px">
+          <canvas ref="modelUsageTrendChart" />
+        </div>
+      </div>
+    </div>
+
     <!-- Token使用趋势图 -->
     <div class="mb-4 sm:mb-6 md:mb-8">
       <div class="card p-4 sm:p-6">
@@ -795,6 +859,7 @@ const {
   dashboardData,
   costsData,
   dashboardModelStats,
+  modelUsageTrendData,
   trendData,
   apiKeysTrendData,
   accountUsageTrendData,
@@ -802,11 +867,13 @@ const {
   formattedUptime,
   dateFilter,
   trendGranularity,
+  modelUsageTrendMetric,
   apiKeysTrendMetric
 } = storeToRefs(dashboardStore)
 
 const {
   loadDashboardData,
+  loadModelUsageTrend,
   loadApiKeysTrend,
   setDateFilterPreset,
   onCustomDateRangeChange,
@@ -821,10 +888,12 @@ const defaultTime = [new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59,
 
 // Chart 实例
 const modelUsageChart = ref(null)
+const modelUsageTrendChart = ref(null)
 const usageTrendChart = ref(null)
 const apiKeysUsageTrendChart = ref(null)
 const accountUsageTrendChart = ref(null)
 let modelUsageChartInstance = null
+let modelUsageTrendChartInstance = null
 let usageTrendChartInstance = null
 let apiKeysUsageTrendChartInstance = null
 let accountUsageTrendChartInstance = null
@@ -1267,6 +1336,197 @@ function createUsageTrendChart() {
   })
 }
 
+function getModelTrendMetricValue(modelData = {}, metric = modelUsageTrendMetric.value) {
+  if (metric === 'cost') {
+    return Number(modelData.cost) || 0
+  }
+  if (metric === 'tokens') {
+    return Number(modelData.allTokens || modelData.tokens) || 0
+  }
+  return Number(modelData.requests) || 0
+}
+
+function getModelTrendMetricLabel(metric = modelUsageTrendMetric.value) {
+  if (metric === 'cost') {
+    return '费用 (USD)'
+  }
+  if (metric === 'tokens') {
+    return '总 Token 数'
+  }
+  return '调用次数'
+}
+
+function formatModelTrendTooltipValue(value, metric = modelUsageTrendMetric.value) {
+  if (metric === 'cost') {
+    return formatCostValue(Number(value) || 0)
+  }
+  if (metric === 'tokens') {
+    return `${formatNumber(value)} tokens`
+  }
+  return `${formatNumber(value)} 次`
+}
+
+function createModelUsageTrendChart() {
+  if (!modelUsageTrendChart.value) return
+
+  if (modelUsageTrendChartInstance) {
+    modelUsageTrendChartInstance.destroy()
+  }
+
+  const data = modelUsageTrendData.value?.data || []
+  const metric = modelUsageTrendMetric.value
+  const colors = [
+    '#2563EB',
+    '#059669',
+    '#D97706',
+    '#DC2626',
+    '#7C3AED',
+    '#EC4899',
+    '#14B8A6',
+    '#F97316',
+    '#6366F1',
+    '#84CC16'
+  ]
+
+  const fallbackTopModels = Array.from(
+    new Set(data.flatMap((item) => Object.keys(item.models || {})))
+  ).slice(0, 10)
+  const topModels =
+    modelUsageTrendData.value?.topModels?.length > 0
+      ? modelUsageTrendData.value.topModels
+      : fallbackTopModels
+
+  const datasets = topModels.map((model, index) => ({
+    label: model,
+    data: data.map((item) => getModelTrendMetricValue(item.models?.[model], metric)),
+    borderColor: colors[index % colors.length],
+    backgroundColor: colors[index % colors.length] + '20',
+    model,
+    tension: 0.4,
+    fill: false
+  }))
+
+  const labelField = data[0]?.date ? 'date' : 'hour'
+  const labels = data.map((item) => {
+    if (item.label) {
+      return item.label
+    }
+
+    if (labelField === 'hour') {
+      const date = new Date(item.hour)
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hour = String(date.getHours()).padStart(2, '0')
+      return `${month}/${day} ${hour}:00`
+    }
+
+    if (item.date && item.date.includes('-')) {
+      const parts = item.date.split('-')
+      if (parts.length >= 3) {
+        return `${parts[1]}/${parts[2]}`
+      }
+    }
+
+    return item.date
+  })
+
+  modelUsageTrendChartInstance = new Chart(modelUsageTrendChart.value, {
+    type: 'line',
+    data: {
+      labels,
+      datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            padding: 20,
+            usePointStyle: true,
+            font: {
+              size: 12
+            },
+            color: chartColors.value.legend
+          }
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          itemSort: (a, b) => b.parsed.y - a.parsed.y,
+          callbacks: {
+            label: function (context) {
+              const label = context.dataset.label || ''
+              const value = context.parsed.y || 0
+              const dataIndex = context.dataIndex
+              const model = context.dataset.model
+              const modelData = modelUsageTrendData.value.data[dataIndex]?.models?.[model]
+              const requests = modelData?.requests || 0
+              const tokens = modelData?.allTokens || modelData?.tokens || 0
+              const cost = modelData?.formattedCost || formatCostValue(modelData?.cost || 0)
+              const mainValue = formatModelTrendTooltipValue(value, metric)
+
+              if (metric === 'requests') {
+                return `${label}: ${mainValue} / ${formatNumber(tokens)} tokens / ${cost}`
+              }
+              if (metric === 'tokens') {
+                return `${label}: ${mainValue} / ${formatNumber(requests)} 次 / ${cost}`
+              }
+              return `${label}: ${mainValue} / ${formatNumber(requests)} 次 / ${formatNumber(tokens)} tokens`
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'category',
+          display: true,
+          title: {
+            display: true,
+            text: trendGranularity.value === 'hour' ? '时间' : '日期',
+            color: chartColors.value.text
+          },
+          ticks: {
+            color: chartColors.value.text
+          },
+          grid: {
+            color: chartColors.value.grid
+          }
+        },
+        y: {
+          beginAtZero: true,
+          min: 0,
+          title: {
+            display: true,
+            text: getModelTrendMetricLabel(metric),
+            color: chartColors.value.text
+          },
+          ticks: {
+            callback: function (value) {
+              return metric === 'cost' ? formatCostValue(Number(value)) : formatNumber(value)
+            },
+            color: chartColors.value.text
+          },
+          grid: {
+            color: chartColors.value.grid
+          }
+        }
+      }
+    }
+  })
+}
+
+async function updateModelUsageTrendChart() {
+  await loadModelUsageTrend(modelUsageTrendMetric.value)
+  await nextTick()
+  createModelUsageTrendChart()
+}
+
 // 创建API Keys使用趋势图
 function createApiKeysUsageTrendChart() {
   if (!apiKeysUsageTrendChart.value) return
@@ -1689,6 +1949,10 @@ watch(dashboardModelStats, () => {
   nextTick(() => createModelUsageChart())
 })
 
+watch(modelUsageTrendData, () => {
+  nextTick(() => createModelUsageTrendChart())
+})
+
 watch(trendData, () => {
   nextTick(() => createUsageTrendChart())
 })
@@ -1782,6 +2046,7 @@ watch(autoRefreshEnabled, (newVal) => {
 watch(isDarkMode, () => {
   nextTick(() => {
     createModelUsageChart()
+    createModelUsageTrendChart()
     createUsageTrendChart()
     createApiKeysUsageTrendChart()
     createAccountUsageTrendChart()
@@ -1794,6 +2059,7 @@ watch(
   () => {
     nextTick(() => {
       createModelUsageChart()
+      createModelUsageTrendChart()
       createUsageTrendChart()
       createApiKeysUsageTrendChart()
       createAccountUsageTrendChart()
@@ -1809,6 +2075,7 @@ onMounted(async () => {
   // 创建图表
   await nextTick()
   createModelUsageChart()
+  createModelUsageTrendChart()
   createUsageTrendChart()
   createApiKeysUsageTrendChart()
   createAccountUsageTrendChart()
@@ -1820,6 +2087,9 @@ onUnmounted(() => {
   // 销毁图表实例
   if (modelUsageChartInstance) {
     modelUsageChartInstance.destroy()
+  }
+  if (modelUsageTrendChartInstance) {
+    modelUsageTrendChartInstance.destroy()
   }
   if (usageTrendChartInstance) {
     usageTrendChartInstance.destroy()

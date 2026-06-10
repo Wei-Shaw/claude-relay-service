@@ -1556,6 +1556,110 @@ async function getApiKeysUsageTrend({
   }
 }
 
+async function getModelUsageTrend({
+  days = 7,
+  granularity = 'day',
+  startDate = null,
+  endDate = null,
+  metric = 'requests',
+  limit = 10
+} = {}) {
+  const normalizedMetric = ['requests', 'cost', 'tokens'].includes(metric) ? metric : 'requests'
+  const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 10, 20))
+  const { periodType, periodInfos } = buildPeriodInfos({ days, granularity, startDate, endDate })
+  const trendData = periodInfos.map((info) =>
+    periodType === 'hour'
+      ? { hour: info.hour, label: info.label, models: {} }
+      : { date: info.date, models: {} }
+  )
+
+  if (periodInfos.length === 0) {
+    return { data: trendData, topModels: [], totalModels: 0 }
+  }
+
+  const periodStarts = periodInfos.map((info) => info.periodStart)
+  const result = await postgres.query(
+    `
+      SELECT
+        period_start,
+        model,
+        SUM(request_count) AS request_count,
+        SUM(input_tokens) AS input_tokens,
+        SUM(output_tokens) AS output_tokens,
+        SUM(cache_create_tokens) AS cache_create_tokens,
+        SUM(cache_read_tokens) AS cache_read_tokens,
+        SUM(ephemeral_5m_tokens) AS ephemeral_5m_tokens,
+        SUM(ephemeral_1h_tokens) AS ephemeral_1h_tokens,
+        SUM(total_tokens) AS total_tokens,
+        SUM(cost) AS cost,
+        SUM(real_cost) AS real_cost
+      FROM usage_rollups
+      WHERE period_type = $1
+        AND period_start = ANY($2::timestamptz[])
+        AND dimension_type = 'model'
+        AND model <> ''
+      GROUP BY period_start, model
+    `,
+    [periodType, periodStarts]
+  )
+
+  const pointByPeriod = new Map(
+    periodInfos.map((info, index) => [info.periodStart.toISOString(), trendData[index]])
+  )
+  const modelTotals = new Map()
+  const modelNames = new Set()
+
+  for (const row of result.rows) {
+    const model = row.model || 'unknown'
+    const point = pointByPeriod.get(new Date(row.period_start).toISOString())
+    if (!point) {
+      continue
+    }
+
+    const inputTokens = normalizeInteger(row.input_tokens)
+    const outputTokens = normalizeInteger(row.output_tokens)
+    const cacheCreateTokens = normalizeInteger(row.cache_create_tokens)
+    const cacheReadTokens = normalizeInteger(row.cache_read_tokens)
+    const allTokens =
+      normalizeInteger(row.total_tokens) ||
+      inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+    const cost = normalizeNumber(row.cost)
+    const realCost = normalizeNumber(row.real_cost)
+    const requests = normalizeInteger(row.request_count)
+
+    point.models[model] = {
+      requests,
+      inputTokens,
+      outputTokens,
+      cacheCreateTokens,
+      cacheReadTokens,
+      ephemeral5mTokens: normalizeInteger(row.ephemeral_5m_tokens),
+      ephemeral1hTokens: normalizeInteger(row.ephemeral_1h_tokens),
+      allTokens,
+      tokens: allTokens,
+      cost,
+      realCost,
+      formattedCost: formatCost(cost)
+    }
+
+    const metricValue =
+      normalizedMetric === 'cost' ? cost : normalizedMetric === 'tokens' ? allTokens : requests
+    modelTotals.set(model, (modelTotals.get(model) || 0) + metricValue)
+    modelNames.add(model)
+  }
+
+  const topModels = Array.from(modelTotals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, safeLimit)
+    .map(([model]) => model)
+
+  return {
+    data: trendData,
+    topModels,
+    totalModels: modelNames.size
+  }
+}
+
 async function getAccountUsageTrend({
   accounts = [],
   days = 7,
@@ -1772,6 +1876,7 @@ module.exports = {
   getGlobalModelStats,
   getUsageCosts,
   getApiKeysUsageTrend,
+  getModelUsageTrend,
   getAccountUsageTrend,
   getAccountUsageSummary,
   normalizeModelName,
