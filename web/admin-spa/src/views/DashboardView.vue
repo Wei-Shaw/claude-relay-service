@@ -711,11 +711,11 @@
           </div>
         </div>
         <div class="mb-4 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
+          <span>共 {{ modelUsageTrendData.totalModels || 0 }} 个模型</span>
+          <span v-if="(modelUsageTrendData.totalModels || 0) > 0">，含全部模型汇总</span>
           <span v-if="modelUsageTrendData.totalModels > 10">
-            共 {{ modelUsageTrendData.totalModels }} 个模型，显示当前指标前
-            {{ modelUsageTrendData.topModels.length }} 个
+            ，显示当前指标前 {{ modelUsageTrendData.topModels.length }} 个
           </span>
-          <span v-else> 共 {{ modelUsageTrendData.totalModels || 0 }} 个模型 </span>
         </div>
         <div
           v-if="!modelUsageTrendData.data || modelUsageTrendData.data.length === 0"
@@ -1396,15 +1396,48 @@ function createModelUsageTrendChart() {
       ? modelUsageTrendData.value.topModels
       : fallbackTopModels
 
-  const datasets = topModels.map((model, index) => ({
-    label: model,
-    data: data.map((item) => getModelTrendMetricValue(item.models?.[model], metric)),
-    borderColor: colors[index % colors.length],
-    backgroundColor: colors[index % colors.length] + '20',
-    model,
-    tension: 0.4,
-    fill: false
-  }))
+  const aggregateDataPoints = data.map((item) =>
+    Object.values(item.models || {}).reduce(
+      (summary, modelData) => {
+        const cost = Number(modelData.cost) || 0
+        const requests = Number(modelData.requests) || 0
+        const tokens = Number(modelData.allTokens || modelData.tokens) || 0
+        return {
+          cost: summary.cost + cost,
+          requests: summary.requests + requests,
+          tokens: summary.tokens + tokens
+        }
+      },
+      { cost: 0, requests: 0, tokens: 0 }
+    )
+  )
+
+  const aggregateColor = isDarkMode.value ? '#E5E7EB' : '#111827'
+  const datasets = [
+    {
+      label: '全部模型汇总',
+      data: aggregateDataPoints.map((item) => getModelTrendMetricValue(item, metric)),
+      borderColor: aggregateColor,
+      backgroundColor: aggregateColor + '18',
+      borderWidth: 3,
+      borderDash: [6, 4],
+      pointRadius: 2,
+      pointHoverRadius: 4,
+      tension: 0.35,
+      fill: false,
+      isAggregate: true,
+      aggregateDataPoints
+    },
+    ...topModels.map((model, index) => ({
+      label: model,
+      data: data.map((item) => getModelTrendMetricValue(item.models?.[model], metric)),
+      borderColor: colors[index % colors.length],
+      backgroundColor: colors[index % colors.length] + '20',
+      model,
+      tension: 0.4,
+      fill: false
+    }))
+  ]
 
   const labelField = data[0]?.date ? 'date' : 'hour'
   const labels = data.map((item) => {
@@ -1464,6 +1497,23 @@ function createModelUsageTrendChart() {
               const label = context.dataset.label || ''
               const value = context.parsed.y || 0
               const dataIndex = context.dataIndex
+              const dataset = context.dataset || {}
+              if (dataset.isAggregate) {
+                const aggregatePoint = dataset.aggregateDataPoints?.[dataIndex] || {}
+                const requests = aggregatePoint.requests || 0
+                const tokens = aggregatePoint.tokens || 0
+                const cost = formatCostValue(aggregatePoint.cost || 0)
+                const mainValue = formatModelTrendTooltipValue(value, metric)
+
+                if (metric === 'requests') {
+                  return `${label}: ${mainValue} / ${formatNumber(tokens)} tokens / ${cost}`
+                }
+                if (metric === 'tokens') {
+                  return `${label}: ${mainValue} / ${formatNumber(requests)} 次 / ${cost}`
+                }
+                return `${label}: ${mainValue} / ${formatNumber(requests)} 次 / ${formatNumber(tokens)} tokens`
+              }
+
               const model = context.dataset.model
               const modelData = modelUsageTrendData.value.data[dataIndex]?.models?.[model]
               const requests = modelData?.requests || 0
