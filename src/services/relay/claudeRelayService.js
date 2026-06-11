@@ -2907,20 +2907,33 @@ class ClaudeRelayService {
                 )
               }
 
-              await unifiedClaudeScheduler.markAccountRateLimited(
-                accountId,
-                accountType,
-                sessionHash,
-                rateLimitResetTimestamp
+              // 🛡️ Agent View 辅助请求（x-app: cli-bg 的后台标题/标签生成请求）命中 429 时，
+              // 不应把账号标记为限流：它们非用户主动请求，误摘账号会放大限流影响、打空账号池。
+              // 与 relayRequest 非流式分支及本函数 early-error 分支保持一致（见 #1188 / da3470df）。
+              const isAgentViewAuxiliaryRequest = this._isAgentViewAuxiliaryRequest(
+                body,
+                clientHeaders
               )
-              await upstreamErrorHelper
-                .markTempUnavailable(
+              if (isAgentViewAuxiliaryRequest) {
+                logger.warn(
+                  `🚫 [Stream] Agent View auxiliary request hit 429 for account ${accountId}; skipping account-level rate-limit marking`
+                )
+              } else {
+                await unifiedClaudeScheduler.markAccountRateLimited(
                   accountId,
                   accountType,
-                  429,
-                  upstreamErrorHelper.parseRetryAfter(res.headers)
+                  sessionHash,
+                  rateLimitResetTimestamp
                 )
-                .catch(() => {})
+                await upstreamErrorHelper
+                  .markTempUnavailable(
+                    accountId,
+                    accountType,
+                    429,
+                    upstreamErrorHelper.parseRetryAfter(res.headers)
+                  )
+                  .catch(() => {})
+              }
             }
           } else if (res.statusCode === 200) {
             // 请求成功，清除401和500错误计数
