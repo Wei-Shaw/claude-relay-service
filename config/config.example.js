@@ -53,7 +53,12 @@ const config = {
         // 验证配置值：限制在0-1440分钟(24小时)内
         return Math.max(0, Math.min(minutes, 1440))
       })()
-    }
+    },
+    // 🚦 无权威 reset 头的 429 限流冷却秒数（默认 60 秒）
+    // 上游 429 缺少 anthropic-ratelimit-unified-reset 头时，不再按整个 5 小时会话窗口封号，
+    // 仅做有上限的短冷却，避免单账号池被一次瞬时 / overage 429 打穿数小时
+    rateLimitNoResetCooldownSeconds:
+      parseInt(process.env.CLAUDE_RATE_LIMIT_NO_RESET_COOLDOWN_SECONDS) || 60
   },
 
   // ☁️ Bedrock API配置

@@ -1450,23 +1450,18 @@ class ClaudeAccountService {
         const windowData = await this.updateSessionWindow(accountId, updatedAccountData)
         Object.assign(updatedAccountData, windowData)
 
-        // 限流结束时间 = 会话窗口结束时间
-        if (updatedAccountData.sessionWindowEnd) {
-          updatedAccountData.rateLimitEndAt = updatedAccountData.sessionWindowEnd
-          const windowEnd = new Date(updatedAccountData.sessionWindowEnd)
-          const now = new Date()
-          const minutesUntilEnd = Math.ceil((windowEnd - now) / (1000 * 60))
-          logger.warn(
-            `🚫 Account marked as rate limited until estimated session window ends: ${accountData.name} (${accountId}) - ${minutesUntilEnd} minutes remaining`
-          )
-        } else {
-          // 如果没有会话窗口，使用默认1小时（兼容旧逻辑）
-          const oneHourLater = new Date(Date.now() + 60 * 60 * 1000)
-          updatedAccountData.rateLimitEndAt = oneHourLater.toISOString()
-          logger.warn(
-            `🚫 Account marked as rate limited (1 hour default): ${accountData.name} (${accountId})`
-          )
-        }
+        // ⚠️ 没有上游权威 reset 头（anthropic-ratelimit-unified-reset）时，
+        // 不再按"整个 5 小时会话窗口"封号；无 reset 头的 429（overage /
+        // org_level_disabled / RPM / 瞬时抖动）多数不是真正的窗口耗尽，旧逻辑
+        // 直接封到窗口末（最长 ~5h）会让单账号池被一次抖动打穿数小时
+        // （见 #1183 / #1195 / #1199 / #1203）。改为有上限的短冷却，快速自愈。
+        // 会话窗口仍照常维护（用于使用量追踪与 5h 自动恢复），仅不再用作限流时长。
+        const cooldownSeconds = config.claude.rateLimitNoResetCooldownSeconds || 60
+        const cooldownEnd = new Date(Date.now() + cooldownSeconds * 1000)
+        updatedAccountData.rateLimitEndAt = cooldownEnd.toISOString()
+        logger.warn(
+          `🚫 Account marked as rate limited without reset header, applying ${cooldownSeconds}s cooldown: ${accountData.name} (${accountId})`
+        )
       }
 
       await redis.setClaudeAccount(accountId, updatedAccountData)
