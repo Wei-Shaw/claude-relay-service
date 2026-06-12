@@ -41,7 +41,8 @@ function isProAccount(info) {
 
 class ClaudeAccountService {
   constructor() {
-    this.claudeApiUrl = 'https://console.anthropic.com/v1/oauth/token'
+    // console.anthropic.com 已迁移至 platform.claude.com，旧域名对 refresh_token grant 返回 404
+    this.claudeApiUrl = 'https://platform.claude.com/v1/oauth/token'
     this.claudeOauthClientId = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
     let maxWarnings = parseInt(process.env.CLAUDE_5H_WARNING_MAX_NOTIFICATIONS || '', 10)
 
