@@ -2571,6 +2571,10 @@ class RedisClient {
     const key = `oauth:${sessionId}`
     const data = await this.client.hgetall(key)
 
+    if (!data || Object.keys(data).length === 0) {
+      return null
+    }
+
     // 反序列化 proxy 字段
     if (data.proxy) {
       try {
