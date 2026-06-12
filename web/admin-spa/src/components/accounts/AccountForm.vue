@@ -4925,6 +4925,9 @@ const onAuthMethodChange = () => {
 
 // 构建 Claude 账户数据（辅助函数）
 const buildClaudeAccountData = (tokenInfo, accountName, clientId) => {
+  if (!tokenInfo) {
+    throw new Error('OAuth 凭证缺失，请先完成 OAuth 授权流程')
+  }
   const proxyPayload = buildProxyPayload(form.value.proxy)
   const claudeOauthPayload = tokenInfo.claudeAiOauth || tokenInfo
 
@@ -5047,6 +5050,9 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
 
     if (currentPlatform === 'claude') {
       // Claude使用claudeAiOauth字段
+      if (!tokenInfo) {
+        throw new Error('OAuth 凭证缺失，请先完成 OAuth 授权流程')
+      }
       const claudeOauthPayload = tokenInfo.claudeAiOauth || tokenInfo
       data.claudeAiOauth = claudeOauthPayload
       if (claudeOauthPayload) {
