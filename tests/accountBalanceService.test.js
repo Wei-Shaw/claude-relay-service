@@ -6,6 +6,10 @@ jest.mock('../src/utils/logger', () => ({
   error: jest.fn()
 }))
 
+jest.mock('../src/services/usageStatsService', () => ({
+  shouldReadPostgres: jest.fn(() => false)
+}))
+
 const accountBalanceServiceModule = require('../src/services/account/accountBalanceService')
 
 const { AccountBalanceService } = accountBalanceServiceModule
