@@ -16,7 +16,9 @@
               ? 'API Key 使用统计'
               : currentTab === 'quota'
                 ? '额度卡'
-                : '使用教程'
+                : currentTab === 'models'
+                  ? '可用模型'
+                  : '使用教程'
           "
           :title="oemSettings.siteName"
         />
@@ -58,7 +60,7 @@
     <div class="mb-4 sm:mb-6 md:mb-8">
       <div class="flex justify-center">
         <div
-          class="inline-flex w-full max-w-2xl flex-wrap justify-center gap-1 rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl sm:w-auto sm:flex-nowrap"
+          class="inline-flex w-full max-w-3xl flex-wrap justify-center gap-1 rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl sm:w-auto sm:flex-nowrap"
         >
           <button
             :class="['tab-pill-button', currentTab === 'stats' ? 'active' : '']"
@@ -73,6 +75,13 @@
           >
             <i class="fas fa-ticket-alt mr-1 md:mr-2" />
             <span class="text-sm md:text-base">额度卡</span>
+          </button>
+          <button
+            :class="['tab-pill-button', currentTab === 'models' ? 'active' : '']"
+            @click="currentTab = 'models'"
+          >
+            <i class="fas fa-layer-group mr-1 md:mr-2" />
+            <span class="text-sm md:text-base">可用模型</span>
           </button>
           <button
             :class="['tab-pill-button', currentTab === 'tutorial' ? 'active' : '']"
@@ -234,6 +243,11 @@
       <div class="glass-strong rounded-3xl shadow-xl">
         <TutorialView />
       </div>
+    </div>
+
+    <!-- 可用模型内容 -->
+    <div v-if="currentTab === 'models'" class="tab-content">
+      <AvailableModelsPanel @test="openTestModal" />
     </div>
 
     <!-- 额度卡内容（含二级 tab） -->
@@ -546,6 +560,7 @@ import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import ServiceCostCards from '@/components/apistats/ServiceCostCards.vue'
 import ApiKeyRequestDetails from '@/components/apistats/ApiKeyRequestDetails.vue'
+import AvailableModelsPanel from '@/components/apistats/AvailableModelsPanel.vue'
 import TutorialView from './TutorialView.vue'
 import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 
