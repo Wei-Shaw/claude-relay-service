@@ -902,24 +902,31 @@ class ClaudeRelayService {
                 rateLimitResetTimestamp || account?.rateLimitEndAt
               )
             }
-            logger.warn(
-              `🚫 Rate limit detected for account ${accountId}, status: ${response.statusCode}`
-            )
-            // 标记账号为限流状态并删除粘性会话映射，传递准确的重置时间戳
-            await unifiedClaudeScheduler.markAccountRateLimited(
-              accountId,
-              accountType,
-              sessionHash,
-              rateLimitResetTimestamp
-            )
-            await upstreamErrorHelper
-              .markTempUnavailable(
+            if (!rateLimitResetTimestamp) {
+              // 无权威 reset 头的 429 大概率不是真实限流，不标记账号、不进入冷却，直接透传错误
+              logger.warn(
+                `⚠️ Rate limit without reset header for account ${accountId}, status: ${response.statusCode}, skipping rate limit marking`
+              )
+            } else {
+              logger.warn(
+                `🚫 Rate limit detected for account ${accountId}, status: ${response.statusCode}`
+              )
+              // 标记账号为限流状态并删除粘性会话映射，传递准确的重置时间戳
+              await unifiedClaudeScheduler.markAccountRateLimited(
                 accountId,
                 accountType,
-                429,
-                upstreamErrorHelper.parseRetryAfter(response.headers)
+                sessionHash,
+                rateLimitResetTimestamp
               )
-              .catch(() => {})
+              await upstreamErrorHelper
+                .markTempUnavailable(
+                  accountId,
+                  accountType,
+                  429,
+                  upstreamErrorHelper.parseRetryAfter(response.headers)
+                )
+                .catch(() => {})
+            }
           }
 
           if (dedicatedRateLimitMessage) {
@@ -2241,6 +2248,11 @@ class ClaudeRelayService {
                 logger.warn(
                   `🚫 [Stream] Agent View auxiliary request hit 429 for account ${accountId}; skipping account-level rate-limit marking`
                 )
+              } else if (!rateLimitResetTimestamp) {
+                // 无权威 reset 头的 429 大概率不是真实限流，不标记账号、不进入冷却，直接透传错误
+                logger.warn(
+                  `⚠️ [Stream] 429 without reset header for account ${accountId}, skipping rate limit marking`
+                )
               } else {
                 await unifiedClaudeScheduler.markAccountRateLimited(
                   accountId,
@@ -2896,22 +2908,25 @@ class ClaudeRelayService {
               logger.warn(
                 `🚫 [Stream] Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
               )
+            } else if (this._isAgentViewAuxiliaryRequest(body, clientHeaders)) {
+              logger.warn(
+                `🚫 [Stream] Agent View auxiliary request hit rate limit at stream end for account ${accountId}; skipping account-level rate-limit marking`
+              )
+            } else if (Number.isNaN(parsedResetTimestamp)) {
+              // 无权威 reset 头的 429 大概率不是真实限流，不标记账号、不进入冷却，直接透传错误
+              logger.warn(
+                `⚠️ [Stream] Rate limit at stream end without reset header for account ${accountId}, skipping rate limit marking`
+              )
             } else {
-              const rateLimitResetTimestamp = Number.isNaN(parsedResetTimestamp)
-                ? null
-                : parsedResetTimestamp
-
-              if (!Number.isNaN(parsedResetTimestamp)) {
-                logger.info(
-                  `🕐 Extracted rate limit reset timestamp from stream: ${parsedResetTimestamp} (${new Date(parsedResetTimestamp * 1000).toISOString()})`
-                )
-              }
+              logger.info(
+                `🕐 Extracted rate limit reset timestamp from stream: ${parsedResetTimestamp} (${new Date(parsedResetTimestamp * 1000).toISOString()})`
+              )
 
               await unifiedClaudeScheduler.markAccountRateLimited(
                 accountId,
                 accountType,
                 sessionHash,
-                rateLimitResetTimestamp
+                parsedResetTimestamp
               )
               await upstreamErrorHelper
                 .markTempUnavailable(

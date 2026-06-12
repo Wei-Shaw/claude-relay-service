@@ -1420,6 +1420,18 @@ class ClaudeAccountService {
         return { success: true, skipped: true }
       }
 
+      // 无上游权威 reset 时间的 429 大概率不是真实限流（如 overage、org_level_disabled、extra usage），
+      // 不标记账号限流，直接透传错误给客户端（与 sub2api 对 Anthropic 平台无 reset 头 429 的处理一致）
+      if (!rateLimitResetTimestamp) {
+        logger.warn(
+          `⚠️ 429 without authoritative reset header for account ${accountData.name} (${accountId}), skipping rate limit marking`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(accountId, 'claude-official', 429, 'rate_limit')
+          .catch(() => {})
+        return { success: true, skipped: true }
+      }
+
       // 设置限流状态和时间
       const updatedAccountData = { ...accountData }
       updatedAccountData.rateLimitedAt = new Date().toISOString()
@@ -1429,45 +1441,20 @@ class ClaudeAccountService {
       // 使用独立的限流自动停止标记，避免与其他自动停止冲突
       updatedAccountData.rateLimitAutoStopped = 'true'
 
-      // 如果提供了准确的限流重置时间戳（来自API响应头）
-      if (rateLimitResetTimestamp) {
-        // 将Unix时间戳（秒）转换为毫秒并创建Date对象
-        const resetTime = new Date(rateLimitResetTimestamp * 1000)
-        updatedAccountData.rateLimitEndAt = resetTime.toISOString()
+      // 将Unix时间戳（秒）转换为毫秒并创建Date对象
+      const resetTime = new Date(rateLimitResetTimestamp * 1000)
+      updatedAccountData.rateLimitEndAt = resetTime.toISOString()
 
-        // 计算当前会话窗口的开始时间（重置时间减去5小时）
-        const windowStartTime = new Date(resetTime.getTime() - 5 * 60 * 60 * 1000)
-        updatedAccountData.sessionWindowStart = windowStartTime.toISOString()
-        updatedAccountData.sessionWindowEnd = resetTime.toISOString()
+      // 计算当前会话窗口的开始时间（重置时间减去5小时）
+      const windowStartTime = new Date(resetTime.getTime() - 5 * 60 * 60 * 1000)
+      updatedAccountData.sessionWindowStart = windowStartTime.toISOString()
+      updatedAccountData.sessionWindowEnd = resetTime.toISOString()
 
-        const now = new Date()
-        const minutesUntilEnd = Math.ceil((resetTime - now) / (1000 * 60))
-        logger.warn(
-          `🚫 Account marked as rate limited with accurate reset time: ${accountData.name} (${accountId}) - ${minutesUntilEnd} minutes remaining until ${resetTime.toISOString()}`
-        )
-      } else {
-        // 获取或创建会话窗口（预估方式）
-        const windowData = await this.updateSessionWindow(accountId, updatedAccountData)
-        Object.assign(updatedAccountData, windowData)
-
-        // 限流结束时间 = 会话窗口结束时间
-        if (updatedAccountData.sessionWindowEnd) {
-          updatedAccountData.rateLimitEndAt = updatedAccountData.sessionWindowEnd
-          const windowEnd = new Date(updatedAccountData.sessionWindowEnd)
-          const now = new Date()
-          const minutesUntilEnd = Math.ceil((windowEnd - now) / (1000 * 60))
-          logger.warn(
-            `🚫 Account marked as rate limited until estimated session window ends: ${accountData.name} (${accountId}) - ${minutesUntilEnd} minutes remaining`
-          )
-        } else {
-          // 如果没有会话窗口，使用默认1小时（兼容旧逻辑）
-          const oneHourLater = new Date(Date.now() + 60 * 60 * 1000)
-          updatedAccountData.rateLimitEndAt = oneHourLater.toISOString()
-          logger.warn(
-            `🚫 Account marked as rate limited (1 hour default): ${accountData.name} (${accountId})`
-          )
-        }
-      }
+      const now = new Date()
+      const minutesUntilEnd = Math.ceil((resetTime - now) / (1000 * 60))
+      logger.warn(
+        `🚫 Account marked as rate limited with accurate reset time: ${accountData.name} (${accountId}) - ${minutesUntilEnd} minutes remaining until ${resetTime.toISOString()}`
+      )
 
       await redis.setClaudeAccount(accountId, updatedAccountData)
 
@@ -1486,7 +1473,7 @@ class ClaudeAccountService {
           platform: 'claude-oauth',
           status: 'error',
           errorCode: 'CLAUDE_OAUTH_RATE_LIMITED',
-          reason: `Account rate limited (429 error). ${rateLimitResetTimestamp ? `Reset at: ${formatDateWithTimezone(rateLimitResetTimestamp)}` : 'Estimated reset in 1-5 hours'}`,
+          reason: `Account rate limited (429 error). Reset at: ${formatDateWithTimezone(rateLimitResetTimestamp)}`,
           timestamp: getISOStringWithTimezone(new Date())
         })
       } catch (webhookError) {
