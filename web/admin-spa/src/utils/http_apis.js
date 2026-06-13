@@ -152,6 +152,13 @@ export const createBedrockAccountApi = (data) =>
 export const updateBedrockAccountApi = (id, data) =>
   request({ url: `/admin/bedrock-accounts/${id}`, method: 'PUT', data })
 
+// Vertex AI 账户
+export const getVertexAccountsApi = () => request({ url: '/admin/vertex-accounts', method: 'GET' })
+export const createVertexAccountApi = (data) =>
+  request({ url: '/admin/vertex-accounts', method: 'POST', data })
+export const updateVertexAccountApi = (id, data) =>
+  request({ url: `/admin/vertex-accounts/${id}`, method: 'PUT', data })
+
 // Gemini 账户
 export const getGeminiAccountsApi = () => request({ url: '/admin/gemini-accounts', method: 'GET' })
 export const createGeminiAccountApi = (data) =>

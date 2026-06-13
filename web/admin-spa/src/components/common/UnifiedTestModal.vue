@@ -336,7 +336,8 @@ const platformFallbackModels = {
   'gemini-api': 'gemini-2.5-flash',
   'openai-responses': 'gpt-5',
   droid: 'claude-sonnet-4-5-20250929',
-  ccr: 'claude-sonnet-4-5-20250929'
+  ccr: 'claude-sonnet-4-5-20250929',
+  vertex: 'claude-sonnet-4-5@20250929'
 }
 
 const defaultModel = computed(() => {
@@ -452,6 +453,11 @@ const platformConfigs = {
     label: 'CCR',
     icon: 'fas fa-key',
     badge: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+  },
+  vertex: {
+    label: 'Vertex AI',
+    icon: 'fab fa-google',
+    badge: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300'
   }
 }
 
@@ -530,7 +536,8 @@ const getAccountEndpoint = () => {
     'openai-responses': `${APP_CONFIG.apiPrefix}/admin/openai-responses-accounts/${props.account.id}/test`,
     'azure-openai': `${APP_CONFIG.apiPrefix}/admin/azure-openai-accounts/${props.account.id}/test`,
     droid: `${APP_CONFIG.apiPrefix}/admin/droid-accounts/${props.account.id}/test`,
-    ccr: `${APP_CONFIG.apiPrefix}/admin/ccr-accounts/${props.account.id}/test`
+    ccr: `${APP_CONFIG.apiPrefix}/admin/ccr-accounts/${props.account.id}/test`,
+    vertex: `${APP_CONFIG.apiPrefix}/admin/vertex-accounts/${props.account.id}/test`
   }
   return endpoints[platform] || ''
 }
@@ -540,7 +547,7 @@ const startTest = () => {
     const endpoint = getAccountEndpoint()
     if (!endpoint) return
     const authToken = localStorage.getItem('authToken')
-    const useSSE = ['claude', 'claude-console', 'bedrock', 'gemini-api'].includes(
+    const useSSE = ['claude', 'claude-console', 'bedrock', 'gemini-api', 'vertex'].includes(
       props.account.platform
     )
     state.sendTestRequest(

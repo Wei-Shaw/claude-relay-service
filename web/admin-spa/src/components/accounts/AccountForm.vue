@@ -315,6 +315,39 @@
                       <label
                         class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
                         :class="[
+                          form.platform === 'vertex'
+                            ? 'border-blue-700 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
+                            : 'border-gray-300 bg-white hover:border-blue-500 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
+                        ]"
+                      >
+                        <input
+                          v-model="form.platform"
+                          class="sr-only"
+                          type="radio"
+                          value="vertex"
+                        />
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-cloud text-sm text-blue-700 dark:text-blue-300"></i>
+                          <div>
+                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                              >Vertex AI</span
+                            >
+                            <span class="text-xs text-gray-500 dark:text-gray-400"
+                              >Google Cloud</span
+                            >
+                          </div>
+                        </div>
+                        <div
+                          v-if="form.platform === 'vertex'"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-700"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </label>
+
+                      <label
+                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
+                        :class="[
                           form.platform === 'ccr'
                             ? 'border-cyan-500 bg-cyan-50 dark:border-cyan-400 dark:bg-cyan-900/30'
                             : 'border-gray-300 bg-white hover:border-cyan-400 hover:bg-cyan-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/20'
