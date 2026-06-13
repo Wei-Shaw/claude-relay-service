@@ -14,6 +14,48 @@ const {
 const modelsConfig = require('../../config/models')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 
+const TRUE_ENV_VALUES = new Set(['true', '1', 'yes', 'on'])
+
+const isCustomerBillingDetailsHidden = () =>
+  TRUE_ENV_VALUES.has(
+    String(process.env.HIDE_CUSTOMER_BILLING_DETAILS || '')
+      .trim()
+      .toLowerCase()
+  )
+
+const firstFiniteNumber = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null) {
+      continue
+    }
+
+    const number = Number(value)
+    if (Number.isFinite(number)) {
+      return number
+    }
+  }
+
+  return 0
+}
+
+const buildCustomerBillingCostFields = (costData = {}) => {
+  if (!isCustomerBillingDetailsHidden()) {
+    return {
+      costs: costData.costs,
+      formatted: costData.formatted,
+      pricing: costData.pricing
+    }
+  }
+
+  const costs = costData.costs || {}
+  const total = firstFiniteNumber(costs.rated, costs.total, costs.real)
+
+  return {
+    costs: { total },
+    formatted: { total: CostCalculator.formatCost(total) }
+  }
+}
+
 const router = express.Router()
 
 // 📋 获取可用模型列表（公开接口）
@@ -557,10 +599,12 @@ router.post('/api/user-stats', async (req, res) => {
         restrictedModels: fullKeyData.restrictedModels || [],
         enableClientRestriction: fullKeyData.enableClientRestriction || false,
         allowedClients: fullKeyData.allowedClients || []
-      },
+      }
+    }
 
+    if (!isCustomerBillingDetailsHidden()) {
       // Key 级别的服务倍率
-      serviceRates: (() => {
+      responseData.serviceRates = (() => {
         try {
           return fullKeyData.serviceRates
             ? typeof fullKeyData.serviceRates === 'string'
@@ -905,6 +949,8 @@ router.post('/api/batch-model-stats', async (req, res) => {
         costData.formatted.total = `$${costData.costs.real.toFixed(6)}`
       }
 
+      const billingCostFields = buildCustomerBillingCostFields(costData)
+
       modelStats.push({
         model,
         requests: usage.requests,
@@ -913,9 +959,9 @@ router.post('/api/batch-model-stats', async (req, res) => {
         cacheCreateTokens: usage.cacheCreateTokens,
         cacheReadTokens: usage.cacheReadTokens,
         allTokens: usage.allTokens,
-        costs: costData.costs,
-        formatted: costData.formatted,
-        pricing: costData.pricing,
+        costs: billingCostFields.costs,
+        formatted: billingCostFields.formatted,
+        ...(billingCostFields.pricing ? { pricing: billingCostFields.pricing } : {}),
         isLegacy: !hasStoredCost
       })
     }
@@ -1469,6 +1515,8 @@ router.post('/api/user-model-stats', async (req, res) => {
               usage.cache_read_input_tokens
             : parseInt(data.allTokens) || 0
 
+        const billingCostFields = buildCustomerBillingCostFields(costData)
+
         modelStats.push({
           model,
           requests: parseInt(data.requests) || 0,
@@ -1477,9 +1525,9 @@ router.post('/api/user-model-stats', async (req, res) => {
           cacheCreateTokens: usage.cache_creation_input_tokens,
           cacheReadTokens: usage.cache_read_input_tokens,
           allTokens,
-          costs: costData.costs,
-          formatted: costData.formatted,
-          pricing: costData.pricing,
+          costs: billingCostFields.costs,
+          formatted: billingCostFields.formatted,
+          ...(billingCostFields.pricing ? { pricing: billingCostFields.pricing } : {}),
           isLegacy: !hasStoredCost
         })
       }
@@ -1510,6 +1558,14 @@ router.post('/api/user-model-stats', async (req, res) => {
 
 // 📊 获取服务倍率配置（公开接口）
 router.get('/service-rates', async (req, res) => {
+  if (isCustomerBillingDetailsHidden()) {
+    return res.json({
+      success: false,
+      data: null,
+      billingDetailsHidden: true
+    })
+  }
+
   try {
     const rates = await serviceRatesService.getRates()
     res.json({
