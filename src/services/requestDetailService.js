@@ -12,6 +12,7 @@ const azureOpenaiAccountService = require('./account/azureOpenaiAccountService')
 const droidAccountService = require('./account/droidAccountService')
 const bedrockAccountService = require('./account/bedrockAccountService')
 const CostCalculator = require('../utils/costCalculator')
+const { sanitizeErrorMessage } = require('../utils/errorSanitizer')
 const {
   sanitizeRequestBodySnapshot,
   getRequestDetailCacheMetrics,
@@ -30,6 +31,62 @@ const REQUEST_DETAIL_SCAN_BATCH_SIZE = 200
 const REQUEST_DETAIL_QUERY_SNAPSHOT_TTL_SECONDS = 30
 const MAX_REQUEST_DETAIL_SNAPSHOT_POINTERS = 25000
 const MAX_REQUEST_DETAIL_SNAPSHOT_BYTES = 2 * 1024 * 1024
+const SLA_LATENCY_BUCKETS_MS = [500, 1000, 2000, 5000, 10000, 30000]
+const SLA_TOP_GROUP_LIMIT = 8
+
+const OUTCOME_LABELS = {
+  success: '成功',
+  client_error: '客户端错误',
+  server_error: '系统错误',
+  upstream_error: '上游错误',
+  timeout: '超时',
+  rate_limited: '限流',
+  auth_error: '认证失败',
+  quota_exceeded: '额度不足',
+  client_aborted: '客户端中断',
+  incomplete: '未完成',
+  unknown: '未知'
+}
+
+const FAILURE_STAGE_LABELS = {
+  none: '无',
+  auth: '认证',
+  permission: '权限',
+  quota: '额度',
+  rate_limit: '限流',
+  queue: '排队',
+  routing: '路由',
+  upstream: '上游',
+  streaming: '流式传输',
+  billing: '计费',
+  internal: '内部',
+  client_abort: '客户端中断',
+  not_found: '未命中路由',
+  request: '请求格式',
+  unknown: '未知'
+}
+
+const SLA_ROUTE_PREFIXES = [
+  '/api',
+  '/claude',
+  '/antigravity/api',
+  '/gemini-cli/api',
+  '/gemini',
+  '/openai',
+  '/droid',
+  '/azure'
+]
+
+const SLA_EXCLUDED_PREFIXES = [
+  '/admin',
+  '/admin-next',
+  '/web',
+  '/users',
+  '/apistats',
+  '/health',
+  '/metrics',
+  '/'
+]
 
 const accountTypeNames = {
   claude: 'Claude官方',
@@ -82,6 +139,483 @@ function normalizeNumber(value, digits = null) {
 
 function normalizeTokenValue(value) {
   return Math.max(0, Math.trunc(normalizeNumber(value)))
+}
+
+function clampErrorMessage(value) {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const sanitized = sanitizeErrorMessage(value)
+  if (!sanitized) {
+    return null
+  }
+
+  return sanitized.length > 240 ? `${sanitized.slice(0, 240)}...` : sanitized
+}
+
+function normalizeStatusClass(statusCode) {
+  const status = normalizeNumber(statusCode)
+  if (status <= 0) {
+    return 'unknown'
+  }
+  if (status >= 500) {
+    return '5xx'
+  }
+  if (status >= 400) {
+    return '4xx'
+  }
+  if (status >= 300) {
+    return '3xx'
+  }
+  if (status >= 200) {
+    return '2xx'
+  }
+  return 'other'
+}
+
+function normalizeEndpointPath(endpoint) {
+  if (!endpoint || typeof endpoint !== 'string') {
+    return '/'
+  }
+
+  const [pathPart] = endpoint.split('?')
+  const collapsed = pathPart.toLowerCase().replace(/\/{2,}/g, '/')
+  if (collapsed.length > 1 && collapsed.endsWith('/')) {
+    return collapsed.slice(0, -1)
+  }
+  return collapsed || '/'
+}
+
+function isRelayEndpoint(endpoint) {
+  const path = normalizeEndpointPath(endpoint)
+  if (!path || path === '/') {
+    return false
+  }
+
+  if (SLA_EXCLUDED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
+    return false
+  }
+
+  return SLA_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+}
+
+function inferFailureStage(detail = {}, statusCode = 0, outcome = 'unknown') {
+  if (detail.failureStage) {
+    return detail.failureStage
+  }
+
+  if (detail.clientAborted || outcome === 'client_aborted') {
+    return 'client_abort'
+  }
+
+  if (statusCode === 401) {
+    return 'auth'
+  }
+
+  if (statusCode === 403) {
+    return 'permission'
+  }
+
+  if (statusCode === 402) {
+    return 'quota'
+  }
+
+  if (statusCode === 408 || statusCode === 504 || outcome === 'timeout') {
+    return 'upstream'
+  }
+
+  if (statusCode === 429 || statusCode === 529) {
+    return 'rate_limit'
+  }
+
+  if (statusCode === 404) {
+    return 'not_found'
+  }
+
+  if (statusCode >= 500) {
+    if (
+      detail.upstreamStatus ||
+      detail.accountId ||
+      detail.accountType ||
+      /upstream|gateway|timeout/i.test(
+        detail.errorType || detail.errorCode || detail.errorMessage || ''
+      )
+    ) {
+      return 'upstream'
+    }
+    return 'internal'
+  }
+
+  if (statusCode >= 400) {
+    return 'request'
+  }
+
+  return 'none'
+}
+
+function inferOutcome(detail = {}, statusCode = 0) {
+  if (detail.outcome) {
+    return detail.outcome
+  }
+
+  if (detail.clientAborted) {
+    return 'client_aborted'
+  }
+
+  if (statusCode === 0 && detail.completed === false) {
+    return 'incomplete'
+  }
+
+  if (statusCode === 401 || statusCode === 403) {
+    return 'auth_error'
+  }
+
+  if (statusCode === 402) {
+    return 'quota_exceeded'
+  }
+
+  if (statusCode === 408 || statusCode === 504) {
+    return 'timeout'
+  }
+
+  if (statusCode === 429 || statusCode === 529) {
+    return 'rate_limited'
+  }
+
+  if (statusCode >= 500) {
+    const stage = inferFailureStage(detail, statusCode, 'server_error')
+    return stage === 'upstream' ? 'upstream_error' : 'server_error'
+  }
+
+  if (statusCode >= 400) {
+    return 'client_error'
+  }
+
+  if (statusCode >= 200 && statusCode < 400) {
+    return 'success'
+  }
+
+  return 'unknown'
+}
+
+function isSlaEligibleRecord(record = {}) {
+  if (record.isSlaEligible === true || record.slaEligible === true) {
+    return true
+  }
+  if (record.isSlaEligible === false || record.slaEligible === false) {
+    return false
+  }
+
+  if (!isRelayEndpoint(record.endpoint)) {
+    return false
+  }
+
+  const status = normalizeNumber(record.statusCode)
+  const stage = record.failureStage || inferFailureStage(record, status, record.outcome)
+  const outcome = record.outcome || inferOutcome(record, status)
+
+  if (stage === 'auth' || stage === 'permission' || stage === 'quota' || stage === 'not_found') {
+    return false
+  }
+
+  if (outcome === 'auth_error' || outcome === 'quota_exceeded') {
+    return false
+  }
+
+  return true
+}
+
+function isSlaFailureRecord(record = {}) {
+  if (!isSlaEligibleRecord(record)) {
+    return false
+  }
+
+  const status = normalizeNumber(record.statusCode)
+  const outcome = record.outcome || inferOutcome(record, status)
+  const stage = record.failureStage || inferFailureStage(record, status, outcome)
+
+  if (outcome === 'success') {
+    return false
+  }
+
+  if (
+    outcome === 'server_error' ||
+    outcome === 'upstream_error' ||
+    outcome === 'timeout' ||
+    outcome === 'incomplete'
+  ) {
+    return true
+  }
+
+  if (outcome === 'client_aborted') {
+    return stage === 'streaming' || Boolean(record.upstreamStatus)
+  }
+
+  return status >= 500
+}
+
+function normalizeRequestResultFields(detail = {}, normalized = {}) {
+  const statusCode = normalizeNumber(normalized.statusCode ?? detail.statusCode)
+  const completed = detail.completed !== false
+  const clientAborted = detail.clientAborted === true || detail.aborted === true
+  const outcome = inferOutcome({ ...detail, completed, clientAborted }, statusCode)
+  const failureStage = inferFailureStage(
+    { ...detail, completed, clientAborted },
+    statusCode,
+    outcome
+  )
+  const errorMessage =
+    clampErrorMessage(detail.errorMessageSafe) ||
+    clampErrorMessage(detail.errorMessage) ||
+    clampErrorMessage(detail.message) ||
+    null
+
+  const result = {
+    completed,
+    clientAborted,
+    outcome,
+    outcomeName: OUTCOME_LABELS[outcome] || OUTCOME_LABELS.unknown,
+    statusClass: normalizeStatusClass(statusCode),
+    failureStage,
+    failureStageName: FAILURE_STAGE_LABELS[failureStage] || FAILURE_STAGE_LABELS.unknown,
+    errorType: detail.errorType || null,
+    errorCode: detail.errorCode || null,
+    errorMessage: errorMessage || null,
+    upstreamStatus: normalizeNumber(detail.upstreamStatus),
+    isSlaEligible: detail.isSlaEligible ?? detail.slaEligible
+  }
+
+  result.isSlaEligible = isSlaEligibleRecord({ ...normalized, ...detail, ...result })
+  result.isSlaFailure = isSlaFailureRecord({ ...normalized, ...detail, ...result })
+
+  return result
+}
+
+function percentile(sortedValues = [], percentileValue = 95) {
+  if (!Array.isArray(sortedValues) || sortedValues.length === 0) {
+    return 0
+  }
+
+  const index = Math.ceil((percentileValue / 100) * sortedValues.length) - 1
+  return sortedValues[Math.min(Math.max(index, 0), sortedValues.length - 1)]
+}
+
+function createLatencyBuckets() {
+  return SLA_LATENCY_BUCKETS_MS.map((upperBoundMs, index) => ({
+    key:
+      index === 0
+        ? `le_${upperBoundMs}`
+        : `gt_${SLA_LATENCY_BUCKETS_MS[index - 1]}_le_${upperBoundMs}`,
+    label:
+      index === 0
+        ? `<=${upperBoundMs}ms`
+        : `${SLA_LATENCY_BUCKETS_MS[index - 1]}-${upperBoundMs}ms`,
+    upperBoundMs,
+    count: 0
+  })).concat([
+    {
+      key: `gt_${SLA_LATENCY_BUCKETS_MS[SLA_LATENCY_BUCKETS_MS.length - 1]}`,
+      label: `>${SLA_LATENCY_BUCKETS_MS[SLA_LATENCY_BUCKETS_MS.length - 1]}ms`,
+      upperBoundMs: null,
+      count: 0
+    }
+  ])
+}
+
+function hasMeaningfulValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return false
+  }
+  if (value === 'unknown') {
+    return false
+  }
+  return true
+}
+
+function mergeRequestDetailRecords(existing = null, incoming = {}) {
+  if (!existing) {
+    return {
+      ...incoming,
+      ...normalizeRequestResultFields(incoming, incoming)
+    }
+  }
+
+  const merged = {
+    ...existing,
+    ...incoming
+  }
+
+  const existingResult = normalizeRequestResultFields(existing, existing)
+  const incomingResult = normalizeRequestResultFields(incoming, incoming)
+  const incomingHasExplicitError =
+    hasMeaningfulValue(incoming.errorType) ||
+    hasMeaningfulValue(incoming.errorCode) ||
+    hasMeaningfulValue(incoming.errorMessage) ||
+    normalizeNumber(incoming.upstreamStatus) > 0 ||
+    incoming.clientAborted === true ||
+    incoming.completed === false
+  const incomingIsPlainUsageSuccess =
+    incomingResult.outcome === 'success' && !incomingHasExplicitError && incoming.statusCode >= 200
+  const existingIsExplicitFailure =
+    existingResult.isSlaFailure === true ||
+    normalizeNumber(existing.statusCode) >= 400 ||
+    existing.completed === false ||
+    existing.clientAborted === true ||
+    hasMeaningfulValue(existing.errorType) ||
+    hasMeaningfulValue(existing.errorCode) ||
+    hasMeaningfulValue(existing.errorMessage)
+
+  const preferExistingIfIncomingEmpty = [
+    'requestId',
+    'requestStartedAt',
+    'endpoint',
+    'method',
+    'apiKeyId',
+    'accountId',
+    'accountType',
+    'model',
+    'actualModel',
+    'requestedModel',
+    'displayModel',
+    'pricingSource',
+    'errorType',
+    'errorCode',
+    'errorMessage',
+    'requestBodySnapshot'
+  ]
+
+  for (const field of preferExistingIfIncomingEmpty) {
+    if (!hasMeaningfulValue(incoming[field]) && hasMeaningfulValue(existing[field])) {
+      merged[field] = existing[field]
+    }
+  }
+
+  if (
+    existingResult.outcome !== 'success' &&
+    existingIsExplicitFailure &&
+    incomingIsPlainUsageSuccess
+  ) {
+    Object.assign(merged, {
+      statusCode: normalizeNumber(existing.statusCode),
+      completed: existing.completed,
+      clientAborted: existing.clientAborted,
+      outcome: existingResult.outcome,
+      outcomeName: existingResult.outcomeName,
+      statusClass: existingResult.statusClass,
+      failureStage: existingResult.failureStage,
+      failureStageName: existingResult.failureStageName,
+      errorType: existing.errorType || null,
+      errorCode: existing.errorCode || null,
+      errorMessage: existing.errorMessage || null,
+      upstreamStatus: normalizeNumber(existing.upstreamStatus)
+    })
+  }
+
+  const usageNumericFields = [
+    'inputTokens',
+    'outputTokens',
+    'cacheReadTokens',
+    'cacheCreateTokens',
+    'totalTokens',
+    'cost',
+    'realCost'
+  ]
+
+  for (const field of usageNumericFields) {
+    if (normalizeNumber(incoming[field]) <= 0 && normalizeNumber(existing[field]) > 0) {
+      merged[field] = existing[field]
+    }
+  }
+
+  const objectFields = ['costBreakdown', 'realCostBreakdown']
+  for (const field of objectFields) {
+    if (!incoming[field] && existing[field]) {
+      merged[field] = existing[field]
+    }
+  }
+
+  if (existing.usedFallbackPricing === true && incoming.usedFallbackPricing !== true) {
+    merged.usedFallbackPricing = true
+  }
+
+  if (existing.costRecomputed === true && incoming.costRecomputed !== true) {
+    merged.costRecomputed = true
+  }
+
+  if (existing.isLongContextRequest === true && incoming.isLongContextRequest !== true) {
+    merged.isLongContextRequest = true
+  }
+
+  return {
+    ...merged,
+    ...normalizeRequestResultFields(merged, merged)
+  }
+}
+
+function extractErrorFieldsFromResponseBody(body) {
+  if (!body) {
+    return {}
+  }
+
+  if (typeof body === 'string') {
+    return {
+      errorMessage: clampErrorMessage(body)
+    }
+  }
+
+  if (typeof body !== 'object' || Array.isArray(body)) {
+    return {}
+  }
+
+  const errorObject = body.error && typeof body.error === 'object' ? body.error : body
+  const errorType = errorObject.type || body.type || null
+  const errorCode = errorObject.code || body.code || null
+  const errorMessage =
+    errorObject.message || body.message || errorObject.error || body.error || body.detail || null
+  const upstreamStatus =
+    errorObject.upstreamStatus || body.upstreamStatus || errorObject.status || body.status || null
+
+  return {
+    errorType: typeof errorType === 'string' ? errorType : null,
+    errorCode: errorCode !== null && errorCode !== undefined ? String(errorCode) : null,
+    errorMessage: clampErrorMessage(typeof errorMessage === 'string' ? errorMessage : null),
+    upstreamStatus: normalizeNumber(upstreamStatus)
+  }
+}
+
+function buildLifecycleDetail(req = {}, res = {}, options = {}) {
+  const endpoint = normalizeEndpointPath(req.originalUrl || req.url || req.path || '')
+  const statusCode = normalizeNumber(options.statusCode ?? res.statusCode)
+  const responseError = extractErrorFieldsFromResponseBody(res._responseBody)
+  const requestBody = req.body && typeof req.body === 'object' ? req.body : undefined
+  const model =
+    requestBody?.model ||
+    requestBody?.modelId ||
+    requestBody?.model_id ||
+    req.query?.model ||
+    'unknown'
+
+  return {
+    requestId: req.requestId || null,
+    timestamp: new Date().toISOString(),
+    requestStartedAt: req.requestStartedAt ? new Date(req.requestStartedAt).toISOString() : null,
+    endpoint,
+    method: req.method || null,
+    statusCode,
+    stream: requestBody?.stream === true,
+    durationMs: normalizeNumber(options.durationMs),
+    requestBody,
+    apiKeyId: req.apiKey?.id || null,
+    model,
+    completed: options.completed !== false,
+    clientAborted: options.clientAborted === true,
+    errorType: options.errorType || responseError.errorType || null,
+    errorCode: options.errorCode || responseError.errorCode || null,
+    errorMessage: options.errorMessage || responseError.errorMessage || null,
+    upstreamStatus: options.upstreamStatus || responseError.upstreamStatus || 0,
+    failureStage: options.failureStage || null
+  }
 }
 
 function buildCostUsageFromRequestDetail(record = {}) {
@@ -338,6 +872,10 @@ function createRequestDetailFilterSignature(
     accountId: normalizeOptionalFilterValue(filters.accountId),
     model: normalizeOptionalFilterValue(filters.model),
     endpoint: normalizeOptionalFilterValue(filters.endpoint),
+    outcome: normalizeOptionalFilterValue(filters.outcome),
+    failureStage: normalizeOptionalFilterValue(filters.failureStage),
+    statusClass: normalizeOptionalFilterValue(filters.statusClass),
+    slaOnly: filters.slaOnly === 'true' || filters.slaOnly === true,
     sortOrder: filters.sortOrder === 'asc' ? 'asc' : 'desc',
     retentionHours:
       retentionHours !== null && retentionHours !== undefined ? Number(retentionHours) : null,
@@ -395,6 +933,10 @@ function requestDetailFilterSignaturesMatch(snapshotSignature, currentSignature)
     normalizedSnapshot.accountId === normalizedCurrent.accountId &&
     normalizedSnapshot.model === normalizedCurrent.model &&
     normalizedSnapshot.endpoint === normalizedCurrent.endpoint &&
+    normalizedSnapshot.outcome === normalizedCurrent.outcome &&
+    normalizedSnapshot.failureStage === normalizedCurrent.failureStage &&
+    normalizedSnapshot.statusClass === normalizedCurrent.statusClass &&
+    normalizedSnapshot.slaOnly === normalizedCurrent.slaOnly &&
     normalizedSnapshot.sortOrder === normalizedCurrent.sortOrder &&
     normalizedSnapshot.retentionHours === normalizedCurrent.retentionHours &&
     requestDetailDateBoundarySignaturesMatch(
@@ -458,6 +1000,9 @@ function createAvailableFilterAccumulator() {
     accountMap: new Map(),
     modelSet: new Set(),
     endpointSet: new Set(),
+    outcomeSet: new Set(),
+    failureStageSet: new Set(),
+    statusClassSet: new Set(),
     earliest: null,
     latest: null
   }
@@ -487,6 +1032,18 @@ function updateAvailableFilterAccumulator(accumulator, record) {
 
   if (record.endpoint) {
     accumulator.endpointSet.add(record.endpoint)
+  }
+
+  if (record.outcome) {
+    accumulator.outcomeSet.add(record.outcome)
+  }
+
+  if (record.failureStage) {
+    accumulator.failureStageSet.add(record.failureStage)
+  }
+
+  if (record.statusClass) {
+    accumulator.statusClassSet.add(record.statusClass)
   }
 
   const ts = toMillis(record.timestamp)
@@ -523,6 +1080,19 @@ function updateAvailableFilterAccumulatorRaw(accumulator, record) {
 
   if (record.endpoint) {
     accumulator.endpointSet.add(record.endpoint)
+  }
+
+  const resultFields = normalizeRequestResultFields(record, record)
+  if (resultFields.outcome) {
+    accumulator.outcomeSet.add(resultFields.outcome)
+  }
+
+  if (resultFields.failureStage) {
+    accumulator.failureStageSet.add(resultFields.failureStage)
+  }
+
+  if (resultFields.statusClass) {
+    accumulator.statusClassSet.add(resultFields.statusClass)
   }
 
   const ts = toMillis(record.timestamp)
@@ -563,6 +1133,15 @@ function finalizeAvailableFilters(accumulator) {
     ),
     models: Array.from(accumulator.modelSet).sort((a, b) => a.localeCompare(b)),
     endpoints: Array.from(accumulator.endpointSet).sort((a, b) => a.localeCompare(b)),
+    outcomes: Array.from(accumulator.outcomeSet)
+      .map((value) => ({ value, label: OUTCOME_LABELS[value] || value }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    failureStages: Array.from(accumulator.failureStageSet)
+      .map((value) => ({ value, label: FAILURE_STAGE_LABELS[value] || value }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    statusClasses: Array.from(accumulator.statusClassSet)
+      .map((value) => ({ value, label: value.toUpperCase() }))
+      .sort((a, b) => a.value.localeCompare(b.value)),
     dateRange: {
       earliest: accumulator.earliest !== null ? new Date(accumulator.earliest).toISOString() : null,
       latest: accumulator.latest !== null ? new Date(accumulator.latest).toISOString() : null
@@ -581,12 +1160,32 @@ function createSummaryAccumulator() {
     totalDurationMs: 0,
     cacheHitNumerator: 0,
     cacheHitDenominator: 0,
-    openAIRelatedRequests: 0
+    openAIRelatedRequests: 0,
+    successRequests: 0,
+    failedRequests: 0,
+    slaEligibleRequests: 0,
+    slaFailureRequests: 0,
+    clientErrorRequests: 0,
+    serverErrorRequests: 0,
+    upstreamErrorRequests: 0,
+    timeoutRequests: 0,
+    rateLimitedRequests: 0,
+    authErrorRequests: 0,
+    quotaExceededRequests: 0,
+    clientAbortedRequests: 0,
+    incompleteRequests: 0,
+    outcomeCounts: {},
+    failureStageCounts: {},
+    statusClassCounts: {}
   }
 }
 
 function updateSummaryAccumulator(accumulator, record) {
   const cacheMetrics = getRequestDetailCacheMetrics(record)
+  const resultFields = normalizeRequestResultFields(record, record)
+  const outcome = resultFields.outcome || 'unknown'
+  const failureStage = resultFields.failureStage || 'unknown'
+  const statusClass = resultFields.statusClass || 'unknown'
 
   accumulator.totalRequests += 1
   accumulator.inputTokens += normalizeNumber(record.inputTokens)
@@ -602,11 +1201,55 @@ function updateSummaryAccumulator(accumulator, record) {
   if (cacheMetrics.isOpenAIRelated) {
     accumulator.openAIRelatedRequests += 1
   }
+  accumulator.outcomeCounts[outcome] = (accumulator.outcomeCounts[outcome] || 0) + 1
+  accumulator.failureStageCounts[failureStage] =
+    (accumulator.failureStageCounts[failureStage] || 0) + 1
+  accumulator.statusClassCounts[statusClass] = (accumulator.statusClassCounts[statusClass] || 0) + 1
+
+  if (outcome === 'success') {
+    accumulator.successRequests += 1
+  } else {
+    accumulator.failedRequests += 1
+  }
+
+  if (statusClass === '4xx') {
+    accumulator.clientErrorRequests += 1
+  } else if (statusClass === '5xx') {
+    accumulator.serverErrorRequests += 1
+  }
+
+  if (outcome === 'upstream_error') {
+    accumulator.upstreamErrorRequests += 1
+  } else if (outcome === 'timeout') {
+    accumulator.timeoutRequests += 1
+  } else if (outcome === 'rate_limited') {
+    accumulator.rateLimitedRequests += 1
+  } else if (outcome === 'auth_error') {
+    accumulator.authErrorRequests += 1
+  } else if (outcome === 'quota_exceeded') {
+    accumulator.quotaExceededRequests += 1
+  } else if (outcome === 'client_aborted') {
+    accumulator.clientAbortedRequests += 1
+  } else if (outcome === 'incomplete') {
+    accumulator.incompleteRequests += 1
+  }
+
+  if (resultFields.isSlaEligible) {
+    accumulator.slaEligibleRequests += 1
+    if (resultFields.isSlaFailure) {
+      accumulator.slaFailureRequests += 1
+    }
+  }
 }
 
 function finalizeSummary(accumulator) {
+  const { totalRequests } = accumulator
+  const slaSuccessRequests = Math.max(
+    accumulator.slaEligibleRequests - accumulator.slaFailureRequests,
+    0
+  )
   return {
-    totalRequests: accumulator.totalRequests,
+    totalRequests,
     inputTokens: accumulator.inputTokens,
     outputTokens: accumulator.outputTokens,
     cacheReadTokens: accumulator.cacheReadTokens,
@@ -626,8 +1269,42 @@ function finalizeSummary(accumulator) {
     cacheHitDenominator: accumulator.cacheHitDenominator,
     cacheHitFormula: CACHE_HIT_FORMULA,
     cacheCreateNotApplicable:
-      accumulator.totalRequests > 0 &&
-      accumulator.openAIRelatedRequests === accumulator.totalRequests
+      totalRequests > 0 && accumulator.openAIRelatedRequests === totalRequests,
+    successRequests: accumulator.successRequests,
+    failedRequests: accumulator.failedRequests,
+    clientErrorRequests: accumulator.clientErrorRequests,
+    serverErrorRequests: accumulator.serverErrorRequests,
+    upstreamErrorRequests: accumulator.upstreamErrorRequests,
+    timeoutRequests: accumulator.timeoutRequests,
+    rateLimitedRequests: accumulator.rateLimitedRequests,
+    authErrorRequests: accumulator.authErrorRequests,
+    quotaExceededRequests: accumulator.quotaExceededRequests,
+    clientAbortedRequests: accumulator.clientAbortedRequests,
+    incompleteRequests: accumulator.incompleteRequests,
+    slaEligibleRequests: accumulator.slaEligibleRequests,
+    slaFailureRequests: accumulator.slaFailureRequests,
+    slaSuccessRequests,
+    successRate:
+      totalRequests > 0
+        ? Number(((accumulator.successRequests / totalRequests) * 100).toFixed(2))
+        : 0,
+    errorRate:
+      totalRequests > 0
+        ? Number(((accumulator.failedRequests / totalRequests) * 100).toFixed(2))
+        : 0,
+    slaSuccessRate:
+      accumulator.slaEligibleRequests > 0
+        ? Number(((slaSuccessRequests / accumulator.slaEligibleRequests) * 100).toFixed(2))
+        : 0,
+    slaFailureRate:
+      accumulator.slaEligibleRequests > 0
+        ? Number(
+            ((accumulator.slaFailureRequests / accumulator.slaEligibleRequests) * 100).toFixed(2)
+          )
+        : 0,
+    outcomeCounts: accumulator.outcomeCounts,
+    failureStageCounts: accumulator.failureStageCounts,
+    statusClassCounts: accumulator.statusClassCounts
   }
 }
 
@@ -664,6 +1341,10 @@ class RequestDetailService {
         accountId: filters.accountId || null,
         model: filters.model || null,
         endpoint: filters.endpoint || null,
+        outcome: filters.outcome || null,
+        failureStage: filters.failureStage || null,
+        statusClass: filters.statusClass || null,
+        slaOnly: filters.slaOnly === 'true' || filters.slaOnly === true,
         hasCustomDateRange: Boolean(filters.startDate || filters.endDate),
         sortOrder: filters.sortOrder === 'asc' ? 'asc' : 'desc'
       },
@@ -672,6 +1353,9 @@ class RequestDetailService {
         accounts: [],
         models: [],
         endpoints: [],
+        outcomes: [],
+        failureStages: [],
+        statusClasses: [],
         dateRange: {
           earliest: null,
           latest: null
@@ -689,7 +1373,28 @@ class RequestDetailService {
         cacheHitNumerator: 0,
         cacheHitDenominator: 0,
         cacheHitFormula: CACHE_HIT_FORMULA,
-        cacheCreateNotApplicable: false
+        cacheCreateNotApplicable: false,
+        successRequests: 0,
+        failedRequests: 0,
+        clientErrorRequests: 0,
+        serverErrorRequests: 0,
+        upstreamErrorRequests: 0,
+        timeoutRequests: 0,
+        rateLimitedRequests: 0,
+        authErrorRequests: 0,
+        quotaExceededRequests: 0,
+        clientAbortedRequests: 0,
+        incompleteRequests: 0,
+        slaEligibleRequests: 0,
+        slaFailureRequests: 0,
+        slaSuccessRequests: 0,
+        successRate: 0,
+        errorRate: 0,
+        slaSuccessRate: 0,
+        slaFailureRate: 0,
+        outcomeCounts: {},
+        failureStageCounts: {},
+        statusClassCounts: {}
       }
     }
   }
@@ -721,6 +1426,9 @@ class RequestDetailService {
       accountId: detail.accountId || null,
       accountType: detail.accountType || 'unknown',
       model: detail.model || 'unknown',
+      actualModel: detail.actualModel || detail.model || 'unknown',
+      requestedModel: detail.requestedModel || null,
+      displayModel: detail.displayModel || detail.model || 'unknown',
       inputTokens,
       outputTokens,
       cacheReadTokens,
@@ -738,6 +1446,8 @@ class RequestDetailService {
       reasoningDisplay: detail.reasoningDisplay || reasoningInfo.reasoningDisplay || null,
       reasoningSource: detail.reasoningSource || reasoningInfo.reasoningSource || null
     }
+
+    Object.assign(normalized, normalizeRequestResultFields(detail, normalized))
 
     if (options.bodyPreviewEnabled && requestBodySource !== undefined) {
       normalized.requestBodySnapshot = sanitizeRequestBodySnapshot(requestBodySource)
@@ -759,11 +1469,21 @@ class RequestDetailService {
       }
 
       const requestId = detail.requestId || makeRequestDetailId()
-      const normalized = this._normalizeRecord(detail, requestId, {
+      const incoming = this._normalizeRecord(detail, requestId, {
         bodyPreviewEnabled: settings.bodyPreviewEnabled
       })
-      const timestampMs = toMillis(normalized.timestamp) || Date.now()
       const itemKey = `${REQUEST_DETAIL_ITEM_PREFIX}${requestId}`
+      let existing = null
+      if (typeof client.get === 'function') {
+        try {
+          existing = safeJsonParse(await client.get(itemKey))
+        } catch (error) {
+          logger.debug(`⚠️ Failed to read existing request detail before merge: ${error.message}`)
+        }
+      }
+
+      const normalized = mergeRequestDetailRecords(existing, incoming)
+      const timestampMs = toMillis(normalized.timestamp) || Date.now()
       const dayKey = `${REQUEST_DETAIL_DAY_INDEX_PREFIX}${formatDayKey(new Date(timestampMs))}`
       const ttlSeconds = Math.max(3600, settings.retentionHours * 3600)
       const indexTtlSeconds = ttlSeconds + 86400
@@ -780,6 +1500,36 @@ class RequestDetailService {
       logger.warn(`⚠️ Failed to capture request detail: ${error.message}`)
       return { captured: false, reason: 'error', message: error.message }
     }
+  }
+
+  shouldCaptureLifecycleRequest(req = {}, res = {}, options = {}) {
+    const endpoint = normalizeEndpointPath(req.originalUrl || req.url || req.path || '')
+    if (!endpoint || endpoint === '/health') {
+      return false
+    }
+
+    const statusCode = normalizeNumber(options.statusCode ?? res.statusCode)
+    const isExceptional =
+      options.completed === false || options.clientAborted === true || statusCode >= 400
+
+    if (isRelayEndpoint(endpoint)) {
+      return isExceptional
+    }
+
+    if (isExceptional && statusCode >= 500) {
+      return true
+    }
+
+    return false
+  }
+
+  async captureLifecycleRequest(req = {}, res = {}, options = {}) {
+    if (!this.shouldCaptureLifecycleRequest(req, res, options)) {
+      return { captured: false, reason: 'excluded' }
+    }
+
+    const detail = buildLifecycleDetail(req, res, options)
+    return this.captureRequestDetail(detail)
   }
 
   async _loadRequestPointersInRange(startDate, endDate) {
@@ -1061,23 +1811,27 @@ class RequestDetailService {
 
     for (const record of records) {
       const displayRecord = prepareRecordForDisplay(record)
-      const cacheMetrics = getRequestDetailCacheMetrics(displayRecord)
-      const reasoningInfo = resolveRequestDetailReasoning(displayRecord)
-      const apiKeyName = await this._getApiKeyName(displayRecord.apiKeyId, apiKeyCache)
+      const normalizedDisplayRecord = {
+        ...displayRecord,
+        ...normalizeRequestResultFields(displayRecord, displayRecord)
+      }
+      const cacheMetrics = getRequestDetailCacheMetrics(normalizedDisplayRecord)
+      const reasoningInfo = resolveRequestDetailReasoning(normalizedDisplayRecord)
+      const apiKeyName = await this._getApiKeyName(normalizedDisplayRecord.apiKeyId, apiKeyCache)
       const accountInfo = await this._resolveAccountInfo(
-        displayRecord.accountId,
-        displayRecord.accountType,
+        normalizedDisplayRecord.accountId,
+        normalizedDisplayRecord.accountType,
         accountCache
       )
 
       enriched.push({
-        ...displayRecord,
-        apiKeyName: apiKeyName || displayRecord.apiKeyId || '未知 Key',
-        accountName: accountInfo?.accountName || displayRecord.accountId || '未知账户',
-        accountType: accountInfo?.accountType || displayRecord.accountType || 'unknown',
+        ...normalizedDisplayRecord,
+        apiKeyName: apiKeyName || normalizedDisplayRecord.apiKeyId || '未知 Key',
+        accountName: accountInfo?.accountName || normalizedDisplayRecord.accountId || '未知账户',
+        accountType: accountInfo?.accountType || normalizedDisplayRecord.accountType || 'unknown',
         accountTypeName:
           accountInfo?.accountTypeName ||
-          accountTypeNames[displayRecord.accountType] ||
+          accountTypeNames[normalizedDisplayRecord.accountType] ||
           accountTypeNames.unknown,
         isOpenAIRelated: cacheMetrics.isOpenAIRelated,
         cacheCreateNotApplicable: cacheMetrics.cacheCreateNotApplicable,
@@ -1085,7 +1839,7 @@ class RequestDetailService {
         cacheHitNumerator: cacheMetrics.numerator,
         cacheHitDenominator: cacheMetrics.denominator,
         cacheHitFormula: cacheMetrics.cacheHitFormula,
-        hasRequestBodySnapshot: Boolean(displayRecord.requestBodySnapshot),
+        hasRequestBodySnapshot: Boolean(normalizedDisplayRecord.requestBodySnapshot),
         reasoningDisplay: reasoningInfo.reasoningDisplay,
         reasoningSource: reasoningInfo.reasoningSource
       })
@@ -1113,7 +1867,15 @@ class RequestDetailService {
       record.accountTypeName,
       record.model,
       record.endpoint,
-      record.method
+      record.method,
+      record.outcome,
+      record.outcomeName,
+      record.failureStage,
+      record.failureStageName,
+      record.statusClass,
+      record.errorType,
+      record.errorCode,
+      record.errorMessage
     ]
 
     return haystacks.some((value) =>
@@ -1136,6 +1898,18 @@ class RequestDetailService {
     if (filters.endpoint && record.endpoint !== filters.endpoint) {
       return false
     }
+    if (filters.outcome && record.outcome !== filters.outcome) {
+      return false
+    }
+    if (filters.failureStage && record.failureStage !== filters.failureStage) {
+      return false
+    }
+    if (filters.statusClass && record.statusClass !== filters.statusClass) {
+      return false
+    }
+    if ((filters.slaOnly === 'true' || filters.slaOnly === true) && record.isSlaEligible !== true) {
+      return false
+    }
 
     return true
   }
@@ -1149,6 +1923,10 @@ class RequestDetailService {
       accountId: filters.accountId || null,
       model: filters.model || null,
       endpoint: filters.endpoint || null,
+      outcome: filters.outcome || null,
+      failureStage: filters.failureStage || null,
+      statusClass: filters.statusClass || null,
+      slaOnly: filters.slaOnly === 'true' || filters.slaOnly === true,
       hasCustomDateRange: Boolean(filters.startDate || filters.endDate),
       sortOrder
     }
@@ -1228,6 +2006,17 @@ class RequestDetailService {
   }
 
   async _buildListQueryData(filters, effectiveStart, effectiveEnd, sortOrder) {
+    filters = {
+      ...filters,
+      apiKeyId: normalizeOptionalFilterValue(filters.apiKeyId),
+      accountId: normalizeOptionalFilterValue(filters.accountId),
+      model: normalizeOptionalFilterValue(filters.model),
+      endpoint: normalizeOptionalFilterValue(filters.endpoint),
+      outcome: normalizeOptionalFilterValue(filters.outcome),
+      failureStage: normalizeOptionalFilterValue(filters.failureStage),
+      statusClass: normalizeOptionalFilterValue(filters.statusClass),
+      slaOnly: filters.slaOnly === 'true' || filters.slaOnly === true ? 'true' : ''
+    }
     const requestPointers = await this._loadRequestPointersInRange(effectiveStart, effectiveEnd)
     if (requestPointers.length === 0) {
       return {
@@ -1238,6 +2027,9 @@ class RequestDetailService {
           accounts: [],
           models: [],
           endpoints: [],
+          outcomes: [],
+          failureStages: [],
+          statusClasses: [],
           dateRange: {
             earliest: null,
             latest: null
@@ -1310,16 +2102,19 @@ class RequestDetailService {
         for (const { record, pointer } of recordItems) {
           updateAvailableFilterAccumulatorRaw(availableFilterAccumulator, record)
 
-          if (!this._matchesStructuredFilters(record, filters)) {
+          const displayRecord = prepareRecordForDisplay(record)
+          const normalizedDisplayRecord = {
+            ...displayRecord,
+            ...normalizeRequestResultFields(displayRecord, displayRecord)
+          }
+          if (!this._matchesStructuredFilters(normalizedDisplayRecord, filters)) {
             continue
           }
-
-          const displayRecord = prepareRecordForDisplay(record)
-          updateSummaryAccumulator(summaryAccumulator, displayRecord)
+          updateSummaryAccumulator(summaryAccumulator, normalizedDisplayRecord)
 
           matchedPointers.push({
-            requestId: displayRecord.requestId,
-            timestampMs: toMillis(displayRecord.timestamp) ?? pointer.timestampMs
+            requestId: normalizedDisplayRecord.requestId,
+            timestampMs: toMillis(normalizedDisplayRecord.timestamp) ?? pointer.timestampMs
           })
         }
       }
@@ -1459,17 +2254,7 @@ class RequestDetailService {
     }
   }
 
-  async listRequestDetails(filters = {}) {
-    filters = {
-      ...filters,
-      apiKeyId: normalizeOptionalFilterValue(filters.apiKeyId),
-      accountId: normalizeOptionalFilterValue(filters.accountId),
-      model: normalizeOptionalFilterValue(filters.model),
-      endpoint: normalizeOptionalFilterValue(filters.endpoint)
-    }
-    const settings = await this.getSettings()
-    const emptyResult = this._emptyListResult(settings, filters)
-
+  _normalizeDateRange(filters = {}, settings = { retentionHours: DEFAULT_RETENTION_HOURS }) {
     const now = new Date()
     const retentionStart = new Date(now.getTime() - settings.retentionHours * 3600 * 1000)
     const startDate = filters.startDate ? new Date(filters.startDate) : retentionStart
@@ -1485,6 +2270,33 @@ class RequestDetailService {
     if (effectiveStart > effectiveEnd) {
       throw new RequestDetailValidationError('Start date must be before or equal to end date')
     }
+
+    return {
+      now,
+      retentionStart,
+      effectiveStart,
+      effectiveEnd
+    }
+  }
+
+  async listRequestDetails(filters = {}) {
+    filters = {
+      ...filters,
+      apiKeyId: normalizeOptionalFilterValue(filters.apiKeyId),
+      accountId: normalizeOptionalFilterValue(filters.accountId),
+      model: normalizeOptionalFilterValue(filters.model),
+      endpoint: normalizeOptionalFilterValue(filters.endpoint),
+      outcome: normalizeOptionalFilterValue(filters.outcome),
+      failureStage: normalizeOptionalFilterValue(filters.failureStage),
+      statusClass: normalizeOptionalFilterValue(filters.statusClass),
+      slaOnly: filters.slaOnly === 'true' || filters.slaOnly === true ? 'true' : ''
+    }
+    const settings = await this.getSettings()
+    const emptyResult = this._emptyListResult(settings, filters)
+    const { now, retentionStart, effectiveStart, effectiveEnd } = this._normalizeDateRange(
+      filters,
+      settings
+    )
 
     const page = Math.max(Number.parseInt(filters.page, 10) || 1, 1)
     const pageSize = Math.min(Math.max(Number.parseInt(filters.pageSize, 10) || 50, 1), 200)
@@ -1562,6 +2374,276 @@ class RequestDetailService {
       pageSize,
       snapshotId
     })
+  }
+
+  _createSlaAccumulator() {
+    return {
+      totalRequests: 0,
+      slaEligibleRequests: 0,
+      slaFailureRequests: 0,
+      successRequests: 0,
+      clientErrorRequests: 0,
+      serverErrorRequests: 0,
+      upstreamErrorRequests: 0,
+      timeoutRequests: 0,
+      rateLimitedRequests: 0,
+      clientAbortedRequests: 0,
+      totalDurationMs: 0,
+      durations: [],
+      outcomeCounts: {},
+      failureStageCounts: {},
+      statusClassCounts: {},
+      latencyBuckets: createLatencyBuckets(),
+      byEndpoint: new Map(),
+      byModel: new Map(),
+      byAccount: new Map(),
+      byApiKey: new Map()
+    }
+  }
+
+  _updateSlaGroup(map, key, label, record) {
+    const safeKey = key || 'unknown'
+    if (!map.has(safeKey)) {
+      map.set(safeKey, {
+        key: safeKey,
+        label: label || safeKey,
+        totalRequests: 0,
+        slaEligibleRequests: 0,
+        slaFailureRequests: 0,
+        totalDurationMs: 0,
+        durations: []
+      })
+    }
+
+    const entry = map.get(safeKey)
+    const durationMs = normalizeNumber(record.durationMs)
+    entry.totalRequests += 1
+    entry.totalDurationMs += durationMs
+    if (durationMs > 0) {
+      entry.durations.push(durationMs)
+    }
+    if (record.isSlaEligible) {
+      entry.slaEligibleRequests += 1
+      if (record.isSlaFailure) {
+        entry.slaFailureRequests += 1
+      }
+    }
+  }
+
+  _updateSlaAccumulator(accumulator, record) {
+    const normalized = {
+      ...prepareRecordForDisplay(record),
+      ...normalizeRequestResultFields(record, record)
+    }
+    const durationMs = normalizeNumber(normalized.durationMs)
+    const outcome = normalized.outcome || 'unknown'
+    const failureStage = normalized.failureStage || 'unknown'
+    const statusClass = normalized.statusClass || 'unknown'
+
+    accumulator.totalRequests += 1
+    accumulator.outcomeCounts[outcome] = (accumulator.outcomeCounts[outcome] || 0) + 1
+    accumulator.failureStageCounts[failureStage] =
+      (accumulator.failureStageCounts[failureStage] || 0) + 1
+    accumulator.statusClassCounts[statusClass] =
+      (accumulator.statusClassCounts[statusClass] || 0) + 1
+
+    if (outcome === 'success') {
+      accumulator.successRequests += 1
+    }
+    if (statusClass === '4xx') {
+      accumulator.clientErrorRequests += 1
+    } else if (statusClass === '5xx') {
+      accumulator.serverErrorRequests += 1
+    }
+    if (outcome === 'upstream_error') {
+      accumulator.upstreamErrorRequests += 1
+    } else if (outcome === 'timeout') {
+      accumulator.timeoutRequests += 1
+    } else if (outcome === 'rate_limited') {
+      accumulator.rateLimitedRequests += 1
+    } else if (outcome === 'client_aborted') {
+      accumulator.clientAbortedRequests += 1
+    }
+
+    if (durationMs > 0) {
+      accumulator.durations.push(durationMs)
+      const bucket = accumulator.latencyBuckets.find(
+        (item) => item.upperBoundMs === null || durationMs <= item.upperBoundMs
+      )
+      if (bucket) {
+        bucket.count += 1
+      }
+    }
+    accumulator.totalDurationMs += durationMs
+
+    if (normalized.isSlaEligible) {
+      accumulator.slaEligibleRequests += 1
+      if (normalized.isSlaFailure) {
+        accumulator.slaFailureRequests += 1
+      }
+    }
+
+    this._updateSlaGroup(
+      accumulator.byEndpoint,
+      normalized.endpoint || 'unknown',
+      normalized.endpoint || '未知接口',
+      normalized
+    )
+    this._updateSlaGroup(
+      accumulator.byModel,
+      normalized.model || 'unknown',
+      normalized.model || '未知模型',
+      normalized
+    )
+    this._updateSlaGroup(
+      accumulator.byAccount,
+      normalized.accountId || 'unknown',
+      normalized.accountName || normalized.accountId || '未知账户',
+      normalized
+    )
+    this._updateSlaGroup(
+      accumulator.byApiKey,
+      normalized.apiKeyId || 'unknown',
+      normalized.apiKeyName || normalized.apiKeyId || '未知 Key',
+      normalized
+    )
+  }
+
+  _finalizeSlaGroups(map) {
+    return Array.from(map.values())
+      .map((entry) => {
+        entry.durations.sort((a, b) => a - b)
+        const slaSuccessRequests = Math.max(entry.slaEligibleRequests - entry.slaFailureRequests, 0)
+        return {
+          key: entry.key,
+          label: entry.label,
+          totalRequests: entry.totalRequests,
+          slaEligibleRequests: entry.slaEligibleRequests,
+          slaFailureRequests: entry.slaFailureRequests,
+          slaSuccessRate:
+            entry.slaEligibleRequests > 0
+              ? Number(((slaSuccessRequests / entry.slaEligibleRequests) * 100).toFixed(2))
+              : 0,
+          avgDurationMs:
+            entry.totalRequests > 0 ? Math.round(entry.totalDurationMs / entry.totalRequests) : 0,
+          p95DurationMs: percentile(entry.durations, 95)
+        }
+      })
+      .sort((a, b) => b.totalRequests - a.totalRequests)
+      .slice(0, SLA_TOP_GROUP_LIMIT)
+  }
+
+  _countMapToList(counts = {}, labels = {}) {
+    return Object.entries(counts)
+      .map(([value, count]) => ({
+        value,
+        label: labels[value] || value,
+        count
+      }))
+      .sort((a, b) => b.count - a.count)
+  }
+
+  async getServiceQualitySummary(filters = {}) {
+    filters = {
+      ...filters,
+      apiKeyId: normalizeOptionalFilterValue(filters.apiKeyId),
+      accountId: normalizeOptionalFilterValue(filters.accountId),
+      model: normalizeOptionalFilterValue(filters.model),
+      endpoint: normalizeOptionalFilterValue(filters.endpoint),
+      outcome: normalizeOptionalFilterValue(filters.outcome),
+      failureStage: normalizeOptionalFilterValue(filters.failureStage),
+      statusClass: normalizeOptionalFilterValue(filters.statusClass)
+    }
+    const settings = await this.getSettings()
+    const { effectiveStart, effectiveEnd } = this._normalizeDateRange(filters, settings)
+    const requestPointers = await this._loadRequestPointersInRange(effectiveStart, effectiveEnd)
+    const accumulator = this._createSlaAccumulator()
+    const availableFilterAccumulator = createAvailableFilterAccumulator()
+    const client = redis.getClient()
+    const apiKeyCache = new Map()
+    const accountCache = new Map()
+
+    for (
+      let startIndex = 0;
+      startIndex < requestPointers.length;
+      startIndex += REQUEST_DETAIL_QUERY_BATCH_SIZE
+    ) {
+      const pointerBatch = requestPointers.slice(
+        startIndex,
+        startIndex + REQUEST_DETAIL_QUERY_BATCH_SIZE
+      )
+      const recordItems = await this._loadPointerBatchRecords(pointerBatch, client)
+      const enrichedRecords = await this._enrichRecords(
+        recordItems.map(({ record }) => record),
+        apiKeyCache,
+        accountCache
+      )
+
+      for (const record of enrichedRecords) {
+        updateAvailableFilterAccumulator(availableFilterAccumulator, record)
+        if (!this._matchesStructuredFilters(record, filters)) {
+          continue
+        }
+        this._updateSlaAccumulator(accumulator, record)
+      }
+    }
+
+    accumulator.durations.sort((a, b) => a - b)
+    const slaSuccessRequests = Math.max(
+      accumulator.slaEligibleRequests - accumulator.slaFailureRequests,
+      0
+    )
+
+    return {
+      captureEnabled: settings.captureEnabled,
+      retentionHours: settings.retentionHours,
+      filters: this._buildResponseFilters(filters, effectiveStart, effectiveEnd, 'desc'),
+      availableFilters: finalizeAvailableFilters(availableFilterAccumulator),
+      summary: {
+        totalRequests: accumulator.totalRequests,
+        slaEligibleRequests: accumulator.slaEligibleRequests,
+        slaSuccessRequests,
+        slaFailureRequests: accumulator.slaFailureRequests,
+        slaSuccessRate:
+          accumulator.slaEligibleRequests > 0
+            ? Number(((slaSuccessRequests / accumulator.slaEligibleRequests) * 100).toFixed(2))
+            : 0,
+        slaFailureRate:
+          accumulator.slaEligibleRequests > 0
+            ? Number(
+                ((accumulator.slaFailureRequests / accumulator.slaEligibleRequests) * 100).toFixed(
+                  2
+                )
+              )
+            : 0,
+        successRequests: accumulator.successRequests,
+        clientErrorRequests: accumulator.clientErrorRequests,
+        serverErrorRequests: accumulator.serverErrorRequests,
+        upstreamErrorRequests: accumulator.upstreamErrorRequests,
+        timeoutRequests: accumulator.timeoutRequests,
+        rateLimitedRequests: accumulator.rateLimitedRequests,
+        clientAbortedRequests: accumulator.clientAbortedRequests,
+        avgDurationMs:
+          accumulator.totalRequests > 0
+            ? Math.round(accumulator.totalDurationMs / accumulator.totalRequests)
+            : 0,
+        p50DurationMs: percentile(accumulator.durations, 50),
+        p95DurationMs: percentile(accumulator.durations, 95),
+        p99DurationMs: percentile(accumulator.durations, 99)
+      },
+      distributions: {
+        outcomes: this._countMapToList(accumulator.outcomeCounts, OUTCOME_LABELS),
+        failureStages: this._countMapToList(accumulator.failureStageCounts, FAILURE_STAGE_LABELS),
+        statusClasses: this._countMapToList(accumulator.statusClassCounts),
+        latencyBuckets: accumulator.latencyBuckets
+      },
+      topGroups: {
+        endpoints: this._finalizeSlaGroups(accumulator.byEndpoint),
+        models: this._finalizeSlaGroups(accumulator.byModel),
+        accounts: this._finalizeSlaGroups(accumulator.byAccount),
+        apiKeys: this._finalizeSlaGroups(accumulator.byApiKey)
+      }
+    }
   }
 
   async getRequestDetail(requestId) {

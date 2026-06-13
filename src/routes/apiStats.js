@@ -6,6 +6,7 @@ const CostCalculator = require('../utils/costCalculator')
 const claudeAccountService = require('../services/account/claudeAccountService')
 const openaiAccountService = require('../services/account/openaiAccountService')
 const serviceRatesService = require('../services/serviceRatesService')
+const openaiResponsesTestService = require('../services/openaiResponsesTestService')
 const {
   createClaudeTestPayload,
   extractErrorMessage,
@@ -1163,9 +1164,6 @@ router.post('/api-key/test-gemini', async (req, res) => {
 
 // 🧪 OpenAI/Codex API Key 端点测试接口
 router.post('/api-key/test-openai', async (req, res) => {
-  const config = require('../../config/config')
-  const { createOpenAITestPayload } = require('../utils/testPayloadHelper')
-
   try {
     const { apiKey, model = 'gpt-5', prompt = 'hi' } = req.body
     const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
@@ -1204,102 +1202,13 @@ router.post('/api-key/test-openai', async (req, res) => {
       `🧪 OpenAI API Key test started for: ${validation.keyData.name} (${validation.keyData.id})`
     )
 
-    const port = config.server.port || 3000
-    const apiUrl = `http://127.0.0.1:${port}/openai/responses`
-
-    // 设置 SSE 响应头
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no'
+    await openaiResponsesTestService.sendApiKeyTestStream({
+      apiKey,
+      model,
+      prompt,
+      maxTokens,
+      responseStream: res
     })
-
-    res.write(`data: ${JSON.stringify({ type: 'test_start', message: 'Test started' })}\n\n`)
-
-    const axios = require('axios')
-    const payload = createOpenAITestPayload(model, { prompt, maxTokens })
-
-    try {
-      const response = await axios.post(apiUrl, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'User-Agent': 'codex_cli_rs/1.0.0'
-        },
-        timeout: 60000,
-        responseType: 'stream',
-        validateStatus: () => true
-      })
-
-      if (response.status !== 200) {
-        const chunks = []
-        response.data.on('data', (chunk) => chunks.push(chunk))
-        response.data.on('end', () => {
-          const errorData = Buffer.concat(chunks).toString()
-          let errorMsg = `API Error: ${response.status}`
-          try {
-            const json = JSON.parse(errorData)
-            errorMsg = extractErrorMessage(json, errorMsg)
-          } catch {
-            if (errorData.length < 200) {
-              errorMsg = errorData || errorMsg
-            }
-          }
-          res.write(
-            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: sanitizeErrorMsg(errorMsg) })}\n\n`
-          )
-          res.end()
-        })
-        return
-      }
-
-      let buffer = ''
-      response.data.on('data', (chunk) => {
-        buffer += chunk.toString()
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data:')) {
-            continue
-          }
-          const jsonStr = line.substring(5).trim()
-          if (!jsonStr || jsonStr === '[DONE]') {
-            continue
-          }
-
-          try {
-            const data = JSON.parse(jsonStr)
-            // OpenAI Responses 格式: output[].content[].text 或 delta
-            if (data.type === 'response.output_text.delta' && data.delta) {
-              res.write(`data: ${JSON.stringify({ type: 'content', text: data.delta })}\n\n`)
-            } else if (data.type === 'response.content_part.delta' && data.delta?.text) {
-              res.write(`data: ${JSON.stringify({ type: 'content', text: data.delta.text })}\n\n`)
-            }
-          } catch {
-            // ignore
-          }
-        }
-      })
-
-      response.data.on('end', () => {
-        res.write(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
-        res.end()
-      })
-
-      response.data.on('error', (err) => {
-        res.write(
-          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(err) })}\n\n`
-        )
-        res.end()
-      })
-    } catch (axiosError) {
-      res.write(
-        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(axiosError) })}\n\n`
-      )
-      res.end()
-    }
   } catch (error) {
     logger.error('❌ OpenAI API Key test failed:', error)
 

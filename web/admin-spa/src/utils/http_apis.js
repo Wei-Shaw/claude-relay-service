@@ -51,6 +51,8 @@ export const getUsageCostsApi = (period) =>
 export const getUsageStatsApi = (url) => request({ url, method: 'GET' })
 export const getRequestDetailsApi = (params) =>
   request({ url: '/admin/request-details', method: 'GET', params })
+export const getServiceQualityApi = (params) =>
+  request({ url: '/admin/service-quality', method: 'GET', params })
 export const getRequestDetailBodyPreviewStatsApi = (config) =>
   request({ url: '/admin/request-details/body-preview-stats', method: 'GET', ...config })
 export const purgeRequestDetailBodyPreviewApi = (config) =>
@@ -76,6 +78,8 @@ export const getApiKeyStatsApi = (id, params) =>
   request({ url: `/admin/api-keys/${id}/stats`, method: 'GET', params })
 export const getApiKeyModelStatsApi = (id, params) =>
   request({ url: `/admin/api-keys/${id}/model-stats`, method: 'GET', params })
+export const getApiKeyUsageHistoryApi = (id, days = 30) =>
+  request({ url: `/admin/api-keys/${id}/usage-history`, method: 'GET', params: { days } })
 export const getApiKeyTagsApi = () => request({ url: '/admin/api-keys/tags', method: 'GET' })
 export const getApiKeyTagsDetailsApi = () =>
   request({ url: '/admin/api-keys/tags/details', method: 'GET' })
@@ -177,6 +181,8 @@ export const createOpenAIAccountApi = (data) =>
   request({ url: '/admin/openai-accounts', method: 'POST', data })
 export const updateOpenAIAccountApi = (id, data) =>
   request({ url: `/admin/openai-accounts/${id}`, method: 'PUT', data })
+export const batchImportOpenAIOAuthAccountsApi = (data) =>
+  request({ url: '/admin/openai-accounts/batch-import-oauth', method: 'POST', data })
 export const generateOpenAIAuthUrlApi = (data) =>
   request({ url: '/admin/openai-accounts/generate-auth-url', method: 'POST', data })
 export const exchangeOpenAICodeApi = (data) =>
@@ -224,6 +230,8 @@ export const deleteAccountByEndpointApi = (endpoint) => request({ url: endpoint,
 export const testAccountByEndpointApi = (endpoint) => request({ url: endpoint, method: 'POST' })
 export const updateAccountByEndpointApi = (endpoint, data) =>
   request({ url: endpoint, method: 'PUT', data })
+export const batchUpdateAccountsPriorityApi = (data) =>
+  request({ url: '/admin/accounts/batch-priority', method: 'PUT', data })
 
 // 账户使用统计
 export const getClaudeAccountsUsageApi = () =>
