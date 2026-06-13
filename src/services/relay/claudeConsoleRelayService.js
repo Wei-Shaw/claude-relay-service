@@ -1007,6 +1007,14 @@ class ClaudeConsoleRelayService {
               }
 
               const chunkStr = chunk.toString()
+              // 📡 Langfuse 输出文本捕获
+              if (options && options.langfuseCollector) {
+                try {
+                  options.langfuseCollector.onChunk(chunkStr)
+                } catch (_collectErr) {
+                  // ignore
+                }
+              }
               buffer += chunkStr
 
               // 处理完整的SSE行
