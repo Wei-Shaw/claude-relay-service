@@ -30,6 +30,31 @@ router.get('/request-details', authenticateAdmin, async (req, res) => {
   }
 })
 
+router.get('/service-quality', authenticateAdmin, async (req, res) => {
+  try {
+    const data = await requestDetailService.getServiceQualitySummary(req.query || {})
+    return res.json({
+      success: true,
+      data
+    })
+  } catch (error) {
+    if (error?.statusCode === 400) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid service quality query',
+        message: error.message
+      })
+    }
+
+    logger.error('❌ Failed to get service quality summary:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get service quality summary',
+      message: error.message
+    })
+  }
+})
+
 router.get('/request-details/body-preview-stats', authenticateAdmin, async (_req, res) => {
   try {
     const data = await requestDetailService.getRequestBodyPreviewStats()

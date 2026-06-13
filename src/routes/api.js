@@ -1272,8 +1272,7 @@ async function handleMessagesRequest(req, res) {
             response.actualModel || jsonData.model || _requestBodyNonStream.model || 'unknown'
           const { baseModel: usageBaseModel } = parseVendorPrefixedModel(rawModel)
           const actualModel = usageBaseModel || rawModel
-          const displayModel =
-            response.displayModel || _requestBodyNonStream.model || actualModel
+          const displayModel = response.displayModel || _requestBodyNonStream.model || actualModel
 
           // 构建 usage 对象以传递给 recordUsageWithDetails
           const usageObject = {
