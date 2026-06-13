@@ -363,8 +363,8 @@ class PricingService {
       return this.pricingData[modelName]
     }
 
-    // 特殊处理：gpt-5-codex 回退到 gpt-5
-    if (modelName === 'gpt-5-codex' && !this.pricingData['gpt-5-codex']) {
+    // 特殊处理：gpt-5.5 回退到 gpt-5
+    if (modelName === 'gpt-5.5' && !this.pricingData['gpt-5.5']) {
       const fallbackPricing = this.pricingData['gpt-5']
       if (fallbackPricing) {
         logger.info(`💰 Using gpt-5 pricing as fallback for ${modelName}`)

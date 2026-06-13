@@ -51,10 +51,10 @@ describe('requestBodyRuleService', () => {
   test('keeps the last rule when the same path appears multiple times', () => {
     const result = requestBodyRuleService.applyRules({ model: 'gpt-4.1' }, [
       { path: 'model', valueType: 'string', value: 'gpt-5' },
-      { path: 'model', valueType: 'string', value: 'gpt-5-codex' }
+      { path: 'model', valueType: 'string', value: 'gpt-5.5' }
     ])
 
-    expect(result.model).toBe('gpt-5-codex')
+    expect(result.model).toBe('gpt-5.5')
   })
 
   test('rejects invalid typed values', () => {
