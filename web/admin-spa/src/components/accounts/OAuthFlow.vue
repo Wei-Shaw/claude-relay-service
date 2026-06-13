@@ -1163,6 +1163,11 @@ const exchangeCode = async () => {
       stopCountdown()
     }
 
+    if (!tokenInfo) {
+      showToast('授权码交换失败，请重新生成授权链接并重试', 'error')
+      return
+    }
+
     emit('success', tokenInfo)
   } catch (error) {
     showToast(error.message || '授权失败，请检查授权码是否正确', 'error')

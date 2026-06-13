@@ -9,12 +9,17 @@ const axios = require('axios')
 const logger = require('./logger')
 
 // OAuth 配置常量 - 从claude-code-login.js提取
+// 注：console.anthropic.com 已迁移至 platform.claude.com，旧域名对 refresh_token grant 返回 404
 const OAUTH_CONFIG = {
   AUTHORIZE_URL: 'https://claude.ai/oauth/authorize',
-  TOKEN_URL: 'https://console.anthropic.com/v1/oauth/token',
+  TOKEN_URL: 'https://platform.claude.com/v1/oauth/token',
   CLIENT_ID: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
   REDIRECT_URI: 'https://platform.claude.com/oauth/code/callback',
-  SCOPES: 'org:create_api_key user:profile user:inference user:sessions:claude_code',
+  SCOPES:
+    'org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload',
+  // Cookie/API 流程使用的 scope（不含 org:create_api_key，该 scope 仅适用于浏览器授权）
+  SCOPES_API:
+    'user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload',
   SCOPES_SETUP: 'user:inference' // Setup Token 只需要推理权限
 }
 
@@ -838,7 +843,7 @@ async function oauthWithCookie(sessionKey, proxyConfig = null, isSetupToken = fa
   const { organizationUuid, capabilities } = await getOrganizationInfo(sessionKey, proxyConfig)
 
   // 步骤2：确定scope并获取授权code
-  const scope = isSetupToken ? OAUTH_CONFIG.SCOPES_SETUP : 'user:profile user:inference'
+  const scope = isSetupToken ? OAUTH_CONFIG.SCOPES_SETUP : OAUTH_CONFIG.SCOPES_API
 
   logger.debug('Step 2/3: Getting authorization code...', { scope })
   const { authorizationCode, codeVerifier, state } = await authorizeWithCookie(
