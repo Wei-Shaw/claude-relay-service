@@ -4,6 +4,7 @@ const apiKeyService = require('../services/apiKeyService')
 const userService = require('../services/userService')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
+const requestDetailService = require('../services/requestDetailService')
 // const { RateLimiterRedis } = require('rate-limiter-flexible') // 暂时未使用
 const ClientValidator = require('../validators/clientValidator')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
@@ -1775,6 +1776,17 @@ const requestLogger = (req, res, next) => {
   const clientIP = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown'
   const userAgent = req.get('User-Agent') || 'unknown'
   const referer = req.get('Referer') || 'none'
+  let lifecycleCaptured = false
+
+  const scheduleLifecycleCapture = (options = {}) => {
+    if (lifecycleCaptured) {
+      return
+    }
+    lifecycleCaptured = true
+    requestDetailService.captureLifecycleRequest(req, res, options).catch((error) => {
+      logger.debug(`⚠️ Failed to capture lifecycle request detail: ${error.message}`)
+    })
+  }
 
   // 请求开始 → debug 级别（减少正常请求的日志量）
   const isDebugRoute = req.originalUrl.includes('event_logging')
@@ -1851,11 +1863,44 @@ const requestLogger = (req, res, next) => {
     if (duration > 5000) {
       logger.warn(`🐌 Slow request: ${duration}ms ${req.method} ${req.originalUrl}`)
     }
+
+    scheduleLifecycleCapture({
+      completed: true,
+      clientAborted: false,
+      durationMs: duration,
+      statusCode: status
+    })
   })
 
   res.on('error', (error) => {
     const duration = Date.now() - start
     logger.error(`💥 [${requestId}] Response error after ${duration}ms:`, error)
+    scheduleLifecycleCapture({
+      completed: false,
+      clientAborted: false,
+      durationMs: duration,
+      statusCode: res.statusCode || 500,
+      errorType: 'response_error',
+      errorMessage: error?.message || 'Response error',
+      failureStage: 'internal'
+    })
+  })
+
+  res.on('close', () => {
+    if (res.writableEnded || lifecycleCaptured) {
+      return
+    }
+
+    const duration = Date.now() - start
+    scheduleLifecycleCapture({
+      completed: false,
+      clientAborted: true,
+      durationMs: duration,
+      statusCode: res.statusCode || 499,
+      errorType: 'client_aborted',
+      errorMessage: 'Client connection closed before response completed',
+      failureStage: 'client_abort'
+    })
   })
 
   next()

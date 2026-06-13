@@ -51,6 +51,8 @@ export const getUsageCostsApi = (period) =>
 export const getUsageStatsApi = (url) => request({ url, method: 'GET' })
 export const getRequestDetailsApi = (params) =>
   request({ url: '/admin/request-details', method: 'GET', params })
+export const getServiceQualityApi = (params) =>
+  request({ url: '/admin/service-quality', method: 'GET', params })
 export const getRequestDetailBodyPreviewStatsApi = (config) =>
   request({ url: '/admin/request-details/body-preview-stats', method: 'GET', ...config })
 export const purgeRequestDetailBodyPreviewApi = (config) =>
