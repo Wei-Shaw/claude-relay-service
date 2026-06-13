@@ -669,6 +669,17 @@ class LdapService {
     }
   }
 
+  // 🔐 验证用户当前 LDAP 密码，不保留临时登录会话
+  async verifyUserCredentials(username, password) {
+    const authResult = await this.authenticateUserCredentials(username, password)
+
+    if (authResult?.success && authResult.sessionToken) {
+      await userService.invalidateUserSession(authResult.sessionToken)
+    }
+
+    return authResult
+  }
+
   // 🔍 测试LDAP连接
   async testConnection() {
     if (!this.config.enabled) {
