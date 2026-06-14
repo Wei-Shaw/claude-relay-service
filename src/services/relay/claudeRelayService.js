@@ -897,21 +897,20 @@ class ClaudeRelayService {
               `🚫 Agent View auxiliary request hit 429 for account ${accountId}; skipping account-level rate-limit marking`
             )
           } else {
-            if (isDedicatedOfficialAccount && !dedicatedRateLimitMessage) {
-              dedicatedRateLimitMessage = this._buildStandardRateLimitMessage(
-                rateLimitResetTimestamp || account?.rateLimitEndAt
-              )
-            }
             if (!rateLimitResetTimestamp) {
               // 无权威 reset 头的 429 大概率不是真实限流，不标记账号、不进入冷却，直接透传错误
               logger.warn(
                 `⚠️ Rate limit without reset header for account ${accountId}, status: ${response.statusCode}, skipping rate limit marking`
               )
             } else {
+              if (isDedicatedOfficialAccount && !dedicatedRateLimitMessage) {
+                dedicatedRateLimitMessage = this._buildStandardRateLimitMessage(
+                  rateLimitResetTimestamp || account?.rateLimitEndAt
+                )
+              }
               logger.warn(
                 `🚫 Rate limit detected for account ${accountId}, status: ${response.statusCode}`
               )
-              // 标记账号为限流状态并删除粘性会话映射，传递准确的重置时间戳
               await unifiedClaudeScheduler.markAccountRateLimited(
                 accountId,
                 accountType,
@@ -2271,7 +2270,7 @@ class ClaudeRelayService {
                 logger.warn(`🚫 [Stream] Rate limit detected for account ${accountId}, status 429`)
               }
 
-              if (isDedicatedOfficialAccount && !isAgentViewAuxiliaryRequest) {
+              if (isDedicatedOfficialAccount && !isAgentViewAuxiliaryRequest && rateLimitResetTimestamp) {
                 const limitMessage = this._buildStandardRateLimitMessage(
                   rateLimitResetTimestamp || account?.rateLimitEndAt
                 )
