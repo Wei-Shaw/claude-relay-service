@@ -36,7 +36,11 @@ function isProAccount(info) {
     return true
   }
   // Local configured account type
-  return info.accountType === 'claude_pro'
+  return info.accountType === 'claude_pro' || info.accountType === 'claude_team_standard'
+}
+
+function isFreeAccount(info) {
+  return info.accountType === 'free' || info.accountType === 'claude_free'
 }
 
 class ClaudeAccountService {
@@ -974,7 +978,7 @@ class ClaudeAccountService {
               const info = JSON.parse(account.subscriptionInfo)
 
               // Free account: does not support any Opus model
-              if (info.accountType === 'free') {
+              if (isFreeAccount(info)) {
                 return false
               }
 
@@ -1100,7 +1104,7 @@ class ClaudeAccountService {
               const info = JSON.parse(account.subscriptionInfo)
 
               // Free account: does not support any Opus model
-              if (info.accountType === 'free') {
+              if (isFreeAccount(info)) {
                 return false
               }
 
@@ -2253,9 +2257,46 @@ class ClaudeAccountService {
         const organizationType = String(
           profileData.organization?.organization_type || ''
         ).toLowerCase()
+        const rateLimitTier = String(profileData.organization?.rate_limit_tier || '').toLowerCase()
+        const seatTier = String(profileData.organization?.seat_tier || '').toLowerCase()
+        const subscriptionStatus = String(
+          profileData.organization?.subscription_status || ''
+        ).toLowerCase()
         const isEnterpriseOrg = organizationType === 'claude_enterprise'
-        const hasClaudeMax = profileData.account?.has_claude_max === true || isEnterpriseOrg
-        const hasClaudePro = profileData.account?.has_claude_pro === true && !hasClaudeMax
+        const isTeamOrg = organizationType === 'claude_team'
+        const hasTeamPremiumSeat = isTeamOrg && seatTier.includes('premium')
+        const hasTeamStandardSeat = isTeamOrg && seatTier.includes('standard')
+        const hasTeamMaxTier = isTeamOrg && rateLimitTier.includes('claude_max')
+        const hasActiveTeamMax = isTeamOrg && subscriptionStatus === 'active' && hasTeamMaxTier
+        const hasActiveTeamStandard =
+          isTeamOrg && subscriptionStatus === 'active' && hasTeamStandardSeat && !hasActiveTeamMax
+        const hasClaudeMax =
+          profileData.account?.has_claude_max === true ||
+          isEnterpriseOrg ||
+          hasActiveTeamMax ||
+          hasTeamPremiumSeat
+        const hasClaudePro =
+          (profileData.account?.has_claude_pro === true || hasActiveTeamStandard) && !hasClaudeMax
+        const planKind =
+          isEnterpriseOrg || hasActiveTeamMax || hasTeamPremiumSeat
+            ? 'team_premium'
+            : hasActiveTeamStandard
+              ? 'team_standard'
+              : hasClaudeMax
+                ? 'individual_max'
+                : hasClaudePro
+                  ? 'individual_pro'
+                  : 'free'
+        const accountType =
+          isEnterpriseOrg || hasActiveTeamMax || hasTeamPremiumSeat
+            ? 'claude_team_premium'
+            : hasActiveTeamStandard
+              ? 'claude_team_standard'
+              : hasClaudeMax
+                ? 'claude_max'
+                : hasClaudePro
+                  ? 'claude_pro'
+                  : 'claude_free'
 
         // 构建订阅信息
         const subscriptionInfo = {
@@ -2272,10 +2313,16 @@ class ClaudeAccountService {
           organizationUuid: profileData.organization?.uuid,
           billingType: profileData.organization?.billing_type,
           rateLimitTier: profileData.organization?.rate_limit_tier,
+          seatTier: profileData.organization?.seat_tier,
+          subscriptionStatus: profileData.organization?.subscription_status,
           organizationType: profileData.organization?.organization_type,
+          planKind,
+          isTeamPlan: isTeamOrg || isEnterpriseOrg,
+          isTeamPremium: hasTeamPremiumSeat,
+          isTeamStandard: hasActiveTeamStandard,
 
-          // 账号类型：Enterprise 组织按 Max 能力处理，确保可调度 Opus
-          accountType: hasClaudeMax ? 'claude_max' : hasClaudePro ? 'claude_pro' : 'claude_max',
+          // 账号类型：Team Premium 权限等效 Max，Team Standard 权限等效 Pro
+          accountType,
 
           // 更新时间
           profileFetchedAt: new Date().toISOString()

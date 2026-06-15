@@ -32,7 +32,11 @@ function isProAccount(info) {
     return true
   }
   // Local configured account type
-  return info.accountType === 'claude_pro'
+  return info.accountType === 'claude_pro' || info.accountType === 'claude_team_standard'
+}
+
+function isFreeAccount(info) {
+  return info.accountType === 'free' || info.accountType === 'claude_free'
 }
 
 class UnifiedClaudeScheduler {
@@ -80,7 +84,7 @@ class UnifiedClaudeScheduler {
                 : account.subscriptionInfo
 
             // Free account: does not support any Opus model
-            if (info.accountType === 'free') {
+            if (isFreeAccount(info)) {
               logger.info(
                 `🚫 Claude account ${account.name} (Free) does not support Opus model${context ? ` ${context}` : ''}`
               )
