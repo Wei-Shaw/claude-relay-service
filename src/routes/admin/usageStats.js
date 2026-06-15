@@ -557,6 +557,27 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
     const fallbackModel = fallbackModelMap[platform] || 'unknown'
     const daysCount = Math.min(Math.max(parseInt(days, 10) || 30, 1), 60)
 
+    try {
+      const postgresUsageHistory = await usageStatsService.getAccountUsageHistory({
+        accountId,
+        days: daysCount,
+        accountCreatedAt
+      })
+
+      if (postgresUsageHistory?.hasData) {
+        const { hasData: _hasData, ...data } = postgresUsageHistory
+        return res.json({
+          success: true,
+          data: {
+            ...data,
+            generatedAt: new Date().toISOString()
+          }
+        })
+      }
+    } catch (error) {
+      logger.warn(`⚠️ PostgreSQL account usage history failed, fallback to Redis: ${error.message}`)
+    }
+
     // 获取概览统计数据
     const accountUsageStats = await redis.getAccountUsageStats(
       accountId,
@@ -571,19 +592,30 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
     let highestCostDay = null
     let highestRequestDay = null
 
-    const sumModelCostsForDay = async (dateKey) => {
-      const modelPattern = `account_usage:model:daily:${accountId}:*:${dateKey}`
-      const modelResults = await redis.scanAndGetAllChunked(modelPattern)
-      let summedCost = 0
+    const client = redis.getClientSafe()
 
-      if (modelResults.length === 0) {
-        return summedCost
+    const sumModelCostsForDay = async (dateKey) => {
+      const indexKey = `account_usage:model:daily:index:${dateKey}`
+      const accountPrefix = `${accountId}:`
+      const indexedModels = (await client.smembers(indexKey))
+        .filter((entry) => entry.startsWith(accountPrefix))
+        .map((entry) => entry.substring(accountPrefix.length))
+
+      if (indexedModels.length === 0) {
+        return 0
       }
 
-      for (const { key: modelKey, data: modelData } of modelResults) {
-        const modelParts = modelKey.split(':')
-        const modelName = modelParts[4] || 'unknown'
-        if (!modelData || Object.keys(modelData).length === 0) {
+      const pipeline = client.pipeline()
+      for (const model of indexedModels) {
+        pipeline.hgetall(`account_usage:model:daily:${accountId}:${model}:${dateKey}`)
+      }
+      const modelResults = await pipeline.exec()
+      let summedCost = 0
+
+      for (let i = 0; i < indexedModels.length; i++) {
+        const modelName = indexedModels[i] || 'unknown'
+        const [err, modelData] = modelResults[i] || []
+        if (err || !modelData || Object.keys(modelData).length === 0) {
           continue
         }
 
@@ -623,7 +655,6 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       const dayLabel = String(tzDate.getUTCDate()).padStart(2, '0')
       const label = `${monthLabel}/${dayLabel}`
 
-      const client = redis.getClientSafe()
       const dailyKey = `account_usage:daily:${accountId}:${dateKey}`
       const dailyData = await client.hgetall(dailyKey)
 

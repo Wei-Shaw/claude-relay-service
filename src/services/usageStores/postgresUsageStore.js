@@ -423,6 +423,21 @@ function buildUsagePoint(base, row = {}) {
   }
 }
 
+function buildAccountHistoryPoint(periodInfo, row = {}) {
+  const point = buildUsagePoint(
+    {
+      date: periodInfo.date,
+      label: periodInfo.date ? periodInfo.date.slice(5).replace('-', '/') : ''
+    },
+    row
+  )
+
+  return {
+    ...point,
+    tokens: point.totalTokens
+  }
+}
+
 function normalizeUsageEvent(event = {}) {
   const requestId = normalizeText(event.requestId)
   const timestamp = normalizeDate(event.timestamp)
@@ -1744,6 +1759,240 @@ async function getAccountUsageTrend({
   }
 }
 
+function buildAccountHistorySummary(history = [], daysCount = 30, accountCreatedAt = null) {
+  let totalCost = 0
+  let totalRequests = 0
+  let totalTokens = 0
+  let highestCostDay = null
+  let highestRequestDay = null
+
+  for (const item of history) {
+    const cost = normalizeNumber(item.cost)
+    const requests = normalizeInteger(item.requests)
+    const tokens = normalizeInteger(item.tokens || item.totalTokens)
+
+    totalCost += cost
+    totalRequests += requests
+    totalTokens += tokens
+
+    if (!highestCostDay || cost > highestCostDay.cost) {
+      highestCostDay = {
+        date: item.date,
+        label: item.label,
+        cost,
+        formattedCost: formatCost(cost)
+      }
+    }
+
+    if (!highestRequestDay || requests > highestRequestDay.requests) {
+      highestRequestDay = {
+        date: item.date,
+        label: item.label,
+        requests
+      }
+    }
+  }
+
+  totalCost = Math.round(totalCost * 1_000_000) / 1_000_000
+
+  let actualDaysForAvg = daysCount
+  if (accountCreatedAt) {
+    const createdAt = normalizeDate(accountCreatedAt, null)
+    if (createdAt) {
+      const diffTime = Math.abs(Date.now() - createdAt.getTime())
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      actualDaysForAvg = Math.max(Math.min(diffDays, daysCount), 1)
+    }
+  }
+
+  const avgDailyCost = actualDaysForAvg > 0 ? totalCost / actualDaysForAvg : 0
+  const avgDailyRequests = actualDaysForAvg > 0 ? totalRequests / actualDaysForAvg : 0
+  const avgDailyTokens = actualDaysForAvg > 0 ? totalTokens / actualDaysForAvg : 0
+  const todayData = history.length > 0 ? history[history.length - 1] : null
+
+  return {
+    days: daysCount,
+    actualDaysUsed: actualDaysForAvg,
+    accountCreatedAt: accountCreatedAt ? normalizeDate(accountCreatedAt).toISOString() : null,
+    totalCost,
+    totalCostFormatted: formatCost(totalCost),
+    totalRequests,
+    totalTokens,
+    avgDailyCost,
+    avgDailyCostFormatted: formatCost(avgDailyCost),
+    avgDailyRequests,
+    avgDailyTokens,
+    today: todayData
+      ? {
+          date: todayData.date,
+          cost: todayData.cost,
+          costFormatted: todayData.formattedCost,
+          requests: todayData.requests,
+          tokens: todayData.tokens || todayData.totalTokens || 0
+        }
+      : null,
+    highestCostDay,
+    highestRequestDay
+  }
+}
+
+async function getAccountUsageOverviewRows(accountId) {
+  if (!accountId) {
+    return {}
+  }
+
+  const currentDay = getCurrentPeriodStart('day')
+  const currentMonth = getCurrentPeriodStart('month')
+  const result = await postgres.query(
+    `
+      SELECT
+        COUNT(*) AS total_request_count,
+        SUM(input_tokens) AS total_input_tokens,
+        SUM(output_tokens) AS total_output_tokens,
+        SUM(cache_create_tokens) AS total_cache_create_tokens,
+        SUM(cache_read_tokens) AS total_cache_read_tokens,
+        SUM(ephemeral_5m_tokens) AS total_ephemeral_5m_tokens,
+        SUM(ephemeral_1h_tokens) AS total_ephemeral_1h_tokens,
+        SUM(total_tokens) AS total_total_tokens,
+        SUM(cost) AS total_cost,
+
+        COUNT(*) FILTER (WHERE timestamp >= $2) AS daily_request_count,
+        SUM(input_tokens) FILTER (WHERE timestamp >= $2) AS daily_input_tokens,
+        SUM(output_tokens) FILTER (WHERE timestamp >= $2) AS daily_output_tokens,
+        SUM(cache_create_tokens) FILTER (WHERE timestamp >= $2) AS daily_cache_create_tokens,
+        SUM(cache_read_tokens) FILTER (WHERE timestamp >= $2) AS daily_cache_read_tokens,
+        SUM(ephemeral_5m_tokens) FILTER (WHERE timestamp >= $2) AS daily_ephemeral_5m_tokens,
+        SUM(ephemeral_1h_tokens) FILTER (WHERE timestamp >= $2) AS daily_ephemeral_1h_tokens,
+        SUM(total_tokens) FILTER (WHERE timestamp >= $2) AS daily_total_tokens,
+        SUM(cost) FILTER (WHERE timestamp >= $2) AS daily_cost,
+
+        COUNT(*) FILTER (WHERE timestamp >= $3) AS monthly_request_count,
+        SUM(input_tokens) FILTER (WHERE timestamp >= $3) AS monthly_input_tokens,
+        SUM(output_tokens) FILTER (WHERE timestamp >= $3) AS monthly_output_tokens,
+        SUM(cache_create_tokens) FILTER (WHERE timestamp >= $3) AS monthly_cache_create_tokens,
+        SUM(cache_read_tokens) FILTER (WHERE timestamp >= $3) AS monthly_cache_read_tokens,
+        SUM(ephemeral_5m_tokens) FILTER (WHERE timestamp >= $3) AS monthly_ephemeral_5m_tokens,
+        SUM(ephemeral_1h_tokens) FILTER (WHERE timestamp >= $3) AS monthly_ephemeral_1h_tokens,
+        SUM(total_tokens) FILTER (WHERE timestamp >= $3) AS monthly_total_tokens,
+        SUM(cost) FILTER (WHERE timestamp >= $3) AS monthly_cost
+      FROM usage_events
+      WHERE account_id = $1
+    `,
+    [accountId, currentDay, currentMonth]
+  )
+
+  return result.rows[0] || {}
+}
+
+function buildAccountOverviewUsage(row = {}, prefix = 'total') {
+  const inputTokens = normalizeInteger(row[`${prefix}_input_tokens`])
+  const outputTokens = normalizeInteger(row[`${prefix}_output_tokens`])
+  const cacheCreateTokens = normalizeInteger(row[`${prefix}_cache_create_tokens`])
+  const cacheReadTokens = normalizeInteger(row[`${prefix}_cache_read_tokens`])
+  const ephemeral5mTokens = normalizeInteger(row[`${prefix}_ephemeral_5m_tokens`])
+  const ephemeral1hTokens = normalizeInteger(row[`${prefix}_ephemeral_1h_tokens`])
+  const allTokens =
+    normalizeInteger(row[`${prefix}_total_tokens`]) ||
+    inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+  return {
+    tokens: inputTokens + outputTokens,
+    inputTokens,
+    outputTokens,
+    cacheCreateTokens,
+    cacheReadTokens,
+    ephemeral5mTokens,
+    ephemeral1hTokens,
+    allTokens,
+    requests: normalizeInteger(row[`${prefix}_request_count`]),
+    cost: normalizeNumber(row[`${prefix}_cost`])
+  }
+}
+
+function buildAccountOverviewFromRows(row = {}, accountCreatedAt = null) {
+  const total = buildAccountOverviewUsage(row, 'total')
+  const daily = buildAccountOverviewUsage(row, 'daily')
+  const monthly = buildAccountOverviewUsage(row, 'monthly')
+  const createdAt = accountCreatedAt ? normalizeDate(accountCreatedAt, null) : null
+  const daysSinceCreated = createdAt
+    ? Math.max(1, Math.ceil((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)))
+    : 1
+  const totalMinutes = Math.max(1, daysSinceCreated * 24 * 60)
+
+  return {
+    total,
+    daily,
+    monthly,
+    averages: {
+      rpm: Math.round((total.requests / totalMinutes) * 100) / 100,
+      tpm: Math.round((total.allTokens / totalMinutes) * 100) / 100,
+      dailyRequests: Math.round((total.requests / daysSinceCreated) * 100) / 100,
+      dailyTokens: Math.round((total.allTokens / daysSinceCreated) * 100) / 100
+    }
+  }
+}
+
+async function getAccountUsageHistory({ accountId, days = 30, accountCreatedAt = null } = {}) {
+  const daysCount = Math.min(Math.max(parseInt(days, 10) || 30, 1), 60)
+  const { periodInfos } = buildPeriodInfos({ days: daysCount, granularity: 'day' })
+  const emptyHistory = periodInfos.map((info) => buildAccountHistoryPoint(info))
+
+  if (!accountId || periodInfos.length === 0) {
+    return {
+      history: emptyHistory,
+      summary: buildAccountHistorySummary(emptyHistory, daysCount, accountCreatedAt),
+      overview: buildAccountOverviewFromRows({}, accountCreatedAt),
+      hasData: false
+    }
+  }
+
+  const start = periodInfos[0].periodStart
+  const endExclusive = addPeriod(periodInfos[periodInfos.length - 1].periodStart, 'day')
+  const bucketExpression =
+    "date_trunc('day', timestamp + make_interval(secs => $1)) - make_interval(secs => $1)"
+
+  const [historyResult, overviewResult] = await Promise.all([
+    postgres.query(
+      `
+        SELECT
+          ${bucketExpression} AS period_start,
+          COUNT(*) AS request_count,
+          SUM(input_tokens) AS input_tokens,
+          SUM(output_tokens) AS output_tokens,
+          SUM(cache_create_tokens) AS cache_create_tokens,
+          SUM(cache_read_tokens) AS cache_read_tokens,
+          SUM(ephemeral_5m_tokens) AS ephemeral_5m_tokens,
+          SUM(ephemeral_1h_tokens) AS ephemeral_1h_tokens,
+          SUM(total_tokens) AS total_tokens,
+          SUM(cost) AS cost,
+          SUM(real_cost) AS real_cost
+        FROM usage_events
+        WHERE account_id = $2
+          AND timestamp >= $3
+          AND timestamp < $4
+        GROUP BY period_start
+      `,
+      [Math.trunc(getOffsetMs() / 1000), accountId, start, endExclusive]
+    ),
+    getAccountUsageOverviewRows(accountId)
+  ])
+
+  const rowsByDate = new Map(
+    historyResult.rows.map((row) => [formatLocalDate(row.period_start), row])
+  )
+  const history = periodInfos.map((info) =>
+    buildAccountHistoryPoint(info, rowsByDate.get(info.date) || {})
+  )
+
+  return {
+    history,
+    summary: buildAccountHistorySummary(history, daysCount, accountCreatedAt),
+    overview: buildAccountOverviewFromRows(overviewResult, accountCreatedAt),
+    hasData:
+      historyResult.rows.length > 0 || normalizeInteger(overviewResult?.total_request_count) > 0
+  }
+}
+
 async function getAccountUsageSummary(accountId) {
   if (!accountId) {
     return {
@@ -1878,6 +2127,7 @@ module.exports = {
   getApiKeysUsageTrend,
   getModelUsageTrend,
   getAccountUsageTrend,
+  getAccountUsageHistory,
   getAccountUsageSummary,
   normalizeModelName,
   getPeriodStart,
