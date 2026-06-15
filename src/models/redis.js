@@ -2571,6 +2571,12 @@ class RedisClient {
     const key = `oauth:${sessionId}`
     const data = await this.client.hgetall(key)
 
+    // hgetall 在 key 不存在或已过期时返回空对象 {}，调用方的 if (!session) 检查无法识别
+    // 这里显式返回 null，避免过期会话绕过检查后在后续逻辑中崩溃
+    if (!data || Object.keys(data).length === 0) {
+      return null
+    }
+
     // 反序列化 proxy 字段
     if (data.proxy) {
       try {
