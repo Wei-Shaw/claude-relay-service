@@ -4400,10 +4400,7 @@ const getClaudeAccountType = (account) => {
         info.accountType === 'claude_team_max'
       ) {
         return 'Claude Team Premium'
-      } else if (
-        info.planKind === 'team_standard' ||
-        info.accountType === 'claude_team_standard'
-      ) {
+      } else if (info.planKind === 'team_standard' || info.accountType === 'claude_team_standard') {
         return 'Claude Team Standard'
       } else if (info.hasClaudeMax === true || info.accountType === 'claude_max') {
         return 'Claude Max'
