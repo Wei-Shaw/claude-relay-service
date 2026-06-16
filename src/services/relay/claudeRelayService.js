@@ -19,6 +19,9 @@ const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const metadataUserIdHelper = require('../../utils/metadataUserIdHelper')
 const {
+  normalizeClaudePayloadForUpstream
+} = require('../../utils/claudeLongContextHelper')
+const {
   getHttpsAgentForStream,
   getHttpsAgentForNonStream,
   getPricingData
@@ -1589,6 +1592,14 @@ class ClaudeRelayService {
     requestPayload = extensionResult.body
     finalHeaders = extensionResult.headers
 
+    const clientBetaHeader = this._getHeaderValueCaseInsensitive(clientHeaders, 'anthropic-beta')
+    const normalizedLongContext = normalizeClaudePayloadForUpstream(
+      requestPayload,
+      clientBetaHeader
+    )
+    requestPayload = normalizedLongContext.body
+    const normalizedClientBetaHeader = normalizedLongContext.betaHeader
+
     let toolNameMap = null
     if (!isRealClaudeCode) {
       toolNameMap = this._transformToolNamesInRequestBody(requestPayload, {
@@ -1632,8 +1643,7 @@ class ClaudeRelayService {
 
     // 根据模型和客户端传递的 anthropic-beta 动态设置 header
     const modelId = requestPayload?.model || body?.model
-    const clientBetaHeader = this._getHeaderValueCaseInsensitive(clientHeaders, 'anthropic-beta')
-    headers['anthropic-beta'] = this._getBetaHeader(modelId, clientBetaHeader)
+    headers['anthropic-beta'] = this._getBetaHeader(modelId, normalizedClientBetaHeader)
     return {
       requestPayload,
       bodyString,
