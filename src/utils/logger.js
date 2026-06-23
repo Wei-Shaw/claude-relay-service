@@ -5,6 +5,7 @@ const { formatDateWithTimezone } = require('../utils/dateHelper')
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
+const { isClientConnectionError } = require('./connectionErrorHelper')
 
 // 安全的 JSON 序列化函数，处理循环引用和特殊字符
 const safeStringify = (obj, maxDepth = Infinity) => {
@@ -175,6 +176,17 @@ const createFileFormat = () =>
 const fileFormat = createFileFormat()
 const consoleFormat = createConsoleFormat()
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID
+
+if (!isTestEnv) {
+  for (const stream of [process.stdout, process.stderr]) {
+    stream.on('error', (error) => {
+      if (isClientConnectionError(error)) {
+        return
+      }
+      throw error
+    })
+  }
+}
 
 // 📁 确保日志目录存在并设置权限
 if (!fs.existsSync(config.logging.dirname)) {

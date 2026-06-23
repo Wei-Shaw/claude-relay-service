@@ -12,6 +12,7 @@ const redis = require('./models/redis')
 const pricingService = require('./services/pricingService')
 const cacheMonitor = require('./utils/cacheMonitor')
 const { getSafeMessage } = require('./utils/errorSanitizer')
+const { isClientConnectionError } = require('./utils/connectionErrorHelper')
 
 // Import routes
 const apiRoutes = require('./routes/api')
@@ -931,11 +932,25 @@ class Application {
 
     // 处理未捕获异常
     process.on('uncaughtException', (error) => {
+      if (isClientConnectionError(error)) {
+        logger.warn('⚠️ Ignoring client connection error:', {
+          code: error?.code,
+          message: error?.message
+        })
+        return
+      }
       logger.error('💥 Uncaught exception:', error)
       shutdown('uncaughtException')
     })
 
     process.on('unhandledRejection', (reason, promise) => {
+      if (isClientConnectionError(reason)) {
+        logger.warn('⚠️ Ignoring client connection rejection:', {
+          code: reason?.code,
+          message: reason?.message
+        })
+        return
+      }
       logger.error('💥 Unhandled rejection at:', promise, 'reason:', reason)
       shutdown('unhandledRejection')
     })

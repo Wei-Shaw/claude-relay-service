@@ -21,6 +21,11 @@ const {
 } = require('../utils/requestDetailHelper')
 const requestBodyRuleService = require('../services/requestBodyRuleService')
 const { CODEX_CLI_INSTRUCTIONS } = require('../utils/codexCliInstructions')
+const {
+  attachResponseErrorHandler,
+  safeEndResponse,
+  safeWriteToResponse
+} = require('../utils/connectionErrorHelper')
 
 // 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
@@ -570,8 +575,13 @@ const handleResponses = async (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream')
         res.setHeader('Cache-Control', 'no-cache')
         res.setHeader('Connection', 'keep-alive')
-        res.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
-        res.end()
+        safeWriteToResponse(
+          res,
+          `data: ${JSON.stringify(errorResponse)}\n\n`,
+          logger,
+          'OpenAI stream'
+        )
+        safeEndResponse(res, logger, 'OpenAI stream')
       } else {
         res.status(429).json(errorResponse)
       }
@@ -777,6 +787,7 @@ const handleResponses = async (req, res) => {
     // 使用增量 SSE 解析器
     const sseParser = new IncrementalSSEParser()
     let upstreamEnded = false
+    const detachResponseErrorHandler = attachResponseErrorHandler(res, logger, 'OpenAI stream')
 
     // 客户端断开时清理上游流；res.close 可覆盖 FIN/Nginx/CDN 断开。
     const cleanup = () => {
@@ -785,6 +796,7 @@ const handleResponses = async (req, res) => {
       }
 
       upstreamEnded = true
+      detachResponseErrorHandler()
       try {
         upstream.data?.unpipe?.(res)
         upstream.data?.destroy?.()
@@ -825,8 +837,10 @@ const handleResponses = async (req, res) => {
     upstream.data.on('data', (chunk) => {
       try {
         // 转发数据给客户端
-        if (!res.destroyed) {
-          res.write(chunk)
+        const written = safeWriteToResponse(res, chunk, logger, 'OpenAI stream')
+        if (!written) {
+          cleanup()
+          return
         }
 
         // 使用增量解析器处理数据
@@ -844,6 +858,7 @@ const handleResponses = async (req, res) => {
     upstream.data.on('end', async () => {
       upstreamEnded = true
       res.removeListener('close', cleanup)
+      detachResponseErrorHandler()
 
       // 处理剩余的 buffer
       const remaining = sseParser.getRemaining()
@@ -928,9 +943,7 @@ const handleResponses = async (req, res) => {
         }
       }
 
-      if (!res.destroyed) {
-        res.end()
-      }
+      safeEndResponse(res, logger, 'OpenAI stream')
     })
 
     upstream.data.on('error', (err) => {
@@ -939,12 +952,13 @@ const handleResponses = async (req, res) => {
       }
       upstreamEnded = true
       res.removeListener('close', cleanup)
+      detachResponseErrorHandler()
 
       logger.error('Upstream stream error:', err)
       if (!res.headersSent) {
         res.status(502).json({ error: { message: 'Upstream stream error' } })
-      } else if (!res.destroyed) {
-        res.end()
+      } else {
+        safeEndResponse(res, logger, 'OpenAI stream')
       }
     })
 
