@@ -18,6 +18,11 @@ const {
   sanitizeOpenAIResponsesStreamEvent
 } = require('../../utils/openaiResponsesErrorAdapter')
 const openaiResponsesTestService = require('../openaiResponsesTestService')
+const {
+  attachResponseErrorHandler,
+  safeEndResponse,
+  safeWriteToResponse
+} = require('../../utils/connectionErrorHelper')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
@@ -585,6 +590,11 @@ class OpenAIResponsesRelayService {
     let rateLimitDetected = false
     let rateLimitResetsInSeconds = null
     let streamEnded = false
+    const detachResponseErrorHandler = attachResponseErrorHandler(
+      res,
+      logger,
+      'OpenAI-Responses stream'
+    )
 
     const cleanup = () => {
       if (streamEnded || res.writableEnded) {
@@ -592,6 +602,7 @@ class OpenAIResponsesRelayService {
       }
 
       streamEnded = true
+      detachResponseErrorHandler()
       try {
         response.data?.unpipe?.(res)
         response.data?.destroy?.()
@@ -608,8 +619,11 @@ class OpenAIResponsesRelayService {
       parseSSEForUsage(event)
 
       const rewritten = this._rewriteStreamEventForClient(event, response.headers)
-      if (!res.destroyed && !streamEnded && rewritten) {
-        res.write(rewritten)
+      if (!streamEnded && rewritten) {
+        const written = safeWriteToResponse(res, rewritten, logger, 'OpenAI-Responses stream')
+        if (!written) {
+          cleanup()
+        }
       }
     }
 
@@ -790,10 +804,9 @@ class OpenAIResponsesRelayService {
       // 清理监听器
       res.removeListener('close', handleClientDisconnect)
       res.removeListener('close', cleanup)
+      detachResponseErrorHandler()
 
-      if (!res.destroyed) {
-        res.end()
-      }
+      safeEndResponse(res, logger, 'OpenAI-Responses stream')
 
       logger.info('Stream response completed', {
         accountId: account.id,
@@ -812,14 +825,15 @@ class OpenAIResponsesRelayService {
       // 清理监听器
       res.removeListener('close', handleClientDisconnect)
       res.removeListener('close', cleanup)
+      detachResponseErrorHandler()
 
       if (!res.headersSent) {
         const safeErrorResponse = buildOpenAIResponsesClientError(502, error, {
           fallbackStatus: 502
         })
         res.status(safeErrorResponse.status).json(safeErrorResponse.body)
-      } else if (!res.destroyed) {
-        res.end()
+      } else {
+        safeEndResponse(res, logger, 'OpenAI-Responses stream')
       }
     })
 
