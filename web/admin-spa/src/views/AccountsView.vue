@@ -1388,15 +1388,15 @@
                     <button
                       v-if="
                         account.platform === 'claude' &&
-                        (account.status === 'unauthorized' ||
-                          (account.status === 'error' && /40[01]/.test(account.errorMessage || '')))
+                        account.authType === 'oauth' &&
+                        (account.status === 'error' || account.status === 'unauthorized')
                       "
-                      class="rounded bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/40 dark:text-orange-300"
+                      class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
                       title="重新授权"
                       @click="openReAuthDialog(account)"
                     >
-                      <i class="fas fa-key" />
-                      <span class="ml-1">授权</span>
+                      <i class="fas fa-link" />
+                      <span class="ml-1">重新授权</span>
                     </button>
                     <button
                       class="rounded bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-200"
@@ -1436,15 +1436,15 @@
                     <button
                       v-if="
                         account.platform === 'claude' &&
-                        (account.status === 'unauthorized' ||
-                          (account.status === 'error' && /40[01]/.test(account.errorMessage || '')))
+                        account.authType === 'oauth' &&
+                        (account.status === 'error' || account.status === 'unauthorized')
                       "
-                      class="rounded bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/40 dark:text-orange-300"
+                      class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
                       title="重新授权"
                       @click="openReAuthDialog(account)"
                     >
-                      <i class="fas fa-key" />
-                      <span class="ml-1">授权</span>
+                      <i class="fas fa-link" />
+                      <span class="ml-1">重新授权</span>
                     </button>
                     <ActionDropdown :actions="getAccountActions(account)" />
                   </div>
@@ -1946,15 +1946,15 @@
             <button
               v-if="
                 account.platform === 'claude' &&
-                (account.status === 'unauthorized' ||
-                  (account.status === 'error' && /40[01]/.test(account.errorMessage || '')))
+                account.authType === 'oauth' &&
+                (account.status === 'error' || account.status === 'unauthorized')
               "
-              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-600 transition-colors hover:bg-orange-100 dark:bg-orange-900/40 dark:text-orange-300"
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300"
               title="重新授权"
               @click="openReAuthDialog(account)"
             >
-              <i class="fas fa-key" />
-              授权
+              <i class="fas fa-link" />
+              重新授权
             </button>
 
             <button
@@ -2081,14 +2081,6 @@
       :account="editingAccount"
       @close="showEditAccountModal = false"
       @success="handleEditSuccess"
-    />
-
-    <!-- 重新授权弹窗 -->
-    <ReAuthDialog
-      v-if="showReAuthModal && reAuthAccount"
-      :account="reAuthAccount"
-      @close="showReAuthModal = false"
-      @success="handleReAuthSuccess"
     />
 
     <!-- 确认弹窗 -->
@@ -2301,6 +2293,14 @@
       @close="showGroupManagementModal = false"
       @refresh="loadAccountGroups"
     />
+
+    <!-- 重新授权弹窗 -->
+    <ReAuthDialog
+      v-if="showReAuthModal && reAuthAccount"
+      :account="reAuthAccount"
+      @close="showReAuthModal = false"
+      @success="handleReAuthSuccess"
+    />
   </div>
 </template>
 
@@ -2468,10 +2468,6 @@ const showAccountStatsModal = ref(false)
 
 // 分组管理弹窗状态
 const showGroupManagementModal = ref(false)
-
-// 重新授权弹窗状态
-const showReAuthModal = ref(false)
-const reAuthAccount = ref(null)
 
 // 表格横向滚动检测
 const tableContainerRef = ref(null)
@@ -4009,14 +4005,14 @@ const editAccount = (account) => {
 }
 
 // 重新授权
+const showReAuthModal = ref(false)
+const reAuthAccount = ref(null)
 const openReAuthDialog = (account) => {
   reAuthAccount.value = account
   showReAuthModal.value = true
 }
-
 const handleReAuthSuccess = () => {
   showReAuthModal.value = false
-  showToast('账号重新授权成功', 'success')
   loadAccounts()
 }
 
