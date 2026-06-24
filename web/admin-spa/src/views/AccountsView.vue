@@ -1386,6 +1386,19 @@
                       <span class="ml-1">编辑</span>
                     </button>
                     <button
+                      v-if="
+                        account.platform === 'claude' &&
+                        (account.status === 'unauthorized' ||
+                          (account.status === 'error' && /40[01]/.test(account.errorMessage || '')))
+                      "
+                      class="rounded bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/40 dark:text-orange-300"
+                      title="重新授权"
+                      @click="openReAuthDialog(account)"
+                    >
+                      <i class="fas fa-key" />
+                      <span class="ml-1">授权</span>
+                    </button>
+                    <button
                       class="rounded bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-200"
                       title="删除账户"
                       @click="deleteAccount(account)"
@@ -1419,6 +1432,19 @@
                     >
                       <i class="fas fa-edit" />
                       <span class="ml-1">编辑</span>
+                    </button>
+                    <button
+                      v-if="
+                        account.platform === 'claude' &&
+                        (account.status === 'unauthorized' ||
+                          (account.status === 'error' && /40[01]/.test(account.errorMessage || '')))
+                      "
+                      class="rounded bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-900/40 dark:text-orange-300"
+                      title="重新授权"
+                      @click="openReAuthDialog(account)"
+                    >
+                      <i class="fas fa-key" />
+                      <span class="ml-1">授权</span>
                     </button>
                     <ActionDropdown :actions="getAccountActions(account)" />
                   </div>
@@ -1918,6 +1944,20 @@
             </button>
 
             <button
+              v-if="
+                account.platform === 'claude' &&
+                (account.status === 'unauthorized' ||
+                  (account.status === 'error' && /40[01]/.test(account.errorMessage || '')))
+              "
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-600 transition-colors hover:bg-orange-100 dark:bg-orange-900/40 dark:text-orange-300"
+              title="重新授权"
+              @click="openReAuthDialog(account)"
+            >
+              <i class="fas fa-key" />
+              授权
+            </button>
+
+            <button
               class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 transition-colors hover:bg-red-100"
               @click="deleteAccount(account)"
             >
@@ -2041,6 +2081,14 @@
       :account="editingAccount"
       @close="showEditAccountModal = false"
       @success="handleEditSuccess"
+    />
+
+    <!-- 重新授权弹窗 -->
+    <ReAuthDialog
+      v-if="showReAuthModal && reAuthAccount"
+      :account="reAuthAccount"
+      @close="showReAuthModal = false"
+      @success="handleReAuthSuccess"
     />
 
     <!-- 确认弹窗 -->
@@ -2274,6 +2322,7 @@ import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import GroupManagementModal from '@/components/accounts/GroupManagementModal.vue'
 import BalanceDisplay from '@/components/accounts/BalanceDisplay.vue'
 import AccountBalanceScriptModal from '@/components/accounts/AccountBalanceScriptModal.vue'
+import ReAuthDialog from '@/components/accounts/ReAuthDialog.vue'
 
 // 确认弹窗状态
 const showConfirmModal = ref(false)
@@ -2419,6 +2468,10 @@ const showAccountStatsModal = ref(false)
 
 // 分组管理弹窗状态
 const showGroupManagementModal = ref(false)
+
+// 重新授权弹窗状态
+const showReAuthModal = ref(false)
+const reAuthAccount = ref(null)
 
 // 表格横向滚动检测
 const tableContainerRef = ref(null)
@@ -3953,6 +4006,18 @@ const closeCreateAccountModal = () => {
 const editAccount = (account) => {
   editingAccount.value = account
   showEditAccountModal.value = true
+}
+
+// 重新授权
+const openReAuthDialog = (account) => {
+  reAuthAccount.value = account
+  showReAuthModal.value = true
+}
+
+const handleReAuthSuccess = () => {
+  showReAuthModal.value = false
+  showToast('账号重新授权成功', 'success')
+  loadAccounts()
 }
 
 const getBoundApiKeysForAccount = (account) => {
