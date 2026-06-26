@@ -400,6 +400,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_speed": true,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -433,6 +434,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_speed": true,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -466,6 +468,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_speed": true,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -500,6 +503,7 @@
     "supports_reasoning": true,
     "supports_response_schema": true,
     "supports_sampling_params": false,
+    "supports_speed": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_xhigh_reasoning_effort": true
@@ -535,6 +539,7 @@
     "supports_reasoning": true,
     "supports_response_schema": true,
     "supports_sampling_params": false,
+    "supports_speed": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_xhigh_reasoning_effort": true
@@ -570,6 +575,7 @@
     "supports_reasoning": true,
     "supports_response_schema": true,
     "supports_sampling_params": false,
+    "supports_speed": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_xhigh_reasoning_effort": true
@@ -1355,6 +1361,7 @@
     "supports_web_search": true
   },
   "gemini-2.5-flash-native-audio-latest": {
+    "gemini_native_audio": true,
     "input_cost_per_audio_token": 1e-06,
     "input_cost_per_token": 3e-07,
     "litellm_provider": "gemini",
@@ -1379,6 +1386,7 @@
     "supports_audio_output": true
   },
   "gemini-2.5-flash-native-audio-preview-09-2025": {
+    "gemini_native_audio": true,
     "input_cost_per_audio_token": 1e-06,
     "input_cost_per_token": 3e-07,
     "litellm_provider": "gemini",
@@ -1403,6 +1411,7 @@
     "supports_audio_output": true
   },
   "gemini-2.5-flash-native-audio-preview-12-2025": {
+    "gemini_native_audio": true,
     "input_cost_per_audio_token": 1e-06,
     "input_cost_per_token": 3e-07,
     "litellm_provider": "gemini",
@@ -1689,6 +1698,47 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
+    "supports_vision": true,
+    "supports_web_search": true,
+    "web_search_billing_unit": "per_query"
+  },
+  "gemini-3-pro-image": {
+    "input_cost_per_image": 0.0011,
+    "input_cost_per_token": 2e-06,
+    "input_cost_per_token_batches": 1e-06,
+    "litellm_provider": "vertex_ai-language-models",
+    "max_input_tokens": 65536,
+    "max_output_tokens": 32768,
+    "max_tokens": 32768,
+    "mode": "image_generation",
+    "output_cost_per_image": 0.134,
+    "output_cost_per_image_token": 0.00012,
+    "output_cost_per_token": 1.2e-05,
+    "output_cost_per_token_batches": 6e-06,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
+    "source": "https://ai.google.dev/gemini-api/docs/pricing#gemini-3-pro-image",
+    "supported_endpoints": [
+      "/v1/chat/completions",
+      "/v1/completions",
+      "/v1/batch"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "text",
+      "image"
+    ],
+    "supports_function_calling": false,
+    "supports_prompt_caching": true,
+    "supports_response_schema": true,
+    "supports_service_tier": true,
+    "supports_system_messages": true,
     "supports_vision": true,
     "supports_web_search": true,
     "web_search_billing_unit": "per_query"
@@ -1999,6 +2049,7 @@
     "web_search_billing_unit": "per_query"
   },
   "gemini-3.1-flash-live-preview": {
+    "gemini_audio_only_live": true,
     "input_cost_per_audio_token": 3e-06,
     "input_cost_per_image_token": 1e-06,
     "input_cost_per_token": 7.5e-07,
@@ -2548,6 +2599,7 @@
   },
   "gemini-live-2.5-flash-preview-native-audio-09-2025": {
     "cache_read_input_token_cost": 7.5e-08,
+    "gemini_native_audio": true,
     "input_cost_per_audio_token": 3e-06,
     "input_cost_per_token": 3e-07,
     "litellm_provider": "vertex_ai-language-models",
