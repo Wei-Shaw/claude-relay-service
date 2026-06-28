@@ -249,3 +249,6 @@ web/apiStats/
 web/admin-spa/dist/
 
 .serena/
+
+# Cookie-auth impersonation helper (built artifact; build via scripts/build-cookie-helper.sh)
+/bin/claude-cookie-helper
