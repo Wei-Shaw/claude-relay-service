@@ -233,6 +233,10 @@ class UnifiedClaudeScheduler {
         effectiveModel && typeof effectiveModel === 'string'
           ? effectiveModel.toLowerCase().includes('opus')
           : false
+      const isFableRequest =
+        effectiveModel && typeof effectiveModel === 'string'
+          ? effectiveModel.toLowerCase().includes('fable')
+          : false
 
       // 如果是 CCR 前缀，只在 CCR 账户池中选择
       if (vendor === 'ccr') {
@@ -285,6 +289,9 @@ class UnifiedClaudeScheduler {
             } else {
               if (isOpusRequest) {
                 await claudeAccountService.clearExpiredOpusRateLimit(boundAccount.id)
+              }
+              if (isFableRequest) {
+                await claudeAccountService.clearExpiredFableRateLimit(boundAccount.id)
               }
               logger.info(
                 `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
@@ -465,6 +472,10 @@ class UnifiedClaudeScheduler {
     const isOpusRequest =
       requestedModel && typeof requestedModel === 'string'
         ? requestedModel.toLowerCase().includes('opus')
+        : false
+    const isFableRequest =
+      requestedModel && typeof requestedModel === 'string'
+        ? requestedModel.toLowerCase().includes('fable')
         : false
 
     // 如果API Key绑定了专属账户，优先返回
@@ -653,6 +664,18 @@ class UnifiedClaudeScheduler {
           if (isOpusRateLimited) {
             logger.info(
               `🚫 Skipping account ${account.name} (${account.id}) due to active Opus limit`
+            )
+            continue
+          }
+        }
+
+        if (isFableRequest) {
+          const isFableRateLimited = await claudeAccountService.isAccountFableRateLimited(
+            account.id
+          )
+          if (isFableRateLimited) {
+            logger.info(
+              `🚫 Skipping account ${account.name} (${account.id}) due to active Fable limit`
             )
             continue
           }
@@ -1029,6 +1052,18 @@ class UnifiedClaudeScheduler {
           const isOpusRateLimited = await claudeAccountService.isAccountOpusRateLimited(accountId)
           if (isOpusRateLimited) {
             logger.info(`🚫 Account ${accountId} skipped due to active Opus limit (session check)`)
+            return false
+          }
+        }
+
+        if (
+          requestedModel &&
+          typeof requestedModel === 'string' &&
+          requestedModel.toLowerCase().includes('fable')
+        ) {
+          const isFableRateLimited = await claudeAccountService.isAccountFableRateLimited(accountId)
+          if (isFableRateLimited) {
+            logger.info(`🚫 Account ${accountId} skipped due to active Fable limit (session check)`)
             return false
           }
         }
@@ -1516,6 +1551,10 @@ class UnifiedClaudeScheduler {
         requestedModel && typeof requestedModel === 'string'
           ? requestedModel.toLowerCase().includes('opus')
           : false
+      const isFableRequest =
+        requestedModel && typeof requestedModel === 'string'
+          ? requestedModel.toLowerCase().includes('fable')
+          : false
 
       // 获取所有成员账户的详细信息
       for (const memberId of memberIds) {
@@ -1591,6 +1630,18 @@ class UnifiedClaudeScheduler {
             if (isOpusRateLimited) {
               logger.info(
                 `🚫 Skipping group member ${account.name} (${account.id}) due to active Opus limit`
+              )
+              continue
+            }
+          }
+
+          if (accountType === 'claude-official' && isFableRequest) {
+            const isFableRateLimited = await claudeAccountService.isAccountFableRateLimited(
+              account.id
+            )
+            if (isFableRateLimited) {
+              logger.info(
+                `🚫 Skipping group member ${account.name} (${account.id}) due to active Fable limit`
               )
               continue
             }

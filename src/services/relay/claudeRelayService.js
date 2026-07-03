@@ -474,6 +474,8 @@ class ClaudeRelayService {
 
       const isOpusModelRequest =
         typeof requestBody?.model === 'string' && requestBody.model.toLowerCase().includes('opus')
+      const isFableModelRequest =
+        typeof requestBody?.model === 'string' && requestBody.model.toLowerCase().includes('fable')
 
       // 生成会话哈希用于sticky会话
       const sessionHash = sessionHelper.generateSessionHash(requestBody)
@@ -848,6 +850,14 @@ class ClaudeRelayService {
                   accountId
                 }
               }
+            } else if (isFableModelRequest && !Number.isNaN(parsedResetTimestamp)) {
+              await claudeAccountService.markAccountFableRateLimited(
+                accountId,
+                parsedResetTimestamp
+              )
+              logger.warn(
+                `🚫 Account ${accountId} hit Fable limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+              )
             } else {
               isRateLimited = true
               if (!Number.isNaN(parsedResetTimestamp)) {
@@ -2106,6 +2116,8 @@ class ClaudeRelayService {
 
     const isOpusModelRequest =
       typeof body?.model === 'string' && body.model.toLowerCase().includes('opus')
+    const isFableModelRequest =
+      typeof body?.model === 'string' && body.model.toLowerCase().includes('fable')
 
     // 使用公共方法准备请求头和 payload
     const prepared = await this._prepareRequestHeadersAndPayload(
@@ -2237,6 +2249,16 @@ class ClaudeRelayService {
                 responseStream.end()
                 resolve()
                 return
+              }
+            } else if (isFableModelRequest) {
+              if (!Number.isNaN(parsedResetTimestamp)) {
+                await claudeAccountService.markAccountFableRateLimited(
+                  accountId,
+                  parsedResetTimestamp
+                )
+                logger.warn(
+                  `🚫 [Stream] Account ${accountId} hit Fable limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+                )
               }
             } else {
               const rateLimitResetTimestamp = Number.isNaN(parsedResetTimestamp)
@@ -2915,6 +2937,14 @@ class ClaudeRelayService {
               await claudeAccountService.markAccountOpusRateLimited(accountId, parsedResetTimestamp)
               logger.warn(
                 `🚫 [Stream] Account ${accountId} hit Opus limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+              )
+            } else if (isFableModelRequest && !Number.isNaN(parsedResetTimestamp)) {
+              await claudeAccountService.markAccountFableRateLimited(
+                accountId,
+                parsedResetTimestamp
+              )
+              logger.warn(
+                `🚫 [Stream] Account ${accountId} hit Fable limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
               )
             } else if (this._isAgentViewAuxiliaryRequest(body, clientHeaders)) {
               logger.warn(
