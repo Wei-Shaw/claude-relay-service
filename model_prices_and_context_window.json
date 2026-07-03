@@ -693,6 +693,7 @@
     "supports_assistant_prefill": true,
     "supports_computer_use": true,
     "supports_function_calling": true,
+    "supports_parallel_tool_use_config": true,
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
