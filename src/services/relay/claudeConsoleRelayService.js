@@ -103,6 +103,11 @@ class ClaudeConsoleRelayService {
       }
 
       const autoProtectionDisabled = account.disableAutoProtection === true
+      const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+        apiKeyData,
+        accountId,
+        'claude-console'
+      )
 
       logger.info(
         `📤 Processing Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId}), request: ${requestId}`
@@ -337,7 +342,7 @@ class ClaudeConsoleRelayService {
         )
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', 401)
+            .markTempUnavailable(accountId, 'claude-console', 401, null, tempUnavailableContext)
             .catch(() => {})
         }
       } else if (accountDisabledError) {
@@ -366,7 +371,8 @@ class ClaudeConsoleRelayService {
               accountId,
               'claude-console',
               429,
-              upstreamErrorHelper.parseRetryAfter(response.headers)
+              upstreamErrorHelper.parseRetryAfter(response.headers),
+              tempUnavailableContext
             )
             .catch(() => {})
         }
@@ -377,7 +383,7 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markAccountOverloaded(accountId)
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', 529)
+            .markTempUnavailable(accountId, 'claude-console', 529, null, tempUnavailableContext)
             .catch(() => {})
         }
       } else if (response.status >= 500) {
@@ -386,7 +392,13 @@ class ClaudeConsoleRelayService {
         )
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', response.status)
+            .markTempUnavailable(
+              accountId,
+              'claude-console',
+              response.status,
+              null,
+              tempUnavailableContext
+            )
             .catch(() => {})
         }
       } else if (response.status === 200 || response.status === 201) {
@@ -576,6 +588,11 @@ class ClaudeConsoleRelayService {
       if (!account) {
         throw new Error('Claude Console Claude account not found')
       }
+      const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+        apiKeyData,
+        accountId,
+        'claude-console'
+      )
 
       logger.info(
         `📡 Processing streaming Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId}), request: ${requestId}`
@@ -670,7 +687,7 @@ class ClaudeConsoleRelayService {
         accountId,
         usageCallback,
         streamTransformer,
-        options,
+        { ...options, tempUnavailableContext },
         // 📬 回调：在收到响应头时释放队列锁
         async () => {
           if (queueLockAcquired && queueRequestId && accountId) {
@@ -763,6 +780,7 @@ class ClaudeConsoleRelayService {
   ) {
     return new Promise((resolve, reject) => {
       let aborted = false
+      const tempUnavailableContext = requestOptions.tempUnavailableContext || null
 
       // 构建完整的API URL
       const cleanUrl = account.apiUrl.replace(/\/$/, '') // 移除末尾斜杠
@@ -863,7 +881,13 @@ class ClaudeConsoleRelayService {
                 )
                 if (!autoProtectionDisabled) {
                   await upstreamErrorHelper
-                    .markTempUnavailable(accountId, 'claude-console', 401)
+                    .markTempUnavailable(
+                      accountId,
+                      'claude-console',
+                      401,
+                      null,
+                      tempUnavailableContext
+                    )
                     .catch(() => {})
                 }
               } else if (accountDisabledError) {
@@ -892,7 +916,8 @@ class ClaudeConsoleRelayService {
                       accountId,
                       'claude-console',
                       429,
-                      upstreamErrorHelper.parseRetryAfter(response.headers)
+                      upstreamErrorHelper.parseRetryAfter(response.headers),
+                      tempUnavailableContext
                     )
                     .catch(() => {})
                 }
@@ -903,7 +928,13 @@ class ClaudeConsoleRelayService {
                 if (!autoProtectionDisabled) {
                   await claudeConsoleAccountService.markAccountOverloaded(accountId)
                   await upstreamErrorHelper
-                    .markTempUnavailable(accountId, 'claude-console', 529)
+                    .markTempUnavailable(
+                      accountId,
+                      'claude-console',
+                      529,
+                      null,
+                      tempUnavailableContext
+                    )
                     .catch(() => {})
                 }
               } else if (response.status >= 500) {
@@ -912,7 +943,13 @@ class ClaudeConsoleRelayService {
                 )
                 if (!autoProtectionDisabled) {
                   await upstreamErrorHelper
-                    .markTempUnavailable(accountId, 'claude-console', response.status)
+                    .markTempUnavailable(
+                      accountId,
+                      'claude-console',
+                      response.status,
+                      null,
+                      tempUnavailableContext
+                    )
                     .catch(() => {})
                 }
               }
@@ -1039,9 +1076,7 @@ class ClaudeConsoleRelayService {
                   }
 
                   if (dataToWrite) {
-                    responseStream.write(
-                      rewriteSsePayloadModels(dataToWrite, clientDisplayModel)
-                    )
+                    responseStream.write(rewriteSsePayloadModels(dataToWrite, clientDisplayModel))
                   }
                 } else {
                   // 客户端连接已断开，记录警告（但仍继续解析usage）
@@ -1185,9 +1220,7 @@ class ClaudeConsoleRelayService {
                 if (streamTransformer) {
                   const transformed = streamTransformer(buffer)
                   if (transformed) {
-                    responseStream.write(
-                      rewriteSsePayloadModels(transformed, clientDisplayModel)
-                    )
+                    responseStream.write(rewriteSsePayloadModels(transformed, clientDisplayModel))
                   }
                 } else {
                   responseStream.write(rewriteSsePayloadModels(buffer, clientDisplayModel))
@@ -1308,7 +1341,13 @@ class ClaudeConsoleRelayService {
             if (error.response.status === 401) {
               if (!catchAutoProtectionDisabled) {
                 upstreamErrorHelper
-                  .markTempUnavailable(accountId, 'claude-console', 401)
+                  .markTempUnavailable(
+                    accountId,
+                    'claude-console',
+                    401,
+                    null,
+                    tempUnavailableContext
+                  )
                   .catch(() => {})
               }
             } else if (error.response.status === 429) {
@@ -1323,7 +1362,8 @@ class ClaudeConsoleRelayService {
                     accountId,
                     'claude-console',
                     429,
-                    upstreamErrorHelper.parseRetryAfter(error.response.headers)
+                    upstreamErrorHelper.parseRetryAfter(error.response.headers),
+                    tempUnavailableContext
                   )
                   .catch(() => {})
               }
@@ -1331,7 +1371,13 @@ class ClaudeConsoleRelayService {
               if (!catchAutoProtectionDisabled) {
                 claudeConsoleAccountService.markAccountOverloaded(accountId)
                 upstreamErrorHelper
-                  .markTempUnavailable(accountId, 'claude-console', 529)
+                  .markTempUnavailable(
+                    accountId,
+                    'claude-console',
+                    529,
+                    null,
+                    tempUnavailableContext
+                  )
                   .catch(() => {})
               }
             }

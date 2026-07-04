@@ -196,7 +196,13 @@ class OpenAIResponsesRelayService {
     }
   }
 
-  async _markOther4xxTempUnavailable(account, status, sessionHash, source = 'response') {
+  async _markOther4xxTempUnavailable(
+    account,
+    status,
+    sessionHash,
+    source = 'response',
+    tempUnavailableContext = null
+  ) {
     if (!account?.id || !this._shouldTempPauseOther4xx(status)) {
       return false
     }
@@ -215,7 +221,7 @@ class OpenAIResponsesRelayService {
         'openai-responses',
         status,
         OPENAI_RESPONSES_OTHER_4XX_TEMP_UNAVAILABLE_SECONDS,
-        { errorTypeOverride: 'client_error' }
+        { ...tempUnavailableContext, errorTypeOverride: 'client_error' }
       )
       .catch(() => {})
 
@@ -231,6 +237,12 @@ class OpenAIResponsesRelayService {
   async handleRequest(req, res, account, apiKeyData) {
     let abortController = null
     let handleClientDisconnect = null
+    if (account?.id) {
+      req._relayAccountContext = {
+        accountId: account.id,
+        accountType: 'openai-responses'
+      }
+    }
     const removeClientDisconnectListener = () => {
       if (!handleClientDisconnect) {
         return
@@ -245,6 +257,11 @@ class OpenAIResponsesRelayService {
     const sessionHash = sessionId
       ? crypto.createHash('sha256').update(sessionId).digest('hex')
       : null
+    const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+      apiKeyData,
+      account?.id,
+      'openai-responses'
+    )
 
     try {
       // 获取完整的账户信息（包含解密的 API Key）
@@ -306,7 +323,8 @@ class OpenAIResponsesRelayService {
               account.id,
               'openai-responses',
               429,
-              resetsInSeconds || upstreamErrorHelper.parseRetryAfter(response.headers)
+              resetsInSeconds || upstreamErrorHelper.parseRetryAfter(response.headers),
+              tempUnavailableContext
             )
             .catch(() => {})
         }
@@ -378,7 +396,13 @@ class OpenAIResponsesRelayService {
             // 仅临时暂停，不永久禁用
             if (!this._isAutoProtectionDisabled(account)) {
               await upstreamErrorHelper
-                .markTempUnavailable(account.id, 'openai-responses', 401)
+                .markTempUnavailable(
+                  account.id,
+                  'openai-responses',
+                  401,
+                  null,
+                  tempUnavailableContext
+                )
                 .catch(() => {})
             }
             await this._clearSessionMapping(sessionHash)
@@ -402,7 +426,13 @@ class OpenAIResponsesRelayService {
         // 处理其他 4xx 上游错误：统一软暂停 3 分钟
         if (this._shouldTempPauseOther4xx(response.status) && account?.id) {
           try {
-            await this._markOther4xxTempUnavailable(account, response.status, sessionHash)
+            await this._markOther4xxTempUnavailable(
+              account,
+              response.status,
+              sessionHash,
+              'response',
+              tempUnavailableContext
+            )
           } catch (markError) {
             logger.warn(
               'Failed to mark OpenAI-Responses account temporarily unavailable for 4xx error:',
@@ -418,7 +448,9 @@ class OpenAIResponsesRelayService {
               await upstreamErrorHelper.markTempUnavailable(
                 account.id,
                 'openai-responses',
-                response.status
+                response.status,
+                null,
+                tempUnavailableContext
               )
             }
             await this._clearSessionMapping(sessionHash)
@@ -480,7 +512,13 @@ class OpenAIResponsesRelayService {
         if (account?.id) {
           if (!this._isAutoProtectionDisabled(account)) {
             await upstreamErrorHelper
-              .markTempUnavailable(account.id, 'openai-responses', 503)
+              .markTempUnavailable(
+                account.id,
+                'openai-responses',
+                503,
+                null,
+                tempUnavailableContext
+              )
               .catch(() => {})
           }
         }
@@ -526,7 +564,13 @@ class OpenAIResponsesRelayService {
             // 仅临时暂停，不永久禁用
             if (!this._isAutoProtectionDisabled(account)) {
               await upstreamErrorHelper
-                .markTempUnavailable(account.id, 'openai-responses', 401)
+                .markTempUnavailable(
+                  account.id,
+                  'openai-responses',
+                  401,
+                  null,
+                  tempUnavailableContext
+                )
                 .catch(() => {})
             }
             await this._clearSessionMapping(sessionHash)
@@ -545,7 +589,13 @@ class OpenAIResponsesRelayService {
 
         if (this._shouldTempPauseOther4xx(status) && account?.id) {
           try {
-            await this._markOther4xxTempUnavailable(account, status, sessionHash, 'catch')
+            await this._markOther4xxTempUnavailable(
+              account,
+              status,
+              sessionHash,
+              'catch',
+              tempUnavailableContext
+            )
           } catch (markError) {
             logger.warn(
               'Failed to mark OpenAI-Responses account temporarily unavailable for 4xx catch error:',

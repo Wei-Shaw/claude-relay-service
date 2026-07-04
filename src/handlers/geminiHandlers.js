@@ -34,7 +34,8 @@ const handleGeminiUpstreamError = async (
   accountType,
   sessionHash,
   headers,
-  disableAutoProtection = false
+  disableAutoProtection = false,
+  tempUnavailableContext = null
 ) => {
   if (!accountId || !errorStatus) {
     return
@@ -44,7 +45,13 @@ const handleGeminiUpstreamError = async (
     if (errorStatus === 429) {
       if (!autoProtectionDisabled) {
         const ttl = upstreamErrorHelper.parseRetryAfter(headers)
-        await upstreamErrorHelper.markTempUnavailable(accountId, accountType || 'gemini', 429, ttl)
+        await upstreamErrorHelper.markTempUnavailable(
+          accountId,
+          accountType || 'gemini',
+          429,
+          ttl,
+          tempUnavailableContext
+        )
         // 同时设置 rate-limit 状态，保持与 /messages handler 一致
         await unifiedGeminiScheduler
           .markAccountRateLimited(accountId, accountType || 'gemini', sessionHash)
@@ -60,7 +67,9 @@ const handleGeminiUpstreamError = async (
         await upstreamErrorHelper.markTempUnavailable(
           accountId,
           accountType || 'gemini',
-          errorStatus
+          errorStatus,
+          null,
+          tempUnavailableContext
         )
       }
     }
@@ -864,7 +873,8 @@ async function handleMessages(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
     )
 
     // 返回错误响应
@@ -1636,7 +1646,8 @@ async function handleCountTokens(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
     )
 
     if (accountType === 'gemini-api') {
@@ -1888,7 +1899,8 @@ async function handleGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
     )
     res.status(500).json({
       error: {
@@ -2283,7 +2295,8 @@ async function handleStreamGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
     )
 
     if (!res.headersSent) {
@@ -2588,7 +2601,8 @@ async function handleStandardGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
     )
 
     if (accountType === 'gemini-api') {
@@ -3098,7 +3112,8 @@ async function handleStandardStreamGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
     )
 
     if (!res.headersSent) {

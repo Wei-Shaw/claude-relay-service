@@ -82,6 +82,359 @@ const EMPTY_TEMP_UNAVAILABLE_POLICY = {
   ttl5xxSeconds: null
 }
 
+const ACCOUNT_TYPE_TO_GROUP_PLATFORM = {
+  'claude-official': 'claude',
+  claude: 'claude',
+  'claude-console': 'claude',
+  ccr: 'claude',
+  gemini: 'gemini',
+  'gemini-api': 'gemini',
+  openai: 'openai',
+  'openai-responses': 'openai',
+  droid: 'droid'
+}
+
+const GROUP_ACCOUNT_TYPES_BY_PLATFORM = {
+  claude: ['claude-official', 'claude-console', 'ccr'],
+  gemini: ['gemini', 'gemini-api'],
+  openai: ['openai', 'openai-responses'],
+  droid: ['droid']
+}
+
+const isTruthy = (value) => value === true || value === 'true'
+const isSchedulableValue = (value) => value !== false && value !== 'false'
+
+const parseGroupIds = (value) => {
+  if (!value) {
+    return []
+  }
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).map(String)
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return []
+    }
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        return Array.isArray(parsed) ? parsed.filter(Boolean).map(String) : []
+      } catch {
+        return []
+      }
+    }
+    return trimmed
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+const parseGroupInfoIds = (value) => {
+  if (!value) {
+    return []
+  }
+
+  let items = value
+  if (typeof value === 'string') {
+    try {
+      items = JSON.parse(value)
+    } catch {
+      return []
+    }
+  }
+
+  if (!Array.isArray(items)) {
+    return []
+  }
+
+  return items
+    .map((item) => {
+      if (!item) {
+        return null
+      }
+      if (typeof item === 'string') {
+        return item
+      }
+      return item.id || item.groupId || null
+    })
+    .filter(Boolean)
+    .map(String)
+}
+
+const normalizeBinding = (value) => (typeof value === 'string' ? value.trim() : '')
+
+const bindingToGroupId = (binding) => {
+  const normalized = normalizeBinding(binding)
+  return normalized.startsWith('group:') ? normalized.slice('group:'.length) : null
+}
+
+const directBindingMatches = (binding, accountId, prefix = '') => {
+  const normalized = normalizeBinding(binding)
+  if (!normalized || normalized.startsWith('group:')) {
+    return false
+  }
+  const normalizedAccountId = String(accountId)
+  return normalized === `${prefix}${normalizedAccountId}` || normalized === normalizedAccountId
+}
+
+const buildSchedulingContext = (apiKeyData, accountId, accountType) => {
+  if (!apiKeyData || !accountId || !accountType) {
+    return null
+  }
+
+  const direct = () => ({
+    schedulingMode: 'dedicated',
+    reason: 'api_key_dedicated_binding'
+  })
+  const group = (groupId) =>
+    groupId
+      ? {
+          schedulingMode: 'group',
+          groupId,
+          reason: 'api_key_group_binding'
+        }
+      : null
+
+  switch (accountType) {
+    case 'claude-official': {
+      const groupId = bindingToGroupId(apiKeyData.claudeAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.claudeAccountId, accountId) ? direct() : null
+    }
+    case 'claude-console': {
+      if (directBindingMatches(apiKeyData.claudeConsoleAccountId, accountId)) {
+        return direct()
+      }
+      return group(bindingToGroupId(apiKeyData.claudeAccountId))
+    }
+    case 'bedrock':
+      return directBindingMatches(apiKeyData.bedrockAccountId, accountId) ? direct() : null
+    case 'gemini': {
+      const groupId = bindingToGroupId(apiKeyData.geminiAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.geminiAccountId, accountId) ? direct() : null
+    }
+    case 'gemini-api': {
+      const groupId = bindingToGroupId(apiKeyData.geminiAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.geminiAccountId, accountId, 'api:') ? direct() : null
+    }
+    case 'openai': {
+      const groupId = bindingToGroupId(apiKeyData.openaiAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.openaiAccountId, accountId) ? direct() : null
+    }
+    case 'openai-responses': {
+      const groupId = bindingToGroupId(apiKeyData.openaiAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.openaiAccountId, accountId, 'responses:')
+        ? direct()
+        : null
+    }
+    case 'droid': {
+      const groupId = bindingToGroupId(apiKeyData.droidAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.droidAccountId, accountId) ? direct() : null
+    }
+    case 'azure-openai':
+      return directBindingMatches(apiKeyData.azureOpenaiAccountId, accountId) ? direct() : null
+    default:
+      return null
+  }
+}
+
+const normalizeServiceAccountResult = (result) => {
+  if (!result) {
+    return null
+  }
+  if (result.success === true && result.data) {
+    return result.data
+  }
+  return result
+}
+
+const loadAccountForPauseDecision = async (accountId, accountType) => {
+  try {
+    switch (accountType) {
+      case 'claude':
+      case 'claude-official': {
+        const redis = getRedis()
+        if (typeof redis.getClaudeAccount === 'function') {
+          return await redis.getClaudeAccount(accountId)
+        }
+        const client = redis.getClientSafe()
+        return await client.hgetall(`claude:account:${accountId}`)
+      }
+      case 'claude-console':
+        return await require('../services/account/claudeConsoleAccountService').getAccount(
+          accountId
+        )
+      case 'ccr':
+        return await require('../services/account/ccrAccountService').getAccount(accountId)
+      case 'gemini':
+        return await require('../services/account/geminiAccountService').getAccount(accountId)
+      case 'gemini-api':
+        return await require('../services/account/geminiApiAccountService').getAccount(accountId)
+      case 'openai':
+        return await require('../services/account/openaiAccountService').getAccount(accountId)
+      case 'openai-responses':
+        return await require('../services/account/openaiResponsesAccountService').getAccount(
+          accountId
+        )
+      case 'bedrock':
+        return normalizeServiceAccountResult(
+          await require('../services/account/bedrockAccountService').getAccount(accountId)
+        )
+      case 'droid':
+        return await require('../services/account/droidAccountService').getAccount(accountId)
+      case 'azure-openai':
+        return await require('../services/account/azureOpenaiAccountService').getAccount(accountId)
+      default:
+        return null
+    }
+  } catch (error) {
+    logger.debug(
+      `⚠️ [UpstreamError] Failed to load account for pause decision ${accountType}:${accountId}: ${error.message}`
+    )
+    return null
+  }
+}
+
+const isEnabledForGroupPauseDecision = (account, accountType) => {
+  if (!account || !isTruthy(account.isActive) || !isSchedulableValue(account.schedulable)) {
+    return false
+  }
+
+  const status = String(account.status || 'active').toLowerCase()
+  if (accountType === 'claude-official' || accountType === 'claude') {
+    return !['error', 'blocked', 'temp_error'].includes(status)
+  }
+  if (accountType === 'claude-console' || accountType === 'ccr') {
+    return status === 'active'
+  }
+
+  return ![
+    'error',
+    'unauthorized',
+    'blocked',
+    'temp_error',
+    'account_blocked',
+    'quota_exceeded',
+    'rate_limited',
+    'ratelimited'
+  ].includes(status)
+}
+
+const loadGroupMemberAccount = async (memberId, platform, preferredAccountType) => {
+  const accountTypes = GROUP_ACCOUNT_TYPES_BY_PLATFORM[platform] || []
+  const orderedTypes =
+    preferredAccountType && accountTypes.includes(preferredAccountType)
+      ? [preferredAccountType, ...accountTypes.filter((type) => type !== preferredAccountType)]
+      : accountTypes
+
+  for (const accountType of orderedTypes) {
+    const account = await loadAccountForPauseDecision(memberId, accountType)
+    if (account) {
+      return { account, accountType }
+    }
+  }
+  return { account: null, accountType: preferredAccountType }
+}
+
+const getEnabledGroupMemberCount = async (groupId, preferredAccountType) => {
+  if (!groupId) {
+    return null
+  }
+
+  try {
+    const accountGroupService = require('../services/accountGroupService')
+    const group = await accountGroupService.getGroup(groupId)
+    const platform = group?.platform || ACCOUNT_TYPE_TO_GROUP_PLATFORM[preferredAccountType]
+    if (!platform) {
+      return null
+    }
+
+    const memberIds = await accountGroupService.getGroupMembers(groupId)
+    let enabledCount = 0
+    for (const memberId of memberIds) {
+      const { account, accountType } = await loadGroupMemberAccount(
+        memberId,
+        platform,
+        preferredAccountType
+      )
+      if (isEnabledForGroupPauseDecision(account, accountType)) {
+        enabledCount += 1
+      }
+    }
+    return enabledCount
+  } catch (error) {
+    logger.warn(
+      `⚠️ [UpstreamError] Failed to count enabled accounts in group ${groupId}: ${error.message}`
+    )
+    return null
+  }
+}
+
+const shouldSkipTempUnavailableForScheduling = async (accountId, accountType, context = null) => {
+  const schedulingMode =
+    context?.schedulingMode || context?.selectionMode || context?.routingMode || null
+
+  if (schedulingMode === 'dedicated') {
+    return { skip: true, reason: 'dedicated_scheduling' }
+  }
+
+  if (schedulingMode === 'group' && context?.groupId) {
+    const explicitCount = Number(context.enabledAccountCount ?? context.groupEnabledAccountCount)
+    const enabledCount = Number.isFinite(explicitCount)
+      ? explicitCount
+      : await getEnabledGroupMemberCount(context.groupId, accountType)
+    if (enabledCount !== null && enabledCount <= 1) {
+      return { skip: true, reason: 'single_enabled_group_account' }
+    }
+    return { skip: false }
+  }
+
+  const account = await loadAccountForPauseDecision(accountId, accountType)
+  if (account?.accountType === 'dedicated') {
+    return { skip: true, reason: 'dedicated_account' }
+  }
+
+  if (account?.accountType === 'group') {
+    const groupIds = [
+      account.groupId,
+      ...parseGroupIds(account.groupIds),
+      ...parseGroupInfoIds(account.groupInfos)
+    ]
+      .filter(Boolean)
+      .map(String)
+    const uniqueGroupIds = [...new Set(groupIds)]
+
+    for (const groupId of uniqueGroupIds) {
+      const enabledCount = await getEnabledGroupMemberCount(groupId, accountType)
+      if (enabledCount !== null && enabledCount <= 1) {
+        return { skip: true, reason: 'single_enabled_group_account' }
+      }
+    }
+  }
+
+  return { skip: false }
+}
+
 const getAccountTempUnavailablePolicy = async (accountId, accountType) => {
   try {
     const accountPrefix = ACCOUNT_KEY_PREFIX_BY_TYPE[accountType]
@@ -317,6 +670,22 @@ const markTempUnavailable = async (
       return { success: false, reason: 'not_a_pausable_error' }
     }
 
+    const key = `${TEMP_UNAVAILABLE_PREFIX}:${accountType}:${accountId}`
+    const schedulingDecision = await shouldSkipTempUnavailableForScheduling(
+      accountId,
+      accountType,
+      context
+    )
+    if (schedulingDecision.skip) {
+      const redis = getRedis()
+      const client = redis.getClientSafe()
+      await client.del(key).catch(() => {})
+      logger.info(
+        `⏭️ [UpstreamError] Skip temp-unavailable for account ${accountId} (${accountType}), reason: ${schedulingDecision.reason}`
+      )
+      return { success: true, skipped: true, reason: schedulingDecision.reason }
+    }
+
     const policy = await getAccountTempUnavailablePolicy(accountId, accountType)
     const policyDecision = resolveAccountTtlOverride({
       policy,
@@ -324,7 +693,6 @@ const markTempUnavailable = async (
       errorType
     })
 
-    const key = `${TEMP_UNAVAILABLE_PREFIX}:${accountType}:${accountId}`
     if (policyDecision.skip) {
       const redis = getRedis()
       const client = redis.getClientSafe()
@@ -532,6 +900,8 @@ module.exports = {
   recordErrorHistory,
   getErrorHistory,
   clearErrorHistory,
+  buildSchedulingContext,
+  shouldSkipTempUnavailableForScheduling,
   TEMP_UNAVAILABLE_PREFIX,
   ERROR_HISTORY_PREFIX
 }

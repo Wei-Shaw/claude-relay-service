@@ -595,6 +595,10 @@ function buildLifecycleDetail(req = {}, res = {}, options = {}) {
     requestBody?.model_id ||
     req.query?.model ||
     'unknown'
+  const relayAccountContext =
+    req._relayAccountContext && typeof req._relayAccountContext === 'object'
+      ? req._relayAccountContext
+      : {}
 
   return {
     requestId: req.requestId || null,
@@ -607,6 +611,8 @@ function buildLifecycleDetail(req = {}, res = {}, options = {}) {
     durationMs: normalizeNumber(options.durationMs),
     requestBody,
     apiKeyId: req.apiKey?.id || null,
+    accountId: relayAccountContext.accountId || null,
+    accountType: relayAccountContext.accountType || null,
     model,
     completed: options.completed !== false,
     clientAborted: options.clientAborted === true,
