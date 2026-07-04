@@ -419,6 +419,7 @@ const handleResponses = async (req, res) => {
       sessionId,
       schedulerModel
     ))
+    req._relayAccountContext = { accountId, accountType }
 
     // 如果是 OpenAI-Responses 账户，使用专门的中继服务处理
     if (accountType === 'openai-responses') {

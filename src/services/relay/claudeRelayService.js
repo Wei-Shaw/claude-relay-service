@@ -551,6 +551,11 @@ class ClaudeRelayService {
       const { accountId } = accountSelection
       const { accountType } = accountSelection
       selectedAccountId = accountId
+      const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+        apiKeyData,
+        accountId,
+        accountType
+      )
 
       logger.info(
         `📤 Processing API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId} (${accountType})${sessionHash ? `, session: ${sessionHash}` : ''}`
@@ -716,7 +721,9 @@ class ClaudeRelayService {
             },
             {
               ...requestOptions,
-              isRealClaudeCodeRequest
+              isRealClaudeCodeRequest,
+              accountType,
+              tempUnavailableContext
             }
           )
 
@@ -811,7 +818,9 @@ class ClaudeRelayService {
               `❌ Account ${accountId} encountered 401 error (${errorCount} errors), temporarily pausing`
             )
           }
-          await upstreamErrorHelper.markTempUnavailable(accountId, accountType, 401).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, accountType, 401, null, tempUnavailableContext)
+            .catch(() => {})
           // 清除粘性会话，让后续请求路由到其他账户
           if (sessionHash) {
             await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch(() => {})
@@ -831,7 +840,9 @@ class ClaudeRelayService {
           logger.error(
             `🚫 Forbidden error (403) detected for account ${accountId}${retryCount > 0 ? ` after ${retryCount} retries` : ''}, temporarily pausing`
           )
-          await upstreamErrorHelper.markTempUnavailable(accountId, accountType, 403).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, accountType, 403, null, tempUnavailableContext)
+            .catch(() => {})
           // 清除粘性会话，让后续请求路由到其他账户
           if (sessionHash) {
             await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch(() => {})
@@ -854,12 +865,21 @@ class ClaudeRelayService {
           } else {
             logger.info(`🚫 529 error handling is disabled, skipping account overload marking`)
           }
-          await upstreamErrorHelper.markTempUnavailable(accountId, accountType, 529).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, accountType, 529, null, tempUnavailableContext)
+            .catch(() => {})
         }
         // 检查是否为5xx状态码
         else if (response.statusCode >= 500 && response.statusCode < 600) {
           logger.warn(`🔥 Server error (${response.statusCode}) detected for account ${accountId}`)
-          await this._handleServerError(accountId, response.statusCode, sessionHash)
+          await this._handleServerError(
+            accountId,
+            response.statusCode,
+            sessionHash,
+            '',
+            accountType,
+            tempUnavailableContext
+          )
         }
         // 检查是否为429状态码
         else if (response.statusCode === 429) {
@@ -976,7 +996,8 @@ class ClaudeRelayService {
                   accountId,
                   accountType,
                   429,
-                  upstreamErrorHelper.parseRetryAfter(response.headers)
+                  upstreamErrorHelper.parseRetryAfter(response.headers),
+                  tempUnavailableContext
                 )
                 .catch(() => {})
             }
@@ -1857,7 +1878,14 @@ class ClaudeRelayService {
         } else if (error.code === 'ETIMEDOUT') {
           errorMessage = 'Connection timed out to Claude API server'
 
-          await this._handleServerError(accountId, 504, null, 'Network')
+          await this._handleServerError(
+            accountId,
+            504,
+            null,
+            'Network',
+            requestOptions.accountType || 'claude-official',
+            requestOptions.tempUnavailableContext || null
+          )
         }
 
         reject(new Error(errorMessage))
@@ -1867,7 +1895,14 @@ class ClaudeRelayService {
         req.destroy()
         logger.error(`❌ Claude API request timeout (Account: ${accountId})`)
 
-        await this._handleServerError(accountId, 504, null, 'Request')
+        await this._handleServerError(
+          accountId,
+          504,
+          null,
+          'Request',
+          requestOptions.accountType || 'claude-official',
+          requestOptions.tempUnavailableContext || null
+        )
 
         reject(new Error('Request timeout'))
       })
@@ -1955,6 +1990,11 @@ class ClaudeRelayService {
       const { accountId } = accountSelection
       const { accountType } = accountSelection
       selectedAccountId = accountId
+      const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+        apiKeyData,
+        accountId,
+        accountType
+      )
 
       // 📬 用户消息队列处理：如果是用户消息请求，需要获取队列锁
       if (userMessageQueueService.isUserMessageRequest(requestBody)) {
@@ -2104,7 +2144,8 @@ class ClaudeRelayService {
         {
           ...options,
           bodyStoreId,
-          isRealClaudeCodeRequest
+          isRealClaudeCodeRequest,
+          tempUnavailableContext
         },
         isDedicatedOfficialAccount,
         // 📬 新增回调：在收到响应头时释放队列锁
@@ -2169,6 +2210,7 @@ class ClaudeRelayService {
     retryCount = 0 // 🔄 403 重试计数器
   ) {
     const maxRetries = 2 // 最大重试次数
+    const tempUnavailableContext = requestOptions.tempUnavailableContext || null
     // 获取账户信息用于统一 User-Agent
     const account = await claudeAccountService.getAccount(accountId)
 
@@ -2340,7 +2382,8 @@ class ClaudeRelayService {
                     accountId,
                     accountType,
                     429,
-                    upstreamErrorHelper.parseRetryAfter(res.headers)
+                    upstreamErrorHelper.parseRetryAfter(res.headers),
+                    tempUnavailableContext
                   )
                   .catch(() => {})
                 logger.warn(`🚫 [Stream] Rate limit detected for account ${accountId}, status 429`)
@@ -2490,7 +2533,7 @@ class ClaudeRelayService {
                 )
               }
               await upstreamErrorHelper
-                .markTempUnavailable(accountId, accountType, 401)
+                .markTempUnavailable(accountId, accountType, 401, null, tempUnavailableContext)
                 .catch(() => {})
               // 清除粘性会话，让后续请求路由到其他账户
               if (sessionHash) {
@@ -2516,7 +2559,7 @@ class ClaudeRelayService {
                   `🚫 [Stream] Forbidden error (403) detected for account ${accountId}${retryCount > 0 ? ` after ${retryCount} retries` : ''}, temporarily pausing`
                 )
                 await upstreamErrorHelper
-                  .markTempUnavailable(accountId, accountType, 403)
+                  .markTempUnavailable(accountId, accountType, 403, null, tempUnavailableContext)
                   .catch(() => {})
               }
               // 清除粘性会话，让后续请求路由到其他账户
@@ -2545,13 +2588,20 @@ class ClaudeRelayService {
                 )
               }
               await upstreamErrorHelper
-                .markTempUnavailable(accountId, accountType, 529)
+                .markTempUnavailable(accountId, accountType, 529, null, tempUnavailableContext)
                 .catch(() => {})
             } else if (res.statusCode >= 500 && res.statusCode < 600) {
               logger.warn(
                 `🔥 [Stream] Server error (${res.statusCode}) detected for account ${accountId}`
               )
-              await this._handleServerError(accountId, res.statusCode, sessionHash, '[Stream]')
+              await this._handleServerError(
+                accountId,
+                res.statusCode,
+                sessionHash,
+                '[Stream]',
+                accountType,
+                tempUnavailableContext
+              )
             }
           }
 
@@ -3027,7 +3077,8 @@ class ClaudeRelayService {
                   accountId,
                   accountType,
                   429,
-                  upstreamErrorHelper.parseRetryAfter(res.headers)
+                  upstreamErrorHelper.parseRetryAfter(res.headers),
+                  tempUnavailableContext
                 )
                 .catch(() => {})
             }
@@ -3185,7 +3236,8 @@ class ClaudeRelayService {
     statusCode,
     sessionHash = null,
     context = '',
-    accountType = 'claude-official'
+    accountType = 'claude-official',
+    tempUnavailableContext = null
   ) {
     try {
       await claudeAccountService.recordServerError(accountId, statusCode)
@@ -3207,7 +3259,8 @@ class ClaudeRelayService {
           accountType,
           sessionHash,
           null,
-          statusCode
+          statusCode,
+          tempUnavailableContext
         )
       } catch (markError) {
         logger.error(`❌ Failed to mark account temporarily unavailable: ${accountId}`, markError)
