@@ -204,6 +204,7 @@ class DroidRelayService {
     let account = null
     let selectedApiKey = null
     let accessToken = null
+    let tempUnavailableContext = null
 
     try {
       logger.info(
@@ -218,6 +219,11 @@ class DroidRelayService {
       if (!account) {
         throw new Error(`No available Droid account for endpoint type: ${normalizedEndpoint}`)
       }
+      tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+        keyInfo,
+        account.id,
+        'droid'
+      )
 
       // 获取认证凭据：支持 Access Token 和 API Key 两种模式
       if (
@@ -361,7 +367,9 @@ class DroidRelayService {
         account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
       // 5xx 错误
       if (status >= 500 && account?.id && !droidAutoProtectionDisabled) {
-        await upstreamErrorHelper.markTempUnavailable(account.id, 'droid', status).catch(() => {})
+        await upstreamErrorHelper
+          .markTempUnavailable(account.id, 'droid', status, null, tempUnavailableContext)
+          .catch(() => {})
       } else if (
         !status &&
         account?.id &&
@@ -369,7 +377,9 @@ class DroidRelayService {
         !droidAutoProtectionDisabled
       ) {
         // 网络错误（非客户端断开），临时不可用
-        await upstreamErrorHelper.markTempUnavailable(account.id, 'droid', 503).catch(() => {})
+        await upstreamErrorHelper
+          .markTempUnavailable(account.id, 'droid', 503, null, tempUnavailableContext)
+          .catch(() => {})
       }
 
       if (status >= 400 && status < 500) {
@@ -379,7 +389,8 @@ class DroidRelayService {
             selectedAccountApiKey: selectedApiKey,
             endpointType: normalizedEndpoint,
             sessionHash,
-            clientApiKeyId
+            clientApiKeyId,
+            tempUnavailableContext
           })
         } catch (handlingError) {
           logger.error('❌ 处理 Droid 4xx 异常失败:', handlingError)
@@ -443,6 +454,11 @@ class DroidRelayService {
     sessionHash = null,
     clientApiKeyId = null
   ) {
+    const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+      apiKeyData,
+      account?.id,
+      'droid'
+    )
     return new Promise((resolve, reject) => {
       const url = new URL(apiUrl)
       const keyId = apiKeyData?.id
@@ -567,7 +583,13 @@ class DroidRelayService {
                 account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
               if (!streamAutoProtectionDisabled) {
                 upstreamErrorHelper
-                  .markTempUnavailable(account.id, 'droid', res.statusCode)
+                  .markTempUnavailable(
+                    account.id,
+                    'droid',
+                    res.statusCode,
+                    null,
+                    tempUnavailableContext
+                  )
                   .catch(() => {})
               }
             }
@@ -577,7 +599,8 @@ class DroidRelayService {
                 selectedAccountApiKey,
                 endpointType,
                 sessionHash,
-                clientApiKeyId
+                clientApiKeyId,
+                tempUnavailableContext
               }).catch((handlingError) => {
                 logger.error('❌ 处理 Droid 流式4xx 异常失败:', handlingError)
               })
@@ -1405,7 +1428,8 @@ class DroidRelayService {
       selectedAccountApiKey = null,
       endpointType = null,
       sessionHash = null,
-      clientApiKeyId = null
+      clientApiKeyId = null,
+      tempUnavailableContext = null
     } = context
 
     const accountId = this._extractAccountId(account)
@@ -1484,7 +1508,13 @@ class DroidRelayService {
     const clientErrorAutoProtectionDisabled =
       account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
     if (!clientErrorAutoProtectionDisabled) {
-      await upstreamErrorHelper.markTempUnavailable(accountId, 'droid', statusCode)
+      await upstreamErrorHelper.markTempUnavailable(
+        accountId,
+        'droid',
+        statusCode,
+        null,
+        tempUnavailableContext
+      )
     }
     await this._clearAccountStickyMapping(normalizedEndpoint, sessionHash, clientApiKeyId)
   }

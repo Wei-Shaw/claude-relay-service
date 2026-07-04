@@ -158,24 +158,6 @@ class Application {
         logger.error('📁 Account group reverse index migration failed:', err)
       })
 
-      // 超早期拦截 /admin-next/ 请求 - 在所有中间件之前
-      this.app.use((req, res, next) => {
-        if (req.path === '/admin-next/' && req.method === 'GET') {
-          logger.warn('🚨 INTERCEPTING /admin-next/ request at the very beginning!')
-          const adminSpaPath = path.join(__dirname, '..', 'web', 'admin-spa', 'dist')
-          const indexPath = path.join(adminSpaPath, 'index.html')
-
-          if (fs.existsSync(indexPath)) {
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-            return res.sendFile(indexPath)
-          } else {
-            logger.error('❌ index.html not found at:', indexPath)
-            return res.status(404).send('index.html not found')
-          }
-        }
-        next()
-      })
-
       // 🛡️ 安全中间件
       this.app.use(
         helmet({
@@ -250,16 +232,6 @@ class Application {
         this.app.set('trust proxy', 1)
       }
 
-      // 调试中间件 - 拦截所有 /admin-next 请求
-      this.app.use((req, res, next) => {
-        if (req.path.startsWith('/admin-next')) {
-          logger.info(
-            `🔍 DEBUG: Incoming request - method: ${req.method}, path: ${req.path}, originalUrl: ${req.originalUrl}`
-          )
-        }
-        next()
-      })
-
       // 🎨 新版管理界面静态文件服务（必须在其他路由之前）
       const adminSpaPath = path.join(__dirname, '..', 'web', 'admin-spa', 'dist')
       if (fs.existsSync(adminSpaPath)) {
@@ -270,9 +242,6 @@ class Application {
 
         // 使用 all 方法确保捕获所有 HTTP 方法
         this.app.all('/admin-next/', (req, res) => {
-          logger.info('🎯 HIT: /admin-next/ route handler triggered!')
-          logger.info(`Method: ${req.method}, Path: ${req.path}, URL: ${req.url}`)
-
           if (req.method !== 'GET' && req.method !== 'HEAD') {
             return res.status(405).send('Method Not Allowed')
           }
