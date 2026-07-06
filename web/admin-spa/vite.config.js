@@ -51,6 +51,7 @@ export default defineConfig(({ mode }) => {
         imports: ['vue', 'vue-router', 'pinia']
       }),
       Components({
+        globs: ['src/components/**/*.vue', '!src/components/user/CreateApiKeyModal.vue'],
         resolvers: [ElementPlusResolver()]
       })
     ],

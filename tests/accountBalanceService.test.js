@@ -11,16 +11,6 @@ const accountBalanceServiceModule = require('../src/services/account/accountBala
 const { AccountBalanceService } = accountBalanceServiceModule
 
 describe('AccountBalanceService', () => {
-  const originalBalanceScriptEnabled = process.env.BALANCE_SCRIPT_ENABLED
-
-  afterEach(() => {
-    if (originalBalanceScriptEnabled === undefined) {
-      delete process.env.BALANCE_SCRIPT_ENABLED
-    } else {
-      process.env.BALANCE_SCRIPT_ENABLED = originalBalanceScriptEnabled
-    }
-  })
-
   const mockLogger = {
     debug: jest.fn(),
     info: jest.fn(),
@@ -34,7 +24,6 @@ describe('AccountBalanceService', () => {
     getAccountBalance: jest.fn().mockResolvedValue(null),
     setAccountBalance: jest.fn().mockResolvedValue(undefined),
     deleteAccountBalance: jest.fn().mockResolvedValue(undefined),
-    getBalanceScriptConfig: jest.fn().mockResolvedValue(null),
     getAccountUsageStats: jest.fn().mockResolvedValue({
       total: { requests: 10 },
       daily: { requests: 2, cost: 20 },
@@ -123,13 +112,8 @@ describe('AccountBalanceService', () => {
     expect(result.data.error).toBe('boom')
   })
 
-  it('should ignore script config when balance script is disabled', async () => {
-    process.env.BALANCE_SCRIPT_ENABLED = 'false'
-
+  it('should query provider when queryApi=true and cache successful API balance', async () => {
     const mockRedis = buildMockRedis()
-    mockRedis.getBalanceScriptConfig.mockResolvedValue({
-      scriptBody: '({ request: { url: "http://example.com" }, extractor: function(){ return {} } })'
-    })
 
     const service = new AccountBalanceService({ redis: mockRedis, logger: mockLogger })
     service._computeMonthlyCost = jest.fn().mockResolvedValue(0)
@@ -138,55 +122,54 @@ describe('AccountBalanceService', () => {
     const provider = { queryBalance: jest.fn().mockResolvedValue({ balance: 1, currency: 'USD' }) }
     service.registerProvider('openai', provider)
 
-    const scriptSpy = jest.spyOn(service, '_getBalanceFromScript')
-
-    const account = { id: 'acct-script-off', name: 'S' }
+    const account = { id: 'acct-provider', name: 'S' }
     const result = await service._getAccountBalanceForAccount(account, 'openai', {
       queryApi: true,
       useCache: false
     })
 
-    expect(provider.queryBalance).toHaveBeenCalled()
-    expect(scriptSpy).not.toHaveBeenCalled()
+    expect(provider.queryBalance).toHaveBeenCalledWith(account)
+    expect(mockRedis.setAccountBalance).toHaveBeenCalledWith(
+      'openai',
+      'acct-provider',
+      expect.objectContaining({
+        status: 'success',
+        balance: 1,
+        currency: 'USD',
+        queryMethod: 'api'
+      }),
+      service.CACHE_TTL_SECONDS
+    )
     expect(result.data.source).toBe('api')
+    expect(result.data.balance.amount).toBeCloseTo(1, 6)
   })
 
-  it('should prefer script when configured and enabled', async () => {
-    process.env.BALANCE_SCRIPT_ENABLED = 'true'
-
+  it('should not cache provider fallback results as API balance', async () => {
     const mockRedis = buildMockRedis()
-    mockRedis.getBalanceScriptConfig.mockResolvedValue({
-      scriptBody: '({ request: { url: "http://example.com" }, extractor: function(){ return {} } })'
-    })
 
     const service = new AccountBalanceService({ redis: mockRedis, logger: mockLogger })
     service._computeMonthlyCost = jest.fn().mockResolvedValue(0)
     service._computeTotalCost = jest.fn().mockResolvedValue(0)
 
-    const provider = { queryBalance: jest.fn().mockResolvedValue({ balance: 2, currency: 'USD' }) }
+    const provider = {
+      queryBalance: jest.fn().mockResolvedValue({
+        balance: 3,
+        currency: 'USD',
+        queryMethod: 'local'
+      })
+    }
     service.registerProvider('openai', provider)
 
-    jest.spyOn(service, '_getBalanceFromScript').mockResolvedValue({
-      status: 'success',
-      balance: 3,
-      currency: 'USD',
-      quota: null,
-      queryMethod: 'script',
-      rawData: { ok: true },
-      lastRefreshAt: '2025-01-01T00:00:00Z',
-      errorMessage: ''
-    })
-
-    const account = { id: 'acct-script-on', name: 'T' }
+    const account = { id: 'acct-provider-fallback', name: 'T' }
     const result = await service._getAccountBalanceForAccount(account, 'openai', {
       queryApi: true,
       useCache: false
     })
 
-    expect(provider.queryBalance).not.toHaveBeenCalled()
-    expect(result.data.source).toBe('api')
+    expect(provider.queryBalance).toHaveBeenCalledWith(account)
+    expect(mockRedis.setAccountBalance).not.toHaveBeenCalled()
+    expect(result.data.source).toBe('local')
     expect(result.data.balance.amount).toBeCloseTo(3, 6)
-    expect(result.data.lastRefreshAt).toBe('2025-01-01T00:00:00Z')
   })
 
   it('should count low balance once per account in summary', async () => {

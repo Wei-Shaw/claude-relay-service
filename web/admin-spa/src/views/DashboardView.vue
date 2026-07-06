@@ -933,12 +933,6 @@ const refreshCountdown = ref(0)
 const countdownTimer = ref(null)
 const isRefreshing = ref(false)
 
-// 计算倒计时显示
-// const refreshCountdownDisplay = computed(() => {
-//   if (!autoRefreshEnabled.value || refreshCountdown.value <= 0) return ''
-//   return `${refreshCountdown.value}秒后刷新`
-// })
-
 // 图表颜色配置（根据主题动态调整）
 const chartColors = computed(() => ({
   text: isDarkMode.value ? '#e5e7eb' : '#374151',
@@ -1722,16 +1716,6 @@ function stopAutoRefresh() {
   }
   refreshCountdown.value = 0
 }
-
-// 切换自动刷新
-// function toggleAutoRefresh() {
-//   autoRefreshEnabled.value = !autoRefreshEnabled.value
-//   if (autoRefreshEnabled.value) {
-//     startAutoRefresh()
-//   } else {
-//     stopAutoRefresh()
-//   }
-// }
 
 // 监听自动刷新状态变化
 watch(autoRefreshEnabled, (newVal) => {

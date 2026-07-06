@@ -4162,6 +4162,7 @@ import TempUnavailablePolicyFields from './TempUnavailablePolicyFields.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import GroupManagementModal from './GroupManagementModal.vue'
 import ApiKeyManagementModal from './ApiKeyManagementModal.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
 
 const props = defineProps({
   account: {
@@ -4175,26 +4176,13 @@ const emit = defineEmits(['close', 'success', 'platform-changed'])
 const accountsStore = useAccountsStore()
 
 // 确认弹窗状态
-const showConfirmModal = ref(false)
-const confirmOptions = ref({ title: '', message: '', confirmText: '继续', cancelText: '取消' })
-let confirmResolve = null
-const showConfirm = (title, message, confirmText = '继续', cancelText = '取消') => {
-  return new Promise((resolve) => {
-    confirmOptions.value = { title, message, confirmText, cancelText }
-    confirmResolve = resolve
-    showConfirmModal.value = true
-  })
-}
-const handleConfirm = () => {
-  showConfirmModal.value = false
-  confirmResolve?.(true)
-  confirmResolve = null
-}
-const handleCancel = () => {
-  showConfirmModal.value = false
-  confirmResolve?.(false)
-  confirmResolve = null
-}
+const {
+  showConfirmModal,
+  confirmModalConfig: confirmOptions,
+  showConfirm,
+  handleConfirmModal: handleConfirm,
+  handleCancelModal: handleCancel
+} = useConfirmModal({ confirmText: '继续' })
 
 // 是否为编辑模式
 const isEdit = computed(() => !!props.account)
@@ -4253,8 +4241,6 @@ const parsedSessionKeyCount = computed(() => {
 // Claude Code 统一 User-Agent 信息
 const unifiedUserAgent = ref('')
 const clearingCache = ref(false)
-// 客户端标识编辑状态（已废弃，不再需要编辑功能）
-// const editingClientId = ref(false)
 
 // 平台分组状态
 const platformGroup = ref('')
@@ -4906,14 +4892,6 @@ const loadAccountUsage = async () => {
     // 静默处理使用量加载失败
   }
 }
-
-// // 计算是否可以创建
-// const canCreate = computed(() => {
-//   if (form.value.addType === 'manual') {
-//     return form.value.name?.trim() && form.value.accessToken?.trim()
-//   }
-//   return form.value.name?.trim()
-// })
 
 // 选择平台分组
 const selectPlatformGroup = (group) => {

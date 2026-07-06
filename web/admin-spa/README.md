@@ -24,7 +24,7 @@ npm run dev
 
 **重要提示：**
 - 开发服务器启动后，会自动在浏览器中打开
-- 必须访问完整路径：http://localhost:3001/web/admin/
+- 必须访问完整路径：http://localhost:3001/admin/
 - 不要访问 http://localhost:3001/ （会显示404）
 - 首次访问会自动跳转到登录页面
 
@@ -120,12 +120,12 @@ npm run dev
 
 ## 部署
 
-构建后的文件需要部署到 Claude Relay Service 的 `web/admin/` 路径下。
+构建后的文件由 Claude Relay Service 从 `web/admin-spa/dist` 提供，并挂载到 `/admin-next/`。
 
 ## 常见问题
 
 ### Q: 访问 localhost:3001 显示 404？
-A: 这是正常的。应用配置在 `/web/admin/` 路径下，必须访问完整路径：http://localhost:3001/web/admin/
+A: 这是正常的。开发环境应用配置在 `/admin/` 路径下，必须访问完整路径：http://localhost:3001/admin/
 
 ### Q: 登录时 API 请求失败（500错误）？
 A: 
@@ -143,5 +143,5 @@ A:
 ### Q: 如何部署到生产环境？
 A: 
 1. 运行 `npm run build` 构建项目
-2. 将 `dist` 目录内容复制到服务器的 `/web/admin/` 路径
+2. 将 `dist` 目录保留在服务器的 `web/admin-spa/dist`
 3. 确保服务器配置了 SPA 路由回退规则

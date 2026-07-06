@@ -2266,28 +2266,16 @@ import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import GroupManagementModal from '@/components/accounts/GroupManagementModal.vue'
 import BalanceDisplay from '@/components/accounts/BalanceDisplay.vue'
 import BatchPriorityModal from '@/components/accounts/BatchPriorityModal.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
 
 // 确认弹窗状态
-const showConfirmModal = ref(false)
-const confirmOptions = ref({ title: '', message: '', confirmText: '继续', cancelText: '取消' })
-let confirmResolve = null
-const showConfirm = (title, message, confirmText = '继续', cancelText = '取消') => {
-  return new Promise((resolve) => {
-    confirmOptions.value = { title, message, confirmText, cancelText }
-    confirmResolve = resolve
-    showConfirmModal.value = true
-  })
-}
-const handleConfirm = () => {
-  showConfirmModal.value = false
-  confirmResolve?.(true)
-  confirmResolve = null
-}
-const handleCancel = () => {
-  showConfirmModal.value = false
-  confirmResolve?.(false)
-  confirmResolve = null
-}
+const {
+  showConfirmModal,
+  confirmModalConfig: confirmOptions,
+  showConfirm,
+  handleConfirmModal: handleConfirm,
+  handleCancelModal: handleCancel
+} = useConfirmModal({ confirmText: '继续' })
 
 // 数据状态
 const accounts = ref([])
@@ -3253,7 +3241,6 @@ const loadAccounts = async (forceReload = false) => {
     await Promise.all([loadBindingCounts(forceReload), loadAccountGroups(forceReload)])
 
     // 后端账户API已经包含分组信息，不需要单独加载分组成员关系
-    // await loadGroupMembers(forceReload)
 
     const platformResults = await Promise.all(
       platformsToFetch.map(async (platform) => {
@@ -4767,16 +4754,6 @@ const getAccountStatusDotClass = (account) => {
   return 'bg-green-500'
 }
 
-// 获取会话窗口百分比
-// const getSessionWindowPercentage = (account) => {
-//   if (!account.sessionWindow) return 100
-//   const { remaining, total } = account.sessionWindow
-//   if (!total || total === 0) return 100
-//   return Math.round((remaining / total) * 100)
-// }
-
-// 格式化相对时间
-
 // 获取会话窗口进度条的样式类
 const getSessionProgressBarClass = (status, account = null) => {
   // 根据状态返回不同的颜色类，包含防御性检查
@@ -5069,11 +5046,6 @@ const calculateDailyCost = (account) => {
   return '0.0000'
 }
 
-// 切换调度状态
-// const toggleDispatch = async (account) => {
-//   await toggleSchedulable(account)
-// }
-
 watch(searchKeyword, () => {
   currentPage.value = 1
   updateSelectAllState()
@@ -5093,21 +5065,6 @@ watch(
     updateSelectAllState()
   }
 )
-
-// 监听排序选择变化 - 已重构为 handleDropdownSort，此处注释保留原逻辑参考
-// watch(accountSortBy, (newVal) => {
-//   const fieldMap = {
-//     name: 'name',
-//     dailyTokens: 'dailyTokens',
-//     dailyRequests: 'dailyRequests',
-//     totalTokens: 'totalTokens',
-//     lastUsed: 'lastUsed'
-//   }
-//
-//   if (fieldMap[newVal]) {
-//     sortAccounts(fieldMap[newVal])
-//   }
-// })
 
 watch(currentPage, () => {
   updateSelectAllState()

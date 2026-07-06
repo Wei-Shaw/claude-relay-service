@@ -18,6 +18,7 @@ const ACCOUNT_TYPE_CONFIG = {
   'azure-openai': { prefix: 'azure_openai:account:' },
   gemini: { prefix: 'gemini_account:' },
   'gemini-api': { prefix: 'gemini_api_account:' },
+  bedrock: { prefix: 'bedrock_account:', storage: 'json' },
   droid: { prefix: 'droid:account:' }
 }
 
@@ -27,6 +28,7 @@ const ACCOUNT_TYPE_PRIORITY = [
   'azure-openai',
   'claude',
   'claude-console',
+  'bedrock',
   'gemini',
   'gemini-api',
   'droid'
@@ -40,6 +42,7 @@ const ACCOUNT_CATEGORY_MAP = {
   'azure-openai': 'openai',
   gemini: 'gemini',
   'gemini-api': 'gemini',
+  bedrock: 'claude',
   droid: 'droid'
 }
 
@@ -2361,7 +2364,12 @@ class ApiKeyService {
     const redisKey = `${accountConfig.prefix}${accountId}`
     let accountData = null
     try {
-      accountData = await client.hgetall(redisKey)
+      if (accountConfig.storage === 'json') {
+        const rawAccount = await client.get(redisKey)
+        accountData = rawAccount ? JSON.parse(rawAccount) : null
+      } else {
+        accountData = await client.hgetall(redisKey)
+      }
     } catch (error) {
       logger.debug(`加载账号信息失败 ${redisKey}:`, error)
     }

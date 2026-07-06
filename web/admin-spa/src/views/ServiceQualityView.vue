@@ -549,7 +549,8 @@ onMounted(() => {
   color: rgb(243 244 246);
 }
 
-.panel-link {
+.panel-link,
+.quality-panel :deep(.panel-link) {
   font-size: 12px;
   font-weight: 700;
   color: rgb(8 145 178);
@@ -579,32 +580,114 @@ onMounted(() => {
   color: rgb(75 85 99);
 }
 
-.quality-table {
+.quality-panel :deep(.quality-table) {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 560px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
 }
 
-.quality-table th,
-.quality-table td {
+.quality-panel :deep(.quality-table th),
+.quality-panel :deep(.quality-table td) {
   border-bottom: 1px solid rgb(229 231 235);
-  padding: 10px 8px;
+  padding: 11px 12px;
   text-align: left;
   white-space: nowrap;
 }
 
-.dark .quality-table th,
-.dark .quality-table td {
+.dark .quality-panel :deep(.quality-table th),
+.dark .quality-panel :deep(.quality-table td) {
   border-color: rgb(55 65 81);
 }
 
-.quality-table th {
+.quality-panel :deep(.quality-table th) {
   font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0.04em;
   color: rgb(100 116 139);
 }
 
+.quality-panel :deep(.quality-table th:first-child),
+.quality-panel :deep(.quality-table td:first-child) {
+  width: 42%;
+}
+
+.quality-panel :deep(.quality-table th:nth-child(2)),
+.quality-panel :deep(.quality-table td:nth-child(2)) {
+  width: 12%;
+  text-align: right;
+}
+
+.quality-panel :deep(.quality-table th:nth-child(3)),
+.quality-panel :deep(.quality-table td:nth-child(3)) {
+  width: 15%;
+  text-align: right;
+}
+
+.quality-panel :deep(.quality-table th:nth-child(4)),
+.quality-panel :deep(.quality-table td:nth-child(4)) {
+  width: 19%;
+  text-align: right;
+}
+
+.quality-panel :deep(.quality-table th:last-child),
+.quality-panel :deep(.quality-table td:last-child) {
+  width: 12%;
+  text-align: right;
+}
+
+.quality-panel :deep(.quality-table td:first-child) {
+  overflow: hidden;
+  max-width: 0;
+  text-overflow: ellipsis;
+  font-weight: 700;
+  color: rgb(31 41 55);
+}
+
+.dark .quality-panel :deep(.quality-table td:first-child) {
+  color: rgb(229 231 235);
+}
+
+.quality-panel :deep(.quality-table td:nth-child(n + 2)) {
+  font-variant-numeric: tabular-nums;
+  color: rgb(71 85 105);
+}
+
+.dark .quality-panel :deep(.quality-table td:nth-child(n + 2)) {
+  color: rgb(203 213 225);
+}
+
+.quality-panel :deep(.quality-table tbody tr:last-child td) {
+  border-bottom: 0;
+}
+
+.quality-panel :deep(.quality-table tbody tr:hover td) {
+  background: rgba(8, 145, 178, 0.06);
+}
+
+.dark .quality-panel :deep(.quality-table tbody tr:hover td) {
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.quality-panel :deep(.quality-table .panel-link) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(8, 145, 178, 0.1);
+  padding: 4px 10px;
+}
+
 .empty-note {
+  padding: 18px 0;
+  text-align: center;
+  font-size: 13px;
+  color: rgb(100 116 139);
+}
+
+.quality-panel :deep(.empty-note) {
   padding: 18px 0;
   text-align: center;
   font-size: 13px;

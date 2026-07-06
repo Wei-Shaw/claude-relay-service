@@ -558,9 +558,6 @@ const updateDropdownPosition = () => {
   const spaceAbove = rect.top
   const margin = 8 // 边距
 
-  // 获取下拉框的高度
-  // const dropdownHeight = dropdownRef.value.offsetHeight
-
   // 计算最大可用高度
   const maxHeightBelow = spaceBelow - margin
   const maxHeightAbove = spaceAbove - margin

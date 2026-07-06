@@ -2058,6 +2058,7 @@ import { useSettingsStore } from '@/stores/settings'
 import * as httpApis from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import ModelPricingSection from '@/components/settings/ModelPricingSection.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
 
 // 定义组件名称，用于keep-alive排除
 defineOptions({
@@ -2081,43 +2082,8 @@ const isMounted = ref(true)
 const abortController = ref(new AbortController())
 
 // ConfirmModal 状态
-const showConfirmModal = ref(false)
-const confirmModalConfig = ref({
-  title: '',
-  message: '',
-  type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
-})
-const confirmResolve = ref(null)
-
-const showConfirm = (
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  type = 'primary'
-) => {
-  return new Promise((resolve) => {
-    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
-    confirmResolve.value = resolve
-    showConfirmModal.value = true
-  })
-}
-
-const handleConfirmModal = () => {
-  showConfirmModal.value = false
-  const resolve = confirmResolve.value
-  confirmResolve.value = null
-  resolve?.(true)
-}
-
-const handleCancelModal = () => {
-  showConfirmModal.value = false
-  const resolve = confirmResolve.value
-  confirmResolve.value = null
-  resolve?.(false)
-}
+const { showConfirmModal, confirmModalConfig, showConfirm, handleConfirmModal, handleCancelModal } =
+  useConfirmModal()
 
 // 计算属性：隐藏管理后台按钮（反转 showAdminButton 的值）
 const hideAdminButton = computed({

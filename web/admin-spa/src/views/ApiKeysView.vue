@@ -2176,7 +2176,6 @@ import { showToast, copyText, formatNumber, formatDate } from '@/utils/tools'
 
 import * as httpApis from '@/utils/http_apis'
 import { useAuthStore } from '@/stores/auth'
-import * as XLSX from 'xlsx-js-style'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -2190,6 +2189,7 @@ import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
 
 // 响应式数据
 const router = useRouter()
@@ -2366,37 +2366,13 @@ const newApiKeyData = ref(null)
 const batchApiKeyData = ref([])
 
 // ConfirmModal 状态
-const showConfirmModal = ref(false)
-const confirmModalConfig = ref({
-  title: '',
-  message: '',
-  type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
-})
-const confirmResolve = ref(null)
-
-const showConfirm = (
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  type = 'primary'
-) => {
-  return new Promise((resolve) => {
-    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
-    confirmResolve.value = resolve
-    showConfirmModal.value = true
-  })
-}
-const handleConfirm = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(true)
-}
-const handleCancel = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(false)
-}
+const {
+  showConfirmModal,
+  confirmModalConfig,
+  showConfirm,
+  handleConfirmModal: handleConfirm,
+  handleCancelModal: handleCancel
+} = useConfirmModal()
 
 // 计算排序后的API Keys（现在由后端处理，这里直接返回）
 const sortedApiKeys = computed(() => {
@@ -4071,8 +4047,6 @@ const clearAllDeletedApiKeys = async () => {
 
       // 如果有失败的，显示详细信息
       if (data.details && data.details.failedCount > 0) {
-        // const errors = data.details.errors
-        // console.error('部分API Keys清空失败:', errors)
         showToast(`${data.details.failedCount} 个清空失败`, 'warning')
       }
 
@@ -4242,43 +4216,6 @@ const formatWindowTime = (seconds) => {
   }
 }
 
-// 获取每日费用进度 - 已移到 LimitProgressBar 组件中
-// const getDailyCostProgress = (key) => {
-//   if (!key.dailyCostLimit || key.dailyCostLimit === 0) return 0
-//   const percentage = ((key.dailyCost || 0) / key.dailyCostLimit) * 100
-//   return Math.min(percentage, 100)
-// }
-
-// 获取每日费用进度条颜色 - 已移到 LimitProgressBar 组件中
-// const getDailyCostProgressColor = (key) => {
-//   const progress = getDailyCostProgress(key)
-//   if (progress >= 100) return 'bg-red-500'
-//   if (progress >= 80) return 'bg-yellow-500'
-//   return 'bg-green-500'
-// }
-
-// 获取 Opus 周费用进度 - 已移到 LimitBadge 组件中
-// const getWeeklyOpusCostProgress = (key) => {
-//   if (!key.weeklyOpusCostLimit || key.weeklyOpusCostLimit === 0) return 0
-//   const percentage = ((key.weeklyOpusCost || 0) / key.weeklyOpusCostLimit) * 100
-//   return Math.min(percentage, 100)
-// }
-
-// 获取 Opus 周费用进度条颜色 - 已移到 LimitBadge 组件中
-// const getWeeklyOpusCostProgressColor = (key) => {
-//   const progress = getWeeklyOpusCostProgress(key)
-//   if (progress >= 100) return 'bg-red-500'
-//   if (progress >= 80) return 'bg-yellow-500'
-//   return 'bg-green-500'
-// }
-
-// 获取总费用进度 - 暂时不用
-// const getTotalCostProgress = (key) => {
-//   if (!key.totalCostLimit || key.totalCostLimit === 0) return 0
-//   const percentage = ((key.totalCost || 0) / key.totalCostLimit) * 100
-//   return Math.min(percentage, 100)
-// }
-
 // 显示使用详情
 const showUsageDetails = (apiKey) => {
   const cachedStats = getCachedStats(apiKey.id)
@@ -4341,23 +4278,6 @@ const loadApiKeyUsageHistory = async (keyId) => {
   }
   apiKeyUsageLoading.value = false
 }
-
-// 格式化时间（秒转换为可读格式） - 已移到 WindowLimitBar 组件中
-// const formatTime = (seconds) => {
-//   if (seconds === null || seconds === undefined) return '--:--'
-//
-//   const hours = Math.floor(seconds / 3600)
-//   const minutes = Math.floor((seconds % 3600) / 60)
-//   const secs = seconds % 60
-//
-//   if (hours > 0) {
-//     return `${hours}h ${minutes}m`
-//   } else if (minutes > 0) {
-//     return `${minutes}m ${secs}s`
-//   } else {
-//     return `${secs}s`
-//   }
-// }
 
 // 格式化最后使用时间
 const formatLastUsed = (dateString) => {
@@ -4483,8 +4403,11 @@ const clearSearch = () => {
 }
 
 // 导出数据到Excel
-const exportToExcel = () => {
+const exportToExcel = async () => {
   try {
+    const XLSXModule = await import('xlsx-js-style')
+    const XLSX = XLSXModule.default || XLSXModule
+
     // 准备导出的数据 - 简化版本
     const exportData = sortedApiKeys.value.map((key) => {
       // 获取当前时间段的数据
