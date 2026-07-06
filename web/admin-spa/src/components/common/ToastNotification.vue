@@ -40,6 +40,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 const toasts = ref([])
 let toastIdCounter = 0
 
+const normalizeToastType = (type) => {
+  const allowedTypes = ['success', 'error', 'warning', 'info']
+  return allowedTypes.includes(type) ? type : 'info'
+}
+
 // 获取图标类名
 const getIconClass = (type) => {
   const iconMap = {
@@ -54,11 +59,12 @@ const getIconClass = (type) => {
 // 添加Toast
 const addToast = (message, type = 'info', title = null, duration = 5000) => {
   const id = ++toastIdCounter
+  const safeType = normalizeToastType(type)
   const toast = {
     id,
-    message,
-    type,
-    title,
+    message: String(message ?? ''),
+    type: safeType,
+    title: title ? String(title) : '',
     duration,
     isVisible: false
   }
@@ -210,6 +216,7 @@ defineExpose({
 .toast-message {
   font-size: 14px;
   line-height: 1.5;
+  white-space: pre-line;
   word-wrap: break-word;
 }
 

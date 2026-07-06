@@ -229,6 +229,7 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
 
 const props = defineProps({
   show: {
@@ -246,37 +247,8 @@ const emit = defineEmits(['close', 'save'])
 const saving = ref(false)
 
 // ConfirmModal 状态
-const showConfirmModal = ref(false)
-const confirmModalConfig = ref({
-  title: '',
-  message: '',
-  type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
-})
-const confirmResolve = ref(null)
-
-const showConfirm = (
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  type = 'primary'
-) => {
-  return new Promise((resolve) => {
-    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
-    confirmResolve.value = resolve
-    showConfirmModal.value = true
-  })
-}
-const handleConfirmModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(true)
-}
-const handleCancelModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(false)
-}
+const { showConfirmModal, confirmModalConfig, showConfirm, handleConfirmModal, handleCancelModal } =
+  useConfirmModal()
 
 // 表单数据
 const localForm = reactive({
