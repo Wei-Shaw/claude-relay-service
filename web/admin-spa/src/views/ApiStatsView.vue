@@ -890,27 +890,6 @@ watch(apiKey, (newValue) => {
   z-index: 0;
 }
 
-/* 玻璃态效果 - 使用CSS变量 */
-.glass-strong {
-  background: var(--glass-strong-color);
-  backdrop-filter: blur(25px);
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  position: relative;
-  z-index: 1;
-}
-
-/* 暗色模式的玻璃态效果 */
-:global(.dark) .glass-strong {
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(55, 65, 81, 0.3),
-    inset 0 1px 0 rgba(75, 85, 99, 0.2);
-}
-
 /* 标题渐变 */
 .header-title {
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
