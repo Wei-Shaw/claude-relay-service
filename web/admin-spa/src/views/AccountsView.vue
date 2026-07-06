@@ -887,17 +887,6 @@
                     @error="(error) => handleBalanceError(account.id, error)"
                     @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
                   />
-                  <div class="mt-1 text-xs">
-                    <button
-                      v-if="
-                        !(account.platform === 'gemini' && account.oauthProvider === 'antigravity')
-                      "
-                      class="text-blue-500 hover:underline dark:text-blue-300"
-                      @click="openBalanceScriptModal(account)"
-                    >
-                      配置余额脚本
-                    </button>
-                  </div>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4">
                   <div v-if="account.platform === 'claude'" class="space-y-2">
@@ -1586,15 +1575,6 @@
               @error="(error) => handleBalanceError(account.id, error)"
               @refreshed="(data) => handleBalanceRefreshed(account.id, data)"
             />
-            <div class="mt-1 text-xs">
-              <button
-                v-if="!(account.platform === 'gemini' && account.oauthProvider === 'antigravity')"
-                class="text-blue-500 hover:underline dark:text-blue-300"
-                @click="openBalanceScriptModal(account)"
-              >
-                配置余额脚本
-              </button>
-            </div>
           </div>
 
           <!-- 状态信息 -->
@@ -2119,13 +2099,6 @@
       @saved="handleScheduledTestSaved"
     />
 
-    <AccountBalanceScriptModal
-      :account="selectedAccountForScript"
-      :show="showBalanceScriptModal"
-      @close="closeBalanceScriptModal"
-      @saved="handleBalanceScriptSaved"
-    />
-
     <!-- 账户统计弹窗 -->
     <el-dialog
       v-model="showAccountStatsModal"
@@ -2292,7 +2265,6 @@ import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import GroupManagementModal from '@/components/accounts/GroupManagementModal.vue'
 import BalanceDisplay from '@/components/accounts/BalanceDisplay.vue'
-import AccountBalanceScriptModal from '@/components/accounts/AccountBalanceScriptModal.vue'
 import BatchPriorityModal from '@/components/accounts/BatchPriorityModal.vue'
 
 // 确认弹窗状态
@@ -2818,43 +2790,6 @@ const handleScheduledTestSaved = () => {
   showToast('定时测试配置已保存', 'success')
 }
 
-// 余额脚本配置
-const showBalanceScriptModal = ref(false)
-const selectedAccountForScript = ref(null)
-
-const openBalanceScriptModal = (account) => {
-  selectedAccountForScript.value = account
-  showBalanceScriptModal.value = true
-}
-
-const closeBalanceScriptModal = () => {
-  showBalanceScriptModal.value = false
-  selectedAccountForScript.value = null
-}
-
-const handleBalanceScriptSaved = async () => {
-  showToast('余额脚本已保存', 'success')
-  const account = selectedAccountForScript.value
-  closeBalanceScriptModal()
-
-  if (!account?.id || !account?.platform) {
-    return
-  }
-
-  // 重新拉取一次余额信息，用于刷新 scriptConfigured 状态（启用"刷新余额"按钮）
-  try {
-    const res = await httpApis.getAccountBalanceApi(account.id, {
-      platform: account.platform,
-      queryApi: false
-    })
-    if (res?.success && res.data) {
-      handleBalanceRefreshed(account.id, res.data)
-    }
-  } catch (error) {
-    console.debug('Failed to reload balance after saving script:', error)
-  }
-}
-
 // 计算排序后的账户列表
 const sortedAccounts = computed(() => {
   let sourceAccounts = accounts.value
@@ -3127,21 +3062,14 @@ const paginatedAccounts = computed(() => {
 
 const canRefreshVisibleBalances = computed(() => {
   const targets = paginatedAccounts.value
-  if (!Array.isArray(targets) || targets.length === 0) {
-    return false
-  }
-
-  return targets.some((account) => {
-    const info = account?.balanceInfo
-    return info?.scriptEnabled !== false && !!info?.scriptConfigured
-  })
+  return Array.isArray(targets) && targets.length > 0
 })
 
 const refreshBalanceTooltip = computed(() => {
   if (accountsLoading.value) return '正在加载账户...'
   if (refreshingBalances.value) return '刷新中...'
-  if (!canRefreshVisibleBalances.value) return '当前页未配置余额脚本，无法刷新'
-  return '刷新当前页余额（仅对已配置余额脚本的账户生效）'
+  if (!canRefreshVisibleBalances.value) return '当前页没有可刷新的账户'
+  return '刷新当前页账户余额/配额'
 })
 
 // 余额刷新成功回调
@@ -3167,22 +3095,10 @@ const refreshVisibleBalances = async () => {
     return
   }
 
-  const eligibleTargets = targets.filter((account) => {
-    const info = account?.balanceInfo
-    return info?.scriptEnabled !== false && !!info?.scriptConfigured
-  })
-
-  if (eligibleTargets.length === 0) {
-    showToast('当前页没有配置余额脚本的账户', 'warning')
-    return
-  }
-
-  const skippedCount = targets.length - eligibleTargets.length
-
   refreshingBalances.value = true
   try {
     const results = await Promise.all(
-      eligibleTargets.map(async (account) => {
+      targets.map(async (account) => {
         try {
           const response = await httpApis.refreshAccountBalanceApi(account.id, {
             platform: account.platform
@@ -3204,7 +3120,6 @@ const refreshVisibleBalances = async () => {
     const successCount = results.filter((r) => r.success).length
     const failCount = results.length - successCount
 
-    const skippedText = skippedCount > 0 ? `，跳过 ${skippedCount} 个未配置脚本` : ''
     if (Object.keys(updatedMap).length > 0) {
       accounts.value = accounts.value.map((account) => {
         const balanceInfo = updatedMap[account.id]
@@ -3214,9 +3129,9 @@ const refreshVisibleBalances = async () => {
     }
 
     if (failCount === 0) {
-      showToast(`成功刷新 ${successCount} 个账户余额${skippedText}`, 'success')
+      showToast(`成功刷新 ${successCount} 个账户余额`, 'success')
     } else {
-      showToast(`刷新完成：${successCount} 成功，${failCount} 失败${skippedText}`, 'warning')
+      showToast(`刷新完成：${successCount} 成功，${failCount} 失败`, 'warning')
     }
   } finally {
     refreshingBalances.value = false

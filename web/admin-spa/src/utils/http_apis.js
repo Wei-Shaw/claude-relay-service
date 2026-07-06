@@ -295,26 +295,6 @@ export const getBalanceSummaryApi = () =>
 export const getBalanceByPlatformApi = (platform, params) =>
   request({ url: `/admin/accounts/balance/platform/${platform}`, method: 'GET', params })
 
-// 账户余额脚本
-export const getAccountBalanceScriptApi = (id, platform) =>
-  request({ url: `/admin/accounts/${id}/balance/script?platform=${platform}`, method: 'GET' })
-export const updateAccountBalanceScriptApi = (id, platform, data) =>
-  request({ url: `/admin/accounts/${id}/balance/script?platform=${platform}`, method: 'PUT', data })
-export const testAccountBalanceScriptApi = (id, platform, data) =>
-  request({
-    url: `/admin/accounts/${id}/balance/script/test?platform=${platform}`,
-    method: 'POST',
-    data
-  })
-
-// 默认余额脚本
-export const getDefaultBalanceScriptApi = () =>
-  request({ url: '/admin/balance-scripts/default', method: 'GET' })
-export const updateDefaultBalanceScriptApi = (data) =>
-  request({ url: '/admin/balance-scripts/default', method: 'PUT', data })
-export const testDefaultBalanceScriptApi = (data) =>
-  request({ url: '/admin/balance-scripts/default/test', method: 'POST', data })
-
 // 前台用户管理
 export const getFrontUsersApi = (params) => request({ url: '/users', method: 'GET', params })
 export const getFrontUsersStatsOverviewApi = () =>

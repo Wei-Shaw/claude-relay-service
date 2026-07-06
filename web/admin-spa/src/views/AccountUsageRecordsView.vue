@@ -26,13 +26,28 @@
       </div>
     </div>
 
-    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
       <div
         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
         <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总请求</p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
           {{ formatNumber(summary.totalRequests) }}
+        </p>
+      </div>
+      <div
+        class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+      >
+        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">缺失用量</p>
+        <p
+          class="mt-1 text-2xl font-bold"
+          :class="
+            summary.missingUsageRequests > 0
+              ? 'text-red-600 dark:text-red-400'
+              : 'text-gray-900 dark:text-gray-100'
+          "
+        >
+          {{ formatNumber(summary.missingUsageRequests) }}
         </p>
       </div>
       <div
@@ -159,6 +174,11 @@
                   <th
                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
+                    状态
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                  >
                     输入
                   </th>
                   <th
@@ -207,6 +227,18 @@
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-800 dark:text-gray-100">
                     {{ record.model }}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-3 text-sm">
+                    <span
+                      class="rounded-full px-2 py-1 text-xs font-semibold"
+                      :class="
+                        isUsageMissing(record)
+                          ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                          : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                      "
+                    >
+                      {{ formatUsageStatus(record) }}
+                    </span>
                   </td>
                   <td class="whitespace-nowrap px-4 py-3 text-sm text-blue-600 dark:text-blue-400">
                     {{ formatNumber(record.inputTokens) }}
@@ -260,6 +292,9 @@
               </div>
               <div class="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <div>模型：{{ record.model }}</div>
+                <div :class="isUsageMissing(record) ? 'text-red-600 dark:text-red-400' : ''">
+                  状态：{{ formatUsageStatus(record) }}
+                </div>
                 <div>总 Token：{{ formatNumber(record.totalTokens) }}</div>
                 <div>输入：{{ formatNumber(record.inputTokens) }}</div>
                 <div>输出：{{ formatNumber(record.outputTokens) }}</div>
@@ -333,7 +368,11 @@ const summary = reactive({
   totalRequests: 0,
   totalTokens: 0,
   totalCost: 0,
-  avgCost: 0
+  avgCost: 0,
+  completedRequests: 0,
+  missingUsageRequests: 0,
+  abortedRequests: 0,
+  streamErrorRequests: 0
 })
 
 const accountInfo = reactive({
@@ -372,6 +411,24 @@ const formatCost = (value) => {
   if (num >= 1) return `$${num.toFixed(2)}`
   if (num >= 0.001) return `$${num.toFixed(4)}`
   return `$${num.toFixed(6)}`
+}
+
+const isUsageMissing = (record) =>
+  record?.usageMissing === true || record?.billableUsageUnknown === true
+
+const formatUsageStatus = (record) => {
+  if (!record) return '未知'
+  if (record.usageStatusName) return record.usageStatusName
+
+  const map = {
+    started: '已发起',
+    completed: '已完成',
+    aborted: '客户端中断',
+    stream_error: '流错误',
+    completed_without_usage: '无用量结束',
+    record_failed: '记录失败'
+  }
+  return map[record.usageStatus] || record.usageStatus || '已完成'
 }
 
 const buildParams = (page) => {
@@ -419,6 +476,10 @@ const syncResponseState = (data) => {
   summary.totalTokens = summaryData.totalTokens || 0
   summary.totalCost = summaryData.totalCost || 0
   summary.avgCost = summaryData.avgCost || 0
+  summary.completedRequests = summaryData.completedRequests || 0
+  summary.missingUsageRequests = summaryData.missingUsageRequests || 0
+  summary.abortedRequests = summaryData.abortedRequests || 0
+  summary.streamErrorRequests = summaryData.streamErrorRequests || 0
 
   accountInfo.id = data.accountInfo?.id || accountId.value
   accountInfo.name = data.accountInfo?.name || ''
@@ -503,6 +564,7 @@ const exportCsv = async () => {
       '时间',
       'API Key',
       '模型',
+      '状态',
       '输入Token',
       '输出Token',
       '缓存创建Token',
@@ -517,6 +579,7 @@ const exportCsv = async () => {
         formatDate(record.timestamp),
         record.apiKeyName || record.apiKeyId || '',
         record.model || '',
+        formatUsageStatus(record),
         record.inputTokens || 0,
         record.outputTokens || 0,
         record.cacheCreateTokens || 0,

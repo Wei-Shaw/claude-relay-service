@@ -559,7 +559,9 @@ router.get('/api-keys/:keyId/usage-history', authenticateAdmin, async (req, res)
 
       const dailyKey = `usage:daily:${keyId}:${dateKey}`
       const dailyData = await redis.client.hgetall(dailyKey)
-      const modelResults = await redis.scanAndGetAllChunked(`usage:${keyId}:model:daily:*:${dateKey}`)
+      const modelResults = await redis.scanAndGetAllChunked(
+        `usage:${keyId}:model:daily:*:${dateKey}`
+      )
 
       let inputTokens = 0
       let outputTokens = 0
@@ -3351,6 +3353,25 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       return true
     }
 
+    const missingUsageStatuses = new Set([
+      'started',
+      'aborted',
+      'stream_error',
+      'completed_without_usage',
+      'record_failed'
+    ])
+    const usageStatusNames = {
+      started: '已发起',
+      completed: '已完成',
+      aborted: '客户端中断',
+      stream_error: '流错误',
+      completed_without_usage: '无用量结束',
+      record_failed: '记录失败'
+    }
+    const getUsageStatus = (record) => record.usageStatus || record.lifecycleStatus || 'completed'
+    const isUsageMissingRecord = (record) =>
+      record.usageMissing === true || missingUsageStatuses.has(getUsageStatus(record))
+
     const filteredRecords = []
     const modelSet = new Set()
     const apiKeyOptionMap = new Map()
@@ -3430,7 +3451,11 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       cacheCreateTokens: 0,
       cacheReadTokens: 0,
       totalTokens: 0,
-      totalCost: 0
+      totalCost: 0,
+      completedRequests: 0,
+      missingUsageRequests: 0,
+      abortedRequests: 0,
+      streamErrorRequests: 0
     }
 
     for (const record of filteredRecords) {
@@ -3453,6 +3478,20 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       summary.cacheReadTokens += usage.cache_read_input_tokens
       summary.totalTokens += totalTokens
       summary.totalCost += computedCost
+
+      const usageStatus = getUsageStatus(record)
+      if (usageStatus === 'completed') {
+        summary.completedRequests += 1
+      }
+      if (isUsageMissingRecord(record)) {
+        summary.missingUsageRequests += 1
+      }
+      if (usageStatus === 'aborted') {
+        summary.abortedRequests += 1
+      }
+      if (usageStatus === 'stream_error') {
+        summary.streamErrorRequests += 1
+      }
     }
 
     const totalRecords = filteredRecords.length
@@ -3471,6 +3510,8 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
       const realCost =
         typeof record.realCost === 'number' ? record.realCost : costData?.costs?.total || 0
+      const usageStatus = getUsageStatus(record)
+      const usageMissing = isUsageMissingRecord(record)
       const totalTokens =
         record.totalTokens ||
         usage.input_tokens +
@@ -3490,6 +3531,15 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
         accountName: accountInfo.name || accountInfo.email || accountId,
         accountType: record.accountType,
         accountTypeName: accountTypeNames[record.accountType] || '未知渠道',
+        usageStatus,
+        usageStatusName: usageStatusNames[usageStatus] || usageStatus,
+        usageMissing,
+        billableUsageUnknown: record.billableUsageUnknown === true || usageMissing,
+        statusMessage: record.statusMessage || null,
+        failureReason: record.failureReason || null,
+        lifecycleRecordId: record.lifecycleRecordId || record.requestLifecycleId || null,
+        startedAt: record.startedAt || null,
+        endedAt: record.endedAt || record.completedAt || null,
         inputTokens: usage.input_tokens,
         outputTokens: usage.output_tokens,
         cacheCreateTokens: usage.cache_creation_input_tokens,

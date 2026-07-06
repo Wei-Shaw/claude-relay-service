@@ -210,14 +210,6 @@ const config = {
     hotReload: process.env.HOT_RELOAD === 'true'
   },
 
-  // 💰 账户余额相关配置
-  accountBalance: {
-    // 是否允许执行自定义余额脚本（安全开关）
-    // 说明：脚本能力可发起任意 HTTP 请求并在服务端执行 extractor 逻辑，建议仅在受控环境开启
-    // 默认保持开启；如需禁用请显式设置：BALANCE_SCRIPT_ENABLED=false
-    enableBalanceScript: process.env.BALANCE_SCRIPT_ENABLED !== 'false'
-  },
-
   // 🧼 供应商上游错误对外脱敏配置
   // 说明：用于控制内部供应商账号（如 OpenAI-Responses / Gemini API / CCR / Droid）
   // 的上游错误是否直接暴露给终端客户。默认开启脱敏，避免泄露供应商和网关细节。

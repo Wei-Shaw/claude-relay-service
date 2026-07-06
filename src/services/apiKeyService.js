@@ -1655,6 +1655,136 @@ class ApiKeyService {
     }
   }
 
+  async _persistUsageRecord(keyId, usageRecord, lifecycleRecordId = null) {
+    if (!lifecycleRecordId) {
+      await redis.addUsageRecord(keyId, usageRecord)
+      return
+    }
+
+    const updated = await redis.updateUsageRecord(keyId, lifecycleRecordId, {
+      ...usageRecord,
+      lifecycleRecordId,
+      requestLifecycleId: lifecycleRecordId
+    })
+
+    if (!updated) {
+      logger.warn(
+        `⚠️ Lifecycle usage record ${lifecycleRecordId} not found for ${keyId}, appending completed record`
+      )
+      await redis.addUsageRecord(keyId, {
+        ...usageRecord,
+        lifecycleRecordId,
+        requestLifecycleId: lifecycleRecordId
+      })
+    }
+  }
+
+  async recordUsageAttempt(
+    keyId,
+    {
+      model = 'unknown',
+      accountId = null,
+      accountType = null,
+      requestMeta = null,
+      status = 'started',
+      statusMessage = null
+    } = {}
+  ) {
+    try {
+      const finalizedRequestMeta = finalizeRequestDetailMeta(requestMeta)
+      const lifecycleRecordId =
+        finalizedRequestMeta?.lifecycleRecordId ||
+        finalizedRequestMeta?.requestLifecycleId ||
+        uuidv4()
+      const now = new Date().toISOString()
+
+      const usageRecord = {
+        timestamp: now,
+        startedAt: now,
+        updatedAt: now,
+        lifecycleRecordId,
+        requestLifecycleId: lifecycleRecordId,
+        model: model || 'unknown',
+        accountId: accountId || null,
+        accountType: accountType || null,
+        requestId: finalizedRequestMeta?.requestId || lifecycleRecordId,
+        endpoint: finalizedRequestMeta?.endpoint || null,
+        method: finalizedRequestMeta?.method || null,
+        statusCode: finalizedRequestMeta?.statusCode || null,
+        stream: finalizedRequestMeta?.stream === true,
+        durationMs: finalizedRequestMeta?.durationMs ?? null,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreateTokens: 0,
+        cacheReadTokens: 0,
+        totalTokens: 0,
+        cost: 0,
+        realCost: 0,
+        costBreakdown: {
+          input: 0,
+          output: 0,
+          cacheCreate: 0,
+          cacheRead: 0,
+          total: 0
+        },
+        realCostBreakdown: {
+          input: 0,
+          output: 0,
+          cacheCreate: 0,
+          cacheRead: 0,
+          total: 0
+        },
+        usageStatus: status,
+        lifecycleStatus: status,
+        statusMessage,
+        usageMissing: true,
+        billableUsageUnknown: true,
+        isUsageFinal: false
+      }
+
+      await redis.addUsageRecord(keyId, usageRecord)
+
+      logger.database(
+        `📊 Recorded usage lifecycle start: ${keyId} - ${lifecycleRecordId}, model: ${usageRecord.model}, status: ${status}`
+      )
+
+      return { lifecycleRecordId, usageRecord }
+    } catch (error) {
+      logger.error('❌ Failed to record usage lifecycle start:', error)
+      return { lifecycleRecordId: null, usageRecord: null }
+    }
+  }
+
+  async updateUsageLifecycleRecord(keyId, lifecycleRecordId, updates = {}) {
+    if (!keyId || !lifecycleRecordId) {
+      return false
+    }
+
+    const now = new Date().toISOString()
+    const status = updates.usageStatus || updates.lifecycleStatus || 'updated'
+    const shouldMarkMissing = status !== 'completed'
+
+    const updated = await redis.updateUsageRecord(keyId, lifecycleRecordId, {
+      ...updates,
+      timestamp: updates.timestamp || now,
+      updatedAt: now,
+      endedAt: updates.endedAt || now,
+      lifecycleRecordId,
+      requestLifecycleId: lifecycleRecordId,
+      usageStatus: status,
+      lifecycleStatus: status,
+      usageMissing: updates.usageMissing ?? shouldMarkMissing,
+      billableUsageUnknown: updates.billableUsageUnknown ?? shouldMarkMissing,
+      isUsageFinal: updates.isUsageFinal ?? true
+    })
+
+    if (!updated) {
+      logger.warn(`⚠️ Lifecycle usage record ${lifecycleRecordId} not found for ${keyId}`)
+    }
+
+    return updated
+  }
+
   // 📊 记录使用情况（支持缓存token和账户级别统计，应用服务倍率）
   async recordUsage(
     keyId,
@@ -1670,6 +1800,8 @@ class ApiKeyService {
   ) {
     try {
       const finalizedRequestMeta = finalizeRequestDetailMeta(requestMeta)
+      const lifecycleRecordId =
+        finalizedRequestMeta?.lifecycleRecordId || finalizedRequestMeta?.requestLifecycleId || null
       const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
 
       // 计算费用
@@ -1770,8 +1902,13 @@ class ApiKeyService {
       }
 
       // 记录单次请求的使用详情（同时保存真实成本和倍率成本）
+      const recordTimestamp = new Date().toISOString()
       const usageRecord = {
-        timestamp: new Date().toISOString(),
+        timestamp: recordTimestamp,
+        completedAt: recordTimestamp,
+        updatedAt: recordTimestamp,
+        lifecycleRecordId,
+        requestLifecycleId: lifecycleRecordId,
         model,
         accountId: accountId || null,
         accountType: accountType || null,
@@ -1790,10 +1927,15 @@ class ApiKeyService {
         realCost: Number(realCost.toFixed(6)),
         costBreakdown: costInfo?.costs || undefined,
         realCostBreakdown: costInfo?.costs || undefined,
-        isLongContext: isLongContextRequest
+        isLongContext: isLongContextRequest,
+        usageStatus: 'completed',
+        lifecycleStatus: 'completed',
+        usageMissing: false,
+        billableUsageUnknown: false,
+        isUsageFinal: true
       }
 
-      await redis.addUsageRecord(keyId, usageRecord)
+      await this._persistUsageRecord(keyId, usageRecord, lifecycleRecordId)
       this._captureRequestDetail(keyId, usageRecord, finalizedRequestMeta).catch((captureError) => {
         logger.warn(`⚠️ Failed to schedule request detail capture: ${captureError.message}`)
       })
@@ -1859,6 +2001,8 @@ class ApiKeyService {
   ) {
     try {
       const finalizedRequestMeta = finalizeRequestDetailMeta(requestMeta)
+      const lifecycleRecordId =
+        finalizedRequestMeta?.lifecycleRecordId || finalizedRequestMeta?.requestLifecycleId || null
       const actualModel = normalizeDisplayModel(model) || 'unknown'
       const requestedModel =
         normalizeDisplayModel(finalizedRequestMeta?.requestedModel) ||
@@ -2030,8 +2174,13 @@ class ApiKeyService {
         }
       }
 
+      const recordTimestamp = new Date().toISOString()
       const usageRecord = {
-        timestamp: new Date().toISOString(),
+        timestamp: recordTimestamp,
+        completedAt: recordTimestamp,
+        updatedAt: recordTimestamp,
+        lifecycleRecordId,
+        requestLifecycleId: lifecycleRecordId,
         model: recordModel,
         actualModel,
         requestedModel: requestedModel || null,
@@ -2073,10 +2222,15 @@ class ApiKeyService {
         },
         pricingSource: costInfo.pricingSource || null,
         usedFallbackPricing: costInfo.usedFallbackPricing === true,
-        isLongContext: costInfo.isLongContextRequest || false
+        isLongContext: costInfo.isLongContextRequest || false,
+        usageStatus: 'completed',
+        lifecycleStatus: 'completed',
+        usageMissing: false,
+        billableUsageUnknown: false,
+        isUsageFinal: true
       }
 
-      await redis.addUsageRecord(keyId, usageRecord)
+      await this._persistUsageRecord(keyId, usageRecord, lifecycleRecordId)
       this._captureRequestDetail(keyId, usageRecord, finalizedRequestMeta).catch((captureError) => {
         logger.warn(`⚠️ Failed to schedule request detail capture: ${captureError.message}`)
       })
