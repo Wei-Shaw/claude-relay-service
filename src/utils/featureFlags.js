@@ -49,28 +49,6 @@ const getVendorErrorSanitizationConfig = (providerKey = '') => {
 }
 
 /**
- * 是否允许执行"余额脚本"（安全开关）
- * ⚠️ 安全警告：vm模块非安全沙箱，默认禁用。如需启用请显式设置 BALANCE_SCRIPT_ENABLED=true
- * 仅在完全信任管理员且了解RCE风险时才启用此功能
- */
-const isBalanceScriptEnabled = () => {
-  if (
-    process.env.BALANCE_SCRIPT_ENABLED !== undefined &&
-    process.env.BALANCE_SCRIPT_ENABLED !== ''
-  ) {
-    return parseBooleanEnv(process.env.BALANCE_SCRIPT_ENABLED)
-  }
-
-  const fromConfig =
-    config?.accountBalance?.enableBalanceScript ??
-    config?.features?.balanceScriptEnabled ??
-    config?.security?.enableBalanceScript
-
-  // 默认禁用，需显式启用
-  return typeof fromConfig === 'boolean' ? fromConfig : false
-}
-
-/**
  * 是否启用供应商上游错误对外脱敏
  * - 默认启用，避免把供应商账号/网关细节暴露给终端客户
  * - 可通过全局或 provider 级开关关闭
@@ -108,7 +86,6 @@ const isVendorErrorSanitizationEnabled = (providerKey = '') => {
 }
 
 module.exports = {
-  isBalanceScriptEnabled,
   isVendorErrorSanitizationEnabled,
   normalizeProviderFlagKey
 }

@@ -640,25 +640,75 @@ class OpenAIResponsesRelayService {
     let rateLimitDetected = false
     let rateLimitResetsInSeconds = null
     let streamEnded = false
+    let clientDisconnected = false
+    let lifecycleFinalized = false
+    const lifecycleStart = await apiKeyService.recordUsageAttempt(apiKeyData.id, {
+      model: requestedModel || 'unknown',
+      accountId: account.id,
+      accountType: 'openai-responses',
+      requestMeta: createRequestDetailMeta(req, {
+        requestBody: req?.body,
+        stream: true,
+        statusCode: response.status
+      }),
+      status: 'started',
+      statusMessage: 'upstream_stream_started'
+    })
+    const { lifecycleRecordId } = lifecycleStart
+    // 流已经建立后，客户端断开不能再 abort 上游，否则拿不到最终 usage。
+    if (handleClientDisconnect) {
+      res.removeListener('close', handleClientDisconnect)
+    }
     const detachResponseErrorHandler = attachResponseErrorHandler(
       res,
       logger,
       'OpenAI-Responses stream'
     )
 
-    const cleanup = () => {
-      if (streamEnded || res.writableEnded) {
+    const buildLifecycleMeta = (statusCode = res.statusCode) =>
+      createRequestDetailMeta(req, {
+        requestBody: req?.body,
+        stream: true,
+        statusCode
+      })
+
+    const finalizeLifecycleRecord = async (status, updates = {}) => {
+      if (!lifecycleRecordId || lifecycleFinalized) {
+        return false
+      }
+
+      lifecycleFinalized = true
+      const lifecycleMeta = buildLifecycleMeta(updates.statusCode)
+      return apiKeyService.updateUsageLifecycleRecord(apiKeyData.id, lifecycleRecordId, {
+        model: actualModel || requestedModel || 'unknown',
+        statusCode: lifecycleMeta.statusCode,
+        durationMs: lifecycleMeta.durationMs,
+        usageStatus: status,
+        lifecycleStatus: status,
+        ...updates
+      })
+    }
+
+    const scheduleLifecycleFinalization = (status, updates = {}) => {
+      finalizeLifecycleRecord(status, updates).catch((error) => {
+        logger.warn(`⚠️ Failed to finalize usage lifecycle ${lifecycleRecordId}: ${error.message}`)
+      })
+    }
+
+    const markClientDisconnected = (source = 'close') => {
+      if (clientDisconnected || streamEnded || res.writableEnded) {
         return
       }
 
-      streamEnded = true
-      detachResponseErrorHandler()
-      try {
-        response.data?.unpipe?.(res)
-        response.data?.destroy?.()
-      } catch (_) {
-        // 忽略清理错误
-      }
+      clientDisconnected = true
+      logger.info(
+        '🔌 Client disconnected during OpenAI-Responses stream, draining upstream for usage',
+        {
+          accountId: account.id,
+          lifecycleRecordId,
+          source
+        }
+      )
     }
 
     const writeEventToClient = (event) => {
@@ -669,10 +719,10 @@ class OpenAIResponsesRelayService {
       parseSSEForUsage(event)
 
       const rewritten = this._rewriteStreamEventForClient(event, response.headers)
-      if (!streamEnded && rewritten) {
+      if (!streamEnded && !clientDisconnected && rewritten) {
         const written = safeWriteToResponse(res, rewritten, logger, 'OpenAI-Responses stream')
         if (!written) {
-          cleanup()
+          markClientDisconnected('write_failed')
         }
       }
     }
@@ -786,6 +836,14 @@ class OpenAIResponsesRelayService {
           const modelToRecord = actualModel || requestedModel || 'gpt-4'
 
           const serviceTier = req._serviceTier || null
+          const requestDetailMeta = createRequestDetailMeta(req, {
+            requestBody: req.body,
+            stream: true,
+            statusCode: res.statusCode
+          })
+          requestDetailMeta.lifecycleRecordId = lifecycleRecordId
+          requestDetailMeta.requestLifecycleId = lifecycleRecordId
+
           await apiKeyService.recordUsage(
             apiKeyData.id,
             actualInputTokens, // 传递实际输入（不含缓存）
@@ -796,12 +854,9 @@ class OpenAIResponsesRelayService {
             account.id,
             'openai-responses',
             serviceTier,
-            createRequestDetailMeta(req, {
-              requestBody: req.body,
-              stream: true,
-              statusCode: res.statusCode
-            })
+            requestDetailMeta
           )
+          lifecycleFinalized = true
 
           logger.info(
             `📊 Recorded usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), CacheCreate: ${cacheCreateTokens}, Output: ${outputTokens}, Total: ${totalTokens}, Model: ${modelToRecord}`
@@ -828,7 +883,20 @@ class OpenAIResponsesRelayService {
           }
         } catch (error) {
           logger.error('Failed to record usage:', error)
+          await finalizeLifecycleRecord('record_failed', {
+            statusMessage: 'usage_data_captured_but_local_record_failed',
+            failureReason: error.message,
+            usageMissing: false,
+            billableUsageUnknown: false
+          })
         }
+      } else {
+        await finalizeLifecycleRecord('completed_without_usage', {
+          statusMessage: 'stream_ended_without_response_usage',
+          failureReason: 'missing_usage',
+          usageMissing: true,
+          billableUsageUnknown: true
+        })
       }
 
       // 如果在流式响应中检测到限流
@@ -853,15 +921,18 @@ class OpenAIResponsesRelayService {
 
       // 清理监听器
       res.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', cleanup)
+      res.removeListener('close', markClientDisconnected)
       detachResponseErrorHandler()
 
-      safeEndResponse(res, logger, 'OpenAI-Responses stream')
+      if (!clientDisconnected) {
+        safeEndResponse(res, logger, 'OpenAI-Responses stream')
+      }
 
       logger.info('Stream response completed', {
         accountId: account.id,
         hasUsage: !!usageData,
-        actualModel: actualModel || 'unknown'
+        actualModel: actualModel || 'unknown',
+        clientDisconnected
       })
     })
 
@@ -871,23 +942,29 @@ class OpenAIResponsesRelayService {
       }
       streamEnded = true
       logger.error('Stream error:', error)
+      scheduleLifecycleFinalization('stream_error', {
+        statusMessage: 'upstream_stream_error_before_usage_completed',
+        failureReason: error.message,
+        usageMissing: true,
+        billableUsageUnknown: true
+      })
 
       // 清理监听器
       res.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', cleanup)
+      res.removeListener('close', markClientDisconnected)
       detachResponseErrorHandler()
 
-      if (!res.headersSent) {
+      if (!clientDisconnected && !res.headersSent) {
         const safeErrorResponse = buildOpenAIResponsesClientError(502, error, {
           fallbackStatus: 502
         })
         res.status(safeErrorResponse.status).json(safeErrorResponse.body)
-      } else {
+      } else if (!clientDisconnected) {
         safeEndResponse(res, logger, 'OpenAI-Responses stream')
       }
     })
 
-    res.on('close', cleanup)
+    res.on('close', markClientDisconnected)
   }
 
   // 处理非流式响应
