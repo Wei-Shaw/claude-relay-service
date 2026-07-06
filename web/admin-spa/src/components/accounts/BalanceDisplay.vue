@@ -225,30 +225,20 @@ const quotaBarClass = computed(() => {
 })
 
 const canRefresh = computed(() => {
-  // antigravity 配额：允许直接触发 Provider 刷新（无需脚本）
   if (props.queryMode === 'api' || props.queryMode === 'auto') {
     return true
   }
 
-  // 其他平台：仅在“已启用脚本且该账户配置了脚本”时允许刷新，避免误导（非脚本 Provider 多为降级策略）
-  const data = balanceData.value
-  if (!data) return false
-  if (data.scriptEnabled === false) return false
-  return !!data.scriptConfigured
+  return !!balanceData.value
 })
 
 const refreshTitle = computed(() => {
   if (refreshing.value) return '刷新中...'
-  if (!canRefresh.value) {
-    if (balanceData.value?.scriptEnabled === false) {
-      return '余额脚本功能已禁用'
-    }
-    return '请先配置余额脚本'
-  }
+  if (!canRefresh.value) return '暂无可刷新余额'
   if (isAntigravityQuota.value) {
     return '刷新配额（调用 Antigravity API）'
   }
-  return '刷新余额（调用脚本配置的余额 API）'
+  return '刷新余额/配额'
 })
 
 const primaryText = computed(() => {
