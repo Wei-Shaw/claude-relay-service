@@ -214,7 +214,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { getRequestDetailApi } from '@/utils/http_apis'
-import { showToast, formatNumber } from '@/utils/tools'
+import { showToast, formatNumber, formatRequestCost as formatCost } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -423,12 +423,6 @@ const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
 const formatCacheCreate = (value, notApplicable = false) =>
   notApplicable ? '-' : formatNumber(value)
 const formatReasoning = (value) => value || '-'
-const formatCost = (value) => {
-  const num = Number(value || 0)
-  if (num >= 1) return `$${num.toFixed(2)}`
-  if (num >= 0.001) return `$${num.toFixed(4)}`
-  return `$${num.toFixed(6)}`
-}
 const formatCacheCreateCost = (value, notApplicable = false) =>
   notApplicable ? '-' : formatCost(value)
 

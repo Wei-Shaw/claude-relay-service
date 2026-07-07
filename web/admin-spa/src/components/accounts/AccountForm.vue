@@ -882,7 +882,7 @@
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >凭证类型 *</label
                 >
-                <div v-if="!isEdit" class="flex gap-4">
+                <div class="flex gap-4">
                   <label class="flex cursor-pointer items-center">
                     <input
                       v-model="form.credentialType"
@@ -898,32 +898,6 @@
                     <input
                       v-model="form.credentialType"
                       class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                      type="radio"
-                      value="bearer_token"
-                    />
-                    <span class="text-sm text-gray-700 dark:text-gray-300"
-                      >Bearer Token（长期令牌）</span
-                    >
-                  </label>
-                </div>
-                <div v-else class="flex gap-4">
-                  <label class="flex items-center opacity-60">
-                    <input
-                      v-model="form.credentialType"
-                      class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                      disabled
-                      type="radio"
-                      value="access_key"
-                    />
-                    <span class="text-sm text-gray-700 dark:text-gray-300"
-                      >AWS Access Key（访问密钥）</span
-                    >
-                  </label>
-                  <label class="flex items-center opacity-60">
-                    <input
-                      v-model="form.credentialType"
-                      class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                      disabled
                       type="radio"
                       value="bearer_token"
                     />
@@ -944,9 +918,6 @@
                       <p v-else class="font-medium">
                         使用 AWS Bedrock API Keys 生成的 Bearer Token
                         进行身份验证，更简单、权限范围更小
-                      </p>
-                      <p v-if="isEdit" class="mt-1 text-xs italic">
-                        💡 编辑模式下凭证类型不可更改，如需切换类型请重新创建账户
                       </p>
                     </div>
                   </div>
@@ -2805,49 +2776,6 @@
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               共享账户：供所有API Key使用；专属账户：仅供特定API
               Key使用；分组调度：加入分组供分组内调度
-            </p>
-          </div>
-
-          <!-- 到期时间 - 仅在创建账户时显示，编辑时使用独立的过期时间编辑弹窗 -->
-          <div v-if="!isEdit">
-            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-              >到期时间 (可选)</label
-            >
-            <div
-              class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
-            >
-              <select
-                v-model="form.expireDuration"
-                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                @change="updateAccountExpireAt"
-              >
-                <option value="">永不过期</option>
-                <option value="30d">30 天</option>
-                <option value="90d">90 天</option>
-                <option value="180d">180 天</option>
-                <option value="365d">365 天</option>
-                <option value="custom">自定义日期</option>
-              </select>
-              <div v-if="form.expireDuration === 'custom'" class="mt-3">
-                <input
-                  v-model="form.customExpireDate"
-                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  :min="minDateTime"
-                  type="datetime-local"
-                  @change="updateAccountCustomExpireAt"
-                />
-              </div>
-              <p v-if="form.expiresAt" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                <i class="fas fa-calendar-alt mr-1" />
-                将于 {{ formatExpireDate(form.expiresAt) }} 过期
-              </p>
-              <p v-else class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                <i class="fas fa-infinity mr-1" />
-                账户永不过期
-              </p>
-            </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              设置 Claude Max/Pro 订阅的到期时间，到期后将停止调度此账户
             </p>
           </div>
 

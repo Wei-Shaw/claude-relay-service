@@ -197,9 +197,40 @@ export const formatDateTime = (date) => {
 }
 
 // 金额格式化
-export const formatCost = (value) => {
+export const formatCost = (value, options = {}) => {
+  const {
+    zeroValue = '$0.00',
+    invalidValue = zeroValue,
+    mediumThreshold = 0.01,
+    mediumDecimals = 2,
+    smallDecimals = 6,
+    largeDecimals = 2
+  } = options
   const num = Number(value || 0)
-  if (num === 0) return '$0.00'
-  if (num < 0.01) return `$${num.toFixed(6)}`
-  return `$${num.toFixed(2)}`
+
+  if (Number.isNaN(num)) return invalidValue
+  if (num === 0) return zeroValue
+  if (num >= 1) return `$${num.toFixed(largeDecimals)}`
+  if (num >= mediumThreshold) return `$${num.toFixed(mediumDecimals)}`
+  return `$${num.toFixed(smallDecimals)}`
 }
+
+export const formatDetailedCost = (value) =>
+  formatCost(value, {
+    zeroValue: '$0.000000',
+    invalidValue: '$0.000000',
+    mediumDecimals: 3
+  })
+
+export const formatRequestCost = (value) =>
+  formatCost(value, {
+    zeroValue: '$0.000000',
+    invalidValue: '$0.000000',
+    mediumThreshold: 0.001,
+    mediumDecimals: 4
+  })
+
+export const formatServiceCost = (value) =>
+  formatCost(value, {
+    mediumDecimals: 4
+  })

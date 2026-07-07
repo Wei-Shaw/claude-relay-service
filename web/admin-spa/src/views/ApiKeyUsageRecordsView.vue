@@ -296,7 +296,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { getApiKeyUsageRecordsApi } from '@/utils/http_apis'
-import { showToast, formatNumber, formatDate } from '@/utils/tools'
+import { showToast, formatNumber, formatDate, formatRequestCost as formatCost } from '@/utils/tools'
 import RecordDetailModal from '@/components/apikeys/RecordDetailModal.vue'
 
 const route = useRoute()
@@ -343,13 +343,6 @@ const dateRangeHint = computed(() => {
   if (!filters.dateRange || filters.dateRange.length !== 2) return ''
   return `${formatDate(filters.dateRange[0])} ~ ${formatDate(filters.dateRange[1])}`
 })
-
-const formatCost = (value) => {
-  const num = typeof value === 'number' ? value : 0
-  if (num >= 1) return `$${num.toFixed(2)}`
-  if (num >= 0.001) return `$${num.toFixed(4)}`
-  return `$${num.toFixed(6)}`
-}
 
 const buildParams = (page) => {
   const params = {

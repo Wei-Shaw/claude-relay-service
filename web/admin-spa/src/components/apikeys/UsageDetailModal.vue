@@ -500,7 +500,7 @@ import LimitProgressBar from './LimitProgressBar.vue'
 import WindowCountdown from './WindowCountdown.vue'
 import { useThemeStore } from '@/stores/theme'
 
-import { formatNumber } from '@/utils/tools'
+import { formatNumber, formatDetailedCost as formatCost } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -630,14 +630,6 @@ const formatTokenCount = (count) => {
     return (count / 1000).toFixed(1) + 'K'
   }
   return count.toString()
-}
-
-const formatCost = (value) => {
-  const num = Number(value || 0)
-  if (Number.isNaN(num)) return '$0.000000'
-  if (num >= 1) return `$${num.toFixed(2)}`
-  if (num >= 0.01) return `$${num.toFixed(3)}`
-  return `$${num.toFixed(6)}`
 }
 
 const roundToTwo = (value) => Math.round((Number(value) || 0) * 100) / 100

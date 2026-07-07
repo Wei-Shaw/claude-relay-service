@@ -782,7 +782,7 @@ import Chart from 'chart.js/auto'
 
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
-import { formatNumber, showToast } from '@/utils/tools'
+import { formatNumber, showToast, formatDetailedCost as formatCostValue } from '@/utils/tools'
 
 import { getBalanceSummaryApi } from '@/utils/http_apis'
 
@@ -939,19 +939,6 @@ const chartColors = computed(() => ({
   grid: isDarkMode.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(0, 0, 0, 0.1)',
   legend: isDarkMode.value ? '#e5e7eb' : '#374151'
 }))
-
-function formatCostValue(cost) {
-  if (!Number.isFinite(cost)) {
-    return '$0.000000'
-  }
-  if (cost >= 1) {
-    return `$${cost.toFixed(2)}`
-  }
-  if (cost >= 0.01) {
-    return `$${cost.toFixed(3)}`
-  }
-  return `$${cost.toFixed(6)}`
-}
 
 // 计算百分比
 function calculatePercentage(value, stats) {
