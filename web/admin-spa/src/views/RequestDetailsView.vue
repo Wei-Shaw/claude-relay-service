@@ -669,7 +669,7 @@ import {
   getRequestDetailBodyPreviewStatsApi,
   purgeRequestDetailBodyPreviewApi
 } from '@/utils/http_apis'
-import { showToast, formatDate, formatNumber } from '@/utils/tools'
+import { showToast, formatDate, formatNumber, formatRequestCost as formatCost } from '@/utils/tools'
 import RequestDetailModal from '@/components/admin/RequestDetailModal.vue'
 
 const router = useRouter()
@@ -1124,12 +1124,6 @@ const exportCsv = async () => {
   }
 }
 
-const formatCost = (value) => {
-  const num = Number(value || 0)
-  if (num >= 1) return `$${num.toFixed(2)}`
-  if (num >= 0.001) return `$${num.toFixed(4)}`
-  return `$${num.toFixed(6)}`
-}
 const formatCacheCreate = (value, notApplicable = false) =>
   notApplicable ? '-' : formatNumber(value)
 const formatRetentionHours = (value) => {

@@ -112,7 +112,7 @@
 </template>
 
 <script setup>
-import { formatNumber } from '@/utils/tools'
+import { formatNumber, formatServiceCost as formatCost } from '@/utils/tools'
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
@@ -225,14 +225,6 @@ const serviceStats = computed(() => {
     })
     .sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens))
 })
-
-// 格式化费用
-const formatCost = (cost) => {
-  if (!cost || cost === 0) return '$0.00'
-  if (cost >= 1) return '$' + cost.toFixed(2)
-  if (cost >= 0.01) return '$' + cost.toFixed(4)
-  return '$' + cost.toFixed(6)
-}
 
 // 格式化数字
 </script>
