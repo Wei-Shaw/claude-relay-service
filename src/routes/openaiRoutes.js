@@ -26,6 +26,7 @@ const {
   safeEndResponse,
   safeWriteToResponse
 } = require('../utils/connectionErrorHelper')
+const { isModelRestricted } = require('../utils/modelHelper')
 
 // 创建代理 Agent（使用统一的代理工具）
 function createProxyAgent(proxy) {
@@ -341,6 +342,20 @@ const handleResponses = async (req, res) => {
           message: 'This API key does not have permission to access OpenAI',
           type: 'permission_denied',
           code: 'permission_denied'
+        }
+      })
+    }
+
+    const originalRequestedModel = req.body?.model || ''
+    if (
+      apiKeyData.enableModelRestriction &&
+      isModelRestricted(originalRequestedModel, apiKeyData.restrictedModels)
+    ) {
+      return res.status(403).json({
+        error: {
+          message: `Model ${originalRequestedModel} is not allowed for this API key`,
+          type: 'invalid_request_error',
+          code: 'model_not_allowed'
         }
       })
     }

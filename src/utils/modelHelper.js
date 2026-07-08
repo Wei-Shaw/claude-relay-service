@@ -258,6 +258,41 @@ function getRateLimitModelFamily(modelName) {
   return RATE_LIMITED_MODEL_FAMILIES.find((family) => baseModel.includes(family)) || null
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Match a model name against an API Key restriction entry.
+ * Supports exact names and "*" wildcards, e.g. "gpt-5.6*" or "claude-opus-4-*".
+ */
+function modelMatchesRestriction(modelName, restriction) {
+  if (typeof modelName !== 'string' || typeof restriction !== 'string') {
+    return false
+  }
+
+  const model = modelName.trim()
+  const pattern = restriction.trim()
+  if (!model || !pattern) {
+    return false
+  }
+
+  if (!pattern.includes('*')) {
+    return model === pattern
+  }
+
+  const regexp = new RegExp(`^${pattern.split('*').map(escapeRegExp).join('.*')}$`)
+  return regexp.test(model)
+}
+
+function isModelRestricted(modelName, restrictedModels) {
+  if (!Array.isArray(restrictedModels) || restrictedModels.length === 0) {
+    return false
+  }
+
+  return restrictedModels.some((restriction) => modelMatchesRestriction(modelName, restriction))
+}
+
 module.exports = {
   parseVendorPrefixedModel,
   hasVendorPrefix,
@@ -266,5 +301,7 @@ module.exports = {
   isOpus45OrNewer,
   isClaudeFamilyModel,
   RATE_LIMITED_MODEL_FAMILIES,
-  getRateLimitModelFamily
+  getRateLimitModelFamily,
+  modelMatchesRestriction,
+  isModelRestricted
 }

@@ -17,7 +17,7 @@ const { getSafeMessage } = require('../utils/errorSanitizer')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const pricingService = require('../services/pricingService')
-const { getEffectiveModel } = require('../utils/modelHelper')
+const { getEffectiveModel, isModelRestricted } = require('../utils/modelHelper')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
 
 // 🔧 辅助函数：检查 API Key 权限
@@ -88,7 +88,7 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
 
     // 如果启用了模型限制，视为黑名单：过滤掉受限模型
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
-      models = models.filter((model) => !apiKeyData.restrictedModels.includes(model.id))
+      models = models.filter((model) => !isModelRestricted(model.id, apiKeyData.restrictedModels))
     }
 
     res.json({
@@ -127,7 +127,7 @@ router.get('/v1/models/:model', authenticateApiKey, async (req, res) => {
 
     // 模型限制（黑名单）：命中则直接拒绝
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
-      if (apiKeyData.restrictedModels.includes(modelId)) {
+      if (isModelRestricted(modelId, apiKeyData.restrictedModels)) {
         return res.status(404).json({
           error: {
             message: `Model '${modelId}' not found`,
@@ -213,7 +213,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
     // 模型限制（黑名单）：命中受限模型则拒绝
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
       const effectiveModel = getEffectiveModel(claudeRequest.model || '')
-      if (apiKeyData.restrictedModels.includes(effectiveModel)) {
+      if (isModelRestricted(effectiveModel, apiKeyData.restrictedModels)) {
         return res.status(403).json({
           error: {
             message: `Model ${req.body.model} is not allowed for this API key`,
