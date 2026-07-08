@@ -5,11 +5,31 @@ const droidRelayService = require('../services/relay/droidRelayService')
 const sessionHelper = require('../utils/sessionHelper')
 const logger = require('../utils/logger')
 const apiKeyService = require('../services/apiKeyService')
+const { getEffectiveModel, isModelRestricted } = require('../utils/modelHelper')
 
 const router = express.Router()
 
 function hasDroidPermission(apiKeyData) {
   return apiKeyService.hasPermission(apiKeyData?.permissions, 'droid')
+}
+
+function isDroidModelRestricted(apiKeyData, model) {
+  if (!apiKeyData?.enableModelRestriction || typeof model !== 'string') {
+    return false
+  }
+
+  const effectiveModel = getEffectiveModel(model)
+  return (
+    isModelRestricted(model, apiKeyData.restrictedModels) ||
+    isModelRestricted(effectiveModel, apiKeyData.restrictedModels)
+  )
+}
+
+function sendModelNotAllowed(res, model) {
+  return res.status(403).json({
+    error: 'model_not_allowed',
+    message: `Model ${model} is not allowed for this API key`
+  })
 }
 
 /**
@@ -34,6 +54,10 @@ router.post('/claude/v1/messages', authenticateApiKey, async (req, res) => {
         error: 'permission_denied',
         message: '此 API Key 未启用 Droid 权限'
       })
+    }
+
+    if (isDroidModelRestricted(req.apiKey, req.body?.model || '')) {
+      return sendModelNotAllowed(res, req.body.model)
     }
 
     const result = await droidRelayService.relayRequest(
@@ -85,6 +109,10 @@ router.post('/comm/v1/chat/completions', authenticateApiKey, async (req, res) =>
       })
     }
 
+    if (isDroidModelRestricted(req.apiKey, req.body?.model || '')) {
+      return sendModelNotAllowed(res, req.body.model)
+    }
+
     const result = await droidRelayService.relayRequest(
       req.body,
       req.apiKey,
@@ -132,6 +160,10 @@ router.post(['/openai/v1/responses', '/openai/responses'], authenticateApiKey, a
       })
     }
 
+    if (isDroidModelRestricted(req.apiKey, req.body?.model || '')) {
+      return sendModelNotAllowed(res, req.body.model)
+    }
+
     const result = await droidRelayService.relayRequest(
       req.body,
       req.apiKey,
@@ -159,7 +191,7 @@ router.post(['/openai/v1/responses', '/openai/responses'], authenticateApiKey, a
 router.get('/*/v1/models', authenticateApiKey, async (req, res) => {
   try {
     // 返回可用的模型列表
-    const models = [
+    let models = [
       {
         id: 'claude-opus-4-1-20250805',
         object: 'model',
@@ -179,6 +211,10 @@ router.get('/*/v1/models', authenticateApiKey, async (req, res) => {
         owned_by: 'openai'
       }
     ]
+
+    if (req.apiKey?.enableModelRestriction) {
+      models = models.filter((model) => !isDroidModelRestricted(req.apiKey, model.id))
+    }
 
     res.json({
       object: 'list',

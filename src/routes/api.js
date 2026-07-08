@@ -8,7 +8,11 @@ const unifiedClaudeScheduler = require('../services/scheduler/unifiedClaudeSched
 const apiKeyService = require('../services/apiKeyService')
 const { authenticateApiKey } = require('../middleware/auth')
 const logger = require('../utils/logger')
-const { getEffectiveModel, parseVendorPrefixedModel } = require('../utils/modelHelper')
+const {
+  getEffectiveModel,
+  isModelRestricted,
+  parseVendorPrefixedModel
+} = require('../utils/modelHelper')
 const { rewriteModelFieldsForClient } = require('../utils/modelDisplayHelper')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
@@ -189,7 +193,7 @@ async function handleMessagesRequest(req, res) {
       req.apiKey.restrictedModels.length > 0
     ) {
       const effectiveModel = getEffectiveModel(req.body.model || '')
-      if (req.apiKey.restrictedModels.includes(effectiveModel)) {
+      if (isModelRestricted(effectiveModel, req.apiKey.restrictedModels)) {
         return res.status(403).json({
           error: {
             type: 'forbidden',
@@ -1552,7 +1556,9 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
       // 可选：根据 API Key 的模型限制过滤（黑名单语义）
       let filteredModels = models
       if (req.apiKey.enableModelRestriction && req.apiKey.restrictedModels?.length > 0) {
-        filteredModels = models.filter((model) => !req.apiKey.restrictedModels.includes(model.id))
+        filteredModels = models.filter(
+          (model) => !isModelRestricted(model.id, req.apiKey.restrictedModels)
+        )
       }
 
       return res.json({ object: 'list', data: filteredModels })
@@ -1567,7 +1573,9 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
     let filteredModels = models
     if (req.apiKey.enableModelRestriction && req.apiKey.restrictedModels?.length > 0) {
       // 将 restrictedModels 视为黑名单：过滤掉受限模型
-      filteredModels = models.filter((model) => !req.apiKey.restrictedModels.includes(model.id))
+      filteredModels = models.filter(
+        (model) => !isModelRestricted(model.id, req.apiKey.restrictedModels)
+      )
     }
 
     res.json({

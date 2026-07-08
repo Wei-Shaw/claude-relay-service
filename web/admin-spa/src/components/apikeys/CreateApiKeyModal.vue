@@ -809,7 +809,7 @@
                   </div>
                 </div>
                 <p class="mt-2 text-xs text-gray-500">
-                  设置此API Key无法访问的模型，例如：claude-opus-4-20250514
+                  设置此API Key无法访问的模型，支持 * 通配符，例如：claude-opus-4-*、gpt-5.6*
                 </p>
               </div>
             </div>
