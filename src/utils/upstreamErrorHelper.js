@@ -5,6 +5,102 @@ const TEMP_UNAVAILABLE_PREFIX = 'temp_unavailable'
 const ERROR_HISTORY_PREFIX = 'error_history'
 const ERROR_HISTORY_MAX = 5000
 const ERROR_HISTORY_TTL = 3 * 24 * 60 * 60 // 3天
+const ERROR_HISTORY_BODY_MAX = 2000
+const ERROR_HISTORY_REDACTED = '[REDACTED]'
+
+const ERROR_HISTORY_SENSITIVE_KEY_PATTERN =
+  /^(authorization|cookie|x[-_a-z]*api[-_]?key|api[-_]?key|access[-_]?token|refresh[-_]?token|id[-_]?token|token|secret|password)$/i
+
+const sanitizeSensitiveText = (value) =>
+  value
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(/([?&](?:key|api_key|api-key)=)[^&\s]+/gi, '$1[REDACTED]')
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, ERROR_HISTORY_REDACTED)
+    .replace(/(sk-[A-Za-z0-9_-]{8,})/g, ERROR_HISTORY_REDACTED)
+
+const sanitizeErrorHistoryValue = (value, depth = 0) => {
+  if (value === null || value === undefined) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    return sanitizeSensitiveText(value)
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return sanitizeSensitiveText(value.toString('utf8'))
+  }
+
+  if (typeof value !== 'object') {
+    return value
+  }
+
+  if (depth >= 6) {
+    return '[MaxDepth]'
+  }
+
+  if (typeof value.pipe === 'function') {
+    return '[Stream]'
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeErrorHistoryValue(item, depth + 1))
+  }
+
+  const sanitized = {}
+  for (const [key, item] of Object.entries(value)) {
+    sanitized[key] = ERROR_HISTORY_SENSITIVE_KEY_PATTERN.test(key)
+      ? ERROR_HISTORY_REDACTED
+      : sanitizeErrorHistoryValue(item, depth + 1)
+  }
+  return sanitized
+}
+
+const serializeErrorHistoryBody = (errorBody) => {
+  if (errorBody === null || errorBody === undefined) {
+    return undefined
+  }
+
+  try {
+    const sanitized = sanitizeErrorHistoryValue(errorBody)
+    if (typeof sanitized === 'string') {
+      return sanitized.slice(0, ERROR_HISTORY_BODY_MAX)
+    }
+    return JSON.stringify(sanitized).slice(0, ERROR_HISTORY_BODY_MAX)
+  } catch (error) {
+    return sanitizeSensitiveText(String(errorBody)).slice(0, ERROR_HISTORY_BODY_MAX)
+  }
+}
+
+const sanitizeErrorHistoryContext = (context) => {
+  if (!context || typeof context !== 'object') {
+    return context || null
+  }
+
+  const sanitized = sanitizeErrorHistoryValue(context)
+  if (Object.prototype.hasOwnProperty.call(context, 'errorBody')) {
+    sanitized.errorBody = serializeErrorHistoryBody(context.errorBody)
+  }
+  return sanitized
+}
+
+const buildErrorHistoryContext = (baseContext = null, details = {}) => {
+  const merged = {}
+
+  if (baseContext && typeof baseContext === 'object') {
+    Object.assign(merged, baseContext)
+  }
+
+  if (details && typeof details === 'object') {
+    for (const [key, value] of Object.entries(details)) {
+      if (value !== undefined && value !== null && value !== '') {
+        merged[key] = value
+      }
+    }
+  }
+
+  return Object.keys(merged).length ? merged : null
+}
 
 // 默认 TTL（秒）
 const DEFAULT_TTL = {
@@ -585,22 +681,13 @@ const recordErrorHistory = async (
     const redis = getRedis()
     const client = redis.getClientSafe()
     const redisKey = `${ERROR_HISTORY_PREFIX}:${accountType}:${accountId}`
+    const safeContext = sanitizeErrorHistoryContext(context)
 
     const entry = JSON.stringify({
       time: new Date().toISOString(),
       status: statusCode,
       errorType,
-      context: context
-        ? {
-            ...context,
-            errorBody:
-              typeof context.errorBody === 'string'
-                ? context.errorBody.slice(0, 2000)
-                : context.errorBody
-                  ? JSON.stringify(context.errorBody).slice(0, 2000)
-                  : undefined
-          }
-        : null
+      context: safeContext
     })
 
     const pipeline = client.pipeline()
@@ -901,6 +988,7 @@ module.exports = {
   getErrorHistory,
   clearErrorHistory,
   buildSchedulingContext,
+  buildErrorHistoryContext,
   shouldSkipTempUnavailableForScheduling,
   TEMP_UNAVAILABLE_PREFIX,
   ERROR_HISTORY_PREFIX

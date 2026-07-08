@@ -108,6 +108,13 @@ class ClaudeConsoleRelayService {
         accountId,
         'claude-console'
       )
+      const buildErrorHistoryContext = (details = {}) =>
+        upstreamErrorHelper.buildErrorHistoryContext(tempUnavailableContext, {
+          model: requestBody?.model,
+          path: options.customPath || '/v1/messages',
+          apiKeyName: apiKeyData?.name || apiKeyData?.id,
+          ...details
+        })
 
       logger.info(
         `📤 Processing Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId}), request: ${requestId}`
@@ -342,7 +349,13 @@ class ClaudeConsoleRelayService {
         )
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', 401, null, tempUnavailableContext)
+            .markTempUnavailable(
+              accountId,
+              'claude-console',
+              401,
+              null,
+              buildErrorHistoryContext({ errorBody: response.data })
+            )
             .catch(() => {})
         }
       } else if (accountDisabledError) {
@@ -372,7 +385,7 @@ class ClaudeConsoleRelayService {
               'claude-console',
               429,
               upstreamErrorHelper.parseRetryAfter(response.headers),
-              tempUnavailableContext
+              buildErrorHistoryContext({ errorBody: response.data })
             )
             .catch(() => {})
         }
@@ -383,7 +396,13 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markAccountOverloaded(accountId)
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', 529, null, tempUnavailableContext)
+            .markTempUnavailable(
+              accountId,
+              'claude-console',
+              529,
+              null,
+              buildErrorHistoryContext({ errorBody: response.data })
+            )
             .catch(() => {})
         }
       } else if (response.status >= 500) {
@@ -397,7 +416,7 @@ class ClaudeConsoleRelayService {
               'claude-console',
               response.status,
               null,
-              tempUnavailableContext
+              buildErrorHistoryContext({ errorBody: response.data })
             )
             .catch(() => {})
         }
@@ -687,7 +706,7 @@ class ClaudeConsoleRelayService {
         accountId,
         usageCallback,
         streamTransformer,
-        { ...options, tempUnavailableContext },
+        { ...options, tempUnavailableContext, apiKeyName: apiKeyData?.name || apiKeyData?.id },
         // 📬 回调：在收到响应头时释放队列锁
         async () => {
           if (queueLockAcquired && queueRequestId && accountId) {
@@ -781,6 +800,13 @@ class ClaudeConsoleRelayService {
     return new Promise((resolve, reject) => {
       let aborted = false
       const tempUnavailableContext = requestOptions.tempUnavailableContext || null
+      const buildErrorHistoryContext = (details = {}) =>
+        upstreamErrorHelper.buildErrorHistoryContext(tempUnavailableContext, {
+          model: body?.model,
+          path: requestOptions.customPath || '/v1/messages',
+          apiKeyName: requestOptions.apiKeyName,
+          ...details
+        })
 
       // 构建完整的API URL
       const cleanUrl = account.apiUrl.replace(/\/$/, '') // 移除末尾斜杠
@@ -886,7 +912,7 @@ class ClaudeConsoleRelayService {
                       'claude-console',
                       401,
                       null,
-                      tempUnavailableContext
+                      buildErrorHistoryContext({ errorBody: errorDataForCheck })
                     )
                     .catch(() => {})
                 }
@@ -917,7 +943,7 @@ class ClaudeConsoleRelayService {
                       'claude-console',
                       429,
                       upstreamErrorHelper.parseRetryAfter(response.headers),
-                      tempUnavailableContext
+                      buildErrorHistoryContext({ errorBody: errorDataForCheck })
                     )
                     .catch(() => {})
                 }
@@ -933,7 +959,7 @@ class ClaudeConsoleRelayService {
                       'claude-console',
                       529,
                       null,
-                      tempUnavailableContext
+                      buildErrorHistoryContext({ errorBody: errorDataForCheck })
                     )
                     .catch(() => {})
                 }
@@ -948,7 +974,7 @@ class ClaudeConsoleRelayService {
                       'claude-console',
                       response.status,
                       null,
-                      tempUnavailableContext
+                      buildErrorHistoryContext({ errorBody: errorDataForCheck })
                     )
                     .catch(() => {})
                 }
@@ -1346,7 +1372,7 @@ class ClaudeConsoleRelayService {
                     'claude-console',
                     401,
                     null,
-                    tempUnavailableContext
+                    buildErrorHistoryContext({ errorBody: error.response.data })
                   )
                   .catch(() => {})
               }
@@ -1363,7 +1389,7 @@ class ClaudeConsoleRelayService {
                     'claude-console',
                     429,
                     upstreamErrorHelper.parseRetryAfter(error.response.headers),
-                    tempUnavailableContext
+                    buildErrorHistoryContext({ errorBody: error.response.data })
                   )
                   .catch(() => {})
               }
@@ -1376,7 +1402,7 @@ class ClaudeConsoleRelayService {
                     'claude-console',
                     529,
                     null,
-                    tempUnavailableContext
+                    buildErrorHistoryContext({ errorBody: error.response.data })
                   )
                   .catch(() => {})
               }

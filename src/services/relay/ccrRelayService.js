@@ -28,6 +28,14 @@ class CcrRelayService {
     let account = null
     let queueLockAcquired = false
     let queueRequestId = null
+    let upstreamPath = options.customPath || '/v1/messages'
+    const buildErrorHistoryContext = (details = {}) =>
+      upstreamErrorHelper.buildErrorHistoryContext(null, {
+        model: requestBody?.model,
+        path: upstreamPath,
+        apiKeyName: apiKeyData?.name || apiKeyData?.id,
+        ...details
+      })
 
     try {
       // 📬 用户消息队列处理
@@ -158,6 +166,7 @@ class CcrRelayService {
         // 默认使用 messages 端点
         apiEndpoint = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
       }
+      upstreamPath = options.customPath || '/v1/messages'
 
       logger.debug(`🎯 Final API endpoint: ${apiEndpoint}`)
       logger.debug(`[DEBUG] Options passed to relayRequest: ${JSON.stringify(options)}`)
@@ -268,7 +277,13 @@ class CcrRelayService {
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'ccr', response.status)
+            .markTempUnavailable(
+              accountId,
+              'ccr',
+              response.status,
+              null,
+              buildErrorHistoryContext({ errorBody: response.data })
+            )
             .catch(() => {})
         }
       } else if (response.status === 429) {
@@ -287,7 +302,8 @@ class CcrRelayService {
               accountId,
               'ccr',
               429,
-              upstreamErrorHelper.parseRetryAfter(response.headers)
+              upstreamErrorHelper.parseRetryAfter(response.headers),
+              buildErrorHistoryContext({ errorBody: response.data })
             )
             .catch(() => {})
         }
@@ -297,7 +313,15 @@ class CcrRelayService {
         const autoProtectionDisabled =
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!autoProtectionDisabled) {
-          await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 529).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(
+              accountId,
+              'ccr',
+              529,
+              null,
+              buildErrorHistoryContext({ errorBody: response.data })
+            )
+            .catch(() => {})
         }
       } else if (response.status >= 500) {
         logger.warn(`🔥 Server error (${response.status}) detected for CCR account ${accountId}`)
@@ -305,7 +329,13 @@ class CcrRelayService {
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'ccr', response.status)
+            .markTempUnavailable(
+              accountId,
+              'ccr',
+              response.status,
+              null,
+              buildErrorHistoryContext({ errorBody: response.data })
+            )
             .catch(() => {})
         }
       } else if (response.status === 200 || response.status === 201) {
@@ -369,7 +399,20 @@ class CcrRelayService {
         const autoProtectionDisabled =
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!autoProtectionDisabled) {
-          await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 503).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(
+              accountId,
+              'ccr',
+              503,
+              null,
+              buildErrorHistoryContext({
+                errorBody: {
+                  message: error.message,
+                  code: error.code || 'network_error'
+                }
+              })
+            )
+            .catch(() => {})
         }
       }
 
@@ -416,6 +459,13 @@ class CcrRelayService {
     let account = null
     let queueLockAcquired = false
     let queueRequestId = null
+    const buildErrorHistoryContext = (details = {}) =>
+      upstreamErrorHelper.buildErrorHistoryContext(null, {
+        model: requestBody?.model,
+        path: options.customPath || '/v1/messages',
+        apiKeyName: apiKeyData?.name || apiKeyData?.id,
+        ...details
+      })
 
     try {
       // 📬 用户消息队列处理
@@ -534,7 +584,7 @@ class CcrRelayService {
         accountId,
         usageCallback,
         streamTransformer,
-        options,
+        { ...options, apiKeyName: apiKeyData?.name || apiKeyData?.id },
         // 📬 回调：在收到响应头时释放队列锁
         async () => {
           if (queueLockAcquired && queueRequestId && accountId) {
@@ -570,7 +620,20 @@ class CcrRelayService {
           const autoProtectionDisabled =
             account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
           if (!autoProtectionDisabled) {
-            await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 503).catch(() => {})
+            await upstreamErrorHelper
+              .markTempUnavailable(
+                accountId,
+                'ccr',
+                503,
+                null,
+                buildErrorHistoryContext({
+                  errorBody: {
+                    message: error.message,
+                    code: error.code || 'network_error'
+                  }
+                })
+              )
+              .catch(() => {})
           }
         }
       }
