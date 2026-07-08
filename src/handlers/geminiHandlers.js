@@ -26,6 +26,7 @@ const {
   buildGeminiApiClientError,
   sanitizeGeminiApiStreamEvent
 } = require('../utils/geminiApiErrorAdapter')
+const { isModelRestricted } = require('../utils/modelHelper')
 
 // 处理 Gemini 上游错误，标记账户为临时不可用
 const handleGeminiUpstreamError = async (
@@ -218,6 +219,44 @@ function ensureGeminiPermissionMiddleware(req, res, next) {
     return next()
   }
   return undefined
+}
+
+function isGeminiModelRestricted(apiKeyData, model) {
+  if (!apiKeyData?.enableModelRestriction || typeof model !== 'string') {
+    return false
+  }
+
+  const bareModel = model.replace(/^models\//, '')
+  return (
+    isModelRestricted(model, apiKeyData.restrictedModels) ||
+    isModelRestricted(bareModel, apiKeyData.restrictedModels)
+  )
+}
+
+function ensureGeminiModelAllowed(req, res, model, options = {}) {
+  if (!isGeminiModelRestricted(req.apiKey, model)) {
+    return true
+  }
+
+  const notFound = options.notFound === true
+  res.status(notFound ? 404 : 403).json({
+    error: {
+      message: notFound
+        ? `Model '${model}' not found`
+        : `Model ${model} is not allowed for this API key`,
+      type: 'invalid_request_error',
+      code: notFound ? 'model_not_found' : 'model_not_allowed'
+    }
+  })
+  return false
+}
+
+function filterGeminiModelsForApiKey(models, apiKeyData) {
+  if (!apiKeyData?.enableModelRestriction || !Array.isArray(models)) {
+    return models
+  }
+
+  return models.filter((model) => !isGeminiModelRestricted(apiKeyData, model.id))
 }
 
 /**
@@ -511,6 +550,10 @@ async function handleMessages(req, res) {
           type: 'invalid_request_error'
         }
       })
+    }
+
+    if (!ensureGeminiModelAllowed(req, res, model)) {
+      return undefined
     }
 
     // 生成会话哈希用于粘性会话
@@ -949,14 +992,17 @@ async function handleModels(req, res) {
       // 返回默认模型列表
       return res.json({
         object: 'list',
-        data: [
-          {
-            id: 'gemini-2.5-flash',
-            object: 'model',
-            created: Date.now() / 1000,
-            owned_by: 'google'
-          }
-        ]
+        data: filterGeminiModelsForApiKey(
+          [
+            {
+              id: 'gemini-2.5-flash',
+              object: 'model',
+              created: Date.now() / 1000,
+              owned_by: 'google'
+            }
+          ],
+          apiKeyData
+        )
       })
     }
 
@@ -1012,7 +1058,7 @@ async function handleModels(req, res) {
 
     res.json({
       object: 'list',
-      data: models
+      data: filterGeminiModelsForApiKey(models, apiKeyData)
     })
   } catch (error) {
     logger.error('Failed to get Gemini models:', error)
@@ -1033,6 +1079,10 @@ function handleModelDetails(req, res) {
   const { modelName } = req.params
   const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
   logger.info(`Standard Gemini API model details request (${version}): ${modelName}`)
+
+  if (!ensureGeminiModelAllowed(req, res, modelName, { notFound: true })) {
+    return undefined
+  }
 
   res.json({
     name: `models/${modelName}`,
@@ -1138,6 +1188,10 @@ function handleSimpleEndpoint(apiMethod) {
 
       // 从路径参数或请求体中获取模型名
       const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
+      if (!ensureGeminiModelAllowed(req, res, requestedModel)) {
+        return undefined
+      }
+
       const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
         req.apiKey,
         sessionHash,
@@ -1219,6 +1273,10 @@ async function handleLoadCodeAssist(req, res) {
 
     // 从路径参数或请求体中获取模型名
     const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
+    if (!ensureGeminiModelAllowed(req, res, requestedModel)) {
+      return undefined
+    }
+
     const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
@@ -1323,6 +1381,10 @@ async function handleOnboardUser(req, res) {
 
     // 从路径参数或请求体中获取模型名
     const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
+    if (!ensureGeminiModelAllowed(req, res, requestedModel)) {
+      return undefined
+    }
+
     const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
@@ -1438,6 +1500,10 @@ async function handleRetrieveUserQuota(req, res) {
 
     // 3. 账户选择
     const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
+    if (!ensureGeminiModelAllowed(req, res, requestedModel)) {
+      return undefined
+    }
+
     const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
       req.apiKey,
       sessionHash,
@@ -1541,6 +1607,10 @@ async function handleCountTokens(req, res) {
     const { contents } = requestData
     // 从路径参数或请求体中获取模型名
     const model = requestData.model || req.params.modelName || 'gemini-2.5-flash'
+    if (!ensureGeminiModelAllowed(req, res, model)) {
+      return undefined
+    }
+
     sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 验证必需参数
@@ -1685,6 +1755,10 @@ async function handleGenerateContent(req, res) {
     const { project, user_prompt_id, request: requestData } = req.body
     // 从路径参数或请求体中获取模型名
     const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
+    if (!ensureGeminiModelAllowed(req, res, model)) {
+      return undefined
+    }
+
     sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 处理不同格式的请求
@@ -1930,6 +2004,10 @@ async function handleStreamGenerateContent(req, res) {
     const { project, user_prompt_id, request: requestData } = req.body
     // 从路径参数或请求体中获取模型名
     const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
+    if (!ensureGeminiModelAllowed(req, res, model)) {
+      return undefined
+    }
+
     sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 处理不同格式的请求
@@ -2336,6 +2414,10 @@ async function handleStandardGenerateContent(req, res) {
 
     // 从路径参数中获取模型名
     const model = req.params.modelName || 'gemini-2.0-flash-exp'
+    if (!ensureGeminiModelAllowed(req, res, model)) {
+      return undefined
+    }
+
     sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 标准 Gemini API 请求体直接包含 contents 等字段
@@ -2640,6 +2722,10 @@ async function handleStandardStreamGenerateContent(req, res) {
 
     // 从路径参数中获取模型名
     const model = req.params.modelName || 'gemini-2.0-flash-exp'
+    if (!ensureGeminiModelAllowed(req, res, model)) {
+      return undefined
+    }
+
     sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 标准 Gemini API 请求体直接包含 contents 等字段
