@@ -262,6 +262,14 @@ class OpenAIResponsesRelayService {
       account?.id,
       'openai-responses'
     )
+    let targetPath = req.originalUrl || req.path
+    const buildErrorHistoryContext = (details = {}) =>
+      upstreamErrorHelper.buildErrorHistoryContext(tempUnavailableContext, {
+        model: req.body?.model,
+        path: targetPath,
+        apiKeyName: apiKeyData?.name || apiKeyData?.id,
+        ...details
+      })
 
     try {
       // 获取完整的账户信息（包含解密的 API Key）
@@ -288,9 +296,11 @@ class OpenAIResponsesRelayService {
       // 监听响应关闭事件；req.close 可能只表示请求体已读完，req.aborted 覆盖不全。
       res.once('close', handleClientDisconnect)
 
-      const { targetUrl, headers, requestOptions } = this._createRequestOptions(req, fullAccount, {
+      const requestMeta = this._createRequestOptions(req, fullAccount, {
         signal: abortController.signal
       })
+      targetPath = requestMeta.targetPath || targetPath
+      const { targetUrl, headers, requestOptions } = requestMeta
 
       // 记录请求信息
       logger.info('📤 OpenAI-Responses relay request', {
@@ -324,7 +334,7 @@ class OpenAIResponsesRelayService {
               'openai-responses',
               429,
               resetsInSeconds || upstreamErrorHelper.parseRetryAfter(response.headers),
-              tempUnavailableContext
+              buildErrorHistoryContext({ errorBody: errorData })
             )
             .catch(() => {})
         }
@@ -401,7 +411,7 @@ class OpenAIResponsesRelayService {
                   'openai-responses',
                   401,
                   null,
-                  tempUnavailableContext
+                  buildErrorHistoryContext({ errorBody: errorData })
                 )
                 .catch(() => {})
             }
@@ -431,7 +441,7 @@ class OpenAIResponsesRelayService {
               response.status,
               sessionHash,
               'response',
-              tempUnavailableContext
+              buildErrorHistoryContext({ errorBody: errorData })
             )
           } catch (markError) {
             logger.warn(
@@ -450,7 +460,7 @@ class OpenAIResponsesRelayService {
                 'openai-responses',
                 response.status,
                 null,
-                tempUnavailableContext
+                buildErrorHistoryContext({ errorBody: errorData })
               )
             }
             await this._clearSessionMapping(sessionHash)
@@ -517,7 +527,12 @@ class OpenAIResponsesRelayService {
                 'openai-responses',
                 503,
                 null,
-                tempUnavailableContext
+                buildErrorHistoryContext({
+                  errorBody: {
+                    message: error.message,
+                    code: error.code || 'network_error'
+                  }
+                })
               )
               .catch(() => {})
           }
@@ -569,7 +584,7 @@ class OpenAIResponsesRelayService {
                   'openai-responses',
                   401,
                   null,
-                  tempUnavailableContext
+                  buildErrorHistoryContext({ errorBody: errorData })
                 )
                 .catch(() => {})
             }
@@ -594,7 +609,7 @@ class OpenAIResponsesRelayService {
               status,
               sessionHash,
               'catch',
-              tempUnavailableContext
+              buildErrorHistoryContext({ errorBody: errorData })
             )
           } catch (markError) {
             logger.warn(
