@@ -40,6 +40,24 @@ function isAzureModelRestricted(apiKeyData, model) {
   )
 }
 
+function buildAzureErrorHistoryContext(req, account, endpoint, response) {
+  const responseData = response?.data
+  const errorBody =
+    responseData && typeof responseData.pipe === 'function'
+      ? { message: `HTTP ${response.status}`, stream: true }
+      : responseData
+
+  return upstreamErrorHelper.buildErrorHistoryContext(
+    upstreamErrorHelper.buildSchedulingContext(req.apiKey, account?.id, 'azure-openai'),
+    {
+      model: req.body?.model || account?.deploymentName,
+      path: endpoint,
+      apiKeyName: req.apiKey?.name || req.apiKey?.id,
+      errorBody
+    }
+  )
+}
+
 function sendModelNotAllowed(res, model) {
   return res.status(403).json({
     error: {
@@ -249,7 +267,13 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
       const customTtl =
         response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .markTempUnavailable(
+          account.id,
+          'azure-openai',
+          response.status,
+          customTtl,
+          buildAzureErrorHistoryContext(req, account, 'chat/completions', response)
+        )
         .catch(() => {})
     }
 
@@ -384,7 +408,13 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
       const customTtl =
         response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .markTempUnavailable(
+          account.id,
+          'azure-openai',
+          response.status,
+          customTtl,
+          buildAzureErrorHistoryContext(req, account, 'responses', response)
+        )
         .catch(() => {})
     }
 
@@ -518,7 +548,13 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
       const customTtl =
         response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .markTempUnavailable(
+          account.id,
+          'azure-openai',
+          response.status,
+          customTtl,
+          buildAzureErrorHistoryContext(req, account, 'embeddings', response)
+        )
         .catch(() => {})
     }
 

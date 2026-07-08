@@ -182,6 +182,18 @@ function generateSessionHash(req) {
   return crypto.createHash('sha256').update(sessionData).digest('hex')
 }
 
+function buildGeminiErrorHistoryContext(req, accountId, accountType, errorBody) {
+  return upstreamErrorHelper.buildErrorHistoryContext(
+    upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini'),
+    {
+      model: req.body?.model || req.params?.model,
+      path: req.originalUrl || req.path,
+      apiKeyName: req.apiKey?.name || req.apiKey?.id,
+      errorBody
+    }
+  )
+}
+
 /**
  * 检查 API Key 权限
  */
@@ -917,7 +929,12 @@ async function handleMessages(req, res) {
       sessionHash,
       error.response?.headers,
       account?.disableAutoProtection,
-      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
+      buildGeminiErrorHistoryContext(
+        req,
+        accountId,
+        accountType,
+        error.response?.data || error.message
+      )
     )
 
     // 返回错误响应
@@ -1717,7 +1734,12 @@ async function handleCountTokens(req, res) {
       sessionHash,
       error.response?.headers,
       account?.disableAutoProtection,
-      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
+      buildGeminiErrorHistoryContext(
+        req,
+        accountId,
+        accountType,
+        error.response?.data || error.message
+      )
     )
 
     if (accountType === 'gemini-api') {
@@ -1974,7 +1996,12 @@ async function handleGenerateContent(req, res) {
       sessionHash,
       error.response?.headers,
       account?.disableAutoProtection,
-      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
+      buildGeminiErrorHistoryContext(
+        req,
+        accountId,
+        accountType,
+        error.response?.data || error.message
+      )
     )
     res.status(500).json({
       error: {
@@ -2374,7 +2401,12 @@ async function handleStreamGenerateContent(req, res) {
       sessionHash,
       error.response?.headers,
       account?.disableAutoProtection,
-      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
+      buildGeminiErrorHistoryContext(
+        req,
+        accountId,
+        accountType,
+        error.response?.data || error.message
+      )
     )
 
     if (!res.headersSent) {
@@ -2684,7 +2716,12 @@ async function handleStandardGenerateContent(req, res) {
       sessionHash,
       error.response?.headers,
       account?.disableAutoProtection,
-      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
+      buildGeminiErrorHistoryContext(
+        req,
+        accountId,
+        accountType,
+        error.response?.data || error.message
+      )
     )
 
     if (accountType === 'gemini-api') {
@@ -3199,7 +3236,15 @@ async function handleStandardStreamGenerateContent(req, res) {
       sessionHash,
       error.response?.headers,
       account?.disableAutoProtection,
-      upstreamErrorHelper.buildSchedulingContext(req.apiKey, accountId, accountType || 'gemini')
+      buildGeminiErrorHistoryContext(
+        req,
+        accountId,
+        accountType,
+        normalizedError.parsedBody ||
+          normalizedError.rawBody ||
+          error.response?.data ||
+          error.message
+      )
     )
 
     if (!res.headersSent) {

@@ -529,6 +529,13 @@ class ClaudeRelayService {
         accountId,
         accountType
       )
+      const buildErrorHistoryContext = (details = {}) =>
+        upstreamErrorHelper.buildErrorHistoryContext(tempUnavailableContext, {
+          model: requestBody?.model,
+          path: options.customPath || '/v1/messages',
+          apiKeyName: apiKeyData?.name || apiKeyData?.id,
+          ...details
+        })
 
       logger.info(
         `📤 Processing API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${accountId} (${accountType})${sessionHash ? `, session: ${sessionHash}` : ''}`
@@ -792,7 +799,13 @@ class ClaudeRelayService {
             )
           }
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, accountType, 401, null, tempUnavailableContext)
+            .markTempUnavailable(
+              accountId,
+              accountType,
+              401,
+              null,
+              buildErrorHistoryContext({ errorBody: response.body })
+            )
             .catch(() => {})
           // 清除粘性会话，让后续请求路由到其他账户
           if (sessionHash) {
@@ -814,7 +827,13 @@ class ClaudeRelayService {
             `🚫 Forbidden error (403) detected for account ${accountId}${retryCount > 0 ? ` after ${retryCount} retries` : ''}, temporarily pausing`
           )
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, accountType, 403, null, tempUnavailableContext)
+            .markTempUnavailable(
+              accountId,
+              accountType,
+              403,
+              null,
+              buildErrorHistoryContext({ errorBody: response.body })
+            )
             .catch(() => {})
           // 清除粘性会话，让后续请求路由到其他账户
           if (sessionHash) {
@@ -839,7 +858,13 @@ class ClaudeRelayService {
             logger.info(`🚫 529 error handling is disabled, skipping account overload marking`)
           }
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, accountType, 529, null, tempUnavailableContext)
+            .markTempUnavailable(
+              accountId,
+              accountType,
+              529,
+              null,
+              buildErrorHistoryContext({ errorBody: response.body })
+            )
             .catch(() => {})
         }
         // 检查是否为5xx状态码
@@ -851,7 +876,7 @@ class ClaudeRelayService {
             sessionHash,
             '',
             accountType,
-            tempUnavailableContext
+            buildErrorHistoryContext({ errorBody: response.body })
           )
         }
         // 检查是否为429状态码
@@ -968,7 +993,7 @@ class ClaudeRelayService {
                   accountType,
                   429,
                   upstreamErrorHelper.parseRetryAfter(response.headers),
-                  tempUnavailableContext
+                  buildErrorHistoryContext({ errorBody: response.body })
                 )
                 .catch(() => {})
             }
