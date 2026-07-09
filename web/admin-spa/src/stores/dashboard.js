@@ -153,13 +153,16 @@ export const useDashboardStore = defineStore('dashboard', () => {
   })
 
   // 辅助函数：获取系统时区某一天的起止UTC时间
-  // 输入：一个本地时间的日期对象（如用户选择的日期）
-  // 输出：该日期在系统时区的0点/23:59对应的UTC时间
+  // 输入：一个时间点（Date 对象，通常由当前时刻推算而来）
+  // 输出：该时间点在系统时区（UTC+8）所属日期的0点/23:59对应的UTC时间
   function getSystemTimezoneDay(localDate, startOfDay = true) {
     // 固定使用UTC+8，因为后端系统时区是UTC+8
-    const year = localDate.getFullYear()
-    const month = localDate.getMonth()
-    const day = localDate.getDate()
+    // 通过时间戳偏移取 UTC+8 的日历日期，不能用 getFullYear/getDate（那是浏览器本地时区的日期，
+    // 浏览器时区 ≠ UTC+8 时会在系统时区已跨日、本地未跨日的窗口内漏掉整天数据）
+    const shifted = new Date(localDate.getTime() + 8 * 60 * 60 * 1000)
+    const year = shifted.getUTCFullYear()
+    const month = shifted.getUTCMonth()
+    const day = shifted.getUTCDate()
 
     if (startOfDay) {
       // 系统时区（UTC+8）的 YYYY-MM-DD 00:00:00
