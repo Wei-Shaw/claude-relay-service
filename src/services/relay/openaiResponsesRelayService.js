@@ -1270,6 +1270,70 @@ class OpenAIResponsesRelayService {
     }
   }
 
+  async testAccountConfig(accountInput, model = 'gpt-5') {
+    const startTime = Date.now()
+
+    try {
+      if (!accountInput?.apiKey) {
+        const authError = new Error('API Key is required')
+        authError.status = 401
+        throw authError
+      }
+
+      const { payload, headers: testHeaders } = openaiResponsesTestService.buildTestRequestParts(
+        model,
+        {
+          stream: true,
+          maxTokens: 64
+        }
+      )
+
+      const mockReq = {
+        method: 'POST',
+        path: openaiResponsesTestService.OPENAI_RESPONSES_TEST_PATH,
+        headers: testHeaders,
+        body: payload
+      }
+
+      const draftAccount = {
+        id: 'draft',
+        name: accountInput.name || 'Draft OpenAI-Responses Account',
+        baseApi: accountInput.baseApi,
+        apiKey: accountInput.apiKey,
+        userAgent: accountInput.userAgent || '',
+        providerEndpoint: accountInput.providerEndpoint || 'responses',
+        proxy: accountInput.proxy || null
+      }
+
+      const { requestOptions } = this._createRequestOptions(mockReq, draftAccount, {
+        timeout: 30000
+      })
+
+      const response = await axios(requestOptions)
+      const latency = Date.now() - startTime
+      const parsed = await openaiResponsesTestService.parseOpenAITestResponse(response)
+
+      if (response.status >= 400) {
+        const upstreamError = new Error(parsed.errorMessage || `API Error: ${response.status}`)
+        upstreamError.status = response.status
+        upstreamError.latency = latency
+        throw upstreamError
+      }
+
+      return {
+        model,
+        latency,
+        requestMode: 'codex_cli_simulated',
+        responseText: parsed.responseText.substring(0, 200)
+      }
+    } catch (error) {
+      if (error.latency === undefined) {
+        error.latency = Date.now() - startTime
+      }
+      throw error
+    }
+  }
+
   // 过滤请求头 - 已迁移到 headerFilter 工具类
   // 此方法保留用于向后兼容，实际使用 filterForOpenAI()
   _filterRequestHeaders(headers) {
