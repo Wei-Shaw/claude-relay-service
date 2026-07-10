@@ -11,7 +11,7 @@
       <div class="mb-6 text-center sm:mb-8">
         <!-- 使用自定义布局来保持登录页面的居中大logo样式 -->
         <div
-          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-gray-300/30 bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-sm sm:mb-6 sm:h-20 sm:w-20 sm:rounded-2xl"
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-teal-300/30 bg-gradient-to-br from-teal-400/25 to-slate-900/25 backdrop-blur-sm sm:mb-6 sm:h-20 sm:w-20 sm:rounded-2xl"
         >
           <template v-if="!oemLoading">
             <img
@@ -21,20 +21,22 @@
               :src="authStore.oemSettings.siteIconData || authStore.oemSettings.siteIcon"
               @error="(e) => (e.target.style.display = 'none')"
             />
-            <i v-else class="fas fa-cloud text-2xl text-gray-700 sm:text-3xl" />
+            <i v-else class="fas fa-network-wired text-2xl text-gray-700 sm:text-3xl" />
           </template>
           <div v-else class="h-10 w-10 animate-pulse rounded bg-gray-300/50 sm:h-12 sm:w-12" />
         </div>
-        <template v-if="!oemLoading && authStore.oemSettings.siteName">
+        <template v-if="!oemLoading">
           <h1 class="header-title mb-2 text-2xl font-bold text-white sm:text-3xl">
-            {{ authStore.oemSettings.siteName }}
+            {{ displaySiteName }}
           </h1>
         </template>
         <div
           v-else-if="oemLoading"
           class="mx-auto mb-2 h-8 w-48 animate-pulse rounded bg-gray-300/50 sm:h-9 sm:w-64"
         />
-        <p class="text-base text-gray-600 dark:text-gray-400 sm:text-lg">管理后台</p>
+        <p class="text-base text-gray-600 dark:text-gray-400 sm:text-lg">
+          {{ productConfig.adminSubtitle }}
+        </p>
       </div>
 
       <form class="space-y-4 sm:space-y-6" @submit.prevent="handleLogin">
@@ -99,11 +101,13 @@
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
+import { productConfig, resolveProductName } from '@/config/productConfig'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
 const oemLoading = computed(() => authStore.oemLoading)
+const displaySiteName = computed(() => resolveProductName(authStore.oemSettings.siteName))
 
 const loginForm = ref({
   username: '',

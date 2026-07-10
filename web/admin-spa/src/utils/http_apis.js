@@ -284,6 +284,29 @@ export const refreshAccountBalanceApi = (id, data) =>
   request({ url: `/admin/accounts/${id}/balance/refresh`, method: 'POST', data })
 export const getBalanceSummaryApi = () =>
   request({ url: '/admin/accounts/balance/summary', method: 'GET' })
+export const getAccountPoolSummaryApi = () =>
+  request({ url: '/admin/account-pool/summary', method: 'GET' })
+export const getAccountPoolShadowApi = () =>
+  request({ url: '/admin/account-pool/shadow', method: 'GET' })
+export const getAccountPoolPolicyApi = () =>
+  request({ url: '/admin/account-pool/policy', method: 'GET' })
+export const updateAccountPoolPolicyApi = (data) =>
+  request({ url: '/admin/account-pool/policy', method: 'PUT', data })
+export const runAccountPoolDemoApi = (data) =>
+  request({ url: '/admin/account-pool/demo', method: 'PUT', data })
+export const runAccountPoolSweepApi = (data) =>
+  request({ url: '/admin/account-pool/sweep', method: 'POST', data })
+export const runAccountPoolAdminSkillActionApi = (data, config = {}) =>
+  request({ url: '/admin/account-pool/admin-skill/action', method: 'POST', data, ...config })
+export const getServerStateSummaryApi = () =>
+  request({ url: '/admin/server-state/summary', method: 'GET' })
+export const getServerStateAccountsApi = (params = {}) =>
+  request({ url: '/admin/server-state/accounts', method: 'GET', params })
+export const runServerStateAccountActionApi = ({ provider, accountId, action }) =>
+  request({
+    url: `/admin/server-state/accounts/${encodeURIComponent(provider)}/${encodeURIComponent(accountId)}/${encodeURIComponent(action)}`,
+    method: 'POST'
+  })
 export const getBalanceByPlatformApi = (platform, params) =>
   request({ url: `/admin/accounts/balance/platform/${platform}`, method: 'GET', params })
 

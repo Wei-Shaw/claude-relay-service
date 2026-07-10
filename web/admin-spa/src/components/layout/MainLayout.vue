@@ -39,6 +39,7 @@ const tabRouteMap = computed(() => {
     dashboard: '/dashboard',
     apiKeys: '/api-keys',
     accounts: '/accounts',
+    accountPool: '/account-pool',
     requestDetails: '/request-details',
     quotaCards: '/quota-cards',
     settings: '/settings'
@@ -68,6 +69,7 @@ const initActiveTab = () => {
       Dashboard: 'dashboard',
       ApiKeys: 'apiKeys',
       Accounts: 'accounts',
+      AccountPool: 'accountPool',
       RequestDetails: 'requestDetails',
       QuotaCards: 'quotaCards',
       Settings: 'settings'
@@ -98,6 +100,7 @@ watch(
         Dashboard: 'dashboard',
         ApiKeys: 'apiKeys',
         Accounts: 'accounts',
+        AccountPool: 'accountPool',
         RequestDetails: 'requestDetails',
         QuotaCards: 'quotaCards',
         Tutorial: 'tutorial',

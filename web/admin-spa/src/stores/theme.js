@@ -10,6 +10,26 @@ export const ThemeMode = {
 
 // 中国传统色系预设
 export const ColorSchemes = {
+  ops: {
+    name: '控制台',
+    nameEn: 'Ops',
+    primary: '#0f766e',
+    secondary: '#0f172a',
+    accent: '#f59e0b',
+    gradientStart: '#0f172a',
+    gradientMid: '#164e63',
+    gradientEnd: '#0f766e',
+    glassStrong: 'rgba(248, 250, 252, 0.96)',
+    glass: 'rgba(15, 118, 110, 0.12)',
+    darkPrimary: '#2dd4bf',
+    darkSecondary: '#64748b',
+    darkAccent: '#fbbf24',
+    darkGradientStart: '#020617',
+    darkGradientMid: '#0f172a',
+    darkGradientEnd: '#134e4a',
+    darkGlassStrong: 'rgba(15, 23, 42, 0.94)',
+    darkGlass: 'rgba(15, 118, 110, 0.16)'
+  },
   purple: {
     name: '默认紫',
     nameEn: 'Purple',
@@ -159,7 +179,7 @@ export const useThemeStore = defineStore('theme', () => {
   const themeMode = ref(ThemeMode.AUTO)
   const systemPrefersDark = ref(false)
   // 色系状态
-  const colorScheme = ref('purple')
+  const colorScheme = ref('ops')
 
   // 计算属性 - 实际的暗黑模式状态
   const isDarkMode = computed(() => {
@@ -180,7 +200,7 @@ export const useThemeStore = defineStore('theme', () => {
 
   // 计算属性 - 当前色系配置
   const currentColorScheme = computed(() => {
-    return ColorSchemes[colorScheme.value] || ColorSchemes.purple
+    return ColorSchemes[colorScheme.value] || ColorSchemes.ops
   })
 
   // 初始化主题
@@ -200,7 +220,17 @@ export const useThemeStore = defineStore('theme', () => {
     }
 
     // 从 localStorage 读取保存的色系
-    const savedColorScheme = localStorage.getItem('colorScheme')
+    const themeMigrated = localStorage.getItem('openaiKeyPoolThemeMigrated')
+    let savedColorScheme = localStorage.getItem('colorScheme')
+    if (!themeMigrated && (!savedColorScheme || savedColorScheme === 'purple')) {
+      colorScheme.value = 'ops'
+      localStorage.setItem('colorScheme', 'ops')
+      localStorage.setItem('openaiKeyPoolThemeMigrated', 'true')
+      savedColorScheme = 'ops'
+    } else if (!themeMigrated) {
+      localStorage.setItem('openaiKeyPoolThemeMigrated', 'true')
+    }
+
     if (savedColorScheme && ColorSchemes[savedColorScheme]) {
       colorScheme.value = savedColorScheme
     }

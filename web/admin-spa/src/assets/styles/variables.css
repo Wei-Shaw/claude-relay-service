@@ -1,13 +1,13 @@
 :root {
-  --primary-color: #667eea;
-  --secondary-color: #764ba2;
-  --accent-color: #f093fb;
+  --primary-color: #0f766e;
+  --secondary-color: #0f172a;
+  --accent-color: #f59e0b;
   --success-color: #10b981;
   --warning-color: #f59e0b;
   --error-color: #ef4444;
   --surface-color: rgba(255, 255, 255, 0.95);
-  --glass-color: rgba(255, 255, 255, 0.1);
+  --glass-color: rgba(15, 118, 110, 0.12);
   --text-primary: #1f2937;
   --text-secondary: #6b7280;
-  --border-color: rgba(255, 255, 255, 0.2);
+  --border-color: rgba(148, 163, 184, 0.24);
 }

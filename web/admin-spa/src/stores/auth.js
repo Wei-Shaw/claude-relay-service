@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import router from '@/router'
+import { productConfig, resolveProductName } from '@/config/productConfig'
 
 import { loginApi, getAuthUserApi, getOemSettingsApi } from '@/utils/http_apis'
 
@@ -12,7 +13,7 @@ export const useAuthStore = defineStore('auth', () => {
   const loginError = ref('')
   const loginLoading = ref(false)
   const oemSettings = ref({
-    siteName: 'Claude Relay Service',
+    siteName: productConfig.name,
     siteIcon: '',
     siteIconData: '',
     faviconData: ''
@@ -94,7 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         if (result.data.siteName) {
-          document.title = `${result.data.siteName} - 管理后台`
+          document.title = `${resolveProductName(result.data.siteName)} - ${productConfig.adminSubtitle}`
         }
       }
     } catch (error) {

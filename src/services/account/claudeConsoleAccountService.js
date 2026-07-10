@@ -349,15 +349,20 @@ class ClaudeConsoleAccountService {
       }
       if (updates.schedulable !== undefined) {
         updatedData.schedulable = updates.schedulable.toString()
-        // 如果是手动修改调度状态，清除所有自动停止相关的字段
-        // 防止自动恢复
-        updatedData.rateLimitAutoStopped = ''
-        updatedData.quotaAutoStopped = ''
-        // 兼容旧的标记
-        updatedData.autoStoppedAt = ''
-        updatedData.stoppedReason = ''
+        const isAccountPoolPolicyUpdate =
+          updates.accountPoolAutoStopped !== undefined ||
+          updates.accountPoolStoppedReason !== undefined ||
+          updates.accountPoolStoppedAt !== undefined
+        if (!isAccountPoolPolicyUpdate) {
+          updatedData.rateLimitAutoStopped = ''
+          updatedData.quotaAutoStopped = ''
+          updatedData.accountPoolAutoStopped = ''
+          updatedData.accountPoolStoppedReason = ''
+          updatedData.accountPoolStoppedAt = ''
+          updatedData.autoStoppedAt = ''
+          updatedData.stoppedReason = ''
+        }
 
-        // 记录日志
         if (updates.schedulable === true || updates.schedulable === 'true') {
           logger.info(`✅ Manually enabled scheduling for Claude Console account ${accountId}`)
         } else {
@@ -388,6 +393,15 @@ class ClaudeConsoleAccountService {
       }
       if (updates.disableAutoProtection !== undefined) {
         updatedData.disableAutoProtection = updates.disableAutoProtection.toString()
+      }
+      if (updates.accountPoolAutoStopped !== undefined) {
+        updatedData.accountPoolAutoStopped = updates.accountPoolAutoStopped.toString()
+      }
+      if (updates.accountPoolStoppedReason !== undefined) {
+        updatedData.accountPoolStoppedReason = updates.accountPoolStoppedReason
+      }
+      if (updates.accountPoolStoppedAt !== undefined) {
+        updatedData.accountPoolStoppedAt = updates.accountPoolStoppedAt
       }
       if (updates.interceptWarmup !== undefined) {
         updatedData.interceptWarmup = updates.interceptWarmup.toString()

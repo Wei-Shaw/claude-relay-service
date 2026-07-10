@@ -555,131 +555,26 @@
                   <div class="flex items-center gap-1">
                     <!-- 平台图标和名称 -->
                     <div
-                      v-if="account.platform === 'gemini'"
-                      class="flex items-center gap-1.5 rounded-lg border border-yellow-200 bg-gradient-to-r from-yellow-100 to-amber-100 px-2.5 py-1"
-                    >
-                      <i class="fas fa-robot text-xs text-yellow-700" />
-                      <span class="text-xs font-semibold text-yellow-800">Gemini</span>
-                      <span class="mx-1 h-4 w-px bg-yellow-300" />
-                      <span class="text-xs font-medium text-yellow-700">
-                        {{ getGeminiAuthType() }}
-                      </span>
-                    </div>
-                    <div
-                      v-else-if="account.platform === 'claude-console'"
-                      class="flex items-center gap-1.5 rounded-lg border border-purple-200 bg-gradient-to-r from-purple-100 to-pink-100 px-2.5 py-1"
-                    >
-                      <i class="fas fa-terminal text-xs text-purple-700" />
-                      <span class="text-xs font-semibold text-purple-800">Console</span>
-                      <span class="mx-1 h-4 w-px bg-purple-300" />
-                      <span class="text-xs font-medium text-purple-700">API Key</span>
-                    </div>
-                    <div
-                      v-else-if="account.platform === 'bedrock'"
-                      class="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-gradient-to-r from-orange-100 to-red-100 px-2.5 py-1"
-                    >
-                      <i class="fab fa-aws text-xs text-orange-700" />
-                      <span class="text-xs font-semibold text-orange-800">Bedrock</span>
-                      <span class="mx-1 h-4 w-px bg-orange-300" />
-                      <span class="text-xs font-medium text-orange-700">AWS</span>
-                    </div>
-                    <div
-                      v-else-if="account.platform === 'openai'"
-                      class="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-100 bg-gradient-to-r from-gray-100 to-gray-100 px-2.5 py-1"
-                    >
-                      <div class="fa-openai" />
-                      <span class="text-xs font-semibold text-gray-950">OpenAi</span>
-                      <span class="mx-1 h-4 w-px bg-gray-400" />
-                      <span class="text-xs font-medium text-gray-950">{{
-                        getOpenAIAuthType()
-                      }}</span>
-                    </div>
-                    <div
-                      v-else-if="account.platform === 'azure_openai'"
-                      class="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-100 to-cyan-100 px-2.5 py-1 dark:border-blue-700 dark:from-blue-900/20 dark:to-cyan-900/20"
-                    >
-                      <i class="fab fa-microsoft text-xs text-blue-700 dark:text-blue-400" />
-                      <span class="text-xs font-semibold text-blue-800 dark:text-blue-300"
-                        >Azure OpenAI</span
-                      >
-                      <span class="mx-1 h-4 w-px bg-blue-300 dark:bg-blue-600" />
-                      <span class="text-xs font-medium text-blue-700 dark:text-blue-400"
-                        >API Key</span
-                      >
-                    </div>
-                    <div
-                      v-else-if="account.platform === 'openai-responses'"
-                      class="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-gradient-to-r from-teal-100 to-green-100 px-2.5 py-1 dark:border-teal-700 dark:from-teal-900/20 dark:to-green-900/20"
-                    >
-                      <i class="fas fa-server text-xs text-teal-700 dark:text-teal-400" />
-                      <span class="text-xs font-semibold text-teal-800 dark:text-teal-300"
-                        >OpenAI-Api</span
-                      >
-                      <span class="mx-1 h-4 w-px bg-teal-300 dark:bg-teal-600" />
-                      <span class="text-xs font-medium text-teal-700 dark:text-teal-400"
-                        >API Key</span
-                      >
-                    </div>
-                    <div
-                      v-else-if="
-                        account.platform === 'claude' || account.platform === 'claude-oauth'
-                      "
+                      v-if="getBusinessPlatform(account) === 'claude'"
                       class="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-100 to-blue-100 px-2.5 py-1"
                     >
                       <i class="fas fa-brain text-xs text-indigo-700" />
-                      <span class="text-xs font-semibold text-indigo-800">{{
-                        getClaudeAccountType(account)
-                      }}</span>
+                      <span class="text-xs font-semibold text-indigo-800">Claude</span>
                       <span class="mx-1 h-4 w-px bg-indigo-300" />
                       <span class="text-xs font-medium text-indigo-700">
-                        {{ getClaudeAuthType(account) }}
+                        {{ getBusinessPlatformDetail(account) }}
                       </span>
                     </div>
                     <div
-                      v-else-if="account.platform === 'ccr'"
-                      class="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-gradient-to-r from-teal-100 to-emerald-100 px-2.5 py-1 dark:border-teal-700 dark:from-teal-900/20 dark:to-emerald-900/20"
+                      v-else-if="getBusinessPlatform(account) === 'openai'"
+                      class="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-100 bg-gradient-to-r from-gray-100 to-gray-100 px-2.5 py-1"
                     >
-                      <i class="fas fa-code-branch text-xs text-teal-700 dark:text-teal-400" />
-                      <span class="text-xs font-semibold text-teal-800 dark:text-teal-300"
-                        >CCR</span
-                      >
-                      <span class="mx-1 h-4 w-px bg-teal-300 dark:bg-teal-600" />
-                      <span class="text-xs font-medium text-teal-700 dark:text-teal-300"
-                        >Relay</span
-                      >
-                    </div>
-                    <div
-                      v-else-if="account.platform === 'droid'"
-                      class="flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-gradient-to-r from-cyan-100 to-sky-100 px-2.5 py-1 dark:border-cyan-700 dark:from-cyan-900/20 dark:to-sky-900/20"
-                    >
-                      <i class="fas fa-robot text-xs text-cyan-700 dark:text-cyan-400" />
-                      <span class="text-xs font-semibold text-cyan-800 dark:text-cyan-300"
-                        >Droid</span
-                      >
-                      <span class="mx-1 h-4 w-px bg-cyan-300 dark:bg-cyan-600" />
-                      <span class="text-xs font-medium text-cyan-700 dark:text-cyan-300">
-                        {{ getDroidAuthType(account) }}
-                      </span>
-                      <span
-                        v-if="isDroidApiKeyMode(account)"
-                        :class="getDroidApiKeyBadgeClasses(account)"
-                      >
-                        <i class="fas fa-key text-[9px]" />
-                        <span>x{{ getDroidApiKeyCount(account) }}</span>
-                      </span>
-                    </div>
-                    <div
-                      v-else-if="account.platform === 'gemini-api'"
-                      class="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-100 to-yellow-100 px-2.5 py-1 dark:border-amber-700 dark:from-amber-900/20 dark:to-yellow-900/20"
-                    >
-                      <i class="fas fa-robot text-xs text-amber-700 dark:text-amber-400" />
-                      <span class="text-xs font-semibold text-amber-800 dark:text-amber-300"
-                        >Gemini-API</span
-                      >
-                      <span class="mx-1 h-4 w-px bg-amber-300 dark:bg-amber-600" />
-                      <span class="text-xs font-medium text-amber-700 dark:text-amber-400"
-                        >API Key</span
-                      >
+                      <div class="fa-openai" />
+                      <span class="text-xs font-semibold text-gray-950">OpenAI</span>
+                      <span class="mx-1 h-4 w-px bg-gray-400" />
+                      <span class="text-xs font-medium text-gray-950">{{
+                        getBusinessPlatformDetail(account)
+                      }}</span>
                     </div>
                     <div
                       v-else
@@ -2373,10 +2268,46 @@ const accountUsageSummary = ref({})
 const accountUsageOverview = ref({})
 const accountUsageGeneratedAt = ref('')
 
-const supportedAccountPlatforms = productConfig.supportedAccountPlatforms
+const businessPlatformAliases = productConfig.hiddenAccountPlatformAliases
+const supportedAccountPlatforms = Object.values(businessPlatformAliases).flat()
+const visibleAccountPlatforms = productConfig.visibleAccountPlatforms
 const supportedAccountPlatformSet = new Set(supportedAccountPlatforms)
 const supportedAccountGroups = productConfig.supportedAccountGroups
 const supportedUsagePlatforms = supportedAccountPlatforms
+const businessPlatformLabels = {
+  openai: 'OpenAI',
+  claude: 'Claude'
+}
+const businessPlatformIcons = {
+  openai: 'fa-openai',
+  claude: 'fa-brain'
+}
+const getBusinessPlatform = (accountOrPlatform) => {
+  const platform =
+    typeof accountOrPlatform === 'string' ? accountOrPlatform : accountOrPlatform?.platform
+  return (
+    Object.entries(businessPlatformAliases).find(([, aliases]) =>
+      aliases.includes(platform)
+    )?.[0] || platform
+  )
+}
+const getBusinessPlatformLabel = (accountOrPlatform) => {
+  const businessPlatform = getBusinessPlatform(accountOrPlatform)
+  return businessPlatformLabels[businessPlatform] || businessPlatform || '未知'
+}
+const getBusinessPlatformIcon = (accountOrPlatform) => {
+  const businessPlatform = getBusinessPlatform(accountOrPlatform)
+  return businessPlatformIcons[businessPlatform] || 'fa-server'
+}
+const getBusinessPlatformDetail = (account) => {
+  if (account?.platform === 'openai-responses') return 'API Key'
+  if (account?.platform === 'openai') return getOpenAIAuthType(account)
+  if (account?.platform === 'claude-console') return 'Console'
+  if (account?.platform === 'claude' || account?.platform === 'claude-oauth') {
+    return getClaudeAuthType(account)
+  }
+  return getBusinessPlatformLabel(account)
+}
 
 // 过期时间编辑弹窗状态
 const editingExpiryAccount = ref(null)
@@ -2429,26 +2360,25 @@ const platformHierarchy = [
     value: 'group-openai',
     label: 'OpenAI（全部）',
     icon: 'fa-openai',
-    children: [
-      { value: 'openai', label: 'OpenAI 官方', icon: 'fa-openai' },
-      { value: 'openai-responses', label: 'OpenAI Responses', icon: 'fa-server' }
-    ]
+    children: [{ value: 'openai', label: 'OpenAI', icon: 'fa-openai' }]
   },
   {
     value: 'group-claude',
     label: 'Claude（全部）',
     icon: 'fa-brain',
-    children: [
-      { value: 'claude', label: 'Claude OAuth', icon: 'fa-brain' },
-      { value: 'claude-console', label: 'Claude Console', icon: 'fa-terminal' }
-    ]
+    children: [{ value: 'claude', label: 'Claude', icon: 'fa-brain' }]
   }
 ]
 
 // 平台分组映射
 const platformGroupMap = {
-  ...supportedAccountGroups,
-  'group-primary-ai': supportedAccountPlatforms
+  'group-primary-ai': supportedAccountPlatforms,
+  ...Object.fromEntries(
+    Object.entries(supportedAccountGroups).map(([group, platforms]) => [
+      group,
+      platforms.flatMap((platform) => businessPlatformAliases[platform] || [platform])
+    ])
+  )
 }
 
 // 平台请求处理器
@@ -2460,11 +2390,18 @@ const platformRequestHandlers = {
 }
 
 const allPlatformKeys = Object.keys(platformRequestHandlers)
+const platformFilterAliasMap = Object.fromEntries(
+  visibleAccountPlatforms.map((platform) => [
+    platform,
+    businessPlatformAliases[platform] || [platform]
+  ])
+)
 
 // 根据过滤器获取需要加载的平台列表
 const getPlatformsForFilter = (filter) => {
   if (filter === 'all') return allPlatformKeys
   if (platformGroupMap[filter]) return platformGroupMap[filter]
+  if (platformFilterAliasMap[filter]) return platformFilterAliasMap[filter]
   if (allPlatformKeys.includes(filter)) return [filter]
   return allPlatformKeys
 }
@@ -2496,20 +2433,16 @@ const groupOptions = computed(() => {
     { value: 'all', label: '所有账户', icon: 'fa-globe' },
     { value: 'ungrouped', label: '未分组账户', icon: 'fa-user' }
   ]
-  accountGroups.value.forEach((group) => {
-    options.push({
-      value: group.id,
-      label: `${group.name} (${group.platform === 'claude' ? 'Claude' : group.platform === 'gemini' ? 'Gemini' : group.platform === 'openai' ? 'OpenAI' : 'Droid'})`,
-      icon:
-        group.platform === 'claude'
-          ? 'fa-brain'
-          : group.platform === 'gemini'
-            ? 'fa-robot'
-            : group.platform === 'openai'
-              ? 'fa-openai'
-              : 'fa-robot'
+  accountGroups.value
+    .filter((group) => visibleAccountPlatforms.includes(getBusinessPlatform(group.platform)))
+    .forEach((group) => {
+      const label = getBusinessPlatformLabel(group.platform)
+      options.push({
+        value: group.id,
+        label: `${group.name} (${label})`,
+        icon: getBusinessPlatformIcon(group.platform)
+      })
     })
-  })
   return options
 })
 
@@ -2862,16 +2795,14 @@ const totalPages = computed(() => {
 
 // 账户统计数据（按平台和状态分类）
 const accountStats = computed(() => {
-  const platforms = [
-    { value: 'openai', label: 'OpenAI 官方' },
-    { value: 'openai-responses', label: 'OpenAI Responses' },
-    { value: 'claude', label: 'Claude OAuth' },
-    { value: 'claude-console', label: 'Claude Console' }
-  ]
+  const platforms = visibleAccountPlatforms.map((platform) => ({
+    value: platform,
+    label: getBusinessPlatformLabel(platform)
+  }))
 
   return platforms
     .map((p) => {
-      const platformAccounts = accounts.value.filter((acc) => acc.platform === p.value)
+      const platformAccounts = accounts.value.filter((acc) => getBusinessPlatform(acc) === p.value)
 
       // 先筛选限流账户（优先级最高）
       const rateLimitedAccounts = platformAccounts.filter((acc) => isAccountRateLimited(acc))
@@ -3225,7 +3156,11 @@ const loadAccounts = async (forceReload = false) => {
   try {
     // 构建查询参数（用于其他筛选情况）
     const params = {}
-    if (platformFilter.value !== 'all' && !platformGroupMap[platformFilter.value]) {
+    const isSingleInternalPlatform =
+      platformFilter.value !== 'all' &&
+      !platformGroupMap[platformFilter.value] &&
+      !platformFilterAliasMap[platformFilter.value]
+    if (isSingleInternalPlatform) {
       params.platform = platformFilter.value
     }
     if (groupFilter.value !== 'all') {
@@ -4112,162 +4047,34 @@ const getClaudeAuthType = (account) => {
   return 'OAuth'
 }
 
-// 获取 Gemini 账号的添加方式
-const getGeminiAuthType = () => {
-  // Gemini 统一显示 OAuth
-  return 'OAuth'
-}
-
 // 获取 OpenAI 账号的添加方式
 const getOpenAIAuthType = () => {
   // OpenAI 统一显示 OAuth
   return 'OAuth'
 }
 
-// 获取 Droid 账号的认证方式
-const getDroidAuthType = (account) => {
-  if (!account || typeof account !== 'object') {
-    return 'OAuth'
-  }
-
-  const apiKeyModeFlag =
-    account.isApiKeyMode ?? account.is_api_key_mode ?? account.apiKeyMode ?? account.api_key_mode
-
-  if (
-    apiKeyModeFlag === true ||
-    apiKeyModeFlag === 'true' ||
-    apiKeyModeFlag === 1 ||
-    apiKeyModeFlag === '1'
-  ) {
-    return 'API Key'
-  }
-
-  const methodCandidate =
-    account.authenticationMethod ||
-    account.authMethod ||
-    account.authentication_mode ||
-    account.authenticationMode ||
-    account.authentication_method ||
-    account.auth_type ||
-    account.authType ||
-    account.authentication_type ||
-    account.authenticationType ||
-    account.droidAuthType ||
-    account.droidAuthenticationMethod ||
-    account.method ||
-    account.auth ||
-    ''
-
-  if (typeof methodCandidate === 'string') {
-    const normalized = methodCandidate.trim().toLowerCase()
-    const compacted = normalized.replace(/[\s_-]/g, '')
-
-    if (compacted === 'apikey') {
-      return 'API Key'
-    }
-  }
-
-  return 'OAuth'
+const accountPoolStopReasonLabels = {
+  five_hour_limit: '5h 限额已用尽，额度恢复后自动复用',
+  seven_day_limit: '7d 限额已用尽，额度恢复后自动复用',
+  cost_limit: '成本额度已用尽，额度恢复后自动复用',
+  token_limit: 'Token 额度已用尽，额度恢复后自动复用',
+  request_limit: '请求数额度已用尽，额度恢复后自动复用'
 }
 
-// 判断是否为 API Key 模式的 Droid 账号
-const isDroidApiKeyMode = (account) => getDroidAuthType(account) === 'API Key'
-
-// 获取 Droid 账号的 API Key 数量
-const getDroidApiKeyCount = (account) => {
-  if (!account || typeof account !== 'object') {
-    return 0
+const getAccountPoolStoppedReason = (account) => {
+  if (account?.accountPoolAutoStopped !== true && account?.accountPoolAutoStopped !== 'true') {
+    return null
   }
 
-  // 优先使用 apiKeys 数组来计算正常状态的 API Keys
-  if (Array.isArray(account.apiKeys)) {
-    // 只计算状态不是 'error' 的 API Keys
-    return account.apiKeys.filter((apiKey) => apiKey.status !== 'error').length
-  }
-
-  // 如果是字符串格式的 apiKeys，尝试解析
-  if (typeof account.apiKeys === 'string' && account.apiKeys.trim()) {
-    try {
-      const parsed = JSON.parse(account.apiKeys)
-      if (Array.isArray(parsed)) {
-        // 只计算状态不是 'error' 的 API Keys
-        return parsed.filter((apiKey) => apiKey.status !== 'error').length
-      }
-    } catch (error) {
-      // 忽略解析错误，继续使用其他字段
-    }
-  }
-
-  const candidates = [
-    account.apiKeyCount,
-    account.api_key_count,
-    account.apiKeysCount,
-    account.api_keys_count
-  ]
-
-  for (const candidate of candidates) {
-    const value = Number(candidate)
-    if (Number.isFinite(value) && value >= 0) {
-      return value
-    }
-  }
-
-  return 0
-}
-
-// 根据数量返回徽标样式
-const getDroidApiKeyBadgeClasses = (account) => {
-  const count = getDroidApiKeyCount(account)
-  const baseClass =
-    'ml-1 inline-flex items-center gap-1 rounded-md border px-1.5 py-[1px] text-[10px] font-medium shadow-sm backdrop-blur-sm'
-
-  if (count > 0) {
-    return [
-      baseClass,
-      'border-cyan-200 bg-cyan-50/90 text-cyan-700 dark:border-cyan-500/40 dark:bg-cyan-900/40 dark:text-cyan-200'
-    ]
-  }
-
-  return [
-    baseClass,
-    'border-rose-200 bg-rose-50/90 text-rose-600 dark:border-rose-500/40 dark:bg-rose-900/40 dark:text-rose-200'
-  ]
-}
-
-// 获取 Claude 账号类型显示
-const getClaudeAccountType = (account) => {
-  // 如果有订阅信息
-  if (account.subscriptionInfo) {
-    try {
-      // 如果 subscriptionInfo 是字符串，尝试解析
-      const info =
-        typeof account.subscriptionInfo === 'string'
-          ? JSON.parse(account.subscriptionInfo)
-          : account.subscriptionInfo
-
-      // 订阅信息已解析
-
-      // 根据 has_claude_max 和 has_claude_pro 判断
-      if (info.hasClaudeMax === true) {
-        return 'Claude Max'
-      } else if (info.hasClaudePro === true) {
-        return 'Claude Pro'
-      } else {
-        return 'Claude Free'
-      }
-    } catch (e) {
-      // 解析失败，返回默认值
-      return 'Claude'
-    }
-  }
-
-  // 没有订阅信息，保持原有显示
-  return 'Claude'
+  return accountPoolStopReasonLabels[account.accountPoolStoppedReason] || '账号池策略已自动停用'
 }
 
 // 获取停止调度的原因
 const getSchedulableReason = (account) => {
   if (account.schedulable !== false) return null
+
+  const accountPoolReason = getAccountPoolStoppedReason(account)
+  if (accountPoolReason) return accountPoolReason
 
   // Claude Console 账户的错误状态
   if (account.platform === 'claude-console') {

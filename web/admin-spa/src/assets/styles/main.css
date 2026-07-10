@@ -18,9 +18,9 @@ body {
     sans-serif;
   background: linear-gradient(
     135deg,
-    var(--primary-color) 0%,
-    var(--secondary-color) 50%,
-    var(--accent-color) 100%
+    var(--bg-gradient-start, var(--secondary-color)) 0%,
+    var(--bg-gradient-mid, #164e63) 48%,
+    var(--bg-gradient-end, var(--primary-color)) 100%
   );
   background-attachment: fixed;
   min-height: 100vh;
@@ -36,9 +36,13 @@ body::before {
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(circle at 20% 80%, rgba(var(--accent-rgb), 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(var(--primary-rgb), 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(var(--secondary-rgb), 0.1) 0%, transparent 50%);
+    linear-gradient(120deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 100%),
+    linear-gradient(90deg, rgba(var(--primary-rgb), 0.18), transparent 45%),
+    linear-gradient(180deg, rgba(var(--accent-rgb), 0.1), transparent 36%);
+  background-size:
+    28px 28px,
+    100% 100%,
+    100% 100%;
   pointer-events: none;
   z-index: -1;
 }

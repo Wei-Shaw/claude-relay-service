@@ -493,49 +493,23 @@
               >服务权限</label
             >
             <div class="flex flex-wrap gap-4">
-              <label class="flex cursor-pointer items-center">
+              <label
+                v-for="permission in availablePermissions"
+                :key="permission.key"
+                class="flex cursor-pointer items-center"
+              >
                 <input
                   v-model="form.permissions"
                   class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   type="checkbox"
-                  value="claude"
+                  :value="permission.key"
                   @change="updatePermissions"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">Claude</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input
-                  v-model="form.permissions"
-                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="checkbox"
-                  value="gemini"
-                  @change="updatePermissions"
-                />
-                <span class="text-sm text-gray-700 dark:text-gray-300">Gemini</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input
-                  v-model="form.permissions"
-                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="checkbox"
-                  value="openai"
-                  @change="updatePermissions"
-                />
-                <span class="text-sm text-gray-700 dark:text-gray-300">OpenAI</span>
-              </label>
-              <label class="flex cursor-pointer items-center">
-                <input
-                  v-model="form.permissions"
-                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                  type="checkbox"
-                  value="droid"
-                  @change="updatePermissions"
-                />
-                <span class="text-sm text-gray-700 dark:text-gray-300">Droid</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">{{ permission.label }}</span>
               </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              不选择任何服务表示允许访问全部服务
+              不选择任何服务表示允许访问 Claude 与 OpenAI
             </p>
           </div>
 
@@ -784,20 +758,6 @@
               </div>
               <div>
                 <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Gemini 专属账号</label
-                >
-                <AccountSelector
-                  v-model="form.geminiAccountId"
-                  :accounts="localAccounts.gemini"
-                  default-option-text="使用共享账号池"
-                  :disabled="form.permissions.length > 0 && !form.permissions.includes('gemini')"
-                  :groups="localAccounts.geminiGroups"
-                  placeholder="请选择Gemini账号"
-                  platform="gemini"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                   >OpenAI 专属账号</label
                 >
                 <AccountSelector
@@ -810,37 +770,9 @@
                   platform="openai"
                 />
               </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Bedrock 专属账号</label
-                >
-                <AccountSelector
-                  v-model="form.bedrockAccountId"
-                  :accounts="localAccounts.bedrock"
-                  default-option-text="使用共享账号池"
-                  :disabled="form.permissions.length > 0 && !form.permissions.includes('claude')"
-                  :groups="[]"
-                  placeholder="请选择Bedrock账号"
-                  platform="bedrock"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Droid 专属账号</label
-                >
-                <AccountSelector
-                  v-model="form.droidAccountId"
-                  :accounts="localAccounts.droid"
-                  default-option-text="使用共享账号池"
-                  :disabled="form.permissions.length > 0 && !form.permissions.includes('droid')"
-                  :groups="localAccounts.droidGroups"
-                  placeholder="请选择Droid账号"
-                  platform="droid"
-                />
-              </div>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              修改绑定账号将影响此API Key的请求路由
+              修改绑定账号将影响此 API Key 的 OpenAI / Claude 请求路由
             </p>
           </div>
 
@@ -1026,6 +958,7 @@ import { useApiKeysStore } from '@/stores/apiKeys'
 import * as httpApis from '@/utils/http_apis'
 import AccountSelector from '@/components/common/AccountSelector.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import { productConfig } from '@/config/productConfig'
 
 const props = defineProps({
   apiKey: {
@@ -1036,14 +969,9 @@ const props = defineProps({
     type: Object,
     default: () => ({
       claude: [],
-      gemini: [],
       openai: [],
-      bedrock: [],
-      droid: [],
       claudeGroups: [],
-      geminiGroups: [],
       openaiGroups: [],
-      droidGroups: [],
       openaiResponses: []
     })
   }
@@ -1092,14 +1020,9 @@ const handleCancelModal = () => {
 
 const localAccounts = ref({
   claude: [],
-  gemini: [],
   openai: [],
-  bedrock: [],
-  droid: [],
   claudeGroups: [],
-  geminiGroups: [],
-  openaiGroups: [],
-  droidGroups: []
+  openaiGroups: []
 })
 
 // 支持的客户端列表
@@ -1119,15 +1042,8 @@ const unselectedTags = computed(() => {
 
 // 服务倍率相关
 const enableServiceRates = ref(false)
-const availableServices = [
-  { key: 'claude', label: 'Claude' },
-  { key: 'gemini', label: 'Gemini' },
-  { key: 'codex', label: 'Codex' },
-  { key: 'droid', label: 'Droid' },
-  { key: 'bedrock', label: 'Bedrock' },
-  { key: 'azure', label: 'Azure' },
-  { key: 'ccr', label: 'CCR' }
-]
+const availableServices = productConfig.apiKeyServiceRates
+const availablePermissions = productConfig.apiKeyPermissions
 
 const payloadRuleValueTypeOptions = [
   { value: 'string', label: '字符串' },
@@ -1158,10 +1074,7 @@ const form = reactive({
   weeklyResetHour: 0,
   permissions: [], // 数组格式，空数组表示全部服务
   claudeAccountId: '',
-  geminiAccountId: '',
   openaiAccountId: '',
-  bedrockAccountId: '',
-  droidAccountId: '',
   enableModelRestriction: false,
   restrictedModels: [],
   modelInput: '',
@@ -1395,31 +1308,11 @@ const updateApiKey = async () => {
       data.claudeConsoleAccountId = null
     }
 
-    // Gemini账户绑定
-    if (form.geminiAccountId) {
-      data.geminiAccountId = form.geminiAccountId
-    } else {
-      data.geminiAccountId = null
-    }
-
     // OpenAI账户绑定
     if (form.openaiAccountId) {
       data.openaiAccountId = form.openaiAccountId
     } else {
       data.openaiAccountId = null
-    }
-
-    // Bedrock账户绑定
-    if (form.bedrockAccountId) {
-      data.bedrockAccountId = form.bedrockAccountId
-    } else {
-      data.bedrockAccountId = null
-    }
-
-    if (form.droidAccountId) {
-      data.droidAccountId = form.droidAccountId
-    } else {
-      data.droidAccountId = null
     }
 
     // 模型限制 - 始终提交这些字段
@@ -1457,27 +1350,14 @@ const updateApiKey = async () => {
 const refreshAccounts = async () => {
   accountsLoading.value = true
   try {
-    const [
-      claudeData,
-      claudeConsoleData,
-      geminiData,
-      geminiApiData,
-      openaiData,
-      openaiResponsesData,
-      bedrockData,
-      droidData,
-      groupsData
-    ] = await Promise.all([
-      httpApis.getClaudeAccountsApi(),
-      httpApis.getClaudeConsoleAccountsApi(),
-      httpApis.getGeminiAccountsApi(),
-      httpApis.getGeminiApiAccountsApi(),
-      httpApis.getOpenAIAccountsApi(),
-      httpApis.getOpenAIResponsesAccountsApi(),
-      httpApis.getBedrockAccountsApi(),
-      httpApis.getDroidAccountsApi(),
-      httpApis.getAccountGroupsApi()
-    ])
+    const [claudeData, claudeConsoleData, openaiData, openaiResponsesData, groupsData] =
+      await Promise.all([
+        httpApis.getClaudeAccountsApi(),
+        httpApis.getClaudeConsoleAccountsApi(),
+        httpApis.getOpenAIAccountsApi(),
+        httpApis.getOpenAIResponsesAccountsApi(),
+        httpApis.getAccountGroupsApi()
+      ])
 
     // 合并Claude OAuth账户和Claude Console账户
     const claudeAccounts = []
@@ -1504,31 +1384,6 @@ const refreshAccounts = async () => {
 
     localAccounts.value.claude = claudeAccounts
 
-    // 合并 Gemini OAuth 和 Gemini API 账号
-    const geminiAccounts = []
-
-    if (geminiData.success) {
-      ;(geminiData.data || []).forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    if (geminiApiData.success) {
-      ;(geminiApiData.data || []).forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini-api',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    localAccounts.value.gemini = geminiAccounts
-
     // 合并 OpenAI 和 OpenAI-Responses 账号
     const openaiAccounts = []
 
@@ -1554,28 +1409,11 @@ const refreshAccounts = async () => {
 
     localAccounts.value.openai = openaiAccounts
 
-    if (bedrockData.success) {
-      localAccounts.value.bedrock = (bedrockData.data || []).map((account) => ({
-        ...account,
-        isDedicated: account.accountType === 'dedicated'
-      }))
-    }
-
-    if (droidData.success) {
-      localAccounts.value.droid = (droidData.data || []).map((account) => ({
-        ...account,
-        platform: 'droid',
-        isDedicated: account.accountType === 'dedicated'
-      }))
-    }
-
     // 处理分组数据
     if (groupsData.success) {
       const allGroups = groupsData.data || []
       localAccounts.value.claudeGroups = allGroups.filter((g) => g.platform === 'claude')
-      localAccounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
       localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
-      localAccounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
     }
 
     showToast('账号列表已刷新', 'success')
@@ -1628,13 +1466,6 @@ onMounted(async () => {
 
   // 初始化账号数据
   if (props.accounts) {
-    // props.accounts.gemini 已经包含了 OAuth 和 API 两种类型的账号（父组件已合并）
-    // 保留原有的 platform 属性，不要覆盖
-    const geminiAccounts = (props.accounts.gemini || []).map((account) => ({
-      ...account,
-      platform: account.platform || 'gemini' // 保留原有 platform，只在没有时设默认值
-    }))
-
     // props.accounts.openai 只包含 openai 类型，openaiResponses 需要单独处理
     const openaiAccounts = []
     if (props.accounts.openai) {
@@ -1656,17 +1487,9 @@ onMounted(async () => {
 
     localAccounts.value = {
       claude: props.accounts.claude || [],
-      gemini: geminiAccounts,
       openai: openaiAccounts,
-      bedrock: props.accounts.bedrock || [],
-      droid: (props.accounts.droid || []).map((account) => ({
-        ...account,
-        platform: account.platform || 'droid'
-      })),
       claudeGroups: props.accounts.claudeGroups || [],
-      geminiGroups: props.accounts.geminiGroups || [],
-      openaiGroups: props.accounts.openaiGroups || [],
-      droidGroups: props.accounts.droidGroups || []
+      openaiGroups: props.accounts.openaiGroups || []
     }
   }
 
@@ -1696,9 +1519,9 @@ onMounted(async () => {
   form.weeklyResetHour = props.apiKey.weeklyResetHour || 0
   // 处理权限数据，兼容旧格式（字符串）和新格式（数组）
   // 有效的权限值
-  const VALID_PERMS = ['claude', 'gemini', 'openai', 'droid']
+  const VALID_PERMS = productConfig.apiKeyPermissions.map((permission) => permission.key)
   let perms = props.apiKey.permissions
-  // 如果是字符串，尝试 JSON.parse（Redis 可能返回 "[]" 或 "[\"gemini\"]"）
+  // 如果是字符串，尝试 JSON.parse（Redis 可能返回 "[]" 或 "[\"openai\"]"）
   if (typeof perms === 'string') {
     if (perms === 'all' || perms === '') {
       perms = []
@@ -1732,13 +1555,9 @@ onMounted(async () => {
   } else {
     form.claudeAccountId = props.apiKey.claudeAccountId || ''
   }
-  form.geminiAccountId = props.apiKey.geminiAccountId || ''
-
   // 处理 OpenAI 账号 - 直接使用后端传来的值（已包含 responses: 前缀）
   form.openaiAccountId = props.apiKey.openaiAccountId || ''
 
-  form.bedrockAccountId = props.apiKey.bedrockAccountId || ''
-  form.droidAccountId = props.apiKey.droidAccountId || ''
   form.restrictedModels = props.apiKey.restrictedModels || []
   form.allowedClients = props.apiKey.allowedClients || []
   form.tags = props.apiKey.tags || []
