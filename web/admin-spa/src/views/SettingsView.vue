@@ -1429,7 +1429,7 @@
                       class="w-24 rounded-lg border border-gray-300 px-3 py-2 text-center text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                       max="10"
                       min="0.1"
-                      step="0.1"
+                      step="0.01"
                       type="number"
                     />
                     <span class="text-sm text-gray-500 dark:text-gray-400">倍</span>
