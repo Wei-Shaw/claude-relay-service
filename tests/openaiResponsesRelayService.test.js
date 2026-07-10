@@ -13,6 +13,7 @@ jest.mock('../src/utils/headerFilter', () => ({
 
 jest.mock('../src/services/account/openaiResponsesAccountService', () => ({
   getAccount: jest.fn(),
+  getMappedModel: jest.fn((mapping, requestedModel) => mapping?.[requestedModel] || requestedModel),
   updateAccount: jest.fn(),
   updateAccountUsage: jest.fn(),
   updateUsageQuota: jest.fn()
@@ -170,6 +171,41 @@ describe('openaiResponsesRelayService 路径和连接清理', () => {
     expect(res.removeListener).toHaveBeenCalledWith('close', expect.any(Function))
     expect(res.status).toHaveBeenCalledWith(200)
     expect(res.json).toHaveBeenCalledWith({ object: 'response', output_text: 'ok' })
+  })
+
+  it('按账户映射重定向上游模型且保留客户端请求模型', async () => {
+    openaiResponsesAccountService.getAccount.mockResolvedValue({
+      id: 'resp-1',
+      name: 'Responses 1',
+      baseApi: 'https://api.openai.com',
+      apiKey: 'test-key',
+      providerEndpoint: 'responses',
+      supportedModels: { 'gpt-4.1-mini': 'gpt-5-mini' },
+      proxy: null,
+      userAgent: null
+    })
+    axios.mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      data: { object: 'response', output_text: 'ok' },
+      headers: {}
+    })
+
+    const { req, res } = createReqRes()
+
+    await openaiResponsesRelayService.handleRequest(
+      req,
+      res,
+      { id: 'resp-1', name: 'Responses 1', disableAutoProtection: false },
+      { id: 'key-1' }
+    )
+
+    expect(axios).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ model: 'gpt-5-mini' })
+      })
+    )
+    expect(req.body.model).toBe('gpt-4.1-mini')
   })
 })
 

@@ -44,6 +44,7 @@ class OpenAIResponsesAccountService {
       apiKey = '', // 必填：API 密钥
       userAgent = '', // 可选：自定义 User-Agent，空则透传原始请求
       priority = 50, // 调度优先级 (1-100)
+      supportedModels = [], // 支持的模型列表或映射表，空数组/对象表示支持所有
       proxy = null,
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
@@ -72,6 +73,7 @@ class OpenAIResponsesAccountService {
     const normalizedBaseApi = baseApi.endsWith('/') ? baseApi.slice(0, -1) : baseApi
 
     const accountId = uuidv4()
+    const processedModels = this._processModelMapping(supportedModels)
 
     const accountData = {
       id: accountId,
@@ -82,6 +84,7 @@ class OpenAIResponsesAccountService {
       apiKey: this._encryptSensitiveData(apiKey),
       userAgent,
       priority: priority.toString(),
+      supportedModels: JSON.stringify(processedModels),
       proxy: proxy ? JSON.stringify(proxy) : '',
       isActive: isActive.toString(),
       accountType,
@@ -142,6 +145,14 @@ class OpenAIResponsesAccountService {
       }
     }
 
+    try {
+      accountData.supportedModels = this._processModelMapping(
+        JSON.parse(accountData.supportedModels || '{}')
+      )
+    } catch {
+      accountData.supportedModels = {}
+    }
+
     return accountData
   }
 
@@ -160,6 +171,10 @@ class OpenAIResponsesAccountService {
     // 处理 JSON 字段
     if (updates.proxy !== undefined) {
       updates.proxy = updates.proxy ? JSON.stringify(updates.proxy) : ''
+    }
+
+    if (updates.supportedModels !== undefined) {
+      updates.supportedModels = JSON.stringify(this._processModelMapping(updates.supportedModels))
     }
 
     // 规范化 baseApi
@@ -260,6 +275,14 @@ class OpenAIResponsesAccountService {
         } catch {
           accountData.proxy = null
         }
+      }
+
+      try {
+        accountData.supportedModels = this._processModelMapping(
+          JSON.parse(accountData.supportedModels || '{}')
+        )
+      } catch {
+        accountData.supportedModels = {}
       }
 
       // 获取限流状态信息
@@ -567,6 +590,59 @@ class OpenAIResponsesAccountService {
     }
 
     return false
+  }
+
+  _processModelMapping(supportedModels) {
+    if (!supportedModels || (Array.isArray(supportedModels) && supportedModels.length === 0)) {
+      return {}
+    }
+
+    if (typeof supportedModels === 'object' && !Array.isArray(supportedModels)) {
+      return supportedModels
+    }
+
+    if (Array.isArray(supportedModels)) {
+      return supportedModels.reduce((mapping, model) => {
+        if (model && typeof model === 'string') {
+          mapping[model] = model
+        }
+        return mapping
+      }, {})
+    }
+
+    return {}
+  }
+
+  isModelSupported(modelMapping, requestedModel) {
+    if (!modelMapping || Object.keys(modelMapping).length === 0) {
+      return true
+    }
+
+    if (Object.prototype.hasOwnProperty.call(modelMapping, requestedModel)) {
+      return true
+    }
+
+    const requestedModelLower = requestedModel.toLowerCase()
+    return Object.keys(modelMapping).some((model) => model.toLowerCase() === requestedModelLower)
+  }
+
+  getMappedModel(modelMapping, requestedModel) {
+    if (!modelMapping || Object.keys(modelMapping).length === 0) {
+      return requestedModel
+    }
+
+    if (modelMapping[requestedModel]) {
+      return modelMapping[requestedModel]
+    }
+
+    const requestedModelLower = requestedModel.toLowerCase()
+    for (const [model, mappedModel] of Object.entries(modelMapping)) {
+      if (model.toLowerCase() === requestedModelLower) {
+        return mappedModel
+      }
+    }
+
+    return requestedModel
   }
 
   // 获取限流信息

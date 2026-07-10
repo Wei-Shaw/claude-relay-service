@@ -423,17 +423,11 @@ const handleResponses = async (req, res) => {
     const schedulerModel = getCodexCompatibleModel(requestedModel)
     const isStream = req.body?.stream !== false // 默认为流式（兼容现有行为）
 
-    if (schedulerModel !== requestedModel) {
-      logger.info(
-        `🧭 Using Codex-compatible model ${schedulerModel} for account selection (requested: ${requestedModel})`
-      )
-    }
-
     // 使用调度器选择账户
     ;({ accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
       apiKeyData,
       sessionId,
-      schedulerModel
+      requestedModel
     ))
     req._relayAccountContext = { accountId, accountType }
 

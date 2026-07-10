@@ -205,7 +205,7 @@ describe('openai responses payload toggles', () => {
     expect(unifiedOpenAIScheduler.selectAccountForApiKey).toHaveBeenCalledWith(
       req.apiKey,
       createHash('session-a'),
-      'gpt-5'
+      'gpt-5-2025-08-07'
     )
   })
 
@@ -344,7 +344,7 @@ describe('openai responses payload toggles', () => {
     expect(unifiedOpenAIScheduler.selectAccountForApiKey).toHaveBeenCalledWith(
       req.apiKey,
       createHash('compat-key'),
-      'gpt-5'
+      'gpt-5-2025-08-07'
     )
     expect(req.body.model).toBe('gpt-5')
     expect(req.body.service_tier).toBe('priority')
@@ -401,7 +401,7 @@ describe('openai responses payload toggles', () => {
     expect(unifiedOpenAIScheduler.selectAccountForApiKey).toHaveBeenCalledWith(
       req.apiKey,
       createHash('rule-model-key'),
-      'gpt-5'
+      'gpt-5-2025-08-07'
     )
     expect(req.body.model).toBe('gpt-5')
     expect(req.body.text).toEqual({ format: {} })
