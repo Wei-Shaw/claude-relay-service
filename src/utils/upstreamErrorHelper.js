@@ -16,6 +16,12 @@ const DEFAULT_TTL = {
   rate_limit: 300 // 429: 5分钟（优先使用响应头解析值）
 }
 
+// 上游 retry-after 派生 TTL 的上限（秒）。
+// temp-unavailable 只用于「短暂抖动」的冷却；而周级限额的 retry-after 可达数天，
+// 直接采纳会把账号整整下线数天，且账号哈希看起来完全正常（该键是独立的 TTL 键），
+// 极难排查。真正的长时限额应由 markAccountRateLimited / 各模型家族限流桶承担。
+const DEFAULT_MAX_CUSTOM_TTL = 1800 // 30 分钟
+
 // 延迟加载配置，避免循环依赖
 let _configCache = null
 const getConfig = () => {
@@ -45,7 +51,11 @@ const getTtlConfig = () => {
     overload: config.upstreamError?.overloadTtlSeconds ?? DEFAULT_TTL.overload,
     auth_error: config.upstreamError?.authErrorTtlSeconds ?? DEFAULT_TTL.auth_error,
     timeout: config.upstreamError?.timeoutTtlSeconds ?? DEFAULT_TTL.timeout,
-    rate_limit: DEFAULT_TTL.rate_limit
+    rate_limit: DEFAULT_TTL.rate_limit,
+    max_custom:
+      config.upstreamError?.maxCustomTtlSeconds ??
+      parseEnvPositiveInt('UPSTREAM_ERROR_MAX_CUSTOM_TTL_SECONDS') ??
+      DEFAULT_MAX_CUSTOM_TTL
   }
 }
 
@@ -318,10 +328,19 @@ const markTempUnavailable = async (
 
     const ttlConfig = getTtlConfig()
     const parsedCustomTtl = Number(customTtl)
-    let ttlSeconds =
-      Number.isFinite(parsedCustomTtl) && parsedCustomTtl > 0
-        ? Math.ceil(parsedCustomTtl)
-        : ttlConfig[errorType]
+    let ttlSeconds
+    if (Number.isFinite(parsedCustomTtl) && parsedCustomTtl > 0) {
+      // 上游 retry-after 可能是周级限额（数天），必须钳制，否则账号会被长时间下线
+      const requestedTtl = Math.ceil(parsedCustomTtl)
+      ttlSeconds = Math.min(requestedTtl, ttlConfig.max_custom)
+      if (ttlSeconds < requestedTtl) {
+        logger.warn(
+          `⚠️ [UpstreamError] Upstream retry-after ${requestedTtl}s for account ${accountId} (${accountType}) exceeds temp-unavailable cap, clamping to ${ttlSeconds}s`
+        )
+      }
+    } else {
+      ttlSeconds = ttlConfig[errorType]
+    }
     if (
       Number.isFinite(policyDecision.ttlOverrideSeconds) &&
       policyDecision.ttlOverrideSeconds > 0

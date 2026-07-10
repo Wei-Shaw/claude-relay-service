@@ -492,7 +492,7 @@ gemini  # 或其他 Gemini CLI 命令
 
 ```toml
 model_provider = "crs"
-model = "gpt-5.1-codex-max"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 disable_response_storage = true
 preferred_auth_method = "apikey"
@@ -530,8 +530,8 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
       "max_tokens": 64000
     },
     {
-      "model_display_name": "GPT5-Codex [crs]",
-      "model": "gpt-5-codex",
+      "model_display_name": "GPT5.5 [crs]",
+      "model": "gpt-5.5",
       "base_url": "http://127.0.0.1:3000/droid/openai",
       "api_key": "后台创建的API密钥",
       "provider": "openai",
