@@ -11,6 +11,26 @@ class UnifiedOpenAIScheduler {
     this.SESSION_MAPPING_PREFIX = 'unified_openai_session_mapping:'
   }
 
+  _isModelSupportedByAccount(account, accountType, requestedModel) {
+    const isCodexModel = requestedModel?.toLowerCase().includes('codex')
+    const modelToCheck =
+      accountType === 'openai' && requestedModel?.startsWith('gpt-5-') && !isCodexModel
+        ? 'gpt-5'
+        : requestedModel
+
+    if (!modelToCheck || !account.supportedModels) {
+      return true
+    }
+
+    if (accountType === 'openai-responses') {
+      return openaiResponsesAccountService.isModelSupported(account.supportedModels, modelToCheck)
+    }
+
+    return !Array.isArray(account.supportedModels) || account.supportedModels.length === 0
+      ? true
+      : account.supportedModels.includes(modelToCheck)
+  }
+
   // 🔧 辅助方法：检查账户是否被限流（兼容字符串和对象格式）
   _isRateLimited(rateLimitStatus) {
     if (!rateLimitStatus) {
@@ -223,22 +243,12 @@ class UnifiedOpenAIScheduler {
               }
             }
 
-            // 专属账户：可选的模型检查（只有明确配置了supportedModels且不为空才检查）
-            // OpenAI-Responses 账户默认支持所有模型
-            if (
-              accountType === 'openai' &&
-              requestedModel &&
-              boundAccount.supportedModels &&
-              boundAccount.supportedModels.length > 0
-            ) {
-              const modelSupported = boundAccount.supportedModels.includes(requestedModel)
-              if (!modelSupported) {
-                const errorMsg = `Dedicated account ${boundAccount.name} does not support model ${requestedModel}`
-                logger.warn(`⚠️ ${errorMsg}`)
-                const error = new Error(errorMsg)
-                error.statusCode = 400 // Bad Request - 请求参数错误
-                throw error
-              }
+            if (!this._isModelSupportedByAccount(boundAccount, accountType, requestedModel)) {
+              const errorMsg = `Dedicated account ${boundAccount.name} does not support model ${requestedModel}`
+              logger.warn(`⚠️ ${errorMsg}`)
+              const error = new Error(errorMsg)
+              error.statusCode = 400 // Bad Request - 请求参数错误
+              throw error
             }
 
             logger.info(
@@ -279,7 +289,8 @@ class UnifiedOpenAIScheduler {
           // 验证映射的账户是否仍然可用
           const isAvailable = await this._isAccountAvailable(
             mappedAccount.accountId,
-            mappedAccount.accountType
+            mappedAccount.accountType,
+            requestedModel
           )
           if (isAvailable) {
             // 🚀 智能会话续期（续期 unified 映射键，按配置）
@@ -411,16 +422,11 @@ class UnifiedOpenAIScheduler {
           }
         }
 
-        // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
-        // 如果没有设置supportedModels或为空数组，则支持所有模型
-        if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
-          const modelSupported = account.supportedModels.includes(requestedModel)
-          if (!modelSupported) {
-            logger.debug(
-              `⏭️ Skipping OpenAI account ${account.name} - doesn't support model ${requestedModel}`
-            )
-            continue
-          }
+        if (!this._isModelSupportedByAccount(account, 'openai', requestedModel)) {
+          logger.debug(
+            `⏭️ Skipping OpenAI account ${account.name} - doesn't support model ${requestedModel}`
+          )
+          continue
         }
 
         availableAccounts.push({
@@ -502,8 +508,12 @@ class UnifiedOpenAIScheduler {
           continue
         }
 
-        // OpenAI-Responses 账户默认支持所有模型
-        // 因为它们是第三方兼容 API，模型支持由第三方决定
+        if (!this._isModelSupportedByAccount(account, 'openai-responses', requestedModel)) {
+          logger.debug(
+            `⏭️ Skipping OpenAI-Responses account ${account.name} - doesn't support model ${requestedModel}`
+          )
+          continue
+        }
 
         availableAccounts.push({
           ...account,
@@ -519,7 +529,7 @@ class UnifiedOpenAIScheduler {
   }
 
   // 🔍 检查账户是否可用
-  async _isAccountAvailable(accountId, accountType) {
+  async _isAccountAvailable(accountId, accountType, requestedModel = null) {
     try {
       if (accountType === 'openai') {
         const account = await openaiAccountService.getAccount(accountId)
@@ -552,6 +562,10 @@ class UnifiedOpenAIScheduler {
         )
         if (isTempUnavailable) {
           logger.info(`⏱️ OpenAI account ${accountId} (${accountType}) is temporarily unavailable`)
+          return false
+        }
+
+        if (!this._isModelSupportedByAccount(account, accountType, requestedModel)) {
           return false
         }
 
@@ -589,6 +603,10 @@ class UnifiedOpenAIScheduler {
         )
         if (isTempUnavailable) {
           logger.info(`⏱️ OpenAI account ${accountId} (${accountType}) is temporarily unavailable`)
+          return false
+        }
+
+        if (!this._isModelSupportedByAccount(account, accountType, requestedModel)) {
           return false
         }
 
@@ -842,7 +860,8 @@ class UnifiedOpenAIScheduler {
           if (isInGroup) {
             const isAvailable = await this._isAccountAvailable(
               mappedAccount.accountId,
-              mappedAccount.accountType
+              mappedAccount.accountType,
+              requestedModel
             )
             if (isAvailable) {
               // 🚀 智能会话续期（续期 unified 映射键，按配置）
@@ -925,16 +944,11 @@ class UnifiedOpenAIScheduler {
             }
           }
 
-          // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
-          // 如果没有设置supportedModels或为空数组，则支持所有模型
-          if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
-            const modelSupported = account.supportedModels.includes(requestedModel)
-            if (!modelSupported) {
-              logger.debug(
-                `⏭️ Skipping group member ${accountType} account ${account.name} - doesn't support model ${requestedModel}`
-              )
-              continue
-            }
+          if (!this._isModelSupportedByAccount(account, accountType, requestedModel)) {
+            logger.debug(
+              `⏭️ Skipping group member ${accountType} account ${account.name} - doesn't support model ${requestedModel}`
+            )
+            continue
           }
 
           // 添加到可用账户列表
