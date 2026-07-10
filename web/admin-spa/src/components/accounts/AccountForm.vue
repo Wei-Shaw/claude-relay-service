@@ -1419,7 +1419,7 @@
                       创建前测试
                     </p>
                     <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                      使用默认模型 {{ draftAccountTestModel }} 发起一次真实请求，不会保存账户。
+                      选择模型后发起一次真实请求，不会保存账户。
                     </p>
                   </div>
                   <button
@@ -1432,6 +1432,25 @@
                     <i v-else class="fas fa-vial" />
                     {{ draftAccountTestLoading ? '测试中...' : '测试连接' }}
                   </button>
+                </div>
+                <div
+                  class="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200/70 bg-white/70 p-3 dark:border-amber-700/70 dark:bg-gray-800/50 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span class="text-xs font-semibold text-amber-800 dark:text-amber-200"
+                    >测试模型</span
+                  >
+                  <div class="min-w-0 flex-1 sm:max-w-[360px]">
+                    <ModelSelector
+                      v-model="draftAccountTestSelectedModel"
+                      :disabled="draftAccountTestLoading"
+                      :models="draftAccountTestModelOptions"
+                    />
+                    <div
+                      class="mt-1 truncate text-right text-xs text-amber-600 dark:text-amber-300"
+                    >
+                      {{ draftAccountTestModel }}
+                    </div>
+                  </div>
                 </div>
                 <p
                   v-if="draftAccountTestResult"
@@ -1843,7 +1862,7 @@
                       创建前测试
                     </p>
                     <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                      使用默认模型 {{ draftAccountTestModel }} 发起一次真实请求，不会保存账户。
+                      选择模型后发起一次真实请求，不会保存账户。
                     </p>
                   </div>
                   <button
@@ -1856,6 +1875,25 @@
                     <i v-else class="fas fa-vial" />
                     {{ draftAccountTestLoading ? '测试中...' : '测试连接' }}
                   </button>
+                </div>
+                <div
+                  class="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200/70 bg-white/70 p-3 dark:border-amber-700/70 dark:bg-gray-800/50 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span class="text-xs font-semibold text-amber-800 dark:text-amber-200"
+                    >测试模型</span
+                  >
+                  <div class="min-w-0 flex-1 sm:max-w-[360px]">
+                    <ModelSelector
+                      v-model="draftAccountTestSelectedModel"
+                      :disabled="draftAccountTestLoading"
+                      :models="draftAccountTestModelOptions"
+                    />
+                    <div
+                      class="mt-1 truncate text-right text-xs text-amber-600 dark:text-amber-300"
+                    >
+                      {{ draftAccountTestModel }}
+                    </div>
+                  </div>
                 </div>
                 <p
                   v-if="draftAccountTestResult"
@@ -4474,6 +4512,7 @@ import ProxyConfig from './ProxyConfig.vue'
 import OAuthFlow from './OAuthFlow.vue'
 import TempUnavailablePolicyFields from './TempUnavailablePolicyFields.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import ModelSelector from '@/components/common/ModelSelector.vue'
 import GroupManagementModal from './GroupManagementModal.vue'
 import ApiKeyManagementModal from './ApiKeyManagementModal.vue'
 import { useConfirmModal } from '@/utils/useConfirmModal'
@@ -4550,6 +4589,7 @@ const channelConnImportPlaceholder =
   '{"_type":"newapi_channel_conn","key":"sk-xxxx","url":"https://api.example.com"}'
 const draftAccountTestLoading = ref(false)
 const draftAccountTestResult = ref(null)
+const draftAccountTestSelectedModel = ref('')
 
 // 解析后的 sessionKey 数量
 const parsedSessionKeyCount = computed(() => {
@@ -4903,13 +4943,15 @@ const allowedModels = ref([
 
 // 常用模型列表（从 API 获取）
 const commonModels = ref([])
+const testModelsFromApi = ref({ platforms: {} })
 
 // 加载模型列表
 const loadCommonModels = async () => {
   try {
     const result = await httpApis.getModelsApi()
-    if (result.success && result.data?.all) {
-      commonModels.value = result.data.all
+    if (result.success && result.data) {
+      commonModels.value = result.data.all || []
+      testModelsFromApi.value = result.data
     }
   } catch (error) {
     console.error('Failed to load models:', error)
@@ -5147,8 +5189,35 @@ const channelConnTargetLabel = computed(() =>
   form.value.platform === 'openai-responses' ? 'OpenAI-Responses' : 'Claude Console'
 )
 
-const draftAccountTestModel = computed(() =>
-  form.value.platform === 'openai-responses' ? 'gpt-5' : 'claude-sonnet-4-5-20250929'
+const draftAccountPlatformFallbackModels = {
+  'claude-console': 'claude-sonnet-4-5-20250929',
+  'openai-responses': 'gpt-5'
+}
+
+const draftAccountTestAvailableModels = computed(
+  () => testModelsFromApi.value.platforms?.[form.value.platform] || []
+)
+
+const draftAccountDefaultTestModel = computed(() => {
+  const models = draftAccountTestAvailableModels.value
+  if (models.length > 0) {
+    return models[0].value
+  }
+  return draftAccountPlatformFallbackModels[form.value.platform] || 'claude-sonnet-4-5-20250929'
+})
+
+const draftAccountTestModelOptions = computed(() => {
+  const models = draftAccountTestAvailableModels.value
+  if (models.length > 0) {
+    return models
+  }
+
+  const fallbackModel = draftAccountDefaultTestModel.value
+  return fallbackModel ? [{ value: fallbackModel, label: fallbackModel }] : []
+})
+
+const draftAccountTestModel = computed(
+  () => draftAccountTestSelectedModel.value || draftAccountDefaultTestModel.value
 )
 
 // 表单验证错误
@@ -6891,6 +6960,39 @@ watch(
     if (errors.value.refreshToken && form.value.refreshToken?.trim()) {
       errors.value.refreshToken = ''
     }
+  }
+)
+
+watch(
+  () => form.value.addType,
+  (newAddType) => {
+    if (newAddType === 'batch-import') {
+      errors.value.name = ''
+      if (form.value.platform === 'openai') {
+        form.value.name = ''
+      }
+    }
+  }
+)
+
+watch(
+  () => [form.value.platform, draftAccountDefaultTestModel.value],
+  ([newPlatform, newDefaultModel], [oldPlatform, oldDefaultModel] = []) => {
+    if (
+      newPlatform !== oldPlatform ||
+      !draftAccountTestSelectedModel.value ||
+      draftAccountTestSelectedModel.value === oldDefaultModel
+    ) {
+      draftAccountTestSelectedModel.value = newDefaultModel
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => draftAccountTestSelectedModel.value,
+  () => {
+    clearDraftAccountTestResult()
   }
 )
 
