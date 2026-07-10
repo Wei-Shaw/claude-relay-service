@@ -333,7 +333,6 @@ function createOpenAITestPayload(model = 'gpt-5', options = {}) {
     prompt = 'hi',
     maxTokens = 100,
     stream = true,
-    sessionId = generateCodexTestSessionId(),
     instructions = CODEX_CLI_INSTRUCTIONS
   } = options
 
@@ -347,7 +346,6 @@ function createOpenAITestPayload(model = 'gpt-5', options = {}) {
     ],
     max_output_tokens: maxTokens,
     stream,
-    session_id: sessionId,
     instructions
   }
 }
