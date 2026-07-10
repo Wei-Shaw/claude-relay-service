@@ -84,7 +84,7 @@
                   class="form-input w-24 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                   min="0"
                   placeholder="1.0"
-                  step="0.1"
+                  step="0.01"
                   type="number"
                 />
                 <span class="text-xs text-gray-400">默认 1.0</span>
