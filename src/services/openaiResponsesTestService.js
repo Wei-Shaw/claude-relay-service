@@ -27,12 +27,13 @@ function buildInternalTestUrl(baseUrl = getDefaultBaseUrl()) {
 }
 
 function buildTestRequestParts(model = 'gpt-5', options = {}) {
+  const { sessionId: requestedSessionId, ...payloadOptions } = options
   const payload = createOpenAITestPayload(model, {
     stream: true,
-    ...options
+    ...payloadOptions
   })
   const { sessionId, headers } = createCodexTestHeaders({
-    sessionId: payload.session_id,
+    sessionId: requestedSessionId,
     stream: payload.stream !== false
   })
 

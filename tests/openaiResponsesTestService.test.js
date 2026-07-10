@@ -56,6 +56,21 @@ beforeEach(() => {
   jest.clearAllMocks()
 })
 
+describe('openaiResponsesTestService.buildTestRequestParts', () => {
+  it('只在请求头中携带 session_id', () => {
+    const { sessionId, payload, headers } = openaiResponsesTestService.buildTestRequestParts(
+      'gpt-5.4',
+      {
+        sessionId: 'codex_test_fixed'
+      }
+    )
+
+    expect(payload).not.toHaveProperty('session_id')
+    expect(headers.session_id).toBe(sessionId)
+    expect(sessionId).toBe('codex_test_fixed')
+  })
+})
+
 describe('openaiResponsesTestService.parseOpenAITestResponse', () => {
   it('成功 JSON 响应不把完整响应体当作 errorMessage', async () => {
     const parsed = await openaiResponsesTestService.parseOpenAITestResponse({
