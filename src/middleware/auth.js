@@ -1892,11 +1892,21 @@ const requestLogger = (req, res, next) => {
     }
 
     const duration = Date.now() - start
+    if (req._relayResponseTerminalForwarded === true) {
+      scheduleLifecycleCapture({
+        completed: true,
+        clientAborted: false,
+        durationMs: duration,
+        statusCode: res.statusCode
+      })
+      return
+    }
+
     scheduleLifecycleCapture({
       completed: false,
       clientAborted: true,
       durationMs: duration,
-      statusCode: res.statusCode || 499,
+      statusCode: 499,
       errorType: 'client_aborted',
       errorMessage: 'Client connection closed before response completed',
       failureStage: 'client_abort'
