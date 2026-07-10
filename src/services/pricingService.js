@@ -372,6 +372,15 @@ class PricingService {
       }
     }
 
+    // 特殊处理：gpt-5.6 系列（sol/terra/luna）在 LiteLLM 收录前回退到 gpt-5
+    if (modelName.startsWith('gpt-5.6') && !this.pricingData[modelName]) {
+      const fallbackPricing = this.pricingData['gpt-5']
+      if (fallbackPricing) {
+        logger.info(`💰 Using gpt-5 pricing as fallback for ${modelName}`)
+        return fallbackPricing
+      }
+    }
+
     // 对于Bedrock区域前缀模型（如 us.anthropic.claude-sonnet-4-20250514-v1:0），
     // 尝试去掉区域前缀进行匹配
     if (modelName.includes('.anthropic.') || modelName.includes('.claude')) {

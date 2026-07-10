@@ -369,6 +369,14 @@ class CostCalculator {
         return gpt5Pricing
       }
     }
+    // 特殊处理：gpt-5.6 系列（sol/terra/luna）在收录专门定价前回退到 gpt-5
+    if (model.startsWith('gpt-5.6') && !MODEL_PRICING[model]) {
+      const gpt5Pricing = MODEL_PRICING['gpt-5']
+      if (gpt5Pricing) {
+        console.log(`Using gpt-5 pricing as fallback for ${model}`)
+        return gpt5Pricing
+      }
+    }
     return MODEL_PRICING[model] || MODEL_PRICING['unknown']
   }
 
