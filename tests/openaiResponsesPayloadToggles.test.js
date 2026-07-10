@@ -283,7 +283,7 @@ describe('openai responses payload toggles', () => {
         enableOpenAIResponsesCodexAdaptation: true,
         enableOpenAIResponsesPayloadRules: true,
         openaiResponsesPayloadRules: [
-          { path: 'model', valueType: 'string', value: 'gpt-5-codex' },
+          { path: 'model', valueType: 'string', value: 'gpt-5.5' },
           { path: 'instructions', valueType: 'string', value: 'custom instructions' },
           { path: 'prompt_cache_key', valueType: 'string', value: 'rule-key' }
         ]
@@ -292,13 +292,13 @@ describe('openai responses payload toggles', () => {
 
     await openaiRoutes.handleResponses(req, createRes())
 
-    expect(req.body.model).toBe('gpt-5-codex')
+    expect(req.body.model).toBe('gpt-5.5')
     expect(req.body.instructions).toBe('custom instructions')
     expect(req.body.temperature).toBeUndefined()
     expect(unifiedOpenAIScheduler.selectAccountForApiKey).toHaveBeenCalledWith(
       req.apiKey,
       createHash('rule-key'),
-      'gpt-5-codex'
+      'gpt-5.5'
     )
   })
 

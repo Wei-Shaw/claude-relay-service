@@ -363,8 +363,17 @@ class PricingService {
       return this.pricingData[modelName]
     }
 
-    // 特殊处理：gpt-5-codex 回退到 gpt-5
-    if (modelName === 'gpt-5-codex' && !this.pricingData['gpt-5-codex']) {
+    // 特殊处理：gpt-5.5 回退到 gpt-5
+    if (modelName === 'gpt-5.5' && !this.pricingData['gpt-5.5']) {
+      const fallbackPricing = this.pricingData['gpt-5']
+      if (fallbackPricing) {
+        logger.info(`💰 Using gpt-5 pricing as fallback for ${modelName}`)
+        return fallbackPricing
+      }
+    }
+
+    // 特殊处理：gpt-5.6 系列（sol/terra/luna）在 LiteLLM 收录前回退到 gpt-5
+    if (modelName.startsWith('gpt-5.6') && !this.pricingData[modelName]) {
       const fallbackPricing = this.pricingData['gpt-5']
       if (fallbackPricing) {
         logger.info(`💰 Using gpt-5 pricing as fallback for ${modelName}`)

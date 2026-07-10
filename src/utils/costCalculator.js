@@ -361,8 +361,16 @@ class CostCalculator {
    * @returns {Object} 定价信息
    */
   static getModelPricing(model = 'unknown') {
-    // 特殊处理：gpt-5-codex 回退到 gpt-5（如果没有专门定价）
-    if (model === 'gpt-5-codex' && !MODEL_PRICING['gpt-5-codex']) {
+    // 特殊处理：gpt-5.5 回退到 gpt-5（如果没有专门定价）
+    if (model === 'gpt-5.5' && !MODEL_PRICING['gpt-5.5']) {
+      const gpt5Pricing = MODEL_PRICING['gpt-5']
+      if (gpt5Pricing) {
+        console.log(`Using gpt-5 pricing as fallback for ${model}`)
+        return gpt5Pricing
+      }
+    }
+    // 特殊处理：gpt-5.6 系列（sol/terra/luna）在收录专门定价前回退到 gpt-5
+    if (model.startsWith('gpt-5.6') && !MODEL_PRICING[model]) {
       const gpt5Pricing = MODEL_PRICING['gpt-5']
       if (gpt5Pricing) {
         console.log(`Using gpt-5 pricing as fallback for ${model}`)
@@ -412,7 +420,7 @@ class CostCalculator {
    * @returns {Object} 节省信息
    */
   static calculateCacheSavings(usage, model = 'unknown') {
-    const pricing = this.getModelPricing(model) // 已包含 gpt-5-codex 回退逻辑
+    const pricing = this.getModelPricing(model) // 已包含 gpt-5.5 回退逻辑
     const cacheReadTokens = usage.cache_read_input_tokens || 0
 
     // 如果这些token不使用缓存，需要按正常input价格计费

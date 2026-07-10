@@ -44,6 +44,10 @@ const config = {
   claude: {
     apiUrl: process.env.CLAUDE_API_URL || 'https://api.anthropic.com/v1/messages',
     apiVersion: process.env.CLAUDE_API_VERSION || '2023-06-01',
+    // 专属账号不可用时是否回退到共享池。
+    // 默认 false：API Key 绑定了专属账号就必须使用该账号，不可用时直接报错，
+    // 否则「限定账号」的语义会被破坏（请求会静默用到别的账号）。
+    dedicatedAccountFallback: process.env.CLAUDE_DEDICATED_ACCOUNT_FALLBACK === 'true',
     betaHeader:
       process.env.CLAUDE_BETA_HEADER ||
       'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14',
@@ -238,7 +242,10 @@ const config = {
     serverErrorTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_5XX_TTL_SECONDS) || 300, // 5xx错误暂停秒数
     overloadTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_OVERLOAD_TTL_SECONDS) || 600, // 529过载暂停秒数
     authErrorTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_AUTH_TTL_SECONDS) || 1800, // 401/403认证错误暂停秒数
-    timeoutTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_TIMEOUT_TTL_SECONDS) || 300 // 504超时暂停秒数
+    timeoutTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_TIMEOUT_TTL_SECONDS) || 300, // 504超时暂停秒数
+    // 上游 retry-after 派生的暂停时长上限（秒）。周级限额的 retry-after 可达数天，
+    // 若不钳制会把账号整整下线数天。长时限额应由账号级/模型级限流桶承担。
+    maxCustomTtlSeconds: parseInt(process.env.UPSTREAM_ERROR_MAX_CUSTOM_TTL_SECONDS) || 1800
   }
 }
 
