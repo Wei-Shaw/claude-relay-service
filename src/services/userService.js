@@ -311,15 +311,6 @@ class UserService {
     }
   }
 
-  // 📊 更新用户API Key数量 (已废弃，现在通过聚合计算)
-  async updateUserApiKeyCount(userId, _count) {
-    // This method is deprecated since apiKeyCount is now calculated dynamically
-    // in getUserById by aggregating the user's API keys
-    logger.debug(
-      `📊 updateUserApiKeyCount called for ${userId} but is now deprecated (count auto-calculated)`
-    )
-  }
-
   // 📝 记录用户登录
   async recordUserLogin(userId) {
     try {
