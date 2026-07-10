@@ -97,8 +97,8 @@ class CodexCliValidator {
           return false
         }
 
-        // 额外检查 model 字段应该是 gpt-5-codex
-        if (req.body.model && req.body.model !== 'gpt-5-codex') {
+        // 额外检查 model 字段应该是 gpt-5.5
+        if (req.body.model && req.body.model !== 'gpt-5.5') {
           logger.debug(`Codex CLI validation warning - unexpected model: ${req.body.model}`)
           // 只记录警告，不拒绝请求
         }

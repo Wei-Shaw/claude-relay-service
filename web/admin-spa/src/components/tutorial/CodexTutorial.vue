@@ -123,7 +123,7 @@ const authPath = computed(() =>
 
 const configTomlLines = computed(() => [
   'model_provider = "crs"',
-  'model = "gpt-5-codex"',
+  'model = "gpt-5.5"',
   'model_reasoning_effort = "high"',
   'disable_response_storage = true',
   'preferred_auth_method = "apikey"',
