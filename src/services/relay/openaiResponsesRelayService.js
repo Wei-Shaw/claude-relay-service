@@ -731,13 +731,15 @@ class OpenAIResponsesRelayService {
         return
       }
 
-      parseSSEForUsage(event)
+      const responseCompletedSeen = parseSSEForUsage(event)
 
       const rewritten = this._rewriteStreamEventForClient(event, response.headers)
       if (!streamEnded && !clientDisconnected && rewritten) {
         const written = safeWriteToResponse(res, rewritten, logger, 'OpenAI-Responses stream')
         if (!written) {
           markClientDisconnected('write_failed')
+        } else if (responseCompletedSeen && !res.destroyed && !res.socket?.destroyed) {
+          req._relayResponseTerminalForwarded = true
         }
       }
     }
@@ -745,6 +747,7 @@ class OpenAIResponsesRelayService {
     // 解析 SSE 事件以捕获 usage 数据和 model
     const parseSSEForUsage = (data) => {
       const lines = data.split('\n')
+      let responseCompletedSeen = false
 
       for (const line of lines) {
         if (line.startsWith('data:')) {
@@ -758,6 +761,8 @@ class OpenAIResponsesRelayService {
 
             // 检查是否是 response.completed 事件（OpenAI-Responses 格式）
             if (eventData.type === 'response.completed' && eventData.response) {
+              responseCompletedSeen = true
+
               // 从响应中获取真实的 model
               if (eventData.response.model) {
                 actualModel = eventData.response.model
@@ -797,6 +802,8 @@ class OpenAIResponsesRelayService {
           }
         }
       }
+
+      return responseCompletedSeen
     }
 
     // 监听数据流
