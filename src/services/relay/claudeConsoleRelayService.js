@@ -1538,12 +1538,165 @@ class ClaudeConsoleRelayService {
     }
   }
 
+  _buildTestRequestOptions(account, model, responseStream = null) {
+    const { createClaudeTestPayload } = require('../../utils/testPayloadHelper')
+
+    const cleanUrl = account.apiUrl.replace(/\/$/, '')
+    const apiUrl = cleanUrl.endsWith('/v1/messages')
+      ? cleanUrl
+      : `${cleanUrl}/v1/messages?beta=true`
+    const payload = createClaudeTestPayload(model, { stream: true, maxTokens: 64 })
+    const extraHeaders = account.userAgent ? { 'User-Agent': account.userAgent } : {}
+    const requestOptions = {
+      apiUrl,
+      responseStream,
+      payload,
+      proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
+      extraHeaders,
+      sanitizeErrors: false // Admin测试显示完整错误信息
+    }
+
+    if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
+      requestOptions.extraHeaders['x-api-key'] = account.apiKey
+    } else {
+      requestOptions.authorization = `Bearer ${account.apiKey}`
+    }
+
+    return requestOptions
+  }
+
+  _readStreamToString(stream) {
+    return new Promise((resolve, reject) => {
+      const chunks = []
+      stream.on('data', (chunk) => chunks.push(chunk))
+      stream.on('end', () => resolve(Buffer.concat(chunks).toString()))
+      stream.on('error', reject)
+    })
+  }
+
+  _parseClaudeConsoleTestStream(stream) {
+    return new Promise((resolve, reject) => {
+      let buffer = ''
+      let responseText = ''
+      let settled = false
+
+      const finish = () => {
+        if (settled) {
+          return
+        }
+        settled = true
+        resolve(responseText)
+      }
+
+      const fail = (message) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        reject(new Error(message || '测试失败'))
+      }
+
+      stream.on('data', (chunk) => {
+        buffer += chunk.toString()
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data:')) {
+            continue
+          }
+
+          const jsonText = line.substring(5).trim()
+          if (!jsonText || jsonText === '[DONE]') {
+            continue
+          }
+
+          try {
+            const data = JSON.parse(jsonText)
+            if (data.type === 'content_block_delta' && data.delta?.text) {
+              responseText += data.delta.text
+            } else if (data.type === 'message_stop') {
+              finish()
+              return
+            } else if (data.type === 'error') {
+              fail(data.error?.message || data.message || '上游返回错误')
+              return
+            }
+          } catch {
+            // 忽略非JSON事件片段
+          }
+        }
+      })
+
+      stream.on('end', finish)
+      stream.on('error', (error) => fail(error.message))
+    })
+  }
+
+  async testAccountConfig(accountInput, model = 'claude-sonnet-4-5-20250929') {
+    const { extractErrorMessage } = require('../../utils/testPayloadHelper')
+    const startTime = Date.now()
+
+    try {
+      const requestOptions = this._buildTestRequestOptions(accountInput, model)
+      const requestConfig = {
+        method: 'POST',
+        url: requestOptions.apiUrl,
+        data: requestOptions.payload,
+        headers: {
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+          'User-Agent': this.defaultUserAgent,
+          ...(requestOptions.authorization ? { authorization: requestOptions.authorization } : {}),
+          ...requestOptions.extraHeaders
+        },
+        timeout: 30000,
+        responseType: 'stream',
+        validateStatus: () => true
+      }
+
+      if (requestOptions.proxyAgent) {
+        requestConfig.httpAgent = requestOptions.proxyAgent
+        requestConfig.httpsAgent = requestOptions.proxyAgent
+        requestConfig.proxy = false
+      }
+
+      const response = await axios(requestConfig)
+      const latency = Date.now() - startTime
+
+      if (response.status !== 200) {
+        const errorData = await this._readStreamToString(response.data)
+        let errorMessage = `API Error: ${response.status}`
+        try {
+          errorMessage = extractErrorMessage(JSON.parse(errorData), errorMessage)
+        } catch {
+          if (errorData.length < 200) {
+            errorMessage = errorData || errorMessage
+          }
+        }
+        const upstreamError = new Error(errorMessage)
+        upstreamError.status = response.status
+        upstreamError.latency = latency
+        throw upstreamError
+      }
+
+      const responseText = await this._parseClaudeConsoleTestStream(response.data)
+      return {
+        model,
+        latency,
+        responseText: responseText.substring(0, 200)
+      }
+    } catch (error) {
+      if (error.latency === undefined) {
+        error.latency = Date.now() - startTime
+      }
+      throw error
+    }
+  }
+
   // 🧪 测试账号连接（供Admin API使用）
   async testAccountConnection(accountId, responseStream, model) {
-    const {
-      createClaudeTestPayload,
-      sendStreamTestRequest
-    } = require('../../utils/testPayloadHelper')
+    const { sendStreamTestRequest } = require('../../utils/testPayloadHelper')
 
     try {
       const account = await claudeConsoleAccountService.getAccount(accountId)
@@ -1553,28 +1706,7 @@ class ClaudeConsoleRelayService {
 
       logger.info(`🧪 Testing Claude Console account connection: ${account.name} (${accountId})`)
 
-      const cleanUrl = account.apiUrl.replace(/\/$/, '')
-      const apiUrl = cleanUrl.endsWith('/v1/messages')
-        ? cleanUrl
-        : `${cleanUrl}/v1/messages?beta=true`
-      const payload = createClaudeTestPayload(model, { stream: true })
-
-      const extraHeaders = account.userAgent ? { 'User-Agent': account.userAgent } : {}
-      const requestOptions = {
-        apiUrl,
-        responseStream,
-        payload,
-        proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
-        extraHeaders,
-        sanitizeErrors: false // Admin测试显示完整错误信息
-      }
-
-      if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
-        requestOptions.extraHeaders['x-api-key'] = account.apiKey
-      } else {
-        requestOptions.authorization = `Bearer ${account.apiKey}`
-      }
-
+      const requestOptions = this._buildTestRequestOptions(account, model, responseStream)
       await sendStreamTestRequest(requestOptions)
     } catch (error) {
       logger.error(`❌ Test account connection failed:`, error)

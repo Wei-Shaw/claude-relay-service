@@ -574,6 +574,54 @@
             </div>
 
             <div
+              v-if="supportsChannelConnQuickImport"
+              class="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-4 shadow-sm dark:border-cyan-800 dark:from-cyan-950/30 dark:via-gray-800/80 dark:to-emerald-950/30"
+            >
+              <div class="mb-3 flex items-start gap-3">
+                <div
+                  class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-500 text-white shadow-sm"
+                >
+                  <i class="fas fa-wand-magic-sparkles text-sm" />
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    快速粘贴导入 {{ channelConnTargetLabel }}
+                  </p>
+                  <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    支持 New API 渠道连接 JSON，自动填入名称、URL 和 API Key。
+                  </p>
+                </div>
+              </div>
+
+              <textarea
+                v-model="channelConnImportText"
+                class="form-input w-full resize-none border-gray-300 font-mono text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                :class="{ 'border-red-500': channelConnImportError }"
+                :placeholder="channelConnImportPlaceholder"
+                rows="3"
+                @paste="handleChannelConnPaste"
+              />
+
+              <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p v-if="channelConnImportError" class="text-xs text-red-600 dark:text-red-400">
+                  <i class="fas fa-circle-exclamation mr-1" />
+                  {{ channelConnImportError }}
+                </p>
+                <p v-else class="text-xs text-gray-500 dark:text-gray-400">
+                  粘贴后会自动解析；也可以点击按钮手动解析。
+                </p>
+                <button
+                  class="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-cyan-700"
+                  type="button"
+                  @click="applyChannelConnImport()"
+                >
+                  <i class="fas fa-bolt" />
+                  解析并填入
+                </button>
+              </div>
+            </div>
+
+            <div
               v-if="
                 !isEdit &&
                 form.platform !== 'claude-console' &&
@@ -1306,6 +1354,50 @@
                 </p>
               </div>
 
+              <div
+                v-if="form.platform === 'claude-console'"
+                class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/20"
+              >
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                      创建前测试
+                    </p>
+                    <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                      使用默认模型 {{ draftAccountTestModel }} 发起一次真实请求，不会保存账户。
+                    </p>
+                  </div>
+                  <button
+                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                    :disabled="draftAccountTestLoading"
+                    type="button"
+                    @click="testDraftAccountConnection"
+                  >
+                    <div v-if="draftAccountTestLoading" class="loading-spinner mr-1" />
+                    <i v-else class="fas fa-vial" />
+                    {{ draftAccountTestLoading ? '测试中...' : '测试连接' }}
+                  </button>
+                </div>
+                <p
+                  v-if="draftAccountTestResult"
+                  class="mt-2 text-xs"
+                  :class="
+                    draftAccountTestResult.success
+                      ? 'text-green-700 dark:text-green-300'
+                      : 'text-red-600 dark:text-red-400'
+                  "
+                >
+                  <i
+                    :class="
+                      draftAccountTestResult.success
+                        ? 'fas fa-check-circle mr-1'
+                        : 'fas fa-circle-exclamation mr-1'
+                    "
+                  />
+                  {{ draftAccountTestResult.message }}
+                </p>
+              </div>
+
               <!-- 额度管理字段 -->
               <div class="grid grid-cols-2 gap-4">
                 <div>
@@ -1645,11 +1737,15 @@
                 <input
                   v-model="form.baseApi"
                   class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                  :class="{ 'border-red-500': errors.baseApi }"
                   placeholder="https://api.example.com/v1"
                   required
                   type="url"
                 />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p v-if="errors.baseApi" class="mt-1 text-xs text-red-500">
+                  {{ errors.baseApi }}
+                </p>
+                <p v-else class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   第三方 OpenAI 兼容 API 的基础地址，不要包含具体路径
                 </p>
               </div>
@@ -1662,6 +1758,7 @@
                   <input
                     v-model="form.apiKey"
                     class="form-input w-full border-gray-300 pr-10 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
+                    :class="{ 'border-red-500': errors.apiKey }"
                     placeholder="sk-xxxxxxxxxxxx"
                     required
                     :type="showApiKey ? 'text' : 'password'"
@@ -1674,8 +1771,54 @@
                     <i :class="showApiKey ? 'fas fa-eye-slash' : 'fas fa-eye'" />
                   </button>
                 </div>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p v-if="errors.apiKey" class="mt-1 text-xs text-red-500">
+                  {{ errors.apiKey }}
+                </p>
+                <p v-else class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   第三方服务提供的 API 密钥
+                </p>
+              </div>
+
+              <div
+                class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/20"
+              >
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                      创建前测试
+                    </p>
+                    <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                      使用默认模型 {{ draftAccountTestModel }} 发起一次真实请求，不会保存账户。
+                    </p>
+                  </div>
+                  <button
+                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                    :disabled="draftAccountTestLoading"
+                    type="button"
+                    @click="testDraftAccountConnection"
+                  >
+                    <div v-if="draftAccountTestLoading" class="loading-spinner mr-1" />
+                    <i v-else class="fas fa-vial" />
+                    {{ draftAccountTestLoading ? '测试中...' : '测试连接' }}
+                  </button>
+                </div>
+                <p
+                  v-if="draftAccountTestResult"
+                  class="mt-2 text-xs"
+                  :class="
+                    draftAccountTestResult.success
+                      ? 'text-green-700 dark:text-green-300'
+                      : 'text-red-600 dark:text-red-400'
+                  "
+                >
+                  <i
+                    :class="
+                      draftAccountTestResult.success
+                        ? 'fas fa-check-circle mr-1'
+                        : 'fas fa-circle-exclamation mr-1'
+                    "
+                  />
+                  {{ draftAccountTestResult.message }}
                 </p>
               </div>
 
@@ -4157,6 +4300,12 @@ const openaiBatchFolderInputRef = ref(null)
 const openaiBatchImporting = ref(false)
 const openaiBatchImportFolderPath = ref('/Users/hobee/Downloads/accounts_json')
 const openaiBatchSelectedFileCount = ref(0)
+const channelConnImportText = ref('')
+const channelConnImportError = ref('')
+const channelConnImportPlaceholder =
+  '{"_type":"newapi_channel_conn","key":"sk-xxxx","url":"https://api.example.com"}'
+const draftAccountTestLoading = ref(false)
+const draftAccountTestResult = ref(null)
 
 // 解析后的 sessionKey 数量
 const parsedSessionKeyCount = computed(() => {
@@ -4706,6 +4855,18 @@ const isOpenAIBatchImportMode = computed(
   () => !isEdit.value && form.value.platform === 'openai' && form.value.addType === 'batch-import'
 )
 
+const supportsChannelConnQuickImport = computed(
+  () => !isEdit.value && ['claude-console', 'openai-responses'].includes(form.value.platform)
+)
+
+const channelConnTargetLabel = computed(() =>
+  form.value.platform === 'openai-responses' ? 'OpenAI-Responses' : 'Claude Console'
+)
+
+const draftAccountTestModel = computed(() =>
+  form.value.platform === 'openai-responses' ? 'gpt-5' : 'claude-sonnet-4-5-20250929'
+)
+
 // 表单验证错误
 const errors = ref({
   name: '',
@@ -4722,6 +4883,191 @@ const errors = ref({
   azureEndpoint: '',
   deploymentName: ''
 })
+
+const clearDraftAccountTestResult = () => {
+  draftAccountTestResult.value = null
+}
+
+const parseChannelConnImport = (rawText) => {
+  const text = (rawText || '').trim()
+  if (!text) {
+    throw new Error('请先粘贴渠道连接 JSON')
+  }
+
+  let payload
+  try {
+    payload = JSON.parse(text)
+  } catch (error) {
+    throw new Error('JSON 格式不正确，请检查后重试')
+  }
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('请粘贴单个渠道连接对象')
+  }
+
+  if (payload._type !== 'newapi_channel_conn') {
+    throw new Error('不是支持的 New API 渠道连接格式')
+  }
+
+  const apiKey = typeof payload.key === 'string' ? payload.key.trim() : ''
+  const apiUrl = typeof payload.url === 'string' ? payload.url.trim() : ''
+
+  if (!apiKey) {
+    throw new Error('JSON 中缺少 key')
+  }
+
+  if (!apiUrl) {
+    throw new Error('JSON 中缺少 url')
+  }
+
+  let parsedUrl
+  try {
+    parsedUrl = new URL(apiUrl)
+  } catch (error) {
+    throw new Error('url 不是有效地址')
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new Error('url 必须以 http:// 或 https:// 开头')
+  }
+
+  return {
+    apiKey,
+    apiUrl,
+    name: parsedUrl.hostname
+  }
+}
+
+const applyChannelConnImport = ({ silent = false } = {}) => {
+  if (!supportsChannelConnQuickImport.value) {
+    return false
+  }
+
+  try {
+    const parsed = parseChannelConnImport(channelConnImportText.value)
+
+    form.value.name = parsed.name
+    form.value.apiKey = parsed.apiKey
+    if (form.value.platform === 'openai-responses') {
+      form.value.baseApi = parsed.apiUrl
+    } else {
+      form.value.apiUrl = parsed.apiUrl
+    }
+
+    errors.value.name = ''
+    errors.value.apiKey = ''
+    errors.value.apiUrl = ''
+    errors.value.baseApi = ''
+    channelConnImportError.value = ''
+
+    if (!silent) {
+      showToast(`已填入 ${channelConnTargetLabel.value} 渠道信息`, 'success')
+    }
+    return true
+  } catch (error) {
+    channelConnImportError.value = error.message || '解析失败'
+    return false
+  }
+}
+
+const handleChannelConnPaste = () => {
+  setTimeout(() => {
+    if (channelConnImportText.value.trim()) {
+      applyChannelConnImport({ silent: true })
+    }
+  }, 0)
+}
+
+const validateDraftAccountTestFields = () => {
+  errors.value.apiKey = ''
+  errors.value.apiUrl = ''
+  errors.value.baseApi = ''
+
+  if (!form.value.apiKey || form.value.apiKey.trim() === '') {
+    errors.value.apiKey = '请填写 API Key'
+    return false
+  }
+
+  if (form.value.platform === 'claude-console') {
+    if (!form.value.apiUrl || form.value.apiUrl.trim() === '') {
+      errors.value.apiUrl = '请填写 API URL'
+      return false
+    }
+  } else if (form.value.platform === 'openai-responses') {
+    if (!form.value.baseApi || form.value.baseApi.trim() === '') {
+      errors.value.baseApi = '请填写 API 基础地址'
+      return false
+    }
+  } else {
+    return false
+  }
+
+  return true
+}
+
+const testDraftAccountConnection = async () => {
+  if (draftAccountTestLoading.value || !supportsChannelConnQuickImport.value) {
+    return
+  }
+
+  clearDraftAccountTestResult()
+
+  if (!validateDraftAccountTestFields()) {
+    draftAccountTestResult.value = {
+      success: false,
+      message: '请先补全测试所需字段'
+    }
+    return
+  }
+
+  draftAccountTestLoading.value = true
+  try {
+    const proxyPayload = buildProxyPayload(form.value.proxy)
+    const basePayload = {
+      name: form.value.name || channelConnTargetLabel.value,
+      apiKey: form.value.apiKey.trim(),
+      userAgent: form.value.userAgent || '',
+      model: draftAccountTestModel.value,
+      proxy: proxyPayload
+    }
+
+    const result =
+      form.value.platform === 'openai-responses'
+        ? await httpApis.testOpenAIResponsesAccountConfigApi({
+            ...basePayload,
+            baseApi: form.value.baseApi.trim(),
+            providerEndpoint: form.value.providerEndpoint || 'responses'
+          })
+        : await httpApis.testClaudeConsoleAccountConfigApi({
+            ...basePayload,
+            apiUrl: form.value.apiUrl.trim()
+          })
+
+    if (result.success) {
+      draftAccountTestResult.value = {
+        success: true,
+        latency: result.data?.latency,
+        message: `测试通过${result.data?.latency ? `，耗时 ${result.data.latency}ms` : ''}`
+      }
+      showToast('测试通过，可以创建账户', 'success')
+    } else {
+      draftAccountTestResult.value = {
+        success: false,
+        latency: result.latency,
+        message: result.message || result.error || '测试失败'
+      }
+      showToast(draftAccountTestResult.value.message, 'error')
+    }
+  } catch (error) {
+    draftAccountTestResult.value = {
+      success: false,
+      message: error.message || '测试失败'
+    }
+    showToast(draftAccountTestResult.value.message, 'error')
+  } finally {
+    draftAccountTestLoading.value = false
+  }
+}
 
 // 计算是否可以进入下一步
 const canProceed = computed(() => {
@@ -5386,6 +5732,7 @@ const createAccount = async () => {
   errors.value.apiUrl = ''
   errors.value.apiKey = ''
   errors.value.apiKeys = ''
+  errors.value.baseApi = ''
 
   let hasError = false
 
@@ -6212,8 +6559,20 @@ watch(
 watch(
   () => form.value.apiUrl,
   () => {
+    clearDraftAccountTestResult()
     if (errors.value.apiUrl && form.value.apiUrl?.trim()) {
       errors.value.apiUrl = ''
+    }
+  }
+)
+
+// 监听OpenAI-Responses API 基础地址变化，清除错误
+watch(
+  () => form.value.baseApi,
+  () => {
+    clearDraftAccountTestResult()
+    if (errors.value.baseApi && form.value.baseApi?.trim()) {
+      errors.value.baseApi = ''
     }
   }
 )
@@ -6222,10 +6581,26 @@ watch(
 watch(
   () => form.value.apiKey,
   () => {
+    clearDraftAccountTestResult()
     if (errors.value.apiKey && form.value.apiKey?.trim()) {
       errors.value.apiKey = ''
     }
   }
+)
+
+watch(
+  () => [form.value.userAgent, form.value.providerEndpoint],
+  () => {
+    clearDraftAccountTestResult()
+  }
+)
+
+watch(
+  () => form.value.proxy,
+  () => {
+    clearDraftAccountTestResult()
+  },
+  { deep: true }
 )
 
 // 监听Azure Endpoint变化，清除错误
@@ -6356,6 +6731,9 @@ watch(
       form.value.groupId = ''
       form.value.groupIds = []
     }
+
+    channelConnImportError.value = ''
+    clearDraftAccountTestResult()
   }
 )
 
