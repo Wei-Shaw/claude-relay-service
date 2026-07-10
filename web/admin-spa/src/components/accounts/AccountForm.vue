@@ -1854,6 +1854,51 @@
                 </p>
               </div>
 
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >模型重定向 (可选)</label
+                >
+                <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                  左侧是客户端请求模型，右侧是实际发送给上游的模型。配置后仅列出的客户端模型会调度到此账户；留空表示支持全部模型且不重定向。
+                </p>
+                <div class="mb-3 space-y-2">
+                  <div
+                    v-for="(mapping, index) in modelMappings"
+                    :key="index"
+                    class="flex items-center gap-2"
+                  >
+                    <input
+                      v-model="mapping.from"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                      placeholder="客户端模型"
+                      type="text"
+                    />
+                    <i class="fas fa-arrow-right text-gray-400 dark:text-gray-500" />
+                    <input
+                      v-model="mapping.to"
+                      class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                      placeholder="上游模型"
+                      type="text"
+                    />
+                    <button
+                      class="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+                      type="button"
+                      @click="removeModelMapping(index)"
+                    >
+                      <i class="fas fa-trash" />
+                    </button>
+                  </div>
+                </div>
+                <button
+                  class="w-full rounded-lg border-2 border-dashed border-gray-300 px-4 py-2 text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500"
+                  type="button"
+                  @click="addModelMapping"
+                >
+                  <i class="fas fa-plus mr-2" />
+                  添加模型重定向
+                </button>
+              </div>
+
               <!-- 限流时长字段 - 隐藏不显示，使用默认值60 -->
               <input v-model.number="form.rateLimitDuration" type="hidden" value="60" />
             </div>
@@ -3667,6 +3712,51 @@
                 指定 Provider 支持的端点类型。Responses 会将所有请求路由到（包括来自
                 /v1/chat/completions 的请求会自动转换）；自动则保持原始路径
               </p>
+            </div>
+
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >模型重定向 (可选)</label
+              >
+              <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                左侧是客户端请求模型，右侧是实际发送给上游的模型。配置后仅列出的客户端模型会调度到此账户；留空表示支持全部模型且不重定向。
+              </p>
+              <div class="mb-3 space-y-2">
+                <div
+                  v-for="(mapping, index) in modelMappings"
+                  :key="index"
+                  class="flex items-center gap-2"
+                >
+                  <input
+                    v-model="mapping.from"
+                    class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    placeholder="客户端模型"
+                    type="text"
+                  />
+                  <i class="fas fa-arrow-right text-gray-400 dark:text-gray-500" />
+                  <input
+                    v-model="mapping.to"
+                    class="form-input flex-1 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    placeholder="上游模型"
+                    type="text"
+                  />
+                  <button
+                    class="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+                    type="button"
+                    @click="removeModelMapping(index)"
+                  >
+                    <i class="fas fa-trash" />
+                  </button>
+                </div>
+              </div>
+              <button
+                class="w-full rounded-lg border-2 border-dashed border-gray-300 px-4 py-2 text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500"
+                type="button"
+                @click="addModelMapping"
+              >
+                <i class="fas fa-plus mr-2" />
+                添加模型重定向
+              </button>
             </div>
 
             <!-- 限流时长字段 - 隐藏不显示，保持原值 -->
@@ -6032,6 +6122,7 @@ const createAccount = async () => {
       data.userAgent = form.value.userAgent || ''
       data.providerEndpoint = form.value.providerEndpoint || 'responses'
       data.priority = form.value.priority || 50
+      data.supportedModels = convertModelMappingsToObject()
       data.rateLimitDuration = 60 // 默认值60，不从用户输入获取
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
@@ -6384,6 +6475,7 @@ const updateAccount = async () => {
       data.userAgent = form.value.userAgent || ''
       data.providerEndpoint = form.value.providerEndpoint || 'responses'
       data.priority = form.value.priority || 50
+      data.supportedModels = convertModelMappingsToObject()
       // 编辑时不上传 rateLimitDuration，保持原值
       data.dailyQuota = form.value.dailyQuota || 0
       data.quotaResetTime = form.value.quotaResetTime || '00:00'
@@ -6926,6 +7018,16 @@ const addPresetMapping = (from, to) => {
   showToast(`已添加映射: ${from} → ${to}`, 'success')
 }
 
+const convertModelMappingsToObject = () => {
+  const mapping = {}
+  modelMappings.value.forEach((item) => {
+    if (item.from && item.to) {
+      mapping[item.from] = item.to
+    }
+  })
+  return mapping
+}
+
 // 将模型映射表转换为对象格式（根据当前模式）
 const convertMappingsToObject = () => {
   const mapping = {}
@@ -6937,11 +7039,7 @@ const convertMappingsToObject = () => {
     })
   } else {
     // 映射模式：使用手动配置的映射表
-    modelMappings.value.forEach((item) => {
-      if (item.from && item.to) {
-        mapping[item.from] = item.to
-      }
-    })
+    Object.assign(mapping, convertModelMappingsToObject())
   }
 
   return Object.keys(mapping).length > 0 ? mapping : null

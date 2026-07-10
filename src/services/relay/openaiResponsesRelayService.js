@@ -162,13 +162,14 @@ class OpenAIResponsesRelayService {
     logger.info(`🎯 Forwarding to: ${targetUrl}`)
 
     const headers = this._buildRequestHeaders(req.headers || {}, fullAccount)
+    const requestBody = options.requestBody ?? req.body
     const requestOptions = {
       method: req.method,
       url: targetUrl,
       headers,
-      data: req.body,
+      data: requestBody,
       timeout: options.timeout || this.defaultTimeout,
-      responseType: req.body?.stream ? 'stream' : 'json',
+      responseType: requestBody?.stream ? 'stream' : 'json',
       validateStatus: () => true
     }
 
@@ -278,6 +279,22 @@ class OpenAIResponsesRelayService {
         throw new Error('Account not found')
       }
 
+      const requestedModel = req.body?.model
+      const mappedModel = requestedModel
+        ? openaiResponsesAccountService.getMappedModel(fullAccount.supportedModels, requestedModel)
+        : requestedModel
+      const requestBody =
+        mappedModel && mappedModel !== requestedModel
+          ? {
+              ...req.body,
+              model: mappedModel
+            }
+          : req.body
+
+      if (mappedModel !== requestedModel) {
+        logger.info(`🔄 Mapping OpenAI-Responses model from ${requestedModel} to ${mappedModel}`)
+      }
+
       // 创建 AbortController 用于取消请求
       abortController = new AbortController()
 
@@ -297,7 +314,8 @@ class OpenAIResponsesRelayService {
       res.once('close', handleClientDisconnect)
 
       const requestMeta = this._createRequestOptions(req, fullAccount, {
-        signal: abortController.signal
+        signal: abortController.signal,
+        requestBody
       })
       targetPath = requestMeta.targetPath || targetPath
       const { targetUrl, headers, requestOptions } = requestMeta
@@ -1227,8 +1245,12 @@ class OpenAIResponsesRelayService {
         throw authError
       }
 
+      const mappedModel = openaiResponsesAccountService.getMappedModel(
+        account.supportedModels,
+        model
+      )
       const { payload, headers: testHeaders } = openaiResponsesTestService.buildTestRequestParts(
-        model,
+        mappedModel,
         {
           stream: true,
           maxTokens: 64
