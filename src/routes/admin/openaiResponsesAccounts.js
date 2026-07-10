@@ -186,6 +186,72 @@ router.post('/openai-responses-accounts', authenticateAdmin, async (req, res) =>
   }
 })
 
+// 测试未保存的 OpenAI-Responses 账户配置，不创建账户
+router.post('/openai-responses-accounts/test-connection', authenticateAdmin, async (req, res) => {
+  const {
+    name,
+    baseApi,
+    apiKey,
+    userAgent,
+    providerEndpoint = 'responses',
+    proxy,
+    model = 'gpt-5'
+  } = req.body || {}
+
+  const normalizedBaseApi = typeof baseApi === 'string' ? baseApi.trim() : ''
+  const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : ''
+  const testModel = typeof model === 'string' && model.trim() ? model.trim() : undefined
+
+  if (!normalizedBaseApi || !normalizedApiKey) {
+    return res.status(400).json({
+      success: false,
+      error: 'API base URL and API Key are required'
+    })
+  }
+
+  let parsedUrl
+  try {
+    parsedUrl = new URL(normalizedBaseApi)
+  } catch {
+    return res.status(400).json({
+      success: false,
+      error: 'API base URL is invalid'
+    })
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    return res.status(400).json({
+      success: false,
+      error: 'API base URL must start with http:// or https://'
+    })
+  }
+
+  try {
+    const result = await openaiResponsesRelayService.testAccountConfig(
+      {
+        name,
+        baseApi: normalizedBaseApi,
+        apiKey: normalizedApiKey,
+        userAgent,
+        providerEndpoint,
+        proxy
+      },
+      testModel
+    )
+
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ OpenAI-Responses draft account test failed:', error.message)
+    return res.json({
+      success: false,
+      error: 'Test failed',
+      message: error.message,
+      latency: error.latency,
+      upstreamStatus: error.status
+    })
+  }
+})
+
 // 更新 OpenAI-Responses 账户
 router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res) => {
   try {

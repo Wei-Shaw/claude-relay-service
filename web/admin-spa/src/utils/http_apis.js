@@ -145,6 +145,8 @@ export const getClaudeConsoleAccountsApi = () =>
   request({ url: '/admin/claude-console-accounts', method: 'GET' })
 export const createClaudeConsoleAccountApi = (data) =>
   request({ url: '/admin/claude-console-accounts', method: 'POST', data })
+export const testClaudeConsoleAccountConfigApi = (data) =>
+  request({ url: '/admin/claude-console-accounts/test-connection', method: 'POST', data })
 export const updateClaudeConsoleAccountApi = (id, data) =>
   request({ url: `/admin/claude-console-accounts/${id}`, method: 'PUT', data })
 
@@ -193,6 +195,8 @@ export const getOpenAIResponsesAccountsApi = () =>
   request({ url: '/admin/openai-responses-accounts', method: 'GET' })
 export const createOpenAIResponsesAccountApi = (data) =>
   request({ url: '/admin/openai-responses-accounts', method: 'POST', data })
+export const testOpenAIResponsesAccountConfigApi = (data) =>
+  request({ url: '/admin/openai-responses-accounts/test-connection', method: 'POST', data })
 export const updateOpenAIResponsesAccountApi = (id, data) =>
   request({ url: `/admin/openai-responses-accounts/${id}`, method: 'PUT', data })
 
