@@ -8,6 +8,7 @@ const ENCRYPTED_CONTENT_KEY = 'encrypted_content'
 const TOOLS_KEY = 'tools'
 const PREVIEW_TRUNCATION_SUFFIX_PATTERN = /\.\.\.\[(?:truncated )?(\d+) chars\]$/
 const OPENAI_RELATED_ACCOUNT_TYPES = new Set(['openai', 'openai-responses', 'azure-openai'])
+const CACHE_HIT_FORMULA = 'cacheReadTokens / (inputTokens + cacheReadTokens + cacheCreateTokens)'
 
 function toFiniteNumber(value) {
   if (value === undefined || value === null || value === '') {
@@ -656,7 +657,7 @@ function getRequestDetailCacheMetrics(detail = {}) {
   const input = Math.max(0, Number(detail.inputTokens) || 0)
   const isOpenAIRelated =
     OPENAI_RELATED_ACCOUNT_TYPES.has(detail.accountType) || isOpenAIRelatedEndpoint(detail.endpoint)
-  const denominator = isOpenAIRelated ? input + read : read + create
+  const denominator = input + read + create
 
   if (denominator <= 0) {
     return {
@@ -664,6 +665,8 @@ function getRequestDetailCacheMetrics(detail = {}) {
       cacheCreateNotApplicable: isOpenAIRelated,
       numerator: read,
       denominator: 0,
+      formula: CACHE_HIT_FORMULA,
+      cacheHitFormula: CACHE_HIT_FORMULA,
       rate: 0
     }
   }
@@ -673,18 +676,25 @@ function getRequestDetailCacheMetrics(detail = {}) {
     cacheCreateNotApplicable: isOpenAIRelated,
     numerator: read,
     denominator,
+    formula: CACHE_HIT_FORMULA,
+    cacheHitFormula: CACHE_HIT_FORMULA,
     rate: Number(((read / denominator) * 100).toFixed(2))
   }
 }
 
-function calculateCacheHitRate(cacheReadTokensOrDetail = 0, cacheCreateTokens = 0) {
+function calculateCacheHitRate(
+  cacheReadTokensOrDetail = 0,
+  cacheCreateTokens = 0,
+  inputTokens = 0
+) {
   if (typeof cacheReadTokensOrDetail === 'object' && cacheReadTokensOrDetail !== null) {
     return getRequestDetailCacheMetrics(cacheReadTokensOrDetail).rate
   }
 
   const read = Math.max(0, Number(cacheReadTokensOrDetail) || 0)
   const create = Math.max(0, Number(cacheCreateTokens) || 0)
-  const denominator = read + create
+  const input = Math.max(0, Number(inputTokens) || 0)
+  const denominator = input + read + create
 
   if (denominator <= 0) {
     return 0
@@ -701,6 +711,7 @@ module.exports = {
   finalizeRequestDetailMeta,
   extractOpenAICacheReadTokens,
   isOpenAIRelatedEndpoint,
+  CACHE_HIT_FORMULA,
   getRequestDetailCacheMetrics,
   calculateCacheHitRate
 }

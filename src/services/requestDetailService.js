@@ -11,11 +11,13 @@ const openaiResponsesAccountService = require('./account/openaiResponsesAccountS
 const azureOpenaiAccountService = require('./account/azureOpenaiAccountService')
 const droidAccountService = require('./account/droidAccountService')
 const bedrockAccountService = require('./account/bedrockAccountService')
+const CostCalculator = require('../utils/costCalculator')
 const {
   sanitizeRequestBodySnapshot,
   getRequestDetailCacheMetrics,
   extractRequestReasoningInfo,
-  resolveRequestDetailReasoning
+  resolveRequestDetailReasoning,
+  CACHE_HIT_FORMULA
 } = require('../utils/requestDetailHelper')
 
 const REQUEST_DETAIL_ITEM_PREFIX = 'request_detail:item:'
@@ -76,6 +78,122 @@ function normalizeNumber(value, digits = null) {
   }
 
   return Number(num.toFixed(digits))
+}
+
+function normalizeTokenValue(value) {
+  return Math.max(0, Math.trunc(normalizeNumber(value)))
+}
+
+function buildCostUsageFromRequestDetail(record = {}) {
+  const inputTokens = normalizeTokenValue(record.inputTokens)
+  const outputTokens = normalizeTokenValue(record.outputTokens)
+  const cacheCreateTokens = normalizeTokenValue(record.cacheCreateTokens)
+  const cacheReadTokens = normalizeTokenValue(record.cacheReadTokens)
+  const usage = {
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    cache_creation_input_tokens: cacheCreateTokens,
+    cache_read_input_tokens: cacheReadTokens
+  }
+
+  const ephemeral5mTokens = normalizeTokenValue(
+    record.ephemeral5mTokens ?? record.cache_creation?.ephemeral_5m_input_tokens
+  )
+  const ephemeral1hTokens = normalizeTokenValue(
+    record.ephemeral1hTokens ?? record.cache_creation?.ephemeral_1h_input_tokens
+  )
+
+  if (ephemeral5mTokens > 0 || ephemeral1hTokens > 0) {
+    usage.cache_creation = {
+      ephemeral_5m_input_tokens: ephemeral5mTokens,
+      ephemeral_1h_input_tokens: ephemeral1hTokens
+    }
+  }
+
+  return usage
+}
+
+function getCostResultNumber(costResult, key, fallbackKey = null) {
+  return normalizeNumber(costResult?.costs?.[key] ?? costResult?.[fallbackKey] ?? 0, 12)
+}
+
+function buildCostBreakdownFromResult(costResult) {
+  const input = getCostResultNumber(costResult, 'input', 'inputCost')
+  const output = getCostResultNumber(costResult, 'output', 'outputCost')
+  const cacheCreate =
+    getCostResultNumber(costResult, 'cacheCreate', 'cacheCreateCost') ||
+    getCostResultNumber(costResult, 'cacheWrite', 'cacheCreateCost')
+  const cacheRead = getCostResultNumber(costResult, 'cacheRead', 'cacheReadCost')
+  const ephemeral5m = getCostResultNumber(costResult, 'ephemeral5m', 'ephemeral5mCost')
+  const ephemeral1h = getCostResultNumber(costResult, 'ephemeral1h', 'ephemeral1hCost')
+  const total = getCostResultNumber(costResult, 'total', 'totalCost')
+
+  return {
+    input,
+    output,
+    cacheCreate,
+    cacheWrite: cacheCreate,
+    cacheRead,
+    ephemeral5m,
+    ephemeral1h,
+    total
+  }
+}
+
+function createCostRecomputePatch(record = {}) {
+  const storedCost = normalizeNumber(record.cost, 6)
+  const storedRealCost = normalizeNumber(record.realCost, 6)
+  if (storedCost > 0 || storedRealCost > 0) {
+    return null
+  }
+
+  const usage = buildCostUsageFromRequestDetail(record)
+  const totalTokens =
+    usage.input_tokens +
+    usage.output_tokens +
+    usage.cache_creation_input_tokens +
+    usage.cache_read_input_tokens
+  if (totalTokens <= 0) {
+    return null
+  }
+
+  try {
+    const costResult = CostCalculator.calculateCost(usage, record.model || 'unknown')
+    const totalCost = normalizeNumber(costResult?.costs?.total ?? costResult?.totalCost ?? 0, 6)
+    if (totalCost <= 0) {
+      return null
+    }
+
+    const breakdown = buildCostBreakdownFromResult(costResult)
+    const pricingSource =
+      costResult?.debug?.pricingSource ||
+      (costResult?.usingDynamicPricing ? 'dynamic' : 'unknown-fallback')
+
+    return {
+      cost: totalCost,
+      realCost: totalCost,
+      costBreakdown: breakdown,
+      realCostBreakdown: breakdown,
+      costRecomputed: true,
+      usedFallbackPricing: costResult?.debug?.usedFallbackPricing === true,
+      pricingSource
+    }
+  } catch (error) {
+    logger.debug(`⚠️ Failed to recompute request detail cost: ${error.message}`)
+    return null
+  }
+}
+
+function prepareRecordForDisplay(record = {}) {
+  const costPatch = createCostRecomputePatch(record)
+  if (!costPatch) {
+    return record
+  }
+
+  return {
+    ...record,
+    ...costPatch
+  }
 }
 
 function formatDayKey(date) {
@@ -504,6 +622,9 @@ function finalizeSummary(accumulator) {
             ((accumulator.cacheHitNumerator / accumulator.cacheHitDenominator) * 100).toFixed(2)
           )
         : 0,
+    cacheHitNumerator: accumulator.cacheHitNumerator,
+    cacheHitDenominator: accumulator.cacheHitDenominator,
+    cacheHitFormula: CACHE_HIT_FORMULA,
     cacheCreateNotApplicable:
       accumulator.totalRequests > 0 &&
       accumulator.openAIRelatedRequests === accumulator.totalRequests
@@ -565,6 +686,9 @@ class RequestDetailService {
         totalCost: 0,
         avgDurationMs: 0,
         cacheHitRate: 0,
+        cacheHitNumerator: 0,
+        cacheHitDenominator: 0,
+        cacheHitFormula: CACHE_HIT_FORMULA,
         cacheCreateNotApplicable: false
       }
     }
@@ -606,6 +730,9 @@ class RequestDetailService {
       realCost,
       costBreakdown: detail.costBreakdown || null,
       realCostBreakdown: detail.realCostBreakdown || null,
+      pricingSource: detail.pricingSource || null,
+      usedFallbackPricing: detail.usedFallbackPricing === true,
+      costRecomputed: detail.costRecomputed === true,
       durationMs,
       isLongContextRequest: detail.isLongContextRequest === true,
       reasoningDisplay: detail.reasoningDisplay || reasoningInfo.reasoningDisplay || null,
@@ -933,28 +1060,32 @@ class RequestDetailService {
     const enriched = []
 
     for (const record of records) {
-      const cacheMetrics = getRequestDetailCacheMetrics(record)
-      const reasoningInfo = resolveRequestDetailReasoning(record)
-      const apiKeyName = await this._getApiKeyName(record.apiKeyId, apiKeyCache)
+      const displayRecord = prepareRecordForDisplay(record)
+      const cacheMetrics = getRequestDetailCacheMetrics(displayRecord)
+      const reasoningInfo = resolveRequestDetailReasoning(displayRecord)
+      const apiKeyName = await this._getApiKeyName(displayRecord.apiKeyId, apiKeyCache)
       const accountInfo = await this._resolveAccountInfo(
-        record.accountId,
-        record.accountType,
+        displayRecord.accountId,
+        displayRecord.accountType,
         accountCache
       )
 
       enriched.push({
-        ...record,
-        apiKeyName: apiKeyName || record.apiKeyId || '未知 Key',
-        accountName: accountInfo?.accountName || record.accountId || '未知账户',
-        accountType: accountInfo?.accountType || record.accountType || 'unknown',
+        ...displayRecord,
+        apiKeyName: apiKeyName || displayRecord.apiKeyId || '未知 Key',
+        accountName: accountInfo?.accountName || displayRecord.accountId || '未知账户',
+        accountType: accountInfo?.accountType || displayRecord.accountType || 'unknown',
         accountTypeName:
           accountInfo?.accountTypeName ||
-          accountTypeNames[record.accountType] ||
+          accountTypeNames[displayRecord.accountType] ||
           accountTypeNames.unknown,
         isOpenAIRelated: cacheMetrics.isOpenAIRelated,
         cacheCreateNotApplicable: cacheMetrics.cacheCreateNotApplicable,
         cacheHitRate: cacheMetrics.rate,
-        hasRequestBodySnapshot: Boolean(record.requestBodySnapshot),
+        cacheHitNumerator: cacheMetrics.numerator,
+        cacheHitDenominator: cacheMetrics.denominator,
+        cacheHitFormula: cacheMetrics.cacheHitFormula,
+        hasRequestBodySnapshot: Boolean(displayRecord.requestBodySnapshot),
         reasoningDisplay: reasoningInfo.reasoningDisplay,
         reasoningSource: reasoningInfo.reasoningSource
       })
@@ -1183,11 +1314,12 @@ class RequestDetailService {
             continue
           }
 
-          updateSummaryAccumulator(summaryAccumulator, record)
+          const displayRecord = prepareRecordForDisplay(record)
+          updateSummaryAccumulator(summaryAccumulator, displayRecord)
 
           matchedPointers.push({
-            requestId: record.requestId,
-            timestampMs: toMillis(record.timestamp) ?? pointer.timestampMs
+            requestId: displayRecord.requestId,
+            timestampMs: toMillis(displayRecord.timestamp) ?? pointer.timestampMs
           })
         }
       }

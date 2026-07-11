@@ -112,8 +112,8 @@
                 {{ formatPercent(summary.cacheHitRate) }}
               </p>
               <p class="summary-sub">
-                读 {{ formatNumber(summary.cacheReadTokens) }} / 建
-                {{ formatCacheCreate(summary.cacheCreateTokens, summary.cacheCreateNotApplicable) }}
+                读 / (输入 + 读 + 建)：{{ formatNumber(summary.cacheHitNumerator) }} /
+                {{ formatNumber(summary.cacheHitDenominator) }}
               </p>
             </div>
             <div class="summary-card">
@@ -650,6 +650,9 @@ const summary = reactive({
   totalCost: 0,
   avgDurationMs: 0,
   cacheHitRate: 0,
+  cacheHitNumerator: 0,
+  cacheHitDenominator: 0,
+  cacheHitFormula: 'cacheReadTokens / (inputTokens + cacheReadTokens + cacheCreateTokens)',
   cacheCreateNotApplicable: false
 })
 
@@ -769,6 +772,11 @@ const syncResponseState = (data) => {
   summary.totalCost = summaryData.totalCost || 0
   summary.avgDurationMs = summaryData.avgDurationMs || 0
   summary.cacheHitRate = summaryData.cacheHitRate || 0
+  summary.cacheHitNumerator = summaryData.cacheHitNumerator || 0
+  summary.cacheHitDenominator = summaryData.cacheHitDenominator || 0
+  summary.cacheHitFormula =
+    summaryData.cacheHitFormula ||
+    'cacheReadTokens / (inputTokens + cacheReadTokens + cacheCreateTokens)'
   summary.cacheCreateNotApplicable = summaryData.cacheCreateNotApplicable === true
 }
 

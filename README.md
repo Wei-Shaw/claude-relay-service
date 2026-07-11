@@ -22,19 +22,6 @@
 
 ---
 
-## 💎 Claude/Codex 拼车服务推荐
-
-<div align="center">
-
-| 平台 | 服务 | 介绍 |
-|:---|:---|:---|
-| **[pincc.ai](https://pincc.ai/)** | <small>✅ Claude Code<br>✅ Codex CLI</small> | 提供稳定的 Codex CLI 拼车服务<br><br> **全新上线 2API 渠道**：接入CC的效果媲美官方 Anthropic Console 账号，暂不支持 PDF 识别功能 <br>💰 单价：0.8元=1美金额度 |
-
-
-</div>
-
----
-
 ## ⚠️ 重要提醒
 
 **使用本项目前请仔细阅读：**
@@ -505,7 +492,7 @@ gemini  # 或其他 Gemini CLI 命令
 
 ```toml
 model_provider = "crs"
-model = "gpt-5.1-codex-max"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 disable_response_storage = true
 preferred_auth_method = "apikey"
@@ -543,8 +530,8 @@ Droid CLI 读取 `~/.factory/config.json`。可以在该文件中添加自定义
       "max_tokens": 64000
     },
     {
-      "model_display_name": "GPT5-Codex [crs]",
-      "model": "gpt-5-codex",
+      "model_display_name": "GPT5.5 [crs]",
+      "model": "gpt-5.5",
       "base_url": "http://127.0.0.1:3000/droid/openai",
       "api_key": "后台创建的API密钥",
       "provider": "openai",
