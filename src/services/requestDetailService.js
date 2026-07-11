@@ -528,7 +528,7 @@ function mergeRequestDetailRecords(existing = null, incoming = {}) {
     }
   }
 
-  const objectFields = ['costBreakdown', 'realCostBreakdown']
+  const objectFields = ['costBreakdown', 'realCostBreakdown', 'pricingTier']
   for (const field of objectFields) {
     if (!incoming[field] && existing[field]) {
       merged[field] = existing[field]
@@ -698,7 +698,10 @@ function createCostRecomputePatch(record = {}) {
   }
 
   try {
-    const costResult = CostCalculator.calculateCost(usage, record.model || 'unknown')
+    const billingModel = record.actualModel || record.model || 'unknown'
+    const costResult = CostCalculator.calculateCost(usage, billingModel, null, {
+      requestLevel: true
+    })
     const totalCost = normalizeNumber(costResult?.costs?.total ?? costResult?.totalCost ?? 0, 6)
     if (totalCost <= 0) {
       return null
@@ -716,7 +719,8 @@ function createCostRecomputePatch(record = {}) {
       realCostBreakdown: breakdown,
       costRecomputed: true,
       usedFallbackPricing: costResult?.debug?.usedFallbackPricing === true,
-      pricingSource
+      pricingSource,
+      pricingTier: costResult?.pricingTier || null
     }
   } catch (error) {
     logger.debug(`⚠️ Failed to recompute request detail cost: ${error.message}`)
@@ -1444,6 +1448,7 @@ class RequestDetailService {
       realCost,
       costBreakdown: detail.costBreakdown || null,
       realCostBreakdown: detail.realCostBreakdown || null,
+      pricingTier: detail.pricingTier || null,
       pricingSource: detail.pricingSource || null,
       usedFallbackPricing: detail.usedFallbackPricing === true,
       costRecomputed: detail.costRecomputed === true,

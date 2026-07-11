@@ -203,7 +203,9 @@ describe('apiKeyService openai responses config', () => {
         cache_creation_input_tokens: 0,
         cache_read_input_tokens: 2048
       },
-      'mimo-v2.5-pro'
+      'mimo-v2.5-pro',
+      null,
+      { requestLevel: true }
     )
     expect(result.realCost).toBeCloseTo(0.0529974, 10)
     expect(result.ratedCost).toBeCloseTo(0.0529974, 10)
@@ -234,6 +236,68 @@ describe('apiKeyService openai responses config', () => {
         realCost: 0.052997,
         usedFallbackPricing: true,
         pricingSource: 'unknown-fallback'
+      })
+    )
+  })
+
+  test('recordUsageWithDetails persists request pricing tier snapshots', async () => {
+    const pricingTier = {
+      name: 'gpt-5.6-long-input',
+      applied: true,
+      eligible: true,
+      threshold: 272000,
+      thresholdType: 'exclusive',
+      contextInputTokens: 272001,
+      inputMultiplier: 2,
+      cachedInputMultiplier: 2,
+      outputMultiplier: 1.5,
+      baseCost: 0.217201,
+      surcharge: 0.212201,
+      totalCost: 0.429402
+    }
+    CostCalculator.calculateCost.mockReturnValue({
+      costs: {
+        input: 0.400002,
+        output: 0.015,
+        cacheCreate: 0,
+        cacheWrite: 0,
+        cacheRead: 0.0144,
+        total: 0.429402
+      },
+      debug: {
+        usedFallbackPricing: false,
+        pricingSource: 'dynamic',
+        isLongContextRequest: false
+      },
+      pricingTier,
+      usingDynamicPricing: true
+    })
+
+    await apiKeyService.recordUsageWithDetails(
+      'key-1',
+      {
+        input_tokens: 200001,
+        output_tokens: 1000,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 72000
+      },
+      'gpt-5.6-sol',
+      'acct-1',
+      'openai-responses'
+    )
+
+    expect(redis.addUsageRecord).toHaveBeenCalledWith(
+      'key-1',
+      expect.objectContaining({
+        model: 'gpt-5.6-sol',
+        realCost: 0.429402,
+        pricingTier
+      })
+    )
+    expect(billingEventPublisher.publishBillingEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-5.6-sol',
+        pricingTier
       })
     )
   })

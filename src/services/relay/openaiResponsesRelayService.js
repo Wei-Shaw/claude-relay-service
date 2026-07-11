@@ -917,7 +917,8 @@ class OpenAIResponsesRelayService {
                 cache_read_input_tokens: cacheReadTokens
               },
               modelToRecord,
-              serviceTier
+              serviceTier,
+              { requestLevel: true }
             )
             await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
           }
@@ -1070,7 +1071,8 @@ class OpenAIResponsesRelayService {
               cache_read_input_tokens: cacheReadTokens
             },
             actualModel,
-            serviceTier
+            serviceTier,
+            { requestLevel: true }
           )
           await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
         }

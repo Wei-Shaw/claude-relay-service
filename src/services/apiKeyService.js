@@ -1817,7 +1817,8 @@ class ApiKeyService {
           cache_read_input_tokens: cacheReadTokens
         },
         model,
-        serviceTier
+        serviceTier,
+        { requestLevel: true }
       )
 
       // 检查是否为 1M 上下文请求
@@ -1930,6 +1931,7 @@ class ApiKeyService {
         realCost: Number(realCost.toFixed(6)),
         costBreakdown: costInfo?.costs || undefined,
         realCostBreakdown: costInfo?.costs || undefined,
+        pricingTier: costInfo?.pricingTier || null,
         isLongContext: isLongContextRequest,
         usageStatus: 'completed',
         lifecycleStatus: 'completed',
@@ -1954,7 +1956,7 @@ class ApiKeyService {
 
       logger.database(`📊 Recorded usage: ${keyId} - ${logParts.join(', ')}`)
 
-      return { realCost, ratedCost }
+      return { realCost, ratedCost, pricingTier: costInfo?.pricingTier || null }
     } catch (error) {
       logger.error('❌ Failed to record usage:', error)
       return { realCost: 0, ratedCost: 0 }
@@ -2032,11 +2034,14 @@ class ApiKeyService {
         ephemeral1hCost: 0,
         isLongContextRequest: false,
         usedFallbackPricing: false,
-        pricingSource: null
+        pricingSource: null,
+        pricingTier: null
       }
       try {
         const CostCalculator = require('../utils/costCalculator')
-        const calculatedCost = CostCalculator.calculateCost(usageObject, actualModel)
+        const calculatedCost = CostCalculator.calculateCost(usageObject, actualModel, null, {
+          requestLevel: true
+        })
         const costs = calculatedCost?.costs || {}
         const totalCost = Number(costs.total ?? calculatedCost?.totalCost ?? 0)
 
@@ -2060,7 +2065,8 @@ class ApiKeyService {
           usedFallbackPricing: calculatedCost?.debug?.usedFallbackPricing === true,
           pricingSource:
             calculatedCost?.debug?.pricingSource ||
-            (calculatedCost?.usingDynamicPricing ? 'dynamic' : 'unknown-fallback')
+            (calculatedCost?.usingDynamicPricing ? 'dynamic' : 'unknown-fallback'),
+          pricingTier: calculatedCost?.pricingTier || null
         }
       } catch (pricingError) {
         logger.error(`❌ Failed to calculate cost for model ${actualModel}:`, pricingError)
@@ -2225,6 +2231,7 @@ class ApiKeyService {
         },
         pricingSource: costInfo.pricingSource || null,
         usedFallbackPricing: costInfo.usedFallbackPricing === true,
+        pricingTier: costInfo.pricingTier,
         isLongContext: costInfo.isLongContextRequest || false,
         usageStatus: 'completed',
         lifecycleStatus: 'completed',
@@ -2294,13 +2301,18 @@ class ApiKeyService {
         accountId,
         accountType,
         isLongContext: costInfo.isLongContextRequest || false,
+        pricingTier: costInfo.pricingTier,
         requestTimestamp: usageRecord.timestamp
       }).catch((err) => {
         // 发布失败不影响主流程，只记录错误
         logger.warn('⚠️ Failed to publish billing event:', err.message)
       })
 
-      return { realCost: realCostWithDetails, ratedCost: ratedCostWithDetails }
+      return {
+        realCost: realCostWithDetails,
+        ratedCost: ratedCostWithDetails,
+        pricingTier: costInfo.pricingTier
+      }
     } catch (error) {
       logger.error('❌ Failed to record usage:', error)
       return { realCost: 0, ratedCost: 0 }
@@ -2340,6 +2352,7 @@ class ApiKeyService {
       realCostBreakdown: usageRecord.realCostBreakdown || usageRecord.costBreakdown || null,
       pricingSource: usageRecord.pricingSource || null,
       usedFallbackPricing: usageRecord.usedFallbackPricing === true,
+      pricingTier: usageRecord.pricingTier || null,
       isLongContextRequest:
         usageRecord.isLongContext === true || usageRecord.isLongContextRequest === true
     })
