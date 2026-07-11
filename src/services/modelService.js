@@ -65,8 +65,14 @@ class ModelService {
           'gpt-5.5-xhigh',
           'gpt-5.4-pro',
           'gpt-5.6-sol',
+          'gpt-5.6-sol-high',
+          'gpt-5.6-sol-xhigh',
           'gpt-5.6-terra',
-          'gpt-5.6-luna'
+          'gpt-5.6-terra-high',
+          'gpt-5.6-terra-xhigh',
+          'gpt-5.6-luna',
+          'gpt-5.6-luna-high',
+          'gpt-5.6-luna-xhigh'
         ]
       },
       gemini: {

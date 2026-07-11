@@ -564,6 +564,82 @@ describe('openai responses payload toggles', () => {
     })
   })
 
+  test.each([
+    ['gpt-5.6-sol-high', 'gpt-5.6-sol', 'high'],
+    ['gpt-5.6-sol-xhigh', 'gpt-5.6-sol', 'xhigh'],
+    ['gpt-5.6-terra-high', 'gpt-5.6-terra', 'high'],
+    ['gpt-5.6-terra-xhigh', 'gpt-5.6-terra', 'xhigh'],
+    ['gpt-5.6-luna-high', 'gpt-5.6-luna', 'high'],
+    ['gpt-5.6-luna-xhigh', 'gpt-5.6-luna', 'xhigh']
+  ])(
+    'maps %s to %s with %s reasoning across responses and the anthropic bridge',
+    async (alias, normalizedModel, effort) => {
+      unifiedOpenAIScheduler.selectAccountForApiKey.mockResolvedValue({
+        accountId: 'openai-1',
+        accountType: 'openai'
+      })
+      openaiAccountService.getAccount.mockResolvedValue({
+        id: 'openai-1',
+        name: 'OpenAI Account',
+        accessToken: 'encrypted-token',
+        accountId: 'chatgpt-account-1'
+      })
+      axios.post.mockResolvedValue({
+        status: 200,
+        data: {
+          model: normalizedModel,
+          usage: {
+            input_tokens: 9,
+            output_tokens: 4,
+            total_tokens: 13
+          }
+        },
+        headers: {}
+      })
+
+      const promptCacheKey = `${alias}-key`
+      const req = createReq({
+        body: {
+          model: alias,
+          prompt_cache_key: promptCacheKey,
+          stream: false
+        },
+        apiKeyOverrides: {
+          enableOpenAIResponsesCodexAdaptation: false,
+          enableOpenAIResponsesPayloadRules: false
+        }
+      })
+
+      await openaiRoutes.handleResponses(req, createRes())
+
+      expect(unifiedOpenAIScheduler.selectAccountForApiKey).toHaveBeenCalledWith(
+        req.apiKey,
+        createHash(promptCacheKey),
+        normalizedModel
+      )
+      expect(req.body.model).toBe(normalizedModel)
+      expect(req.body.reasoning).toEqual({ effort })
+      expect(axios.post.mock.calls[0][1]).toMatchObject({
+        model: normalizedModel,
+        reasoning: { effort },
+        store: false
+      })
+
+      expect(
+        buildResponsesRequestFromAnthropic({
+          model: alias,
+          messages: [{ role: 'user', content: 'hello' }]
+        })
+      ).toMatchObject({
+        model: normalizedModel,
+        reasoning: {
+          effort,
+          summary: 'auto'
+        }
+      })
+    }
+  )
+
   test('records the mutated service_tier for standard responses sent through openai accounts', async () => {
     unifiedOpenAIScheduler.selectAccountForApiKey.mockResolvedValue({
       accountId: 'openai-1',

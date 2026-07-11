@@ -125,6 +125,24 @@ function resolveOpenAIReasoningModelAlias(model) {
   if (normalized === 'gpt-5.5-xhigh') {
     return { normalizedModel: 'gpt-5.5', effort: 'xhigh' }
   }
+  if (normalized === 'gpt-5.6-sol-high') {
+    return { normalizedModel: 'gpt-5.6-sol', effort: 'high' }
+  }
+  if (normalized === 'gpt-5.6-sol-xhigh') {
+    return { normalizedModel: 'gpt-5.6-sol', effort: 'xhigh' }
+  }
+  if (normalized === 'gpt-5.6-terra-high') {
+    return { normalizedModel: 'gpt-5.6-terra', effort: 'high' }
+  }
+  if (normalized === 'gpt-5.6-terra-xhigh') {
+    return { normalizedModel: 'gpt-5.6-terra', effort: 'xhigh' }
+  }
+  if (normalized === 'gpt-5.6-luna-high') {
+    return { normalizedModel: 'gpt-5.6-luna', effort: 'high' }
+  }
+  if (normalized === 'gpt-5.6-luna-xhigh') {
+    return { normalizedModel: 'gpt-5.6-luna', effort: 'xhigh' }
+  }
 
   return null
 }
