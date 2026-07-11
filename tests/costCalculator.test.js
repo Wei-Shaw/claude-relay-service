@@ -155,4 +155,102 @@ describe('CostCalculator', () => {
     expect(result.debug.usedFallbackPricing).toBe(false)
     expect(result.debug.pricingSource).toBe('dynamic')
   })
+
+  describe('GPT-5.6 request-level long input pricing', () => {
+    const pricing = {
+      input_cost_per_token: 0.000001,
+      output_cost_per_token: 0.00001,
+      cache_creation_input_token_cost: 0.00000125,
+      cache_read_input_token_cost: 0.0000001
+    }
+
+    beforeEach(() => {
+      pricingService.getModelPricing.mockReturnValue(pricing)
+    })
+
+    it('does not apply the tier at exactly 272K context input tokens', () => {
+      const result = CostCalculator.calculateCost(
+        {
+          input_tokens: 200000,
+          output_tokens: 1000,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 72000
+        },
+        'gpt-5.6-sol',
+        null,
+        { requestLevel: true }
+      )
+
+      expect(result.pricingTier).toMatchObject({
+        applied: false,
+        eligible: true,
+        threshold: 272000,
+        contextInputTokens: 272000
+      })
+      expect(result.costs.total).toBeCloseTo(0.2172, 10)
+    })
+
+    it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna-2026-07-11'])(
+      'applies whole-request component multipliers for %s above 272K',
+      (model) => {
+        const result = CostCalculator.calculateCost(
+          {
+            input_tokens: 200001,
+            output_tokens: 1000,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 72000
+          },
+          model,
+          null,
+          { requestLevel: true }
+        )
+
+        expect(result.pricingTier).toMatchObject({
+          applied: true,
+          eligible: true,
+          contextInputTokens: 272001,
+          inputMultiplier: 2,
+          cachedInputMultiplier: 2,
+          outputMultiplier: 1.5
+        })
+        expect(result.pricingTier.baseCost).toBeCloseTo(0.217201, 10)
+        expect(result.pricingTier.totalCost).toBeCloseTo(0.429402, 10)
+        expect(result.costs.input).toBeCloseTo(0.400002, 10)
+        expect(result.costs.cacheRead).toBeCloseTo(0.0144, 10)
+        expect(result.costs.output).toBeCloseTo(0.015, 10)
+        expect(result.costs.total).toBeCloseTo(0.429402, 10)
+      }
+    )
+
+    it('does not infer a request tier for aggregated usage', () => {
+      const result = CostCalculator.calculateAggregatedCost(
+        {
+          inputTokens: 400000,
+          outputTokens: 1000,
+          cacheReadTokens: 0
+        },
+        'gpt-5.6-terra'
+      )
+
+      expect(result.pricingTier).toBeUndefined()
+      expect(result.costs.total).toBeCloseTo(0.41, 10)
+    })
+
+    it('does not apply the tier to unrelated models', () => {
+      const result = CostCalculator.calculateCost(
+        {
+          input_tokens: 300000,
+          output_tokens: 1000,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0
+        },
+        'gpt-5.4',
+        null,
+        { requestLevel: true }
+      )
+
+      expect(result.pricingTier).toBeUndefined()
+      expect(result.costs.total).toBeCloseTo(0.31, 10)
+    })
+  })
 })

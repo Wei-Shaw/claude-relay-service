@@ -3,6 +3,15 @@ const logger = require('./logger')
 
 const warnedDetailedPricingFallbackModels = new Set()
 
+const GPT_56_LONG_INPUT_TIER = {
+  threshold: 272000,
+  inputMultiplier: 2,
+  cachedInputMultiplier: 2,
+  outputMultiplier: 1.5
+}
+
+const GPT_56_TIERED_MODEL_PATTERN = /^gpt-5\.6-(sol|terra|luna)(?:$|[-:])/i
+
 // Claude模型价格配置 (USD per 1M tokens) - 备用定价
 const MODEL_PRICING = {
   // Claude 3.5 Sonnet
@@ -109,6 +118,96 @@ class CostCalculator {
     }
 
     return pricingData?.litellm_provider === 'openai'
+  }
+
+  static getRequestPricingTier(usage, model, options = {}) {
+    const normalizedModel = typeof model === 'string' ? model.trim() : ''
+    if (options.requestLevel !== true || !GPT_56_TIERED_MODEL_PATTERN.test(normalizedModel)) {
+      return null
+    }
+
+    const contextInputTokens =
+      (usage.input_tokens || 0) +
+      (usage.cache_creation_input_tokens || 0) +
+      (usage.cache_read_input_tokens || 0)
+    const applied = contextInputTokens > GPT_56_LONG_INPUT_TIER.threshold
+
+    return {
+      name: 'gpt-5.6-long-input',
+      applied,
+      eligible: true,
+      threshold: GPT_56_LONG_INPUT_TIER.threshold,
+      thresholdType: 'exclusive',
+      contextInputTokens,
+      inputMultiplier: applied ? GPT_56_LONG_INPUT_TIER.inputMultiplier : 1,
+      cachedInputMultiplier: applied ? GPT_56_LONG_INPUT_TIER.cachedInputMultiplier : 1,
+      outputMultiplier: applied ? GPT_56_LONG_INPUT_TIER.outputMultiplier : 1
+    }
+  }
+
+  static applyRequestPricingTier(result, usage, model, options = {}) {
+    const pricingTier = this.getRequestPricingTier(usage, model, options)
+    if (!pricingTier) {
+      return result
+    }
+
+    pricingTier.baseCost = result.costs.total
+    pricingTier.surcharge = 0
+    pricingTier.totalCost = result.costs.total
+    result.pricingTier = pricingTier
+    result.debug = {
+      ...result.debug,
+      pricingTierApplied: pricingTier.applied,
+      pricingTier: pricingTier.name,
+      pricingTierContextInputTokens: pricingTier.contextInputTokens
+    }
+
+    if (!pricingTier.applied) {
+      return result
+    }
+
+    result.pricing = {
+      ...result.pricing,
+      input: result.pricing.input * pricingTier.inputMultiplier,
+      output: result.pricing.output * pricingTier.outputMultiplier,
+      cacheWrite: result.pricing.cacheWrite * pricingTier.cachedInputMultiplier,
+      cacheRead: result.pricing.cacheRead * pricingTier.cachedInputMultiplier
+    }
+
+    const inputCost = result.costs.input * pricingTier.inputMultiplier
+    const outputCost = result.costs.output * pricingTier.outputMultiplier
+    const cacheCreateCost = result.costs.cacheCreate * pricingTier.cachedInputMultiplier
+    const cacheReadCost = result.costs.cacheRead * pricingTier.cachedInputMultiplier
+    const ephemeral5mCost = result.costs.ephemeral5m * pricingTier.cachedInputMultiplier
+    const ephemeral1hCost = result.costs.ephemeral1h * pricingTier.cachedInputMultiplier
+    const totalCost = inputCost + outputCost + cacheCreateCost + cacheReadCost
+
+    pricingTier.surcharge = totalCost - pricingTier.baseCost
+    pricingTier.totalCost = totalCost
+
+    result.costs = {
+      ...result.costs,
+      input: inputCost,
+      output: outputCost,
+      cacheCreate: cacheCreateCost,
+      cacheWrite: cacheCreateCost,
+      cacheRead: cacheReadCost,
+      ephemeral5m: ephemeral5mCost,
+      ephemeral1h: ephemeral1hCost,
+      total: totalCost
+    }
+    result.formatted = {
+      input: this.formatCost(inputCost),
+      output: this.formatCost(outputCost),
+      cacheCreate: this.formatCost(cacheCreateCost),
+      cacheWrite: this.formatCost(cacheCreateCost),
+      cacheRead: this.formatCost(cacheReadCost),
+      ephemeral5m: this.formatCost(ephemeral5mCost),
+      ephemeral1h: this.formatCost(ephemeral1hCost),
+      total: this.formatCost(totalCost)
+    }
+
+    return result
   }
 
   static getPricingSource(model, pricingData) {
@@ -306,24 +405,31 @@ class CostCalculator {
    * @param {number} usage.cache_creation_input_tokens - 缓存创建token数量
    * @param {number} usage.cache_read_input_tokens - 缓存读取token数量
    * @param {string} model - 模型名称
+   * @param {string|null} serviceTier - OpenAI 服务层级
+   * @param {Object} options - 计算选项
+   * @param {boolean} options.requestLevel - 是否按单次请求应用条件计费规则
    * @returns {Object} 费用详情
    */
-  static calculateCost(usage, model = 'unknown', serviceTier = null) {
+  static calculateCost(usage, model = 'unknown', serviceTier = null, options = {}) {
+    let result
+
     // 如果 usage 包含详细的 cache_creation 对象或是 1M 模型，优先使用 pricingService
     if (this.isDetailedPricingRequest(usage, model)) {
-      const result = pricingService.calculateCost(usage, model)
-      if (this.isValidPricingServiceResult(result)) {
-        return this.buildDetailedPricingResult(usage, model, result)
+      const detailedResult = pricingService.calculateCost(usage, model)
+      if (this.isValidPricingServiceResult(detailedResult)) {
+        result = this.buildDetailedPricingResult(usage, model, detailedResult)
+      } else {
+        this.logDetailedPricingFallback(model, usage, detailedResult)
+
+        result = this.buildLegacyCostResult(usage, model, serviceTier, {
+          usedFallbackPricing: true
+        })
       }
-
-      this.logDetailedPricingFallback(model, usage, result)
-
-      return this.buildLegacyCostResult(usage, model, serviceTier, {
-        usedFallbackPricing: true
-      })
+    } else {
+      result = this.buildLegacyCostResult(usage, model, serviceTier)
     }
 
-    return this.buildLegacyCostResult(usage, model, serviceTier)
+    return this.applyRequestPricingTier(result, usage, model, options)
   }
 
   /**
