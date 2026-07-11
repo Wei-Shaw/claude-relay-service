@@ -479,11 +479,14 @@ const handleClickOutside = (event) => {
   }
 }
 
+// 组件实例作用域，避免多实例共享
+let updateCheckTimer = null
+
 onMounted(() => {
   checkForUpdates()
 
   // 设置自动检查更新（每小时检查一次）
-  setInterval(() => {
+  updateCheckTimer = setInterval(() => {
     checkForUpdates()
   }, 3600000) // 1小时
 
@@ -491,6 +494,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (updateCheckTimer) {
+    clearInterval(updateCheckTimer)
+    updateCheckTimer = null
+  }
   document.removeEventListener('click', handleClickOutside)
 })
 </script>
