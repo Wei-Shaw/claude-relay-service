@@ -4,12 +4,19 @@ export const APP_CONFIG = {
   apiPrefix: import.meta.env.DEV ? '/webapi' : ''
 }
 
+/** History 模式下的应用内 URL（禁止拼 #） */
 export const getAppUrl = (path = '') => {
-  if (path && !path.startsWith('/')) path = '/' + path
-  return APP_CONFIG.basePath + (path.startsWith('#') ? path : '#' + path)
+  const base = APP_CONFIG.basePath.replace(/\/$/, '')
+  if (path === '' || path == null) {
+    return base + '/'
+  }
+  if (!path.startsWith('/')) path = '/' + path
+  return base + path
 }
 
 export const getLoginUrl = () => getAppUrl('/login')
+
+export const getUserLoginUrl = () => getAppUrl('/user-login')
 
 // Toast 通知管理
 let toastContainer = null

@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import { showToast } from '@/utils/tools'
-import { APP_CONFIG } from '@/utils/tools'
+import { showToast, APP_CONFIG, getUserLoginUrl } from '@/utils/tools'
 
 const API_BASE = `${APP_CONFIG.apiPrefix}/users`
 
@@ -204,9 +203,10 @@ export const useUserStore = defineStore('user', {
             if (message && (message.includes('disabled') || message.includes('Account disabled'))) {
               this.clearAuth()
               showToast(message, 'error')
-              // Redirect to login page
-              if (window.location.pathname !== '/user-login') {
-                window.location.href = '/user-login'
+              const userLoginUrl = getUserLoginUrl()
+              const userLoginPath = new URL(userLoginUrl, window.location.origin).pathname
+              if (window.location.pathname !== userLoginPath) {
+                window.location.href = userLoginUrl
               }
             }
           }

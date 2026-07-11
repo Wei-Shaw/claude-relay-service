@@ -202,21 +202,6 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const userStore = useUserStore()
 
-  console.log('路由导航:', {
-    to: to.path,
-    from: from.path,
-    fullPath: to.fullPath,
-    requiresAuth: to.meta.requiresAuth,
-    requiresUserAuth: to.meta.requiresUserAuth,
-    isAuthenticated: authStore.isAuthenticated,
-    isUserAuthenticated: userStore.isAuthenticated
-  })
-
-  // 防止重定向循环：如果已经在目标路径，直接放行
-  if (to.path === from.path && to.fullPath === from.fullPath) {
-    return next()
-  }
-
   // 检查用户认证状态
   if (to.meta.requiresUserAuth) {
     if (!userStore.isAuthenticated) {
@@ -239,21 +224,38 @@ router.beforeEach(async (to, from, next) => {
 
   // API Stats 页面不需要认证，直接放行
   if (to.path === '/api-stats' || to.path.startsWith('/api-stats')) {
-    next()
-  } else if (to.path === '/user-login') {
+    return next()
+  }
+
+  if (to.path === '/user-login') {
     // 如果已经是用户登录状态，重定向到用户仪表板
     if (userStore.isAuthenticated) {
-      next('/user-dashboard')
-    } else {
-      next()
+      return next('/user-dashboard')
     }
-  } else if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next('/login')
-  } else if (to.path === '/login' && authStore.isAuthenticated) {
-    next('/dashboard')
-  } else {
-    next()
+    return next()
   }
+
+  // 管理员受保护路由：始终 await checkAuth（authReady 时快速返回）
+  if (to.meta.requiresAuth) {
+    await authStore.checkAuth()
+    if (!authStore.isAuthenticated) {
+      return next('/login')
+    }
+    return next()
+  }
+
+  // 登录页：有 token 或尚未就绪时先校验，再决定是否去 dashboard
+  if (to.path === '/login') {
+    if (authStore.authToken || !authStore.authReady) {
+      await authStore.checkAuth()
+    }
+    if (authStore.isAuthenticated) {
+      return next('/dashboard')
+    }
+    return next()
+  }
+
+  return next()
 })
 
 export default router
