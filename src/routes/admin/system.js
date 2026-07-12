@@ -296,12 +296,16 @@ router.get('/oem-settings', async (req, res) => {
       }
     }
 
-    // 添加 LDAP 启用状态到响应中
+    const ldapEnabled = config.ldap && config.ldap.enabled === true
+    const userSystemEnabled = ldapEnabled && config.userManagement?.enabled === true
+
+    // 添加用户系统启用状态到响应中
     return res.json({
       success: true,
       data: {
         ...settings,
-        ldapEnabled: config.ldap && config.ldap.enabled === true
+        ldapEnabled,
+        userSystemEnabled
       }
     })
   } catch (error) {

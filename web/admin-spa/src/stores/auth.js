@@ -20,7 +20,8 @@ export const useAuthStore = defineStore('auth', () => {
     siteIcon: '',
     siteIconData: '',
     faviconData: '',
-    codexTutorialModel: DEFAULT_CODEX_TUTORIAL_MODEL
+    codexTutorialModel: DEFAULT_CODEX_TUTORIAL_MODEL,
+    userSystemEnabled: false
   })
   const oemLoading = ref(true)
 

@@ -202,6 +202,13 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const userStore = useUserStore()
 
+  if (to.path === '/user-login' || to.path === '/user-dashboard') {
+    await authStore.loadOemSettings()
+    if (!authStore.oemSettings.userSystemEnabled) {
+      return next('/api-stats')
+    }
+  }
+
   // 检查用户认证状态
   if (to.meta.requiresUserAuth) {
     if (!userStore.isAuthenticated) {
