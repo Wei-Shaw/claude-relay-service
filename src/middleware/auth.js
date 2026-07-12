@@ -1477,6 +1477,13 @@ const authenticateUser = async (req, res, next) => {
   const startTime = Date.now()
 
   try {
+    if (config.userManagement?.enabled !== true || config.ldap?.enabled !== true) {
+      return res.status(503).json({
+        error: 'Service unavailable',
+        message: 'User system is not enabled'
+      })
+    }
+
     // 安全提取用户session token，支持多种方式
     const sessionToken =
       req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||

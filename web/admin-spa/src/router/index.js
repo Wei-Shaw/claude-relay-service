@@ -51,13 +51,13 @@ const routes = [
     path: '/user-login',
     name: 'UserLogin',
     component: UserLoginView,
-    meta: { requiresAuth: false, userAuth: true }
+    meta: { requiresAuth: false, userAuth: true, requiresUserSystem: true }
   },
   {
     path: '/user-dashboard',
     name: 'UserDashboard',
     component: UserDashboardView,
-    meta: { requiresUserAuth: true }
+    meta: { requiresUserAuth: true, requiresUserSystem: true }
   },
   {
     path: '/api-stats',
@@ -202,7 +202,7 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const userStore = useUserStore()
 
-  if (to.path === '/user-login' || to.path === '/user-dashboard') {
+  if (to.meta.requiresUserSystem) {
     await authStore.loadOemSettings()
     if (!authStore.oemSettings.userSystemEnabled) {
       return next('/api-stats')

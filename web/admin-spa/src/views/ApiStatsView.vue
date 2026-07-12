@@ -28,13 +28,13 @@
 
           <!-- 分隔线 -->
           <div
-            v-if="oemSettings.ldapEnabled || oemSettings.showAdminButton !== false"
+            v-if="oemSettings.userSystemEnabled || oemSettings.showAdminButton !== false"
             class="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent opacity-50 dark:via-gray-600"
           />
 
-          <!-- 用户登录按钮 (仅在 LDAP 启用时显示) -->
+          <!-- 用户登录按钮 (仅在用户系统启用时显示) -->
           <router-link
-            v-if="oemSettings.ldapEnabled"
+            v-if="oemSettings.userSystemEnabled"
             class="user-login-button flex items-center gap-2 rounded-2xl px-4 py-2 text-white transition-all duration-300 md:px-5 md:py-2.5"
             to="/user-login"
           >
