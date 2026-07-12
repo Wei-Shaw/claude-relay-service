@@ -49,7 +49,10 @@ describe('claudeConsoleRelayService.testAccountConnection', () => {
     const res = {}
     await claudeConsoleRelayService.testAccountConnection('a1', res, 'claude-sonnet-4-6')
 
-    expect(createClaudeTestPayload).toHaveBeenCalledWith('claude-sonnet-4-6', { stream: true })
+    expect(createClaudeTestPayload).toHaveBeenCalledWith('claude-sonnet-4-6', {
+      stream: true,
+      maxTokens: 64
+    })
     expect(sendStreamTestRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         payload,
@@ -78,7 +81,10 @@ describe('claudeConsoleRelayService.testAccountConnection', () => {
     const res = {}
     await claudeConsoleRelayService.testAccountConnection('a1', res, 'claude-sonnet-4-6')
 
-    expect(createClaudeTestPayload).toHaveBeenCalledWith('claude-sonnet-4-6', { stream: true })
+    expect(createClaudeTestPayload).toHaveBeenCalledWith('claude-sonnet-4-6', {
+      stream: true,
+      maxTokens: 64
+    })
     const requestOptions = sendStreamTestRequest.mock.calls[0][0]
     expect(requestOptions).toEqual(
       expect.objectContaining({
