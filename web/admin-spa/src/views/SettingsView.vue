@@ -11,7 +11,7 @@
 
       <!-- 设置分类导航 -->
       <div class="mb-6">
-        <nav class="flex space-x-8">
+        <nav class="flex space-x-8 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0">
           <button
             :class="[
               'border-b-2 pb-2 text-sm font-medium transition-colors',
@@ -23,6 +23,18 @@
           >
             <i class="fas fa-palette mr-2"></i>
             品牌设置
+          </button>
+          <button
+            :class="[
+              'flex-shrink-0 border-b-2 pb-2 text-sm font-medium transition-colors',
+              activeSection === 'testModels'
+                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+            @click="activeSection = 'testModels'"
+          >
+            <i class="fas fa-vial mr-2"></i>
+            测试模型
           </button>
           <button
             :class="[
@@ -1452,6 +1464,11 @@
           </div>
         </div>
 
+        <!-- 测试模型部分 -->
+        <div v-show="activeSection === 'testModels'">
+          <ConnectivityTestModelsSection />
+        </div>
+
         <!-- 模型价格部分 -->
         <div v-show="activeSection === 'modelPricing'">
           <ModelPricingSection />
@@ -2058,6 +2075,7 @@ import { useSettingsStore } from '@/stores/settings'
 import * as httpApis from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import ModelPricingSection from '@/components/settings/ModelPricingSection.vue'
+import ConnectivityTestModelsSection from '@/components/settings/ConnectivityTestModelsSection.vue'
 import { useConfirmModal } from '@/utils/useConfirmModal'
 
 // 定义组件名称，用于keep-alive排除

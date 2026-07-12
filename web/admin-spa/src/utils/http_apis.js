@@ -2,6 +2,14 @@ import request from '@/utils/request'
 
 // 模型
 export const getModelsApi = () => request({ url: '/apiStats/models', method: 'GET' })
+export const getConnectivityTestModelsApi = () =>
+  request({ url: '/apiStats/connectivity-test-models', method: 'GET' })
+export const getConnectivityTestModelConfigApi = () =>
+  request({ url: '/admin/connectivity-test-models', method: 'GET' })
+export const updateConnectivityTestModelConfigApi = (data) =>
+  request({ url: '/admin/connectivity-test-models', method: 'PUT', data })
+export const resetConnectivityTestModelConfigApi = () =>
+  request({ url: '/admin/connectivity-test-models', method: 'DELETE' })
 
 // 模型价格管理
 export const getModelPricingApi = () => request({ url: '/admin/models/pricing', method: 'GET' })
