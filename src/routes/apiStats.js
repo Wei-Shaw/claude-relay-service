@@ -13,6 +13,7 @@ const {
   sanitizeErrorMsg
 } = require('../utils/testPayloadHelper')
 const modelsConfig = require('../../config/models')
+const connectivityTestModelConfigService = require('../services/connectivityTestModelConfigService')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 
 const router = express.Router()
@@ -42,6 +43,20 @@ router.get('/models', (req, res) => {
       platforms: modelsConfig.PLATFORM_TEST_MODELS
     }
   })
+})
+
+// 📋 获取连通性测试使用的模型列表（公开接口）
+router.get('/connectivity-test-models', async (_req, res) => {
+  try {
+    const data = await connectivityTestModelConfigService.getPublicConfig()
+    return res.json({ success: true, data })
+  } catch (error) {
+    logger.error('❌ Failed to get connectivity test models:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get connectivity test models'
+    })
+  }
 })
 
 // 🏠 重定向页面请求到新版 admin-spa

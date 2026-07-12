@@ -31,6 +31,7 @@ const serviceRatesRoutes = require('./serviceRates')
 const quotaCardsRoutes = require('./quotaCards')
 const errorHistoryRoutes = require('./errorHistory')
 const requestDetailsRoutes = require('./requestDetails')
+const connectivityTestModelsRoutes = require('./connectivityTestModels')
 
 // 挂载所有子路由
 // 使用完整路径的模块（直接挂载到根路径）
@@ -53,6 +54,7 @@ router.use('/', serviceRatesRoutes)
 router.use('/', quotaCardsRoutes)
 router.use('/', errorHistoryRoutes)
 router.use('/', requestDetailsRoutes)
+router.use('/', connectivityTestModelsRoutes)
 
 // 使用相对路径的模块（需要指定基础路径前缀）
 router.use('/account-groups', accountGroupsRoutes)

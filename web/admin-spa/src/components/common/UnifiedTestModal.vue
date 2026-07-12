@@ -117,7 +117,7 @@
                 <span class="text-gray-500 dark:text-gray-400">测试模型</span>
                 <ModelSelector
                   v-model="selectedModel"
-                  :disabled="state.testStatus.value === 'testing'"
+                  :disabled="state.testStatus.value === 'testing' || modelsLoading"
                   :models="availableModels"
                 />
               </div>
@@ -263,15 +263,19 @@
             <i
               :class="[
                 'fas',
-                state.testStatus.value === 'testing' ? 'fa-spinner fa-spin' : 'fa-play'
+                state.testStatus.value === 'testing' || modelsLoading
+                  ? 'fa-spinner fa-spin'
+                  : 'fa-play'
               ]"
             />
             {{
-              state.testStatus.value === 'testing'
-                ? '测试中...'
-                : state.testStatus.value === 'idle'
-                  ? '开始测试'
-                  : '重新测试'
+              modelsLoading
+                ? '加载模型...'
+                : state.testStatus.value === 'testing'
+                  ? '测试中...'
+                  : state.testStatus.value === 'idle'
+                    ? '开始测试'
+                    : '重新测试'
             }}
           </button>
         </div>
@@ -281,9 +285,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { APP_CONFIG } from '@/utils/tools'
-import { getModelsApi } from '@/utils/http_apis'
+import { getConnectivityTestModelsApi } from '@/utils/http_apis'
 import { useTestState } from '@/utils/useTestState'
 import ModelSelector from '@/components/common/ModelSelector.vue'
 
@@ -303,16 +307,24 @@ const state = useTestState()
 
 // ========== 模型相关 ==========
 const selectedModel = ref('')
-const modelsFromApi = ref({ claude: [], gemini: [], openai: [], platforms: {} })
+const modelsLoading = ref(false)
+const modelsFromApi = ref({
+  services: { claude: [], gemini: [], openai: [] },
+  platforms: {},
+  defaults: { services: {}, platforms: {} }
+})
 
 const loadModels = async () => {
-  const result = await getModelsApi()
-  if (result.success && result.data) {
-    modelsFromApi.value = result.data
+  modelsLoading.value = true
+  try {
+    const result = await getConnectivityTestModelsApi()
+    if (result.success && result.data) {
+      modelsFromApi.value = result.data
+    }
+  } finally {
+    modelsLoading.value = false
   }
 }
-
-onMounted(loadModels)
 
 const availableModels = computed(() => {
   if (props.mode === 'account') {
@@ -325,7 +337,7 @@ const availableModels = computed(() => {
     return modelsFromApi.value.platforms?.[platform] || []
   }
   // apikey 模式
-  return modelsFromApi.value[props.serviceType] || []
+  return modelsFromApi.value.services?.[props.serviceType] || []
 })
 
 // 各平台回退默认模型（模型列表未加载时使用）
@@ -343,6 +355,8 @@ const defaultModel = computed(() => {
   if (props.mode === 'account') {
     const platform = props.account?.platform
     if (platform === 'azure-openai') return props.account?.deploymentName
+    const configuredDefault = modelsFromApi.value.defaults?.platforms?.[platform]
+    if (configuredDefault) return configuredDefault
     // bedrock 优先用列表，列表为空时按凭证类型回退
     if (platform === 'bedrock') {
       const models = availableModels.value
@@ -356,6 +370,8 @@ const defaultModel = computed(() => {
     return platformFallbackModels[platform] || platformFallbackModels.claude
   }
   // apikey 模式: 优先用列表，回退用 serviceConfig 的 defaultModel
+  const configuredDefault = modelsFromApi.value.defaults?.services?.[props.serviceType]
+  if (configuredDefault) return configuredDefault
   const models = availableModels.value
   if (models.length > 0) return models[0].value
   return apikeyServiceConfig.value.defaultModel
@@ -404,7 +420,12 @@ const maskedApiKey = computed(() => {
   return key.substring(0, 6) + '****' + key.substring(key.length - 4)
 })
 
-const disableTest = computed(() => props.mode === 'apikey' && !props.apiKeyValue)
+const disableTest = computed(
+  () =>
+    modelsLoading.value ||
+    !selectedModel.value?.trim() ||
+    (props.mode === 'apikey' && !props.apiKeyValue)
+)
 
 // ========== account 模式 - 平台信息 ==========
 const platformConfigs = {
@@ -576,9 +597,10 @@ const handleClose = () => {
 // ========== 监听 ==========
 watch(
   () => props.show,
-  (newVal) => {
+  async (newVal) => {
     if (newVal) {
       state.resetState()
+      await loadModels()
       selectedModel.value = defaultModel.value
       if (props.mode === 'apikey') {
         testPrompt.value = 'hi'
