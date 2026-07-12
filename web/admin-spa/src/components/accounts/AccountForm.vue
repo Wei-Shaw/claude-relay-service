@@ -4943,15 +4943,20 @@ const allowedModels = ref([
 
 // 常用模型列表（从 API 获取）
 const commonModels = ref([])
-const testModelsFromApi = ref({ platforms: {} })
+const testModelsFromApi = ref({ platforms: {}, defaults: { platforms: {} } })
 
 // 加载模型列表
 const loadCommonModels = async () => {
   try {
-    const result = await httpApis.getModelsApi()
-    if (result.success && result.data) {
-      commonModels.value = result.data.all || []
-      testModelsFromApi.value = result.data
+    const [modelsResult, testModelsResult] = await Promise.all([
+      httpApis.getModelsApi(),
+      httpApis.getConnectivityTestModelsApi()
+    ])
+    if (modelsResult.success && modelsResult.data) {
+      commonModels.value = modelsResult.data.all || []
+    }
+    if (testModelsResult.success && testModelsResult.data) {
+      testModelsFromApi.value = testModelsResult.data
     }
   } catch (error) {
     console.error('Failed to load models:', error)
@@ -5199,6 +5204,10 @@ const draftAccountTestAvailableModels = computed(
 )
 
 const draftAccountDefaultTestModel = computed(() => {
+  const configuredDefault = testModelsFromApi.value.defaults?.platforms?.[form.value.platform]
+  if (configuredDefault) {
+    return configuredDefault
+  }
   const models = draftAccountTestAvailableModels.value
   if (models.length > 0) {
     return models[0].value
