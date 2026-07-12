@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import { showToast, APP_CONFIG, getUserLoginUrl } from '@/utils/tools'
+import { showToast, APP_CONFIG, getAppUrl, getUserLoginUrl } from '@/utils/tools'
 
 const API_BASE = `${APP_CONFIG.apiPrefix}/users`
 
@@ -198,6 +198,22 @@ export const useUserStore = defineStore('user', {
       axios.interceptors.response.use(
         (response) => response,
         (error) => {
+          const isUserRequest = error.config?.url?.startsWith(API_BASE)
+          const userSystemDisabled =
+            isUserRequest &&
+            error.response?.status === 503 &&
+            error.response.data?.message === 'User system is not enabled'
+
+          if (userSystemDisabled) {
+            this.clearAuth()
+            showToast('用户系统未启用', 'error')
+            const apiStatsUrl = getAppUrl('/api-stats')
+            const apiStatsPath = new URL(apiStatsUrl, window.location.origin).pathname
+            if (window.location.pathname !== apiStatsPath) {
+              window.location.href = apiStatsUrl
+            }
+          }
+
           if (error.response?.status === 403) {
             const message = error.response.data?.message
             if (message && (message.includes('disabled') || message.includes('Account disabled'))) {
