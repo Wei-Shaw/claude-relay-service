@@ -1146,13 +1146,23 @@
                     </div>
                   </div>
                   <div v-else-if="account.platform === 'openai'" class="space-y-2">
-                    <div v-if="account.codexUsage" class="space-y-2">
-                      <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
+                    <div
+                      v-if="
+                        account.codexUsage &&
+                        (hasCodexWindow(account.codexUsage.primary) ||
+                          hasCodexWindow(account.codexUsage.secondary))
+                      "
+                      class="space-y-2"
+                    >
+                      <div
+                        v-if="hasCodexWindow(account.codexUsage.primary)"
+                        class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
+                      >
                         <div class="flex items-center gap-2">
                           <span
                             class="inline-flex min-w-[32px] justify-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
                           >
-                            {{ getCodexWindowLabel('primary') }}
+                            {{ getCodexWindowLabel(account.codexUsage.primary, 'primary') }}
                           </span>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
@@ -1179,12 +1189,15 @@
                           重置剩余 {{ formatCodexRemaining(account.codexUsage.primary) }}
                         </div>
                       </div>
-                      <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
+                      <div
+                        v-if="hasCodexWindow(account.codexUsage.secondary)"
+                        class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
+                      >
                         <div class="flex items-center gap-2">
                           <span
                             class="inline-flex min-w-[32px] justify-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"
                           >
-                            {{ getCodexWindowLabel('secondary') }}
+                            {{ getCodexWindowLabel(account.codexUsage.secondary, 'secondary') }}
                           </span>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
@@ -1746,13 +1759,23 @@
               <div v-else class="text-xs text-gray-400">暂无统计</div>
             </div>
             <div v-else-if="account.platform === 'openai'" class="space-y-2">
-              <div v-if="account.codexUsage" class="space-y-2">
-                <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+              <div
+                v-if="
+                  account.codexUsage &&
+                  (hasCodexWindow(account.codexUsage.primary) ||
+                    hasCodexWindow(account.codexUsage.secondary))
+                "
+                class="space-y-2"
+              >
+                <div
+                  v-if="hasCodexWindow(account.codexUsage.primary)"
+                  class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
+                >
                   <div class="flex items-center gap-2">
                     <span
                       class="inline-flex min-w-[32px] justify-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
                     >
-                      {{ getCodexWindowLabel('primary') }}
+                      {{ getCodexWindowLabel(account.codexUsage.primary, 'primary') }}
                     </span>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
@@ -1779,12 +1802,15 @@
                     重置剩余 {{ formatCodexRemaining(account.codexUsage.primary) }}
                   </div>
                 </div>
-                <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <div
+                  v-if="hasCodexWindow(account.codexUsage.secondary)"
+                  class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
+                >
                   <div class="flex items-center gap-2">
                     <span
                       class="inline-flex min-w-[32px] justify-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"
                     >
-                      {{ getCodexWindowLabel('secondary') }}
+                      {{ getCodexWindowLabel(account.codexUsage.secondary, 'secondary') }}
                     </span>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
@@ -1812,7 +1838,7 @@
                   </div>
                 </div>
               </div>
-              <div v-if="!account.codexUsage" class="text-xs text-gray-400">暂无统计</div>
+              <div v-else class="text-xs text-gray-400">暂无统计</div>
             </div>
 
             <!-- 最后使用时间 -->
@@ -4949,12 +4975,43 @@ const getCodexUsageWidth = (usageItem) => {
   return `${percent}%`
 }
 
-// 时间窗口标签
-const getCodexWindowLabel = (type) => {
-  if (type === 'secondary') {
+// 根据窗口时长（分钟）推导标签，避免写死槽位（OpenAI 已取消 5h，现仅下发周限）
+const formatCodexWindowMinutes = (windowMinutes) => {
+  const m = Number(windowMinutes)
+  if (!Number.isFinite(m) || m <= 0) {
+    return null
+  }
+  if (m === 10080) {
     return '周限'
   }
-  return '5h'
+  if (m % 10080 === 0) {
+    return `${m / 10080}周`
+  }
+  if (m % 1440 === 0) {
+    return `${m / 1440}天`
+  }
+  if (m % 60 === 0) {
+    return `${m / 60}h`
+  }
+  return `${m}分钟`
+}
+
+// 该额度窗口是否有真实数据（无 windowMinutes 视为空槽，不渲染）
+const hasCodexWindow = (usageItem) => {
+  if (!usageItem) {
+    return false
+  }
+  const m = Number(usageItem.windowMinutes)
+  return Number.isFinite(m) && m > 0
+}
+
+// 时间窗口标签：优先按实际 windowMinutes 动态推导，取不到时退回位置标签
+const getCodexWindowLabel = (usageItem, type) => {
+  const dynamic = formatCodexWindowMinutes(usageItem?.windowMinutes)
+  if (dynamic) {
+    return dynamic
+  }
+  return type === 'secondary' ? '周限' : '5h'
 }
 
 // 格式化剩余时间
