@@ -588,7 +588,7 @@
                     快速粘贴导入 {{ channelConnTargetLabel }}
                   </p>
                   <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                    支持 New API 渠道连接 JSON，自动填入名称、URL 和 API Key。
+                    支持 New API 渠道连接或 Claude Code env JSON，自动填入名称、URL 和 API Key。
                   </p>
                 </div>
               </div>
@@ -4432,7 +4432,7 @@ const openaiBatchSelectedFileCount = ref(0)
 const channelConnImportText = ref('')
 const channelConnImportError = ref('')
 const channelConnImportPlaceholder =
-  '{"_type":"newapi_channel_conn","key":"sk-xxxx","url":"https://api.example.com"}'
+  '粘贴 New API 渠道连接，或包含 ANTHROPIC_BASE_URL 和 ANTHROPIC_AUTH_TOKEN 的 env JSON'
 const draftAccountTestLoading = ref(false)
 const draftAccountTestResult = ref(null)
 const draftAccountTestSelectedModel = ref('')
@@ -5073,19 +5073,35 @@ const parseChannelConnImport = (rawText) => {
     throw new Error('请粘贴单个渠道连接对象')
   }
 
-  if (payload._type !== 'newapi_channel_conn') {
-    throw new Error('不是支持的 New API 渠道连接格式')
+  const env =
+    payload.env && typeof payload.env === 'object' && !Array.isArray(payload.env)
+      ? payload.env
+      : null
+  let apiKey = ''
+  let apiUrl = ''
+  let missingKeyMessage = ''
+  let missingUrlMessage = ''
+
+  if (payload._type === 'newapi_channel_conn') {
+    apiKey = typeof payload.key === 'string' ? payload.key.trim() : ''
+    apiUrl = typeof payload.url === 'string' ? payload.url.trim() : ''
+    missingKeyMessage = 'JSON 中缺少 key'
+    missingUrlMessage = 'JSON 中缺少 url'
+  } else if (env) {
+    apiKey = typeof env.ANTHROPIC_AUTH_TOKEN === 'string' ? env.ANTHROPIC_AUTH_TOKEN.trim() : ''
+    apiUrl = typeof env.ANTHROPIC_BASE_URL === 'string' ? env.ANTHROPIC_BASE_URL.trim() : ''
+    missingKeyMessage = 'env 中缺少 ANTHROPIC_AUTH_TOKEN'
+    missingUrlMessage = 'env 中缺少 ANTHROPIC_BASE_URL'
+  } else {
+    throw new Error('不是支持的 New API 渠道连接或 Claude Code env 格式')
   }
 
-  const apiKey = typeof payload.key === 'string' ? payload.key.trim() : ''
-  const apiUrl = typeof payload.url === 'string' ? payload.url.trim() : ''
-
   if (!apiKey) {
-    throw new Error('JSON 中缺少 key')
+    throw new Error(missingKeyMessage)
   }
 
   if (!apiUrl) {
-    throw new Error('JSON 中缺少 url')
+    throw new Error(missingUrlMessage)
   }
 
   let parsedUrl
