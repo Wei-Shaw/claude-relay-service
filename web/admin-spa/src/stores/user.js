@@ -11,7 +11,8 @@ export const useUserStore = defineStore('user', {
     isAuthenticated: false,
     sessionToken: null,
     loading: false,
-    config: null
+    config: null,
+    pendingTwoFactor: null
   }),
 
   getters: {
@@ -24,13 +25,26 @@ export const useUserStore = defineStore('user', {
     // 🔐 用户登录
     async login(credentials) {
       this.loading = true
+      this.pendingTwoFactor = null
       try {
         const response = await axios.post(`${API_BASE}/login`, credentials)
+
+        if (response.data.success && response.data.requiresTwoFactor) {
+          this.clearAuth()
+          this.pendingTwoFactor = {
+            username: credentials.username,
+            pendingLoginToken: response.data.pendingLoginToken,
+            pendingLoginExpiresIn: response.data.pendingLoginExpiresIn,
+            canUseRecoveryCode: !!response.data.canUseRecoveryCode
+          }
+          return response.data
+        }
 
         if (response.data.success) {
           this.user = response.data.user
           this.sessionToken = response.data.sessionToken
           this.isAuthenticated = true
+          this.pendingTwoFactor = null
 
           // 保存到 localStorage
           localStorage.setItem('userToken', this.sessionToken)
@@ -49,6 +63,39 @@ export const useUserStore = defineStore('user', {
       } finally {
         this.loading = false
       }
+    },
+
+    async verifyTwoFactor(payload) {
+      this.loading = true
+      try {
+        if (!this.pendingTwoFactor?.pendingLoginToken) {
+          throw new Error('Two-factor login has expired')
+        }
+
+        const response = await axios.post(`${API_BASE}/2fa/verify`, {
+          pendingLoginToken: this.pendingTwoFactor.pendingLoginToken,
+          ...payload
+        })
+
+        if (response.data.success) {
+          this.user = response.data.user
+          this.sessionToken = response.data.sessionToken
+          this.isAuthenticated = true
+          this.pendingTwoFactor = null
+
+          localStorage.setItem('userToken', this.sessionToken)
+          localStorage.setItem('userData', JSON.stringify(this.user))
+          this.setAuthHeader()
+        }
+
+        return response.data
+      } finally {
+        this.loading = false
+      }
+    },
+
+    cancelTwoFactorLogin() {
+      this.pendingTwoFactor = null
     },
 
     // 🚪 用户登出
@@ -171,12 +218,40 @@ export const useUserStore = defineStore('user', {
       }
     },
 
+    async getTwoFactorStatus() {
+      const response = await axios.get(`${API_BASE}/2fa/status`)
+      return response.data.twoFactor
+    },
+
+    async createTwoFactorSetup(currentPassword) {
+      const response = await axios.post(`${API_BASE}/2fa/setup`, {
+        currentPassword
+      })
+      return response.data
+    },
+
+    async enableTwoFactor(payload) {
+      const response = await axios.post(`${API_BASE}/2fa/enable`, payload)
+      return response.data
+    },
+
+    async disableTwoFactor(payload) {
+      const response = await axios.post(`${API_BASE}/2fa/disable`, payload)
+      return response.data
+    },
+
+    async regenerateRecoveryCodes(payload) {
+      const response = await axios.post(`${API_BASE}/2fa/recovery-codes/regenerate`, payload)
+      return response.data
+    },
+
     // 🧹 清除认证信息
     clearAuth() {
       this.user = null
       this.sessionToken = null
       this.isAuthenticated = false
       this.config = null
+      this.pendingTwoFactor = null
 
       localStorage.removeItem('userToken')
       localStorage.removeItem('userData')
