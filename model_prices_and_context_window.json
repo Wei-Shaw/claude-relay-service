@@ -75,6 +75,7 @@
     "max_tokens": 32000,
     "mode": "chat",
     "output_cost_per_token": 7.5e-05,
+    "prompt_cache_min_tokens": 1024,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -105,6 +106,7 @@
     "mode": "chat",
     "output_cost_per_token": 1.5e-05,
     "output_cost_per_token_above_200k_tokens": 2.25e-05,
+    "prompt_cache_min_tokens": 1024,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -132,6 +134,7 @@
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 5e-05,
+    "prompt_cache_min_tokens": 512,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -169,6 +172,7 @@
     "max_tokens": 64000,
     "mode": "chat",
     "output_cost_per_token": 5e-06,
+    "prompt_cache_min_tokens": 4096,
     "supports_assistant_prefill": true,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -190,6 +194,7 @@
     "max_tokens": 64000,
     "mode": "chat",
     "output_cost_per_token": 5e-06,
+    "prompt_cache_min_tokens": 4096,
     "supports_assistant_prefill": true,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -247,6 +252,7 @@
     "max_tokens": 32000,
     "mode": "chat",
     "output_cost_per_token": 7.5e-05,
+    "prompt_cache_min_tokens": 1024,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -275,6 +281,7 @@
     "max_tokens": 32000,
     "mode": "chat",
     "output_cost_per_token": 7.5e-05,
+    "prompt_cache_min_tokens": 1024,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -303,6 +310,7 @@
     "max_tokens": 32000,
     "mode": "chat",
     "output_cost_per_token": 7.5e-05,
+    "prompt_cache_min_tokens": 1024,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -329,6 +337,7 @@
     "max_tokens": 64000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
+    "prompt_cache_min_tokens": 4096,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -357,6 +366,7 @@
     "max_tokens": 64000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
+    "prompt_cache_min_tokens": 4096,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -385,6 +395,7 @@
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
+    "prompt_cache_min_tokens": 4096,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -420,6 +431,7 @@
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
+    "prompt_cache_min_tokens": 4096,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -455,6 +467,7 @@
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
+    "prompt_cache_min_tokens": 4096,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -490,6 +503,7 @@
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
+    "prompt_cache_min_tokens": 2048,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -527,6 +541,7 @@
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
+    "prompt_cache_min_tokens": 2048,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -564,6 +579,7 @@
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
+    "prompt_cache_min_tokens": 2048,
     "provider_specific_entry": {
       "fast": 6.0,
       "us": 1.1
@@ -606,6 +622,7 @@
     "mode": "chat",
     "output_cost_per_token": 1.5e-05,
     "output_cost_per_token_above_200k_tokens": 2.25e-05,
+    "prompt_cache_min_tokens": 1024,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -637,6 +654,7 @@
     "mode": "chat",
     "output_cost_per_token": 1.5e-05,
     "output_cost_per_token_above_200k_tokens": 2.25e-05,
+    "prompt_cache_min_tokens": 1024,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -669,6 +687,7 @@
     "mode": "chat",
     "output_cost_per_token": 1.5e-05,
     "output_cost_per_token_above_200k_tokens": 2.25e-05,
+    "prompt_cache_min_tokens": 1024,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -702,6 +721,7 @@
     "mode": "chat",
     "output_cost_per_token": 1.5e-05,
     "output_cost_per_token_above_200k_tokens": 2.25e-05,
+    "prompt_cache_min_tokens": 1024,
     "supports_assistant_prefill": true,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -724,6 +744,7 @@
     "max_tokens": 64000,
     "mode": "chat",
     "output_cost_per_token": 1.5e-05,
+    "prompt_cache_min_tokens": 1024,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -755,6 +776,7 @@
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 1e-05,
+    "prompt_cache_min_tokens": 1024,
     "provider_specific_entry": {
       "us": 1.1
     },
