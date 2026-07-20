@@ -89,10 +89,12 @@ describe('apiKeyService openai responses config', () => {
     expect(storedKeyData.enableOpenAIResponsesCodexAdaptation).toBe('true')
     expect(storedKeyData.enableOpenAIResponsesPayloadRules).toBe('false')
     expect(storedKeyData.openaiResponsesPayloadRules).toBe('[]')
+    expect(storedKeyData.scheduledActivationAt).toBe('')
 
     expect(result.enableOpenAIResponsesCodexAdaptation).toBe(true)
     expect(result.enableOpenAIResponsesPayloadRules).toBe(false)
     expect(result.openaiResponsesPayloadRules).toEqual([])
+    expect(result.scheduledActivationAt).toBeNull()
   })
 
   test('updateApiKey serializes toggle and payload rule fields', async () => {
@@ -117,6 +119,42 @@ describe('apiKeyService openai responses config', () => {
     expect(storedKeyData.openaiResponsesPayloadRules).toBe(
       JSON.stringify([{ path: 'model', valueType: 'string', value: 'gpt-5' }])
     )
+  })
+
+  test('activates only inactive keys whose scheduled time has arrived', async () => {
+    const now = new Date('2026-07-20T10:00:00.000Z')
+    const getKeys = jest.spyOn(apiKeyService, 'getAllApiKeysFast').mockResolvedValue([
+      {
+        id: 'due-key',
+        name: 'Due Key',
+        isActive: false,
+        scheduledActivationAt: '2026-07-20T09:59:00.000Z'
+      },
+      {
+        id: 'future-key',
+        name: 'Future Key',
+        isActive: false,
+        scheduledActivationAt: '2026-07-20T10:01:00.000Z'
+      },
+      {
+        id: 'active-key',
+        name: 'Active Key',
+        isActive: true,
+        scheduledActivationAt: '2026-07-20T09:59:00.000Z'
+      }
+    ])
+    const updateKey = jest.spyOn(apiKeyService, 'updateApiKey').mockResolvedValue({ success: true })
+
+    const activated = await apiKeyService.activateScheduledKeys(now)
+
+    expect(activated).toBe(1)
+    expect(updateKey).toHaveBeenCalledWith('due-key', {
+      isActive: true,
+      scheduledActivationAt: null
+    })
+
+    getKeys.mockRestore()
+    updateKey.mockRestore()
   })
 
   test('getApiKeyById returns parsed toggle and rule values', async () => {
