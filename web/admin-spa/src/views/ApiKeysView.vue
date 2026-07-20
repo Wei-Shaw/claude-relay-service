@@ -603,16 +603,29 @@
                             'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
                             key.isActive
                               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                              : key.scheduledActivationAt
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                           ]"
+                          :title="
+                            key.scheduledActivationAt
+                              ? `计划于 ${formatDate(key.scheduledActivationAt)} 激活`
+                              : ''
+                          "
                         >
                           <div
                             :class="[
                               'mr-2 h-2 w-2 rounded-full',
-                              key.isActive ? 'bg-green-500' : 'bg-red-500'
+                              key.isActive
+                                ? 'bg-green-500'
+                                : key.scheduledActivationAt
+                                  ? 'bg-amber-500'
+                                  : 'bg-red-500'
                             ]"
                           />
-                          {{ key.isActive ? '活跃' : '禁用' }}
+                          {{
+                            key.isActive ? '活跃' : key.scheduledActivationAt ? '待激活' : '禁用'
+                          }}
                         </span>
                       </td>
                       <!-- 费用 -->
@@ -965,7 +978,13 @@
                                 : 'text-green-600 hover:bg-green-50 hover:text-green-900 dark:hover:bg-green-900/20',
                               'rounded px-2 py-1 text-xs font-medium transition-colors'
                             ]"
-                            :title="key.isActive ? '禁用' : '激活'"
+                            :title="
+                              key.isActive
+                                ? '禁用'
+                                : key.scheduledActivationAt
+                                  ? `计划于 ${formatDate(key.scheduledActivationAt)} 激活`
+                                  : '激活'
+                            "
                             @click="toggleApiKeyStatus(key)"
                           >
                             <i :class="['fas', key.isActive ? 'fa-ban' : 'fa-check-circle']" />
@@ -1308,16 +1327,27 @@
                     'inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold',
                     key.isActive
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                      : key.scheduledActivationAt
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                   ]"
+                  :title="
+                    key.scheduledActivationAt
+                      ? `计划于 ${formatDate(key.scheduledActivationAt)} 激活`
+                      : ''
+                  "
                 >
                   <div
                     :class="[
                       'mr-1.5 h-1.5 w-1.5 rounded-full',
-                      key.isActive ? 'bg-green-500' : 'bg-red-500'
+                      key.isActive
+                        ? 'bg-green-500'
+                        : key.scheduledActivationAt
+                          ? 'bg-amber-500'
+                          : 'bg-red-500'
                     ]"
                   />
-                  {{ key.isActive ? '活跃' : '已停用' }}
+                  {{ key.isActive ? '活跃' : key.scheduledActivationAt ? '待激活' : '已停用' }}
                 </span>
               </div>
 
@@ -1674,7 +1704,7 @@
                   @click="toggleApiKeyStatus(key)"
                 >
                   <i :class="['fas', key.isActive ? 'fa-ban' : 'fa-check-circle', 'mr-1']" />
-                  {{ key.isActive ? '禁用' : '激活' }}
+                  {{ key.isActive ? '禁用' : key.scheduledActivationAt ? '调整激活' : '激活' }}
                 </button>
                 <button
                   class="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50"
@@ -2139,6 +2169,14 @@
       @save="handleSaveExpiry"
     />
 
+    <ApiKeyActivationModal
+      :api-key="activatingApiKey"
+      :loading="activationSaving"
+      :show="!!activatingApiKey"
+      @close="closeApiKeyActivationModal"
+      @submit="handleApiKeyActivation"
+    />
+
     <UsageDetailModal
       :api-key="selectedApiKeyForDetail || {}"
       :generated-at="apiKeyUsageGeneratedAt"
@@ -2183,6 +2221,7 @@ import NewApiKeyModal from '@/components/apikeys/NewApiKeyModal.vue'
 import BatchApiKeyModal from '@/components/apikeys/BatchApiKeyModal.vue'
 import BatchEditApiKeyModal from '@/components/apikeys/BatchEditApiKeyModal.vue'
 import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
+import ApiKeyActivationModal from '@/components/apikeys/ApiKeyActivationModal.vue'
 import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import TagManagementModal from '@/components/apikeys/TagManagementModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
@@ -2289,6 +2328,8 @@ const accountsLoading = ref(false)
 const accountsLoaded = ref(false)
 const editingExpiryKey = ref(null)
 const expiryEditModalRef = ref(null)
+const activatingApiKey = ref(null)
+const activationSaving = ref(false)
 const showUsageDetailModal = ref(false)
 const selectedApiKeyForDetail = ref(null)
 const apiKeyUsageLoading = ref(false)
@@ -3803,6 +3844,56 @@ const openRenewApiKeyModal = (apiKey) => {
   showRenewApiKeyModal.value = true
 }
 
+const openApiKeyActivationModal = (apiKey) => {
+  activatingApiKey.value = apiKey
+}
+
+const closeApiKeyActivationModal = () => {
+  if (!activationSaving.value) {
+    activatingApiKey.value = null
+  }
+}
+
+const handleApiKeyActivation = async ({ mode, scheduledAt }) => {
+  const apiKey = activatingApiKey.value
+  if (!apiKey) return
+
+  activationSaving.value = true
+  try {
+    const data = await httpApis.updateApiKeyActivationApi(apiKey.id, { mode, scheduledAt })
+    if (!data.success) {
+      showToast(data.message || '操作失败', 'error')
+      return
+    }
+
+    const localKey = apiKeys.value.find((key) => key.id === apiKey.id)
+    if (localKey) {
+      if (mode === 'immediate') {
+        localKey.isActive = true
+        localKey.scheduledActivationAt = null
+      } else if (mode === 'scheduled') {
+        localKey.isActive = false
+        localKey.scheduledActivationAt = data.scheduledActivationAt || scheduledAt
+      } else {
+        localKey.scheduledActivationAt = null
+      }
+    }
+
+    const message =
+      mode === 'immediate'
+        ? 'API Key 已激活'
+        : mode === 'scheduled'
+          ? 'API Key 已设置定时激活'
+          : '已取消定时激活'
+    showToast(message, 'success')
+    activatingApiKey.value = null
+  } catch (error) {
+    showToast('操作失败', 'error')
+  } finally {
+    activationSaving.value = false
+  }
+}
+
 // 处理创建成功
 const handleCreateSuccess = (data) => {
   showCreateApiKeyModal.value = false
@@ -3883,7 +3974,7 @@ const getApiKeyActions = (key) => {
   // 激活/禁用
   actions.push({
     key: 'toggle',
-    label: key.isActive ? '禁用' : '激活',
+    label: key.isActive ? '禁用' : key.scheduledActivationAt ? '调整激活' : '激活',
     icon: key.isActive ? 'fa-ban' : 'fa-check-circle',
     color: key.isActive ? 'orange' : 'green',
     handler: () => toggleApiKeyStatus(key)
@@ -3903,6 +3994,11 @@ const getApiKeyActions = (key) => {
 
 // 切换API Key状态（激活/禁用）
 const toggleApiKeyStatus = async (key) => {
+  if (!key.isActive) {
+    openApiKeyActivationModal(key)
+    return
+  }
+
   let confirmed = true
 
   // 禁用时需要二次确认

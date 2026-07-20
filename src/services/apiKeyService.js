@@ -260,6 +260,7 @@ class ApiKeyService {
       expirationMode: expirationMode || 'fixed', // 新增：过期模式
       isActivated: expirationMode === 'fixed' ? 'true' : 'false', // 根据模式决定激活状态
       activatedAt: expirationMode === 'fixed' ? new Date().toISOString() : '', // 激活时间
+      scheduledActivationAt: '', // 定时启用时间
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
       expiresAt: expirationMode === 'fixed' ? expiresAt || '' : '', // 固定模式才设置过期时间
@@ -336,6 +337,7 @@ class ApiKeyService {
       expirationMode: keyData.expirationMode || 'fixed',
       isActivated: keyData.isActivated === 'true',
       activatedAt: keyData.activatedAt,
+      scheduledActivationAt: keyData.scheduledActivationAt || null,
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
       createdBy: keyData.createdBy,
@@ -660,6 +662,7 @@ class ApiKeyService {
           activationDays: parseInt(keyData.activationDays || 0),
           activationUnit: keyData.activationUnit || 'days',
           activatedAt: keyData.activatedAt || null,
+          scheduledActivationAt: keyData.scheduledActivationAt || null,
           claudeAccountId: keyData.claudeAccountId,
           claudeConsoleAccountId: keyData.claudeConsoleAccountId,
           geminiAccountId: keyData.geminiAccountId,
@@ -915,6 +918,7 @@ class ApiKeyService {
         key.expirationMode = key.expirationMode || 'fixed'
         key.isActivated = key.isActivated === 'true'
         key.activatedAt = key.activatedAt || null
+        key.scheduledActivationAt = key.scheduledActivationAt || null
 
         // 获取当前时间窗口的请求次数、Token使用量和费用
         if (key.rateLimitWindow > 0) {
@@ -1168,6 +1172,7 @@ class ApiKeyService {
         key.activationUnit = key.activationUnit || 'days'
         key.expirationMode = key.expirationMode || 'fixed'
         key.activatedAt = key.activatedAt || null
+        key.scheduledActivationAt = key.scheduledActivationAt || null
 
         // Rate limit 窗口数据
         if (key.rateLimitWindow > 0) {
@@ -1350,6 +1355,7 @@ class ApiKeyService {
         'expirationMode', // 新增：过期模式
         'isActivated', // 新增：是否已激活
         'activatedAt', // 新增：激活时间
+        'scheduledActivationAt', // 定时启用时间
         'enableModelRestriction',
         'restrictedModels',
         'enableClientRestriction',
@@ -1393,7 +1399,11 @@ class ApiKeyService {
           ) {
             // 布尔值转字符串
             updatedData[field] = String(value)
-          } else if (field === 'expiresAt' || field === 'activatedAt') {
+          } else if (
+            field === 'expiresAt' ||
+            field === 'activatedAt' ||
+            field === 'scheduledActivationAt'
+          ) {
             // 日期字段保持原样，不要toString()
             updatedData[field] = value || ''
           } else {
@@ -2864,6 +2874,38 @@ class ApiKeyService {
       return boundKeys.length
     } catch (error) {
       logger.error(`❌ 解绑 API Keys 失败 (${accountType} 账号 ${accountId}):`, error)
+      return 0
+    }
+  }
+
+  // ⏰ 激活到期的定时 API Keys
+  async activateScheduledKeys(now = new Date()) {
+    try {
+      const apiKeys = await this.getAllApiKeysFast()
+      let activatedCount = 0
+
+      for (const key of apiKeys) {
+        const scheduledAt = key.scheduledActivationAt && new Date(key.scheduledActivationAt)
+        if (
+          key.isActive ||
+          !scheduledAt ||
+          Number.isNaN(scheduledAt.getTime()) ||
+          scheduledAt > now
+        ) {
+          continue
+        }
+
+        await this.updateApiKey(key.id, {
+          isActive: true,
+          scheduledActivationAt: null
+        })
+        logger.success(`⏰ Scheduled API key activated: ${key.id} (${key.name})`)
+        activatedCount++
+      }
+
+      return activatedCount
+    } catch (error) {
+      logger.error('❌ Failed to activate scheduled API keys:', error)
       return 0
     }
   }

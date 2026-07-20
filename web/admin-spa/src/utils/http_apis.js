@@ -80,6 +80,8 @@ export const getApiKeysWithParamsApi = (params) =>
 export const createApiKeyApi = (data) => request({ url: '/admin/api-keys', method: 'POST', data })
 export const updateApiKeyApi = (id, data) =>
   request({ url: `/admin/api-keys/${id}`, method: 'PUT', data })
+export const updateApiKeyActivationApi = (id, data) =>
+  request({ url: `/admin/api-keys/${id}/activation`, method: 'PATCH', data })
 export const toggleApiKeyApi = (id) =>
   request({ url: `/admin/api-keys/${id}/toggle`, method: 'PUT' })
 export const deleteApiKeyApi = (id) => request({ url: `/admin/api-keys/${id}`, method: 'DELETE' })

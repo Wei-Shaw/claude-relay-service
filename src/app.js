@@ -45,6 +45,7 @@ class Application {
   constructor() {
     this.app = express()
     this.server = null
+    this.scheduledActivationTimer = null
   }
 
   async initialize() {
@@ -629,6 +630,22 @@ class Application {
   }
 
   startCleanupTasks() {
+    const activateScheduledKeys = async () => {
+      try {
+        const apiKeyService = require('./services/apiKeyService')
+        const activatedKeys = await apiKeyService.activateScheduledKeys()
+        if (activatedKeys > 0) {
+          logger.success(`⏰ Activated ${activatedKeys} scheduled API keys`)
+        }
+      } catch (error) {
+        logger.error('❌ Scheduled API key activation failed:', error)
+      }
+    }
+
+    activateScheduledKeys()
+    this.scheduledActivationTimer = setInterval(activateScheduledKeys, 60 * 1000)
+    logger.info('⏰ Scheduled API key activation check runs every minute')
+
     // 🧹 每小时清理一次过期数据
     setInterval(async () => {
       try {
@@ -820,6 +837,12 @@ class Application {
             logger.info('🚨 Rate limit cleanup service stopped')
           } catch (error) {
             logger.error('❌ Error stopping rate limit cleanup service:', error)
+          }
+
+          if (this.scheduledActivationTimer) {
+            clearInterval(this.scheduledActivationTimer)
+            this.scheduledActivationTimer = null
+            logger.info('⏰ Scheduled API key activation stopped')
           }
 
           // 停止用户消息队列清理服务

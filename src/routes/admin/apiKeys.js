@@ -2437,6 +2437,74 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 设置 API Key 的立即或定时激活
+router.patch('/api-keys/:keyId/activation', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const { mode, scheduledAt } = req.body
+
+    if (!['immediate', 'scheduled', 'cancel'].includes(mode)) {
+      return res.status(400).json({ error: 'Invalid activation mode' })
+    }
+
+    const keyData = await redis.getApiKey(keyId)
+    if (!keyData || Object.keys(keyData).length === 0 || keyData.isDeleted === 'true') {
+      return res.status(404).json({ error: 'API key not found' })
+    }
+
+    if (mode === 'cancel') {
+      await apiKeyService.updateApiKey(keyId, { scheduledActivationAt: null })
+      logger.success(`⏰ Scheduled activation cancelled for API key: ${keyId}`)
+      return res.json({
+        success: true,
+        message: 'Scheduled activation cancelled',
+        scheduledActivationAt: null
+      })
+    }
+
+    if (keyData.isActive === 'true') {
+      return res.status(400).json({ error: 'API key is already active' })
+    }
+
+    if (mode === 'immediate') {
+      await apiKeyService.updateApiKey(keyId, {
+        isActive: true,
+        scheduledActivationAt: null
+      })
+      logger.success(`🔓 API key activated immediately: ${keyId}`)
+      return res.json({
+        success: true,
+        message: 'API key activated',
+        scheduledActivationAt: null
+      })
+    }
+
+    if (typeof scheduledAt !== 'string') {
+      return res.status(400).json({ error: 'Scheduled activation time is required' })
+    }
+
+    const activationTime = new Date(scheduledAt)
+    if (Number.isNaN(activationTime.getTime()) || activationTime <= new Date()) {
+      return res.status(400).json({ error: 'Scheduled activation time must be in the future' })
+    }
+
+    const scheduledActivationAt = activationTime.toISOString()
+    await apiKeyService.updateApiKey(keyId, {
+      isActive: false,
+      scheduledActivationAt
+    })
+    logger.success(`⏰ API key scheduled for activation: ${keyId} at ${scheduledActivationAt}`)
+    return res.json({
+      success: true,
+      message: 'API key activation scheduled',
+      scheduledActivationAt
+    })
+  } catch (error) {
+    logger.error('❌ Failed to update API key activation:', error)
+    return res.status(500).json({ error: 'Failed to update API key activation', message: error.message })
+  }
+})
+
 // 修改API Key过期时间（包括手动激活功能）
 router.patch('/api-keys/:keyId/expiration', authenticateAdmin, async (req, res) => {
   try {
