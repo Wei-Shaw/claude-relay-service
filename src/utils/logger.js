@@ -18,8 +18,14 @@ const safeStringify = (obj, maxDepth = Infinity) => {
     // 处理字符串值，清理可能导致JSON解析错误的特殊字符
     if (typeof value === 'string') {
       try {
+        // 超长字符串（如 axios error 携带的完整请求体）必须在正则清洗/深拷贝之前截断，
+        // 否则错误高峰期多次全量复制会耗尽 V8 堆（heap OOM 崩溃循环，见 #1099）
+        const raw =
+          value.length > 100000
+            ? `${value.substring(0, 10000)}...[truncated ${value.length} chars]`
+            : value
         // 移除或转义可能导致JSON解析错误的字符
-        const cleanValue = value
+        const cleanValue = raw
           // eslint-disable-next-line no-control-regex
           .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '') // 移除控制字符
           .replace(/[\uD800-\uDFFF]/g, '') // 移除孤立的代理对字符
@@ -74,9 +80,12 @@ const safeStringify = (obj, maxDepth = Infinity) => {
     // 体积保护: 超过 50KB 时对大字段做截断，保留顶层结构
     if (result.length > 50000 && processed && typeof processed === 'object') {
       const truncated = { ...processed, _truncated: true, _totalChars: result.length }
+      // 只跳过 safeStringify 自身添加的元数据字段；不能按 `_` 前缀跳过，
+      // 否则 Node 内部对象（如 ClientRequest）的 `_` 开头属性会完全绕过截断（#1099 Bug 1）
+      const isMetaField = (k) => k === '_truncated' || k === '_totalChars'
       // 第一轮: 截断单个大字段
       for (const [k, v] of Object.entries(truncated)) {
-        if (k.startsWith('_')) {
+        if (isMetaField(k)) {
           continue
         }
         const fieldStr = typeof v === 'string' ? v : JSON.stringify(v)
@@ -88,7 +97,7 @@ const safeStringify = (obj, maxDepth = Infinity) => {
       let secondResult = JSON.stringify(truncated)
       if (secondResult.length > 50000) {
         for (const [k, v] of Object.entries(truncated)) {
-          if (k.startsWith('_')) {
+          if (isMetaField(k)) {
             continue
           }
           const fieldStr = typeof v === 'string' ? v : JSON.stringify(v)
