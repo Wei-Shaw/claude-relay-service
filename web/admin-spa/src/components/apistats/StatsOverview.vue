@@ -256,15 +256,18 @@
           </div>
 
           <div v-else-if="account.platform === 'openai'" class="mt-3">
-            <div v-if="account.codexUsage" class="space-y-2">
+            <div
+              v-if="account.codexUsage && codexWindowTypes(account.codexUsage).length"
+              class="space-y-2"
+            >
               <div
-                v-for="type in ['primary', 'secondary']"
+                v-for="type in codexWindowTypes(account.codexUsage)"
                 :key="`${account.key}-${type}`"
                 class="quota-row"
               >
                 <div class="quota-header">
                   <span class="quota-tag" :class="type === 'primary' ? 'tag-indigo' : 'tag-blue'">
-                    {{ getCodexWindowLabel(type) }}
+                    {{ getCodexWindowLabel(account.codexUsage?.[type], type) }}
                   </span>
                   <span class="quota-percent">
                     {{ formatCodexUsagePercent(account.codexUsage?.[type]) }}
@@ -535,7 +538,33 @@ const formatCodexRemaining = (usageItem) => {
   return `${secs}秒`
 }
 
-const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
+// 根据窗口时长（分钟）推导标签，避免写死槽位（OpenAI 已取消 5h，现仅下发周限）
+const formatCodexWindowMinutes = (windowMinutes) => {
+  const m = Number(windowMinutes)
+  if (!Number.isFinite(m) || m <= 0) return null
+  if (m === 10080) return '周限'
+  if (m % 10080 === 0) return `${m / 10080}周`
+  if (m % 1440 === 0) return `${m / 1440}天`
+  if (m % 60 === 0) return `${m / 60}h`
+  return `${m}分钟`
+}
+
+// 该额度窗口是否有真实数据（无 windowMinutes 视为空槽，不渲染）
+const hasCodexWindow = (usageItem) => {
+  if (!usageItem) return false
+  const m = Number(usageItem.windowMinutes)
+  return Number.isFinite(m) && m > 0
+}
+
+// 有真实数据的窗口类型列表（供模板 v-for 过滤空槽）
+const codexWindowTypes = (codexUsage) =>
+  ['primary', 'secondary'].filter((t) => hasCodexWindow(codexUsage?.[t]))
+
+const getCodexWindowLabel = (usageItem, type) => {
+  const dynamic = formatCodexWindowMinutes(usageItem?.windowMinutes)
+  if (dynamic) return dynamic
+  return type === 'secondary' ? '周限' : '5h'
+}
 </script>
 
 <style scoped>
