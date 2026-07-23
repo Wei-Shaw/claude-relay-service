@@ -974,29 +974,58 @@ async function handleImages(req, res) {
     const body = req.body || {}
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
     if (!prompt) {
-      return res.status(400).json({ error: { message: 'prompt is required', type: 'invalid_request_error' } })
+      return res
+        .status(400)
+        .json({ error: { message: 'prompt is required', type: 'invalid_request_error' } })
     }
     const imageModel = (body.model || 'gpt-image-2').toString().trim()
     if (!/^gpt-image-/i.test(imageModel)) {
-      return res.status(400).json({ error: { message: `images endpoint requires a gpt-image-* model, got "${imageModel}"`, type: 'invalid_request_error' } })
+      return res.status(400).json({
+        error: {
+          message: `images endpoint requires a gpt-image-* model, got "${imageModel}"`,
+          type: 'invalid_request_error'
+        }
+      })
     }
     const n = Number.isInteger(body.n) && body.n > 0 ? body.n : 1
     const sessionId = req.headers['session_id'] || req.body?.session_id || null
 
-    let accessToken, account, proxy, accountId, accountType
-    ;({ accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(apiKeyData, sessionId, 'gpt-5.4-mini'))
+    const { accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
+      apiKeyData,
+      sessionId,
+      'gpt-5.4-mini'
+    )
     if (accountType === 'openai-responses' || !accessToken) {
-      return res.status(400).json({ error: { message: 'images bridge requires an OpenAI OAuth (Codex) account', type: 'invalid_request_error' } })
+      return res.status(400).json({
+        error: {
+          message: 'images bridge requires an OpenAI OAuth (Codex) account',
+          type: 'invalid_request_error'
+        }
+      })
     }
 
     const tool = { type: 'image_generation', action: 'generate', model: imageModel }
-    if (body.size) tool.size = String(body.size)
-    if (body.quality) tool.quality = String(body.quality)
-    if (body.background) tool.background = String(body.background)
-    if (body.output_format) tool.output_format = String(body.output_format)
-    if (body.moderation) tool.moderation = String(body.moderation)
-    if (Number.isInteger(body.output_compression)) tool.output_compression = body.output_compression
-    if (n !== 1) tool.n = n
+    if (body.size) {
+      tool.size = String(body.size)
+    }
+    if (body.quality) {
+      tool.quality = String(body.quality)
+    }
+    if (body.background) {
+      tool.background = String(body.background)
+    }
+    if (body.output_format) {
+      tool.output_format = String(body.output_format)
+    }
+    if (body.moderation) {
+      tool.moderation = String(body.moderation)
+    }
+    if (Number.isInteger(body.output_compression)) {
+      tool.output_compression = body.output_compression
+    }
+    if (n !== 1) {
+      tool.n = n
+    }
 
     const payload = {
       instructions: '',
@@ -1022,15 +1051,35 @@ async function handleImages(req, res) {
       version: '0.144.5'
     }
     const proxyAgent = createProxyAgent(proxy)
-    const axiosConfig = { headers, timeout: config.requestTimeout || 600000, validateStatus: () => true, responseType: 'stream' }
-    if (proxyAgent) { axiosConfig.httpAgent = proxyAgent; axiosConfig.httpsAgent = proxyAgent; axiosConfig.proxy = false }
+    const axiosConfig = {
+      headers,
+      timeout: config.requestTimeout || 600000,
+      validateStatus: () => true,
+      responseType: 'stream'
+    }
+    if (proxyAgent) {
+      axiosConfig.httpAgent = proxyAgent
+      axiosConfig.httpsAgent = proxyAgent
+      axiosConfig.proxy = false
+    }
 
-    const upstream = await axios.post('https://chatgpt.com/backend-api/codex/responses', payload, axiosConfig)
+    const upstream = await axios.post(
+      'https://chatgpt.com/backend-api/codex/responses',
+      payload,
+      axiosConfig
+    )
     if (upstream.status < 200 || upstream.status >= 300) {
       let errBuf = ''
-      upstream.data.on('data', (d) => { errBuf += d.toString() })
+      upstream.data.on('data', (d) => {
+        errBuf += d.toString()
+      })
       upstream.data.on('end', () => {
-        res.status(upstream.status).json({ error: { message: `upstream ${upstream.status}: ${errBuf.slice(0, 500)}`, type: 'upstream_error' } })
+        res.status(upstream.status).json({
+          error: {
+            message: `upstream ${upstream.status}: ${errBuf.slice(0, 500)}`,
+            type: 'upstream_error'
+          }
+        })
       })
       return
     }
@@ -1042,17 +1091,34 @@ async function handleImages(req, res) {
       buf += chunk.toString()
       let idx
       while ((idx = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, idx); buf = buf.slice(idx + 1)
-        if (!line.startsWith('data:')) continue
+        const line = buf.slice(0, idx)
+        buf = buf.slice(idx + 1)
+        if (!line.startsWith('data:')) {
+          continue
+        }
         const p = line.slice(5).trim()
-        if (!p || p === '[DONE]') continue
+        if (!p || p === '[DONE]') {
+          continue
+        }
         let j
-        try { j = JSON.parse(p) } catch (e) { continue }
+        try {
+          j = JSON.parse(p)
+        } catch (e) {
+          continue
+        }
         if (j && typeof j.partial_image_b64 === 'string') {
           const i = Number.isInteger(j.partial_image_index) ? j.partial_image_index : 0
-          if (!best[i] || j.partial_image_b64.length >= best[i].length) best[i] = j.partial_image_b64
+          if (!best[i] || j.partial_image_b64.length >= best[i].length) {
+            best[i] = j.partial_image_b64
+          }
         }
-        if (j && j.type === 'response.completed' && j.response && Array.isArray(j.response.tools) && j.response.tools[0]) {
+        if (
+          j &&
+          j.type === 'response.completed' &&
+          j.response &&
+          Array.isArray(j.response.tools) &&
+          j.response.tools[0]
+        ) {
           meta = j.response.tools[0]
         }
       }
@@ -1060,23 +1126,44 @@ async function handleImages(req, res) {
     upstream.data.on('end', () => {
       const keys = Object.keys(best).sort((a, b) => Number(a) - Number(b))
       if (!keys.length) {
-        if (!res.headersSent) res.status(502).json({ error: { message: 'no image produced by upstream', type: 'upstream_error' } })
+        if (!res.headersSent) {
+          res
+            .status(502)
+            .json({ error: { message: 'no image produced by upstream', type: 'upstream_error' } })
+        }
         return
       }
       const data = keys.map((k) => ({ b64_json: best[k] }))
       if (!res.headersSent) {
-        res.status(200).json({ created: Math.floor(Date.now() / 1000), data, size: meta.size, quality: meta.quality, background: meta.background, output_format: meta.output_format })
+        res.status(200).json({
+          created: Math.floor(Date.now() / 1000),
+          data,
+          size: meta.size,
+          quality: meta.quality,
+          background: meta.background,
+          output_format: meta.output_format
+        })
       }
     })
     upstream.data.on('error', (e) => {
-      if (!res.headersSent) res.status(502).json({ error: { message: getSafeMessage ? getSafeMessage(e) : String(e && e.message), type: 'upstream_error' } })
+      if (!res.headersSent) {
+        res.status(502).json({
+          error: {
+            message: getSafeMessage ? getSafeMessage(e) : String(e && e.message),
+            type: 'upstream_error'
+          }
+        })
+      }
     })
   } catch (error) {
     logger.error('handleImages error:', error)
-    if (!res.headersSent) res.status(error.statusCode || 500).json({ error: { message: (error && error.message) || 'internal error', type: 'api_error' } })
+    if (!res.headersSent) {
+      res.status(error.statusCode || 500).json({
+        error: { message: (error && error.message) || 'internal error', type: 'api_error' }
+      })
+    }
   }
 }
-
 
 router.post('/images/generations', authenticateApiKey, handleImages)
 router.post('/v1/images/generations', authenticateApiKey, handleImages)
