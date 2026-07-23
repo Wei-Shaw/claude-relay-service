@@ -428,6 +428,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
 
       // 处理错误响应
       if (claudeResponse.statusCode >= 400) {
+        res._upstreamResponseBody = claudeData
         return res.status(claudeResponse.statusCode).json({
           error: {
             message: claudeData.error?.message || 'Claude API error',

@@ -464,6 +464,8 @@ class ClaudeConsoleRelayService {
         statusCode: response.status,
         headers: response.headers,
         body: responseBody,
+        upstreamResponseBody:
+          response.status < 200 || response.status >= 300 ? response.data : undefined,
         accountId,
         actualModel: mappedModel,
         requestedModel: requestBody.model,
@@ -890,6 +892,13 @@ class ClaudeConsoleRelayService {
 
             response.data.on('end', async () => {
               const autoProtectionDisabled = account.disableAutoProtection === true
+              const fullErrorData = Buffer.concat(errorChunks).toString()
+              try {
+                responseStream._upstreamResponseBody = JSON.parse(fullErrorData)
+              } catch (parseError) {
+                responseStream._upstreamResponseBody = fullErrorData
+              }
+
               // 记录原始错误消息到日志（方便调试，包含供应商信息）
               logger.error(
                 `📝 [Stream] Upstream error response from ${account?.name || accountId}: ${errorDataForCheck.substring(0, 500)}`
@@ -990,7 +999,6 @@ class ClaudeConsoleRelayService {
 
               // 清理并发送错误响应
               try {
-                const fullErrorData = Buffer.concat(errorChunks).toString()
                 const errorJson = JSON.parse(fullErrorData)
                 const sanitizedError = sanitizeUpstreamError(errorJson)
 

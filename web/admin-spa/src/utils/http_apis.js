@@ -68,6 +68,13 @@ export const purgeRequestDetailBodyPreviewApi = (config) =>
   request({ url: '/admin/request-details/body-preview-purge', method: 'POST', ...config })
 export const getRequestDetailApi = (requestId) =>
   request({ url: `/admin/request-details/${requestId}`, method: 'GET' })
+export const replayRequestDetailApi = (requestId, data) =>
+  request({
+    url: `/admin/request-details/${requestId}/replay`,
+    method: 'POST',
+    data,
+    timeout: 600000
+  })
 
 // 客户端
 export const getSupportedClientsApi = () =>
