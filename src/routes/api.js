@@ -1355,6 +1355,7 @@ async function handleMessagesRequest(req, res) {
         // 使用 Express 内建的 res.json() 发送响应（简单可靠）
         // 对错误响应进行清理，隐藏上游服务的敏感信息
         if (response.statusCode >= 400) {
+          res._upstreamResponseBody = response.upstreamResponseBody ?? jsonData
           res.json(sanitizeUpstreamError(jsonData))
         } else {
           rewriteModelFieldsForClient(
@@ -1366,6 +1367,9 @@ async function handleMessagesRequest(req, res) {
       } catch (parseError) {
         logger.warn('⚠️ Failed to parse Claude API response as JSON:', parseError.message)
         logger.info('📄 Raw response body:', response.body)
+        if (response.statusCode >= 400) {
+          res._upstreamResponseBody = response.upstreamResponseBody ?? response.body
+        }
         // 使用 Express 内建的 res.send() 发送响应（简单可靠）
         res.send(response.body)
       }
@@ -1861,12 +1865,16 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
     try {
       const jsonData = JSON.parse(response.body)
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        res._upstreamResponseBody = response.upstreamResponseBody ?? jsonData
         const sanitizedData = sanitizeUpstreamError(jsonData)
         res.json(sanitizedData)
       } else {
         res.json(jsonData)
       }
     } catch (parseError) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        res._upstreamResponseBody = response.upstreamResponseBody ?? response.body
+      }
       res.send(response.body)
     }
 

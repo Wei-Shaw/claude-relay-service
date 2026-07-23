@@ -427,6 +427,9 @@ class DroidRelayService {
       }
 
       if (error.response) {
+        if (clientResponse) {
+          clientResponse._upstreamResponseBody = error.response.data
+        }
         const safeErrorResponse = buildDroidClientError(
           error.response.status,
           error.response.data,

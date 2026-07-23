@@ -32,6 +32,7 @@ function createRequestResponse() {
   res.setHeader = jest.fn()
   res.get = jest.fn(() => null)
   res.json = jest.fn()
+  res.send = jest.fn()
   return { req, res }
 }
 
@@ -75,5 +76,26 @@ describe('requestLogger close 分类', () => {
         errorType: 'client_aborted'
       })
     )
+  })
+
+  it('捕获通过 res.send 返回的错误响应体', () => {
+    const { req, res } = createRequestResponse()
+    res.statusCode = 502
+    requestLogger(req, res, jest.fn())
+
+    res.send('{"error":"upstream failed"}')
+
+    expect(res._responseBody).toBe('{"error":"upstream failed"}')
+  })
+
+  it('res.json 内部调用 res.send 时保留结构化错误响应体', () => {
+    const { req, res } = createRequestResponse()
+    res.statusCode = 400
+    res.json = jest.fn((body) => res.send(JSON.stringify(body)))
+    requestLogger(req, res, jest.fn())
+
+    res.json({ error: { message: 'invalid request' } })
+
+    expect(res._responseBody).toEqual({ error: { message: 'invalid request' } })
   })
 })

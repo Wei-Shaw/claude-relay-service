@@ -116,4 +116,24 @@ router.get('/request-details/:requestId', authenticateAdmin, async (req, res) =>
   }
 })
 
+router.post('/request-details/:requestId/replay', authenticateAdmin, async (req, res) => {
+  try {
+    const data = await requestDetailService.replayRequest(req.params.requestId, req.body || {})
+    return res.json({
+      success: true,
+      data
+    })
+  } catch (error) {
+    const statusCode = error?.statusCode || 500
+    if (statusCode >= 500) {
+      logger.error('❌ Failed to replay request detail:', error)
+    }
+    return res.status(statusCode).json({
+      success: false,
+      error: 'Failed to replay request detail',
+      message: error.message
+    })
+  }
+})
+
 module.exports = router

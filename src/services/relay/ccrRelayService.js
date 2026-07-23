@@ -354,6 +354,9 @@ class CcrRelayService {
       await this._updateLastUsedTime(accountId)
 
       if (response.status >= 400) {
+        if (clientResponse) {
+          clientResponse._upstreamResponseBody = response.data
+        }
         const safeErrorResponse = buildCcrClientError(response.status, response.data, {
           headers: response.headers
         })

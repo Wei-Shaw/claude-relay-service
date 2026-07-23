@@ -1324,6 +1324,96 @@
                     </button>
                   </div>
                 </div>
+
+                <div
+                  class="rounded-lg border border-red-200 bg-red-50/70 p-4 dark:border-red-900/50 dark:bg-red-950/20"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <i class="fas fa-bug mr-2 text-red-500"></i>
+                        错误请求全量保存
+                      </label>
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        仅对错误请求保存完整请求体和上游返回，数据随请求明细保留时间自动过期。
+                      </p>
+                      <p
+                        v-if="claudeConfig.requestDetailErrorFullCaptureEnabled"
+                        class="mt-2 text-xs text-red-600 dark:text-red-400"
+                      >
+                        完整提示词和上游错误可能包含敏感数据，并会显著增加 Redis 存储压力。
+                      </p>
+                    </div>
+                    <button
+                      :aria-checked="claudeConfig.requestDetailErrorFullCaptureEnabled"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-4 focus:ring-red-300 dark:focus:ring-red-900"
+                      :class="
+                        claudeConfig.requestDetailErrorFullCaptureEnabled
+                          ? 'bg-red-500'
+                          : 'bg-gray-200 dark:bg-gray-700'
+                      "
+                      role="switch"
+                      type="button"
+                      @click="handleErrorFullCaptureToggle"
+                    >
+                      <span class="sr-only">切换错误请求全量保存</span>
+                      <span
+                        class="absolute left-[2px] top-[2px] h-5 w-5 rounded-full border bg-white transition-transform"
+                        :class="
+                          claudeConfig.requestDetailErrorFullCaptureEnabled
+                            ? 'translate-x-full border-white'
+                            : 'border-gray-300'
+                        "
+                      ></span>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  class="rounded-lg border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/50 dark:bg-amber-950/20"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <i class="fas fa-redo-alt mr-2 text-amber-500"></i>
+                        请求重放
+                      </label>
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        在错误请求明细中编辑 JSON
+                        请求体后重发。重放会再次产生真实上游调用、费用和限流计数。
+                      </p>
+                      <p
+                        v-if="!claudeConfig.requestDetailErrorFullCaptureEnabled"
+                        class="mt-2 text-xs text-amber-600 dark:text-amber-400"
+                      >
+                        需要先开启“错误请求全量保存”。
+                      </p>
+                    </div>
+                    <button
+                      :aria-checked="claudeConfig.requestReplayEnabled"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-4 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-amber-900"
+                      :class="
+                        claudeConfig.requestReplayEnabled
+                          ? 'bg-amber-500'
+                          : 'bg-gray-200 dark:bg-gray-700'
+                      "
+                      :disabled="!claudeConfig.requestDetailErrorFullCaptureEnabled"
+                      role="switch"
+                      type="button"
+                      @click="handleReplayToggle"
+                    >
+                      <span class="sr-only">切换请求重放</span>
+                      <span
+                        class="absolute left-[2px] top-[2px] h-5 w-5 rounded-full border bg-white transition-transform"
+                        :class="
+                          claudeConfig.requestReplayEnabled
+                            ? 'translate-x-full border-white'
+                            : 'border-gray-300'
+                        "
+                      ></span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div class="mt-4 rounded-lg bg-cyan-50 p-4 dark:bg-cyan-900/20">
@@ -2156,6 +2246,8 @@ const claudeConfig = ref({
   requestDetailCaptureEnabled: false,
   requestDetailRetentionHours: 6,
   requestDetailBodyPreviewEnabled: false,
+  requestDetailErrorFullCaptureEnabled: false,
+  requestReplayEnabled: false,
   updatedAt: null,
   updatedBy: null
 })
@@ -2256,6 +2348,19 @@ const handleRequestDetailBodyPreviewToggle = async () => {
   } finally {
     requestDetailBodyPreviewSaving.value = false
   }
+}
+
+const handleErrorFullCaptureToggle = async () => {
+  const nextValue = !claudeConfig.value.requestDetailErrorFullCaptureEnabled
+  await saveClaudeConfig({
+    requestDetailErrorFullCaptureEnabled: nextValue,
+    requestReplayEnabled: nextValue ? claudeConfig.value.requestReplayEnabled : false
+  })
+}
+
+const handleReplayToggle = async () => {
+  if (!claudeConfig.value.requestDetailErrorFullCaptureEnabled) return
+  await saveClaudeConfig({ requestReplayEnabled: !claudeConfig.value.requestReplayEnabled })
 }
 
 // 服务倍率配置
@@ -2558,6 +2663,9 @@ const loadClaudeConfig = async () => {
         requestDetailRetentionHours:
           response.config?.requestDetailRetentionHours ?? REQUEST_DETAIL_RETENTION_DEFAULT_HOURS,
         requestDetailBodyPreviewEnabled: response.config?.requestDetailBodyPreviewEnabled ?? false,
+        requestDetailErrorFullCaptureEnabled:
+          response.config?.requestDetailErrorFullCaptureEnabled ?? false,
+        requestReplayEnabled: response.config?.requestReplayEnabled ?? false,
         updatedAt: response.config?.updatedAt || null,
         updatedBy: response.config?.updatedBy || null
       }
@@ -2585,6 +2693,18 @@ const saveClaudeConfig = async (options = {}) => {
     )
       ? options.requestDetailBodyPreviewEnabled === true
       : claudeConfig.value.requestDetailBodyPreviewEnabled
+    const requestDetailErrorFullCaptureEnabled = Object.prototype.hasOwnProperty.call(
+      options,
+      'requestDetailErrorFullCaptureEnabled'
+    )
+      ? options.requestDetailErrorFullCaptureEnabled === true
+      : claudeConfig.value.requestDetailErrorFullCaptureEnabled
+    const requestReplayEnabled = Object.prototype.hasOwnProperty.call(
+      options,
+      'requestReplayEnabled'
+    )
+      ? options.requestReplayEnabled === true
+      : claudeConfig.value.requestReplayEnabled
 
     const payload = {
       claudeCodeOnlyEnabled: claudeConfig.value.claudeCodeOnlyEnabled,
@@ -2601,7 +2721,9 @@ const saveClaudeConfig = async (options = {}) => {
       concurrentRequestQueueTimeoutMs: claudeConfig.value.concurrentRequestQueueTimeoutMs,
       requestDetailCaptureEnabled: claudeConfig.value.requestDetailCaptureEnabled,
       requestDetailRetentionHours: claudeConfig.value.requestDetailRetentionHours,
-      requestDetailBodyPreviewEnabled
+      requestDetailBodyPreviewEnabled,
+      requestDetailErrorFullCaptureEnabled,
+      requestReplayEnabled
     }
 
     if (options.purgeRequestDetailBodySnapshots === true) {
@@ -2620,6 +2742,11 @@ const saveClaudeConfig = async (options = {}) => {
         requestDetailBodyPreviewEnabled:
           response.config?.requestDetailBodyPreviewEnabled ??
           claudeConfig.value.requestDetailBodyPreviewEnabled,
+        requestDetailErrorFullCaptureEnabled:
+          response.config?.requestDetailErrorFullCaptureEnabled ??
+          claudeConfig.value.requestDetailErrorFullCaptureEnabled,
+        requestReplayEnabled:
+          response.config?.requestReplayEnabled ?? claudeConfig.value.requestReplayEnabled,
         updatedAt: response.config?.updatedAt || new Date().toISOString(),
         updatedBy: response.config?.updatedBy || null
       }
