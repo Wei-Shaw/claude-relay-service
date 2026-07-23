@@ -698,6 +698,7 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       } else {
         // 返回 OpenAI 格式的错误响应
         const status = error.status || 500
+        res._upstreamResponseBody = error.upstreamResponseBody || error.response?.data
         const errorResponse = {
           error: error.error || {
             message: error.message || 'Internal server error',

@@ -2702,6 +2702,7 @@ async function handleStandardGenerateContent(req, res) {
 
     res.json(response.response || response)
   } catch (error) {
+    res._upstreamResponseBody = error.response?.data
     logger.error(`Error in standard generateContent endpoint`, {
       message: error.message,
       status: error.response?.status,
@@ -3221,6 +3222,7 @@ async function handleStandardStreamGenerateContent(req, res) {
     })
   } catch (error) {
     const normalizedError = await normalizeAxiosStreamError(error)
+    res._upstreamResponseBody = normalizedError.parsedBody || normalizedError.rawBody
 
     logger.error(`Error in standard streamGenerateContent endpoint`, {
       message: error.message,

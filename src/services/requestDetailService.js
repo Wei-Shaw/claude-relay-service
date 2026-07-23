@@ -1,3 +1,5 @@
+const axios = require('axios')
+const appConfig = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const claudeRelayConfigService = require('./claudeRelayConfigService')
@@ -13,6 +15,7 @@ const droidAccountService = require('./account/droidAccountService')
 const bedrockAccountService = require('./account/bedrockAccountService')
 const CostCalculator = require('../utils/costCalculator')
 const { sanitizeErrorMessage } = require('../utils/errorSanitizer')
+const { createEncryptor } = require('../utils/commonHelper')
 const {
   sanitizeRequestBodySnapshot,
   getRequestDetailCacheMetrics,
@@ -33,6 +36,26 @@ const MAX_REQUEST_DETAIL_SNAPSHOT_POINTERS = 25000
 const MAX_REQUEST_DETAIL_SNAPSHOT_BYTES = 2 * 1024 * 1024
 const SLA_LATENCY_BUCKETS_MS = [500, 1000, 2000, 5000, 10000, 30000]
 const SLA_TOP_GROUP_LIMIT = 8
+const replayCredentialEncryptor = createEncryptor('request-detail-replay')
+const REPLAY_HEADER_ALLOWLIST = new Set([
+  'accept',
+  'anthropic-beta',
+  'anthropic-version',
+  'content-type',
+  'openai-beta',
+  'session_id',
+  'user-agent',
+  'x-app',
+  'x-client-version',
+  'x-session-id',
+  'x-stainless-arch'
+])
+const REPLAY_RESPONSE_HEADER_ALLOWLIST = new Set([
+  'content-type',
+  'retry-after',
+  'x-request-id',
+  'request-id'
+])
 
 const OUTCOME_LABELS = {
   success: '成功',
@@ -185,6 +208,85 @@ function normalizeEndpointPath(endpoint) {
     return collapsed.slice(0, -1)
   }
   return collapsed || '/'
+}
+
+function isErrorRequestDetail(detail = {}) {
+  return (
+    normalizeNumber(detail.statusCode) >= 400 ||
+    detail.completed === false ||
+    detail.clientAborted === true ||
+    (detail.outcome && detail.outcome !== 'success')
+  )
+}
+
+function cloneFullPayload(value) {
+  if (value === undefined) {
+    return undefined
+  }
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8')
+  }
+  if (value === null || typeof value !== 'object') {
+    return value
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value))
+  } catch (error) {
+    return String(value)
+  }
+}
+
+function extractReplayHeaders(headers = {}) {
+  const replayHeaders = {}
+  for (const [name, value] of Object.entries(headers || {})) {
+    const normalizedName = String(name).toLowerCase()
+    if (!REPLAY_HEADER_ALLOWLIST.has(normalizedName) || value === undefined) {
+      continue
+    }
+    replayHeaders[normalizedName] = Array.isArray(value) ? value.join(', ') : String(value)
+  }
+  return replayHeaders
+}
+
+function normalizeReplayPath(value) {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\')) {
+    return null
+  }
+
+  try {
+    const parsed = new URL(trimmed, 'http://127.0.0.1')
+    if (!isRelayEndpoint(parsed.pathname)) {
+      return null
+    }
+    for (const name of ['key', 'api_key', 'api-key', 'x-api-key']) {
+      parsed.searchParams.delete(name)
+    }
+    return `${parsed.pathname}${parsed.search}`
+  } catch (error) {
+    return null
+  }
+}
+
+function parseReplayResponseBody(value, contentType = '') {
+  if (typeof value !== 'string') {
+    return value
+  }
+
+  if (contentType.includes('json')) {
+    try {
+      return JSON.parse(value)
+    } catch (error) {
+      return value
+    }
+  }
+
+  return value
 }
 
 function isRelayEndpoint(endpoint) {
@@ -482,7 +584,13 @@ function mergeRequestDetailRecords(existing = null, incoming = {}) {
     'errorType',
     'errorCode',
     'errorMessage',
-    'requestBodySnapshot'
+    'requestBodySnapshot',
+    'fullRequestBody',
+    'upstreamResponseBody',
+    'replayCredentialEncrypted',
+    'replayCredentialStored',
+    'replayHeaders',
+    'replayPath'
   ]
 
   for (const field of preferExistingIfIncomingEmpty) {
@@ -620,7 +728,11 @@ function buildLifecycleDetail(req = {}, res = {}, options = {}) {
     errorCode: options.errorCode || responseError.errorCode || null,
     errorMessage: options.errorMessage || responseError.errorMessage || null,
     upstreamStatus: options.upstreamStatus || responseError.upstreamStatus || 0,
-    failureStage: options.failureStage || null
+    failureStage: options.failureStage || null,
+    upstreamResponseBody: res._upstreamResponseBody ?? res._responseBody,
+    replayCredential: req._replayApiKey || null,
+    replayHeaders: extractReplayHeaders(req.headers),
+    replayPath: normalizeReplayPath(req.originalUrl || req.url || endpoint) || endpoint
   }
 }
 
@@ -730,14 +842,14 @@ function createCostRecomputePatch(record = {}) {
 
 function prepareRecordForDisplay(record = {}) {
   const costPatch = createCostRecomputePatch(record)
-  if (!costPatch) {
-    return record
-  }
-
-  return {
+  const displayRecord = {
     ...record,
-    ...costPatch
+    ...(costPatch || {})
   }
+  delete displayRecord.replayCredentialEncrypted
+  delete displayRecord.replayHeaders
+  delete displayRecord.replayPath
+  return displayRecord
 }
 
 function formatDayKey(date) {
@@ -1324,7 +1436,9 @@ class RequestDetailService {
     return {
       captureEnabled: config.requestDetailCaptureEnabled === true,
       retentionHours: clampRetentionHours(config.requestDetailRetentionHours),
-      bodyPreviewEnabled: config.requestDetailBodyPreviewEnabled === true
+      bodyPreviewEnabled: config.requestDetailBodyPreviewEnabled === true,
+      errorFullCaptureEnabled: config.requestDetailErrorFullCaptureEnabled === true,
+      replayEnabled: config.requestReplayEnabled === true
     }
   }
 
@@ -1333,6 +1447,8 @@ class RequestDetailService {
       captureEnabled: settings.captureEnabled,
       retentionHours: settings.retentionHours,
       bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+      replayEnabled: settings.replayEnabled,
       snapshotId: null,
       records: [],
       pagination: {
@@ -1410,7 +1526,8 @@ class RequestDetailService {
   }
 
   _normalizeRecord(detail, requestId, options = {}) {
-    const requestBodySource = detail.requestBodySnapshot ?? detail.requestBody
+    const requestBodySource =
+      detail.fullRequestBody ?? detail.requestBodySnapshot ?? detail.requestBody
     const timestamp = toIsoString(detail.timestamp) || new Date().toISOString()
     const durationMs = normalizeNumber(detail.durationMs)
     const inputTokens = normalizeNumber(detail.inputTokens)
@@ -1464,6 +1581,24 @@ class RequestDetailService {
       normalized.requestBodySnapshot = sanitizeRequestBodySnapshot(requestBodySource)
     }
 
+    if (options.errorFullCaptureEnabled && isErrorRequestDetail({ ...detail, statusCode })) {
+      normalized.fullRequestBody = cloneFullPayload(requestBodySource)
+      normalized.upstreamResponseBody = cloneFullPayload(
+        detail.upstreamResponseBody ?? detail.responseBody
+      )
+      normalized.replayPath = detail.replayPath || detail.endpoint || null
+      normalized.replayHeaders = cloneFullPayload(detail.replayHeaders) || {}
+
+      if (options.replayEnabled && detail.replayCredential) {
+        normalized.replayCredentialEncrypted = replayCredentialEncryptor.encrypt(
+          String(detail.replayCredential)
+        )
+        normalized.replayCredentialStored = true
+      } else {
+        normalized.replayCredentialStored = detail.replayCredentialStored === true
+      }
+    }
+
     return normalized
   }
 
@@ -1481,7 +1616,9 @@ class RequestDetailService {
 
       const requestId = detail.requestId || makeRequestDetailId()
       const incoming = this._normalizeRecord(detail, requestId, {
-        bodyPreviewEnabled: settings.bodyPreviewEnabled
+        bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+        replayEnabled: settings.replayEnabled
       })
       const itemKey = `${REQUEST_DETAIL_ITEM_PREFIX}${requestId}`
       let existing = null
@@ -1626,6 +1763,8 @@ class RequestDetailService {
       captureEnabled: settings.captureEnabled,
       retentionHours: settings.retentionHours,
       bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+      replayEnabled: settings.replayEnabled,
       snapshotCount,
       hasSnapshots: snapshotCount > 0
     }
@@ -2012,7 +2151,11 @@ class RequestDetailService {
 
     return enrichedRecords.map((record) => ({
       ...record,
-      requestBodySnapshot: undefined
+      requestBodySnapshot: undefined,
+      fullRequestBody: undefined,
+      upstreamResponseBody: undefined,
+      replayHeaders: undefined,
+      replayPath: undefined
     }))
   }
 
@@ -2249,6 +2392,8 @@ class RequestDetailService {
       captureEnabled: settings.captureEnabled,
       retentionHours: settings.retentionHours,
       bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+      replayEnabled: settings.replayEnabled,
       snapshotId,
       records: pageRecords,
       pagination: {
@@ -2363,6 +2508,8 @@ class RequestDetailService {
         captureEnabled: settings.captureEnabled,
         retentionHours: settings.retentionHours,
         bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+        replayEnabled: settings.replayEnabled,
         snapshotId: null,
         filters: responseFilters
       }
@@ -2665,6 +2812,8 @@ class RequestDetailService {
         captureEnabled: settings.captureEnabled,
         retentionHours: settings.retentionHours,
         bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+        replayEnabled: settings.replayEnabled,
         record: null
       }
     }
@@ -2676,6 +2825,8 @@ class RequestDetailService {
         captureEnabled: settings.captureEnabled,
         retentionHours: settings.retentionHours,
         bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+        replayEnabled: settings.replayEnabled,
         record: null
       }
     }
@@ -2690,6 +2841,8 @@ class RequestDetailService {
           captureEnabled: settings.captureEnabled,
           retentionHours: settings.retentionHours,
           bodyPreviewEnabled: settings.bodyPreviewEnabled,
+          errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+          replayEnabled: settings.replayEnabled,
           record: null
         }
       }
@@ -2702,6 +2855,8 @@ class RequestDetailService {
         captureEnabled: settings.captureEnabled,
         retentionHours: settings.retentionHours,
         bodyPreviewEnabled: settings.bodyPreviewEnabled,
+        errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+        replayEnabled: settings.replayEnabled,
         record: null
       }
     }
@@ -2711,7 +2866,107 @@ class RequestDetailService {
       captureEnabled: settings.captureEnabled,
       retentionHours: settings.retentionHours,
       bodyPreviewEnabled: settings.bodyPreviewEnabled,
+      errorFullCaptureEnabled: settings.errorFullCaptureEnabled,
+      replayEnabled: settings.replayEnabled,
       record: enrichedRecord || null
+    }
+  }
+
+  async replayRequest(requestId, payload = {}) {
+    const settings = await this.getSettings()
+    if (!settings.replayEnabled) {
+      const error = new Error('请求重放功能未开启')
+      error.statusCode = 403
+      throw error
+    }
+
+    const client = redis.getClient()
+    if (!client) {
+      throw new Error('Redis unavailable')
+    }
+
+    const record = safeJsonParse(await client.get(`${REQUEST_DETAIL_ITEM_PREFIX}${requestId}`))
+    if (!record) {
+      const error = new Error('请求明细不存在或已过期')
+      error.statusCode = 404
+      throw error
+    }
+    if (!isErrorRequestDetail(record)) {
+      const error = new Error('仅支持重放错误请求')
+      error.statusCode = 400
+      throw error
+    }
+    if (record.fullRequestBody === undefined || !record.replayCredentialEncrypted) {
+      const error = new Error('该请求没有可用于重放的完整请求数据')
+      error.statusCode = 409
+      throw error
+    }
+    if (payload.body === undefined || payload.body === null || typeof payload.body !== 'object') {
+      const error = new Error('body must be a JSON object or array')
+      error.statusCode = 400
+      throw error
+    }
+
+    const replayPath = normalizeReplayPath(record.replayPath || record.endpoint)
+    if (!replayPath) {
+      const error = new Error('原请求接口不支持重放')
+      error.statusCode = 400
+      throw error
+    }
+
+    const apiKey = replayCredentialEncryptor.decrypt(record.replayCredentialEncrypted, false)
+    if (!apiKey || apiKey === record.replayCredentialEncrypted) {
+      const error = new Error('无法读取原请求认证信息')
+      error.statusCode = 409
+      throw error
+    }
+
+    const headers = {
+      ...extractReplayHeaders(record.replayHeaders),
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+      'x-request-replay-source': requestId
+    }
+    const startedAt = Date.now()
+
+    try {
+      const response = await axios.request({
+        method: String(record.method || 'POST').toUpperCase(),
+        url: `http://127.0.0.1:${appConfig.server.port}${replayPath}`,
+        headers,
+        data: cloneFullPayload(payload.body),
+        timeout: appConfig.requestTimeout || 600000,
+        responseType: 'text',
+        transformResponse: [(data) => data],
+        validateStatus: () => true,
+        proxy: false,
+        maxRedirects: 0,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      })
+
+      const responseHeaders = {}
+      for (const [name, value] of Object.entries(response.headers || {})) {
+        if (REPLAY_RESPONSE_HEADER_ALLOWLIST.has(name.toLowerCase())) {
+          responseHeaders[name.toLowerCase()] = value
+        }
+      }
+      const contentType = String(response.headers?.['content-type'] || '')
+
+      return {
+        sourceRequestId: requestId,
+        replayRequestId: response.headers?.['x-request-id'] || null,
+        endpoint: replayPath,
+        method: String(record.method || 'POST').toUpperCase(),
+        statusCode: response.status,
+        durationMs: Date.now() - startedAt,
+        headers: responseHeaders,
+        body: parseReplayResponseBody(response.data, contentType)
+      }
+    } catch (error) {
+      const replayError = new Error(error.message || '重放请求失败')
+      replayError.statusCode = 502
+      throw replayError
     }
   }
 }

@@ -368,6 +368,7 @@ class OpenAIResponsesRelayService {
           safeErrorResponse.body.error.resets_in_seconds = resetsInSeconds
         }
 
+        res._upstreamResponseBody = errorData
         removeClientDisconnectListener()
         return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       }
@@ -416,6 +417,7 @@ class OpenAIResponsesRelayService {
           statusText: response.statusText,
           errorData
         })
+        res._upstreamResponseBody = errorData
 
         if (response.status === 401) {
           logger.warn(`🚫 OpenAI Responses账号认证失败（401错误）for account ${account?.id}`)
@@ -587,6 +589,7 @@ class OpenAIResponsesRelayService {
             }
           }
         }
+        res._upstreamResponseBody = errorData
 
         if (status === 401) {
           logger.warn(
@@ -647,6 +650,10 @@ class OpenAIResponsesRelayService {
       const safeErrorResponse = buildOpenAIResponsesClientError(null, error, {
         fallbackStatus: 503
       })
+      res._upstreamResponseBody = {
+        message: error.message,
+        code: error.code || 'upstream_error'
+      }
       return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
     }
   }

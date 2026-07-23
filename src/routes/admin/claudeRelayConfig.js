@@ -52,6 +52,8 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
       requestDetailCaptureEnabled,
       requestDetailRetentionHours,
       requestDetailBodyPreviewEnabled,
+      requestDetailErrorFullCaptureEnabled,
+      requestReplayEnabled,
       purgeRequestDetailBodySnapshots
     } = req.body
 
@@ -195,6 +197,29 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
     }
 
     if (
+      requestDetailErrorFullCaptureEnabled !== undefined &&
+      typeof requestDetailErrorFullCaptureEnabled !== 'boolean'
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'requestDetailErrorFullCaptureEnabled must be a boolean' })
+    }
+
+    if (requestReplayEnabled !== undefined && typeof requestReplayEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'requestReplayEnabled must be a boolean' })
+    }
+
+    const currentConfig = await claudeRelayConfigService.getConfig()
+    const nextErrorFullCaptureEnabled =
+      requestDetailErrorFullCaptureEnabled ?? currentConfig.requestDetailErrorFullCaptureEnabled
+    const nextReplayEnabled = requestReplayEnabled ?? currentConfig.requestReplayEnabled
+    if (nextReplayEnabled === true && nextErrorFullCaptureEnabled !== true) {
+      return res.status(400).json({
+        error: 'requestReplayEnabled requires requestDetailErrorFullCaptureEnabled'
+      })
+    }
+
+    if (
       purgeRequestDetailBodySnapshots !== undefined &&
       typeof purgeRequestDetailBodySnapshots !== 'boolean'
     ) {
@@ -243,6 +268,12 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
     }
     if (requestDetailBodyPreviewEnabled !== undefined) {
       updateData.requestDetailBodyPreviewEnabled = requestDetailBodyPreviewEnabled
+    }
+    if (requestDetailErrorFullCaptureEnabled !== undefined) {
+      updateData.requestDetailErrorFullCaptureEnabled = requestDetailErrorFullCaptureEnabled
+    }
+    if (requestReplayEnabled !== undefined) {
+      updateData.requestReplayEnabled = requestReplayEnabled
     }
 
     const updatedConfig = await claudeRelayConfigService.updateConfig(

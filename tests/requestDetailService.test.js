@@ -7,6 +7,8 @@ jest.mock('../src/services/claudeRelayConfigService', () => ({
   getConfig: jest.fn()
 }))
 
+jest.mock('axios', () => ({ request: jest.fn() }))
+
 jest.mock('../src/utils/logger', () => ({
   warn: jest.fn(),
   debug: jest.fn(),
@@ -32,13 +34,16 @@ jest.mock('../src/utils/costCalculator', () => ({
 }))
 
 const redis = require('../src/models/redis')
+const axios = require('axios')
 const claudeRelayConfigService = require('../src/services/claudeRelayConfigService')
 const claudeAccountService = require('../src/services/account/claudeAccountService')
 const claudeConsoleAccountService = require('../src/services/account/claudeConsoleAccountService')
 const openaiAccountService = require('../src/services/account/openaiAccountService')
 const bedrockAccountService = require('../src/services/account/bedrockAccountService')
 const CostCalculator = require('../src/utils/costCalculator')
+const { createEncryptor } = require('../src/utils/commonHelper')
 const requestDetailService = require('../src/services/requestDetailService')
+const replayCredentialEncryptor = createEncryptor('request-detail-replay')
 
 describe('requestDetailService', () => {
   beforeEach(() => {
@@ -106,6 +111,158 @@ describe('requestDetailService', () => {
     expect(storedPayload.reasoningSource).toBe('reasoning.effort')
     expect(multi.zadd).toHaveBeenCalled()
     expect(exec).toHaveBeenCalled()
+  })
+
+  test('stores full request and upstream response only for errors when enabled', async () => {
+    const exec = jest.fn().mockResolvedValue([])
+    const multi = {
+      set: jest.fn().mockReturnThis(),
+      zadd: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec
+    }
+    const client = {
+      get: jest.fn().mockResolvedValue(null),
+      multi: jest.fn(() => multi)
+    }
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false,
+      requestDetailErrorFullCaptureEnabled: true,
+      requestReplayEnabled: true
+    })
+    redis.getClient.mockReturnValue(client)
+
+    await requestDetailService.captureRequestDetail({
+      requestId: 'req_error_full',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      statusCode: 502,
+      requestBody: { model: 'gpt-5.4', input: 'x'.repeat(200) },
+      upstreamResponseBody: { error: { message: 'raw upstream failure' } },
+      replayCredential: 'cr_1234567890',
+      replayHeaders: { 'user-agent': 'codex_cli_rs/1.0.0' },
+      replayPath: '/openai/v1/responses'
+    })
+
+    const storedPayload = JSON.parse(multi.set.mock.calls[0][1])
+    expect(storedPayload.fullRequestBody.input).toBe('x'.repeat(200))
+    expect(storedPayload.upstreamResponseBody).toEqual({
+      error: { message: 'raw upstream failure' }
+    })
+    expect(storedPayload.replayCredentialEncrypted).not.toContain('cr_1234567890')
+    expect(storedPayload.replayCredentialStored).toBe(true)
+  })
+
+  test('does not store full payloads for successful requests', async () => {
+    const exec = jest.fn().mockResolvedValue([])
+    const multi = {
+      set: jest.fn().mockReturnThis(),
+      zadd: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec
+    }
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false,
+      requestDetailErrorFullCaptureEnabled: true,
+      requestReplayEnabled: true
+    })
+    redis.getClient.mockReturnValue({
+      get: jest.fn().mockResolvedValue(null),
+      multi: jest.fn(() => multi)
+    })
+
+    await requestDetailService.captureRequestDetail({
+      requestId: 'req_success_no_full',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      statusCode: 200,
+      requestBody: { model: 'gpt-5.4', input: 'secret' },
+      upstreamResponseBody: { id: 'response_1' },
+      replayCredential: 'cr_1234567890'
+    })
+
+    const storedPayload = JSON.parse(multi.set.mock.calls[0][1])
+    expect(storedPayload.fullRequestBody).toBeUndefined()
+    expect(storedPayload.upstreamResponseBody).toBeUndefined()
+    expect(storedPayload.replayCredentialEncrypted).toBeUndefined()
+  })
+
+  test('replays an error request through the original internal endpoint', async () => {
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false,
+      requestDetailErrorFullCaptureEnabled: true,
+      requestReplayEnabled: true
+    })
+    redis.getClient.mockReturnValue({
+      get: jest.fn().mockResolvedValue(
+        JSON.stringify({
+          requestId: 'req_replay',
+          timestamp: '2026-04-07T17:00:00.000Z',
+          endpoint: '/openai/v1/responses',
+          replayPath: '/openai/v1/responses',
+          method: 'POST',
+          statusCode: 500,
+          fullRequestBody: { model: 'gpt-5.4' },
+          replayCredentialEncrypted: replayCredentialEncryptor.encrypt('cr_1234567890'),
+          replayHeaders: { 'user-agent': 'codex_cli_rs/1.0.0' }
+        })
+      )
+    })
+    axios.request.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json', 'x-request-id': 'replayed_1' },
+      data: '{"id":"response_1"}'
+    })
+
+    const result = await requestDetailService.replayRequest('req_replay', {
+      body: { model: 'gpt-5.4-mini' }
+    })
+
+    expect(axios.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining('/openai/v1/responses'),
+        data: { model: 'gpt-5.4-mini' },
+        proxy: false,
+        maxRedirects: 0,
+        headers: expect.objectContaining({ 'x-api-key': 'cr_1234567890' })
+      })
+    )
+    expect(result.statusCode).toBe(200)
+    expect(result.body).toEqual({ id: 'response_1' })
+  })
+
+  test('does not expose the encrypted replay credential in request detail responses', async () => {
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false,
+      requestDetailErrorFullCaptureEnabled: true,
+      requestReplayEnabled: true
+    })
+    redis.getClient.mockReturnValue({
+      get: jest.fn().mockResolvedValue(
+        JSON.stringify({
+          requestId: 'req_hidden_credential',
+          timestamp: '2026-04-07T17:00:00.000Z',
+          endpoint: '/openai/v1/responses',
+          statusCode: 500,
+          model: 'gpt-5.4',
+          replayCredentialEncrypted: replayCredentialEncryptor.encrypt('cr_1234567890'),
+          replayCredentialStored: true
+        })
+      )
+    })
+
+    const result = await requestDetailService.getRequestDetail('req_hidden_credential')
+
+    expect(result.record.replayCredentialEncrypted).toBeUndefined()
+    expect(result.record.replayCredentialStored).toBe(true)
   })
 
   test('listRequestDetails applies openai cache display flags and openai hit-rate formula', async () => {

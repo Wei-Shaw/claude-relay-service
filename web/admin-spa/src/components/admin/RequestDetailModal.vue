@@ -184,12 +184,14 @@
           class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
         >
           <div class="mb-3 flex items-center justify-between gap-3">
-            <h4 class="section-title mb-0">Request Body 快照</h4>
-            <el-button v-if="hasRequestBodySnapshot" size="small" @click="copySnapshot">
+            <h4 class="section-title mb-0">
+              {{ hasFullRequestBody ? '完整 Request Body' : 'Request Body 快照' }}
+            </h4>
+            <el-button v-if="hasStoredRequestBody" size="small" @click="copySnapshot">
               复制 JSON
             </el-button>
           </div>
-          <div v-if="hasRequestBodySnapshot" class="snapshot-panel">
+          <div v-if="hasStoredRequestBody" class="snapshot-panel">
             <pre>{{ formattedSnapshot }}</pre>
           </div>
           <div
@@ -205,6 +207,62 @@
             未保存请求体快照
           </div>
         </div>
+
+        <div
+          v-if="hasUpstreamResponseBody"
+          class="rounded-xl border border-red-200 bg-white p-4 shadow-sm dark:border-red-900/50 dark:bg-gray-900"
+        >
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <h4 class="section-title mb-0">上游返回</h4>
+            <el-button size="small" @click="copyUpstreamResponse">复制返回</el-button>
+          </div>
+          <div class="snapshot-panel response-panel">
+            <pre>{{ formattedUpstreamResponse }}</pre>
+          </div>
+        </div>
+
+        <div
+          v-if="canReplay"
+          class="replay-card rounded-xl border border-amber-300 bg-amber-50/70 p-4 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/20"
+        >
+          <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+            <div>
+              <h4 class="section-title mb-1">编辑并重放</h4>
+              <p class="text-xs leading-5 text-amber-700 dark:text-amber-300">
+                将按原接口和原 API Key 重新发起真实请求；可能产生费用、限流和新的请求明细。
+              </p>
+            </div>
+            <el-button :loading="replayLoading" type="warning" @click="replayRequest">
+              <i class="fas fa-redo-alt mr-2"></i>
+              重放请求
+            </el-button>
+          </div>
+          <textarea
+            v-model="replayBodyText"
+            aria-label="重放请求体 JSON"
+            class="replay-editor mt-4"
+            spellcheck="false"
+          ></textarea>
+          <div
+            v-if="replayResult"
+            class="mt-4 rounded-lg border border-amber-200 bg-white/80 p-3 dark:border-amber-900/50 dark:bg-gray-900/70"
+          >
+            <div class="mb-2 flex flex-wrap items-center gap-2 text-sm">
+              <el-tag effect="dark" :type="statusTagType(replayResult.statusCode)">
+                {{ replayResult.statusCode }}
+              </el-tag>
+              <span class="text-gray-600 dark:text-gray-300">
+                {{ formatDuration(replayResult.durationMs) }}
+              </span>
+              <span v-if="replayResult.replayRequestId" class="break-all text-xs text-gray-500">
+                Request ID: {{ replayResult.replayRequestId }}
+              </span>
+            </div>
+            <div class="snapshot-panel replay-result-panel">
+              <pre>{{ formatPayload(replayResult.body) }}</pre>
+            </div>
+          </div>
+        </div>
       </template>
     </div>
   </el-dialog>
@@ -213,7 +271,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
-import { getRequestDetailApi } from '@/utils/http_apis'
+import { getRequestDetailApi, replayRequestDetailApi } from '@/utils/http_apis'
 import { showToast, formatNumber, formatRequestCost as formatCost } from '@/utils/tools'
 
 const props = defineProps({
@@ -232,6 +290,10 @@ const emit = defineEmits(['close'])
 const loading = ref(false)
 const detail = ref(null)
 const bodyPreviewEnabled = ref(false)
+const replayEnabled = ref(false)
+const replayLoading = ref(false)
+const replayBodyText = ref('')
+const replayResult = ref(null)
 const isMobileViewport = ref(false)
 
 const costBreakdown = computed(() => {
@@ -353,14 +415,28 @@ const extractSnapshotDisplaySource = (snapshot) => {
   return snapshot
 }
 
-const hasRequestBodySnapshot = computed(() => Boolean(detail.value?.requestBodySnapshot))
+const hasFullRequestBody = computed(() => detail.value?.fullRequestBody !== undefined)
+const hasRequestBodySnapshot = computed(() => detail.value?.requestBodySnapshot !== undefined)
+const hasStoredRequestBody = computed(
+  () => hasFullRequestBody.value || hasRequestBodySnapshot.value
+)
+const hasUpstreamResponseBody = computed(() => detail.value?.upstreamResponseBody !== undefined)
+const canReplay = computed(
+  () =>
+    replayEnabled.value &&
+    hasFullRequestBody.value &&
+    detail.value?.replayCredentialStored === true &&
+    Number(detail.value?.statusCode || 0) >= 400
+)
 
 const formattedSnapshot = computed(() => {
-  if (!detail.value?.requestBodySnapshot) {
+  if (!hasStoredRequestBody.value) {
     return ''
   }
 
-  const snapshotSource = extractSnapshotDisplaySource(detail.value.requestBodySnapshot)
+  const snapshotSource = hasFullRequestBody.value
+    ? detail.value.fullRequestBody
+    : extractSnapshotDisplaySource(detail.value.requestBodySnapshot)
 
   if (typeof snapshotSource === 'string') {
     return tryFormatJsonString(snapshotSource) || formatJsonLikeText(snapshotSource)
@@ -368,6 +444,15 @@ const formattedSnapshot = computed(() => {
 
   return JSON.stringify(snapshotSource, null, 2)
 })
+
+const formatPayload = (payload) => {
+  if (typeof payload === 'string') {
+    return tryFormatJsonString(payload) || payload
+  }
+  return JSON.stringify(payload, null, 2)
+}
+
+const formattedUpstreamResponse = computed(() => formatPayload(detail.value?.upstreamResponseBody))
 
 const cacheHitRateLabel = computed(() => '读 / (输入 + 读 + 建)')
 
@@ -390,16 +475,55 @@ const fetchDetail = async () => {
       return
     }
     bodyPreviewEnabled.value = response.data?.bodyPreviewEnabled === true
+    replayEnabled.value = response.data?.replayEnabled === true
     detail.value = response.data?.record || null
+    replayBodyText.value = detail.value?.fullRequestBody
+      ? JSON.stringify(detail.value.fullRequestBody, null, 2)
+      : ''
+    replayResult.value = null
   } catch (error) {
     if (targetRequestId !== props.requestId || !props.show) return
     detail.value = null
     bodyPreviewEnabled.value = false
+    replayEnabled.value = false
     showToast(`加载请求详情失败：${error.message || '未知错误'}`, 'error')
   } finally {
     if (targetRequestId === props.requestId) {
       loading.value = false
     }
+  }
+}
+
+const copyUpstreamResponse = async () => {
+  try {
+    await navigator.clipboard.writeText(formattedUpstreamResponse.value)
+    showToast('已复制上游返回', 'success')
+  } catch (error) {
+    showToast('复制失败，请手动复制', 'error')
+  }
+}
+
+const replayRequest = async () => {
+  let body
+  try {
+    body = JSON.parse(replayBodyText.value)
+  } catch (error) {
+    showToast('请求体不是合法 JSON', 'error')
+    return
+  }
+
+  replayLoading.value = true
+  replayResult.value = null
+  try {
+    const response = await replayRequestDetailApi(props.requestId, { body })
+    if (response?.success === false) {
+      showToast(response.message || '请求重放失败', 'error')
+      return
+    }
+    replayResult.value = response.data || null
+    showToast(`重放完成：HTTP ${response.data?.statusCode || '-'}`, 'success')
+  } finally {
+    replayLoading.value = false
   }
 }
 
@@ -453,6 +577,9 @@ watch(
     if (!visible) {
       detail.value = null
       bodyPreviewEnabled.value = false
+      replayEnabled.value = false
+      replayBodyText.value = ''
+      replayResult.value = null
     }
   }
 )
@@ -625,6 +752,35 @@ onBeforeUnmount(() => {
   font-size: 12px;
   line-height: 1.55;
   color: rgb(226 232 240);
+}
+
+.response-panel {
+  box-shadow: inset 3px 0 0 rgb(239 68 68);
+}
+
+.replay-editor {
+  width: 100%;
+  min-height: 260px;
+  resize: vertical;
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: 14px;
+  background: rgb(15 23 42);
+  padding: 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgb(226 232 240);
+  outline: none;
+}
+
+.replay-editor:focus {
+  border-color: rgb(245 158 11);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.16);
+}
+
+.replay-result-panel {
+  max-height: 300px;
+  box-shadow: inset 3px 0 0 rgb(245 158 11);
 }
 
 @media (max-width: 767px) {

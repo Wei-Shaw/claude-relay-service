@@ -1295,6 +1295,7 @@ const authenticateApiKey = async (req, res, next) => {
     }
 
     // 将验证信息添加到请求对象（只包含必要信息）
+    req._replayApiKey = apiKey
     req.apiKey = {
       id: validation.keyData.id,
       name: validation.keyData.name,
@@ -1809,6 +1810,14 @@ const requestLogger = (req, res, next) => {
   res.json = (body) => {
     res._responseBody = body
     return originalJson(body)
+  }
+
+  const originalSend = res.send.bind(res)
+  res.send = (body) => {
+    if (res.statusCode >= 400 && res._responseBody === undefined) {
+      res._responseBody = body
+    }
+    return originalSend(body)
   }
 
   res.on('finish', () => {
