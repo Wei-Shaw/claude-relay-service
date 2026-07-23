@@ -42,9 +42,15 @@ const safeStringify = (obj, maxDepth = Infinity) => {
       if (value.constructor) {
         const constructorName = value.constructor.name
         if (
-          ['Socket', 'TLSSocket', 'HTTPParser', 'IncomingMessage', 'ServerResponse'].includes(
-            constructorName
-          )
+          [
+            'Socket',
+            'TLSSocket',
+            'HTTPParser',
+            'IncomingMessage',
+            'ServerResponse',
+            'ClientRequest',
+            'Writable'
+          ].includes(constructorName)
         ) {
           return `[${constructorName} Object]`
         }
@@ -76,7 +82,7 @@ const safeStringify = (obj, maxDepth = Infinity) => {
       const truncated = { ...processed, _truncated: true, _totalChars: result.length }
       // 第一轮: 截断单个大字段
       for (const [k, v] of Object.entries(truncated)) {
-        if (k.startsWith('_')) {
+        if (k === '_truncated' || k === '_totalChars') {
           continue
         }
         const fieldStr = typeof v === 'string' ? v : JSON.stringify(v)
@@ -88,7 +94,7 @@ const safeStringify = (obj, maxDepth = Infinity) => {
       let secondResult = JSON.stringify(truncated)
       if (secondResult.length > 50000) {
         for (const [k, v] of Object.entries(truncated)) {
-          if (k.startsWith('_')) {
+          if (k === '_truncated' || k === '_totalChars') {
             continue
           }
           const fieldStr = typeof v === 'string' ? v : JSON.stringify(v)
