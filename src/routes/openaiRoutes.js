@@ -970,7 +970,22 @@ const handleResponses = async (req, res) => {
 // Codex responses backend via the image_generation tool (gpt-image-*). See #1239.
 async function handleImages(req, res) {
   const apiKeyData = req.apiKey || {}
+  let accountId = null
+  let sessionHash = null
   try {
+    if (!checkOpenAIPermissions(apiKeyData)) {
+      logger.security(
+        `🚫 API Key ${apiKeyData.id || 'unknown'} 缺少 OpenAI 权限，拒绝访问 ${req.originalUrl}`
+      )
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access OpenAI',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
+
     const body = req.body || {}
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
     if (!prompt) {
@@ -987,14 +1002,19 @@ async function handleImages(req, res) {
         }
       })
     }
-    const n = Number.isInteger(body.n) && body.n > 0 ? body.n : 1
+    // OpenAI Images API 约定：n 为 1-10 的整数
+    if (body.n !== undefined && (!Number.isInteger(body.n) || body.n < 1 || body.n > 10)) {
+      return res.status(400).json({
+        error: { message: 'n must be an integer between 1 and 10', type: 'invalid_request_error' }
+      })
+    }
+    const n = body.n || 1
     const sessionId = req.headers['session_id'] || req.body?.session_id || null
+    sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
 
-    const { accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
-      apiKeyData,
-      sessionId,
-      'gpt-5.4-mini'
-    )
+    const authResult = await getOpenAIAuthToken(apiKeyData, sessionId, 'gpt-5.4-mini')
+    const { accessToken, accountType, proxy, account } = authResult
+    ;({ accountId } = authResult)
     if (accountType === 'openai-responses' || !accessToken) {
       return res.status(400).json({
         error: {
@@ -1069,24 +1089,102 @@ async function handleImages(req, res) {
       axiosConfig
     )
     if (upstream.status < 200 || upstream.status >= 300) {
-      let errBuf = ''
-      upstream.data.on('data', (d) => {
-        errBuf += d.toString()
+      // 先收集完整的错误响应体（上游以流返回）
+      const chunks = []
+      await new Promise((resolve) => {
+        upstream.data.on('data', (chunk) => chunks.push(chunk))
+        upstream.data.on('end', resolve)
+        upstream.data.on('error', resolve)
+        // 设置超时防止无限等待
+        setTimeout(resolve, 5000)
       })
-      upstream.data.on('end', () => {
-        res.status(upstream.status).json({
+      const rawBody = Buffer.concat(chunks).toString()
+      let errorData = null
+      try {
+        errorData = JSON.parse(rawBody)
+      } catch (parseError) {
+        logger.debug('Failed to parse images upstream error response:', parseError.message)
+      }
+
+      if (upstream.status === 429) {
+        logger.warn(`🚫 Rate limit detected for OpenAI account ${accountId} (images bridge)`)
+        const resetsInSeconds =
+          (errorData && errorData.error && errorData.error.resets_in_seconds) || null
+
+        // 标记账户为限流状态
+        await unifiedOpenAIScheduler.markAccountRateLimited(
+          accountId,
+          'openai',
+          sessionHash,
+          resetsInSeconds
+        )
+
+        const errorResponse = errorData || {
           error: {
-            message: `upstream ${upstream.status}: ${errBuf.slice(0, 500)}`,
-            type: 'upstream_error'
+            type: 'usage_limit_reached',
+            message: 'The usage limit has been reached',
+            resets_in_seconds: resetsInSeconds
           }
-        })
-      })
-      return
+        }
+        return res.status(429).json(errorResponse)
+      }
+
+      if (upstream.status === 401 || upstream.status === 402) {
+        const statusLabel = upstream.status === 401 ? '401错误' : '402错误'
+        const extraHint = upstream.status === 402 ? '，可能欠费' : ''
+        let reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）`
+        const messageCandidate =
+          errorData && errorData.error && typeof errorData.error.message === 'string'
+            ? errorData.error.message.trim()
+            : null
+        if (messageCandidate) {
+          reason = `${reason}：${messageCandidate}`
+        }
+        logger.warn(`🔐 ${statusLabel} detected for OpenAI account ${accountId} (images bridge)`)
+
+        try {
+          await unifiedOpenAIScheduler.markAccountUnauthorized(
+            accountId,
+            'openai',
+            sessionHash,
+            reason
+          )
+        } catch (markError) {
+          logger.error('❌ Failed to mark OpenAI account unauthorized (images bridge):', markError)
+        }
+
+        return res.status(upstream.status).json(
+          errorData || {
+            error: { message: 'Authentication failed', type: 'unauthorized', code: 'unauthorized' }
+          }
+        )
+      }
+
+      logger.error(`❌ Images upstream error ${upstream.status}: ${rawBody.slice(0, 500)}`)
+      return res.status(upstream.status).json(
+        errorData && errorData.error
+          ? errorData
+          : {
+              error: {
+                message: getSafeMessage(rawBody || `upstream error ${upstream.status}`),
+                type: 'upstream_error'
+              }
+            }
+      )
+    }
+
+    // 请求成功，检查并移除限流状态
+    const isRateLimited = await unifiedOpenAIScheduler.isAccountRateLimited(accountId)
+    if (isRateLimited) {
+      logger.info(`✅ Removing rate limit for OpenAI account ${accountId} after successful request`)
+      await unifiedOpenAIScheduler.removeAccountRateLimit(accountId, 'openai')
     }
 
     const best = {}
     let buf = ''
     let meta = {}
+    let usageData = null
+    let actualModel = null
     upstream.data.on('data', (chunk) => {
       buf += chunk.toString()
       let idx
@@ -1112,18 +1210,20 @@ async function handleImages(req, res) {
             best[i] = j.partial_image_b64
           }
         }
-        if (
-          j &&
-          j.type === 'response.completed' &&
-          j.response &&
-          Array.isArray(j.response.tools) &&
-          j.response.tools[0]
-        ) {
-          meta = j.response.tools[0]
+        if (j && j.type === 'response.completed' && j.response) {
+          if (Array.isArray(j.response.tools) && j.response.tools[0]) {
+            meta = j.response.tools[0]
+          }
+          if (j.response.model) {
+            actualModel = j.response.model
+          }
+          if (j.response.usage) {
+            usageData = j.response.usage
+          }
         }
       }
     })
-    upstream.data.on('end', () => {
+    upstream.data.on('end', async () => {
       const keys = Object.keys(best).sort((a, b) => Number(a) - Number(b))
       if (!keys.length) {
         if (!res.headersSent) {
@@ -1131,10 +1231,8 @@ async function handleImages(req, res) {
             .status(502)
             .json({ error: { message: 'no image produced by upstream', type: 'upstream_error' } })
         }
-        return
-      }
-      const data = keys.map((k) => ({ b64_json: best[k] }))
-      if (!res.headersSent) {
+      } else if (!res.headersSent) {
+        const data = keys.map((k) => ({ b64_json: best[k] }))
         res.status(200).json({
           created: Math.floor(Date.now() / 1000),
           data,
@@ -1144,22 +1242,97 @@ async function handleImages(req, res) {
           output_format: meta.output_format
         })
       }
+
+      // 记录使用统计
+      if (usageData) {
+        try {
+          const totalInputTokens = usageData.input_tokens || 0
+          const outputTokens = usageData.output_tokens || 0
+          const cacheReadTokens = extractOpenAICacheReadTokens(usageData)
+          // 计算实际输入token（总输入减去缓存部分）
+          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
+          const modelToRecord = actualModel || imageModel
+
+          const imageCosts = await apiKeyService.recordUsage(
+            apiKeyData.id,
+            actualInputTokens,
+            outputTokens,
+            0, // OpenAI没有cache_creation_tokens
+            cacheReadTokens,
+            modelToRecord,
+            accountId,
+            'openai',
+            null,
+            createRequestDetailMeta(req, {
+              requestBody: req.body,
+              stream: false,
+              statusCode: res.statusCode
+            })
+          )
+
+          logger.info(
+            `📊 Recorded OpenAI images usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Model: ${modelToRecord}`
+          )
+
+          await applyRateLimitTracking(
+            req,
+            {
+              inputTokens: actualInputTokens,
+              outputTokens,
+              cacheCreateTokens: 0,
+              cacheReadTokens
+            },
+            modelToRecord,
+            'openai-images',
+            'openai',
+            imageCosts
+          )
+        } catch (usageError) {
+          logger.error('Failed to record OpenAI images usage:', usageError)
+        }
+      }
     })
     upstream.data.on('error', (e) => {
+      logger.error('Images upstream stream error:', e)
       if (!res.headersSent) {
         res.status(502).json({
-          error: {
-            message: getSafeMessage ? getSafeMessage(e) : String(e && e.message),
-            type: 'upstream_error'
-          }
+          error: { message: getSafeMessage(e), type: 'upstream_error' }
         })
       }
     })
+
+    // 客户端断开时清理上游流
+    const cleanup = () => {
+      try {
+        upstream.data?.destroy?.()
+      } catch (_) {
+        //
+      }
+    }
+    req.on('close', cleanup)
+    req.on('aborted', cleanup)
   } catch (error) {
     logger.error('handleImages error:', error)
+    const status = error.statusCode || error.response?.status || 500
+
+    if ((status === 401 || status === 402) && accountId) {
+      const statusLabel = status === 401 ? '401错误' : '402错误'
+      const extraHint = status === 402 ? '，可能欠费' : ''
+      try {
+        await unifiedOpenAIScheduler.markAccountUnauthorized(
+          accountId,
+          'openai',
+          sessionHash,
+          `OpenAI账号认证失败（${statusLabel}${extraHint}）`
+        )
+      } catch (markError) {
+        logger.error('❌ Failed to mark OpenAI account unauthorized (images bridge):', markError)
+      }
+    }
+
     if (!res.headersSent) {
-      res.status(error.statusCode || 500).json({
-        error: { message: (error && error.message) || 'internal error', type: 'api_error' }
+      res.status(status).json({
+        error: { message: getSafeMessage(error), type: 'api_error' }
       })
     }
   }
