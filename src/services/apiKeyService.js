@@ -8,7 +8,9 @@ const requestDetailService = require('./requestDetailService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 const { finalizeRequestDetailMeta } = require('../utils/requestDetailHelper')
 const { normalizeDisplayModel } = require('../utils/modelDisplayHelper')
+const { shouldSkipApiKeyUsage } = require('../utils/apiKeyUsageContext')
 const requestBodyRuleService = require('./requestBodyRuleService')
+const adminApiKeyTestCredentialService = require('./adminApiKeyTestCredentialService')
 
 const ACCOUNT_TYPE_CONFIG = {
   claude: { prefix: 'claude:account:' },
@@ -360,23 +362,36 @@ class ApiKeyService {
   }
 
   // 🔍 验证API Key
-  async validateApiKey(apiKey) {
+  async validateApiKey(apiKey, options = {}) {
     try {
-      if (!apiKey || !apiKey.startsWith(this.prefix)) {
-        return { valid: false, error: 'Invalid API key format' }
+      const { keyId = null, skipActivation = false } = options
+      let keyData
+
+      if (keyId) {
+        const storedKey = await redis.getApiKey(keyId)
+        keyData =
+          storedKey && Object.keys(storedKey).length > 0 ? { id: keyId, ...storedKey } : null
+      } else {
+        if (!apiKey || !apiKey.startsWith(this.prefix)) {
+          return { valid: false, error: 'Invalid API key format' }
+        }
+
+        // 计算API Key的哈希值
+        const hashedKey = this._hashApiKey(apiKey)
+
+        // 通过哈希值直接查找API Key（性能优化）
+        keyData = await redis.findApiKeyByHash(hashedKey)
+
+        if (!keyData) {
+          // ⚠️ 警告：映射表查找失败，可能是竞态条件或映射表损坏
+          logger.warn(
+            `⚠️ API key not found in hash map: ${hashedKey.substring(0, 16)}... (possible race condition or corrupted hash map)`
+          )
+          return { valid: false, error: 'API key not found' }
+        }
       }
 
-      // 计算API Key的哈希值
-      const hashedKey = this._hashApiKey(apiKey)
-
-      // 通过哈希值直接查找API Key（性能优化）
-      const keyData = await redis.findApiKeyByHash(hashedKey)
-
       if (!keyData) {
-        // ⚠️ 警告：映射表查找失败，可能是竞态条件或映射表损坏
-        logger.warn(
-          `⚠️ API key not found in hash map: ${hashedKey.substring(0, 16)}... (possible race condition or corrupted hash map)`
-        )
         return { valid: false, error: 'API key not found' }
       }
 
@@ -386,7 +401,11 @@ class ApiKeyService {
       }
 
       // 处理激活逻辑（仅在 activation 模式下）
-      if (keyData.expirationMode === 'activation' && keyData.isActivated !== 'true') {
+      if (
+        !skipActivation &&
+        keyData.expirationMode === 'activation' &&
+        keyData.isActivated !== 'true'
+      ) {
         // 首次使用，需要激活
         const now = new Date()
         const activationPeriod = parseInt(keyData.activationDays || 30) // 默认30
@@ -559,8 +578,19 @@ class ApiKeyService {
   }
 
   // 🔍 验证API Key（仅用于统计查询，不触发激活）
-  async validateApiKeyForStats(apiKey) {
+  async validateApiKeyForStats(apiKey, options = {}) {
     try {
+      const adminTestCredential = adminApiKeyTestCredentialService.peekCredential(
+        apiKey,
+        options.adminTestService || null
+      )
+      if (adminTestCredential) {
+        return this.validateApiKey(apiKey, {
+          keyId: adminTestCredential.keyId,
+          skipActivation: true
+        })
+      }
+
       if (!apiKey || !apiKey.startsWith(this.prefix)) {
         return { valid: false, error: 'Invalid API key format' }
       }
@@ -1712,6 +1742,10 @@ class ApiKeyService {
     } = {}
   ) {
     try {
+      if (shouldSkipApiKeyUsage()) {
+        return { lifecycleRecordId: null, usageRecord: null }
+      }
+
       const finalizedRequestMeta = finalizeRequestDetailMeta(requestMeta)
       const lifecycleRecordId =
         finalizedRequestMeta?.lifecycleRecordId ||
@@ -1777,6 +1811,10 @@ class ApiKeyService {
   }
 
   async updateUsageLifecycleRecord(keyId, lifecycleRecordId, updates = {}) {
+    if (shouldSkipApiKeyUsage()) {
+      return false
+    }
+
     if (!keyId || !lifecycleRecordId) {
       return false
     }
@@ -1852,6 +1890,25 @@ class ApiKeyService {
       if (realCost > 0) {
         const service = serviceRatesService.getService(accountType, model)
         ratedCost = await this.calculateRatedCost(keyId, service, realCost)
+      }
+
+      if (shouldSkipApiKeyUsage()) {
+        if (accountId) {
+          await redis.incrementAccountUsage(
+            accountId,
+            totalTokens,
+            inputTokens,
+            outputTokens,
+            cacheCreateTokens,
+            cacheReadTokens,
+            0,
+            0,
+            model,
+            isLongContextRequest
+          )
+        }
+        logger.database(`🧪 Skipped API key usage for admin test: ${keyId}, model: ${model}`)
+        return { realCost, ratedCost, pricingTier: costInfo?.pricingTier || null }
       }
 
       // 记录API Key级别的使用统计（包含费用）
@@ -2106,6 +2163,29 @@ class ApiKeyService {
       if (realCostWithDetails > 0) {
         const service = serviceRatesService.getService(accountType, actualModel)
         ratedCostWithDetails = await this.calculateRatedCost(keyId, service, realCostWithDetails)
+      }
+
+      if (shouldSkipApiKeyUsage()) {
+        if (accountId) {
+          await redis.incrementAccountUsage(
+            accountId,
+            totalTokens,
+            inputTokens,
+            outputTokens,
+            cacheCreateTokens,
+            cacheReadTokens,
+            ephemeral5mTokens,
+            ephemeral1hTokens,
+            actualModel,
+            costInfo.isLongContextRequest || false
+          )
+        }
+        logger.database(`🧪 Skipped API key usage for admin test: ${keyId}, model: ${recordModel}`)
+        return {
+          realCost: realCostWithDetails,
+          ratedCost: ratedCostWithDetails,
+          pricingTier: costInfo.pricingTier
+        }
       }
 
       // 记录API Key级别的使用统计（包含费用）

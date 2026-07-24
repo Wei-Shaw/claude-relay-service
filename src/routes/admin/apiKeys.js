@@ -6,6 +6,7 @@ const logger = require('../../utils/logger')
 const CostCalculator = require('../../utils/costCalculator')
 const config = require('../../../config/config')
 const requestBodyRuleService = require('../../services/requestBodyRuleService')
+const adminApiKeyTestCredentialService = require('../../services/adminApiKeyTestCredentialService')
 
 const router = express.Router()
 
@@ -170,6 +171,40 @@ router.get('/api-keys/used-models', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to get used models:', error)
     return res.status(500).json({ error: 'Failed to get used models', message: error.message })
+  }
+})
+
+router.post('/api-keys/:keyId/test-credential', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const { service } = req.body || {}
+
+    if (!['claude', 'gemini', 'openai'].includes(service)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid test service'
+      })
+    }
+
+    const keyData = await redis.getApiKey(keyId)
+    if (!keyData || Object.keys(keyData).length === 0 || keyData.isDeleted === 'true') {
+      return res.status(404).json({
+        success: false,
+        message: 'API key not found'
+      })
+    }
+
+    const credential = adminApiKeyTestCredentialService.issueCredential(keyId, service)
+    return res.json({
+      success: true,
+      data: credential
+    })
+  } catch (error) {
+    logger.error('❌ Failed to create admin API key test credential:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create API key test credential'
+    })
   }
 })
 

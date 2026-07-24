@@ -964,6 +964,14 @@
                             <span class="ml-1">模型</span>
                           </button>
                           <button
+                            class="rounded px-2 py-1 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-900 dark:hover:bg-emerald-900/20"
+                            title="端到端测试（不计入 Key 额度）"
+                            @click="openApiKeyTestModal(key)"
+                          >
+                            <i class="fas fa-vial" />
+                            <span class="ml-1">测试</span>
+                          </button>
+                          <button
                             class="rounded px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-900 dark:hover:bg-blue-900/20"
                             title="编辑"
                             @click="openEditApiKeyModal(key)"
@@ -1694,13 +1702,22 @@
               </div>
 
               <!-- 操作按钮 -->
-              <div class="mt-3 flex gap-2 border-t border-gray-100 pt-3 dark:border-gray-600">
+              <div
+                class="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3 dark:border-gray-600"
+              >
                 <button
                   class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50"
                   @click="showUsageDetails(key)"
                 >
                   <i class="fas fa-chart-line" />
                   查看详情
+                </button>
+                <button
+                  class="flex-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs text-emerald-600 transition-colors hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50"
+                  @click="openApiKeyTestModal(key)"
+                >
+                  <i class="fas fa-vial mr-1" />
+                  测试
                 </button>
                 <button
                   class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -2230,6 +2247,16 @@
       @cancel="handleCancel"
       @confirm="handleConfirm"
     />
+    <UnifiedTestModal
+      :api-key-id="testingApiKey?.id || ''"
+      :api-key-name="testingApiKey?.name || ''"
+      :available-services="testingServices"
+      managed-api-key-test
+      mode="apikey"
+      :service-type="testServiceType"
+      :show="showApiKeyTestModal"
+      @close="closeApiKeyTestModal"
+    />
   </div>
 </template>
 
@@ -2254,6 +2281,7 @@ import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 import { useConfirmModal } from '@/utils/useConfirmModal'
 
 // 响应式数据
@@ -2433,6 +2461,10 @@ const editingApiKey = ref(null)
 const renewingApiKey = ref(null)
 const newApiKeyData = ref(null)
 const batchApiKeyData = ref([])
+const showApiKeyTestModal = ref(false)
+const testingApiKey = ref(null)
+const testServiceType = ref('claude')
+const testingServices = ref([])
 
 // ConfirmModal 状态
 const {
@@ -4020,6 +4052,13 @@ const handleRenewSuccess = () => {
 const getApiKeyActions = (key) => {
   const actions = [
     {
+      key: 'test',
+      label: '测试',
+      icon: 'fa-vial',
+      color: 'green',
+      handler: () => openApiKeyTestModal(key)
+    },
+    {
       key: 'edit',
       label: '编辑',
       icon: 'fa-edit',
@@ -4058,6 +4097,39 @@ const getApiKeyActions = (key) => {
   })
 
   return actions
+}
+
+const parseApiKeyPermissions = (permissions) => {
+  if (Array.isArray(permissions)) return permissions
+  if (!permissions || permissions === 'all') return []
+  try {
+    const parsed = JSON.parse(permissions)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+const openApiKeyTestModal = (key) => {
+  const permissions = parseApiKeyPermissions(key.permissions)
+  testingServices.value = ['claude', 'gemini', 'openai'].filter((service) =>
+    permissions.length === 0 ? true : permissions.includes(service)
+  )
+  testServiceType.value = testingServices.value[0]
+
+  if (!testServiceType.value) {
+    showToast('该 API Key 没有可测试的 Claude、Gemini 或 OpenAI 权限', 'warning')
+    return
+  }
+
+  testingApiKey.value = key
+  showApiKeyTestModal.value = true
+}
+
+const closeApiKeyTestModal = () => {
+  showApiKeyTestModal.value = false
+  testingApiKey.value = null
+  testingServices.value = []
 }
 
 // 切换API Key状态（激活/禁用）

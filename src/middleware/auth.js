@@ -11,6 +11,27 @@ const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { calculateWaitTimeStats } = require('../utils/statsHelper')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
+const adminApiKeyTestCredentialService = require('../services/adminApiKeyTestCredentialService')
+const { runWithoutApiKeyUsage } = require('../utils/apiKeyUsageContext')
+
+function getApiKeyTestService(req) {
+  const normalizedPath = (req.originalUrl || req.path || '').toLowerCase()
+  if (normalizedPath.startsWith('/gemini/')) {
+    return 'gemini'
+  }
+  if (normalizedPath.startsWith('/openai/')) {
+    return 'openai'
+  }
+  if (
+    normalizedPath.startsWith('/api/') ||
+    normalizedPath.startsWith('/claude/') ||
+    normalizedPath.startsWith('/antigravity/api/') ||
+    normalizedPath.startsWith('/gemini-cli/api/')
+  ) {
+    return 'claude'
+  }
+  return null
+}
 
 // 工具函数
 function sleep(ms) {
@@ -470,8 +491,18 @@ const authenticateApiKey = async (req, res, next) => {
       })
     }
 
+    const adminTestCredential = adminApiKeyTestCredentialService.consumeCredential(
+      apiKey,
+      getApiKeyTestService(req)
+    )
+
     // 验证API Key（带缓存优化）
-    const validation = await apiKeyService.validateApiKey(apiKey)
+    const validation = adminTestCredential
+      ? await apiKeyService.validateApiKey(apiKey, {
+          keyId: adminTestCredential.keyId,
+          skipActivation: true
+        })
+      : await apiKeyService.validateApiKey(apiKey)
 
     if (!validation.valid) {
       const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
@@ -1078,22 +1109,26 @@ const authenticateApiKey = async (req, res, next) => {
       let windowStart = await redis.getClient().get(windowStartKey)
 
       if (!windowStart) {
-        // 第一次请求，设置窗口开始时间
-        await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
-        await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
-        await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
-        await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
+        // 管理端测试不启动新的 Key 限额窗口。
+        if (!adminTestCredential) {
+          await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
+          await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
+          await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
+          await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
+        }
         windowStart = now
       } else {
         windowStart = parseInt(windowStart)
 
         // 检查窗口是否已过期
         if (now - windowStart >= windowDuration) {
-          // 窗口已过期，重置
-          await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
-          await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
-          await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
-          await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
+          if (!adminTestCredential) {
+            // 窗口已过期，重置
+            await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
+            await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
+            await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
+            await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
+          }
           windowStart = now
         }
       }
@@ -1166,22 +1201,26 @@ const authenticateApiKey = async (req, res, next) => {
         }
       }
 
-      // 增加请求计数
-      await redis.getClient().incr(requestCountKey)
+      // 管理端测试只校验现有额度，不增加 Key 的请求计数。
+      if (!adminTestCredential) {
+        await redis.getClient().incr(requestCountKey)
+      }
 
       // 存储限流信息到请求对象
-      req.rateLimitInfo = {
-        windowStart,
-        windowDuration,
-        requestCountKey,
-        tokenCountKey,
-        costCountKey, // 新增：费用计数器
-        currentRequests: currentRequests + 1,
-        currentTokens,
-        currentCost, // 新增：当前费用
-        rateLimitRequests,
-        tokenLimit,
-        rateLimitCost // 新增：费用限制
+      if (!adminTestCredential) {
+        req.rateLimitInfo = {
+          windowStart,
+          windowDuration,
+          requestCountKey,
+          tokenCountKey,
+          costCountKey, // 新增：费用计数器
+          currentRequests: currentRequests + 1,
+          currentTokens,
+          currentCost, // 新增：当前费用
+          rateLimitRequests,
+          tokenLimit,
+          rateLimitCost // 新增：费用限制
+        }
       }
     }
 
@@ -1330,6 +1369,11 @@ const authenticateApiKey = async (req, res, next) => {
       `🔓 Authenticated request from key: ${validation.keyData.name} (${validation.keyData.id}) in ${authDuration}ms`
     )
     logger.api(`   User-Agent: "${userAgent}"`)
+
+    if (adminTestCredential) {
+      req.isAdminApiKeyTest = true
+      return runWithoutApiKeyUsage(() => next())
+    }
 
     return next()
   } catch (error) {

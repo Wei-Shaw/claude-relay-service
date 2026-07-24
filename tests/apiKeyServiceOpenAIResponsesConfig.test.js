@@ -60,6 +60,7 @@ const requestDetailService = require('../src/services/requestDetailService')
 const billingEventPublisher = require('../src/services/billingEventPublisher')
 const CostCalculator = require('../src/utils/costCalculator')
 const apiKeyService = require('../src/services/apiKeyService')
+const { runWithoutApiKeyUsage } = require('../src/utils/apiKeyUsageContext')
 
 describe('apiKeyService openai responses config', () => {
   beforeEach(() => {
@@ -276,6 +277,72 @@ describe('apiKeyService openai responses config', () => {
         pricingSource: 'unknown-fallback'
       })
     )
+  })
+
+  test('admin tests keep account stats but skip API key quota and usage writes', async () => {
+    CostCalculator.calculateCost.mockReturnValue({
+      costs: { input: 0.01, output: 0.02, total: 0.03 },
+      debug: { isLongContextRequest: false },
+      pricingTier: null
+    })
+
+    const result = await runWithoutApiKeyUsage(() =>
+      apiKeyService.recordUsage('key-1', 10, 5, 0, 0, 'test-model', 'account-1', 'openai-responses')
+    )
+
+    expect(result).toEqual({ realCost: 0.03, ratedCost: 0.03, pricingTier: null })
+    expect(redis.incrementAccountUsage).toHaveBeenCalledWith(
+      'account-1',
+      15,
+      10,
+      5,
+      0,
+      0,
+      0,
+      0,
+      'test-model',
+      false
+    )
+    expect(redis.incrementTokenUsage).not.toHaveBeenCalled()
+    expect(redis.incrementDailyCost).not.toHaveBeenCalled()
+    expect(redis.setApiKey).not.toHaveBeenCalled()
+    expect(redis.addUsageRecord).not.toHaveBeenCalled()
+  })
+
+  test('admin tests skip detailed API key usage writes', async () => {
+    CostCalculator.calculateCost.mockReturnValue({
+      costs: { input: 0.01, output: 0.02, total: 0.03 },
+      debug: { isLongContextRequest: false },
+      pricingTier: null
+    })
+
+    const result = await runWithoutApiKeyUsage(() =>
+      apiKeyService.recordUsageWithDetails(
+        'key-1',
+        { input_tokens: 10, output_tokens: 5 },
+        'test-model',
+        'account-1',
+        'claude-official'
+      )
+    )
+
+    expect(result).toEqual({ realCost: 0.03, ratedCost: 0.03, pricingTier: null })
+    expect(redis.incrementAccountUsage).toHaveBeenCalledWith(
+      'account-1',
+      15,
+      10,
+      5,
+      0,
+      0,
+      0,
+      0,
+      'test-model',
+      false
+    )
+    expect(redis.incrementTokenUsage).not.toHaveBeenCalled()
+    expect(redis.incrementDailyCost).not.toHaveBeenCalled()
+    expect(redis.setApiKey).not.toHaveBeenCalled()
+    expect(redis.addUsageRecord).not.toHaveBeenCalled()
   })
 
   test('recordUsageWithDetails persists request pricing tier snapshots', async () => {
