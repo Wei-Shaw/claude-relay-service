@@ -12,6 +12,7 @@ const {
 } = require('../../utils/modelHelper')
 const { isSchedulable, sortAccountsByPriority } = require('../../utils/commonHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const accountPoolPolicyService = require('../accountPoolPolicyService')
 const config = require('../../../config/config')
 
 /**
@@ -514,6 +515,7 @@ class UnifiedClaudeScheduler {
   // 📋 获取所有可用账户（合并官方和Console）
   async _getAllAvailableAccounts(apiKeyData, requestedModel = null, includeCcr = false) {
     const availableAccounts = []
+    const accountPoolPolicy = await accountPoolPolicyService.getPolicy()
     // 请求模型所属的限流家族（opus/sonnet/haiku/fable）
     const requestedModelFamily = getRateLimitModelFamily(requestedModel)
 
@@ -723,6 +725,19 @@ class UnifiedClaudeScheduler {
           }
         }
 
+        const poolPolicy = await accountPoolPolicyService.applySchedulingDecision({
+          account,
+          platform: 'claude',
+          policy: accountPoolPolicy,
+          updateAccount: claudeAccountService.updateAccount.bind(claudeAccountService)
+        })
+        if (!poolPolicy.canSchedule) {
+          logger.debug(
+            `Skipping Claude OAuth account ${account.name || account.id} because account-pool policy ${poolPolicy.reason} is exhausted`
+          )
+          continue
+        }
+
         availableAccounts.push({
           ...account,
           accountId: account.id,
@@ -834,6 +849,21 @@ class UnifiedClaudeScheduler {
 
         // 🔢 记录符合基本条件的账户（通过了前面所有检查，但可能因并发被排除）
         if (!isRateLimited && !isQuotaExceeded) {
+          const poolPolicy = await accountPoolPolicyService.applySchedulingDecision({
+            account: currentAccount,
+            platform: 'claude',
+            policy: accountPoolPolicy,
+            updateAccount: claudeConsoleAccountService.updateAccount.bind(
+              claudeConsoleAccountService
+            )
+          })
+          if (!poolPolicy.canSchedule) {
+            logger.debug(
+              `Skipping Claude Console account ${currentAccount.name || currentAccount.id} because account-pool policy ${poolPolicy.reason} is exhausted`
+            )
+            continue
+          }
+
           consoleAccountsEligibleCount++
           // 🚀 将符合条件且需要并发检查的账户加入批量查询列表
           if (currentAccount.maxConcurrentTasks > 0) {

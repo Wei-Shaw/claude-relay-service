@@ -511,18 +511,6 @@
                                 {{ getClaudeBindingInfo(key) }}
                               </span>
                             </div>
-                            <!-- Gemini 绑定 -->
-                            <div v-if="key.geminiAccountId" class="flex items-center gap-1 text-xs">
-                              <span
-                                class="inline-flex items-center rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                              >
-                                <i class="fas fa-robot mr-1 text-[10px]" />
-                                Gemini
-                              </span>
-                              <span class="truncate text-gray-600 dark:text-gray-400">
-                                {{ getGeminiBindingInfo(key) }}
-                              </span>
-                            </div>
                             <!-- OpenAI 绑定 -->
                             <div v-if="key.openaiAccountId" class="flex items-center gap-1 text-xs">
                               <span
@@ -535,42 +523,12 @@
                                 {{ getOpenAIBindingInfo(key) }}
                               </span>
                             </div>
-                            <!-- Bedrock 绑定 -->
-                            <div
-                              v-if="key.bedrockAccountId"
-                              class="flex items-center gap-1 text-xs"
-                            >
-                              <span
-                                class="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-                              >
-                                <i class="fas fa-cloud mr-1 text-[10px]" />
-                                Bedrock
-                              </span>
-                              <span class="truncate text-gray-600 dark:text-gray-400">
-                                {{ getBedrockBindingInfo(key) }}
-                              </span>
-                            </div>
-                            <!-- Droid 绑定 -->
-                            <div v-if="key.droidAccountId" class="flex items-center gap-1 text-xs">
-                              <span
-                                class="inline-flex items-center rounded bg-cyan-100 px-1.5 py-0.5 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
-                              >
-                                <i class="fas fa-robot mr-1 text-[10px]" />
-                                Droid
-                              </span>
-                              <span class="truncate text-gray-600 dark:text-gray-400">
-                                {{ getDroidBindingInfo(key) }}
-                              </span>
-                            </div>
                             <!-- 共享池 -->
                             <div
                               v-if="
                                 !key.claudeAccountId &&
                                 !key.claudeConsoleAccountId &&
-                                !key.geminiAccountId &&
-                                !key.openaiAccountId &&
-                                !key.bedrockAccountId &&
-                                !key.droidAccountId
+                                !key.openaiAccountId
                               "
                               class="text-xs text-gray-500 dark:text-gray-400"
                             >
@@ -1338,18 +1296,6 @@
                     {{ getClaudeBindingInfo(key) }}
                   </span>
                 </div>
-                <!-- Gemini 绑定 -->
-                <div v-if="key.geminiAccountId" class="flex flex-wrap items-center gap-1 text-xs">
-                  <span
-                    class="inline-flex items-center rounded bg-yellow-100 px-2 py-0.5 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                  >
-                    <i class="fas fa-robot mr-1" />
-                    Gemini
-                  </span>
-                  <span class="text-gray-600 dark:text-gray-400">
-                    {{ getGeminiBindingInfo(key) }}
-                  </span>
-                </div>
                 <!-- OpenAI 绑定 -->
                 <div v-if="key.openaiAccountId" class="flex flex-wrap items-center gap-1 text-xs">
                   <span
@@ -1362,40 +1308,9 @@
                     {{ getOpenAIBindingInfo(key) }}
                   </span>
                 </div>
-                <!-- Bedrock 绑定 -->
-                <div v-if="key.bedrockAccountId" class="flex flex-wrap items-center gap-1 text-xs">
-                  <span
-                    class="inline-flex items-center rounded bg-orange-100 px-2 py-0.5 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-                  >
-                    <i class="fas fa-cloud mr-1" />
-                    Bedrock
-                  </span>
-                  <span class="text-gray-600 dark:text-gray-400">
-                    {{ getBedrockBindingInfo(key) }}
-                  </span>
-                </div>
-                <!-- Droid 绑定 -->
-                <div v-if="key.droidAccountId" class="flex flex-wrap items-center gap-1 text-xs">
-                  <span
-                    class="inline-flex items-center rounded bg-cyan-100 px-2 py-0.5 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
-                  >
-                    <i class="fas fa-robot mr-1" />
-                    Droid
-                  </span>
-                  <span class="text-gray-600 dark:text-gray-400">
-                    {{ getDroidBindingInfo(key) }}
-                  </span>
-                </div>
                 <!-- 无绑定时显示共享池 -->
                 <div
-                  v-if="
-                    !key.claudeAccountId &&
-                    !key.claudeConsoleAccountId &&
-                    !key.geminiAccountId &&
-                    !key.openaiAccountId &&
-                    !key.bedrockAccountId &&
-                    !key.droidAccountId
-                  "
+                  v-if="!key.claudeAccountId && !key.claudeConsoleAccountId && !key.openaiAccountId"
                   class="text-xs text-gray-500 dark:text-gray-400"
                 >
                   <i class="fas fa-share-alt mr-1" />
@@ -1917,19 +1832,6 @@
                               Claude Console
                             </span>
                           </div>
-                          <!-- Gemini 绑定 -->
-                          <div
-                            v-else-if="key.geminiAccountId"
-                            class="flex items-center gap-1 text-xs"
-                          >
-                            <span
-                              class="inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                            >
-                              <i class="fa-google mr-1 text-[10px]" />
-                              Gemini
-                            </span>
-                          </div>
-                          <!-- 共享池 -->
                           <div v-else class="text-xs text-gray-500 dark:text-gray-400">
                             <i class="fas fa-share-alt mr-1" />
                             共享池
@@ -2269,16 +2171,10 @@ const apiKeyDateFilters = ref({})
 const defaultTime = ref([new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 2, 1, 23, 59, 59)])
 const accounts = ref({
   claude: [],
-  gemini: [],
-  geminiApi: [], // 添加 Gemini-API 账号列表（用于传递给子组件初始化）
   openai: [],
   openaiResponses: [], // 添加 OpenAI-Responses 账号列表
-  bedrock: [],
-  droid: [],
   claudeGroups: [],
-  geminiGroups: [],
-  openaiGroups: [],
-  droidGroups: []
+  openaiGroups: []
 })
 // 账号数据加载状态
 const accountsLoading = ref(false)
@@ -2470,27 +2366,14 @@ const loadAccounts = async (forceRefresh = false) => {
 
   accountsLoading.value = true
   try {
-    const [
-      claudeData,
-      claudeConsoleData,
-      geminiData,
-      geminiApiData,
-      openaiData,
-      openaiResponsesData,
-      bedrockData,
-      droidData,
-      groupsData
-    ] = await Promise.all([
-      httpApis.getClaudeAccountsApi(),
-      httpApis.getClaudeConsoleAccountsApi(),
-      httpApis.getGeminiAccountsApi(),
-      httpApis.getGeminiApiAccountsApi(),
-      httpApis.getOpenAIAccountsApi(),
-      httpApis.getOpenAIResponsesAccountsApi(),
-      httpApis.getBedrockAccountsApi(),
-      httpApis.getDroidAccountsApi(),
-      httpApis.getAccountGroupsApi()
-    ])
+    const [claudeData, claudeConsoleData, openaiData, openaiResponsesData, groupsData] =
+      await Promise.all([
+        httpApis.getClaudeAccountsApi(),
+        httpApis.getClaudeConsoleAccountsApi(),
+        httpApis.getOpenAIAccountsApi(),
+        httpApis.getOpenAIResponsesAccountsApi(),
+        httpApis.getAccountGroupsApi()
+      ])
 
     // 合并Claude OAuth账户和Claude Console账户
     const claudeAccounts = []
@@ -2517,34 +2400,6 @@ const loadAccounts = async (forceRefresh = false) => {
 
     accounts.value.claude = claudeAccounts
 
-    // 合并 Gemini OAuth 和 Gemini API 账户
-    const geminiAccounts = []
-
-    if (geminiData.success) {
-      ;(geminiData.data || []).forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    if (geminiApiData.success) {
-      // 保存原始 Gemini-API 账号列表供子组件初始化使用
-      accounts.value.geminiApi = (geminiApiData.data || []).map((account) => ({
-        ...account,
-        platform: 'gemini-api',
-        isDedicated: account.accountType === 'dedicated'
-      }))
-      // 同时添加到合并列表
-      accounts.value.geminiApi.forEach((account) => {
-        geminiAccounts.push(account)
-      })
-    }
-
-    accounts.value.gemini = geminiAccounts
-
     if (openaiData.success) {
       accounts.value.openai = (openaiData.data || []).map((account) => ({
         ...account,
@@ -2559,28 +2414,11 @@ const loadAccounts = async (forceRefresh = false) => {
       }))
     }
 
-    if (bedrockData.success) {
-      accounts.value.bedrock = (bedrockData.data || []).map((account) => ({
-        ...account,
-        isDedicated: account.accountType === 'dedicated'
-      }))
-    }
-
-    if (droidData.success) {
-      accounts.value.droid = (droidData.data || []).map((account) => ({
-        ...account,
-        platform: 'droid',
-        isDedicated: account.accountType === 'dedicated'
-      }))
-    }
-
     if (groupsData.success) {
       // 处理分组数据
       const allGroups = groupsData.data || []
       accounts.value.claudeGroups = allGroups.filter((g) => g.platform === 'claude')
-      accounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
       accounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
-      accounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
     }
 
     // 标记账号数据已加载
@@ -2976,63 +2814,27 @@ const formatTokenCount = (count) => {
 const getBoundAccountName = (accountId) => {
   if (!accountId) return '未知账户'
 
-  // 检查是否是分组
   if (accountId.startsWith('group:')) {
     const groupId = accountId.substring(6) // 移除 'group:' 前缀
 
-    // 从Claude分组中查找
     const claudeGroup = accounts.value.claudeGroups.find((g) => g.id === groupId)
     if (claudeGroup) {
       return `分组-${claudeGroup.name}`
     }
 
-    // 从Gemini分组中查找
-    const geminiGroup = accounts.value.geminiGroups.find((g) => g.id === groupId)
-    if (geminiGroup) {
-      return `分组-${geminiGroup.name}`
-    }
-
-    // 从OpenAI分组中查找
     const openaiGroup = accounts.value.openaiGroups.find((g) => g.id === groupId)
     if (openaiGroup) {
       return `分组-${openaiGroup.name}`
     }
 
-    const droidGroup = accounts.value.droidGroups.find((g) => g.id === groupId)
-    if (droidGroup) {
-      return `分组-${droidGroup.name}`
-    }
-
-    // 如果找不到分组，返回分组ID的前8位
     return `分组-${groupId.substring(0, 8)}`
   }
 
-  // 从Claude账户列表中查找
   const claudeAccount = accounts.value.claude.find((acc) => acc.id === accountId)
   if (claudeAccount) {
     return `${claudeAccount.name}`
   }
 
-  // 处理 api: 前缀的 Gemini-API 账户
-  if (accountId.startsWith('api:')) {
-    const realAccountId = accountId.replace('api:', '')
-    const geminiApiAccount = accounts.value.gemini.find(
-      (acc) => acc.id === realAccountId && acc.platform === 'gemini-api'
-    )
-    if (geminiApiAccount) {
-      return `${geminiApiAccount.name}`
-    }
-    // 如果找不到，返回ID的前8位
-    return `${realAccountId.substring(0, 8)}`
-  }
-
-  // 从Gemini账户列表中查找
-  const geminiAccount = accounts.value.gemini.find((acc) => acc.id === accountId)
-  if (geminiAccount) {
-    return `${geminiAccount.name}`
-  }
-
-  // 处理 responses: 前缀的 OpenAI-Responses 账户
   if (accountId.startsWith('responses:')) {
     const realAccountId = accountId.replace('responses:', '')
     const openaiResponsesAccount = accounts.value.openaiResponses.find(
@@ -3045,43 +2847,22 @@ const getBoundAccountName = (accountId) => {
     return `${realAccountId.substring(0, 8)}`
   }
 
-  // 从OpenAI账户列表中查找
   const openaiAccount = accounts.value.openai.find((acc) => acc.id === accountId)
   if (openaiAccount) {
     return `${openaiAccount.name}`
   }
 
-  // 从 OpenAI-Responses 账户列表中查找（兼容没有前缀的情况）
   const openaiResponsesAccount = accounts.value.openaiResponses.find((acc) => acc.id === accountId)
   if (openaiResponsesAccount) {
     return `${openaiResponsesAccount.name}`
   }
 
-  // 从Bedrock账户列表中查找
-  const bedrockAccount = accounts.value.bedrock.find((acc) => acc.id === accountId)
-  if (bedrockAccount) {
-    return `${bedrockAccount.name}`
-  }
-
-  const droidAccount = accounts.value.droid.find((acc) => acc.id === accountId)
-  if (droidAccount) {
-    return `${droidAccount.name}`
-  }
-
-  // 如果找不到，返回账户ID的前8位
   return `${accountId.substring(0, 8)}`
 }
 
 // 检查 API Key 是否有任何账号绑定
 const hasAnyBinding = (key) => {
-  return !!(
-    key.claudeAccountId ||
-    key.claudeConsoleAccountId ||
-    key.geminiAccountId ||
-    key.openaiAccountId ||
-    key.bedrockAccountId ||
-    key.droidAccountId
-  )
+  return !!(key.claudeAccountId || key.claudeConsoleAccountId || key.openaiAccountId)
 }
 
 // 获取Claude绑定信息
@@ -3113,42 +2894,6 @@ const getClaudeBindingInfo = (key) => {
   return ''
 }
 
-// 获取Gemini绑定信息
-const getGeminiBindingInfo = (key) => {
-  if (key.geminiAccountId) {
-    const info = getBoundAccountName(key.geminiAccountId)
-    if (key.geminiAccountId.startsWith('group:')) {
-      return info
-    }
-
-    // 处理 api: 前缀的 Gemini-API 账户
-    if (key.geminiAccountId.startsWith('api:')) {
-      const realAccountId = key.geminiAccountId.replace('api:', '')
-      const account = accounts.value.gemini.find(
-        (acc) => acc.id === realAccountId && acc.platform === 'gemini-api'
-      )
-      if (!account) {
-        return `⚠️ ${info} (账户不存在)`
-      }
-      if (account.accountType === 'dedicated') {
-        return `🔒 API专属-${info}`
-      }
-      return `API-${info}`
-    }
-
-    // 检查 Gemini OAuth 账户是否存在
-    const account = accounts.value.gemini.find((acc) => acc.id === key.geminiAccountId)
-    if (!account) {
-      return `⚠️ ${info} (账户不存在)`
-    }
-    if (account.accountType === 'dedicated') {
-      return `🔒 专属-${info}`
-    }
-    return info
-  }
-  return ''
-}
-
 // 获取OpenAI绑定信息
 const getOpenAIBindingInfo = (key) => {
   if (key.openaiAccountId) {
@@ -3167,44 +2912,6 @@ const getOpenAIBindingInfo = (key) => {
       account = accounts.value.openai.find((acc) => acc.id === key.openaiAccountId)
     }
 
-    if (!account) {
-      return `⚠️ ${info} (账户不存在)`
-    }
-    if (account.accountType === 'dedicated') {
-      return `🔒 专属-${info}`
-    }
-    return info
-  }
-  return ''
-}
-
-// 获取Bedrock绑定信息
-const getBedrockBindingInfo = (key) => {
-  if (key.bedrockAccountId) {
-    const info = getBoundAccountName(key.bedrockAccountId)
-    if (key.bedrockAccountId.startsWith('group:')) {
-      return info
-    }
-    // 检查账户是否存在
-    const account = accounts.value.bedrock.find((acc) => acc.id === key.bedrockAccountId)
-    if (!account) {
-      return `⚠️ ${info} (账户不存在)`
-    }
-    if (account.accountType === 'dedicated') {
-      return `🔒 专属-${info}`
-    }
-    return info
-  }
-  return ''
-}
-
-const getDroidBindingInfo = (key) => {
-  if (key.droidAccountId) {
-    const info = getBoundAccountName(key.droidAccountId)
-    if (key.droidAccountId.startsWith('group:')) {
-      return info
-    }
-    const account = accounts.value.droid.find((acc) => acc.id === key.droidAccountId)
     if (!account) {
       return `⚠️ ${info} (账户不存在)`
     }
@@ -4344,8 +4051,6 @@ const formatLastUsed = (dateString) => {
 const ACCOUNT_TYPE_LABELS = {
   claude: 'Claude',
   openai: 'OpenAI',
-  gemini: 'Gemini',
-  droid: 'Droid',
   deleted: '已删除',
   other: '其他'
 }
@@ -4360,20 +4065,8 @@ const normalizeFrontendAccountCategory = (type) => {
   if (lower === 'claude-console' || lower === 'claude_console' || lower === 'claude') {
     return 'claude'
   }
-  if (
-    lower === 'openai' ||
-    lower === 'openai-responses' ||
-    lower === 'openai_responses' ||
-    lower === 'azure-openai' ||
-    lower === 'azure_openai'
-  ) {
+  if (lower === 'openai' || lower === 'openai-responses' || lower === 'openai_responses') {
     return 'openai'
-  }
-  if (lower === 'gemini' || lower === 'gemini-api' || lower === 'gemini_api') {
-    return 'gemini'
-  }
-  if (lower === 'droid') {
-    return 'droid'
   }
   return 'other'
 }
@@ -4519,11 +4212,7 @@ const exportToExcel = () => {
         // 账户绑定
         Claude专属账户: key.claudeAccountId || '',
         Claude控制台账户: key.claudeConsoleAccountId || '',
-        Gemini专属账户: key.geminiAccountId || '',
         OpenAI专属账户: key.openaiAccountId || '',
-        'Azure OpenAI专属账户': key.azureOpenaiAccountId || '',
-        Bedrock专属账户: key.bedrockAccountId || '',
-        Droid专属账户: key.droidAccountId || '',
 
         // 模型和客户端限制
         启用模型限制: key.enableModelRestriction ? '是' : '否',

@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { productConfig, resolveProductName } from '@/config/productConfig'
 
 import { getOemSettingsApi, updateOemSettingsApi } from '@/utils/http_apis'
 
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
   const oemSettings = ref({
-    siteName: 'Claude Relay Service',
+    siteName: productConfig.name,
     siteIcon: '',
     siteIconData: '',
     showAdminButton: true,
@@ -42,7 +43,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const resetOemSettings = async () => {
     const defaultSettings = {
-      siteName: 'Claude Relay Service',
+      siteName: productConfig.name,
       siteIcon: '',
       siteIconData: '',
       showAdminButton: true,
@@ -58,7 +59,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const applyOemSettings = () => {
     // 更新页面标题
     if (oemSettings.value.siteName) {
-      document.title = `${oemSettings.value.siteName} - 管理后台`
+      document.title = `${resolveProductName(oemSettings.value.siteName)} - ${productConfig.adminSubtitle}`
     }
 
     // 更新favicon

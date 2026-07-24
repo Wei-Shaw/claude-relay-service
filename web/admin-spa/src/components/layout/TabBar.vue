@@ -39,6 +39,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { productConfig } from '@/config/productConfig'
 
 defineProps({
   activeTab: {
@@ -53,25 +54,14 @@ const authStore = useAuthStore()
 
 // 根据 LDAP 配置动态生成 tabs
 const tabs = computed(() => {
-  const baseTabs = [
-    { key: 'dashboard', name: '仪表板', shortName: '仪表板', icon: 'fas fa-tachometer-alt' },
-    { key: 'apiKeys', name: 'API Keys', shortName: 'API', icon: 'fas fa-key' },
-    { key: 'accounts', name: '账户管理', shortName: '账户', icon: 'fas fa-user-circle' },
-    { key: 'requestDetails', name: '请求明细', shortName: '明细', icon: 'fas fa-table' },
-    { key: 'quotaCards', name: '额度卡', shortName: '额度卡', icon: 'fas fa-ticket-alt' }
-  ]
+  const baseTabs = [...productConfig.tabs]
 
   // 只有在 LDAP 启用时才显示用户管理
   if (authStore.oemSettings?.ldapEnabled) {
-    baseTabs.push({
-      key: 'userManagement',
-      name: '用户管理',
-      shortName: '用户',
-      icon: 'fas fa-users'
-    })
+    baseTabs.push(productConfig.userManagementTab)
   }
 
-  baseTabs.push({ key: 'settings', name: '系统设置', shortName: '设置', icon: 'fas fa-cogs' })
+  baseTabs.push(productConfig.settingsTab)
 
   return baseTabs
 })

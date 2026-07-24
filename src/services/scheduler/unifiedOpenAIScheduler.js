@@ -5,6 +5,7 @@ const redis = require('../../models/redis')
 const logger = require('../../utils/logger')
 const { isSchedulable, sortAccountsByPriority } = require('../../utils/commonHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const accountPoolPolicyService = require('../accountPoolPolicyService')
 
 class UnifiedOpenAIScheduler {
   constructor() {
@@ -58,16 +59,20 @@ class UnifiedOpenAIScheduler {
     let stillLimited = false
 
     const accountSchedulable = isSchedulable(account.schedulable)
+    const accountPoolAutoStopped =
+      account.accountPoolAutoStopped === true || account.accountPoolAutoStopped === 'true'
 
     if (!accountSchedulable) {
-      if (!hasRateLimitFlag) {
+      if (!hasRateLimitFlag && !accountPoolAutoStopped) {
         return { canUse: false, reason: 'not_schedulable' }
       }
 
-      stillLimited = await this.isAccountRateLimited(accountId)
-      rateLimitChecked = true
-      if (stillLimited) {
-        return { canUse: false, reason: 'rate_limited' }
+      if (hasRateLimitFlag) {
+        stillLimited = await this.isAccountRateLimited(accountId)
+        rateLimitChecked = true
+        if (stillLimited) {
+          return { canUse: false, reason: 'rate_limited' }
+        }
       }
 
       // 限流已恢复，矫正本地状态
@@ -355,6 +360,7 @@ class UnifiedOpenAIScheduler {
   // 📋 获取所有可用账户（仅共享池）
   async _getAllAvailableAccounts(apiKeyData, requestedModel = null) {
     const availableAccounts = []
+    const accountPoolPolicy = await accountPoolPolicyService.getPolicy()
 
     // 注意：专属账户的处理已经在 selectAccountForApiKey 中完成
     // 这里只处理共享池账户
@@ -379,6 +385,19 @@ class UnifiedOpenAIScheduler {
           } else {
             logger.debug(`⏭️ 跳过 OpenAI 账号 ${account.name} - 已被管理员禁用调度`)
           }
+          continue
+        }
+
+        const poolPolicy = await accountPoolPolicyService.applySchedulingDecision({
+          account,
+          platform: 'openai',
+          policy: accountPoolPolicy,
+          updateAccount: openaiAccountService.updateAccount
+        })
+        if (!poolPolicy.canSchedule) {
+          logger.debug(
+            `Skipping OpenAI account ${account.name || accountId} because account-pool policy ${poolPolicy.reason} is exhausted`
+          )
           continue
         }
 
@@ -445,8 +464,10 @@ class UnifiedOpenAIScheduler {
         const hasRateLimitFlag =
           this._hasRateLimitFlag(account.rateLimitStatus) || account.status === 'rateLimited'
         const schedulable = isSchedulable(account.schedulable)
+        const accountPoolAutoStopped =
+          account.accountPoolAutoStopped === true || account.accountPoolAutoStopped === 'true'
 
-        if (!schedulable && !hasRateLimitFlag) {
+        if (!schedulable && !hasRateLimitFlag && !accountPoolAutoStopped) {
           logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - not schedulable`)
           continue
         }
@@ -481,6 +502,21 @@ class UnifiedOpenAIScheduler {
             account.status = 'active'
             logger.info(`✅ OpenAI-Responses账号 ${account.name} 已解除限流，恢复调度权限`)
           }
+        }
+
+        const poolPolicy = await accountPoolPolicyService.applySchedulingDecision({
+          account,
+          platform: 'openai',
+          policy: accountPoolPolicy,
+          updateAccount: openaiResponsesAccountService.updateAccount.bind(
+            openaiResponsesAccountService
+          )
+        })
+        if (!poolPolicy.canSchedule) {
+          logger.debug(
+            `Skipping OpenAI-Responses account ${account.name || account.id} because account-pool policy ${poolPolicy.reason} is exhausted`
+          )
+          continue
         }
 
         const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(

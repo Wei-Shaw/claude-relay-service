@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
 import { APP_CONFIG, showToast } from '@/utils/tools'
+import { productConfig } from '@/config/productConfig'
 
 // 路由懒加载
 const LoginView = () => import('@/views/LoginView.vue')
@@ -13,6 +14,7 @@ const DashboardView = () => import('@/views/DashboardView.vue')
 const ApiKeysView = () => import('@/views/ApiKeysView.vue')
 const ApiKeyUsageRecordsView = () => import('@/views/ApiKeyUsageRecordsView.vue')
 const AccountsView = () => import('@/views/AccountsView.vue')
+const AccountPoolView = () => import('@/views/AccountPoolView.vue')
 const AccountUsageRecordsView = () => import('@/views/AccountUsageRecordsView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
@@ -29,11 +31,11 @@ const routes = [
 
       // 如果当前路径已经是 basePath 或 basePath/，重定向到 api-stats
       if (currentPath === basePath || currentPath === basePath + '/') {
-        return '/api-stats'
+        return productConfig.defaultRoute
       }
 
       // 否则保持默认重定向
-      return '/api-stats'
+      return productConfig.defaultRoute
     }
   },
   {
@@ -125,6 +127,18 @@ const routes = [
     ]
   },
   {
+    path: '/account-pool',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'AccountPool',
+        component: AccountPoolView
+      }
+    ]
+  },
+  {
     path: '/settings',
     component: MainLayout,
     meta: { requiresAuth: true },
@@ -175,7 +189,7 @@ const routes = [
   // 捕获所有未匹配的路由
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/api-stats'
+    redirect: productConfig.defaultRoute
   }
 ]
 

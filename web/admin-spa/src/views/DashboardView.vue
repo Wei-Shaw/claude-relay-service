@@ -196,6 +196,8 @@
       </div>
     </div>
 
+    <AccountPoolSummaryPanel />
+
     <!-- 账户余额/配额汇总 -->
     <div class="mb-4 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 md:mb-8 md:gap-6">
       <div class="stat-card">

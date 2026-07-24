@@ -11,8 +11,8 @@
         <LogoTitle
           :loading="oemLoading"
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          subtitle="管理后台"
-          :title="oemSettings.siteName"
+          :subtitle="productConfig.adminSubtitle"
+          :title="displaySiteName"
           title-class="text-white dark:text-gray-100"
         >
           <template #after-title>
@@ -293,6 +293,7 @@ import { useAuthStore } from '@/stores/auth'
 import { showToast } from '@/utils/tools'
 
 import { checkUpdatesApi, changePasswordApi } from '@/utils/http_apis'
+import { productConfig, resolveProductName } from '@/config/productConfig'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -306,6 +307,7 @@ const currentUser = computed(() => authStore.user || { username: 'Admin' })
 // OEM设置
 const oemSettings = computed(() => authStore.oemSettings || {})
 const oemLoading = computed(() => authStore.oemLoading)
+const displaySiteName = computed(() => resolveProductName(oemSettings.value.siteName))
 
 // 版本信息
 const versionInfo = ref({

@@ -213,13 +213,70 @@ const getMappedModelName = (modelMapping, requestedModel) => {
 // 账户调度相关
 // ============================================
 
-// 按优先级和最后使用时间排序账户
+const firstFiniteNumber = (...values) => {
+  for (const value of values) {
+    const number = Number(value)
+    if (Number.isFinite(number)) {
+      return number
+    }
+  }
+  return 0
+}
+
+const firstValue = (...values) =>
+  values.find((value) => value !== undefined && value !== null && value !== '')
+
+const toTimeMs = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return Number.POSITIVE_INFINITY
+  }
+  const numeric = Number(value)
+  if (Number.isFinite(numeric)) {
+    return numeric > 10000000000 ? numeric : numeric * 1000
+  }
+  const timestamp = Date.parse(value)
+  return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp
+}
+
+const getAccountDispatchWeight = (account = {}) => {
+  const resetCardCredits = firstFiniteNumber(
+    account.resetCardCredits,
+    account.resetBankCredits,
+    account.credits,
+    account.reset_cards,
+    account.resetCardCount
+  )
+  const resetCardExpiresAt = firstValue(
+    account.resetCardExpiresAt,
+    account.resetBankExpiresAt,
+    account.resetCardExpireAt,
+    account.resetCardExpiry,
+    account.reset_card_expires_at,
+    account.reset_bank_expires_at
+  )
+
+  return {
+    priority: parseInt(account.priority, 10) || 50,
+    resetCardCredits,
+    hasResetCard: resetCardCredits > 0,
+    resetCardExpiresAt: resetCardExpiresAt || null,
+    resetCardExpiresAtMs: toTimeMs(resetCardExpiresAt)
+  }
+}
+
+// Sort by base priority, reset-card value, then least-recently used.
 const sortAccountsByPriority = (accounts) =>
   [...accounts].sort((a, b) => {
-    const priorityA = parseInt(a.priority, 10) || 50
-    const priorityB = parseInt(b.priority, 10) || 50
-    if (priorityA !== priorityB) {
-      return priorityA - priorityB
+    const weightA = getAccountDispatchWeight(a)
+    const weightB = getAccountDispatchWeight(b)
+    if (weightA.priority !== weightB.priority) {
+      return weightA.priority - weightB.priority
+    }
+    if (weightA.hasResetCard !== weightB.hasResetCard) {
+      return weightA.hasResetCard ? -1 : 1
+    }
+    if (weightA.hasResetCard && weightA.resetCardExpiresAtMs !== weightB.resetCardExpiresAtMs) {
+      return weightA.resetCardExpiresAtMs - weightB.resetCardExpiresAtMs
     }
     const lastUsedA = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0
     const lastUsedB = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0
@@ -386,6 +443,7 @@ module.exports = {
   isModelInMapping,
   getMappedModelName,
   // 调度
+  getAccountDispatchWeight,
   sortAccountsByPriority,
   composeStickySessionKey,
   filterAvailableAccounts,

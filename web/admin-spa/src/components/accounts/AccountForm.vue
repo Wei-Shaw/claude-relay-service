@@ -71,7 +71,7 @@
               <!-- 平台分组选择器 -->
               <div class="space-y-3">
                 <!-- 分组选择器 -->
-                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <!-- Claude 分组 -->
                   <div
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
@@ -144,66 +144,8 @@
                   </div>
 
                   <!-- Gemini 分组 -->
-                  <div
-                    class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
-                    :class="[
-                      platformGroup === 'gemini'
-                        ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md dark:from-blue-900/20 dark:to-indigo-900/20'
-                        : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600'
-                    ]"
-                    @click="selectPlatformGroup('gemini')"
-                  >
-                    <div class="p-3">
-                      <div class="flex items-center justify-between">
-                        <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600"
-                        >
-                          <i class="fab fa-google text-sm text-white"></i>
-                        </div>
-                        <div
-                          v-if="platformGroup === 'gemini'"
-                          class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </div>
-                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        Gemini
-                      </h4>
-                      <p class="text-xs text-gray-600 dark:text-gray-400">Google AI</p>
-                    </div>
-                  </div>
 
                   <!-- Droid 分组 -->
-                  <div
-                    class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
-                    :class="[
-                      platformGroup === 'droid'
-                        ? 'border-rose-500 bg-gradient-to-br from-rose-50 to-orange-50 shadow-md dark:from-rose-900/20 dark:to-orange-900/20'
-                        : 'border-gray-200 bg-white hover:border-rose-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-600'
-                    ]"
-                    @click="selectPlatformGroup('droid')"
-                  >
-                    <div class="p-3">
-                      <div class="flex items-center justify-between">
-                        <div
-                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-rose-500 to-orange-500"
-                        >
-                          <i class="fas fa-robot text-sm text-white"></i>
-                        </div>
-                        <div
-                          v-if="platformGroup === 'droid'"
-                          class="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </div>
-                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        Droid
-                      </h4>
-                      <p class="text-xs text-gray-600 dark:text-gray-400">Claude Droid</p>
-                    </div>
-                  </div>
                 </div>
 
                 <!-- 子平台选择器 -->
@@ -214,7 +156,7 @@
                   <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                     选择具体平台类型：
                   </p>
-                  <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <!-- Claude 子选项 -->
                     <template v-if="platformGroup === 'claude'">
                       <label
@@ -276,67 +218,6 @@
                         <div
                           v-if="form.platform === 'claude-console'"
                           class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-purple-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'bedrock'
-                            ? 'border-orange-500 bg-orange-50 dark:border-orange-400 dark:bg-orange-900/30'
-                            : 'border-gray-300 bg-white hover:border-orange-400 hover:bg-orange-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-orange-500 dark:hover:bg-orange-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="bedrock"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fab fa-aws text-sm text-orange-600 dark:text-orange-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Bedrock</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">AWS</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'bedrock'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'ccr'
-                            ? 'border-cyan-500 bg-cyan-50 dark:border-cyan-400 dark:bg-cyan-900/30'
-                            : 'border-gray-300 bg-white hover:border-cyan-400 hover:bg-cyan-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/20'
-                        ]"
-                      >
-                        <input v-model="form.platform" class="sr-only" type="radio" value="ccr" />
-                        <div class="flex items-center gap-2">
-                          <i
-                            class="fas fa-code-branch text-sm text-cyan-600 dark:text-cyan-400"
-                          ></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >CCR</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400"
-                              >Claude Code Router</span
-                            >
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'ccr'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500"
                         >
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
@@ -410,164 +291,11 @@
                           <i class="fas fa-check text-xs text-white"></i>
                         </div>
                       </label>
-
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'azure_openai'
-                            ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="azure_openai"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fab fa-microsoft text-sm text-blue-600 dark:text-blue-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Azure</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400"
-                              >Azure Openai</span
-                            >
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'azure_openai'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
                     </template>
 
                     <!-- Gemini 子选项 -->
-                    <template v-if="platformGroup === 'gemini'">
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'gemini'
-                            ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="gemini"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fab fa-google text-sm text-blue-600 dark:text-blue-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Gemini Cli</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'gemini'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'gemini-antigravity'
-                            ? 'border-purple-500 bg-purple-50 dark:border-purple-400 dark:bg-purple-900/30'
-                            : 'border-gray-300 bg-white hover:border-purple-400 hover:bg-purple-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-purple-500 dark:hover:bg-purple-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="gemini-antigravity"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fas fa-rocket text-sm text-purple-600 dark:text-purple-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Antigravity</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">OAuth</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'gemini-antigravity'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-purple-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'gemini-api'
-                            ? 'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-900/30'
-                            : 'border-gray-300 bg-white hover:border-amber-400 hover:bg-amber-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-amber-500 dark:hover:bg-amber-900/20'
-                        ]"
-                      >
-                        <input
-                          v-model="form.platform"
-                          class="sr-only"
-                          type="radio"
-                          value="gemini-api"
-                        />
-                        <div class="flex items-center gap-2">
-                          <i class="fas fa-key text-sm text-amber-600 dark:text-amber-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Gemini API</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">API Key</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'gemini-api'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-                    </template>
 
                     <!-- Droid 子选项 -->
-                    <template v-if="platformGroup === 'droid'">
-                      <label
-                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
-                        :class="[
-                          form.platform === 'droid'
-                            ? 'border-rose-500 bg-rose-50 dark:border-rose-400 dark:bg-rose-900/30'
-                            : 'border-gray-300 bg-white hover:border-rose-400 hover:bg-rose-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-rose-500 dark:hover:bg-rose-900/20'
-                        ]"
-                      >
-                        <input v-model="form.platform" class="sr-only" type="radio" value="droid" />
-                        <div class="flex items-center gap-2">
-                          <i class="fas fa-robot text-sm text-rose-600 dark:text-rose-400"></i>
-                          <div>
-                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
-                              >Droid 专属</span
-                            >
-                            <span class="text-xs text-gray-500 dark:text-gray-400">官方</span>
-                          </div>
-                        </div>
-                        <div
-                          v-if="form.platform === 'droid'"
-                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500"
-                        >
-                          <i class="fas fa-check text-xs text-white"></i>
-                        </div>
-                      </label>
-                    </template>
                   </div>
                 </div>
               </div>
@@ -4042,6 +3770,7 @@
 </template>
 
 <script setup>
+import { productConfig } from '@/config/productConfig'
 import { ref, computed, watch, onMounted } from 'vue'
 import { showToast } from '@/utils/tools'
 
@@ -4092,18 +3821,8 @@ const isEdit = computed(() => !!props.account)
 const show = ref(true)
 
 // 支持 disableAutoProtection 的平台白名单
-const autoProtectionPlatforms = [
-  'claude-console',
-  'ccr',
-  'droid',
-  'bedrock',
-  'azure-openai',
-  'azure_openai',
-  'gemini',
-  'gemini-api',
-  'openai',
-  'openai-responses'
-]
+const supportedAccountPlatforms = productConfig.supportedAccountPlatforms
+const autoProtectionPlatforms = ['claude-console', 'openai', 'openai-responses']
 
 // OAuthFlow 组件引用
 const oauthFlowRef = ref(null)
@@ -4151,14 +3870,10 @@ const showApiKeyManagement = ref(false)
 
 // 根据现有平台确定分组
 const determinePlatformGroup = (platform) => {
-  if (['claude', 'claude-console', 'ccr', 'bedrock'].includes(platform)) {
+  if (['claude', 'claude-console'].includes(platform)) {
     return 'claude'
-  } else if (['openai', 'openai-responses', 'azure_openai'].includes(platform)) {
+  } else if (['openai', 'openai-responses'].includes(platform)) {
     return 'openai'
-  } else if (['gemini', 'gemini-antigravity', 'gemini-api'].includes(platform)) {
-    return 'gemini'
-  } else if (platform === 'droid') {
-    return 'droid'
   }
   return ''
 }
@@ -4668,17 +4383,9 @@ const loadAccountUsage = async () => {
 
 // 选择平台分组
 const selectPlatformGroup = (group) => {
+  if (!['claude', 'openai'].includes(group)) return
   platformGroup.value = group
-  // 根据分组自动选择默认平台
-  if (group === 'claude') {
-    form.value.platform = 'claude'
-  } else if (group === 'openai') {
-    form.value.platform = 'openai'
-  } else if (group === 'gemini') {
-    form.value.platform = 'gemini' // Default to Gemini CLI, user can select Antigravity
-  } else if (group === 'droid') {
-    form.value.platform = 'droid'
-  }
+  form.value.platform = group === 'claude' ? 'claude' : 'openai'
 }
 
 // 下一步
@@ -6156,29 +5863,17 @@ const handleApiKeyRefresh = async () => {
 watch(
   () => form.value.platform,
   (newPlatform) => {
-    // 处理添加方式的自动切换
-    if (
-      newPlatform === 'claude-console' ||
-      newPlatform === 'ccr' ||
-      newPlatform === 'bedrock' ||
-      newPlatform === 'openai-responses'
-    ) {
-      form.value.addType = 'manual' // Claude Console、CCR、Bedrock 和 OpenAI-Responses 只支持手动模式
-    } else if (newPlatform === 'claude') {
-      // 切换到 Claude 时，使用 oauth 作为默认方式
-      form.value.addType = 'oauth'
-    } else if (newPlatform === 'gemini') {
-      // 切换到 Gemini 时，使用 OAuth 作为默认方式
-      form.value.addType = 'oauth'
-    } else if (newPlatform === 'openai') {
-      // 切换到 OpenAI 时，使用 OAuth 作为默认方式
-      form.value.addType = 'oauth'
-    } else if (newPlatform === 'gemini-api' || newPlatform === 'azure_openai') {
-      // 切换到 Gemini API 或 Azure OpenAI 时，使用 apikey 模式（直接创建，不需要 OAuth 流程）
-      form.value.addType = 'apikey'
+    if (!supportedAccountPlatforms.includes(newPlatform)) {
+      form.value.platform = 'claude'
+      return
     }
 
-    // 平台变化时，清空分组选择
+    if (newPlatform === 'claude-console' || newPlatform === 'openai-responses') {
+      form.value.addType = 'manual'
+    } else {
+      form.value.addType = 'oauth'
+    }
+
     if (form.value.accountType === 'group') {
       form.value.groupId = ''
       form.value.groupIds = []
@@ -6186,7 +5881,6 @@ watch(
   }
 )
 
-// 监听分组选择变化，保持 groupId 和 groupIds 同步
 watch(
   () => form.value.groupIds,
   (newGroupIds) => {

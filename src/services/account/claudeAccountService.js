@@ -768,7 +768,10 @@ class ClaudeAccountService {
         'interceptWarmup',
         'disableTempUnavailable',
         'tempUnavailable503TtlSeconds',
-        'tempUnavailable5xxTtlSeconds'
+        'tempUnavailable5xxTtlSeconds',
+        'accountPoolAutoStopped',
+        'accountPoolStoppedReason',
+        'accountPoolStoppedAt'
       ]
       const updatedData = { ...accountData }
       let shouldClearAutoStopFields = false
@@ -856,7 +859,14 @@ class ClaudeAccountService {
       updatedData.updatedAt = new Date().toISOString()
 
       // 如果是手动修改调度状态，清除所有自动停止相关的字段
-      if (Object.prototype.hasOwnProperty.call(updates, 'schedulable')) {
+      const isAccountPoolPolicyUpdate = Object.prototype.hasOwnProperty.call(
+        updates,
+        'accountPoolAutoStopped'
+      )
+      if (
+        Object.prototype.hasOwnProperty.call(updates, 'schedulable') &&
+        !isAccountPoolPolicyUpdate
+      ) {
         // 清除所有自动停止的标记，防止自动恢复
         delete updatedData.rateLimitAutoStopped
         delete updatedData.fiveHourAutoStopped

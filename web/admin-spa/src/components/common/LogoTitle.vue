@@ -2,7 +2,7 @@
   <div class="flex items-center gap-4">
     <!-- Logo区域 -->
     <div
-      class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-300/30 bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-sm dark:border-gray-600/30 dark:from-blue-600/20 dark:to-purple-600/20"
+      class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-teal-300/30 bg-gradient-to-br from-teal-400/25 to-slate-900/25 backdrop-blur-sm dark:border-teal-500/30 dark:from-teal-400/20 dark:to-slate-600/20"
     >
       <template v-if="!loading">
         <img
@@ -12,7 +12,7 @@
           :src="logoSrc"
           @error="handleLogoError"
         />
-        <i v-else class="fas fa-cloud text-xl text-gray-700 dark:text-gray-300" />
+        <i v-else class="fas fa-network-wired text-xl text-gray-700 dark:text-gray-300" />
       </template>
       <div v-else class="h-8 w-8 animate-pulse rounded bg-gray-300/50 dark:bg-gray-600/50" />
     </div>
