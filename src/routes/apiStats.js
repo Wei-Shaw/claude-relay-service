@@ -983,7 +983,9 @@ router.post('/api-key/test', async (req, res) => {
       })
     }
 
-    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey, {
+      adminTestService: 'claude'
+    })
     if (!validation.valid) {
       return res.status(401).json({
         error: 'Invalid API key',
@@ -1048,7 +1050,9 @@ router.post('/api-key/test-gemini', async (req, res) => {
       })
     }
 
-    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey, {
+      adminTestService: 'gemini'
+    })
     if (!validation.valid) {
       return res.status(401).json({
         error: 'Invalid API key',
@@ -1197,7 +1201,9 @@ router.post('/api-key/test-openai', async (req, res) => {
       })
     }
 
-    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey, {
+      adminTestService: 'openai'
+    })
     if (!validation.valid) {
       return res.status(401).json({
         error: 'Invalid API key',

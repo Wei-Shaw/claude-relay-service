@@ -121,6 +121,14 @@ export const useTestState = () => {
   }
 
   // ========== 通用测试请求 ==========
+  const setTesting = () => {
+    testStatus.value = 'testing'
+    responseText.value = ''
+    errorMessage.value = ''
+    testDuration.value = 0
+    testStartTime.value = Date.now()
+  }
+
   const sendTestRequest = async (endpoint, payload, options = {}) => {
     const { useSSE = true, headers = {} } = options
 
@@ -172,6 +180,12 @@ export const useTestState = () => {
     }
   }
 
+  const setError = (message) => {
+    testStatus.value = 'error'
+    errorMessage.value = message || '测试失败'
+    testDuration.value = testStartTime.value ? Date.now() - testStartTime.value : 0
+  }
+
   // ========== 重置 + 清理 ==========
   const resetState = () => {
     testStatus.value = 'idle'
@@ -201,7 +215,9 @@ export const useTestState = () => {
     statusIcon,
     statusIconClass,
     statusTextClass,
+    setTesting,
     sendTestRequest,
+    setError,
     resetState,
     cleanup
   }

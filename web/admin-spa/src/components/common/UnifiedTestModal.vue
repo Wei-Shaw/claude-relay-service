@@ -62,7 +62,7 @@
                 class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-10 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                 readonly
                 type="text"
-                :value="maskedApiKey"
+                :value="managedApiKeyTest ? '管理端一次性测试凭证' : maskedApiKey"
               />
               <div class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
                 <i class="fas fa-lock text-xs" />
@@ -111,6 +111,18 @@
                 {{ apikeyServiceConfig.displayEndpoint }}
               </span>
             </div>
+            <div
+              v-if="mode === 'apikey' && managedApiKeyTest"
+              class="flex items-center justify-between text-sm"
+            >
+              <span class="text-gray-500 dark:text-gray-400">Key 额度</span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+              >
+                <i class="fas fa-shield-alt" />
+                本次测试不计入
+              </span>
+            </div>
             <!-- 测试模型（两种模式都有） -->
             <div class="text-sm">
               <div class="mb-1 flex items-center justify-between">
@@ -142,7 +154,21 @@
             <!-- [apikey] 测试服务 -->
             <div v-if="mode === 'apikey'" class="flex items-center justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">测试服务</span>
-              <span class="font-medium text-gray-700 dark:text-gray-300">
+              <select
+                v-if="managedApiKeyTest"
+                v-model="selectedService"
+                class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                :disabled="state.testStatus.value === 'testing'"
+              >
+                <option
+                  v-for="service in managedServiceOptions"
+                  :key="service.value"
+                  :value="service.value"
+                >
+                  {{ service.label }}
+                </option>
+              </select>
+              <span v-else class="font-medium text-gray-700 dark:text-gray-300">
                 {{ apikeyServiceConfig.name }}
               </span>
             </div>
@@ -287,7 +313,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { APP_CONFIG } from '@/utils/tools'
-import { getConnectivityTestModelsApi } from '@/utils/http_apis'
+import { createAdminApiKeyTestCredentialApi, getConnectivityTestModelsApi } from '@/utils/http_apis'
 import { useTestState } from '@/utils/useTestState'
 import ModelSelector from '@/components/common/ModelSelector.vue'
 
@@ -298,8 +324,11 @@ const props = defineProps({
   account: { type: Object, default: null },
   // apikey 模式
   apiKeyValue: { type: String, default: '' },
+  apiKeyId: { type: String, default: '' },
   apiKeyName: { type: String, default: '' },
-  serviceType: { type: String, default: 'claude' }
+  serviceType: { type: String, default: 'claude' },
+  availableServices: { type: Array, default: () => [] },
+  managedApiKeyTest: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['close'])
@@ -307,6 +336,10 @@ const state = useTestState()
 
 // ========== 模型相关 ==========
 const selectedModel = ref('')
+const selectedService = ref('claude')
+const effectiveServiceType = computed(() =>
+  props.managedApiKeyTest ? selectedService.value : props.serviceType
+)
 const modelsLoading = ref(false)
 const modelsFromApi = ref({
   services: { claude: [], gemini: [], openai: [] },
@@ -337,7 +370,7 @@ const availableModels = computed(() => {
     return modelsFromApi.value.platforms?.[platform] || []
   }
   // apikey 模式
-  return modelsFromApi.value.services?.[props.serviceType] || []
+  return modelsFromApi.value.services?.[effectiveServiceType.value] || []
 })
 
 // 各平台回退默认模型（模型列表未加载时使用）
@@ -371,7 +404,7 @@ const defaultModel = computed(() => {
     return platformFallbackModels[platform] || platformFallbackModels.claude
   }
   // apikey 模式: 优先用列表，回退用 serviceConfig 的 defaultModel
-  const configuredDefault = modelsFromApi.value.defaults?.services?.[props.serviceType]
+  const configuredDefault = modelsFromApi.value.defaults?.services?.[effectiveServiceType.value]
   if (configuredDefault) return configuredDefault
   const models = availableModels.value
   if (models.length > 0) return models[0].value
@@ -410,8 +443,17 @@ const apikeyServiceConfigs = {
   }
 }
 
+const managedServiceOptions = computed(() => {
+  const allowedServices = props.availableServices.length
+    ? props.availableServices
+    : Object.keys(apikeyServiceConfigs)
+  return allowedServices
+    .filter((service) => apikeyServiceConfigs[service])
+    .map((service) => ({ value: service, label: apikeyServiceConfigs[service].name }))
+})
+
 const apikeyServiceConfig = computed(
-  () => apikeyServiceConfigs[props.serviceType] || apikeyServiceConfigs.claude
+  () => apikeyServiceConfigs[effectiveServiceType.value] || apikeyServiceConfigs.claude
 )
 
 const maskedApiKey = computed(() => {
@@ -425,7 +467,7 @@ const disableTest = computed(
   () =>
     modelsLoading.value ||
     !selectedModel.value?.trim() ||
-    (props.mode === 'apikey' && !props.apiKeyValue)
+    (props.mode === 'apikey' && (props.managedApiKeyTest ? !props.apiKeyId : !props.apiKeyValue))
 )
 
 // ========== account 模式 - 平台信息 ==========
@@ -515,9 +557,10 @@ const credentialTypeBadgeClass = computed(() => {
 })
 
 // ========== 通用计算属性 ==========
-const modalTitle = computed(() =>
-  props.mode === 'account' ? '账户连通性测试' : 'API Key 端点测试'
-)
+const modalTitle = computed(() => {
+  if (props.mode === 'account') return '账户连通性测试'
+  return props.managedApiKeyTest ? 'API Key 端到端测试' : 'API Key 端点测试'
+})
 const modalSubtitle = computed(() => {
   if (props.mode === 'account') return props.account?.name || '未知账户'
   return props.apiKeyName || '当前 API Key'
@@ -563,7 +606,7 @@ const getAccountEndpoint = () => {
   return endpoints[platform] || ''
 }
 
-const startTest = () => {
+const startTest = async () => {
   if (props.mode === 'account') {
     const endpoint = getAccountEndpoint()
     if (!endpoint) return
@@ -581,10 +624,23 @@ const startTest = () => {
     )
   } else {
     const endpoint = `${APP_CONFIG.apiPrefix}/apiStats${apikeyServiceConfig.value.endpoint}`
+    let apiKey = props.apiKeyValue
+    if (props.managedApiKeyTest) {
+      state.setTesting()
+      const credentialResult = await createAdminApiKeyTestCredentialApi(
+        props.apiKeyId,
+        effectiveServiceType.value
+      )
+      if (!credentialResult.success || !credentialResult.data?.apiKey) {
+        state.setError?.(credentialResult.message || '无法创建管理端测试凭证')
+        return
+      }
+      apiKey = credentialResult.data.apiKey
+    }
     state.sendTestRequest(
       endpoint,
       {
-        apiKey: props.apiKeyValue,
+        apiKey,
         model: selectedModel.value,
         prompt: testPrompt.value,
         maxTokens: maxTokens.value
@@ -610,6 +666,11 @@ watch(
       await loadModels()
       selectedModel.value = defaultModel.value
       if (props.mode === 'apikey') {
+        const preferredService = props.availableServices.includes(props.serviceType)
+          ? props.serviceType
+          : props.availableServices[0]
+        selectedService.value = preferredService || props.serviceType || 'claude'
+        selectedModel.value = defaultModel.value
         testPrompt.value = 'hi'
         maxTokens.value = 1000
       }
@@ -618,7 +679,7 @@ watch(
 )
 
 watch(
-  () => [props.account, props.serviceType],
+  () => [props.account, props.serviceType, selectedService.value],
   () => {
     selectedModel.value = defaultModel.value
   },

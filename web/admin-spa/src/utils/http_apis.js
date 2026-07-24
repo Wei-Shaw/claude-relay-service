@@ -113,6 +113,12 @@ export const renameApiKeyTagApi = (tagName, newName) =>
   })
 export const getApiKeyUsedModelsApi = () =>
   request({ url: '/admin/api-keys/used-models', method: 'GET' })
+export const createAdminApiKeyTestCredentialApi = (id, service) =>
+  request({
+    url: `/admin/api-keys/${id}/test-credential`,
+    method: 'POST',
+    data: { service }
+  })
 export const getApiKeysBatchStatsApi = (data) =>
   request({ url: '/admin/api-keys/batch-stats', method: 'POST', data })
 export const getApiKeysBatchLastUsageApi = (data) =>
