@@ -234,6 +234,20 @@ const config = {
     maxTotalCostLimit: parseFloat(process.env.QUOTA_CARD_MAX_TOTAL_COST_LIMIT) || 1000 // 最大总额度（美元）
   },
 
+  // 📡 Langfuse 调用追踪配置
+  // 当 enabled=true 时，每一次 LLM 调用都会被上报到 Langfuse 平台，
+  // 包含完整的请求体、响应文本、token 用量、成本、耗时、模型、账户类型等。
+  // captureBody=false 时仅上报元数据与用量，不上报 input/output。
+  langfuse: {
+    enabled: process.env.LANGFUSE_ENABLED === 'true',
+    host: process.env.LANGFUSE_HOST || 'https://cloud.langfuse.com',
+    publicKey: process.env.LANGFUSE_PUBLIC_KEY || '',
+    secretKey: process.env.LANGFUSE_SECRET_KEY || '',
+    captureBody: process.env.LANGFUSE_CAPTURE_BODY !== 'false',
+    flushAt: parseInt(process.env.LANGFUSE_FLUSH_AT) || 15,
+    flushInterval: parseInt(process.env.LANGFUSE_FLUSH_INTERVAL) || 10000
+  },
+
   // ⏱️ 上游错误自动暂停配置
   // 说明：此处是全局默认值。Claude 官方 OAuth 账号可在后台做账号级 503/5xx 覆盖，
   // 且可通过账号设置禁用 temp_unavailable（账号级策略优先于全局默认值）。

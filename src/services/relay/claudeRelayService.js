@@ -2682,6 +2682,15 @@ class ClaudeRelayService {
           try {
             const chunkStr = chunk.toString()
 
+            // 📡 Langfuse 输出文本捕获（如果 caller 提供了 collector）
+            if (requestOptions && requestOptions.langfuseCollector) {
+              try {
+                requestOptions.langfuseCollector.onChunk(chunkStr)
+              } catch (_collectErr) {
+                // 收集失败不影响主流程
+              }
+            }
+
             buffer += chunkStr
 
             // 处理完整的SSE行

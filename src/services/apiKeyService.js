@@ -8,6 +8,7 @@ const requestDetailService = require('./requestDetailService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 const { finalizeRequestDetailMeta } = require('../utils/requestDetailHelper')
 const requestBodyRuleService = require('./requestBodyRuleService')
+const langfuseTracker = require('../utils/langfuseTracker')
 
 const ACCOUNT_TYPE_CONFIG = {
   claude: { prefix: 'claude:account:' },
@@ -162,6 +163,100 @@ function parseOpenAIResponsesPayloadRules(rawRules) {
   }
 
   return parsedRules.map((rule) => requestBodyRuleService.normalizeRule(rule)).filter(Boolean)
+}
+
+// 🔭 将一次 LLM 调用记录上报到 Langfuse（统一入口，所有 recordUsage* 都会调用）
+// 任何异常都被吞掉以保证不会影响主流程
+function emitLangfuseGeneration({
+  keyId,
+  keyData,
+  model,
+  accountId,
+  accountType,
+  inputTokens,
+  outputTokens,
+  cacheCreateTokens,
+  cacheReadTokens,
+  totalTokens,
+  realCost,
+  ratedCost,
+  finalizedRequestMeta
+}) {
+  try {
+    if (!langfuseTracker || typeof langfuseTracker.captureGeneration !== 'function') {
+      return
+    }
+    if (!langfuseTracker.isEnabled || !langfuseTracker.isEnabled()) {
+      return
+    }
+
+    const meta = finalizedRequestMeta || {}
+    const startedAtMs = (() => {
+      const raw = meta.requestStartedAt
+      if (!raw) {
+        return null
+      }
+      const parsed = typeof raw === 'number' ? raw : Date.parse(raw)
+      return Number.isFinite(parsed) ? parsed : null
+    })()
+    const durationMs = typeof meta.durationMs === 'number' ? meta.durationMs : null
+    const startTime = startedAtMs ? new Date(startedAtMs) : new Date()
+    const endTime =
+      startedAtMs !== null && durationMs !== null
+        ? new Date(startedAtMs + Math.max(0, durationMs))
+        : new Date()
+
+    const sessionId = meta.sessionId || meta.sessionHash || null
+    const requestBody = meta.requestBody === undefined ? null : meta.requestBody
+    const { responseText } = meta
+    const traceName = `${accountType || 'llm'}-${meta.stream === true ? 'stream' : 'request'}`
+
+    const langfuseMetadata = {}
+    if (keyData?.name) {
+      langfuseMetadata.apiKeyName = keyData.name
+    }
+    if (meta.outputCapture) {
+      langfuseMetadata.outputCapture = meta.outputCapture
+    }
+    if (meta.outputTruncated) {
+      langfuseMetadata.outputTruncated = true
+    }
+
+    langfuseTracker.captureGeneration({
+      apiKeyId: keyId,
+      apiKeyName: keyData?.name || null,
+      accountId: accountId || null,
+      accountType: accountType || null,
+      model: model || null,
+      input: requestBody,
+      output: responseText !== undefined ? responseText : null,
+      usage: {
+        inputTokens,
+        outputTokens,
+        cacheCreateTokens,
+        cacheReadTokens,
+        totalTokens
+      },
+      costs: { realCost, ratedCost },
+      startTime,
+      endTime,
+      sessionId,
+      requestId: meta.requestId || null,
+      endpoint: meta.endpoint || null,
+      method: meta.method || null,
+      statusCode: meta.statusCode ?? null,
+      stream: meta.stream === true,
+      error: meta.error || null,
+      traceName,
+      metadata: langfuseMetadata
+    })
+  } catch (error) {
+    try {
+      logger.warn(`⚠️ Failed to emit Langfuse generation: ${error.message}`)
+    } catch (_logError) {
+      // ignore
+    }
+  }
 }
 
 class ApiKeyService {
@@ -1797,6 +1892,23 @@ class ApiKeyService {
         logger.warn(`⚠️ Failed to schedule request detail capture: ${captureError.message}`)
       })
 
+      // 📡 Langfuse 上报（启用时）
+      emitLangfuseGeneration({
+        keyId,
+        keyData,
+        model,
+        accountId,
+        accountType,
+        inputTokens,
+        outputTokens,
+        cacheCreateTokens,
+        cacheReadTokens,
+        totalTokens,
+        realCost,
+        ratedCost,
+        finalizedRequestMeta
+      })
+
       const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
       if (cacheCreateTokens > 0) {
         logParts.push(`Cache Create: ${cacheCreateTokens}`)
@@ -2068,6 +2180,23 @@ class ApiKeyService {
       await redis.addUsageRecord(keyId, usageRecord)
       this._captureRequestDetail(keyId, usageRecord, finalizedRequestMeta).catch((captureError) => {
         logger.warn(`⚠️ Failed to schedule request detail capture: ${captureError.message}`)
+      })
+
+      // 📡 Langfuse 上报（启用时）
+      emitLangfuseGeneration({
+        keyId,
+        keyData,
+        model,
+        accountId,
+        accountType,
+        inputTokens,
+        outputTokens,
+        cacheCreateTokens,
+        cacheReadTokens,
+        totalTokens,
+        realCost: realCostWithDetails,
+        ratedCost: ratedCostWithDetails,
+        finalizedRequestMeta
       })
 
       const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
