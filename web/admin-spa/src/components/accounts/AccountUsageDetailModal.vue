@@ -338,7 +338,7 @@ import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useThemeStore } from '@/stores/theme'
 
-import { formatNumber } from '@/utils/tools'
+import { formatNumber, formatDetailedCost as formatCost } from '@/utils/tools'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -390,14 +390,6 @@ const chartColors = computed(() => ({
 const totalTokens = computed(() => props.summary?.totalTokens || 0)
 const overviewInputTokens = computed(() => props.overview?.total?.inputTokens || 0)
 const overviewOutputTokens = computed(() => props.overview?.total?.outputTokens || 0)
-
-const formatCost = (value) => {
-  const num = Number(value || 0)
-  if (Number.isNaN(num)) return '$0.000000'
-  if (num >= 1) return `$${num.toFixed(2)}`
-  if (num >= 0.01) return `$${num.toFixed(3)}`
-  return `$${num.toFixed(6)}`
-}
 
 const roundToTwo = (value) => Math.round((Number(value) || 0) * 100) / 100
 

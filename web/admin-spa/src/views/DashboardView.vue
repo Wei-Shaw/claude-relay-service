@@ -782,7 +782,7 @@ import Chart from 'chart.js/auto'
 
 import { useDashboardStore } from '@/stores/dashboard'
 import { useThemeStore } from '@/stores/theme'
-import { formatNumber, showToast } from '@/utils/tools'
+import { formatNumber, showToast, formatDetailedCost as formatCostValue } from '@/utils/tools'
 
 import { getBalanceSummaryApi } from '@/utils/http_apis'
 
@@ -933,31 +933,12 @@ const refreshCountdown = ref(0)
 const countdownTimer = ref(null)
 const isRefreshing = ref(false)
 
-// 计算倒计时显示
-// const refreshCountdownDisplay = computed(() => {
-//   if (!autoRefreshEnabled.value || refreshCountdown.value <= 0) return ''
-//   return `${refreshCountdown.value}秒后刷新`
-// })
-
 // 图表颜色配置（根据主题动态调整）
 const chartColors = computed(() => ({
   text: isDarkMode.value ? '#e5e7eb' : '#374151',
   grid: isDarkMode.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(0, 0, 0, 0.1)',
   legend: isDarkMode.value ? '#e5e7eb' : '#374151'
 }))
-
-function formatCostValue(cost) {
-  if (!Number.isFinite(cost)) {
-    return '$0.000000'
-  }
-  if (cost >= 1) {
-    return `$${cost.toFixed(2)}`
-  }
-  if (cost >= 0.01) {
-    return `$${cost.toFixed(3)}`
-  }
-  return `$${cost.toFixed(6)}`
-}
 
 // 计算百分比
 function calculatePercentage(value, stats) {
@@ -1722,16 +1703,6 @@ function stopAutoRefresh() {
   }
   refreshCountdown.value = 0
 }
-
-// 切换自动刷新
-// function toggleAutoRefresh() {
-//   autoRefreshEnabled.value = !autoRefreshEnabled.value
-//   if (autoRefreshEnabled.value) {
-//     startAutoRefresh()
-//   } else {
-//     stopAutoRefresh()
-//   }
-// }
 
 // 监听自动刷新状态变化
 watch(autoRefreshEnabled, (newVal) => {

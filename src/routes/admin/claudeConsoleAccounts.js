@@ -207,6 +207,68 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 测试未保存的Claude Console账户配置，不创建账户
+router.post('/claude-console-accounts/test-connection', authenticateAdmin, async (req, res) => {
+  const {
+    apiUrl,
+    apiKey,
+    userAgent,
+    proxy,
+    model = 'claude-sonnet-4-5-20250929'
+  } = req.body || {}
+
+  const normalizedApiUrl = typeof apiUrl === 'string' ? apiUrl.trim() : ''
+  const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : ''
+  const testModel = typeof model === 'string' && model.trim() ? model.trim() : undefined
+
+  if (!normalizedApiUrl || !normalizedApiKey) {
+    return res.status(400).json({
+      success: false,
+      error: 'API URL and API Key are required'
+    })
+  }
+
+  let parsedUrl
+  try {
+    parsedUrl = new URL(normalizedApiUrl)
+  } catch {
+    return res.status(400).json({
+      success: false,
+      error: 'API URL is invalid'
+    })
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    return res.status(400).json({
+      success: false,
+      error: 'API URL must start with http:// or https://'
+    })
+  }
+
+  try {
+    const result = await claudeConsoleRelayService.testAccountConfig(
+      {
+        apiUrl: normalizedApiUrl,
+        apiKey: normalizedApiKey,
+        userAgent,
+        proxy
+      },
+      testModel
+    )
+
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Claude Console draft account test failed:', error.message)
+    return res.json({
+      success: false,
+      error: 'Test failed',
+      message: error.message,
+      latency: error.latency,
+      upstreamStatus: error.status
+    })
+  }
+})
+
 // 更新Claude Console账户
 router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req, res) => {
   try {

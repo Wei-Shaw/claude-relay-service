@@ -17,7 +17,7 @@ const { getSafeMessage } = require('../utils/errorSanitizer')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const pricingService = require('../services/pricingService')
-const { getEffectiveModel } = require('../utils/modelHelper')
+const { getEffectiveModel, isModelRestricted } = require('../utils/modelHelper')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
 
 // 🔧 辅助函数：检查 API Key 权限
@@ -88,7 +88,7 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
 
     // 如果启用了模型限制，视为黑名单：过滤掉受限模型
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
-      models = models.filter((model) => !apiKeyData.restrictedModels.includes(model.id))
+      models = models.filter((model) => !isModelRestricted(model.id, apiKeyData.restrictedModels))
     }
 
     res.json({
@@ -127,7 +127,7 @@ router.get('/v1/models/:model', authenticateApiKey, async (req, res) => {
 
     // 模型限制（黑名单）：命中则直接拒绝
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
-      if (apiKeyData.restrictedModels.includes(modelId)) {
+      if (isModelRestricted(modelId, apiKeyData.restrictedModels)) {
         return res.status(404).json({
           error: {
             message: `Model '${modelId}' not found`,
@@ -213,7 +213,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
     // 模型限制（黑名单）：命中受限模型则拒绝
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels?.length > 0) {
       const effectiveModel = getEffectiveModel(claudeRequest.model || '')
-      if (apiKeyData.restrictedModels.includes(effectiveModel)) {
+      if (isModelRestricted(effectiveModel, apiKeyData.restrictedModels)) {
         return res.status(403).json({
           error: {
             message: `Model ${req.body.model} is not allowed for this API key`,
@@ -280,7 +280,8 @@ async function handleChatCompletion(req, res, apiKeyData) {
       const usageCallback = (usage) => {
         // 记录使用统计
         if (usage && usage.input_tokens !== undefined && usage.output_tokens !== undefined) {
-          const model = usage.model || claudeRequest.model
+          const actualModel = usage.model || claudeRequest.model
+          const displayModel = req.body.model || actualModel
           const cacheCreateTokens =
             (usage.cache_creation && typeof usage.cache_creation === 'object'
               ? (usage.cache_creation.ephemeral_5m_input_tokens || 0) +
@@ -304,13 +305,15 @@ async function handleChatCompletion(req, res, apiKeyData) {
             .recordUsageWithDetails(
               apiKeyData.id,
               usageWithRequestMeta, // 传递 usage + 请求模式元信息（beta/speed）
-              model,
+              actualModel,
               accountId,
               accountType,
               createRequestDetailMeta(req, {
                 requestBody: req.body,
                 stream: true,
-                statusCode: res.statusCode
+                statusCode: res.statusCode,
+                requestedModel: req.body.model,
+                displayModel
               })
             )
             .then((costs) => {
@@ -322,7 +325,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
                   cacheCreateTokens,
                   cacheReadTokens
                 },
-                model,
+                actualModel,
                 `openai-${accountType}-stream`,
                 req.apiKey?.id,
                 accountType,
@@ -339,7 +342,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
                   cacheCreateTokens,
                   cacheReadTokens
                 },
-                model,
+                actualModel,
                 `openai-${accountType}-stream`,
                 req.apiKey?.id,
                 accountType
@@ -425,6 +428,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
 
       // 处理错误响应
       if (claudeResponse.statusCode >= 400) {
+        res._upstreamResponseBody = claudeData
         return res.status(claudeResponse.statusCode).json({
           error: {
             message: claudeData.error?.message || 'Claude API error',
@@ -440,6 +444,8 @@ async function handleChatCompletion(req, res, apiKeyData) {
       // 记录使用统计
       if (claudeData.usage) {
         const { usage } = claudeData
+        const actualModel = claudeData.model || claudeRequest.model
+        const displayModel = req.body.model || actualModel
         const cacheCreateTokens =
           (usage.cache_creation && typeof usage.cache_creation === 'object'
             ? (usage.cache_creation.ephemeral_5m_input_tokens || 0) +
@@ -462,13 +468,15 @@ async function handleChatCompletion(req, res, apiKeyData) {
           .recordUsageWithDetails(
             apiKeyData.id,
             usageWithRequestMeta, // 传递 usage + 请求模式元信息（beta/speed）
-            claudeRequest.model,
+            actualModel,
             accountId,
             accountType,
             createRequestDetailMeta(req, {
               requestBody: req.body,
               stream: false,
-              statusCode: res.statusCode
+              statusCode: res.statusCode,
+              requestedModel: req.body.model,
+              displayModel
             })
           )
           .then((costs) => {
@@ -480,7 +488,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
                 cacheCreateTokens,
                 cacheReadTokens
               },
-              claudeRequest.model,
+              actualModel,
               `openai-${accountType}-non-stream`,
               req.apiKey?.id,
               accountType,
@@ -497,7 +505,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
                 cacheCreateTokens,
                 cacheReadTokens
               },
-              claudeRequest.model,
+              actualModel,
               `openai-${accountType}-non-stream`,
               req.apiKey?.id,
               accountType

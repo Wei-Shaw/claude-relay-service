@@ -8,6 +8,7 @@ const { getAvailableModels } = require('../services/relay/geminiRelayService')
 const crypto = require('crypto')
 const apiKeyService = require('../services/apiKeyService')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
+const { isModelRestricted } = require('../utils/modelHelper')
 
 // 生成会话哈希
 function generateSessionHash(req) {
@@ -260,17 +261,18 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       })
     }
 
-    // 检查模型限制
-    if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels.length > 0) {
-      if (!apiKeyData.restrictedModels.includes(model)) {
-        return res.status(403).json({
-          error: {
-            message: `Model ${model} is not allowed for this API key`,
-            type: 'invalid_request_error',
-            code: 'model_not_allowed'
-          }
-        })
-      }
+    // 模型限制（黑名单）：命中受限模型则拒绝
+    if (
+      apiKeyData.enableModelRestriction &&
+      isModelRestricted(model, apiKeyData.restrictedModels)
+    ) {
+      return res.status(403).json({
+        error: {
+          message: `Model ${model} is not allowed for this API key`,
+          type: 'invalid_request_error',
+          code: 'model_not_allowed'
+        }
+      })
     }
 
     // 转换消息格式
@@ -696,6 +698,7 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       } else {
         // 返回 OpenAI 格式的错误响应
         const status = error.status || 500
+        res._upstreamResponseBody = error.upstreamResponseBody || error.response?.data
         const errorResponse = {
           error: error.error || {
             message: error.message || 'Internal server error',
@@ -785,9 +788,9 @@ async function handleGetModels(req, res) {
       ]
     }
 
-    // 如果启用了模型限制，过滤模型列表
+    // 如果启用了模型限制，按黑名单过滤模型列表
     if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels.length > 0) {
-      models = models.filter((model) => apiKeyData.restrictedModels.includes(model.id))
+      models = models.filter((model) => !isModelRestricted(model.id, apiKeyData.restrictedModels))
     }
 
     res.json({
@@ -829,17 +832,18 @@ router.get('/v1/models/:model', authenticateApiKey, async (req, res) => {
       })
     }
 
-    // 检查模型限制
-    if (apiKeyData.enableModelRestriction && apiKeyData.restrictedModels.length > 0) {
-      if (!apiKeyData.restrictedModels.includes(modelId)) {
-        return res.status(404).json({
-          error: {
-            message: `Model '${modelId}' not found`,
-            type: 'invalid_request_error',
-            code: 'model_not_found'
-          }
-        })
-      }
+    // 模型限制（黑名单）：命中则直接拒绝
+    if (
+      apiKeyData.enableModelRestriction &&
+      isModelRestricted(modelId, apiKeyData.restrictedModels)
+    ) {
+      return res.status(404).json({
+        error: {
+          message: `Model '${modelId}' not found`,
+          type: 'invalid_request_error',
+          code: 'model_not_found'
+        }
+      })
     }
 
     // 返回模型信息

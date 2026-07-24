@@ -356,106 +356,19 @@
           </div>
 
           <!-- 专属账号绑定 -->
-          <div>
-            <div class="mb-3 flex items-center justify-between">
-              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >专属账号绑定</label
-              >
-              <button
-                class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-                :disabled="accountsLoading"
-                title="刷新账号列表"
-                type="button"
-                @click="refreshAccounts"
-              >
-                <i
-                  :class="[
-                    'fas',
-                    accountsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt',
-                    'text-xs'
-                  ]"
-                />
-                <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
-              </button>
-            </div>
-            <div class="grid grid-cols-1 gap-3">
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Claude 专属账号</label
-                >
-                <AccountSelector
-                  v-model="claudeAccountSelectorValue"
-                  :accounts="localAccounts.claude"
-                  default-option-text="请选择Claude账号"
-                  :disabled="!isServiceSelectable('claude')"
-                  :groups="localAccounts.claudeGroups"
-                  placeholder="请选择Claude账号"
-                  platform="claude"
-                  :special-options="accountSpecialOptions"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Gemini 专属账号</label
-                >
-                <AccountSelector
-                  v-model="geminiAccountSelectorValue"
-                  :accounts="localAccounts.gemini"
-                  default-option-text="请选择Gemini账号"
-                  :disabled="!isServiceSelectable('gemini')"
-                  :groups="localAccounts.geminiGroups"
-                  placeholder="请选择Gemini账号"
-                  platform="gemini"
-                  :special-options="accountSpecialOptions"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >OpenAI 专属账号</label
-                >
-                <AccountSelector
-                  v-model="openaiAccountSelectorValue"
-                  :accounts="localAccounts.openai"
-                  default-option-text="请选择OpenAI账号"
-                  :disabled="!isServiceSelectable('openai')"
-                  :groups="localAccounts.openaiGroups"
-                  placeholder="请选择OpenAI账号"
-                  platform="openai"
-                  :special-options="accountSpecialOptions"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Bedrock 专属账号</label
-                >
-                <AccountSelector
-                  v-model="bedrockAccountSelectorValue"
-                  :accounts="localAccounts.bedrock"
-                  default-option-text="请选择Bedrock账号"
-                  :disabled="!isServiceSelectable('openai')"
-                  :groups="[]"
-                  placeholder="请选择Bedrock账号"
-                  platform="bedrock"
-                  :special-options="accountSpecialOptions"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Droid 专属账号</label
-                >
-                <AccountSelector
-                  v-model="droidAccountSelectorValue"
-                  :accounts="localAccounts.droid"
-                  default-option-text="请选择Droid账号"
-                  :disabled="!isServiceSelectable('droid')"
-                  :groups="localAccounts.droidGroups"
-                  placeholder="请选择Droid账号"
-                  platform="droid"
-                  :special-options="accountSpecialOptions"
-                />
-              </div>
-            </div>
-          </div>
+          <ApiKeyAccountBindings
+            v-model:bedrock-account-id="bedrockAccountSelectorValue"
+            v-model:claude-account-id="claudeAccountSelectorValue"
+            v-model:droid-account-id="droidAccountSelectorValue"
+            v-model:gemini-account-id="geminiAccountSelectorValue"
+            v-model:openai-account-id="openaiAccountSelectorValue"
+            :accounts="localAccounts"
+            :accounts-loading="accountsLoading"
+            :permissions="form.permissions"
+            :special-options="accountSpecialOptions"
+            title="专属账号绑定"
+            @refresh="refreshAccounts"
+          />
 
           <div class="flex gap-3 pt-4">
             <button
@@ -486,7 +399,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { showToast } from '@/utils/tools'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import * as httpApis from '@/utils/http_apis'
-import AccountSelector from '@/components/common/AccountSelector.vue'
+import ApiKeyAccountBindings from '@/components/apikeys/ApiKeyAccountBindings.vue'
+import { useApiKeyAccountOptions } from '@/utils/useApiKeyAccountOptions'
 
 const props = defineProps({
   selectedKeys: {
@@ -514,18 +428,8 @@ const emit = defineEmits(['close', 'success'])
 
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
-const accountsLoading = ref(false)
-const localAccounts = ref({
-  claude: [],
-  gemini: [],
-  openai: [],
-  bedrock: [],
-  droid: [],
-  claudeGroups: [],
-  geminiGroups: [],
-  openaiGroups: [],
-  droidGroups: []
-})
+const { accountsLoading, localAccounts, setLocalAccountsFromProps, refreshAccounts } =
+  useApiKeyAccountOptions()
 
 // 标签相关
 const newTag = ref('')
@@ -585,14 +489,6 @@ const openaiAccountSelectorValue = createAccountSelectorModel('openaiAccountId')
 const bedrockAccountSelectorValue = createAccountSelectorModel('bedrockAccountId')
 const droidAccountSelectorValue = createAccountSelectorModel('droidAccountId')
 
-const isServiceSelectable = (service) => {
-  if (!form.permissions) return true
-  if (form.permissions === 'all') return true
-  if (Array.isArray(form.permissions) && form.permissions.length === 0) return true
-  if (Array.isArray(form.permissions)) return form.permissions.includes(service)
-  return form.permissions === service
-}
-
 // 标签管理方法
 const addTag = () => {
   if (newTag.value && newTag.value.trim()) {
@@ -612,138 +508,6 @@ const selectTag = (tag) => {
 
 const removeTag = (index) => {
   form.tags.splice(index, 1)
-}
-
-// 刷新账号列表
-const refreshAccounts = async () => {
-  accountsLoading.value = true
-  try {
-    const [
-      claudeData,
-      claudeConsoleData,
-      geminiData,
-      geminiApiData,
-      openaiData,
-      openaiResponsesData,
-      bedrockData,
-      droidData,
-      groupsData
-    ] = await Promise.all([
-      httpApis.getClaudeAccountsApi(),
-      httpApis.getClaudeConsoleAccountsApi(),
-      httpApis.getGeminiAccountsApi(),
-      httpApis.getGeminiApiAccountsApi(), // 获取 Gemini-API 账号
-      httpApis.getOpenAIAccountsApi(),
-      httpApis.getOpenAIResponsesAccountsApi(),
-      httpApis.getBedrockAccountsApi(),
-      httpApis.getDroidAccountsApi(),
-      httpApis.getAccountGroupsApi()
-    ])
-
-    // 合并Claude OAuth账户和Claude Console账户
-    const claudeAccounts = []
-
-    if (claudeData.success) {
-      claudeData.data?.forEach((account) => {
-        claudeAccounts.push({
-          ...account,
-          platform: 'claude-oauth',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    if (claudeConsoleData.success) {
-      claudeConsoleData.data?.forEach((account) => {
-        claudeAccounts.push({
-          ...account,
-          platform: 'claude-console',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    localAccounts.value.claude = claudeAccounts
-
-    // 合并 Gemini OAuth 和 Gemini API 账号
-    const geminiAccounts = []
-
-    if (geminiData.success) {
-      ;(geminiData.data || []).forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    if (geminiApiData.success) {
-      ;(geminiApiData.data || []).forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini-api',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    localAccounts.value.gemini = geminiAccounts
-
-    const openaiAccounts = []
-
-    if (openaiData.success) {
-      ;(openaiData.data || []).forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: 'openai',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    if (openaiResponsesData.success) {
-      ;(openaiResponsesData.data || []).forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: 'openai-responses',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    localAccounts.value.openai = openaiAccounts
-
-    if (bedrockData.success) {
-      localAccounts.value.bedrock = (bedrockData.data || []).map((account) => ({
-        ...account,
-        isDedicated: account.accountType === 'dedicated'
-      }))
-    }
-
-    if (droidData.success) {
-      localAccounts.value.droid = (droidData.data || []).map((account) => ({
-        ...account,
-        platform: 'droid',
-        isDedicated: account.accountType === 'dedicated'
-      }))
-    }
-
-    // 处理分组数据
-    if (groupsData.success) {
-      const allGroups = groupsData.data || []
-      localAccounts.value.claudeGroups = allGroups.filter((g) => g.platform === 'claude')
-      localAccounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
-      localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
-      localAccounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
-    }
-
-    showToast('账号列表已刷新', 'success')
-  } catch (error) {
-    showToast('刷新账号列表失败', 'error')
-  } finally {
-    accountsLoading.value = false
-  }
 }
 
 // 批量更新API Keys
@@ -885,47 +649,6 @@ onMounted(async () => {
   availableTags.value = await apiKeysStore.fetchTags()
 
   // 初始化账号数据
-  if (props.accounts) {
-    // props.accounts.gemini 已经包含了 OAuth 和 API 两种类型的账号（父组件已合并）
-    // 保留原有的 platform 属性，不要覆盖
-    const geminiAccounts = (props.accounts.gemini || []).map((account) => ({
-      ...account,
-      platform: account.platform || 'gemini' // 保留原有 platform，只在没有时设默认值
-    }))
-
-    // props.accounts.openai 只包含 openai 类型，openaiResponses 需要单独处理
-    const openaiAccounts = []
-    if (props.accounts.openai) {
-      props.accounts.openai.forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: account.platform || 'openai'
-        })
-      })
-    }
-    if (props.accounts.openaiResponses) {
-      props.accounts.openaiResponses.forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: account.platform || 'openai-responses'
-        })
-      })
-    }
-
-    localAccounts.value = {
-      claude: props.accounts.claude || [],
-      gemini: geminiAccounts,
-      openai: openaiAccounts,
-      bedrock: props.accounts.bedrock || [],
-      droid: (props.accounts.droid || []).map((account) => ({
-        ...account,
-        platform: account.platform || 'droid'
-      })),
-      claudeGroups: props.accounts.claudeGroups || [],
-      geminiGroups: props.accounts.geminiGroups || [],
-      openaiGroups: props.accounts.openaiGroups || [],
-      droidGroups: props.accounts.droidGroups || []
-    }
-  }
+  setLocalAccountsFromProps(props.accounts)
 })
 </script>

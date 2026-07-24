@@ -89,10 +89,12 @@ describe('apiKeyService openai responses config', () => {
     expect(storedKeyData.enableOpenAIResponsesCodexAdaptation).toBe('true')
     expect(storedKeyData.enableOpenAIResponsesPayloadRules).toBe('false')
     expect(storedKeyData.openaiResponsesPayloadRules).toBe('[]')
+    expect(storedKeyData.scheduledActivationAt).toBe('')
 
     expect(result.enableOpenAIResponsesCodexAdaptation).toBe(true)
     expect(result.enableOpenAIResponsesPayloadRules).toBe(false)
     expect(result.openaiResponsesPayloadRules).toEqual([])
+    expect(result.scheduledActivationAt).toBeNull()
   })
 
   test('updateApiKey serializes toggle and payload rule fields', async () => {
@@ -117,6 +119,42 @@ describe('apiKeyService openai responses config', () => {
     expect(storedKeyData.openaiResponsesPayloadRules).toBe(
       JSON.stringify([{ path: 'model', valueType: 'string', value: 'gpt-5' }])
     )
+  })
+
+  test('activates only inactive keys whose scheduled time has arrived', async () => {
+    const now = new Date('2026-07-20T10:00:00.000Z')
+    const getKeys = jest.spyOn(apiKeyService, 'getAllApiKeysFast').mockResolvedValue([
+      {
+        id: 'due-key',
+        name: 'Due Key',
+        isActive: false,
+        scheduledActivationAt: '2026-07-20T09:59:00.000Z'
+      },
+      {
+        id: 'future-key',
+        name: 'Future Key',
+        isActive: false,
+        scheduledActivationAt: '2026-07-20T10:01:00.000Z'
+      },
+      {
+        id: 'active-key',
+        name: 'Active Key',
+        isActive: true,
+        scheduledActivationAt: '2026-07-20T09:59:00.000Z'
+      }
+    ])
+    const updateKey = jest.spyOn(apiKeyService, 'updateApiKey').mockResolvedValue({ success: true })
+
+    const activated = await apiKeyService.activateScheduledKeys(now)
+
+    expect(activated).toBe(1)
+    expect(updateKey).toHaveBeenCalledWith('due-key', {
+      isActive: true,
+      scheduledActivationAt: null
+    })
+
+    getKeys.mockRestore()
+    updateKey.mockRestore()
   })
 
   test('getApiKeyById returns parsed toggle and rule values', async () => {
@@ -203,7 +241,9 @@ describe('apiKeyService openai responses config', () => {
         cache_creation_input_tokens: 0,
         cache_read_input_tokens: 2048
       },
-      'mimo-v2.5-pro'
+      'mimo-v2.5-pro',
+      null,
+      { requestLevel: true }
     )
     expect(result.realCost).toBeCloseTo(0.0529974, 10)
     expect(result.ratedCost).toBeCloseTo(0.0529974, 10)
@@ -234,6 +274,68 @@ describe('apiKeyService openai responses config', () => {
         realCost: 0.052997,
         usedFallbackPricing: true,
         pricingSource: 'unknown-fallback'
+      })
+    )
+  })
+
+  test('recordUsageWithDetails persists request pricing tier snapshots', async () => {
+    const pricingTier = {
+      name: 'gpt-5.6-long-input',
+      applied: true,
+      eligible: true,
+      threshold: 272000,
+      thresholdType: 'exclusive',
+      contextInputTokens: 272001,
+      inputMultiplier: 2,
+      cachedInputMultiplier: 2,
+      outputMultiplier: 1.5,
+      baseCost: 0.217201,
+      surcharge: 0.212201,
+      totalCost: 0.429402
+    }
+    CostCalculator.calculateCost.mockReturnValue({
+      costs: {
+        input: 0.400002,
+        output: 0.015,
+        cacheCreate: 0,
+        cacheWrite: 0,
+        cacheRead: 0.0144,
+        total: 0.429402
+      },
+      debug: {
+        usedFallbackPricing: false,
+        pricingSource: 'dynamic',
+        isLongContextRequest: false
+      },
+      pricingTier,
+      usingDynamicPricing: true
+    })
+
+    await apiKeyService.recordUsageWithDetails(
+      'key-1',
+      {
+        input_tokens: 200001,
+        output_tokens: 1000,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 72000
+      },
+      'gpt-5.6-sol',
+      'acct-1',
+      'openai-responses'
+    )
+
+    expect(redis.addUsageRecord).toHaveBeenCalledWith(
+      'key-1',
+      expect.objectContaining({
+        model: 'gpt-5.6-sol',
+        realCost: 0.429402,
+        pricingTier
+      })
+    )
+    expect(billingEventPublisher.publishBillingEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-5.6-sol',
+        pricingTier
       })
     )
   })

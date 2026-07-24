@@ -28,13 +28,13 @@
 
           <!-- 分隔线 -->
           <div
-            v-if="oemSettings.ldapEnabled || oemSettings.showAdminButton !== false"
+            v-if="oemSettings.userSystemEnabled || oemSettings.showAdminButton !== false"
             class="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent opacity-50 dark:via-gray-600"
           />
 
-          <!-- 用户登录按钮 (仅在 LDAP 启用时显示) -->
+          <!-- 用户登录按钮 (仅在用户系统启用时显示) -->
           <router-link
-            v-if="oemSettings.ldapEnabled"
+            v-if="oemSettings.userSystemEnabled"
             class="user-login-button flex items-center gap-2 rounded-2xl px-4 py-2 text-white transition-all duration-300 md:px-5 md:py-2.5"
             to="/user-login"
           >
@@ -888,27 +888,6 @@ watch(apiKey, (newValue) => {
     radial-gradient(circle at 40% 40%, rgba(var(--secondary-rgb), 0.1) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
-}
-
-/* 玻璃态效果 - 使用CSS变量 */
-.glass-strong {
-  background: var(--glass-strong-color);
-  backdrop-filter: blur(25px);
-  border: 1px solid var(--border-color);
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  position: relative;
-  z-index: 1;
-}
-
-/* 暗色模式的玻璃态效果 */
-:global(.dark) .glass-strong {
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(55, 65, 81, 0.3),
-    inset 0 1px 0 rgba(75, 85, 99, 0.2);
 }
 
 /* 标题渐变 */

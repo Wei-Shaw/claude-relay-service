@@ -788,19 +788,20 @@ class BedrockAccountService {
   // 🔄 重置Bedrock账户所有异常状态
   async resetAccountStatus(accountId) {
     try {
-      const accountData = await this.getAccount(accountId)
+      const client = redis.getClientSafe()
+      const accountKey = `bedrock_account:${accountId}`
+      const accountData = await client.get(accountKey)
       if (!accountData) {
         throw new Error('Account not found')
       }
 
-      const client = redis.getClientSafe()
-      const accountKey = `bedrock:account:${accountId}`
+      const account = JSON.parse(accountData)
 
       const updates = {
         status: 'active',
         errorMessage: '',
-        schedulable: 'true',
-        isActive: 'true'
+        schedulable: true,
+        isActive: true
       }
 
       const fieldsToDelete = [
@@ -814,8 +815,18 @@ class BedrockAccountService {
         'quotaStoppedAt'
       ]
 
-      await client.hset(accountKey, updates)
-      await client.hdel(accountKey, ...fieldsToDelete)
+      for (const field of fieldsToDelete) {
+        delete account[field]
+      }
+
+      await client.set(
+        accountKey,
+        JSON.stringify({
+          ...account,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        })
+      )
 
       logger.success(`Reset all error status for Bedrock account ${accountId}`)
 
@@ -827,7 +838,7 @@ class BedrockAccountService {
         const webhookNotifier = require('../../utils/webhookNotifier')
         await webhookNotifier.sendAccountAnomalyNotification({
           accountId,
-          accountName: accountData.name || accountId,
+          accountName: account.name || accountId,
           platform: 'bedrock',
           status: 'recovered',
           errorCode: 'STATUS_RESET',

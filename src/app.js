@@ -12,6 +12,7 @@ const redis = require('./models/redis')
 const pricingService = require('./services/pricingService')
 const cacheMonitor = require('./utils/cacheMonitor')
 const { getSafeMessage } = require('./utils/errorSanitizer')
+const { isClientConnectionError } = require('./utils/connectionErrorHelper')
 
 // Import routes
 const apiRoutes = require('./routes/api')
@@ -44,6 +45,7 @@ class Application {
   constructor() {
     this.app = express()
     this.server = null
+    this.scheduledActivationTimer = null
   }
 
   async initialize() {
@@ -157,24 +159,6 @@ class Application {
         logger.error('📁 Account group reverse index migration failed:', err)
       })
 
-      // 超早期拦截 /admin-next/ 请求 - 在所有中间件之前
-      this.app.use((req, res, next) => {
-        if (req.path === '/admin-next/' && req.method === 'GET') {
-          logger.warn('🚨 INTERCEPTING /admin-next/ request at the very beginning!')
-          const adminSpaPath = path.join(__dirname, '..', 'web', 'admin-spa', 'dist')
-          const indexPath = path.join(adminSpaPath, 'index.html')
-
-          if (fs.existsSync(indexPath)) {
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-            return res.sendFile(indexPath)
-          } else {
-            logger.error('❌ index.html not found at:', indexPath)
-            return res.status(404).send('index.html not found')
-          }
-        }
-        next()
-      })
-
       // 🛡️ 安全中间件
       this.app.use(
         helmet({
@@ -218,17 +202,6 @@ class Application {
       // 📝 请求日志（使用自定义logger而不是morgan）
       this.app.use(requestLogger)
 
-      // 🐛 HTTP调试拦截器（仅在启用调试时生效）
-      if (process.env.DEBUG_HTTP_TRAFFIC === 'true') {
-        try {
-          const { debugInterceptor } = require('./middleware/debugInterceptor')
-          this.app.use(debugInterceptor)
-          logger.info('🐛 HTTP调试拦截器已启用 - 日志输出到 logs/http-debug-*.log')
-        } catch (error) {
-          logger.warn('⚠️ 无法加载HTTP调试拦截器:', error.message)
-        }
-      }
-
       // 🔧 基础中间件
       this.app.use(
         express.json({
@@ -249,16 +222,6 @@ class Application {
         this.app.set('trust proxy', 1)
       }
 
-      // 调试中间件 - 拦截所有 /admin-next 请求
-      this.app.use((req, res, next) => {
-        if (req.path.startsWith('/admin-next')) {
-          logger.info(
-            `🔍 DEBUG: Incoming request - method: ${req.method}, path: ${req.path}, originalUrl: ${req.originalUrl}`
-          )
-        }
-        next()
-      })
-
       // 🎨 新版管理界面静态文件服务（必须在其他路由之前）
       const adminSpaPath = path.join(__dirname, '..', 'web', 'admin-spa', 'dist')
       if (fs.existsSync(adminSpaPath)) {
@@ -269,9 +232,6 @@ class Application {
 
         // 使用 all 方法确保捕获所有 HTTP 方法
         this.app.all('/admin-next/', (req, res) => {
-          logger.info('🎯 HIT: /admin-next/ route handler triggered!')
-          logger.info(`Method: ${req.method}, Path: ${req.path}, URL: ${req.url}`)
-
           if (req.method !== 'GET' && req.method !== 'HEAD') {
             return res.status(405).send('Method Not Allowed')
           }
@@ -670,6 +630,22 @@ class Application {
   }
 
   startCleanupTasks() {
+    const activateScheduledKeys = async () => {
+      try {
+        const apiKeyService = require('./services/apiKeyService')
+        const activatedKeys = await apiKeyService.activateScheduledKeys()
+        if (activatedKeys > 0) {
+          logger.success(`⏰ Activated ${activatedKeys} scheduled API keys`)
+        }
+      } catch (error) {
+        logger.error('❌ Scheduled API key activation failed:', error)
+      }
+    }
+
+    activateScheduledKeys()
+    this.scheduledActivationTimer = setInterval(activateScheduledKeys, 60 * 1000)
+    logger.info('⏰ Scheduled API key activation check runs every minute')
+
     // 🧹 每小时清理一次过期数据
     setInterval(async () => {
       try {
@@ -863,6 +839,12 @@ class Application {
             logger.error('❌ Error stopping rate limit cleanup service:', error)
           }
 
+          if (this.scheduledActivationTimer) {
+            clearInterval(this.scheduledActivationTimer)
+            this.scheduledActivationTimer = null
+            logger.info('⏰ Scheduled API key activation stopped')
+          }
+
           // 停止用户消息队列清理服务
           try {
             const userMessageQueueService = require('./services/userMessageQueueService')
@@ -931,11 +913,25 @@ class Application {
 
     // 处理未捕获异常
     process.on('uncaughtException', (error) => {
+      if (isClientConnectionError(error)) {
+        logger.warn('⚠️ Ignoring client connection error:', {
+          code: error?.code,
+          message: error?.message
+        })
+        return
+      }
       logger.error('💥 Uncaught exception:', error)
       shutdown('uncaughtException')
     })
 
     process.on('unhandledRejection', (reason, promise) => {
+      if (isClientConnectionError(reason)) {
+        logger.warn('⚠️ Ignoring client connection rejection:', {
+          code: reason?.code,
+          message: reason?.message
+        })
+        return
+      }
       logger.error('💥 Unhandled rejection at:', promise, 'reason:', reason)
       shutdown('unhandledRejection')
     })

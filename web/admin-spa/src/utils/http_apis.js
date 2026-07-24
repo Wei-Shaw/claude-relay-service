@@ -2,6 +2,14 @@ import request from '@/utils/request'
 
 // 模型
 export const getModelsApi = () => request({ url: '/apiStats/models', method: 'GET' })
+export const getConnectivityTestModelsApi = () =>
+  request({ url: '/apiStats/connectivity-test-models', method: 'GET' })
+export const getConnectivityTestModelConfigApi = () =>
+  request({ url: '/admin/connectivity-test-models', method: 'GET' })
+export const updateConnectivityTestModelConfigApi = (data) =>
+  request({ url: '/admin/connectivity-test-models', method: 'PUT', data })
+export const resetConnectivityTestModelConfigApi = () =>
+  request({ url: '/admin/connectivity-test-models', method: 'DELETE' })
 
 // 模型价格管理
 export const getModelPricingApi = () => request({ url: '/admin/models/pricing', method: 'GET' })
@@ -24,7 +32,8 @@ export const getBatchModelStatsApi = (apiIds, period = 'daily') =>
 
 // 认证
 export const loginApi = (data) => request({ url: '/web/auth/login', method: 'POST', data })
-export const getAuthUserApi = () => request({ url: '/web/auth/user', method: 'GET' })
+export const getAuthUserApi = (config = {}) =>
+  request({ url: '/web/auth/user', method: 'GET', ...config })
 export const changePasswordApi = (data) =>
   request({ url: '/web/auth/change-password', method: 'POST', data })
 
@@ -51,12 +60,21 @@ export const getUsageCostsApi = (period) =>
 export const getUsageStatsApi = (url) => request({ url, method: 'GET' })
 export const getRequestDetailsApi = (params) =>
   request({ url: '/admin/request-details', method: 'GET', params })
+export const getServiceQualityApi = (params) =>
+  request({ url: '/admin/service-quality', method: 'GET', params })
 export const getRequestDetailBodyPreviewStatsApi = (config) =>
   request({ url: '/admin/request-details/body-preview-stats', method: 'GET', ...config })
 export const purgeRequestDetailBodyPreviewApi = (config) =>
   request({ url: '/admin/request-details/body-preview-purge', method: 'POST', ...config })
 export const getRequestDetailApi = (requestId) =>
   request({ url: `/admin/request-details/${requestId}`, method: 'GET' })
+export const replayRequestDetailApi = (requestId, data) =>
+  request({
+    url: `/admin/request-details/${requestId}/replay`,
+    method: 'POST',
+    data,
+    timeout: 600000
+  })
 
 // 客户端
 export const getSupportedClientsApi = () =>
@@ -69,6 +87,8 @@ export const getApiKeysWithParamsApi = (params) =>
 export const createApiKeyApi = (data) => request({ url: '/admin/api-keys', method: 'POST', data })
 export const updateApiKeyApi = (id, data) =>
   request({ url: `/admin/api-keys/${id}`, method: 'PUT', data })
+export const updateApiKeyActivationApi = (id, data) =>
+  request({ url: `/admin/api-keys/${id}/activation`, method: 'PATCH', data })
 export const toggleApiKeyApi = (id) =>
   request({ url: `/admin/api-keys/${id}/toggle`, method: 'PUT' })
 export const deleteApiKeyApi = (id) => request({ url: `/admin/api-keys/${id}`, method: 'DELETE' })
@@ -76,6 +96,8 @@ export const getApiKeyStatsApi = (id, params) =>
   request({ url: `/admin/api-keys/${id}/stats`, method: 'GET', params })
 export const getApiKeyModelStatsApi = (id, params) =>
   request({ url: `/admin/api-keys/${id}/model-stats`, method: 'GET', params })
+export const getApiKeyUsageHistoryApi = (id, days = 30) =>
+  request({ url: `/admin/api-keys/${id}/usage-history`, method: 'GET', params: { days } })
 export const getApiKeyTagsApi = () => request({ url: '/admin/api-keys/tags', method: 'GET' })
 export const getApiKeyTagsDetailsApi = () =>
   request({ url: '/admin/api-keys/tags/details', method: 'GET' })
@@ -141,6 +163,8 @@ export const getClaudeConsoleAccountsApi = () =>
   request({ url: '/admin/claude-console-accounts', method: 'GET' })
 export const createClaudeConsoleAccountApi = (data) =>
   request({ url: '/admin/claude-console-accounts', method: 'POST', data })
+export const testClaudeConsoleAccountConfigApi = (data) =>
+  request({ url: '/admin/claude-console-accounts/test-connection', method: 'POST', data })
 export const updateClaudeConsoleAccountApi = (id, data) =>
   request({ url: `/admin/claude-console-accounts/${id}`, method: 'PUT', data })
 
@@ -177,6 +201,8 @@ export const createOpenAIAccountApi = (data) =>
   request({ url: '/admin/openai-accounts', method: 'POST', data })
 export const updateOpenAIAccountApi = (id, data) =>
   request({ url: `/admin/openai-accounts/${id}`, method: 'PUT', data })
+export const batchImportOpenAIOAuthAccountsApi = (data) =>
+  request({ url: '/admin/openai-accounts/batch-import-oauth', method: 'POST', data })
 export const generateOpenAIAuthUrlApi = (data) =>
   request({ url: '/admin/openai-accounts/generate-auth-url', method: 'POST', data })
 export const exchangeOpenAICodeApi = (data) =>
@@ -187,6 +213,8 @@ export const getOpenAIResponsesAccountsApi = () =>
   request({ url: '/admin/openai-responses-accounts', method: 'GET' })
 export const createOpenAIResponsesAccountApi = (data) =>
   request({ url: '/admin/openai-responses-accounts', method: 'POST', data })
+export const testOpenAIResponsesAccountConfigApi = (data) =>
+  request({ url: '/admin/openai-responses-accounts/test-connection', method: 'POST', data })
 export const updateOpenAIResponsesAccountApi = (id, data) =>
   request({ url: `/admin/openai-responses-accounts/${id}`, method: 'PUT', data })
 
@@ -224,6 +252,8 @@ export const deleteAccountByEndpointApi = (endpoint) => request({ url: endpoint,
 export const testAccountByEndpointApi = (endpoint) => request({ url: endpoint, method: 'POST' })
 export const updateAccountByEndpointApi = (endpoint, data) =>
   request({ url: endpoint, method: 'PUT', data })
+export const batchUpdateAccountsPriorityApi = (data) =>
+  request({ url: '/admin/accounts/batch-priority', method: 'PUT', data })
 
 // 账户使用统计
 export const getClaudeAccountsUsageApi = () =>
@@ -286,26 +316,6 @@ export const getBalanceSummaryApi = () =>
   request({ url: '/admin/accounts/balance/summary', method: 'GET' })
 export const getBalanceByPlatformApi = (platform, params) =>
   request({ url: `/admin/accounts/balance/platform/${platform}`, method: 'GET', params })
-
-// 账户余额脚本
-export const getAccountBalanceScriptApi = (id, platform) =>
-  request({ url: `/admin/accounts/${id}/balance/script?platform=${platform}`, method: 'GET' })
-export const updateAccountBalanceScriptApi = (id, platform, data) =>
-  request({ url: `/admin/accounts/${id}/balance/script?platform=${platform}`, method: 'PUT', data })
-export const testAccountBalanceScriptApi = (id, platform, data) =>
-  request({
-    url: `/admin/accounts/${id}/balance/script/test?platform=${platform}`,
-    method: 'POST',
-    data
-  })
-
-// 默认余额脚本
-export const getDefaultBalanceScriptApi = () =>
-  request({ url: '/admin/balance-scripts/default', method: 'GET' })
-export const updateDefaultBalanceScriptApi = (data) =>
-  request({ url: '/admin/balance-scripts/default', method: 'PUT', data })
-export const testDefaultBalanceScriptApi = (data) =>
-  request({ url: '/admin/balance-scripts/default/test', method: 'POST', data })
 
 // 前台用户管理
 export const getFrontUsersApi = (params) => request({ url: '/users', method: 'GET', params })

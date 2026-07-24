@@ -603,16 +603,29 @@
                             'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
                             key.isActive
                               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                              : key.scheduledActivationAt
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                           ]"
+                          :title="
+                            key.scheduledActivationAt
+                              ? `计划于 ${formatDate(key.scheduledActivationAt)} 激活`
+                              : ''
+                          "
                         >
                           <div
                             :class="[
                               'mr-2 h-2 w-2 rounded-full',
-                              key.isActive ? 'bg-green-500' : 'bg-red-500'
+                              key.isActive
+                                ? 'bg-green-500'
+                                : key.scheduledActivationAt
+                                  ? 'bg-amber-500'
+                                  : 'bg-red-500'
                             ]"
                           />
-                          {{ key.isActive ? '活跃' : '禁用' }}
+                          {{
+                            key.isActive ? '活跃' : key.scheduledActivationAt ? '待激活' : '禁用'
+                          }}
                         </span>
                       </td>
                       <!-- 费用 -->
@@ -965,7 +978,13 @@
                                 : 'text-green-600 hover:bg-green-50 hover:text-green-900 dark:hover:bg-green-900/20',
                               'rounded px-2 py-1 text-xs font-medium transition-colors'
                             ]"
-                            :title="key.isActive ? '禁用' : '激活'"
+                            :title="
+                              key.isActive
+                                ? '禁用'
+                                : key.scheduledActivationAt
+                                  ? `计划于 ${formatDate(key.scheduledActivationAt)} 激活`
+                                  : '激活'
+                            "
                             @click="toggleApiKeyStatus(key)"
                           >
                             <i :class="['fas', key.isActive ? 'fa-ban' : 'fa-check-circle']" />
@@ -1308,16 +1327,27 @@
                     'inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold',
                     key.isActive
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                      : key.scheduledActivationAt
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                   ]"
+                  :title="
+                    key.scheduledActivationAt
+                      ? `计划于 ${formatDate(key.scheduledActivationAt)} 激活`
+                      : ''
+                  "
                 >
                   <div
                     :class="[
                       'mr-1.5 h-1.5 w-1.5 rounded-full',
-                      key.isActive ? 'bg-green-500' : 'bg-red-500'
+                      key.isActive
+                        ? 'bg-green-500'
+                        : key.scheduledActivationAt
+                          ? 'bg-amber-500'
+                          : 'bg-red-500'
                     ]"
                   />
-                  {{ key.isActive ? '活跃' : '已停用' }}
+                  {{ key.isActive ? '活跃' : key.scheduledActivationAt ? '待激活' : '已停用' }}
                 </span>
               </div>
 
@@ -1674,7 +1704,7 @@
                   @click="toggleApiKeyStatus(key)"
                 >
                   <i :class="['fas', key.isActive ? 'fa-ban' : 'fa-check-circle', 'mr-1']" />
-                  {{ key.isActive ? '禁用' : '激活' }}
+                  {{ key.isActive ? '禁用' : key.scheduledActivationAt ? '调整激活' : '激活' }}
                 </button>
                 <button
                   class="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50"
@@ -2139,9 +2169,21 @@
       @save="handleSaveExpiry"
     />
 
+    <ApiKeyActivationModal
+      :api-key="activatingApiKey"
+      :loading="activationSaving"
+      :show="!!activatingApiKey"
+      @close="closeApiKeyActivationModal"
+      @submit="handleApiKeyActivation"
+    />
+
     <UsageDetailModal
       :api-key="selectedApiKeyForDetail || {}"
+      :generated-at="apiKeyUsageGeneratedAt"
+      :history="apiKeyUsageHistory"
+      :loading="apiKeyUsageLoading"
       :show="showUsageDetailModal"
+      :summary="apiKeyUsageSummary"
       @close="showUsageDetailModal = false"
       @open-timeline="openTimeline"
     />
@@ -2172,7 +2214,6 @@ import { showToast, copyText, formatNumber, formatDate } from '@/utils/tools'
 
 import * as httpApis from '@/utils/http_apis'
 import { useAuthStore } from '@/stores/auth'
-import * as XLSX from 'xlsx-js-style'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
 import RenewApiKeyModal from '@/components/apikeys/RenewApiKeyModal.vue'
@@ -2180,12 +2221,14 @@ import NewApiKeyModal from '@/components/apikeys/NewApiKeyModal.vue'
 import BatchApiKeyModal from '@/components/apikeys/BatchApiKeyModal.vue'
 import BatchEditApiKeyModal from '@/components/apikeys/BatchEditApiKeyModal.vue'
 import ExpiryEditModal from '@/components/apikeys/ExpiryEditModal.vue'
+import ApiKeyActivationModal from '@/components/apikeys/ApiKeyActivationModal.vue'
 import UsageDetailModal from '@/components/apikeys/UsageDetailModal.vue'
 import TagManagementModal from '@/components/apikeys/TagManagementModal.vue'
 import LimitProgressBar from '@/components/apikeys/LimitProgressBar.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
 
 // 响应式数据
 const router = useRouter()
@@ -2285,8 +2328,15 @@ const accountsLoading = ref(false)
 const accountsLoaded = ref(false)
 const editingExpiryKey = ref(null)
 const expiryEditModalRef = ref(null)
+const activatingApiKey = ref(null)
+const activationSaving = ref(false)
 const showUsageDetailModal = ref(false)
 const selectedApiKeyForDetail = ref(null)
+const apiKeyUsageLoading = ref(false)
+const apiKeyUsageHistory = ref([])
+const apiKeyUsageSummary = ref({})
+const apiKeyUsageGeneratedAt = ref('')
+let latestUsageHistoryRequestId = 0
 
 // 标签相关
 const selectedTagFilter = ref('')
@@ -2357,37 +2407,13 @@ const newApiKeyData = ref(null)
 const batchApiKeyData = ref([])
 
 // ConfirmModal 状态
-const showConfirmModal = ref(false)
-const confirmModalConfig = ref({
-  title: '',
-  message: '',
-  type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
-})
-const confirmResolve = ref(null)
-
-const showConfirm = (
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  type = 'primary'
-) => {
-  return new Promise((resolve) => {
-    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
-    confirmResolve.value = resolve
-    showConfirmModal.value = true
-  })
-}
-const handleConfirm = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(true)
-}
-const handleCancel = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(false)
-}
+const {
+  showConfirmModal,
+  confirmModalConfig,
+  showConfirm,
+  handleConfirmModal: handleConfirm,
+  handleCancelModal: handleCancel
+} = useConfirmModal()
 
 // 计算排序后的API Keys（现在由后端处理，这里直接返回）
 const sortedApiKeys = computed(() => {
@@ -3818,6 +3844,56 @@ const openRenewApiKeyModal = (apiKey) => {
   showRenewApiKeyModal.value = true
 }
 
+const openApiKeyActivationModal = (apiKey) => {
+  activatingApiKey.value = apiKey
+}
+
+const closeApiKeyActivationModal = () => {
+  if (!activationSaving.value) {
+    activatingApiKey.value = null
+  }
+}
+
+const handleApiKeyActivation = async ({ mode, scheduledAt }) => {
+  const apiKey = activatingApiKey.value
+  if (!apiKey) return
+
+  activationSaving.value = true
+  try {
+    const data = await httpApis.updateApiKeyActivationApi(apiKey.id, { mode, scheduledAt })
+    if (!data.success) {
+      showToast(data.message || '操作失败', 'error')
+      return
+    }
+
+    const localKey = apiKeys.value.find((key) => key.id === apiKey.id)
+    if (localKey) {
+      if (mode === 'immediate') {
+        localKey.isActive = true
+        localKey.scheduledActivationAt = null
+      } else if (mode === 'scheduled') {
+        localKey.isActive = false
+        localKey.scheduledActivationAt = data.scheduledActivationAt || scheduledAt
+      } else {
+        localKey.scheduledActivationAt = null
+      }
+    }
+
+    const message =
+      mode === 'immediate'
+        ? 'API Key 已激活'
+        : mode === 'scheduled'
+          ? 'API Key 已设置定时激活'
+          : '已取消定时激活'
+    showToast(message, 'success')
+    activatingApiKey.value = null
+  } catch (error) {
+    showToast('操作失败', 'error')
+  } finally {
+    activationSaving.value = false
+  }
+}
+
 // 处理创建成功
 const handleCreateSuccess = (data) => {
   showCreateApiKeyModal.value = false
@@ -3898,7 +3974,7 @@ const getApiKeyActions = (key) => {
   // 激活/禁用
   actions.push({
     key: 'toggle',
-    label: key.isActive ? '禁用' : '激活',
+    label: key.isActive ? '禁用' : key.scheduledActivationAt ? '调整激活' : '激活',
     icon: key.isActive ? 'fa-ban' : 'fa-check-circle',
     color: key.isActive ? 'orange' : 'green',
     handler: () => toggleApiKeyStatus(key)
@@ -3918,6 +3994,11 @@ const getApiKeyActions = (key) => {
 
 // 切换API Key状态（激活/禁用）
 const toggleApiKeyStatus = async (key) => {
+  if (!key.isActive) {
+    openApiKeyActivationModal(key)
+    return
+  }
+
   let confirmed = true
 
   // 禁用时需要二次确认
@@ -4062,8 +4143,6 @@ const clearAllDeletedApiKeys = async () => {
 
       // 如果有失败的，显示详细信息
       if (data.details && data.details.failedCount > 0) {
-        // const errors = data.details.errors
-        // console.error('部分API Keys清空失败:', errors)
         showToast(`${data.details.failedCount} 个清空失败`, 'warning')
       }
 
@@ -4233,43 +4312,6 @@ const formatWindowTime = (seconds) => {
   }
 }
 
-// 获取每日费用进度 - 已移到 LimitProgressBar 组件中
-// const getDailyCostProgress = (key) => {
-//   if (!key.dailyCostLimit || key.dailyCostLimit === 0) return 0
-//   const percentage = ((key.dailyCost || 0) / key.dailyCostLimit) * 100
-//   return Math.min(percentage, 100)
-// }
-
-// 获取每日费用进度条颜色 - 已移到 LimitProgressBar 组件中
-// const getDailyCostProgressColor = (key) => {
-//   const progress = getDailyCostProgress(key)
-//   if (progress >= 100) return 'bg-red-500'
-//   if (progress >= 80) return 'bg-yellow-500'
-//   return 'bg-green-500'
-// }
-
-// 获取 Opus 周费用进度 - 已移到 LimitBadge 组件中
-// const getWeeklyOpusCostProgress = (key) => {
-//   if (!key.weeklyOpusCostLimit || key.weeklyOpusCostLimit === 0) return 0
-//   const percentage = ((key.weeklyOpusCost || 0) / key.weeklyOpusCostLimit) * 100
-//   return Math.min(percentage, 100)
-// }
-
-// 获取 Opus 周费用进度条颜色 - 已移到 LimitBadge 组件中
-// const getWeeklyOpusCostProgressColor = (key) => {
-//   const progress = getWeeklyOpusCostProgress(key)
-//   if (progress >= 100) return 'bg-red-500'
-//   if (progress >= 80) return 'bg-yellow-500'
-//   return 'bg-green-500'
-// }
-
-// 获取总费用进度 - 暂时不用
-// const getTotalCostProgress = (key) => {
-//   if (!key.totalCostLimit || key.totalCostLimit === 0) return 0
-//   const percentage = ((key.totalCost || 0) / key.totalCostLimit) * 100
-//   return Math.min(percentage, 100)
-// }
-
 // 显示使用详情
 const showUsageDetails = (apiKey) => {
   const cachedStats = getCachedStats(apiKey.id)
@@ -4302,6 +4344,11 @@ const showUsageDetails = (apiKey) => {
 
   selectedApiKeyForDetail.value = enrichedApiKey
   showUsageDetailModal.value = true
+  apiKeyUsageLoading.value = true
+  apiKeyUsageHistory.value = []
+  apiKeyUsageSummary.value = {}
+  apiKeyUsageGeneratedAt.value = ''
+  loadApiKeyUsageHistory(enrichedApiKey.id)
 }
 
 const openTimeline = (keyId) => {
@@ -4311,22 +4358,22 @@ const openTimeline = (keyId) => {
   router.push(`/api-keys/${id}/usage-records`)
 }
 
-// 格式化时间（秒转换为可读格式） - 已移到 WindowLimitBar 组件中
-// const formatTime = (seconds) => {
-//   if (seconds === null || seconds === undefined) return '--:--'
-//
-//   const hours = Math.floor(seconds / 3600)
-//   const minutes = Math.floor((seconds % 3600) / 60)
-//   const secs = seconds % 60
-//
-//   if (hours > 0) {
-//     return `${hours}h ${minutes}m`
-//   } else if (minutes > 0) {
-//     return `${minutes}m ${secs}s`
-//   } else {
-//     return `${secs}s`
-//   }
-// }
+const loadApiKeyUsageHistory = async (keyId) => {
+  const requestId = ++latestUsageHistoryRequestId
+  const response = await httpApis.getApiKeyUsageHistoryApi(keyId, 30)
+  if (requestId !== latestUsageHistoryRequestId) {
+    return
+  }
+  if (response.success) {
+    const data = response.data || {}
+    apiKeyUsageHistory.value = data.history || []
+    apiKeyUsageSummary.value = data.summary || {}
+    apiKeyUsageGeneratedAt.value = data.generatedAt || ''
+  } else {
+    showToast(response.error || response.message || '加载 API 使用详情失败', 'error')
+  }
+  apiKeyUsageLoading.value = false
+}
 
 // 格式化最后使用时间
 const formatLastUsed = (dateString) => {
@@ -4452,8 +4499,11 @@ const clearSearch = () => {
 }
 
 // 导出数据到Excel
-const exportToExcel = () => {
+const exportToExcel = async () => {
   try {
+    const XLSXModule = await import('xlsx-js-style')
+    const XLSX = XLSXModule.default || XLSXModule
+
     // 准备导出的数据 - 简化版本
     const exportData = sortedApiKeys.value.map((key) => {
       // 获取当前时间段的数据

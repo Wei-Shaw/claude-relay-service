@@ -8,6 +8,7 @@ const apiKeyService = require('../services/apiKeyService')
 const crypto = require('crypto')
 const upstreamErrorHelper = require('../utils/upstreamErrorHelper')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
+const { isModelRestricted } = require('../utils/modelHelper')
 
 // 支持的模型列表 - 基于真实的 Azure OpenAI 模型
 const ALLOWED_MODELS = {
@@ -26,6 +27,46 @@ const ALLOWED_MODELS = {
 }
 
 const ALL_ALLOWED_MODELS = [...ALLOWED_MODELS.CHAT_MODELS, ...ALLOWED_MODELS.EMBEDDING_MODELS]
+
+function isAzureModelRestricted(apiKeyData, model) {
+  if (!apiKeyData?.enableModelRestriction || typeof model !== 'string') {
+    return false
+  }
+
+  const bareModel = model.replace(/^azure\//, '')
+  return (
+    isModelRestricted(model, apiKeyData.restrictedModels) ||
+    isModelRestricted(bareModel, apiKeyData.restrictedModels)
+  )
+}
+
+function buildAzureErrorHistoryContext(req, account, endpoint, response) {
+  const responseData = response?.data
+  const errorBody =
+    responseData && typeof responseData.pipe === 'function'
+      ? { message: `HTTP ${response.status}`, stream: true }
+      : responseData
+
+  return upstreamErrorHelper.buildErrorHistoryContext(
+    upstreamErrorHelper.buildSchedulingContext(req.apiKey, account?.id, 'azure-openai'),
+    {
+      model: req.body?.model || account?.deploymentName,
+      path: endpoint,
+      apiKeyName: req.apiKey?.name || req.apiKey?.id,
+      errorBody
+    }
+  )
+}
+
+function sendModelNotAllowed(res, model) {
+  return res.status(403).json({
+    error: {
+      message: `Model ${model} is not allowed for this API key`,
+      type: 'invalid_request_error',
+      code: 'model_not_allowed'
+    }
+  })
+}
 
 // Azure OpenAI 稳定 API 版本
 // const AZURE_API_VERSION = '2024-02-01' // 当前未使用，保留以备后用
@@ -140,12 +181,16 @@ router.get('/health', (req, res) => {
 // 获取可用模型列表（兼容 OpenAI API）
 router.get('/models', authenticateApiKey, async (req, res) => {
   try {
-    const models = ALL_ALLOWED_MODELS.map((model) => ({
+    let models = ALL_ALLOWED_MODELS.map((model) => ({
       id: `azure/${model}`,
       object: 'model',
       created: Date.now(),
       owned_by: 'azure-openai'
     }))
+
+    if (req.apiKey?.enableModelRestriction) {
+      models = models.filter((model) => !isAzureModelRestricted(req.apiKey, model.id))
+    }
 
     res.json({
       object: 'list',
@@ -171,6 +216,10 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
   })
 
   try {
+    if (isAzureModelRestricted(req.apiKey, req.body?.model || '')) {
+      return sendModelNotAllowed(res, req.body.model)
+    }
+
     // 获取绑定的 Azure OpenAI 账户
     let account = null
     if (req.apiKey?.azureOpenaiAccountId) {
@@ -218,7 +267,13 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
       const customTtl =
         response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .markTempUnavailable(
+          account.id,
+          'azure-openai',
+          response.status,
+          customTtl,
+          buildAzureErrorHistoryContext(req, account, 'chat/completions', response)
+        )
         .catch(() => {})
     }
 
@@ -274,6 +329,7 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
 
     if (!res.headersSent) {
       const statusCode = error.response?.status || 500
+      res._upstreamResponseBody = error.response?.data
       const errorMessage =
         error.response?.data?.error?.message || error.message || 'Internal server error'
 
@@ -302,6 +358,10 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
   })
 
   try {
+    if (isAzureModelRestricted(req.apiKey, req.body?.model || '')) {
+      return sendModelNotAllowed(res, req.body.model)
+    }
+
     // 获取绑定的 Azure OpenAI 账户
     let account = null
     if (req.apiKey?.azureOpenaiAccountId) {
@@ -349,7 +409,13 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
       const customTtl =
         response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .markTempUnavailable(
+          account.id,
+          'azure-openai',
+          response.status,
+          customTtl,
+          buildAzureErrorHistoryContext(req, account, 'responses', response)
+        )
         .catch(() => {})
     }
 
@@ -405,6 +471,7 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
 
     if (!res.headersSent) {
       const statusCode = error.response?.status || 500
+      res._upstreamResponseBody = error.response?.data
       const errorMessage =
         error.response?.data?.error?.message || error.message || 'Internal server error'
 
@@ -432,6 +499,10 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
   })
 
   try {
+    if (isAzureModelRestricted(req.apiKey, req.body?.model || '')) {
+      return sendModelNotAllowed(res, req.body.model)
+    }
+
     // 获取绑定的 Azure OpenAI 账户
     let account = null
     if (req.apiKey?.azureOpenaiAccountId) {
@@ -479,7 +550,13 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
       const customTtl =
         response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .markTempUnavailable(
+          account.id,
+          'azure-openai',
+          response.status,
+          customTtl,
+          buildAzureErrorHistoryContext(req, account, 'embeddings', response)
+        )
         .catch(() => {})
     }
 
@@ -509,6 +586,7 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
 
     if (!res.headersSent) {
       const statusCode = error.response?.status || 500
+      res._upstreamResponseBody = error.response?.data
       const errorMessage =
         error.response?.data?.error?.message || error.message || 'Internal server error'
 

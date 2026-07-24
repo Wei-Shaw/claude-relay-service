@@ -187,6 +187,14 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import {
+  formatExpireDate,
+  getExpiryIsoFromDuration,
+  getExpiryStatus,
+  getMinDateTime,
+  isExpired,
+  parseCustomExpiryDateTime
+} from '@/utils/useExpiryEditor'
 
 const props = defineProps({
   show: {
@@ -221,11 +229,7 @@ const quickOptions = [
 ]
 
 // 计算最小日期时间
-const minDateTime = computed(() => {
-  const now = new Date()
-  now.setMinutes(now.getMinutes() + 1)
-  return now.toISOString().slice(0, 16)
-})
+const minDateTime = computed(getMinDateTime)
 
 // 监听显示状态，初始化表单
 watch(
@@ -275,107 +279,17 @@ const selectQuickOption = (value) => {
     return
   }
 
-  const now = new Date()
-  const match = value.match(/(\d+)([dhmy])/)
-
-  if (match) {
-    const [, num, unit] = match
-    const amount = parseInt(num)
-
-    switch (unit) {
-      case 'd':
-        now.setDate(now.getDate() + amount)
-        break
-      case 'h':
-        now.setHours(now.getHours() + amount)
-        break
-      case 'm':
-        now.setMonth(now.getMonth() + amount)
-        break
-      case 'y':
-        now.setFullYear(now.getFullYear() + amount)
-        break
-    }
-
-    localForm.expiresAt = now.toISOString()
-  }
+  const expiresAt = getExpiryIsoFromDuration(value)
+  if (expiresAt !== undefined) localForm.expiresAt = expiresAt
 }
 
 // 更新自定义过期时间
 const updateCustomExpiryPreview = () => {
-  if (localForm.customExpireDate) {
-    try {
-      // 手动解析日期时间字符串，确保它被正确解释为本地时间
-      const [datePart, timePart] = localForm.customExpireDate.split('T')
-      const [year, month, day] = datePart.split('-').map(Number)
-      const [hours, minutes] = timePart.split(':').map(Number)
-
-      // 使用构造函数创建本地时间的 Date 对象，然后转换为 UTC ISO 字符串
-      const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0)
-
-      // 验证日期有效性
-      if (isNaN(localDate.getTime())) {
-        console.error('Invalid date:', localForm.customExpireDate)
-        return
-      }
-
-      localForm.expiresAt = localDate.toISOString()
-    } catch (error) {
-      console.error('Failed to parse custom expire date:', error)
-    }
-  }
+  const expiresAt = parseCustomExpiryDateTime(localForm.customExpireDate)
+  if (expiresAt) localForm.expiresAt = expiresAt
 }
 
-// 格式化完整过期日期（包含时分）
-const formatFullExpireDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-// 检查是否已过期
-const isExpired = (dateString) => {
-  if (!dateString) return false
-  return new Date(dateString) < new Date()
-}
-
-// 获取过期状态
-const getExpiryStatus = (expiresAt) => {
-  if (!expiresAt) return null
-
-  const now = new Date()
-  const expiryDate = new Date(expiresAt)
-  const diffMs = expiryDate - now
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffMs < 0) {
-    return {
-      text: '已过期',
-      class: 'text-red-600'
-    }
-  } else if (diffDays <= 7) {
-    return {
-      text: `${diffDays} 天后过期`,
-      class: 'text-orange-600'
-    }
-  } else if (diffDays <= 30) {
-    return {
-      text: `${diffDays} 天后过期`,
-      class: 'text-yellow-600'
-    }
-  } else {
-    return {
-      text: `${Math.ceil(diffDays / 30)} 个月后过期`,
-      class: 'text-green-600'
-    }
-  }
-}
+const formatFullExpireDate = formatExpireDate
 
 // 保存
 const handleSave = () => {

@@ -1,8 +1,6 @@
 const redis = require('../../models/redis')
-const balanceScriptService = require('../balanceScriptService')
 const logger = require('../../utils/logger')
 const CostCalculator = require('../../utils/costCalculator')
-const { isBalanceScriptEnabled } = require('../../utils/featureFlags')
 
 class AccountBalanceService {
   constructor(options = {}) {
@@ -298,24 +296,9 @@ class AccountBalanceService {
         'unknown',
         platform,
         'local',
-        null,
-        { scriptEnabled: false, scriptConfigured: false }
+        null
       )
     }
-
-    // 余额脚本配置状态（用于前端控制"刷新余额"按钮）
-    let scriptConfig = null
-    let scriptConfigured = false
-    if (typeof this.redis?.getBalanceScriptConfig === 'function') {
-      scriptConfig = await this.redis.getBalanceScriptConfig(platform, accountId)
-      scriptConfigured = !!(
-        scriptConfig &&
-        scriptConfig.scriptBody &&
-        String(scriptConfig.scriptBody).trim().length > 0
-      )
-    }
-    const scriptEnabled = isBalanceScriptEnabled()
-    const scriptMeta = { scriptEnabled, scriptConfigured }
 
     const localBalance = await this._getBalanceFromLocal(accountId, platform)
     const localStatistics = localBalance.statistics || {}
@@ -346,8 +329,7 @@ class AccountBalanceService {
             accountId,
             platform,
             'cache',
-            cached.ttlSeconds,
-            scriptMeta
+            cached.ttlSeconds
           )
         }
       }
@@ -366,42 +348,33 @@ class AccountBalanceService {
           accountId,
           platform,
           'local',
-          null,
-          scriptMeta
+          null
         )
       }
     }
 
-    // 强制查询：优先脚本（如启用且已配置），否则调用 Provider；失败自动降级到本地统计
-    let providerResult
-
-    if (scriptEnabled && scriptConfigured) {
-      providerResult = await this._getBalanceFromScript(scriptConfig, accountId, platform)
-    } else {
-      const provider = this.providers.get(platform)
-      if (!provider) {
-        return this._buildResponse(
-          {
-            status: 'error',
-            errorMessage: `不支持的平台: ${platform}`,
-            balance: quotaFromLocal.balance,
-            currency: quotaFromLocal.currency || 'USD',
-            quota: quotaFromLocal.quota,
-            statistics: localStatistics,
-            lastRefreshAt: new Date().toISOString()
-          },
-          accountId,
-          platform,
-          'local',
-          null,
-          scriptMeta
-        )
-      }
-      providerResult = await this._getBalanceFromProvider(provider, account)
+    // 强制查询：调用平台 Provider；失败自动降级到本地统计
+    const provider = this.providers.get(platform)
+    if (!provider) {
+      return this._buildResponse(
+        {
+          status: 'error',
+          errorMessage: `不支持的平台: ${platform}`,
+          balance: quotaFromLocal.balance,
+          currency: quotaFromLocal.currency || 'USD',
+          quota: quotaFromLocal.quota,
+          statistics: localStatistics,
+          lastRefreshAt: new Date().toISOString()
+        },
+        accountId,
+        platform,
+        'local',
+        null
+      )
     }
+    const providerResult = await this._getBalanceFromProvider(provider, account)
 
-    const isRemoteSuccess =
-      providerResult.status === 'success' && ['api', 'script'].includes(providerResult.queryMethod)
+    const isRemoteSuccess = providerResult.status === 'success' && providerResult.queryMethod === 'api'
 
     // 仅缓存“真实远程查询成功”的结果，避免把字段/本地降级结果当作 API 结果缓存 1h
     if (isRemoteSuccess) {
@@ -428,49 +401,8 @@ class AccountBalanceService {
       accountId,
       platform,
       source,
-      null,
-      scriptMeta
+      null
     )
-  }
-
-  async _getBalanceFromScript(scriptConfig, accountId, platform) {
-    try {
-      const result = await balanceScriptService.execute({
-        scriptBody: scriptConfig.scriptBody,
-        timeoutSeconds: scriptConfig.timeoutSeconds || 10,
-        variables: {
-          baseUrl: scriptConfig.baseUrl || '',
-          apiKey: scriptConfig.apiKey || '',
-          token: scriptConfig.token || '',
-          accountId,
-          platform,
-          extra: scriptConfig.extra || ''
-        }
-      })
-
-      const mapped = result?.mapped || {}
-      return {
-        status: mapped.status || 'error',
-        balance: typeof mapped.balance === 'number' ? mapped.balance : null,
-        currency: mapped.currency || 'USD',
-        quota: mapped.quota || null,
-        queryMethod: 'api',
-        rawData: mapped.rawData || result?.response?.data || null,
-        lastRefreshAt: new Date().toISOString(),
-        errorMessage: mapped.errorMessage || ''
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        balance: null,
-        currency: 'USD',
-        quota: null,
-        queryMethod: 'api',
-        rawData: null,
-        lastRefreshAt: new Date().toISOString(),
-        errorMessage: error.message || '脚本执行失败'
-      }
-    }
   }
 
   async _getBalanceFromProvider(provider, account) {
@@ -700,7 +632,7 @@ class AccountBalanceService {
     return new Date(resetAtMs).toISOString()
   }
 
-  _buildResponse(balanceData, accountId, platform, source, ttlSeconds = null, extraData = {}) {
+  _buildResponse(balanceData, accountId, platform, source, ttlSeconds = null) {
     const now = new Date()
 
     const amount = typeof balanceData.balance === 'number' ? balanceData.balance : null
@@ -732,8 +664,7 @@ class AccountBalanceService {
         lastRefreshAt: balanceData.lastRefreshAt || now.toISOString(),
         cacheExpiresAt,
         status: balanceData.status || 'success',
-        error: balanceData.errorMessage || null,
-        ...(extraData && typeof extraData === 'object' ? extraData : {})
+        error: balanceData.errorMessage || null
       }
     }
   }

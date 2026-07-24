@@ -204,7 +204,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { APP_CONFIG } from '@/utils/tools'
 import { showToast } from '@/utils/tools'
-import { getModelsApi } from '@/utils/http_apis'
+import { getConnectivityTestModelsApi } from '@/utils/http_apis'
 import ModelSelector from '@/components/common/ModelSelector.vue'
 
 const props = defineProps({
@@ -244,10 +244,15 @@ const cronPresets = [
 const modelOptions = ref([])
 
 const loadModels = async () => {
-  const result = await getModelsApi()
+  const result = await getConnectivityTestModelsApi()
   if (result.success && result.data) {
     const platform = props.account?.platform
-    modelOptions.value = result.data.platforms?.[platform] || result.data.claude || []
+    const models = result.data.platforms?.[platform] || []
+    const currentModel = config.value.model
+    modelOptions.value =
+      currentModel && !models.some((model) => model.value === currentModel)
+        ? [{ value: currentModel, label: `${currentModel}（当前配置）` }, ...models]
+        : models
   }
 }
 
@@ -278,6 +283,8 @@ async function loadConfig() {
     let endpoint = ''
     if (platform === 'claude') {
       endpoint = `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test-config`
+    } else if (platform === 'openai-responses') {
+      endpoint = `${APP_CONFIG.apiPrefix}/admin/openai-responses-accounts/${props.account.id}/test-config`
     } else {
       // 其他平台暂不支持
       loading.value = false
@@ -301,6 +308,8 @@ async function loadConfig() {
         }
       }
     }
+
+    await loadModels()
 
     // 获取测试历史
     const historyEndpoint = endpoint.replace('/test-config', '/test-history')
@@ -335,6 +344,8 @@ async function saveConfig() {
     let endpoint = ''
     if (platform === 'claude') {
       endpoint = `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test-config`
+    } else if (platform === 'openai-responses') {
+      endpoint = `${APP_CONFIG.apiPrefix}/admin/openai-responses-accounts/${props.account.id}/test-config`
     } else {
       saving.value = false
       return

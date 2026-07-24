@@ -255,18 +255,6 @@ class ProxyHelper {
       return 'Invalid proxy config'
     }
   }
-
-  /**
-   * 创建代理 Agent（兼容旧的函数接口）
-   * @param {object|string|null} proxyConfig - 代理配置
-   * @param {boolean} useIPv4 - 是否使用 IPv4
-   * @returns {Agent|null} 代理 Agent 实例或 null
-   * @deprecated 使用 createProxyAgent 替代
-   */
-  static createProxy(proxyConfig, useIPv4 = true) {
-    logger.warn('⚠️ ProxyHelper.createProxy is deprecated, use createProxyAgent instead')
-    return ProxyHelper.createProxyAgent(proxyConfig, { useIPv4 })
-  }
 }
 
 module.exports = ProxyHelper

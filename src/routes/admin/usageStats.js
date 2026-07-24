@@ -520,6 +520,229 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
   }
 })
 
+// 获取单个 API Key 最近使用历史（用于详情弹窗走势图）
+router.get('/api-keys/:keyId/usage-history', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const { days = 30 } = req.query
+
+    const keyData = await redis.getApiKey(keyId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'API key not found'
+      })
+    }
+
+    const daysCount = Math.min(Math.max(parseInt(days, 10) || 30, 1), 60)
+    const keyCreatedAt = keyData.createdAt ? new Date(keyData.createdAt) : null
+    const keyUsageStats = await redis.getUsageStats(keyId)
+
+    const history = []
+    let totalCost = 0
+    let totalRequests = 0
+    let totalTokens = 0
+    let highestCostDay = null
+    let highestRequestDay = null
+
+    const today = new Date()
+
+    for (let offset = daysCount - 1; offset >= 0; offset--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - offset)
+
+      const tzDate = redis.getDateInTimezone(date)
+      const dateKey = redis.getDateStringInTimezone(date)
+      const monthLabel = String(tzDate.getUTCMonth() + 1).padStart(2, '0')
+      const dayLabel = String(tzDate.getUTCDate()).padStart(2, '0')
+      const label = `${monthLabel}/${dayLabel}`
+
+      const dailyKey = `usage:daily:${keyId}:${dateKey}`
+      const dailyData = await redis.client.hgetall(dailyKey)
+      const modelResults = await redis.scanAndGetAllChunked(
+        `usage:${keyId}:model:daily:*:${dateKey}`
+      )
+
+      let inputTokens = 0
+      let outputTokens = 0
+      let cacheCreateTokens = 0
+      let cacheReadTokens = 0
+      let requests = 0
+      let cost = 0
+
+      if (modelResults.length > 0) {
+        for (const { key: modelKey, data: modelData } of modelResults) {
+          const match = modelKey.match(/^usage:[^:]+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/)
+          const model = match ? match[1] : 'unknown'
+
+          const modelInputTokens =
+            parseInt(modelData.totalInputTokens) || parseInt(modelData.inputTokens) || 0
+          const modelOutputTokens =
+            parseInt(modelData.totalOutputTokens) || parseInt(modelData.outputTokens) || 0
+          const modelCacheCreateTokens =
+            parseInt(modelData.totalCacheCreateTokens) || parseInt(modelData.cacheCreateTokens) || 0
+          const modelCacheReadTokens =
+            parseInt(modelData.totalCacheReadTokens) || parseInt(modelData.cacheReadTokens) || 0
+          const modelRequests =
+            parseInt(modelData.totalRequests) || parseInt(modelData.requests) || 0
+
+          inputTokens += modelInputTokens
+          outputTokens += modelOutputTokens
+          cacheCreateTokens += modelCacheCreateTokens
+          cacheReadTokens += modelCacheReadTokens
+          requests += modelRequests
+
+          if ('ratedCostMicro' in modelData || 'realCostMicro' in modelData) {
+            cost += (parseInt(modelData.ratedCostMicro) || 0) / 1000000
+            continue
+          }
+
+          const usage = {
+            input_tokens: modelInputTokens,
+            output_tokens: modelOutputTokens,
+            cache_creation_input_tokens: modelCacheCreateTokens,
+            cache_read_input_tokens: modelCacheReadTokens
+          }
+
+          const eph5m = parseInt(modelData.ephemeral5mTokens) || 0
+          const eph1h = parseInt(modelData.ephemeral1hTokens) || 0
+          if (eph5m > 0 || eph1h > 0) {
+            usage.cache_creation = {
+              ephemeral_5m_input_tokens: eph5m,
+              ephemeral_1h_input_tokens: eph1h
+            }
+          }
+
+          const costResult = CostCalculator.calculateCost(usage, model)
+          cost += costResult.costs.total
+        }
+      } else {
+        inputTokens = parseInt(dailyData.totalInputTokens) || parseInt(dailyData.inputTokens) || 0
+        outputTokens =
+          parseInt(dailyData.totalOutputTokens) || parseInt(dailyData.outputTokens) || 0
+        cacheCreateTokens =
+          parseInt(dailyData.totalCacheCreateTokens) || parseInt(dailyData.cacheCreateTokens) || 0
+        cacheReadTokens =
+          parseInt(dailyData.totalCacheReadTokens) || parseInt(dailyData.cacheReadTokens) || 0
+        requests = parseInt(dailyData.totalRequests) || parseInt(dailyData.requests) || 0
+
+        const allTokens =
+          parseInt(dailyData.totalAllTokens) ||
+          parseInt(dailyData.allTokens) ||
+          inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+        if (allTokens > 0) {
+          const usage = {
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            cache_creation_input_tokens: cacheCreateTokens,
+            cache_read_input_tokens: cacheReadTokens
+          }
+
+          const eph5m = parseInt(dailyData.ephemeral5mTokens) || 0
+          const eph1h = parseInt(dailyData.ephemeral1hTokens) || 0
+          if (eph5m > 0 || eph1h > 0) {
+            usage.cache_creation = {
+              ephemeral_5m_input_tokens: eph5m,
+              ephemeral_1h_input_tokens: eph1h
+            }
+          }
+
+          const costResult = CostCalculator.calculateCost(usage, 'unknown')
+          cost = costResult.costs.total
+        }
+      }
+
+      const tokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+      const normalizedCost = Math.round(cost * 1000000) / 1000000
+
+      totalCost += normalizedCost
+      totalRequests += requests
+      totalTokens += tokens
+
+      if (!highestCostDay || normalizedCost > highestCostDay.cost) {
+        highestCostDay = {
+          date: dateKey,
+          label,
+          cost: normalizedCost,
+          formattedCost: CostCalculator.formatCost(normalizedCost)
+        }
+      }
+
+      if (!highestRequestDay || requests > highestRequestDay.requests) {
+        highestRequestDay = {
+          date: dateKey,
+          label,
+          requests
+        }
+      }
+
+      history.push({
+        date: dateKey,
+        label,
+        cost: normalizedCost,
+        formattedCost: CostCalculator.formatCost(normalizedCost),
+        requests,
+        tokens
+      })
+    }
+
+    let actualDaysForAvg = daysCount
+    if (keyCreatedAt) {
+      const now = new Date()
+      const diffTime = Math.abs(now - keyCreatedAt)
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      actualDaysForAvg = Math.min(diffDays, daysCount)
+      actualDaysForAvg = Math.max(actualDaysForAvg, 1)
+    }
+
+    const avgDailyCost = actualDaysForAvg > 0 ? totalCost / actualDaysForAvg : 0
+    const avgDailyRequests = actualDaysForAvg > 0 ? totalRequests / actualDaysForAvg : 0
+    const avgDailyTokens = actualDaysForAvg > 0 ? totalTokens / actualDaysForAvg : 0
+    const todayData = history.length > 0 ? history[history.length - 1] : null
+
+    return res.json({
+      success: true,
+      data: {
+        history,
+        summary: {
+          days: daysCount,
+          actualDaysUsed: actualDaysForAvg,
+          keyCreatedAt: keyCreatedAt ? keyCreatedAt.toISOString() : null,
+          totalCost,
+          totalCostFormatted: CostCalculator.formatCost(totalCost),
+          totalRequests,
+          totalTokens,
+          avgDailyCost,
+          avgDailyCostFormatted: CostCalculator.formatCost(avgDailyCost),
+          avgDailyRequests,
+          avgDailyTokens,
+          today: todayData
+            ? {
+                date: todayData.date,
+                cost: todayData.cost,
+                costFormatted: todayData.formattedCost,
+                requests: todayData.requests,
+                tokens: todayData.tokens
+              }
+            : null,
+          highestCostDay,
+          highestRequestDay
+        },
+        overview: keyUsageStats,
+        generatedAt: new Date().toISOString()
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get API key usage history:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get API key usage history',
+      message: error.message
+    })
+  }
+})
+
 // 📊 使用趋势和成本分析
 
 // 获取使用趋势数据
@@ -2851,7 +3074,8 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
 
     for (const record of filteredRecords) {
       const usage = toUsageObject(record)
-      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const costModel = record.actualModel || record.model || 'unknown'
+      const costData = CostCalculator.calculateCost(usage, costModel)
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
       const totalTokens =
@@ -2908,7 +3132,8 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
     const enrichedRecords = []
     for (const record of pageRecords) {
       const usage = toUsageObject(record)
-      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const costModel = record.actualModel || record.model || 'unknown'
+      const costData = CostCalculator.calculateCost(usage, costModel)
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
       const realCost =
@@ -2926,6 +3151,9 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
       enrichedRecords.push({
         timestamp: record.timestamp,
         model: record.model || 'unknown',
+        actualModel: record.actualModel || record.model || 'unknown',
+        requestedModel: record.requestedModel || null,
+        displayModel: record.displayModel || record.model || 'unknown',
         accountId: record.accountId || null,
         accountName: accountInfo?.name || null,
         accountStatus: accountInfo?.status ?? null,
@@ -3125,6 +3353,25 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       return true
     }
 
+    const missingUsageStatuses = new Set([
+      'started',
+      'aborted',
+      'stream_error',
+      'completed_without_usage',
+      'record_failed'
+    ])
+    const usageStatusNames = {
+      started: '已发起',
+      completed: '已完成',
+      aborted: '客户端中断',
+      stream_error: '流错误',
+      completed_without_usage: '无用量结束',
+      record_failed: '记录失败'
+    }
+    const getUsageStatus = (record) => record.usageStatus || record.lifecycleStatus || 'completed'
+    const isUsageMissingRecord = (record) =>
+      record.usageMissing === true || missingUsageStatuses.has(getUsageStatus(record))
+
     const filteredRecords = []
     const modelSet = new Set()
     const apiKeyOptionMap = new Map()
@@ -3204,12 +3451,17 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       cacheCreateTokens: 0,
       cacheReadTokens: 0,
       totalTokens: 0,
-      totalCost: 0
+      totalCost: 0,
+      completedRequests: 0,
+      missingUsageRequests: 0,
+      abortedRequests: 0,
+      streamErrorRequests: 0
     }
 
     for (const record of filteredRecords) {
       const usage = toUsageObject(record)
-      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const costModel = record.actualModel || record.model || 'unknown'
+      const costData = CostCalculator.calculateCost(usage, costModel)
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
       const totalTokens =
@@ -3226,6 +3478,20 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       summary.cacheReadTokens += usage.cache_read_input_tokens
       summary.totalTokens += totalTokens
       summary.totalCost += computedCost
+
+      const usageStatus = getUsageStatus(record)
+      if (usageStatus === 'completed') {
+        summary.completedRequests += 1
+      }
+      if (isUsageMissingRecord(record)) {
+        summary.missingUsageRequests += 1
+      }
+      if (usageStatus === 'aborted') {
+        summary.abortedRequests += 1
+      }
+      if (usageStatus === 'stream_error') {
+        summary.streamErrorRequests += 1
+      }
     }
 
     const totalRecords = filteredRecords.length
@@ -3238,11 +3504,14 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
     const enrichedRecords = []
     for (const record of pageRecords) {
       const usage = toUsageObject(record)
-      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const costModel = record.actualModel || record.model || 'unknown'
+      const costData = CostCalculator.calculateCost(usage, costModel)
       const computedCost =
         typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
       const realCost =
         typeof record.realCost === 'number' ? record.realCost : costData?.costs?.total || 0
+      const usageStatus = getUsageStatus(record)
+      const usageMissing = isUsageMissingRecord(record)
       const totalTokens =
         record.totalTokens ||
         usage.input_tokens +
@@ -3253,12 +3522,24 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
       enrichedRecords.push({
         timestamp: record.timestamp,
         model: record.model || 'unknown',
+        actualModel: record.actualModel || record.model || 'unknown',
+        requestedModel: record.requestedModel || null,
+        displayModel: record.displayModel || record.model || 'unknown',
         apiKeyId: record.apiKeyId,
         apiKeyName: record.apiKeyName,
         accountId,
         accountName: accountInfo.name || accountInfo.email || accountId,
         accountType: record.accountType,
         accountTypeName: accountTypeNames[record.accountType] || '未知渠道',
+        usageStatus,
+        usageStatusName: usageStatusNames[usageStatus] || usageStatus,
+        usageMissing,
+        billableUsageUnknown: record.billableUsageUnknown === true || usageMissing,
+        statusMessage: record.statusMessage || null,
+        failureReason: record.failureReason || null,
+        lifecycleRecordId: record.lifecycleRecordId || record.requestLifecycleId || null,
+        startedAt: record.startedAt || null,
+        endedAt: record.endedAt || record.completedAt || null,
         inputTokens: usage.input_tokens,
         outputTokens: usage.output_tokens,
         cacheCreateTokens: usage.cache_creation_input_tokens,

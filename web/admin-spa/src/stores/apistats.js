@@ -2,6 +2,13 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 import * as httpApis from '@/utils/http_apis'
+import { formatCost } from '@/utils/tools'
+
+const API_STATS_COST_FORMAT = {
+  zeroValue: '$0.000000',
+  invalidValue: '$0.000000',
+  mediumDecimals: 4
+}
 
 export const useApiStatsStore = defineStore('apistats', () => {
   // 状态
@@ -240,7 +247,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
           summary.cost += model.costs?.total || 0
         })
 
-        summary.formattedCost = formatCost(summary.cost)
+        summary.formattedCost = formatCost(summary.cost, API_STATS_COST_FORMAT)
 
         // 存储到对应的时间段数据
         if (period === 'daily') {
@@ -325,12 +332,6 @@ export const useApiStatsStore = defineStore('apistats', () => {
         // 保存 Key 级别的服务倍率
         keyServiceRates.value = result.data.serviceRates || {}
 
-        // 调试：打印返回的限制数据
-        console.log('API Stats - Full response:', result.data)
-        console.log('API Stats - limits data:', result.data.limits)
-        console.log('API Stats - weeklyOpusCostLimit:', result.data.limits?.weeklyOpusCostLimit)
-        console.log('API Stats - weeklyOpusCost:', result.data.limits?.weeklyOpusCost)
-
         // 同时加载今日和本月的统计数据
         await loadAllPeriodStats()
 
@@ -380,24 +381,6 @@ export const useApiStatsStore = defineStore('apistats', () => {
     } catch (err) {
       console.error('Error loading service rates:', err)
       serviceRates.value = null
-    }
-  }
-
-  // 工具函数
-
-  // 格式化费用
-  function formatCost(cost) {
-    if (typeof cost !== 'number' || cost === 0) {
-      return '$0.000000'
-    }
-
-    // 根据数值大小选择精度
-    if (cost >= 1) {
-      return '$' + cost.toFixed(2)
-    } else if (cost >= 0.01) {
-      return '$' + cost.toFixed(4)
-    } else {
-      return '$' + cost.toFixed(6)
     }
   }
 

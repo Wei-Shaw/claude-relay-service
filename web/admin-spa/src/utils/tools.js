@@ -1,22 +1,50 @@
 // App 配置
 export const APP_CONFIG = {
-  basePath: import.meta.env.VITE_APP_BASE_URL || (import.meta.env.DEV ? '/admin/' : '/web/admin/'),
+  basePath: import.meta.env.VITE_APP_BASE_URL || (import.meta.env.DEV ? '/admin/' : '/admin-next/'),
   apiPrefix: import.meta.env.DEV ? '/webapi' : ''
 }
 
+/** History 模式下的应用内 URL（禁止拼 #） */
 export const getAppUrl = (path = '') => {
-  if (path && !path.startsWith('/')) path = '/' + path
-  return APP_CONFIG.basePath + (path.startsWith('#') ? path : '#' + path)
+  const base = APP_CONFIG.basePath.replace(/\/$/, '')
+  if (path === '' || path == null) {
+    return base + '/'
+  }
+  if (!path.startsWith('/')) path = '/' + path
+  return base + path
 }
 
 export const getLoginUrl = () => getAppUrl('/login')
+
+export const getUserLoginUrl = () => getAppUrl('/user-login')
 
 // Toast 通知管理
 let toastContainer = null
 let toastId = 0
 
+const normalizeToastType = (type) => {
+  const allowedTypes = ['success', 'error', 'warning', 'info']
+  return allowedTypes.includes(type) ? type : 'info'
+}
+
 export const showToast = (message, type = 'info', title = '', duration = 3000) => {
-  // 创建容器
+  const safeType = normalizeToastType(type)
+  const normalizedMessage = String(message ?? '')
+  const normalizedTitle = title ? String(title) : ''
+
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.showToast === 'function' &&
+    window.showToast !== showToast
+  ) {
+    return window.showToast(normalizedMessage, safeType, normalizedTitle, duration)
+  }
+
+  if (typeof document === 'undefined') {
+    return 0
+  }
+
+  // Vue ToastNotification 未挂载前的安全降级实现
   if (!toastContainer) {
     toastContainer = document.createElement('div')
     toastContainer.id = 'toast-container'
@@ -26,7 +54,7 @@ export const showToast = (message, type = 'info', title = '', duration = 3000) =
 
   const id = ++toastId
   const toast = document.createElement('div')
-  toast.className = `toast rounded-2xl p-4 shadow-2xl backdrop-blur-sm toast-${type}`
+  toast.className = `toast rounded-2xl p-4 shadow-2xl backdrop-blur-sm toast-${safeType}`
   toast.style.cssText = `
     position: relative;
     min-width: 320px;
@@ -43,21 +71,41 @@ export const showToast = (message, type = 'info', title = '', duration = 3000) =
     info: 'fas fa-info-circle'
   }
 
-  toast.innerHTML = `
-    <div class="flex items-start gap-3">
-      <div class="flex-shrink-0 mt-0.5">
-        <i class="${iconMap[type]} text-lg"></i>
-      </div>
-      <div class="flex-1 min-w-0">
-        ${title ? `<h4 class="font-semibold text-sm mb-1">${title}</h4>` : ''}
-        <p class="text-sm opacity-90 leading-relaxed">${message.replace(/\n/g, '<br>')}</p>
-      </div>
-      <button onclick="this.parentElement.parentElement.remove()"
-              class="flex-shrink-0 text-white/70 hover:text-white transition-colors ml-2">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-  `
+  const content = document.createElement('div')
+  content.className = 'flex items-start gap-3'
+
+  const iconWrapper = document.createElement('div')
+  iconWrapper.className = 'mt-0.5 flex-shrink-0'
+  const icon = document.createElement('i')
+  icon.className = `${iconMap[safeType]} text-lg`
+  iconWrapper.appendChild(icon)
+
+  const body = document.createElement('div')
+  body.className = 'min-w-0 flex-1'
+  if (normalizedTitle) {
+    const titleEl = document.createElement('h4')
+    titleEl.className = 'mb-1 text-sm font-semibold'
+    titleEl.textContent = normalizedTitle
+    body.appendChild(titleEl)
+  }
+  const messageEl = document.createElement('p')
+  messageEl.className = 'text-sm leading-relaxed opacity-90'
+  messageEl.style.whiteSpace = 'pre-line'
+  messageEl.textContent = normalizedMessage
+  body.appendChild(messageEl)
+
+  const closeButton = document.createElement('button')
+  closeButton.className = 'ml-2 flex-shrink-0 text-white/70 transition-colors hover:text-white'
+  closeButton.type = 'button'
+  closeButton.addEventListener('click', () => toast.remove())
+  const closeIcon = document.createElement('i')
+  closeIcon.className = 'fas fa-times'
+  closeButton.appendChild(closeIcon)
+
+  content.appendChild(iconWrapper)
+  content.appendChild(body)
+  content.appendChild(closeButton)
+  toast.appendChild(content)
 
   toastContainer.appendChild(toast)
   setTimeout(() => (toast.style.transform = 'translateX(0)'), 10)
@@ -156,9 +204,40 @@ export const formatDateTime = (date) => {
 }
 
 // 金额格式化
-export const formatCost = (value) => {
+export const formatCost = (value, options = {}) => {
+  const {
+    zeroValue = '$0.00',
+    invalidValue = zeroValue,
+    mediumThreshold = 0.01,
+    mediumDecimals = 2,
+    smallDecimals = 6,
+    largeDecimals = 2
+  } = options
   const num = Number(value || 0)
-  if (num === 0) return '$0.00'
-  if (num < 0.01) return `$${num.toFixed(6)}`
-  return `$${num.toFixed(2)}`
+
+  if (Number.isNaN(num)) return invalidValue
+  if (num === 0) return zeroValue
+  if (num >= 1) return `$${num.toFixed(largeDecimals)}`
+  if (num >= mediumThreshold) return `$${num.toFixed(mediumDecimals)}`
+  return `$${num.toFixed(smallDecimals)}`
 }
+
+export const formatDetailedCost = (value) =>
+  formatCost(value, {
+    zeroValue: '$0.000000',
+    invalidValue: '$0.000000',
+    mediumDecimals: 3
+  })
+
+export const formatRequestCost = (value) =>
+  formatCost(value, {
+    zeroValue: '$0.000000',
+    invalidValue: '$0.000000',
+    mediumThreshold: 0.001,
+    mediumDecimals: 4
+  })
+
+export const formatServiceCost = (value) =>
+  formatCost(value, {
+    mediumDecimals: 4
+  })

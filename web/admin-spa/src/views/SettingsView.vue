@@ -11,7 +11,7 @@
 
       <!-- 设置分类导航 -->
       <div class="mb-6">
-        <nav class="flex space-x-8">
+        <nav class="flex space-x-8 overflow-x-auto whitespace-nowrap [&>button]:flex-shrink-0">
           <button
             :class="[
               'border-b-2 pb-2 text-sm font-medium transition-colors',
@@ -26,6 +26,18 @@
           </button>
           <button
             :class="[
+              'flex-shrink-0 border-b-2 pb-2 text-sm font-medium transition-colors',
+              activeSection === 'testModels'
+                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+            @click="activeSection = 'testModels'"
+          >
+            <i class="fas fa-vial mr-2"></i>
+            测试模型
+          </button>
+          <button
+            :class="[
               'border-b-2 pb-2 text-sm font-medium transition-colors',
               activeSection === 'webhook'
                 ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
@@ -35,6 +47,18 @@
           >
             <i class="fas fa-bell mr-2"></i>
             通知设置
+          </button>
+          <button
+            :class="[
+              'border-b-2 pb-2 text-sm font-medium transition-colors',
+              activeSection === 'tutorial'
+                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+            @click="activeSection = 'tutorial'"
+          >
+            <i class="fas fa-graduation-cap mr-2"></i>
+            教程设置
           </button>
           <button
             :class="[
@@ -463,6 +487,70 @@
                   上次更新: {{ formatDateTime(oemSettings.updatedAt) }}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 教程设置部分 -->
+        <div v-show="activeSection === 'tutorial'">
+          <div
+            class="mb-6 rounded-lg bg-gradient-to-r from-blue-50 to-cyan-50 p-6 dark:from-blue-900/20 dark:to-cyan-900/20"
+          >
+            <div class="flex items-start">
+              <div
+                class="mr-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white"
+              >
+                <i class="fas fa-graduation-cap"></i>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">使用教程配置</h3>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  控制后台“使用教程”里展示的默认配置内容。当前仅影响 Codex 的 config.toml 示例模型。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-lg bg-white/80 p-6 shadow-lg backdrop-blur-sm dark:bg-gray-800/80">
+            <div class="mb-4 flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                <i class="fas fa-code mr-2 text-blue-500"></i>
+                Codex 教程
+              </h2>
+              <button
+                class="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                :disabled="saving"
+                @click="saveOemSettings"
+              >
+                <i class="fas fa-save mr-2"></i>
+                {{ saving ? '保存中...' : '保存配置' }}
+              </button>
+            </div>
+
+            <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                教程模型
+              </label>
+              <input
+                v-model="oemSettings.codexTutorialModel"
+                class="form-input w-full max-w-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                maxlength="100"
+                placeholder="gpt-5.5"
+                type="text"
+              />
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                保存后，Codex 使用教程中的
+                <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">model</code>
+                字段会使用这里的值；留空时后端会恢复为 gpt-5.5。
+              </p>
+            </div>
+
+            <div
+              v-if="oemSettings.updatedAt"
+              class="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-500 dark:bg-gray-700/50 dark:text-gray-400"
+            >
+              <i class="fas fa-clock mr-1"></i>
+              最后更新：{{ formatDateTime(oemSettings.updatedAt) }}
             </div>
           </div>
         </div>
@@ -1236,6 +1324,96 @@
                     </button>
                   </div>
                 </div>
+
+                <div
+                  class="rounded-lg border border-red-200 bg-red-50/70 p-4 dark:border-red-900/50 dark:bg-red-950/20"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <i class="fas fa-bug mr-2 text-red-500"></i>
+                        错误请求全量保存
+                      </label>
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        仅对错误请求保存完整请求体和上游返回，数据随请求明细保留时间自动过期。
+                      </p>
+                      <p
+                        v-if="claudeConfig.requestDetailErrorFullCaptureEnabled"
+                        class="mt-2 text-xs text-red-600 dark:text-red-400"
+                      >
+                        完整提示词和上游错误可能包含敏感数据，并会显著增加 Redis 存储压力。
+                      </p>
+                    </div>
+                    <button
+                      :aria-checked="claudeConfig.requestDetailErrorFullCaptureEnabled"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-4 focus:ring-red-300 dark:focus:ring-red-900"
+                      :class="
+                        claudeConfig.requestDetailErrorFullCaptureEnabled
+                          ? 'bg-red-500'
+                          : 'bg-gray-200 dark:bg-gray-700'
+                      "
+                      role="switch"
+                      type="button"
+                      @click="handleErrorFullCaptureToggle"
+                    >
+                      <span class="sr-only">切换错误请求全量保存</span>
+                      <span
+                        class="absolute left-[2px] top-[2px] h-5 w-5 rounded-full border bg-white transition-transform"
+                        :class="
+                          claudeConfig.requestDetailErrorFullCaptureEnabled
+                            ? 'translate-x-full border-white'
+                            : 'border-gray-300'
+                        "
+                      ></span>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  class="rounded-lg border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/50 dark:bg-amber-950/20"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <i class="fas fa-redo-alt mr-2 text-amber-500"></i>
+                        请求重放
+                      </label>
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        在错误请求明细中编辑 JSON
+                        请求体后重发。重放会再次产生真实上游调用、费用和限流计数。
+                      </p>
+                      <p
+                        v-if="!claudeConfig.requestDetailErrorFullCaptureEnabled"
+                        class="mt-2 text-xs text-amber-600 dark:text-amber-400"
+                      >
+                        需要先开启“错误请求全量保存”。
+                      </p>
+                    </div>
+                    <button
+                      :aria-checked="claudeConfig.requestReplayEnabled"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-4 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-amber-900"
+                      :class="
+                        claudeConfig.requestReplayEnabled
+                          ? 'bg-amber-500'
+                          : 'bg-gray-200 dark:bg-gray-700'
+                      "
+                      :disabled="!claudeConfig.requestDetailErrorFullCaptureEnabled"
+                      role="switch"
+                      type="button"
+                      @click="handleReplayToggle"
+                    >
+                      <span class="sr-only">切换请求重放</span>
+                      <span
+                        class="absolute left-[2px] top-[2px] h-5 w-5 rounded-full border bg-white transition-transform"
+                        :class="
+                          claudeConfig.requestReplayEnabled
+                            ? 'translate-x-full border-white'
+                            : 'border-gray-300'
+                        "
+                      ></span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div class="mt-4 rounded-lg bg-cyan-50 p-4 dark:bg-cyan-900/20">
@@ -1353,7 +1531,7 @@
                       class="w-24 rounded-lg border border-gray-300 px-3 py-2 text-center text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                       max="10"
                       min="0.1"
-                      step="0.1"
+                      step="0.01"
                       type="number"
                     />
                     <span class="text-sm text-gray-500 dark:text-gray-400">倍</span>
@@ -1374,6 +1552,11 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- 测试模型部分 -->
+        <div v-show="activeSection === 'testModels'">
+          <ConnectivityTestModelsSection />
         </div>
 
         <!-- 模型价格部分 -->
@@ -1982,6 +2165,8 @@ import { useSettingsStore } from '@/stores/settings'
 import * as httpApis from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import ModelPricingSection from '@/components/settings/ModelPricingSection.vue'
+import ConnectivityTestModelsSection from '@/components/settings/ConnectivityTestModelsSection.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
 
 // 定义组件名称，用于keep-alive排除
 defineOptions({
@@ -2005,43 +2190,8 @@ const isMounted = ref(true)
 const abortController = ref(new AbortController())
 
 // ConfirmModal 状态
-const showConfirmModal = ref(false)
-const confirmModalConfig = ref({
-  title: '',
-  message: '',
-  type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
-})
-const confirmResolve = ref(null)
-
-const showConfirm = (
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  type = 'primary'
-) => {
-  return new Promise((resolve) => {
-    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
-    confirmResolve.value = resolve
-    showConfirmModal.value = true
-  })
-}
-
-const handleConfirmModal = () => {
-  showConfirmModal.value = false
-  const resolve = confirmResolve.value
-  confirmResolve.value = null
-  resolve?.(true)
-}
-
-const handleCancelModal = () => {
-  showConfirmModal.value = false
-  const resolve = confirmResolve.value
-  confirmResolve.value = null
-  resolve?.(false)
-}
+const { showConfirmModal, confirmModalConfig, showConfirm, handleConfirmModal, handleCancelModal } =
+  useConfirmModal()
 
 // 计算属性：隐藏管理后台按钮（反转 showAdminButton 的值）
 const hideAdminButton = computed({
@@ -2096,6 +2246,8 @@ const claudeConfig = ref({
   requestDetailCaptureEnabled: false,
   requestDetailRetentionHours: 6,
   requestDetailBodyPreviewEnabled: false,
+  requestDetailErrorFullCaptureEnabled: false,
+  requestReplayEnabled: false,
   updatedAt: null,
   updatedBy: null
 })
@@ -2196,6 +2348,19 @@ const handleRequestDetailBodyPreviewToggle = async () => {
   } finally {
     requestDetailBodyPreviewSaving.value = false
   }
+}
+
+const handleErrorFullCaptureToggle = async () => {
+  const nextValue = !claudeConfig.value.requestDetailErrorFullCaptureEnabled
+  await saveClaudeConfig({
+    requestDetailErrorFullCaptureEnabled: nextValue,
+    requestReplayEnabled: nextValue ? claudeConfig.value.requestReplayEnabled : false
+  })
+}
+
+const handleReplayToggle = async () => {
+  if (!claudeConfig.value.requestDetailErrorFullCaptureEnabled) return
+  await saveClaudeConfig({ requestReplayEnabled: !claudeConfig.value.requestReplayEnabled })
 }
 
 // 服务倍率配置
@@ -2498,6 +2663,9 @@ const loadClaudeConfig = async () => {
         requestDetailRetentionHours:
           response.config?.requestDetailRetentionHours ?? REQUEST_DETAIL_RETENTION_DEFAULT_HOURS,
         requestDetailBodyPreviewEnabled: response.config?.requestDetailBodyPreviewEnabled ?? false,
+        requestDetailErrorFullCaptureEnabled:
+          response.config?.requestDetailErrorFullCaptureEnabled ?? false,
+        requestReplayEnabled: response.config?.requestReplayEnabled ?? false,
         updatedAt: response.config?.updatedAt || null,
         updatedBy: response.config?.updatedBy || null
       }
@@ -2525,6 +2693,18 @@ const saveClaudeConfig = async (options = {}) => {
     )
       ? options.requestDetailBodyPreviewEnabled === true
       : claudeConfig.value.requestDetailBodyPreviewEnabled
+    const requestDetailErrorFullCaptureEnabled = Object.prototype.hasOwnProperty.call(
+      options,
+      'requestDetailErrorFullCaptureEnabled'
+    )
+      ? options.requestDetailErrorFullCaptureEnabled === true
+      : claudeConfig.value.requestDetailErrorFullCaptureEnabled
+    const requestReplayEnabled = Object.prototype.hasOwnProperty.call(
+      options,
+      'requestReplayEnabled'
+    )
+      ? options.requestReplayEnabled === true
+      : claudeConfig.value.requestReplayEnabled
 
     const payload = {
       claudeCodeOnlyEnabled: claudeConfig.value.claudeCodeOnlyEnabled,
@@ -2541,7 +2721,9 @@ const saveClaudeConfig = async (options = {}) => {
       concurrentRequestQueueTimeoutMs: claudeConfig.value.concurrentRequestQueueTimeoutMs,
       requestDetailCaptureEnabled: claudeConfig.value.requestDetailCaptureEnabled,
       requestDetailRetentionHours: claudeConfig.value.requestDetailRetentionHours,
-      requestDetailBodyPreviewEnabled
+      requestDetailBodyPreviewEnabled,
+      requestDetailErrorFullCaptureEnabled,
+      requestReplayEnabled
     }
 
     if (options.purgeRequestDetailBodySnapshots === true) {
@@ -2560,6 +2742,11 @@ const saveClaudeConfig = async (options = {}) => {
         requestDetailBodyPreviewEnabled:
           response.config?.requestDetailBodyPreviewEnabled ??
           claudeConfig.value.requestDetailBodyPreviewEnabled,
+        requestDetailErrorFullCaptureEnabled:
+          response.config?.requestDetailErrorFullCaptureEnabled ??
+          claudeConfig.value.requestDetailErrorFullCaptureEnabled,
+        requestReplayEnabled:
+          response.config?.requestReplayEnabled ?? claudeConfig.value.requestReplayEnabled,
         updatedAt: response.config?.updatedAt || new Date().toISOString(),
         updatedBy: response.config?.updatedBy || null
       }
@@ -3127,6 +3314,7 @@ const saveOemSettings = async () => {
       siteIcon: oemSettings.value.siteIcon,
       siteIconData: oemSettings.value.siteIconData,
       showAdminButton: oemSettings.value.showAdminButton,
+      codexTutorialModel: oemSettings.value.codexTutorialModel,
       apiStatsNotice: oemSettings.value.apiStatsNotice
     }
     const result = await settingsStore.saveOemSettings(settings)
@@ -3145,7 +3333,7 @@ const resetOemSettings = async () => {
   if (
     !(await showConfirm(
       '重置设置',
-      '确定要重置为默认设置吗？\n\n这将清除所有自定义的网站名称和图标设置。',
+      '确定要重置为默认设置吗？\n\n这将清除自定义的网站名称、图标和教程配置。',
       '重置',
       '取消',
       'warning'

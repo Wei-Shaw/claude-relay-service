@@ -110,7 +110,7 @@
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-2 sm:text-sm"
               >名称 <span class="text-red-500">*</span></label
             >
-            <div>
+            <div class="flex gap-2">
               <input
                 v-model="form.name"
                 class="form-input flex-1 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -124,6 +124,15 @@
                 type="text"
                 @input="errors.name = ''"
               />
+              <button
+                class="rounded-lg bg-purple-500 px-3 py-2 text-sm text-white transition-colors hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700"
+                title="生成随机名称"
+                type="button"
+                @click="generateRandomName"
+              >
+                <i class="fas fa-random mr-1" />
+                随机
+              </button>
             </div>
             <p v-if="errors.name" class="mt-1 text-xs text-red-500 dark:text-red-400">
               {{ errors.name }}
@@ -533,7 +542,7 @@
                   class="form-input w-24 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                   min="0"
                   placeholder="1.0"
-                  step="0.1"
+                  step="0.01"
                   type="number"
                 />
                 <span class="text-xs text-gray-400">默认 1.0</span>
@@ -706,104 +715,20 @@
             </p>
           </div>
 
-          <div>
-            <div class="mb-2 flex items-center justify-between">
-              <label class="text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >专属账号绑定 (可选)</label
-              >
-              <button
-                class="flex items-center gap-1 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-                :disabled="accountsLoading"
-                title="刷新账号列表"
-                type="button"
-                @click="refreshAccounts"
-              >
-                <i
-                  :class="[
-                    'fas',
-                    accountsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt',
-                    'text-xs'
-                  ]"
-                />
-                <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
-              </button>
-            </div>
-            <div class="grid grid-cols-1 gap-3">
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Claude 专属账号</label
-                >
-                <AccountSelector
-                  v-model="form.claudeAccountId"
-                  :accounts="localAccounts.claude"
-                  default-option-text="使用共享账号池"
-                  :disabled="form.permissions.length > 0 && !form.permissions.includes('claude')"
-                  :groups="localAccounts.claudeGroups"
-                  placeholder="请选择Claude账号"
-                  platform="claude"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Gemini 专属账号</label
-                >
-                <AccountSelector
-                  v-model="form.geminiAccountId"
-                  :accounts="localAccounts.gemini"
-                  default-option-text="使用共享账号池"
-                  :disabled="form.permissions.length > 0 && !form.permissions.includes('gemini')"
-                  :groups="localAccounts.geminiGroups"
-                  placeholder="请选择Gemini账号"
-                  platform="gemini"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >OpenAI 专属账号</label
-                >
-                <AccountSelector
-                  v-model="form.openaiAccountId"
-                  :accounts="localAccounts.openai"
-                  default-option-text="使用共享账号池"
-                  :disabled="form.permissions.length > 0 && !form.permissions.includes('openai')"
-                  :groups="localAccounts.openaiGroups"
-                  placeholder="请选择OpenAI账号"
-                  platform="openai"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Bedrock 专属账号</label
-                >
-                <AccountSelector
-                  v-model="form.bedrockAccountId"
-                  :accounts="localAccounts.bedrock"
-                  default-option-text="使用共享账号池"
-                  :disabled="form.permissions.length > 0 && !form.permissions.includes('claude')"
-                  :groups="[]"
-                  placeholder="请选择Bedrock账号"
-                  platform="bedrock"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >Droid 专属账号</label
-                >
-                <AccountSelector
-                  v-model="form.droidAccountId"
-                  :accounts="localAccounts.droid"
-                  default-option-text="使用共享账号池"
-                  :disabled="form.permissions.length > 0 && !form.permissions.includes('droid')"
-                  :groups="localAccounts.droidGroups"
-                  placeholder="请选择Droid账号"
-                  platform="droid"
-                />
-              </div>
-            </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              选择专属账号后，此API Key将只使用该账号，不选择则使用共享账号池
-            </p>
-          </div>
+          <ApiKeyAccountBindings
+            v-model:bedrock-account-id="form.bedrockAccountId"
+            v-model:claude-account-id="form.claudeAccountId"
+            v-model:droid-account-id="form.droidAccountId"
+            v-model:gemini-account-id="form.geminiAccountId"
+            v-model:openai-account-id="form.openaiAccountId"
+            :accounts="localAccounts"
+            :accounts-loading="accountsLoading"
+            default-option-text="使用共享账号池"
+            description="选择专属账号后，此API Key将只使用该账号，不选择则使用共享账号池"
+            :permissions="form.permissions"
+            title="专属账号绑定 (可选)"
+            @refresh="refreshAccounts"
+          />
 
           <div>
             <div class="mb-2 flex items-center">
@@ -884,7 +809,7 @@
                   </div>
                 </div>
                 <p class="mt-2 text-xs text-gray-500">
-                  设置此API Key无法访问的模型，例如：claude-opus-4-20250514
+                  设置此API Key无法访问的模型，支持 * 通配符，例如：claude-opus-4-*、gpt-5.6*
                 </p>
               </div>
             </div>
@@ -980,8 +905,10 @@ import { showToast } from '@/utils/tools'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import * as httpApis from '@/utils/http_apis'
-import AccountSelector from '@/components/common/AccountSelector.vue'
+import ApiKeyAccountBindings from '@/components/apikeys/ApiKeyAccountBindings.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
+import { useApiKeyAccountOptions } from '@/utils/useApiKeyAccountOptions'
 
 const props = defineProps({
   accounts: {
@@ -1005,52 +932,12 @@ const emit = defineEmits(['close', 'success', 'batch-success'])
 const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
-const accountsLoading = ref(false)
-
 // ConfirmModal 状态
-const showConfirmModal = ref(false)
-const confirmModalConfig = ref({
-  title: '',
-  message: '',
-  type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
-})
-const confirmResolve = ref(null)
+const { showConfirmModal, confirmModalConfig, showConfirm, handleConfirmModal, handleCancelModal } =
+  useConfirmModal()
 
-const showConfirm = (
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  type = 'primary'
-) => {
-  return new Promise((resolve) => {
-    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
-    confirmResolve.value = resolve
-    showConfirmModal.value = true
-  })
-}
-const handleConfirmModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(true)
-}
-const handleCancelModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(false)
-}
-
-const localAccounts = ref({
-  claude: [],
-  gemini: [],
-  openai: [],
-  bedrock: [],
-  droid: [],
-  claudeGroups: [],
-  geminiGroups: [],
-  openaiGroups: [],
-  droidGroups: []
-})
+const { accountsLoading, localAccounts, setLocalAccountsFromProps, refreshAccounts } =
+  useApiKeyAccountOptions()
 
 // 表单验证状态
 const errors = ref({
@@ -1127,184 +1014,10 @@ onMounted(async () => {
   supportedClients.value = await clientsStore.loadSupportedClients()
   availableTags.value = await apiKeysStore.fetchTags()
   // 初始化账号数据
-  if (props.accounts) {
-    // props.accounts.gemini 已经包含了 OAuth 和 API 两种类型的账号（父组件已合并）
-    // 保留原有的 platform 属性，不要覆盖
-    const geminiAccounts = (props.accounts.gemini || []).map((account) => ({
-      ...account,
-      platform: account.platform || 'gemini' // 保留原有 platform，只在没有时设默认值
-    }))
-
-    // props.accounts.openai 只包含 openai 类型，openaiResponses 需要单独处理
-    const openaiAccounts = []
-    if (props.accounts.openai) {
-      props.accounts.openai.forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: account.platform || 'openai'
-        })
-      })
-    }
-    if (props.accounts.openaiResponses) {
-      props.accounts.openaiResponses.forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: account.platform || 'openai-responses'
-        })
-      })
-    }
-
-    localAccounts.value = {
-      claude: props.accounts.claude || [],
-      gemini: geminiAccounts,
-      openai: openaiAccounts,
-      bedrock: props.accounts.bedrock || [],
-      droid: (props.accounts.droid || []).map((account) => ({
-        ...account,
-        platform: account.platform || 'droid'
-      })),
-      claudeGroups: props.accounts.claudeGroups || [],
-      geminiGroups: props.accounts.geminiGroups || [],
-      openaiGroups: props.accounts.openaiGroups || [],
-      droidGroups: props.accounts.droidGroups || []
-    }
-  }
+  setLocalAccountsFromProps(props.accounts)
 
   // 使用缓存的账号数据，不自动刷新（用户可点击"刷新账号"按钮手动刷新）
 })
-
-// 刷新账号列表
-const refreshAccounts = async () => {
-  accountsLoading.value = true
-  try {
-    const [
-      claudeData,
-      claudeConsoleData,
-      geminiData,
-      geminiApiData,
-      openaiData,
-      openaiResponsesData,
-      bedrockData,
-      droidData,
-      groupsData
-    ] = await Promise.all([
-      httpApis.getClaudeAccountsApi(),
-      httpApis.getClaudeConsoleAccountsApi(),
-      httpApis.getGeminiAccountsApi(),
-      httpApis.getGeminiApiAccountsApi(), // 获取 Gemini-API 账号
-      httpApis.getOpenAIAccountsApi(),
-      httpApis.getOpenAIResponsesAccountsApi(), // 获取 OpenAI-Responses 账号
-      httpApis.getBedrockAccountsApi(),
-      httpApis.getDroidAccountsApi(),
-      httpApis.getAccountGroupsApi()
-    ])
-
-    // 合并Claude OAuth账户和Claude Console账户
-    const claudeAccounts = []
-
-    if (claudeData.success) {
-      claudeData.data?.forEach((account) => {
-        claudeAccounts.push({
-          ...account,
-          platform: 'claude-oauth',
-          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
-        })
-      })
-    }
-
-    if (claudeConsoleData.success) {
-      claudeConsoleData.data?.forEach((account) => {
-        claudeAccounts.push({
-          ...account,
-          platform: 'claude-console',
-          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
-        })
-      })
-    }
-
-    localAccounts.value.claude = claudeAccounts
-
-    // 合并 Gemini OAuth 和 Gemini API 账号
-    const geminiAccounts = []
-
-    if (geminiData.success) {
-      ;(geminiData.data || []).forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    if (geminiApiData.success) {
-      ;(geminiApiData.data || []).forEach((account) => {
-        geminiAccounts.push({
-          ...account,
-          platform: 'gemini-api',
-          isDedicated: account.accountType === 'dedicated'
-        })
-      })
-    }
-
-    localAccounts.value.gemini = geminiAccounts
-
-    // 合并 OpenAI 和 OpenAI-Responses 账号
-    const openaiAccounts = []
-
-    if (openaiData.success) {
-      ;(openaiData.data || []).forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: 'openai',
-          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
-        })
-      })
-    }
-
-    if (openaiResponsesData.success) {
-      ;(openaiResponsesData.data || []).forEach((account) => {
-        openaiAccounts.push({
-          ...account,
-          platform: 'openai-responses',
-          isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
-        })
-      })
-    }
-
-    localAccounts.value.openai = openaiAccounts
-
-    if (bedrockData.success) {
-      localAccounts.value.bedrock = (bedrockData.data || []).map((account) => ({
-        ...account,
-        isDedicated: account.accountType === 'dedicated' // 保留以便向后兼容
-      }))
-    }
-
-    if (droidData.success) {
-      localAccounts.value.droid = (droidData.data || []).map((account) => ({
-        ...account,
-        platform: 'droid',
-        isDedicated: account.accountType === 'dedicated'
-      }))
-    }
-
-    // 处理分组数据
-    if (groupsData.success) {
-      const allGroups = groupsData.data || []
-      localAccounts.value.claudeGroups = allGroups.filter((g) => g.platform === 'claude')
-      localAccounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
-      localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
-      localAccounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
-    }
-
-    showToast('账号列表已刷新', 'success')
-  } catch (error) {
-    showToast('刷新账号列表失败', 'error')
-  } finally {
-    accountsLoading.value = false
-  }
-}
 
 // 计算最小日期时间
 const minDateTime = computed(() => {
@@ -1451,6 +1164,17 @@ const updateActivationValue = () => {
       form.activationDays = 1
     }
   }
+}
+
+// 生成随机名称（16位字符：字母+数字）
+const generateRandomName = () => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  for (let i = 0; i < 16; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length))
+  }
+  form.name = result
+  errors.value.name = ''
 }
 
 // 创建 API Key

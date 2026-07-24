@@ -13,10 +13,21 @@ const {
   createRequestDetailMeta,
   extractOpenAICacheReadTokens
 } = require('../../utils/requestDetailHelper')
+const {
+  buildOpenAIResponsesClientError,
+  sanitizeOpenAIResponsesStreamEvent
+} = require('../../utils/openaiResponsesErrorAdapter')
+const openaiResponsesTestService = require('../openaiResponsesTestService')
+const {
+  attachResponseErrorHandler,
+  safeEndResponse,
+  safeWriteToResponse
+} = require('../../utils/connectionErrorHelper')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
 const LAST_USED_AT_THROTTLE_MS = 60000
+const OPENAI_RESPONSES_OTHER_4XX_TEMP_UNAVAILABLE_SECONDS = 180
 
 // 抽取缓存写入 token，兼容多种字段命名
 function extractCacheCreationTokens(usageData) {
@@ -64,14 +75,202 @@ class OpenAIResponsesRelayService {
     })
   }
 
+  _isAutoProtectionDisabled(account) {
+    return account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+  }
+
+  _shouldTempPauseOther4xx(status) {
+    return (
+      Number.isInteger(status) && status >= 400 && status < 500 && status !== 401 && status !== 429
+    )
+  }
+
+  async _clearSessionMapping(sessionHash) {
+    if (!sessionHash) {
+      return
+    }
+    await unifiedOpenAIScheduler._deleteSessionMapping(sessionHash).catch(() => {})
+  }
+
+  _isRootBaseApi(baseApi) {
+    if (!baseApi) {
+      return false
+    }
+
+    try {
+      const parsed = new URL(baseApi)
+      return parsed.pathname === '' || parsed.pathname === '/'
+    } catch {
+      return false
+    }
+  }
+
+  _normalizeTargetPath(reqPath, fullAccount) {
+    const providerEndpoint = fullAccount.providerEndpoint || 'responses'
+    const originalPath = reqPath || '/v1/responses'
+    let targetPath = originalPath
+
+    if (
+      providerEndpoint === 'responses' &&
+      (targetPath === '/v1/chat/completions' || targetPath === '/chat/completions')
+    ) {
+      const newPath = targetPath.startsWith('/v1') ? '/v1/responses' : '/responses'
+      logger.info(`📝 Normalized path (${originalPath}) → ${newPath} (providerEndpoint=responses)`)
+      targetPath = newPath
+    }
+
+    const baseApi = fullAccount.baseApi || ''
+    const normalizedBaseApi = baseApi.replace(/\/+$/, '')
+    if (
+      providerEndpoint === 'responses' &&
+      (targetPath === '/responses' || targetPath === '/responses/compact') &&
+      this._isRootBaseApi(baseApi)
+    ) {
+      targetPath = `/v1${targetPath}`
+      logger.info(`📝 Normalized path (${originalPath}) → ${targetPath} (root baseApi)`)
+    }
+
+    if (normalizedBaseApi.endsWith('/v1') && targetPath.startsWith('/v1/')) {
+      targetPath = targetPath.slice(3)
+    }
+
+    return targetPath
+  }
+
+  _buildRequestHeaders(reqHeaders = {}, fullAccount) {
+    const headers = {
+      ...filterForOpenAI(reqHeaders),
+      Authorization: `Bearer ${fullAccount.apiKey}`,
+      'Content-Type': 'application/json'
+    }
+
+    if (fullAccount.userAgent) {
+      headers['User-Agent'] = fullAccount.userAgent
+      logger.debug(`📱 Using custom User-Agent: ${fullAccount.userAgent}`)
+    } else if (reqHeaders['user-agent']) {
+      headers['User-Agent'] = reqHeaders['user-agent']
+      logger.debug(`📱 Forwarding original User-Agent: ${reqHeaders['user-agent']}`)
+    }
+
+    return headers
+  }
+
+  _createRequestOptions(req, fullAccount, options = {}) {
+    const targetPath = this._normalizeTargetPath(req.path, fullAccount)
+    const baseApi = (fullAccount.baseApi || '').replace(/\/+$/, '')
+    const targetUrl = `${baseApi}${targetPath}`
+    logger.info(`🎯 Forwarding to: ${targetUrl}`)
+
+    const headers = this._buildRequestHeaders(req.headers || {}, fullAccount)
+    const requestBody = options.requestBody ?? req.body
+    const requestOptions = {
+      method: req.method,
+      url: targetUrl,
+      headers,
+      data: requestBody,
+      timeout: options.timeout || this.defaultTimeout,
+      responseType: requestBody?.stream ? 'stream' : 'json',
+      validateStatus: () => true
+    }
+
+    if (options.signal) {
+      requestOptions.signal = options.signal
+    }
+
+    if (fullAccount.proxy) {
+      const proxyAgent = ProxyHelper.createProxyAgent(fullAccount.proxy)
+      if (proxyAgent) {
+        requestOptions.httpAgent = proxyAgent
+        requestOptions.httpsAgent = proxyAgent
+        requestOptions.proxy = false
+        logger.info(
+          `🌐 Using proxy for OpenAI-Responses: ${ProxyHelper.getProxyDescription(fullAccount.proxy)}`
+        )
+      }
+    }
+
+    return {
+      targetPath,
+      targetUrl,
+      headers,
+      requestOptions
+    }
+  }
+
+  async _markOther4xxTempUnavailable(
+    account,
+    status,
+    sessionHash,
+    source = 'response',
+    tempUnavailableContext = null
+  ) {
+    if (!account?.id || !this._shouldTempPauseOther4xx(status)) {
+      return false
+    }
+
+    if (this._isAutoProtectionDisabled(account)) {
+      logger.info(
+        `🛡️ OpenAI-Responses account ${account.id} received HTTP ${status} (${source}), auto-protection disabled, skipping temp pause`
+      )
+      await this._clearSessionMapping(sessionHash)
+      return false
+    }
+
+    await upstreamErrorHelper
+      .markTempUnavailable(
+        account.id,
+        'openai-responses',
+        status,
+        OPENAI_RESPONSES_OTHER_4XX_TEMP_UNAVAILABLE_SECONDS,
+        { ...tempUnavailableContext, errorTypeOverride: 'client_error' }
+      )
+      .catch(() => {})
+
+    await this._clearSessionMapping(sessionHash)
+
+    logger.warn(
+      `⏱️ OpenAI-Responses account ${account.id} temporarily unavailable for ${OPENAI_RESPONSES_OTHER_4XX_TEMP_UNAVAILABLE_SECONDS}s after HTTP ${status} (${source})`
+    )
+    return true
+  }
+
   // 处理请求转发
   async handleRequest(req, res, account, apiKeyData) {
     let abortController = null
+    let handleClientDisconnect = null
+    if (account?.id) {
+      req._relayAccountContext = {
+        accountId: account.id,
+        accountType: 'openai-responses'
+      }
+    }
+    const removeClientDisconnectListener = () => {
+      if (!handleClientDisconnect) {
+        return
+      }
+
+      res.removeListener('close', handleClientDisconnect)
+      handleClientDisconnect = null
+    }
+
     // 获取会话哈希（如果有的话）
     const sessionId = req.headers['session_id'] || req.body?.session_id
     const sessionHash = sessionId
       ? crypto.createHash('sha256').update(sessionId).digest('hex')
       : null
+    const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+      apiKeyData,
+      account?.id,
+      'openai-responses'
+    )
+    let targetPath = req.originalUrl || req.path
+    const buildErrorHistoryContext = (details = {}) =>
+      upstreamErrorHelper.buildErrorHistoryContext(tempUnavailableContext, {
+        model: req.body?.model,
+        path: targetPath,
+        apiKeyName: apiKeyData?.name || apiKeyData?.id,
+        ...details
+      })
 
     try {
       // 获取完整的账户信息（包含解密的 API Key）
@@ -80,89 +279,46 @@ class OpenAIResponsesRelayService {
         throw new Error('Account not found')
       }
 
+      const requestedModel = req.body?.model
+      const mappedModel = requestedModel
+        ? openaiResponsesAccountService.getMappedModel(fullAccount.supportedModels, requestedModel)
+        : requestedModel
+      const requestBody =
+        mappedModel && mappedModel !== requestedModel
+          ? {
+              ...req.body,
+              model: mappedModel
+            }
+          : req.body
+
+      if (mappedModel !== requestedModel) {
+        logger.info(`🔄 Mapping OpenAI-Responses model from ${requestedModel} to ${mappedModel}`)
+      }
+
       // 创建 AbortController 用于取消请求
       abortController = new AbortController()
 
       // 设置客户端断开监听器
-      const handleClientDisconnect = () => {
+      handleClientDisconnect = () => {
+        if (res.writableEnded) {
+          return
+        }
+
         logger.info('🔌 Client disconnected, aborting OpenAI-Responses request')
         if (abortController && !abortController.signal.aborted) {
           abortController.abort()
         }
       }
 
-      // 监听客户端断开事件
-      req.once('close', handleClientDisconnect)
+      // 监听响应关闭事件；req.close 可能只表示请求体已读完，req.aborted 覆盖不全。
       res.once('close', handleClientDisconnect)
 
-      // 构建目标 URL（根据 providerEndpoint 配置决定端点路径）
-      const providerEndpoint = fullAccount.providerEndpoint || 'responses'
-      let targetPath = req.path
-
-      // 根据 providerEndpoint 配置归一化路径
-      // 注意：unified.js 已将 /v1/chat/completions 的请求体转换为 Responses 格式，
-      // 因此这里只需归一化路径即可；反向 responses→completions 需要同时转换请求体，
-      // 目前不支持，所以只保留 responses 和 auto 两种模式
-      if (
-        providerEndpoint === 'responses' &&
-        (targetPath === '/v1/chat/completions' || targetPath === '/chat/completions')
-      ) {
-        const newPath = targetPath.startsWith('/v1') ? '/v1/responses' : '/responses'
-        logger.info(`📝 Normalized path (${req.path}) → ${newPath} (providerEndpoint=responses)`)
-        targetPath = newPath
-      }
-      // providerEndpoint === 'auto' 时保持原始路径不变
-
-      // 防止 baseApi 已含 /v1 时路径重复（如 baseApi=http://host/v1 + targetPath=/v1/responses → /v1/v1/responses）
-      const baseApi = fullAccount.baseApi || ''
-      if (baseApi.endsWith('/v1') && targetPath.startsWith('/v1/')) {
-        targetPath = targetPath.slice(3) // '/v1/responses' → '/responses'
-      }
-      const targetUrl = `${baseApi}${targetPath}`
-      logger.info(`🎯 Forwarding to: ${targetUrl}`)
-
-      // 构建请求头 - 使用统一的 headerFilter 移除 CDN headers
-      const headers = {
-        ...filterForOpenAI(req.headers),
-        Authorization: `Bearer ${fullAccount.apiKey}`,
-        'Content-Type': 'application/json'
-      }
-
-      // 处理 User-Agent
-      if (fullAccount.userAgent) {
-        // 使用自定义 User-Agent
-        headers['User-Agent'] = fullAccount.userAgent
-        logger.debug(`📱 Using custom User-Agent: ${fullAccount.userAgent}`)
-      } else if (req.headers['user-agent']) {
-        // 透传原始 User-Agent
-        headers['User-Agent'] = req.headers['user-agent']
-        logger.debug(`📱 Forwarding original User-Agent: ${req.headers['user-agent']}`)
-      }
-
-      // 配置请求选项
-      const requestOptions = {
-        method: req.method,
-        url: targetUrl,
-        headers,
-        data: req.body,
-        timeout: this.defaultTimeout,
-        responseType: req.body?.stream ? 'stream' : 'json',
-        validateStatus: () => true, // 允许处理所有状态码
-        signal: abortController.signal
-      }
-
-      // 配置代理（如果有）
-      if (fullAccount.proxy) {
-        const proxyAgent = ProxyHelper.createProxyAgent(fullAccount.proxy)
-        if (proxyAgent) {
-          requestOptions.httpAgent = proxyAgent
-          requestOptions.httpsAgent = proxyAgent
-          requestOptions.proxy = false
-          logger.info(
-            `🌐 Using proxy for OpenAI-Responses: ${ProxyHelper.getProxyDescription(fullAccount.proxy)}`
-          )
-        }
-      }
+      const requestMeta = this._createRequestOptions(req, fullAccount, {
+        signal: abortController.signal,
+        requestBody
+      })
+      targetPath = requestMeta.targetPath || targetPath
+      const { targetUrl, headers, requestOptions } = requestMeta
 
       // 记录请求信息
       logger.info('📤 OpenAI-Responses relay request', {
@@ -195,21 +351,26 @@ class OpenAIResponsesRelayService {
               account.id,
               'openai-responses',
               429,
-              resetsInSeconds || upstreamErrorHelper.parseRetryAfter(response.headers)
+              resetsInSeconds || upstreamErrorHelper.parseRetryAfter(response.headers),
+              buildErrorHistoryContext({ errorBody: errorData })
             )
             .catch(() => {})
         }
 
-        // 返回错误响应（使用处理后的数据，避免循环引用）
-        const errorResponse = errorData || {
-          error: {
-            message: 'Rate limit exceeded',
-            type: 'rate_limit_error',
-            code: 'rate_limit_exceeded',
-            resets_in_seconds: resetsInSeconds
-          }
+        const safeErrorResponse = buildOpenAIResponsesClientError(429, errorData, {
+          headers: response.headers
+        })
+        if (
+          resetsInSeconds !== null &&
+          safeErrorResponse?.body?.error &&
+          safeErrorResponse.body.error.resets_in_seconds === undefined
+        ) {
+          safeErrorResponse.body.error.resets_in_seconds = resetsInSeconds
         }
-        return res.status(429).json(errorResponse)
+
+        res._upstreamResponseBody = errorData
+        removeClientDisconnectListener()
+        return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       }
 
       // 处理其他错误状态码
@@ -256,22 +417,25 @@ class OpenAIResponsesRelayService {
           statusText: response.statusText,
           errorData
         })
+        res._upstreamResponseBody = errorData
 
         if (response.status === 401) {
           logger.warn(`🚫 OpenAI Responses账号认证失败（401错误）for account ${account?.id}`)
 
           try {
             // 仅临时暂停，不永久禁用
-            const oaiAutoProtectionDisabled =
-              account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
-            if (!oaiAutoProtectionDisabled) {
+            if (!this._isAutoProtectionDisabled(account)) {
               await upstreamErrorHelper
-                .markTempUnavailable(account.id, 'openai-responses', 401)
+                .markTempUnavailable(
+                  account.id,
+                  'openai-responses',
+                  401,
+                  null,
+                  buildErrorHistoryContext({ errorBody: errorData })
+                )
                 .catch(() => {})
             }
-            if (sessionHash) {
-              await unifiedOpenAIScheduler._deleteSessionMapping(sessionHash).catch(() => {})
-            }
+            await this._clearSessionMapping(sessionHash)
           } catch (markError) {
             logger.error(
               '❌ Failed to mark OpenAI-Responses account temporarily unavailable after 401:',
@@ -279,46 +443,47 @@ class OpenAIResponsesRelayService {
             )
           }
 
-          let unauthorizedResponse = errorData
-          if (
-            !unauthorizedResponse ||
-            typeof unauthorizedResponse !== 'object' ||
-            unauthorizedResponse.pipe ||
-            Buffer.isBuffer(unauthorizedResponse)
-          ) {
-            const fallbackMessage =
-              typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
-            unauthorizedResponse = {
-              error: {
-                message: fallbackMessage,
-                type: 'unauthorized',
-                code: 'unauthorized'
-              }
-            }
-          }
+          const unauthorizedResponse = buildOpenAIResponsesClientError(401, errorData, {
+            headers: response.headers
+          })
 
           // 清理监听器
-          req.removeListener('close', handleClientDisconnect)
-          res.removeListener('close', handleClientDisconnect)
+          removeClientDisconnectListener()
 
-          return res.status(401).json(unauthorizedResponse)
+          return res.status(unauthorizedResponse.status).json(unauthorizedResponse.body)
+        }
+
+        // 处理其他 4xx 上游错误：统一软暂停 3 分钟
+        if (this._shouldTempPauseOther4xx(response.status) && account?.id) {
+          try {
+            await this._markOther4xxTempUnavailable(
+              account,
+              response.status,
+              sessionHash,
+              'response',
+              buildErrorHistoryContext({ errorBody: errorData })
+            )
+          } catch (markError) {
+            logger.warn(
+              'Failed to mark OpenAI-Responses account temporarily unavailable for 4xx error:',
+              markError
+            )
+          }
         }
 
         // 处理 5xx 上游错误
         if (response.status >= 500 && account?.id) {
           try {
-            const oaiAutoProtectionDisabled =
-              account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
-            if (!oaiAutoProtectionDisabled) {
+            if (!this._isAutoProtectionDisabled(account)) {
               await upstreamErrorHelper.markTempUnavailable(
                 account.id,
                 'openai-responses',
-                response.status
+                response.status,
+                null,
+                buildErrorHistoryContext({ errorBody: errorData })
               )
             }
-            if (sessionHash) {
-              await unifiedOpenAIScheduler._deleteSessionMapping(sessionHash).catch(() => {})
-            }
+            await this._clearSessionMapping(sessionHash)
           } catch (markError) {
             logger.warn(
               'Failed to mark OpenAI-Responses account temporarily unavailable:',
@@ -328,12 +493,12 @@ class OpenAIResponsesRelayService {
         }
 
         // 清理监听器
-        req.removeListener('close', handleClientDisconnect)
-        res.removeListener('close', handleClientDisconnect)
+        removeClientDisconnectListener()
 
-        return res
-          .status(response.status)
-          .json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        const safeErrorResponse = buildOpenAIResponsesClientError(response.status, errorData, {
+          headers: response.headers
+        })
+        return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       }
 
       // 更新最后使用时间（节流）
@@ -353,8 +518,11 @@ class OpenAIResponsesRelayService {
       }
 
       // 处理非流式响应
+      removeClientDisconnectListener()
       return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model, req)
     } catch (error) {
+      removeClientDisconnectListener()
+
       // 清理 AbortController
       if (abortController && !abortController.signal.aborted) {
         abortController.abort()
@@ -372,11 +540,20 @@ class OpenAIResponsesRelayService {
       // 检查是否是网络错误
       if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
         if (account?.id) {
-          const oaiAutoProtectionDisabled =
-            account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
-          if (!oaiAutoProtectionDisabled) {
+          if (!this._isAutoProtectionDisabled(account)) {
             await upstreamErrorHelper
-              .markTempUnavailable(account.id, 'openai-responses', 503)
+              .markTempUnavailable(
+                account.id,
+                'openai-responses',
+                503,
+                null,
+                buildErrorHistoryContext({
+                  errorBody: {
+                    message: error.message,
+                    code: error.code || 'network_error'
+                  }
+                })
+              )
               .catch(() => {})
           }
         }
@@ -412,6 +589,7 @@ class OpenAIResponsesRelayService {
             }
           }
         }
+        res._upstreamResponseBody = errorData
 
         if (status === 401) {
           logger.warn(
@@ -420,16 +598,18 @@ class OpenAIResponsesRelayService {
 
           try {
             // 仅临时暂停，不永久禁用
-            const oaiAutoProtectionDisabled =
-              account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
-            if (!oaiAutoProtectionDisabled) {
+            if (!this._isAutoProtectionDisabled(account)) {
               await upstreamErrorHelper
-                .markTempUnavailable(account.id, 'openai-responses', 401)
+                .markTempUnavailable(
+                  account.id,
+                  'openai-responses',
+                  401,
+                  null,
+                  buildErrorHistoryContext({ errorBody: errorData })
+                )
                 .catch(() => {})
             }
-            if (sessionHash) {
-              await unifiedOpenAIScheduler._deleteSessionMapping(sessionHash).catch(() => {})
-            }
+            await this._clearSessionMapping(sessionHash)
           } catch (markError) {
             logger.error(
               '❌ Failed to mark OpenAI-Responses account temporarily unavailable in catch handler:',
@@ -437,38 +617,44 @@ class OpenAIResponsesRelayService {
             )
           }
 
-          let unauthorizedResponse = errorData
-          if (
-            !unauthorizedResponse ||
-            typeof unauthorizedResponse !== 'object' ||
-            unauthorizedResponse.pipe ||
-            Buffer.isBuffer(unauthorizedResponse)
-          ) {
-            const fallbackMessage =
-              typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
-            unauthorizedResponse = {
-              error: {
-                message: fallbackMessage,
-                type: 'unauthorized',
-                code: 'unauthorized'
-              }
-            }
-          }
-
-          return res.status(401).json(unauthorizedResponse)
+          const unauthorizedResponse = buildOpenAIResponsesClientError(401, errorData, {
+            headers: error.response.headers
+          })
+          return res.status(unauthorizedResponse.status).json(unauthorizedResponse.body)
         }
 
-        return res.status(status).json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        if (this._shouldTempPauseOther4xx(status) && account?.id) {
+          try {
+            await this._markOther4xxTempUnavailable(
+              account,
+              status,
+              sessionHash,
+              'catch',
+              buildErrorHistoryContext({ errorBody: errorData })
+            )
+          } catch (markError) {
+            logger.warn(
+              'Failed to mark OpenAI-Responses account temporarily unavailable for 4xx catch error:',
+              markError
+            )
+          }
+        }
+
+        const safeErrorResponse = buildOpenAIResponsesClientError(status, errorData, {
+          headers: error.response.headers
+        })
+        return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       }
 
       // 其他错误
-      return res.status(500).json({
-        error: {
-          message: 'Internal server error',
-          type: 'internal_error',
-          details: error.message
-        }
+      const safeErrorResponse = buildOpenAIResponsesClientError(null, error, {
+        fallbackStatus: 503
       })
+      res._upstreamResponseBody = {
+        message: error.message,
+        code: error.code || 'upstream_error'
+      }
+      return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
     }
   }
 
@@ -494,10 +680,99 @@ class OpenAIResponsesRelayService {
     let rateLimitDetected = false
     let rateLimitResetsInSeconds = null
     let streamEnded = false
+    let clientDisconnected = false
+    let lifecycleFinalized = false
+    const lifecycleStart = await apiKeyService.recordUsageAttempt(apiKeyData.id, {
+      model: requestedModel || 'unknown',
+      accountId: account.id,
+      accountType: 'openai-responses',
+      requestMeta: createRequestDetailMeta(req, {
+        requestBody: req?.body,
+        stream: true,
+        statusCode: response.status
+      }),
+      status: 'started',
+      statusMessage: 'upstream_stream_started'
+    })
+    const { lifecycleRecordId } = lifecycleStart
+    // 流已经建立后，客户端断开不能再 abort 上游，否则拿不到最终 usage。
+    if (handleClientDisconnect) {
+      res.removeListener('close', handleClientDisconnect)
+    }
+    const detachResponseErrorHandler = attachResponseErrorHandler(
+      res,
+      logger,
+      'OpenAI-Responses stream'
+    )
+
+    const buildLifecycleMeta = (statusCode = res.statusCode) =>
+      createRequestDetailMeta(req, {
+        requestBody: req?.body,
+        stream: true,
+        statusCode
+      })
+
+    const finalizeLifecycleRecord = async (status, updates = {}) => {
+      if (!lifecycleRecordId || lifecycleFinalized) {
+        return false
+      }
+
+      lifecycleFinalized = true
+      const lifecycleMeta = buildLifecycleMeta(updates.statusCode)
+      return apiKeyService.updateUsageLifecycleRecord(apiKeyData.id, lifecycleRecordId, {
+        model: actualModel || requestedModel || 'unknown',
+        statusCode: lifecycleMeta.statusCode,
+        durationMs: lifecycleMeta.durationMs,
+        usageStatus: status,
+        lifecycleStatus: status,
+        ...updates
+      })
+    }
+
+    const scheduleLifecycleFinalization = (status, updates = {}) => {
+      finalizeLifecycleRecord(status, updates).catch((error) => {
+        logger.warn(`⚠️ Failed to finalize usage lifecycle ${lifecycleRecordId}: ${error.message}`)
+      })
+    }
+
+    const markClientDisconnected = (source = 'close') => {
+      if (clientDisconnected || streamEnded || res.writableEnded) {
+        return
+      }
+
+      clientDisconnected = true
+      logger.info(
+        '🔌 Client disconnected during OpenAI-Responses stream, draining upstream for usage',
+        {
+          accountId: account.id,
+          lifecycleRecordId,
+          source
+        }
+      )
+    }
+
+    const writeEventToClient = (event) => {
+      if (!event.trim()) {
+        return
+      }
+
+      const responseCompletedSeen = parseSSEForUsage(event)
+
+      const rewritten = this._rewriteStreamEventForClient(event, response.headers)
+      if (!streamEnded && !clientDisconnected && rewritten) {
+        const written = safeWriteToResponse(res, rewritten, logger, 'OpenAI-Responses stream')
+        if (!written) {
+          markClientDisconnected('write_failed')
+        } else if (responseCompletedSeen && !res.destroyed && !res.socket?.destroyed) {
+          req._relayResponseTerminalForwarded = true
+        }
+      }
+    }
 
     // 解析 SSE 事件以捕获 usage 数据和 model
     const parseSSEForUsage = (data) => {
       const lines = data.split('\n')
+      let responseCompletedSeen = false
 
       for (const line of lines) {
         if (line.startsWith('data:')) {
@@ -511,6 +786,8 @@ class OpenAIResponsesRelayService {
 
             // 检查是否是 response.completed 事件（OpenAI-Responses 格式）
             if (eventData.type === 'response.completed' && eventData.response) {
+              responseCompletedSeen = true
+
               // 从响应中获取真实的 model
               if (eventData.response.model) {
                 actualModel = eventData.response.model
@@ -550,17 +827,14 @@ class OpenAIResponsesRelayService {
           }
         }
       }
+
+      return responseCompletedSeen
     }
 
     // 监听数据流
     response.data.on('data', (chunk) => {
       try {
         const chunkStr = chunk.toString()
-
-        // 转发数据给客户端
-        if (!res.destroyed && !streamEnded) {
-          res.write(chunk)
-        }
 
         // 同时解析数据以捕获 usage 信息
         buffer += chunkStr
@@ -571,9 +845,7 @@ class OpenAIResponsesRelayService {
           buffer = events.pop() || ''
 
           for (const event of events) {
-            if (event.trim()) {
-              parseSSEForUsage(event)
-            }
+            writeEventToClient(event)
           }
         }
       } catch (error) {
@@ -582,12 +854,16 @@ class OpenAIResponsesRelayService {
     })
 
     response.data.on('end', async () => {
-      streamEnded = true
+      if (streamEnded) {
+        return
+      }
 
       // 处理剩余的 buffer
       if (buffer.trim()) {
-        parseSSEForUsage(buffer)
+        writeEventToClient(buffer)
       }
+
+      streamEnded = true
 
       // 记录使用统计
       if (usageData) {
@@ -607,6 +883,14 @@ class OpenAIResponsesRelayService {
           const modelToRecord = actualModel || requestedModel || 'gpt-4'
 
           const serviceTier = req._serviceTier || null
+          const requestDetailMeta = createRequestDetailMeta(req, {
+            requestBody: req.body,
+            stream: true,
+            statusCode: res.statusCode
+          })
+          requestDetailMeta.lifecycleRecordId = lifecycleRecordId
+          requestDetailMeta.requestLifecycleId = lifecycleRecordId
+
           await apiKeyService.recordUsage(
             apiKeyData.id,
             actualInputTokens, // 传递实际输入（不含缓存）
@@ -617,12 +901,9 @@ class OpenAIResponsesRelayService {
             account.id,
             'openai-responses',
             serviceTier,
-            createRequestDetailMeta(req, {
-              requestBody: req.body,
-              stream: true,
-              statusCode: res.statusCode
-            })
+            requestDetailMeta
           )
+          lifecycleFinalized = true
 
           logger.info(
             `📊 Recorded usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), CacheCreate: ${cacheCreateTokens}, Output: ${outputTokens}, Total: ${totalTokens}, Model: ${modelToRecord}`
@@ -643,13 +924,27 @@ class OpenAIResponsesRelayService {
                 cache_read_input_tokens: cacheReadTokens
               },
               modelToRecord,
-              serviceTier
+              serviceTier,
+              { requestLevel: true }
             )
             await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
           }
         } catch (error) {
           logger.error('Failed to record usage:', error)
+          await finalizeLifecycleRecord('record_failed', {
+            statusMessage: 'usage_data_captured_but_local_record_failed',
+            failureReason: error.message,
+            usageMissing: false,
+            billableUsageUnknown: false
+          })
         }
+      } else {
+        await finalizeLifecycleRecord('completed_without_usage', {
+          statusMessage: 'stream_ended_without_response_usage',
+          failureReason: 'missing_usage',
+          usageMissing: true,
+          billableUsageUnknown: true
+        })
       }
 
       // 如果在流式响应中检测到限流
@@ -673,52 +968,55 @@ class OpenAIResponsesRelayService {
       }
 
       // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
+      res.removeListener('close', markClientDisconnected)
+      detachResponseErrorHandler()
 
-      if (!res.destroyed) {
-        res.end()
+      if (!clientDisconnected) {
+        safeEndResponse(res, logger, 'OpenAI-Responses stream')
       }
 
       logger.info('Stream response completed', {
         accountId: account.id,
         hasUsage: !!usageData,
-        actualModel: actualModel || 'unknown'
+        actualModel: actualModel || 'unknown',
+        clientDisconnected
       })
     })
 
     response.data.on('error', (error) => {
+      if (streamEnded) {
+        return
+      }
       streamEnded = true
       logger.error('Stream error:', error)
+      scheduleLifecycleFinalization('stream_error', {
+        statusMessage: 'upstream_stream_error_before_usage_completed',
+        failureReason: error.message,
+        usageMissing: true,
+        billableUsageUnknown: true
+      })
 
       // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
+      res.removeListener('close', markClientDisconnected)
+      detachResponseErrorHandler()
 
-      if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
-      } else if (!res.destroyed) {
-        res.end()
+      if (!clientDisconnected && !res.headersSent) {
+        const safeErrorResponse = buildOpenAIResponsesClientError(502, error, {
+          fallbackStatus: 502
+        })
+        res.status(safeErrorResponse.status).json(safeErrorResponse.body)
+      } else if (!clientDisconnected) {
+        safeEndResponse(res, logger, 'OpenAI-Responses stream')
       }
     })
 
-    // 处理客户端断开连接
-    const cleanup = () => {
-      streamEnded = true
-      try {
-        response.data?.unpipe?.(res)
-        response.data?.destroy?.()
-      } catch (_) {
-        // 忽略清理错误
-      }
-    }
-
-    req.on('close', cleanup)
-    req.on('aborted', cleanup)
+    res.on('close', markClientDisconnected)
   }
 
   // 处理非流式响应
-  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel, req) {
+  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel, req = null) {
     const responseData = response.data
 
     // 提取 usage 数据和实际 model
@@ -743,7 +1041,7 @@ class OpenAIResponsesRelayService {
         const totalTokens =
           usageData.total_tokens || totalInputTokens + outputTokens + cacheCreateTokens
 
-        const serviceTier = req._serviceTier || null
+        const serviceTier = req?._serviceTier || null
         await apiKeyService.recordUsage(
           apiKeyData.id,
           actualInputTokens, // 传递实际输入（不含缓存）
@@ -780,7 +1078,8 @@ class OpenAIResponsesRelayService {
               cache_read_input_tokens: cacheReadTokens
             },
             actualModel,
-            serviceTier
+            serviceTier,
+            { requestLevel: true }
           )
           await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
         }
@@ -798,6 +1097,41 @@ class OpenAIResponsesRelayService {
       hasUsage: !!usageData,
       model: actualModel
     })
+  }
+
+  _rewriteStreamEventForClient(event, headers = {}) {
+    const lines = event.split('\n')
+    let changed = false
+
+    const rewrittenLines = lines.map((line) => {
+      if (!line.startsWith('data:')) {
+        return line
+      }
+
+      const jsonStr = line.slice(5).trim()
+      if (!jsonStr || jsonStr === '[DONE]') {
+        return line
+      }
+
+      try {
+        const eventData = JSON.parse(jsonStr)
+        const sanitizedResult = sanitizeOpenAIResponsesStreamEvent(eventData, { headers })
+        if (!sanitizedResult.changed) {
+          return line
+        }
+
+        changed = true
+        return `data: ${JSON.stringify(sanitizedResult.data)}`
+      } catch (error) {
+        return line
+      }
+    })
+
+    if (!changed) {
+      return `${event}\n\n`
+    }
+
+    return `${rewrittenLines.join('\n')}\n\n`
   }
 
   // 处理 429 限流错误
@@ -901,6 +1235,141 @@ class OpenAIResponsesRelayService {
 
     // 返回处理后的数据，避免循环引用
     return { resetsInSeconds, errorData }
+  }
+
+  async testAccountConnection(accountId, model = 'gpt-5') {
+    const startTime = Date.now()
+
+    try {
+      const account = await openaiResponsesAccountService.getAccount(accountId)
+      if (!account) {
+        const notFoundError = new Error('Account not found')
+        notFoundError.status = 404
+        throw notFoundError
+      }
+
+      if (!account.apiKey) {
+        const authError = new Error('API Key not found or decryption failed')
+        authError.status = 401
+        throw authError
+      }
+
+      const mappedModel = openaiResponsesAccountService.getMappedModel(
+        account.supportedModels,
+        model
+      )
+      const { payload, headers: testHeaders } = openaiResponsesTestService.buildTestRequestParts(
+        mappedModel,
+        {
+          stream: true,
+          maxTokens: 64
+        }
+      )
+
+      const mockReq = {
+        method: 'POST',
+        path: openaiResponsesTestService.OPENAI_RESPONSES_TEST_PATH,
+        headers: testHeaders,
+        body: payload
+      }
+
+      const { requestOptions } = this._createRequestOptions(mockReq, account, {
+        timeout: 30000
+      })
+
+      const response = await axios(requestOptions)
+      const latency = Date.now() - startTime
+      const parsed = await openaiResponsesTestService.parseOpenAITestResponse(response)
+
+      if (response.status >= 400) {
+        const upstreamError = new Error(parsed.errorMessage || `API Error: ${response.status}`)
+        upstreamError.status = response.status
+        upstreamError.latency = latency
+        throw upstreamError
+      }
+
+      logger.info(
+        `✅ OpenAI-Responses account test passed: ${account.name} (${accountId}), latency: ${latency}ms`
+      )
+
+      return {
+        accountId,
+        accountName: account.name,
+        model,
+        latency,
+        requestMode: 'codex_cli_simulated',
+        responseText: parsed.responseText.substring(0, 200)
+      }
+    } catch (error) {
+      if (error.latency === undefined) {
+        error.latency = Date.now() - startTime
+      }
+      throw error
+    }
+  }
+
+  async testAccountConfig(accountInput, model = 'gpt-5') {
+    const startTime = Date.now()
+
+    try {
+      if (!accountInput?.apiKey) {
+        const authError = new Error('API Key is required')
+        authError.status = 401
+        throw authError
+      }
+
+      const { payload, headers: testHeaders } = openaiResponsesTestService.buildTestRequestParts(
+        model,
+        {
+          stream: true,
+          maxTokens: 64
+        }
+      )
+
+      const mockReq = {
+        method: 'POST',
+        path: openaiResponsesTestService.OPENAI_RESPONSES_TEST_PATH,
+        headers: testHeaders,
+        body: payload
+      }
+
+      const draftAccount = {
+        id: 'draft',
+        name: accountInput.name || 'Draft OpenAI-Responses Account',
+        baseApi: accountInput.baseApi,
+        apiKey: accountInput.apiKey,
+        userAgent: accountInput.userAgent || '',
+        providerEndpoint: accountInput.providerEndpoint || 'responses',
+        proxy: accountInput.proxy || null
+      }
+
+      const { requestOptions } = this._createRequestOptions(mockReq, draftAccount, {
+        timeout: 30000
+      })
+
+      const response = await axios(requestOptions)
+      const latency = Date.now() - startTime
+      const parsed = await openaiResponsesTestService.parseOpenAITestResponse(response)
+
+      if (response.status >= 400) {
+        const upstreamError = new Error(parsed.errorMessage || `API Error: ${response.status}`)
+        upstreamError.status = response.status
+        upstreamError.latency = latency
+        throw upstreamError
+      }
+
+      return {
+        model,
+        latency,
+        requestMode: 'codex_cli_simulated',
+        responseText: parsed.responseText.substring(0, 200)
+      }
+    } catch (error) {
+      if (error.latency === undefined) {
+        error.latency = Date.now() - startTime
+      }
+      throw error
+    }
   }
 
   // 过滤请求头 - 已迁移到 headerFilter 工具类

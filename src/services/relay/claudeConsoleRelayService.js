@@ -13,6 +13,7 @@ const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const { filterForClaude } = require('../../utils/headerFilter')
+const { rewriteSsePayloadModels } = require('../../utils/modelDisplayHelper')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -102,6 +103,18 @@ class ClaudeConsoleRelayService {
       }
 
       const autoProtectionDisabled = account.disableAutoProtection === true
+      const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+        apiKeyData,
+        accountId,
+        'claude-console'
+      )
+      const buildErrorHistoryContext = (details = {}) =>
+        upstreamErrorHelper.buildErrorHistoryContext(tempUnavailableContext, {
+          model: requestBody?.model,
+          path: options.customPath || '/v1/messages',
+          apiKeyName: apiKeyData?.name || apiKeyData?.id,
+          ...details
+        })
 
       logger.info(
         `📤 Processing Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId}), request: ${requestId}`
@@ -336,7 +349,13 @@ class ClaudeConsoleRelayService {
         )
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', 401)
+            .markTempUnavailable(
+              accountId,
+              'claude-console',
+              401,
+              null,
+              buildErrorHistoryContext({ errorBody: response.data })
+            )
             .catch(() => {})
         }
       } else if (accountDisabledError) {
@@ -365,7 +384,8 @@ class ClaudeConsoleRelayService {
               accountId,
               'claude-console',
               429,
-              upstreamErrorHelper.parseRetryAfter(response.headers)
+              upstreamErrorHelper.parseRetryAfter(response.headers),
+              buildErrorHistoryContext({ errorBody: response.data })
             )
             .catch(() => {})
         }
@@ -376,7 +396,13 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markAccountOverloaded(accountId)
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', 529)
+            .markTempUnavailable(
+              accountId,
+              'claude-console',
+              529,
+              null,
+              buildErrorHistoryContext({ errorBody: response.data })
+            )
             .catch(() => {})
         }
       } else if (response.status >= 500) {
@@ -385,7 +411,13 @@ class ClaudeConsoleRelayService {
         )
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', response.status)
+            .markTempUnavailable(
+              accountId,
+              'claude-console',
+              response.status,
+              null,
+              buildErrorHistoryContext({ errorBody: response.data })
+            )
             .catch(() => {})
         }
       } else if (response.status === 200 || response.status === 201) {
@@ -432,7 +464,12 @@ class ClaudeConsoleRelayService {
         statusCode: response.status,
         headers: response.headers,
         body: responseBody,
-        accountId
+        upstreamResponseBody:
+          response.status < 200 || response.status >= 300 ? response.data : undefined,
+        accountId,
+        actualModel: mappedModel,
+        requestedModel: requestBody.model,
+        displayModel: requestBody.model
       }
     } catch (error) {
       // 处理特定错误
@@ -572,6 +609,11 @@ class ClaudeConsoleRelayService {
       if (!account) {
         throw new Error('Claude Console Claude account not found')
       }
+      const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+        apiKeyData,
+        accountId,
+        'claude-console'
+      )
 
       logger.info(
         `📡 Processing streaming Claude Console API request for key: ${apiKeyData.name || apiKeyData.id}, account: ${account.name} (${accountId}), request: ${requestId}`
@@ -643,6 +685,8 @@ class ClaudeConsoleRelayService {
         }
       }
 
+      const clientDisplayModel = requestBody.model
+
       // 创建修改后的请求体
       const modifiedRequestBody = {
         ...requestBody,
@@ -664,7 +708,7 @@ class ClaudeConsoleRelayService {
         accountId,
         usageCallback,
         streamTransformer,
-        options,
+        { ...options, tempUnavailableContext, apiKeyName: apiKeyData?.name || apiKeyData?.id },
         // 📬 回调：在收到响应头时释放队列锁
         async () => {
           if (queueLockAcquired && queueRequestId && accountId) {
@@ -681,7 +725,8 @@ class ClaudeConsoleRelayService {
               )
             }
           }
-        }
+        },
+        clientDisplayModel
       )
 
       // 更新最后使用时间
@@ -751,10 +796,19 @@ class ClaudeConsoleRelayService {
     usageCallback,
     streamTransformer = null,
     requestOptions = {},
-    onResponseHeaderReceived = null
+    onResponseHeaderReceived = null,
+    clientDisplayModel = body?.model
   ) {
     return new Promise((resolve, reject) => {
       let aborted = false
+      const tempUnavailableContext = requestOptions.tempUnavailableContext || null
+      const buildErrorHistoryContext = (details = {}) =>
+        upstreamErrorHelper.buildErrorHistoryContext(tempUnavailableContext, {
+          model: body?.model,
+          path: requestOptions.customPath || '/v1/messages',
+          apiKeyName: requestOptions.apiKeyName,
+          ...details
+        })
 
       // 构建完整的API URL
       const cleanUrl = account.apiUrl.replace(/\/$/, '') // 移除末尾斜杠
@@ -838,6 +892,13 @@ class ClaudeConsoleRelayService {
 
             response.data.on('end', async () => {
               const autoProtectionDisabled = account.disableAutoProtection === true
+              const fullErrorData = Buffer.concat(errorChunks).toString()
+              try {
+                responseStream._upstreamResponseBody = JSON.parse(fullErrorData)
+              } catch (parseError) {
+                responseStream._upstreamResponseBody = fullErrorData
+              }
+
               // 记录原始错误消息到日志（方便调试，包含供应商信息）
               logger.error(
                 `📝 [Stream] Upstream error response from ${account?.name || accountId}: ${errorDataForCheck.substring(0, 500)}`
@@ -855,7 +916,13 @@ class ClaudeConsoleRelayService {
                 )
                 if (!autoProtectionDisabled) {
                   await upstreamErrorHelper
-                    .markTempUnavailable(accountId, 'claude-console', 401)
+                    .markTempUnavailable(
+                      accountId,
+                      'claude-console',
+                      401,
+                      null,
+                      buildErrorHistoryContext({ errorBody: errorDataForCheck })
+                    )
                     .catch(() => {})
                 }
               } else if (accountDisabledError) {
@@ -884,7 +951,8 @@ class ClaudeConsoleRelayService {
                       accountId,
                       'claude-console',
                       429,
-                      upstreamErrorHelper.parseRetryAfter(response.headers)
+                      upstreamErrorHelper.parseRetryAfter(response.headers),
+                      buildErrorHistoryContext({ errorBody: errorDataForCheck })
                     )
                     .catch(() => {})
                 }
@@ -895,7 +963,13 @@ class ClaudeConsoleRelayService {
                 if (!autoProtectionDisabled) {
                   await claudeConsoleAccountService.markAccountOverloaded(accountId)
                   await upstreamErrorHelper
-                    .markTempUnavailable(accountId, 'claude-console', 529)
+                    .markTempUnavailable(
+                      accountId,
+                      'claude-console',
+                      529,
+                      null,
+                      buildErrorHistoryContext({ errorBody: errorDataForCheck })
+                    )
                     .catch(() => {})
                 }
               } else if (response.status >= 500) {
@@ -904,7 +978,13 @@ class ClaudeConsoleRelayService {
                 )
                 if (!autoProtectionDisabled) {
                   await upstreamErrorHelper
-                    .markTempUnavailable(accountId, 'claude-console', response.status)
+                    .markTempUnavailable(
+                      accountId,
+                      'claude-console',
+                      response.status,
+                      null,
+                      buildErrorHistoryContext({ errorBody: errorDataForCheck })
+                    )
                     .catch(() => {})
                 }
               }
@@ -919,7 +999,6 @@ class ClaudeConsoleRelayService {
 
               // 清理并发送错误响应
               try {
-                const fullErrorData = Buffer.concat(errorChunks).toString()
                 const errorJson = JSON.parse(fullErrorData)
                 const sanitizedError = sanitizeUpstreamError(errorJson)
 
@@ -1031,7 +1110,7 @@ class ClaudeConsoleRelayService {
                   }
 
                   if (dataToWrite) {
-                    responseStream.write(dataToWrite)
+                    responseStream.write(rewriteSsePayloadModels(dataToWrite, clientDisplayModel))
                   }
                 } else {
                   // 客户端连接已断开，记录警告（但仍继续解析usage）
@@ -1175,10 +1254,10 @@ class ClaudeConsoleRelayService {
                 if (streamTransformer) {
                   const transformed = streamTransformer(buffer)
                   if (transformed) {
-                    responseStream.write(transformed)
+                    responseStream.write(rewriteSsePayloadModels(transformed, clientDisplayModel))
                   }
                 } else {
-                  responseStream.write(buffer)
+                  responseStream.write(rewriteSsePayloadModels(buffer, clientDisplayModel))
                 }
               }
 
@@ -1296,7 +1375,13 @@ class ClaudeConsoleRelayService {
             if (error.response.status === 401) {
               if (!catchAutoProtectionDisabled) {
                 upstreamErrorHelper
-                  .markTempUnavailable(accountId, 'claude-console', 401)
+                  .markTempUnavailable(
+                    accountId,
+                    'claude-console',
+                    401,
+                    null,
+                    buildErrorHistoryContext({ errorBody: error.response.data })
+                  )
                   .catch(() => {})
               }
             } else if (error.response.status === 429) {
@@ -1311,7 +1396,8 @@ class ClaudeConsoleRelayService {
                     accountId,
                     'claude-console',
                     429,
-                    upstreamErrorHelper.parseRetryAfter(error.response.headers)
+                    upstreamErrorHelper.parseRetryAfter(error.response.headers),
+                    buildErrorHistoryContext({ errorBody: error.response.data })
                   )
                   .catch(() => {})
               }
@@ -1319,7 +1405,13 @@ class ClaudeConsoleRelayService {
               if (!catchAutoProtectionDisabled) {
                 claudeConsoleAccountService.markAccountOverloaded(accountId)
                 upstreamErrorHelper
-                  .markTempUnavailable(accountId, 'claude-console', 529)
+                  .markTempUnavailable(
+                    accountId,
+                    'claude-console',
+                    529,
+                    null,
+                    buildErrorHistoryContext({ errorBody: error.response.data })
+                  )
                   .catch(() => {})
               }
             }
@@ -1454,12 +1546,165 @@ class ClaudeConsoleRelayService {
     }
   }
 
+  _buildTestRequestOptions(account, model, responseStream = null) {
+    const { createClaudeTestPayload } = require('../../utils/testPayloadHelper')
+
+    const cleanUrl = account.apiUrl.replace(/\/$/, '')
+    const apiUrl = cleanUrl.endsWith('/v1/messages')
+      ? cleanUrl
+      : `${cleanUrl}/v1/messages?beta=true`
+    const payload = createClaudeTestPayload(model, { stream: true, maxTokens: 64 })
+    const extraHeaders = account.userAgent ? { 'User-Agent': account.userAgent } : {}
+    const requestOptions = {
+      apiUrl,
+      responseStream,
+      payload,
+      proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
+      extraHeaders,
+      sanitizeErrors: false // Admin测试显示完整错误信息
+    }
+
+    if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
+      requestOptions.extraHeaders['x-api-key'] = account.apiKey
+    } else {
+      requestOptions.authorization = `Bearer ${account.apiKey}`
+    }
+
+    return requestOptions
+  }
+
+  _readStreamToString(stream) {
+    return new Promise((resolve, reject) => {
+      const chunks = []
+      stream.on('data', (chunk) => chunks.push(chunk))
+      stream.on('end', () => resolve(Buffer.concat(chunks).toString()))
+      stream.on('error', reject)
+    })
+  }
+
+  _parseClaudeConsoleTestStream(stream) {
+    return new Promise((resolve, reject) => {
+      let buffer = ''
+      let responseText = ''
+      let settled = false
+
+      const finish = () => {
+        if (settled) {
+          return
+        }
+        settled = true
+        resolve(responseText)
+      }
+
+      const fail = (message) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        reject(new Error(message || '测试失败'))
+      }
+
+      stream.on('data', (chunk) => {
+        buffer += chunk.toString()
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data:')) {
+            continue
+          }
+
+          const jsonText = line.substring(5).trim()
+          if (!jsonText || jsonText === '[DONE]') {
+            continue
+          }
+
+          try {
+            const data = JSON.parse(jsonText)
+            if (data.type === 'content_block_delta' && data.delta?.text) {
+              responseText += data.delta.text
+            } else if (data.type === 'message_stop') {
+              finish()
+              return
+            } else if (data.type === 'error') {
+              fail(data.error?.message || data.message || '上游返回错误')
+              return
+            }
+          } catch {
+            // 忽略非JSON事件片段
+          }
+        }
+      })
+
+      stream.on('end', finish)
+      stream.on('error', (error) => fail(error.message))
+    })
+  }
+
+  async testAccountConfig(accountInput, model = 'claude-sonnet-4-5-20250929') {
+    const { extractErrorMessage } = require('../../utils/testPayloadHelper')
+    const startTime = Date.now()
+
+    try {
+      const requestOptions = this._buildTestRequestOptions(accountInput, model)
+      const requestConfig = {
+        method: 'POST',
+        url: requestOptions.apiUrl,
+        data: requestOptions.payload,
+        headers: {
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+          'User-Agent': this.defaultUserAgent,
+          ...(requestOptions.authorization ? { authorization: requestOptions.authorization } : {}),
+          ...requestOptions.extraHeaders
+        },
+        timeout: 30000,
+        responseType: 'stream',
+        validateStatus: () => true
+      }
+
+      if (requestOptions.proxyAgent) {
+        requestConfig.httpAgent = requestOptions.proxyAgent
+        requestConfig.httpsAgent = requestOptions.proxyAgent
+        requestConfig.proxy = false
+      }
+
+      const response = await axios(requestConfig)
+      const latency = Date.now() - startTime
+
+      if (response.status !== 200) {
+        const errorData = await this._readStreamToString(response.data)
+        let errorMessage = `API Error: ${response.status}`
+        try {
+          errorMessage = extractErrorMessage(JSON.parse(errorData), errorMessage)
+        } catch {
+          if (errorData.length < 200) {
+            errorMessage = errorData || errorMessage
+          }
+        }
+        const upstreamError = new Error(errorMessage)
+        upstreamError.status = response.status
+        upstreamError.latency = latency
+        throw upstreamError
+      }
+
+      const responseText = await this._parseClaudeConsoleTestStream(response.data)
+      return {
+        model,
+        latency,
+        responseText: responseText.substring(0, 200)
+      }
+    } catch (error) {
+      if (error.latency === undefined) {
+        error.latency = Date.now() - startTime
+      }
+      throw error
+    }
+  }
+
   // 🧪 测试账号连接（供Admin API使用）
   async testAccountConnection(accountId, responseStream, model) {
-    const {
-      createClaudeTestPayload,
-      sendStreamTestRequest
-    } = require('../../utils/testPayloadHelper')
+    const { sendStreamTestRequest } = require('../../utils/testPayloadHelper')
 
     try {
       const account = await claudeConsoleAccountService.getAccount(accountId)
@@ -1469,27 +1714,7 @@ class ClaudeConsoleRelayService {
 
       logger.info(`🧪 Testing Claude Console account connection: ${account.name} (${accountId})`)
 
-      const cleanUrl = account.apiUrl.replace(/\/$/, '')
-      const apiUrl = cleanUrl.endsWith('/v1/messages')
-        ? cleanUrl
-        : `${cleanUrl}/v1/messages?beta=true`
-      const payload = createClaudeTestPayload(model, { stream: true })
-
-      const extraHeaders = account.userAgent ? { 'User-Agent': account.userAgent } : {}
-      const requestOptions = {
-        apiUrl,
-        responseStream,
-        payload,
-        proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
-        extraHeaders
-      }
-
-      if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
-        requestOptions.extraHeaders['x-api-key'] = account.apiKey
-      } else {
-        requestOptions.authorization = `Bearer ${account.apiKey}`
-      }
-
+      const requestOptions = this._buildTestRequestOptions(account, model, responseStream)
       await sendStreamTestRequest(requestOptions)
     } catch (error) {
       logger.error(`❌ Test account connection failed:`, error)
