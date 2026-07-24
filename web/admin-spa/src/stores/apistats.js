@@ -36,6 +36,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
 
   // 服务倍率配置
   const serviceRates = ref(null)
+  const billingDetailsHidden = ref(false)
 
   // Key 级别的服务倍率
   const keyServiceRates = ref({})
@@ -140,7 +141,9 @@ export const useApiStatsStore = defineStore('apistats', () => {
           statsData.value = statsResult.data
 
           // 保存 Key 级别的服务倍率
-          keyServiceRates.value = statsResult.data.serviceRates || {}
+          keyServiceRates.value = billingDetailsHidden.value
+            ? {}
+            : statsResult.data.serviceRates || {}
 
           // 同时加载今日和本月的统计数据
           await loadAllPeriodStats()
@@ -323,7 +326,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
         statsData.value = result.data
 
         // 保存 Key 级别的服务倍率
-        keyServiceRates.value = result.data.serviceRates || {}
+        keyServiceRates.value = billingDetailsHidden.value ? {} : result.data.serviceRates || {}
 
         // 调试：打印返回的限制数据
         console.log('API Stats - Full response:', result.data)
@@ -374,12 +377,12 @@ export const useApiStatsStore = defineStore('apistats', () => {
   async function loadServiceRates() {
     try {
       const result = await httpApis.getServiceRatesApi()
-      if (result && result.success && result.data) {
-        serviceRates.value = result.data
-      }
+      billingDetailsHidden.value = result?.billingDetailsHidden === true
+      serviceRates.value = result && result.success && result.data ? result.data : null
     } catch (err) {
       console.error('Error loading service rates:', err)
       serviceRates.value = null
+      billingDetailsHidden.value = false
     }
   }
 
@@ -599,6 +602,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
     individualStats,
     invalidKeys,
     serviceRates,
+    billingDetailsHidden,
     keyServiceRates,
 
     // Computed
