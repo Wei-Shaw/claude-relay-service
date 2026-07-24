@@ -1386,6 +1386,19 @@
                       <span class="ml-1">编辑</span>
                     </button>
                     <button
+                      v-if="
+                        account.platform === 'claude' &&
+                        account.authType === 'oauth' &&
+                        (account.status === 'error' || account.status === 'unauthorized')
+                      "
+                      class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
+                      title="重新授权"
+                      @click="openReAuthDialog(account)"
+                    >
+                      <i class="fas fa-link" />
+                      <span class="ml-1">重新授权</span>
+                    </button>
+                    <button
                       class="rounded bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-200"
                       title="删除账户"
                       @click="deleteAccount(account)"
@@ -1419,6 +1432,19 @@
                     >
                       <i class="fas fa-edit" />
                       <span class="ml-1">编辑</span>
+                    </button>
+                    <button
+                      v-if="
+                        account.platform === 'claude' &&
+                        account.authType === 'oauth' &&
+                        (account.status === 'error' || account.status === 'unauthorized')
+                      "
+                      class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
+                      title="重新授权"
+                      @click="openReAuthDialog(account)"
+                    >
+                      <i class="fas fa-link" />
+                      <span class="ml-1">重新授权</span>
                     </button>
                     <ActionDropdown :actions="getAccountActions(account)" />
                   </div>
@@ -1918,6 +1944,20 @@
             </button>
 
             <button
+              v-if="
+                account.platform === 'claude' &&
+                account.authType === 'oauth' &&
+                (account.status === 'error' || account.status === 'unauthorized')
+              "
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300"
+              title="重新授权"
+              @click="openReAuthDialog(account)"
+            >
+              <i class="fas fa-link" />
+              重新授权
+            </button>
+
+            <button
               class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 transition-colors hover:bg-red-100"
               @click="deleteAccount(account)"
             >
@@ -2253,6 +2293,14 @@
       @close="showGroupManagementModal = false"
       @refresh="loadAccountGroups"
     />
+
+    <!-- 重新授权弹窗 -->
+    <ReAuthDialog
+      v-if="showReAuthModal && reAuthAccount"
+      :account="reAuthAccount"
+      @close="showReAuthModal = false"
+      @success="handleReAuthSuccess"
+    />
   </div>
 </template>
 
@@ -2274,6 +2322,7 @@ import ActionDropdown from '@/components/common/ActionDropdown.vue'
 import GroupManagementModal from '@/components/accounts/GroupManagementModal.vue'
 import BalanceDisplay from '@/components/accounts/BalanceDisplay.vue'
 import AccountBalanceScriptModal from '@/components/accounts/AccountBalanceScriptModal.vue'
+import ReAuthDialog from '@/components/accounts/ReAuthDialog.vue'
 
 // 确认弹窗状态
 const showConfirmModal = ref(false)
@@ -3953,6 +4002,18 @@ const closeCreateAccountModal = () => {
 const editAccount = (account) => {
   editingAccount.value = account
   showEditAccountModal.value = true
+}
+
+// 重新授权
+const showReAuthModal = ref(false)
+const reAuthAccount = ref(null)
+const openReAuthDialog = (account) => {
+  reAuthAccount.value = account
+  showReAuthModal.value = true
+}
+const handleReAuthSuccess = () => {
+  showReAuthModal.value = false
+  loadAccounts()
 }
 
 const getBoundApiKeysForAccount = (account) => {
