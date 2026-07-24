@@ -4393,10 +4393,18 @@ const getClaudeAccountType = (account) => {
 
       // 订阅信息已解析
 
-      // 根据 has_claude_max 和 has_claude_pro 判断
-      if (info.hasClaudeMax === true) {
+      if (
+        info.planKind === 'team_premium' ||
+        info.planKind === 'team_max_premium' ||
+        info.accountType === 'claude_team_premium' ||
+        info.accountType === 'claude_team_max'
+      ) {
+        return 'Claude Team Premium'
+      } else if (info.planKind === 'team_standard' || info.accountType === 'claude_team_standard') {
+        return 'Claude Team Standard'
+      } else if (info.hasClaudeMax === true || info.accountType === 'claude_max') {
         return 'Claude Max'
-      } else if (info.hasClaudePro === true) {
+      } else if (info.hasClaudePro === true || info.accountType === 'claude_pro') {
         return 'Claude Pro'
       } else {
         return 'Claude Free'
