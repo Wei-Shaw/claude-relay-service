@@ -249,7 +249,10 @@
               设置 Claude 模型的周费用限制，仅对 Claude 模型请求生效
             </p>
             <div
-              v-if="form.weeklyOpusCostLimit && Number(form.weeklyOpusCostLimit) > 0"
+              v-if="
+                (form.weeklyOpusCostLimit && Number(form.weeklyOpusCostLimit) > 0) ||
+                (form.weeklyCostLimit && Number(form.weeklyCostLimit) > 0)
+              "
               class="mt-2 flex gap-3"
             >
               <div class="flex-1">
@@ -285,6 +288,24 @@
                 </select>
               </div>
             </div>
+          </div>
+
+          <!-- 全模型周费用限制 -->
+          <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              全模型周费用限制 (美元)
+            </label>
+            <input
+              v-model="form.weeklyCostLimit"
+              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              min="0"
+              placeholder="不修改 (0 表示无限制)"
+              step="0.01"
+              type="number"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              所有模型（含 Claude）请求都计入此额度，重置日/时与上方共用
+            </p>
           </div>
 
           <!-- 并发限制 -->
@@ -548,6 +569,7 @@ const form = reactive({
   dailyCostLimit: '',
   totalCostLimit: '',
   weeklyOpusCostLimit: '', // 新增Claude周费用限制
+  weeklyCostLimit: '', // 全模型周费用限制
   weeklyResetDay: '',
   weeklyResetHour: '',
   permissions: '', // 空字符串表示不修改
@@ -775,6 +797,9 @@ const batchUpdateApiKeys = async () => {
     }
     if (form.weeklyOpusCostLimit !== '' && form.weeklyOpusCostLimit !== null) {
       updates.weeklyOpusCostLimit = parseFloat(form.weeklyOpusCostLimit)
+    }
+    if (form.weeklyCostLimit !== '' && form.weeklyCostLimit !== null) {
+      updates.weeklyCostLimit = parseFloat(form.weeklyCostLimit)
     }
     if (form.weeklyResetDay !== '' && form.weeklyResetDay !== null) {
       updates.weeklyResetDay = Number(form.weeklyResetDay)

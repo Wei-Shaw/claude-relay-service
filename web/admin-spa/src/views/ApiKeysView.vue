@@ -647,6 +647,7 @@
                             v-if="
                               isStatsLoading(key.id) &&
                               (key.weeklyOpusCostLimit > 0 ||
+                                key.weeklyCostLimit > 0 ||
                                 key.dailyCostLimit > 0 ||
                                 key.totalCostLimit > 0 ||
                                 (key.rateLimitWindow > 0 && key.rateLimitCost > 0))
@@ -670,6 +671,16 @@
                               label="Claude 周限制"
                               :limit="key.weeklyOpusCostLimit"
                               type="opus"
+                              variant="compact"
+                            />
+
+                            <!-- 全模型周额度限制 - 独立显示 -->
+                            <LimitProgressBar
+                              v-if="key.weeklyCostLimit > 0"
+                              :current="getCachedStats(key.id)?.weeklyCost || 0"
+                              label="全模型周限制"
+                              :limit="key.weeklyCostLimit"
+                              type="total"
                               variant="compact"
                             />
 
@@ -740,6 +751,7 @@
                             <div
                               v-if="
                                 !(key.weeklyOpusCostLimit > 0) &&
+                                !(key.weeklyCostLimit > 0) &&
                                 !(key.dailyCostLimit > 0) &&
                                 !(key.totalCostLimit > 0) &&
                                 !(key.rateLimitWindow > 0 && key.rateLimitCost > 0)
@@ -4278,6 +4290,7 @@ const showUsageDetails = (apiKey) => {
     ...apiKey,
     dailyCost: cachedStats?.dailyCost ?? apiKey.dailyCost ?? 0,
     weeklyOpusCost: cachedStats?.weeklyOpusCost ?? apiKey.weeklyOpusCost ?? 0,
+    weeklyCost: cachedStats?.weeklyCost ?? apiKey.weeklyCost ?? 0,
     currentWindowCost: cachedStats?.currentWindowCost ?? apiKey.currentWindowCost ?? 0,
     currentWindowRequests: cachedStats?.currentWindowRequests ?? apiKey.currentWindowRequests ?? 0,
     currentWindowTokens: cachedStats?.currentWindowTokens ?? apiKey.currentWindowTokens ?? 0,
