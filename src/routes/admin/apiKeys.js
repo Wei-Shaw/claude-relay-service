@@ -876,6 +876,7 @@ router.get('/accounts/binding-counts', authenticateAdmin, async (req, res) => {
       openaiAccountId: {},
       azureOpenaiAccountId: {},
       bedrockAccountId: {},
+      vertexAccountId: {},
       droidAccountId: {},
       ccrAccountId: {}
     }
@@ -917,6 +918,12 @@ router.get('/accounts/binding-counts', authenticateAdmin, async (req, res) => {
       if (key.bedrockAccountId) {
         const id = key.bedrockAccountId
         bindingCounts.bedrockAccountId[id] = (bindingCounts.bedrockAccountId[id] || 0) + 1
+      }
+
+      // Vertex AI 账户
+      if (key.vertexAccountId) {
+        const id = key.vertexAccountId
+        bindingCounts.vertexAccountId[id] = (bindingCounts.vertexAccountId[id] || 0) + 1
       }
 
       // Droid 账户
@@ -1474,6 +1481,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       geminiAccountId,
       openaiAccountId,
       bedrockAccountId,
+      vertexAccountId,
       droidAccountId,
       permissions,
       concurrencyLimit,
@@ -1679,6 +1687,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       geminiAccountId,
       openaiAccountId,
       bedrockAccountId,
+      vertexAccountId,
       droidAccountId,
       permissions,
       concurrencyLimit,
@@ -1737,6 +1746,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       geminiAccountId,
       openaiAccountId,
       bedrockAccountId,
+      vertexAccountId,
       droidAccountId,
       permissions,
       concurrencyLimit,
@@ -1802,6 +1812,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           geminiAccountId,
           openaiAccountId,
           bedrockAccountId,
+          vertexAccountId,
           droidAccountId,
           permissions,
           concurrencyLimit,
@@ -2002,6 +2013,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         if (updates.bedrockAccountId !== undefined) {
           finalUpdates.bedrockAccountId = updates.bedrockAccountId
         }
+        if (updates.vertexAccountId !== undefined) {
+          finalUpdates.vertexAccountId = updates.vertexAccountId
+        }
         if (updates.droidAccountId !== undefined) {
           finalUpdates.droidAccountId = updates.droidAccountId || ''
         }
@@ -2107,6 +2121,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       geminiAccountId,
       openaiAccountId,
       bedrockAccountId,
+      vertexAccountId,
       droidAccountId,
       permissions,
       enableModelRestriction,
@@ -2203,6 +2218,11 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     if (bedrockAccountId !== undefined) {
       // 空字符串表示解绑，null或空字符串都设置为空字符串
       updates.bedrockAccountId = bedrockAccountId || ''
+    }
+
+    if (vertexAccountId !== undefined) {
+      // 空字符串表示解绑，null或空字符串都设置为空字符串
+      updates.vertexAccountId = vertexAccountId || ''
     }
 
     if (droidAccountId !== undefined) {

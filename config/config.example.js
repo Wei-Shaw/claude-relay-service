@@ -73,6 +73,30 @@ const config = {
     enablePromptCaching: process.env.DISABLE_PROMPT_CACHING !== '1'
   },
 
+  // ☁️ Vertex AI 配置（Google Cloud Vertex AI 提供的 Claude 模型）
+  vertex: {
+    enabled: process.env.CLAUDE_CODE_USE_VERTEX === '1',
+    defaultRegion: process.env.VERTEX_REGION || 'us-east5',
+    defaultModel: process.env.VERTEX_DEFAULT_MODEL || 'claude-sonnet-4-5@20250929',
+    maxOutputTokens: parseInt(process.env.VERTEX_MAX_OUTPUT_TOKENS) || 32000,
+    // 已知支持 Claude 的常见区域（参考用，账号可单独配置）
+    supportedRegions: [
+      'us-east5',
+      'us-central1',
+      'europe-west1',
+      'europe-west4',
+      'asia-southeast1'
+    ],
+    // 常见可用模型 ID（含 @<date> 后缀，用于 URL；usage 记录会自动剥离）
+    knownModels: [
+      'claude-opus-4-1@20250805',
+      'claude-sonnet-4-5@20250929',
+      'claude-haiku-4-5@20251001',
+      'claude-3-7-sonnet@20250219',
+      'claude-3-5-haiku@20241022'
+    ]
+  },
+
   // 🌐 代理配置
   proxy: {
     timeout: parseInt(process.env.DEFAULT_PROXY_TIMEOUT) || 600000, // 10分钟

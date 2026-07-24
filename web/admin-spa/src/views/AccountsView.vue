@@ -584,6 +584,19 @@
                       <span class="text-xs font-medium text-orange-700">AWS</span>
                     </div>
                     <div
+                      v-else-if="account.platform === 'vertex'"
+                      class="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-100 to-indigo-100 px-2.5 py-1 dark:border-blue-700 dark:from-blue-900/20 dark:to-indigo-900/20"
+                    >
+                      <i class="fas fa-cloud text-xs text-blue-700 dark:text-blue-300" />
+                      <span class="text-xs font-semibold text-blue-800 dark:text-blue-200"
+                        >Vertex AI</span
+                      >
+                      <span class="mx-1 h-4 w-px bg-blue-300 dark:bg-blue-700" />
+                      <span class="text-xs font-medium text-blue-700 dark:text-blue-300"
+                        >Google Cloud</span
+                      >
+                    </div>
+                    <div
                       v-else-if="account.platform === 'openai'"
                       class="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-100 bg-gradient-to-r from-gray-100 to-gray-100 px-2.5 py-1"
                     >
@@ -1229,6 +1242,7 @@
                       account.platform === 'claude' ||
                       account.platform === 'claude-console' ||
                       account.platform === 'bedrock' ||
+                      account.platform === 'vertex' ||
                       account.platform === 'gemini' ||
                       account.platform === 'openai' ||
                       account.platform === 'openai-responses' ||
@@ -1454,15 +1468,17 @@
                     ? 'bg-gradient-to-br from-purple-500 to-purple-600'
                     : account.platform === 'bedrock'
                       ? 'bg-gradient-to-br from-orange-500 to-red-600'
-                      : account.platform === 'azure_openai'
-                        ? 'bg-gradient-to-br from-blue-500 to-cyan-600'
-                        : account.platform === 'openai'
-                          ? 'bg-gradient-to-br from-gray-600 to-gray-700'
-                          : account.platform === 'ccr'
-                            ? 'bg-gradient-to-br from-teal-500 to-emerald-600'
-                            : account.platform === 'droid'
-                              ? 'bg-gradient-to-br from-cyan-500 to-sky-600'
-                              : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                      : account.platform === 'vertex'
+                        ? 'bg-gradient-to-br from-blue-600 to-indigo-700'
+                        : account.platform === 'azure_openai'
+                          ? 'bg-gradient-to-br from-blue-500 to-cyan-600'
+                          : account.platform === 'openai'
+                            ? 'bg-gradient-to-br from-gray-600 to-gray-700'
+                            : account.platform === 'ccr'
+                              ? 'bg-gradient-to-br from-teal-500 to-emerald-600'
+                              : account.platform === 'droid'
+                                ? 'bg-gradient-to-br from-cyan-500 to-sky-600'
+                                : 'bg-gradient-to-br from-blue-500 to-blue-600'
                 ]"
               >
                 <i
@@ -1472,15 +1488,17 @@
                       ? 'fas fa-brain'
                       : account.platform === 'bedrock'
                         ? 'fab fa-aws'
-                        : account.platform === 'azure_openai'
-                          ? 'fab fa-microsoft'
-                          : account.platform === 'openai'
-                            ? 'fas fa-openai'
-                            : account.platform === 'ccr'
-                              ? 'fas fa-code-branch'
-                              : account.platform === 'droid'
-                                ? 'fas fa-robot'
-                                : 'fas fa-robot'
+                        : account.platform === 'vertex'
+                          ? 'fas fa-cloud'
+                          : account.platform === 'azure_openai'
+                            ? 'fab fa-microsoft'
+                            : account.platform === 'openai'
+                              ? 'fas fa-openai'
+                              : account.platform === 'ccr'
+                                ? 'fas fa-code-branch'
+                                : account.platform === 'droid'
+                                  ? 'fas fa-robot'
+                                  : 'fas fa-robot'
                   ]"
                 />
               </div>
@@ -2018,7 +2036,10 @@
 
     <!-- 添加账户模态框 -->
     <AccountForm
-      v-if="showCreateAccountModal && (!newAccountPlatform || newAccountPlatform !== 'ccr')"
+      v-if="
+        showCreateAccountModal &&
+        (!newAccountPlatform || (newAccountPlatform !== 'ccr' && newAccountPlatform !== 'vertex'))
+      "
       @close="closeCreateAccountModal"
       @platform-changed="newAccountPlatform = $event"
       @success="handleCreateSuccess"
@@ -2028,10 +2049,21 @@
       @close="closeCreateAccountModal"
       @success="handleCreateSuccess"
     />
+    <VertexAccountForm
+      v-else-if="showCreateAccountModal && newAccountPlatform === 'vertex'"
+      @close="closeCreateAccountModal"
+      @success="handleCreateSuccess"
+    />
 
     <!-- 编辑账户模态框 -->
     <CcrAccountForm
       v-if="showEditAccountModal && editingAccount && editingAccount.platform === 'ccr'"
+      :account="editingAccount"
+      @close="showEditAccountModal = false"
+      @success="handleEditSuccess"
+    />
+    <VertexAccountForm
+      v-else-if="showEditAccountModal && editingAccount && editingAccount.platform === 'vertex'"
       :account="editingAccount"
       @close="showEditAccountModal = false"
       @success="handleEditSuccess"
@@ -2263,6 +2295,7 @@ import { showToast, copyText, formatNumber, formatRelativeTime } from '@/utils/t
 import * as httpApis from '@/utils/http_apis'
 import AccountForm from '@/components/accounts/AccountForm.vue'
 import CcrAccountForm from '@/components/accounts/CcrAccountForm.vue'
+import VertexAccountForm from '@/components/accounts/VertexAccountForm.vue'
 import AccountUsageDetailModal from '@/components/accounts/AccountUsageDetailModal.vue'
 import AccountErrorHistoryModal from '@/components/accounts/AccountErrorHistoryModal.vue'
 import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
@@ -2346,6 +2379,7 @@ const TEMP_UNAVAILABLE_ACCOUNT_TYPE_ALIASES = {
   claude: ['claude-official', 'claude'],
   'claude-console': ['claude-console'],
   bedrock: ['bedrock'],
+  vertex: ['vertex'],
   gemini: ['gemini'],
   'gemini-api': ['gemini-api'],
   openai: ['openai'],
@@ -2399,7 +2433,8 @@ const supportedUsagePlatforms = [
   'gemini',
   'droid',
   'gemini-api',
-  'bedrock'
+  'bedrock',
+  'vertex'
 ]
 
 // 过期时间编辑弹窗状态
@@ -2451,6 +2486,7 @@ const platformHierarchy = [
       { value: 'claude', label: 'Claude 官方/OAuth', icon: 'fa-brain' },
       { value: 'claude-console', label: 'Claude Console', icon: 'fa-terminal' },
       { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' },
+      { value: 'vertex', label: 'Vertex AI', icon: 'fas fa-cloud' },
       { value: 'ccr', label: 'CCR Relay', icon: 'fa-code-branch' }
     ]
   },
@@ -2483,7 +2519,7 @@ const platformHierarchy = [
 
 // 平台分组映射
 const platformGroupMap = {
-  'group-claude': ['claude', 'claude-console', 'bedrock', 'ccr'],
+  'group-claude': ['claude', 'claude-console', 'bedrock', 'vertex', 'ccr'],
   'group-openai': ['openai', 'openai-responses', 'azure_openai'],
   'group-gemini': ['gemini', 'gemini-api'],
   'group-droid': ['droid']
@@ -2494,6 +2530,7 @@ const platformRequestHandlers = {
   claude: () => httpApis.getClaudeAccountsApi(),
   'claude-console': () => httpApis.getClaudeConsoleAccountsApi(),
   bedrock: () => httpApis.getBedrockAccountsApi(),
+  vertex: () => httpApis.getVertexAccountsApi(),
   gemini: () => httpApis.getGeminiAccountsApi(),
   openai: () => httpApis.getOpenAIAccountsApi(),
   azure_openai: () => httpApis.getAzureOpenAIAccountsApi(),
@@ -2639,6 +2676,7 @@ const showResetButton = (account) => {
     'ccr',
     'droid',
     'bedrock',
+    'vertex',
     'azure-openai',
     'azure_openai'
   ]
@@ -2748,6 +2786,7 @@ const supportedTestPlatforms = [
   'claude',
   'claude-console',
   'bedrock',
+  'vertex',
   'gemini',
   'gemini-api',
   'openai-responses',
@@ -2939,6 +2978,7 @@ const accountStats = computed(() => {
     { value: 'openai', label: 'OpenAI' },
     { value: 'azure_openai', label: 'Azure OpenAI' },
     { value: 'bedrock', label: 'Bedrock' },
+    { value: 'vertex', label: 'Vertex AI' },
     { value: 'openai-responses', label: 'OpenAI-Responses' },
     { value: 'ccr', label: 'CCR' },
     { value: 'droid', label: 'Droid' }
@@ -3376,6 +3416,14 @@ const loadAccounts = async (forceReload = false) => {
         }
         case 'bedrock': {
           const items = list.map((acc) => ({ ...acc, platform: 'bedrock', boundApiKeysCount: 0 }))
+          allAccounts.push(...items)
+          break
+        }
+        case 'vertex': {
+          const items = list.map((acc) => {
+            const boundApiKeysCount = counts.vertexAccountId?.[acc.id] || 0
+            return { ...acc, platform: 'vertex', boundApiKeysCount }
+          })
           allAccounts.push(...items)
           break
         }
@@ -3965,6 +4013,9 @@ const getBoundApiKeysForAccount = (account) => {
       key.geminiAccountId === accountId ||
       key.openaiAccountId === accountId ||
       key.azureOpenaiAccountId === accountId ||
+      key.bedrockAccountId === accountId ||
+      key.vertexAccountId === accountId ||
+      key.droidAccountId === accountId ||
       key.openaiAccountId === `responses:${accountId}` ||
       key.geminiAccountId === `api:${accountId}`
     )
@@ -3979,6 +4030,8 @@ const resolveAccountDeleteEndpoint = (account) => {
       return `/admin/claude-console-accounts/${account.id}`
     case 'bedrock':
       return `/admin/bedrock-accounts/${account.id}`
+    case 'vertex':
+      return `/admin/vertex-accounts/${account.id}`
     case 'openai':
       return `/admin/openai-accounts/${account.id}`
     case 'azure_openai':
@@ -4140,6 +4193,7 @@ const RESET_STATUS_ENDPOINT_MAP = {
   'gemini-api': (id) => `/admin/gemini-api-accounts/${id}/reset-status`,
   gemini: (id) => `/admin/gemini-accounts/${id}/reset-status`,
   bedrock: (id) => `/admin/bedrock-accounts/${id}/reset-status`,
+  vertex: (id) => `/admin/vertex-accounts/${id}/reset-status`,
   'azure-openai': (id) => `/admin/azure-openai-accounts/${id}/reset-status`,
   azure_openai: (id) => `/admin/azure-openai-accounts/${id}/reset-status`
 }
@@ -4148,6 +4202,7 @@ const TOGGLE_SCHEDULABLE_ENDPOINT_MAP = {
   claude: (id) => `/admin/claude-accounts/${id}/toggle-schedulable`,
   'claude-console': (id) => `/admin/claude-console-accounts/${id}/toggle-schedulable`,
   bedrock: (id) => `/admin/bedrock-accounts/${id}/toggle-schedulable`,
+  vertex: (id) => `/admin/vertex-accounts/${id}/toggle-schedulable`,
   gemini: (id) => `/admin/gemini-accounts/${id}/toggle-schedulable`,
   openai: (id) => `/admin/openai-accounts/${id}/toggle-schedulable`,
   azure_openai: (id) => `/admin/azure-openai-accounts/${id}/toggle-schedulable`,
@@ -4528,7 +4583,12 @@ const dedupeRoutingReasons = (reasons) => {
 
 const isAccountExpiredForRouting = (account) => {
   if (!account || !account.expiresAt) return false
-  if (account.platform !== 'claude-console' && account.platform !== 'bedrock') return false
+  if (
+    account.platform !== 'claude-console' &&
+    account.platform !== 'bedrock' &&
+    account.platform !== 'vertex'
+  )
+    return false
   return isExpired(account.expiresAt)
 }
 
@@ -5187,6 +5247,9 @@ const handleSaveAccountExpiry = async ({ accountId, expiresAt }) => {
         break
       case 'bedrock':
         endpoint = `/admin/bedrock-accounts/${accountId}`
+        break
+      case 'vertex':
+        endpoint = `/admin/vertex-accounts/${accountId}`
         break
       case 'ccr':
         endpoint = `/admin/ccr-accounts/${accountId}`
