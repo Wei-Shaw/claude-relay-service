@@ -4871,6 +4871,12 @@ const handleCookieAuth = async () => {
       } else {
         result = await accountsStore.oauthWithCookie(payload)
       }
+      // 后端授权失败时 request() 不抛异常，store 返回 null（真实原因存于 accountsStore.error）。
+      // 这里必须显式拦截 null，否则它会被当成成功结果传入 handleOAuthSuccess →
+      // buildClaudeAccountData，触发 "Cannot read properties of null (reading 'claudeAiOauth')"。
+      if (!result) {
+        throw new Error(accountsStore.error || 'Cookie 授权失败，请检查 sessionKey 是否有效')
+      }
       results.push(result)
     } catch (error) {
       errors.push({
@@ -4896,7 +4902,11 @@ const handleCookieAuth = async () => {
   }
 
   if (errors.length > 0 && results.length === 0) {
-    cookieAuthError.value = '全部授权失败，请检查 sessionKey 是否有效'
+    // 单个 sessionKey 失败时直接展示后端返回的真实原因，便于排查（而非笼统提示）
+    cookieAuthError.value =
+      errors.length === 1
+        ? `授权失败：${errors[0].error}`
+        : '全部授权失败，请检查 sessionKey 是否有效'
   } else if (errors.length > 0) {
     cookieAuthError.value = `${errors.length} 个授权失败`
   }
