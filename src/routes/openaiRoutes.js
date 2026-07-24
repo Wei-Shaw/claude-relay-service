@@ -110,18 +110,6 @@ function getCodexCompatibleModel(requestedModel = null) {
   return requestedModel
 }
 
-function normalizeGpt5ModelForCodex(body = {}) {
-  const requestedModel = body?.model || null
-  const compatibleModel = getCodexCompatibleModel(requestedModel)
-
-  if (compatibleModel !== requestedModel) {
-    logger.info(`📝 Model ${requestedModel} detected, normalizing to gpt-5 for Codex API`)
-    body.model = compatibleModel
-  }
-
-  return compatibleModel
-}
-
 function applyCodexCliAdaptation(body = {}) {
   const fieldsToRemove = [
     'temperature',
@@ -377,7 +365,6 @@ const handleResponses = async (req, res) => {
       const shouldApplyPayloadRules = apiKeyData.enableOpenAIResponsesPayloadRules === true
 
       if (shouldApplyCodexAdaptation) {
-        normalizeGpt5ModelForCodex(req.body)
         applyCodexCliAdaptation(req.body)
         logger.info('📝 Standard Responses request applied Codex CLI adaptation')
       } else if (isCodexCLI) {
@@ -394,8 +381,6 @@ const handleResponses = async (req, res) => {
         logger.info('🧩 Standard Responses request applied API key payload rules')
       }
     } else {
-      normalizeGpt5ModelForCodex(req.body)
-
       if (!isCodexCLI && !req._fromUnifiedEndpoint) {
         applyCodexCliAdaptation(req.body)
         logger.info('📝 Non-Codex CLI request detected, applying Codex CLI adaptation')

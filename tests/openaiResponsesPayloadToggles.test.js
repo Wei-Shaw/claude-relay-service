@@ -221,14 +221,35 @@ describe('openai responses payload toggles', () => {
 
     await openaiRoutes.handleResponses(req, createRes())
 
-    expect(req.body.model).toBe('gpt-5')
+    expect(req.body.model).toBe('gpt-5-2025-08-07')
     expect(req.body.instructions).toBe(openaiRoutes.CODEX_CLI_INSTRUCTIONS)
     expect(req.body.temperature).toBeUndefined()
     expect(req.body.service_tier).toBeUndefined()
     expect(unifiedOpenAIScheduler.selectAccountForApiKey).toHaveBeenCalledWith(
       req.apiKey,
       createHash('session-b'),
-      'gpt-5'
+      'gpt-5-2025-08-07'
+    )
+  })
+
+  test('uses the client model for openai-responses model redirection after Codex adaptation', async () => {
+    const req = createReq({
+      body: {
+        model: 'gpt-5-2025-08-07',
+        prompt_cache_key: 'redirect-session'
+      }
+    })
+
+    await openaiRoutes.handleResponses(req, createRes())
+
+    expect(unifiedOpenAIScheduler.selectAccountForApiKey).toHaveBeenCalledWith(
+      req.apiKey,
+      createHash('redirect-session'),
+      'gpt-5-2025-08-07'
+    )
+    expect(openaiResponsesRelayService.handleRequest).toHaveBeenCalled()
+    expect(openaiResponsesRelayService.handleRequest.mock.calls[0][0].body.model).toBe(
+      'gpt-5-2025-08-07'
     )
   })
 
