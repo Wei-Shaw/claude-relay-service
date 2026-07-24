@@ -37,6 +37,18 @@ const OPENAI_MODELS = [
   { value: 'gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark' },
   { value: 'gpt-5.4', label: 'GPT-5.4' },
   { value: 'gpt-5.4-pro', label: 'GPT-5.4 Pro' },
+  { value: 'gpt-5.5', label: 'GPT-5.5' },
+  { value: 'gpt-5.5-high', label: 'GPT-5.5 High' },
+  { value: 'gpt-5.5-xhigh', label: 'GPT-5.5 XHigh' },
+  { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+  { value: 'gpt-5.6-sol-high', label: 'GPT-5.6 Sol High' },
+  { value: 'gpt-5.6-sol-xhigh', label: 'GPT-5.6 Sol XHigh' },
+  { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+  { value: 'gpt-5.6-terra-high', label: 'GPT-5.6 Terra High' },
+  { value: 'gpt-5.6-terra-xhigh', label: 'GPT-5.6 Terra XHigh' },
+  { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
+  { value: 'gpt-5.6-luna-high', label: 'GPT-5.6 Luna High' },
+  { value: 'gpt-5.6-luna-xhigh', label: 'GPT-5.6 Luna XHigh' },
   { value: 'codex-mini', label: 'Codex Mini' }
 ]
 
