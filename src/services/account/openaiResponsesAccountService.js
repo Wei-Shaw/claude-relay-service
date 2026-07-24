@@ -289,7 +289,7 @@ class OpenAIResponsesAccountService {
   }
 
   // 标记账户限流
-  async markAccountRateLimited(accountId, duration = null) {
+  async markAccountRateLimited(accountId, options = null) {
     const account = await this.getAccount(accountId)
     if (!account) {
       return
@@ -306,9 +306,34 @@ class OpenAIResponsesAccountService {
       return
     }
 
-    const rateLimitDuration = duration || parseInt(account.rateLimitDuration) || 60
     const now = new Date()
-    const resetAt = new Date(now.getTime() + rateLimitDuration * 60000)
+    let rateLimitDuration = parseInt(account.rateLimitDuration, 10) || 60
+    let resetAt = null
+
+    if (typeof options === 'number') {
+      rateLimitDuration = options || rateLimitDuration
+    } else if (options && typeof options === 'object') {
+      if (options.duration !== undefined && options.duration !== null) {
+        rateLimitDuration = options.duration || rateLimitDuration
+      }
+
+      if (options.rateLimitResetAt) {
+        const parsedResetAt = new Date(options.rateLimitResetAt)
+        if (!Number.isNaN(parsedResetAt.getTime())) {
+          resetAt = parsedResetAt
+        }
+      } else if (options.resetsInSeconds !== undefined && options.resetsInSeconds !== null) {
+        const resetSeconds = parseInt(options.resetsInSeconds, 10)
+        if (!Number.isNaN(resetSeconds) && resetSeconds > 0) {
+          resetAt = new Date(now.getTime() + resetSeconds * 1000)
+          rateLimitDuration = Math.max(1, Math.ceil(resetSeconds / 60))
+        }
+      }
+    }
+
+    if (!resetAt) {
+      resetAt = new Date(now.getTime() + rateLimitDuration * 60000)
+    }
 
     await this.updateAccount(accountId, {
       rateLimitedAt: now.toISOString(),
