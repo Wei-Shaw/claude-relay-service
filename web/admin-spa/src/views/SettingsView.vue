@@ -3359,26 +3359,26 @@ const resetOemSettings = async () => {
 
 // 处理图标上传
 const handleIconUpload = async (event) => {
-  const file = event.target.files[0]
-  if (!file) return
-
-  // 验证文件
-  const validation = settingsStore.validateIconFile(file)
-  if (!validation.isValid) {
-    validation.errors.forEach((error) => showToast(error, 'error'))
-    return
-  }
-
+  const file = event.target.files?.[0]
   try {
+    if (!file) return
+
+    // 验证文件
+    const validation = settingsStore.validateIconFile(file)
+    if (!validation.isValid) {
+      validation.errors.forEach((error) => showToast(error, 'error'))
+      return
+    }
+
     // 转换为Base64
     const base64Data = await settingsStore.fileToBase64(file)
     oemSettings.value.siteIconData = base64Data
   } catch (error) {
     showToast('文件读取失败', 'error')
+  } finally {
+    // 清除input的值，允许重复选择同一文件
+    event.target.value = ''
   }
-
-  // 清除input的值，允许重复选择同一文件
-  event.target.value = ''
 }
 
 // 删除图标
