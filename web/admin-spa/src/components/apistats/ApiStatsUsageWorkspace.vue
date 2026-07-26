@@ -653,7 +653,7 @@ watch(
   font-family: 'Avenir Next', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-:global(.dark) .usage-shell {
+:global(.dark .usage-shell) {
   --usage-bg: #171b19;
   --usage-card: #202623;
   --usage-ink: #eef2ed;
@@ -778,7 +778,7 @@ watch(
   font-size: 0.7rem;
   cursor: pointer;
 }
-:global(.dark) .partial-notice {
+:global(.dark .partial-notice) {
   border-color: #66512f;
   background: #30281b;
   color: #e1bd7c;

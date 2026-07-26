@@ -23,9 +23,8 @@
           <button :class="{ active: currentTab === 'stats' }" @click="currentTab = 'stats'">
             用量查询
           </button>
-          <button :class="{ active: currentTab === 'quota' }" @click="switchToQuota">额度卡</button>
           <button :class="{ active: currentTab === 'tutorial' }" @click="currentTab = 'tutorial'">
-            使用教程
+            使用帮助
           </button>
         </nav>
 
@@ -57,6 +56,186 @@
           <i class="fas fa-exclamation-triangle" />
           {{ error }}
         </div>
+
+        <section class="quota-workbench fade-in" :class="{ locked: !canUseQuotaCard }">
+          <div class="quota-workbench-head">
+            <div class="quota-heading">
+              <p>CREDIT DESK / 02</p>
+              <div>
+                <h2>为当前 Key 补充额度</h2>
+                <span>验证 API Key 后，可直接兑换额度卡并查看历史记录。</span>
+              </div>
+            </div>
+
+            <div class="quota-head-actions">
+              <span :class="['quota-key-status', { ready: canUseQuotaCard }]">
+                <i :class="canUseQuotaCard ? 'fas fa-check' : 'fas fa-lock'" />
+                {{ quotaStatusText }}
+              </span>
+              <div aria-label="额度卡功能" class="quota-view-switcher">
+                <button
+                  :class="{ active: quotaPanelMode === 'redeem' }"
+                  type="button"
+                  @click="quotaPanelMode = 'redeem'"
+                >
+                  兑换
+                </button>
+                <button
+                  :class="{ active: quotaPanelMode === 'history' }"
+                  type="button"
+                  @click="switchToHistory"
+                >
+                  记录
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="quotaPanelMode === 'redeem'" class="quota-panel-body">
+            <div class="quota-context-panel">
+              <span class="quota-step-number">01</span>
+              <div>
+                <small>兑换目标</small>
+                <strong>{{
+                  canUseQuotaCard ? statsData?.name || apiId : '等待验证 API Key'
+                }}</strong>
+                <p>
+                  {{
+                    canUseQuotaCard
+                      ? '卡内额度或有效期将直接叠加到这个 Key。'
+                      : multiKeyMode
+                        ? '额度卡只能绑定一个 Key，请切换到单 Key 模式。'
+                        : '请先在上方输入并验证需要补充额度的 API Key。'
+                  }}
+                </p>
+              </div>
+            </div>
+
+            <div class="quota-redeem-panel">
+              <label for="quota-card-code">
+                <span>额度卡卡号</span>
+                <small>一次仅兑换一张卡</small>
+              </label>
+              <div class="quota-redeem-entry">
+                <input
+                  id="quota-card-code"
+                  v-model="redeemCode"
+                  autocomplete="off"
+                  :disabled="!canUseQuotaCard || redeemLoading"
+                  placeholder="输入兑换码"
+                  spellcheck="false"
+                  type="text"
+                  @keyup.enter="handleRedeem"
+                />
+                <button
+                  :disabled="!canUseQuotaCard || !redeemCode.trim() || redeemLoading"
+                  type="button"
+                  @click="handleRedeem"
+                >
+                  <i v-if="redeemLoading" class="fas fa-spinner fa-spin" />
+                  <span>{{ redeemLoading ? '兑换中' : '确认兑换' }}</span>
+                  <i v-if="!redeemLoading" class="fas fa-arrow-right" />
+                </button>
+              </div>
+
+              <div
+                v-if="redeemResult"
+                :class="[
+                  'quota-result',
+                  redeemResult.success
+                    ? redeemResult.hasWarnings
+                      ? 'warning'
+                      : 'success'
+                    : 'error'
+                ]"
+                role="status"
+              >
+                <i
+                  :class="
+                    redeemResult.success
+                      ? redeemResult.hasWarnings
+                        ? 'fas fa-exclamation-triangle'
+                        : 'fas fa-check-circle'
+                      : 'fas fa-times-circle'
+                  "
+                />
+                <div>
+                  <strong>
+                    {{
+                      redeemResult.success
+                        ? redeemResult.hasWarnings
+                          ? '兑换成功，部分额度已截断'
+                          : '兑换成功'
+                        : '兑换失败'
+                    }}
+                  </strong>
+                  <p>{{ redeemResult.message }}</p>
+                  <div v-if="redeemResult.success && redeemResult.data" class="quota-result-meta">
+                    <span v-if="redeemResult.data.quotaAdded">
+                      额度 +${{ redeemResult.data.quotaAdded }}
+                    </span>
+                    <span v-if="redeemResult.data.timeAdded">
+                      有效期 +{{ redeemResult.data.timeAdded
+                      }}{{ formatTimeUnit(redeemResult.data.timeUnit) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="quota-history-panel">
+            <div class="quota-history-intro">
+              <span class="quota-step-number">02</span>
+              <div>
+                <small>兑换记录</small>
+                <strong>额度变更轨迹</strong>
+                <p>仅展示当前已验证 API Key 的兑换记录。</p>
+              </div>
+              <button
+                :disabled="!canUseQuotaCard || historyLoading"
+                title="刷新兑换记录"
+                type="button"
+                @click="loadRedemptionHistory"
+              >
+                <i :class="['fas fa-rotate', { 'fa-spin': historyLoading }]" />
+              </button>
+            </div>
+
+            <div v-if="!canUseQuotaCard" class="quota-history-empty locked-message">
+              <i class="fas fa-lock" />
+              <span>{{ quotaStatusText }}</span>
+            </div>
+            <div v-else-if="historyLoading" class="quota-history-empty">
+              <i class="fas fa-spinner fa-spin" />
+              <span>正在读取兑换记录</span>
+            </div>
+            <div v-else-if="redemptionHistory.length === 0" class="quota-history-empty">
+              <i class="fas fa-ticket" />
+              <span>当前 Key 还没有兑换记录</span>
+            </div>
+            <div v-else class="quota-history-list">
+              <article v-for="record in redemptionHistory" :key="record.id">
+                <div>
+                  <span :class="['quota-record-type', record.cardType]">
+                    {{ formatCardType(record.cardType) }}
+                  </span>
+                  <span v-if="record.status === 'revoked'" class="quota-record-revoked">
+                    已撤销
+                  </span>
+                </div>
+                <p>
+                  <span v-if="record.quotaAdded">额度 +${{ record.quotaAdded }}</span>
+                  <span v-if="record.quotaAdded && record.timeAdded"> / </span>
+                  <span v-if="record.timeAdded">
+                    有效期 +{{ record.timeAmount }}{{ formatTimeUnit(record.timeUnit) }}
+                  </span>
+                </p>
+                <time>{{ formatDateTime(record.redeemedAt) }}</time>
+              </article>
+            </div>
+          </div>
+        </section>
 
         <div v-if="statsData && !multiKeyMode" class="single-key-result fade-in">
           <div class="verified-key-bar">
@@ -133,242 +312,7 @@
 
       <!-- 教程内容 -->
       <div v-if="currentTab === 'tutorial'" class="tab-content">
-        <div class="glass-strong rounded-3xl shadow-xl">
-          <TutorialView />
-        </div>
-      </div>
-
-      <!-- 额度卡内容（含二级 tab） -->
-      <div v-if="currentTab === 'quota'" class="tab-content">
-        <div class="glass-strong rounded-2xl p-4 shadow-xl sm:rounded-3xl sm:p-6 md:p-8">
-          <!-- 二级 Tab -->
-          <div
-            class="mb-4 flex gap-2 border-b border-gray-200 pb-4 dark:border-gray-700 md:mb-6 md:pb-6"
-          >
-            <button
-              :class="[
-                'rounded-lg px-4 py-2 text-sm font-medium transition-all',
-                quotaSubTab === 'redeem'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-              ]"
-              @click="quotaSubTab = 'redeem'"
-            >
-              <i class="fas fa-ticket-alt mr-2" />
-              兑换额度卡
-            </button>
-            <button
-              :class="[
-                'rounded-lg px-4 py-2 text-sm font-medium transition-all',
-                quotaSubTab === 'history'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-              ]"
-              @click="switchToHistorySubTab"
-            >
-              <i class="fas fa-history mr-2" />
-              兑换记录
-            </button>
-          </div>
-
-          <!-- 兑换额度卡子内容 -->
-          <div v-if="quotaSubTab === 'redeem'">
-            <!-- 需要先输入 API Key -->
-            <div v-if="!apiId" class="py-8 text-center">
-              <div class="mb-4 text-gray-500 dark:text-gray-400">
-                <i class="fas fa-key mb-4 block text-4xl opacity-50" />
-                <p>请先在「统计查询」页面输入您的 API Key</p>
-              </div>
-              <button
-                class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
-                @click="currentTab = 'stats'"
-              >
-                前往输入 API Key
-              </button>
-            </div>
-
-            <!-- 兑换表单 -->
-            <div v-else>
-              <div class="mb-6 rounded-xl bg-blue-50 p-4 dark:bg-blue-900/20">
-                <p class="text-sm text-blue-700 dark:text-blue-300">
-                  <i class="fas fa-info-circle mr-2" />
-                  当前 API Key: <span class="font-medium">{{ statsData?.name || apiId }}</span>
-                </p>
-              </div>
-
-              <div class="space-y-4">
-                <div>
-                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    额度卡卡号
-                  </label>
-                  <input
-                    v-model="redeemCode"
-                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500"
-                    placeholder="请输入额度卡卡号"
-                    type="text"
-                    @keyup.enter="handleRedeem"
-                  />
-                </div>
-
-                <button
-                  class="w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-3 font-medium text-white transition-all hover:from-green-600 hover:to-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="!redeemCode.trim() || redeemLoading"
-                  @click="handleRedeem"
-                >
-                  <i v-if="redeemLoading" class="fas fa-spinner fa-spin mr-2" />
-                  <i v-else class="fas fa-check-circle mr-2" />
-                  {{ redeemLoading ? '兑换中...' : '立即兑换' }}
-                </button>
-              </div>
-
-              <!-- 兑换结果 -->
-              <div v-if="redeemResult" class="mt-6">
-                <div
-                  :class="[
-                    'rounded-xl p-4',
-                    redeemResult.success
-                      ? redeemResult.hasWarnings
-                        ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300'
-                        : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
-                      : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
-                  ]"
-                >
-                  <div class="flex items-start gap-3">
-                    <i
-                      :class="[
-                        'mt-0.5 text-lg',
-                        redeemResult.success
-                          ? redeemResult.hasWarnings
-                            ? 'fas fa-exclamation-triangle'
-                            : 'fas fa-check-circle'
-                          : 'fas fa-times-circle'
-                      ]"
-                    />
-                    <div>
-                      <p class="font-medium">
-                        {{
-                          redeemResult.success
-                            ? redeemResult.hasWarnings
-                              ? '兑换成功（部分截断）'
-                              : '兑换成功'
-                            : '兑换失败'
-                        }}
-                      </p>
-                      <p class="mt-1 text-sm opacity-90">{{ redeemResult.message }}</p>
-                      <div v-if="redeemResult.success && redeemResult.data" class="mt-2 text-sm">
-                        <p v-if="redeemResult.data.quotaAdded">
-                          额度增加:
-                          <span class="font-medium">${{ redeemResult.data.quotaAdded }}</span>
-                        </p>
-                        <p v-if="redeemResult.data.timeAdded">
-                          有效期延长:
-                          <span class="font-medium"
-                            >{{ redeemResult.data.timeAdded
-                            }}{{
-                              redeemResult.data.timeUnit === 'days'
-                                ? '天'
-                                : redeemResult.data.timeUnit === 'hours'
-                                  ? '小时'
-                                  : '月'
-                            }}</span
-                          >
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 兑换记录子内容 -->
-          <div v-if="quotaSubTab === 'history'">
-            <!-- 需要先输入 API Key -->
-            <div v-if="!apiId" class="py-8 text-center">
-              <div class="mb-4 text-gray-500 dark:text-gray-400">
-                <i class="fas fa-key mb-4 block text-4xl opacity-50" />
-                <p>请先在「统计查询」页面输入您的 API Key</p>
-              </div>
-              <button
-                class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
-                @click="currentTab = 'stats'"
-              >
-                前往输入 API Key
-              </button>
-            </div>
-
-            <!-- 记录列表 -->
-            <div v-else>
-              <div v-if="historyLoading" class="py-8 text-center">
-                <i class="fas fa-spinner fa-spin text-2xl text-gray-400" />
-                <p class="mt-2 text-gray-500 dark:text-gray-400">加载中...</p>
-              </div>
-
-              <div v-else-if="redemptionHistory.length === 0" class="py-8 text-center">
-                <i class="fas fa-inbox text-4xl text-gray-300 dark:text-gray-600" />
-                <p class="mt-2 text-gray-500 dark:text-gray-400">暂无兑换记录</p>
-              </div>
-
-              <div v-else class="space-y-3">
-                <div
-                  v-for="record in redemptionHistory"
-                  :key="record.id"
-                  class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
-                >
-                  <div class="flex items-start justify-between gap-4">
-                    <div class="min-w-0 flex-1">
-                      <div class="mb-1 flex items-center gap-2">
-                        <span
-                          :class="[
-                            'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                            record.cardType === 'quota'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                              : record.cardType === 'time'
-                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                          ]"
-                        >
-                          {{
-                            record.cardType === 'quota'
-                              ? '额度卡'
-                              : record.cardType === 'time'
-                                ? '时间卡'
-                                : '组合卡'
-                          }}
-                        </span>
-                        <span
-                          v-if="record.status === 'revoked'"
-                          class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                        >
-                          已撤销
-                        </span>
-                      </div>
-                      <p class="text-sm text-gray-600 dark:text-gray-300">
-                        <span v-if="record.quotaAdded">额度 +${{ record.quotaAdded }}</span>
-                        <span v-if="record.quotaAdded && record.timeAdded"> · </span>
-                        <span v-if="record.timeAdded"
-                          >有效期 +{{ record.timeAmount
-                          }}{{
-                            record.timeUnit === 'days'
-                              ? '天'
-                              : record.timeUnit === 'hours'
-                                ? '小时'
-                                : '月'
-                          }}</span
-                        >
-                      </p>
-                    </div>
-                    <div
-                      class="whitespace-nowrap text-right text-xs text-gray-500 dark:text-gray-400"
-                    >
-                      {{ formatDateTime(record.redeemedAt) }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <TutorialView />
       </div>
     </main>
 
@@ -489,12 +433,32 @@ const dontShowAgain = ref(false)
 const NOTICE_STORAGE_KEY = 'apiStatsNoticeRead'
 
 // 额度卡兑换相关状态
-const quotaSubTab = ref('redeem')
+const quotaPanelMode = ref('redeem')
 const redeemCode = ref('')
 const redeemLoading = ref(false)
 const redeemResult = ref(null)
 const redemptionHistory = ref([])
 const historyLoading = ref(false)
+const canUseQuotaCard = computed(() =>
+  Boolean(apiId.value && statsData.value && !multiKeyMode.value)
+)
+const quotaStatusText = computed(() => {
+  if (multiKeyMode.value) return '聚合模式不可兑换'
+  if (canUseQuotaCard.value) return statsData.value?.name || 'API Key 已验证'
+  return '先验证 API Key'
+})
+
+const formatTimeUnit = (unit) => {
+  if (unit === 'days') return '天'
+  if (unit === 'hours') return '小时'
+  return '月'
+}
+
+const formatCardType = (type) => {
+  if (type === 'quota') return '额度卡'
+  if (type === 'time') return '时间卡'
+  return '组合卡'
+}
 
 // 兑换额度卡
 const handleRedeem = async () => {
@@ -548,18 +512,8 @@ const loadRedemptionHistory = async () => {
   }
 }
 
-// 切换到额度卡 Tab
-const switchToQuota = () => {
-  currentTab.value = 'quota'
-  // 如果子标签是记录，刷新数据
-  if (quotaSubTab.value === 'history') {
-    loadRedemptionHistory()
-  }
-}
-
-// 切换到兑换记录子 Tab
-const switchToHistorySubTab = () => {
-  quotaSubTab.value = 'history'
+const switchToHistory = () => {
+  quotaPanelMode.value = 'history'
   loadRedemptionHistory()
 }
 
@@ -731,6 +685,16 @@ watch(apiKey, (newValue) => {
     apiStatsStore.clearData()
   }
 })
+
+watch(apiId, (newValue, previousValue) => {
+  if (newValue !== previousValue) {
+    redeemResult.value = null
+    redemptionHistory.value = []
+    if (!newValue) {
+      quotaPanelMode.value = 'redeem'
+    }
+  }
+})
 </script>
 
 <style scoped>
@@ -754,7 +718,7 @@ watch(apiKey, (newValue) => {
   font-family: 'Avenir Next', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-:global(.dark) .api-stats-page {
+:global(.dark .api-stats-page) {
   --page-bg: #171b19;
   --page-card: #202623;
   --page-ink: #eef2ed;
@@ -935,10 +899,475 @@ watch(apiKey, (newValue) => {
   font-size: 0.74rem;
 }
 
-:global(.dark) .query-error {
+:global(.dark .query-error) {
   border-color: #70413d;
   color: #e6a8a2;
   background: #30201e;
+}
+
+.quota-workbench {
+  position: relative;
+  overflow: hidden;
+  margin: 1.2rem 0 2rem;
+  border: 1px solid var(--page-line);
+  border-radius: 0.78rem;
+  background: color-mix(in srgb, var(--page-card) 91%, transparent);
+  box-shadow: 0 1.2rem 3rem rgba(26, 43, 35, 0.045);
+}
+
+.quota-workbench::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 11rem;
+  height: 11rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--page-green) 13%, transparent),
+    transparent 68%
+  );
+  content: '';
+  pointer-events: none;
+  transform: translate(38%, -48%);
+}
+
+.quota-workbench-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--page-line);
+  padding: 1rem 1.15rem;
+}
+
+.quota-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.quota-heading > p {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--page-green);
+  font:
+    700 0.58rem ui-monospace,
+    monospace;
+  letter-spacing: 0.11em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.quota-heading h2,
+.quota-heading span {
+  display: block;
+}
+
+.quota-heading h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: -0.025em;
+}
+
+.quota-heading span {
+  margin-top: 0.25rem;
+  color: var(--page-muted);
+  font-size: 0.65rem;
+  line-height: 1.55;
+}
+
+.quota-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.quota-key-status {
+  max-width: 13rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow: hidden;
+  border: 1px solid var(--page-line);
+  border-radius: 999px;
+  padding: 0.38rem 0.58rem;
+  color: var(--page-muted);
+  background: color-mix(in srgb, var(--page-bg) 68%, transparent);
+  font-size: 0.59rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quota-key-status.ready {
+  color: var(--page-forest);
+  border-color: color-mix(in srgb, var(--page-green) 42%, var(--page-line));
+  background: color-mix(in srgb, var(--page-green) 10%, var(--page-card));
+}
+
+:global(.dark .quota-key-status.ready) {
+  color: var(--page-green);
+}
+
+.quota-view-switcher {
+  display: flex;
+  gap: 0.12rem;
+  border: 1px solid var(--page-line);
+  border-radius: 0.38rem;
+  padding: 0.16rem;
+  background: color-mix(in srgb, var(--page-bg) 64%, transparent);
+}
+
+.quota-view-switcher button {
+  border: 0;
+  border-radius: 0.25rem;
+  padding: 0.38rem 0.58rem;
+  color: var(--page-muted);
+  background: transparent;
+  font-size: 0.61rem;
+  cursor: pointer;
+}
+
+.quota-view-switcher button.active {
+  color: var(--page-ink);
+  background: var(--page-card);
+  box-shadow: 0 1px 4px rgba(26, 43, 35, 0.1);
+  font-weight: 700;
+}
+
+.quota-panel-body {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.72fr) minmax(24rem, 1.28fr);
+}
+
+.quota-context-panel,
+.quota-history-intro {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85rem;
+}
+
+.quota-context-panel {
+  align-content: center;
+  border-right: 1px solid var(--page-line);
+  padding: 1.35rem 1.2rem;
+  background: color-mix(in srgb, var(--page-green) 5%, var(--page-bg));
+}
+
+.quota-step-number {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--page-green) 46%, var(--page-line));
+  border-radius: 50%;
+  color: var(--page-green);
+  background: var(--page-card);
+  font:
+    700 0.6rem ui-monospace,
+    monospace;
+}
+
+.quota-context-panel small,
+.quota-context-panel strong,
+.quota-context-panel p,
+.quota-history-intro small,
+.quota-history-intro strong,
+.quota-history-intro p {
+  display: block;
+}
+
+.quota-context-panel small,
+.quota-history-intro small {
+  color: var(--page-muted);
+  font:
+    600 0.56rem ui-monospace,
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quota-context-panel strong,
+.quota-history-intro strong {
+  overflow: hidden;
+  margin-top: 0.18rem;
+  color: var(--page-ink);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quota-context-panel p,
+.quota-history-intro p {
+  margin: 0.35rem 0 0;
+  color: var(--page-muted);
+  font-size: 0.63rem;
+  line-height: 1.55;
+}
+
+.quota-redeem-panel {
+  padding: 1.35rem 1.2rem;
+}
+
+.quota-redeem-panel label {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.52rem;
+  color: var(--page-ink);
+  font:
+    600 0.65rem ui-monospace,
+    monospace;
+}
+
+.quota-redeem-panel label small {
+  color: var(--page-muted);
+  font-family: 'Avenir Next', 'PingFang SC', sans-serif;
+  font-weight: 400;
+}
+
+.quota-redeem-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+}
+
+.quota-redeem-entry input {
+  min-width: 0;
+  border: 1px solid var(--page-line);
+  border-radius: 0.45rem;
+  padding: 0.76rem 0.82rem;
+  color: var(--page-ink);
+  background: var(--page-card);
+  font:
+    0.72rem ui-monospace,
+    'SFMono-Regular',
+    Consolas,
+    monospace;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.quota-redeem-entry input:focus {
+  outline: none;
+  border-color: var(--page-green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--page-green) 14%, transparent);
+}
+
+.quota-redeem-entry input::placeholder {
+  color: color-mix(in srgb, var(--page-muted) 68%, transparent);
+}
+
+.quota-redeem-entry button {
+  min-width: 7.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.48rem;
+  border: 1px solid var(--page-forest);
+  border-radius: 0.45rem;
+  padding: 0.72rem 0.85rem;
+  color: #f2f5f1;
+  background: var(--page-forest);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.quota-redeem-entry button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.quota-redeem-entry input:disabled,
+.quota-redeem-entry button:disabled,
+.quota-history-intro button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.quota-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+  border: 1px solid;
+  border-radius: 0.45rem;
+  padding: 0.72rem 0.8rem;
+  font-size: 0.64rem;
+}
+
+.quota-result.success {
+  color: #2f6b50;
+  border-color: #a7cdb8;
+  background: #edf7f1;
+}
+
+.quota-result.warning {
+  color: #80611d;
+  border-color: #dac68f;
+  background: #fff8e6;
+}
+
+.quota-result.error {
+  color: #8b403a;
+  border-color: #d8aaa4;
+  background: #fff0ed;
+}
+
+:global(.dark .quota-result.success) {
+  color: #91d4ae;
+  border-color: #3f7256;
+  background: #203429;
+}
+
+:global(.dark .quota-result.warning) {
+  color: #e2c775;
+  border-color: #725f31;
+  background: #352e1d;
+}
+
+:global(.dark .quota-result.error) {
+  color: #e6a8a2;
+  border-color: #70413d;
+  background: #30201e;
+}
+
+.quota-result strong {
+  display: block;
+  font-size: 0.68rem;
+}
+
+.quota-result p {
+  margin: 0.2rem 0 0;
+  line-height: 1.5;
+}
+
+.quota-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.35rem;
+  font-family: ui-monospace, monospace;
+}
+
+.quota-history-panel {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.72fr) minmax(24rem, 1.28fr);
+}
+
+.quota-history-intro {
+  position: relative;
+  align-content: center;
+  border-right: 1px solid var(--page-line);
+  padding: 1.35rem 3.8rem 1.35rem 1.2rem;
+  background: color-mix(in srgb, var(--page-green) 5%, var(--page-bg));
+}
+
+.quota-history-intro > button {
+  position: absolute;
+  top: 50%;
+  right: 1.15rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--page-line);
+  border-radius: 50%;
+  color: var(--page-muted);
+  background: var(--page-card);
+  font-size: 0.62rem;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.quota-history-empty,
+.quota-history-list {
+  min-height: 7rem;
+}
+
+.quota-history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  color: var(--page-muted);
+  font-size: 0.66rem;
+}
+
+.quota-history-empty i {
+  color: var(--page-green);
+}
+
+.quota-history-list {
+  max-height: 17rem;
+  overflow-y: auto;
+  padding: 0.45rem 1.2rem;
+}
+
+.quota-history-list article {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.65fr) minmax(10rem, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  border-bottom: 1px solid var(--page-line);
+  padding: 0.72rem 0;
+}
+
+.quota-history-list article:last-child {
+  border-bottom: 0;
+}
+
+.quota-record-type,
+.quota-record-revoked {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 0.25rem 0.48rem;
+  font-size: 0.56rem;
+  font-weight: 700;
+}
+
+.quota-record-type {
+  color: var(--page-forest);
+  background: color-mix(in srgb, var(--page-green) 13%, var(--page-card));
+}
+
+:global(.dark .quota-record-type) {
+  color: var(--page-green);
+}
+
+.quota-record-type.time {
+  color: #6e5630;
+  background: #f6edda;
+}
+
+:global(.dark .quota-record-type.time) {
+  color: #dec286;
+  background: #352f22;
+}
+
+.quota-record-revoked {
+  margin-left: 0.3rem;
+  color: #8b403a;
+  background: #fff0ed;
+}
+
+.quota-history-list p,
+.quota-history-list time {
+  margin: 0;
+  color: var(--page-muted);
+  font-size: 0.62rem;
+}
+
+.quota-history-list time {
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
 }
 
 .verified-key-bar,
@@ -1134,6 +1563,21 @@ watch(apiKey, (newValue) => {
   .legacy-stats-grid {
     grid-template-columns: 1fr;
   }
+
+  .quota-workbench-head {
+    align-items: flex-start;
+  }
+
+  .quota-panel-body,
+  .quota-history-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .quota-context-panel,
+  .quota-history-intro {
+    border-right: 0;
+    border-bottom: 1px solid var(--page-line);
+  }
 }
 
 @media (max-width: 640px) {
@@ -1170,9 +1614,67 @@ watch(apiKey, (newValue) => {
   }
 
   .verified-key-bar,
-  .legacy-period-bar {
+  .legacy-period-bar,
+  .quota-workbench-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .quota-head-actions,
+  .quota-view-switcher {
+    width: 100%;
+  }
+
+  .quota-key-status {
+    max-width: calc(100% - 7.5rem);
+  }
+
+  .quota-view-switcher {
+    flex: 1;
+  }
+
+  .quota-view-switcher button {
+    flex: 1;
+  }
+
+  .quota-heading > p {
+    display: none;
+  }
+
+  .quota-panel-body,
+  .quota-history-panel {
+    display: block;
+  }
+
+  .quota-context-panel,
+  .quota-history-intro,
+  .quota-redeem-panel {
+    padding: 1rem;
+  }
+
+  .quota-history-intro {
+    padding-right: 3.8rem;
+  }
+
+  .quota-redeem-entry {
+    grid-template-columns: 1fr;
+  }
+
+  .quota-redeem-entry button {
+    min-height: 2.7rem;
+  }
+
+  .quota-history-list {
+    padding: 0.35rem 1rem;
+  }
+
+  .quota-history-list article {
+    grid-template-columns: 1fr auto;
+  }
+
+  .quota-history-list article p {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .legacy-period-switcher,
