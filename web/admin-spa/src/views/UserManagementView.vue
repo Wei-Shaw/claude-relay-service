@@ -417,6 +417,21 @@
                   />
                 </svg>
               </button>
+
+              <button
+                class="inline-flex items-center rounded border border-transparent p-1 text-gray-400 hover:text-amber-600"
+                title="Reset User 2FA"
+                @click="resetUserTwoFactor(user)"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9M4.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
         </li>
@@ -606,6 +621,18 @@ const changeUserRole = (user) => {
   showRoleModal.value = true
 }
 
+const resetUserTwoFactor = (user) => {
+  selectedUser.value = user
+  confirmAction.value = {
+    title: 'Reset User 2FA',
+    message: `Reset two-factor authentication for "${user.username}"? Existing authenticator bindings and recovery codes will stop working immediately.`,
+    confirmText: 'Reset 2FA',
+    confirmClass: 'bg-amber-600 hover:bg-amber-700',
+    action: 'reset2fa'
+  }
+  showConfirmModal.value = true
+}
+
 const handleConfirmAction = async () => {
   const user = selectedUser.value
   const action = confirmAction.value.action
@@ -629,6 +656,12 @@ const handleConfirmAction = async () => {
       if (response.success) {
         showToast(`Disabled ${response.disabledCount} API keys`, 'success')
         await loadUsers() // Refresh to get updated counts
+      }
+    } else if (action === 'reset2fa') {
+      const response = await httpApis.resetFrontUserTwoFactorApi(user.id)
+
+      if (response.success) {
+        showToast('User two-factor authentication reset successfully', 'success')
       }
     }
   } catch (error) {

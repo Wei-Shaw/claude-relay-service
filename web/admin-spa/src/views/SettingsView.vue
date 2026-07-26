@@ -63,6 +63,18 @@
           <button
             :class="[
               'border-b-2 pb-2 text-sm font-medium transition-colors',
+              activeSection === 'security'
+                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+            @click="activeSection = 'security'"
+          >
+            <i class="fas fa-shield-halved mr-2"></i>
+            账号安全
+          </button>
+          <button
+            :class="[
+              'border-b-2 pb-2 text-sm font-medium transition-colors',
               activeSection === 'modelPricing'
                 ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
@@ -1380,6 +1392,10 @@
         <div v-show="activeSection === 'modelPricing'">
           <ModelPricingSection />
         </div>
+
+        <div v-show="activeSection === 'security'">
+          <AdminTwoFactorSection />
+        </div>
       </div>
     </div>
   </div>
@@ -1982,6 +1998,7 @@ import { useSettingsStore } from '@/stores/settings'
 import * as httpApis from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import ModelPricingSection from '@/components/settings/ModelPricingSection.vue'
+import AdminTwoFactorSection from '@/components/security/AdminTwoFactorSection.vue'
 
 // 定义组件名称，用于keep-alive排除
 defineOptions({

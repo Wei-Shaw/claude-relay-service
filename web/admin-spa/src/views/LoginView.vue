@@ -37,7 +37,11 @@
         <p class="text-base text-gray-600 dark:text-gray-400 sm:text-lg">管理后台</p>
       </div>
 
-      <form class="space-y-4 sm:space-y-6" @submit.prevent="handleLogin">
+      <form
+        v-if="!authStore.pendingTwoFactor"
+        class="space-y-4 sm:space-y-6"
+        @submit.prevent="handleLogin"
+      >
         <div>
           <label
             class="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100 sm:mb-3"
@@ -85,6 +89,16 @@
         </button>
       </form>
 
+      <TwoFactorChallengeForm
+        v-else
+        description="密码已通过校验。请输入身份验证器中的动态验证码，或改用恢复码完成后台登录。"
+        :error="authStore.loginError"
+        :loading="authStore.loginLoading"
+        :username="authStore.pendingTwoFactor?.username"
+        @cancel="authStore.cancelTwoFactorLogin()"
+        @submit="handleVerifyTwoFactor"
+      />
+
       <div
         v-if="authStore.loginError"
         class="mt-4 rounded-lg border border-red-500/30 bg-red-500/20 p-3 text-center text-xs text-red-800 backdrop-blur-sm dark:text-red-400 sm:mt-6 sm:rounded-xl sm:p-4 sm:text-sm"
@@ -100,6 +114,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import TwoFactorChallengeForm from '@/components/security/TwoFactorChallengeForm.vue'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
@@ -119,5 +134,9 @@ onMounted(() => {
 
 const handleLogin = async () => {
   await authStore.login(loginForm.value)
+}
+
+const handleVerifyTwoFactor = async (payload) => {
+  await authStore.verifyTwoFactor(payload)
 }
 </script>
