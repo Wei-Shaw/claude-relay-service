@@ -1,463 +1,368 @@
 <template>
-  <div
-    class="min-h-screen p-2 sm:p-4 md:p-6"
-    :class="isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'"
-  >
-    <!-- 顶部导航 -->
-    <div
-      class="glass-strong mb-4 rounded-2xl p-3 shadow-xl sm:mb-6 sm:rounded-3xl sm:p-4 md:mb-8 md:p-6"
-    >
-      <div class="flex flex-col items-center justify-between gap-3 sm:gap-4 md:flex-row">
-        <LogoTitle
-          :loading="oemLoading"
-          :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          :subtitle="
-            currentTab === 'stats'
-              ? 'API Key 使用统计'
-              : currentTab === 'quota'
-                ? '额度卡'
-                : '使用教程'
-          "
-          :title="oemSettings.siteName"
-        />
-        <div class="flex items-center gap-2 md:gap-4">
-          <!-- 主题切换按钮 -->
-          <div class="flex items-center">
-            <ThemeToggle mode="dropdown" />
+  <div class="api-stats-page">
+    <header class="page-topbar">
+      <div class="page-topbar-inner">
+        <div class="site-brand">
+          <div class="site-mark">
+            <template v-if="!oemLoading">
+              <img
+                v-if="oemSettings.siteIconData || oemSettings.siteIcon"
+                alt=""
+                :src="oemSettings.siteIconData || oemSettings.siteIcon"
+              />
+              <span v-else />
+            </template>
           </div>
+          <div>
+            <strong>{{ oemSettings.siteName || 'Relay' }}</strong>
+            <small>API 使用控制台</small>
+          </div>
+        </div>
 
-          <!-- 分隔线 -->
-          <div
-            v-if="oemSettings.userSystemEnabled || oemSettings.showAdminButton !== false"
-            class="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent opacity-50 dark:via-gray-600"
-          />
+        <nav aria-label="页面导航" class="primary-nav">
+          <button :class="{ active: currentTab === 'stats' }" @click="currentTab = 'stats'">
+            用量查询
+          </button>
+          <button :class="{ active: currentTab === 'quota' }" @click="switchToQuota">额度卡</button>
+          <button :class="{ active: currentTab === 'tutorial' }" @click="currentTab = 'tutorial'">
+            使用教程
+          </button>
+        </nav>
 
-          <!-- 用户登录按钮 (仅在用户系统启用时显示) -->
-          <router-link
-            v-if="oemSettings.userSystemEnabled"
-            class="user-login-button flex items-center gap-2 rounded-2xl px-4 py-2 text-white transition-all duration-300 md:px-5 md:py-2.5"
-            to="/user-login"
+        <div class="topbar-actions">
+          <button
+            class="theme-cycle-button"
+            :title="isDarkMode ? '切换到浅色模式' : '切换到深色模式'"
+            type="button"
+            @click="themeStore.cycleThemeMode()"
           >
-            <i class="fas fa-user text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">用户登录</span>
-          </router-link>
-          <!-- 管理后台按钮 -->
-          <router-link
-            v-if="oemSettings.showAdminButton !== false"
-            class="admin-button-refined flex items-center gap-2 rounded-2xl px-4 py-2 transition-all duration-300 md:px-5 md:py-2.5"
-            to="/dashboard"
-          >
-            <i class="fas fa-shield-alt text-sm md:text-base" />
-            <span class="text-xs font-semibold tracking-wide md:text-sm">管理后台</span>
+            <i :class="isDarkMode ? 'fas fa-moon' : 'fas fa-sun'" />
+          </button>
+          <router-link v-if="oemSettings.userSystemEnabled" to="/user-login">用户登录</router-link>
+          <router-link v-if="oemSettings.showAdminButton !== false" to="/dashboard">
+            管理后台
           </router-link>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- Tab 切换 -->
-    <div class="mb-4 sm:mb-6 md:mb-8">
-      <div class="flex justify-center">
-        <div
-          class="inline-flex w-full max-w-2xl flex-wrap justify-center gap-1 rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl sm:w-auto sm:flex-nowrap"
-        >
-          <button
-            :class="['tab-pill-button', currentTab === 'stats' ? 'active' : '']"
-            @click="currentTab = 'stats'"
-          >
-            <i class="fas fa-chart-line mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">统计查询</span>
-          </button>
-          <button
-            :class="['tab-pill-button', currentTab === 'quota' ? 'active' : '']"
-            @click="switchToQuota"
-          >
-            <i class="fas fa-ticket-alt mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">额度卡</span>
-          </button>
-          <button
-            :class="['tab-pill-button', currentTab === 'tutorial' ? 'active' : '']"
-            @click="currentTab = 'tutorial'"
-          >
-            <i class="fas fa-graduation-cap mr-1 md:mr-2" />
-            <span class="text-sm md:text-base">使用教程</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    <main class="page-frame">
+      <!-- 统计内容 -->
+      <div v-if="currentTab === 'stats'" class="tab-content stats-content">
+        <!-- API Key 输入区域 -->
+        <ApiKeyInput />
 
-    <!-- 统计内容 -->
-    <div v-if="currentTab === 'stats'" class="tab-content">
-      <!-- API Key 输入区域 -->
-      <ApiKeyInput />
-
-      <!-- 错误提示 -->
-      <div v-if="error" class="mb-4 sm:mb-6 md:mb-8">
-        <div
-          class="rounded-xl border border-red-500/30 bg-red-500/20 p-3 text-sm text-red-800 backdrop-blur-sm dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200 md:p-4 md:text-base"
-        >
-          <i class="fas fa-exclamation-triangle mr-2" />
+        <!-- 错误提示 -->
+        <div v-if="error" class="query-error" role="alert">
+          <i class="fas fa-exclamation-triangle" />
           {{ error }}
         </div>
+
+        <div v-if="statsData && !multiKeyMode" class="single-key-result fade-in">
+          <div class="verified-key-bar">
+            <span><i />已验证 {{ statsData.name || '当前 API Key' }}</span>
+            <div class="relative">
+              <button
+                class="api-test-trigger"
+                :disabled="loading || !hasAnyTestPermission"
+                :title="
+                  hasAnyTestPermission ? '测试 API' : `当前 Key 可用服务: ${availableServicesText}`
+                "
+                @click="toggleTestMenu"
+              >
+                <i class="fas fa-vial" />
+                测试 API
+                <i class="fas fa-chevron-down" />
+              </button>
+              <div v-if="showTestMenu" class="api-test-menu">
+                <button v-if="canTestClaude" @click="openTestModal('claude')">Claude</button>
+                <button v-if="canTestGemini" @click="openTestModal('gemini')">Gemini</button>
+                <button v-if="canTestOpenAI" @click="openTestModal('openai')">Codex</button>
+              </div>
+            </div>
+          </div>
+          <ApiStatsUsageWorkspace :api-key="apiKey" />
+        </div>
+
+        <!-- 聚合查询保留原有统计口径，请求明细仅支持单 Key 自查询。 -->
+        <div v-if="statsData && multiKeyMode" class="legacy-stats fade-in">
+          <div class="legacy-period-bar">
+            <div>
+              <strong>聚合用量</strong>
+              <span>多 Key 查询不展示单笔请求明细</span>
+            </div>
+            <div class="legacy-period-switcher">
+              <button
+                :class="['period-btn', { active: statsPeriod === 'daily' }]"
+                :disabled="loading"
+                @click="switchPeriod('daily')"
+              >
+                今日
+              </button>
+              <button
+                :class="['period-btn', { active: statsPeriod === 'monthly' }]"
+                :disabled="loading"
+                @click="switchPeriod('monthly')"
+              >
+                本月
+              </button>
+              <button
+                :class="['period-btn', { active: statsPeriod === 'alltime' }]"
+                :disabled="loading"
+                @click="switchPeriod('alltime')"
+              >
+                全部
+              </button>
+            </div>
+          </div>
+          <div class="legacy-stats-body">
+            <StatsOverview />
+            <div class="legacy-stats-grid">
+              <TokenDistribution class="h-full" />
+              <AggregatedStatsCard class="h-full" />
+            </div>
+            <ServiceCostCards class="mb-4 sm:mb-6" />
+            <div class="space-y-4 sm:space-y-6">
+              <ModelUsageStats period="daily" />
+              <ModelUsageStats period="monthly" />
+              <ModelUsageStats period="alltime" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- 统计数据展示区域 -->
-      <div v-if="statsData" class="fade-in">
-        <div class="glass-strong rounded-2xl p-3 shadow-xl sm:rounded-3xl sm:p-4 md:p-6">
-          <!-- 时间范围选择器 -->
+      <!-- 教程内容 -->
+      <div v-if="currentTab === 'tutorial'" class="tab-content">
+        <div class="glass-strong rounded-3xl shadow-xl">
+          <TutorialView />
+        </div>
+      </div>
+
+      <!-- 额度卡内容（含二级 tab） -->
+      <div v-if="currentTab === 'quota'" class="tab-content">
+        <div class="glass-strong rounded-2xl p-4 shadow-xl sm:rounded-3xl sm:p-6 md:p-8">
+          <!-- 二级 Tab -->
           <div
-            class="mb-3 border-b border-gray-200 pb-3 dark:border-gray-700 sm:mb-4 sm:pb-4 md:mb-6 md:pb-6"
+            class="mb-4 flex gap-2 border-b border-gray-200 pb-4 dark:border-gray-700 md:mb-6 md:pb-6"
           >
-            <div
-              class="flex flex-col items-start justify-between gap-2 sm:gap-3 md:flex-row md:items-center md:gap-4"
+            <button
+              :class="[
+                'rounded-lg px-4 py-2 text-sm font-medium transition-all',
+                quotaSubTab === 'redeem'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              ]"
+              @click="quotaSubTab = 'redeem'"
             >
-              <div class="flex items-center gap-2 md:gap-3">
-                <i class="fas fa-clock text-base text-blue-500 md:text-lg" />
-                <span class="text-base font-medium text-gray-700 dark:text-gray-200 md:text-lg"
-                  >统计时间范围</span
-                >
+              <i class="fas fa-ticket-alt mr-2" />
+              兑换额度卡
+            </button>
+            <button
+              :class="[
+                'rounded-lg px-4 py-2 text-sm font-medium transition-all',
+                quotaSubTab === 'history'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              ]"
+              @click="switchToHistorySubTab"
+            >
+              <i class="fas fa-history mr-2" />
+              兑换记录
+            </button>
+          </div>
+
+          <!-- 兑换额度卡子内容 -->
+          <div v-if="quotaSubTab === 'redeem'">
+            <!-- 需要先输入 API Key -->
+            <div v-if="!apiId" class="py-8 text-center">
+              <div class="mb-4 text-gray-500 dark:text-gray-400">
+                <i class="fas fa-key mb-4 block text-4xl opacity-50" />
+                <p>请先在「统计查询」页面输入您的 API Key</p>
               </div>
-              <div class="flex w-full items-center gap-2 md:w-auto">
+              <button
+                class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
+                @click="currentTab = 'stats'"
+              >
+                前往输入 API Key
+              </button>
+            </div>
+
+            <!-- 兑换表单 -->
+            <div v-else>
+              <div class="mb-6 rounded-xl bg-blue-50 p-4 dark:bg-blue-900/20">
+                <p class="text-sm text-blue-700 dark:text-blue-300">
+                  <i class="fas fa-info-circle mr-2" />
+                  当前 API Key: <span class="font-medium">{{ statsData?.name || apiId }}</span>
+                </p>
+              </div>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    额度卡卡号
+                  </label>
+                  <input
+                    v-model="redeemCode"
+                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500"
+                    placeholder="请输入额度卡卡号"
+                    type="text"
+                    @keyup.enter="handleRedeem"
+                  />
+                </div>
+
                 <button
-                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
-                  :class="['period-btn', { active: statsPeriod === 'daily' }]"
-                  :disabled="loading"
-                  @click="switchPeriod('daily')"
+                  class="w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-3 font-medium text-white transition-all hover:from-green-600 hover:to-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="!redeemCode.trim() || redeemLoading"
+                  @click="handleRedeem"
                 >
-                  <i class="fas fa-calendar-day text-xs md:text-sm" />
-                  今日
+                  <i v-if="redeemLoading" class="fas fa-spinner fa-spin mr-2" />
+                  <i v-else class="fas fa-check-circle mr-2" />
+                  {{ redeemLoading ? '兑换中...' : '立即兑换' }}
                 </button>
-                <button
-                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
-                  :class="['period-btn', { active: statsPeriod === 'monthly' }]"
-                  :disabled="loading"
-                  @click="switchPeriod('monthly')"
+              </div>
+
+              <!-- 兑换结果 -->
+              <div v-if="redeemResult" class="mt-6">
+                <div
+                  :class="[
+                    'rounded-xl p-4',
+                    redeemResult.success
+                      ? redeemResult.hasWarnings
+                        ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300'
+                        : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+                      : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                  ]"
                 >
-                  <i class="fas fa-calendar-alt text-xs md:text-sm" />
-                  本月
-                </button>
-                <button
-                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
-                  :class="['period-btn', { active: statsPeriod === 'alltime' }]"
-                  :disabled="loading"
-                  @click="switchPeriod('alltime')"
-                >
-                  <i class="fas fa-infinity text-xs md:text-sm" />
-                  全部
-                </button>
-                <!-- 测试按钮下拉菜单 - 仅在单Key模式下显示 -->
-                <div v-if="!multiKeyMode" class="relative">
-                  <button
-                    :class="[
-                      'test-btn flex items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:gap-2 md:px-6 md:text-sm',
-                      !hasAnyTestPermission ? 'cursor-not-allowed opacity-50' : ''
-                    ]"
-                    :disabled="loading || !hasAnyTestPermission"
-                    :title="
-                      hasAnyTestPermission
-                        ? '测试 API'
-                        : `当前 Key 可用服务: ${availableServicesText}`
-                    "
-                    @click="toggleTestMenu"
-                  >
-                    <i class="fas fa-vial text-xs md:text-sm" />
-                    测试
-                    <i class="fas fa-chevron-down ml-1 text-xs" />
-                  </button>
-                  <!-- 下拉菜单 -->
-                  <div
-                    v-if="showTestMenu"
-                    class="absolute right-0 top-full z-50 mt-1 min-w-[140px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                  >
-                    <button
-                      v-if="canTestClaude"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                      @click="openTestModal('claude')"
-                    >
-                      <i class="fas fa-robot text-orange-500" />
-                      Claude
-                    </button>
-                    <button
-                      v-if="canTestGemini"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                      @click="openTestModal('gemini')"
-                    >
-                      <i class="fas fa-gem text-blue-500" />
-                      Gemini
-                    </button>
-                    <button
-                      v-if="canTestOpenAI"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                      @click="openTestModal('openai')"
-                    >
-                      <i class="fas fa-code text-green-500" />
-                      Codex
-                    </button>
+                  <div class="flex items-start gap-3">
+                    <i
+                      :class="[
+                        'mt-0.5 text-lg',
+                        redeemResult.success
+                          ? redeemResult.hasWarnings
+                            ? 'fas fa-exclamation-triangle'
+                            : 'fas fa-check-circle'
+                          : 'fas fa-times-circle'
+                      ]"
+                    />
+                    <div>
+                      <p class="font-medium">
+                        {{
+                          redeemResult.success
+                            ? redeemResult.hasWarnings
+                              ? '兑换成功（部分截断）'
+                              : '兑换成功'
+                            : '兑换失败'
+                        }}
+                      </p>
+                      <p class="mt-1 text-sm opacity-90">{{ redeemResult.message }}</p>
+                      <div v-if="redeemResult.success && redeemResult.data" class="mt-2 text-sm">
+                        <p v-if="redeemResult.data.quotaAdded">
+                          额度增加:
+                          <span class="font-medium">${{ redeemResult.data.quotaAdded }}</span>
+                        </p>
+                        <p v-if="redeemResult.data.timeAdded">
+                          有效期延长:
+                          <span class="font-medium"
+                            >{{ redeemResult.data.timeAdded
+                            }}{{
+                              redeemResult.data.timeUnit === 'days'
+                                ? '天'
+                                : redeemResult.data.timeUnit === 'hours'
+                                  ? '小时'
+                                  : '月'
+                            }}</span
+                          >
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 基本信息和统计概览 -->
-          <StatsOverview />
-
-          <!-- Token 分布和限制配置 -->
-          <div
-            class="mb-4 mt-4 grid grid-cols-1 gap-3 sm:mb-6 sm:mt-6 sm:gap-4 md:mb-8 md:mt-8 md:gap-6 xl:grid-cols-2 xl:items-stretch"
-          >
-            <TokenDistribution class="h-full" />
-            <template v-if="multiKeyMode">
-              <AggregatedStatsCard class="h-full" />
-            </template>
-            <template v-else>
-              <LimitConfig class="h-full" />
-            </template>
-          </div>
-
-          <!-- 服务费用统计卡片 -->
-          <ServiceCostCards class="mb-4 sm:mb-6" />
-
-          <!-- 模型使用统计 - 三个时间段 -->
-          <div class="space-y-4 sm:space-y-6">
-            <ModelUsageStats period="daily" />
-            <ModelUsageStats period="monthly" />
-            <ModelUsageStats period="alltime" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 教程内容 -->
-    <div v-if="currentTab === 'tutorial'" class="tab-content">
-      <div class="glass-strong rounded-3xl shadow-xl">
-        <TutorialView />
-      </div>
-    </div>
-
-    <!-- 额度卡内容（含二级 tab） -->
-    <div v-if="currentTab === 'quota'" class="tab-content">
-      <div class="glass-strong rounded-2xl p-4 shadow-xl sm:rounded-3xl sm:p-6 md:p-8">
-        <!-- 二级 Tab -->
-        <div
-          class="mb-4 flex gap-2 border-b border-gray-200 pb-4 dark:border-gray-700 md:mb-6 md:pb-6"
-        >
-          <button
-            :class="[
-              'rounded-lg px-4 py-2 text-sm font-medium transition-all',
-              quotaSubTab === 'redeem'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-            ]"
-            @click="quotaSubTab = 'redeem'"
-          >
-            <i class="fas fa-ticket-alt mr-2" />
-            兑换额度卡
-          </button>
-          <button
-            :class="[
-              'rounded-lg px-4 py-2 text-sm font-medium transition-all',
-              quotaSubTab === 'history'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-            ]"
-            @click="switchToHistorySubTab"
-          >
-            <i class="fas fa-history mr-2" />
-            兑换记录
-          </button>
-        </div>
-
-        <!-- 兑换额度卡子内容 -->
-        <div v-if="quotaSubTab === 'redeem'">
-          <!-- 需要先输入 API Key -->
-          <div v-if="!apiId" class="py-8 text-center">
-            <div class="mb-4 text-gray-500 dark:text-gray-400">
-              <i class="fas fa-key mb-4 block text-4xl opacity-50" />
-              <p>请先在「统计查询」页面输入您的 API Key</p>
-            </div>
-            <button
-              class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
-              @click="currentTab = 'stats'"
-            >
-              前往输入 API Key
-            </button>
-          </div>
-
-          <!-- 兑换表单 -->
-          <div v-else>
-            <div class="mb-6 rounded-xl bg-blue-50 p-4 dark:bg-blue-900/20">
-              <p class="text-sm text-blue-700 dark:text-blue-300">
-                <i class="fas fa-info-circle mr-2" />
-                当前 API Key: <span class="font-medium">{{ statsData?.name || apiId }}</span>
-              </p>
-            </div>
-
-            <div class="space-y-4">
-              <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  额度卡卡号
-                </label>
-                <input
-                  v-model="redeemCode"
-                  class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500"
-                  placeholder="请输入额度卡卡号"
-                  type="text"
-                  @keyup.enter="handleRedeem"
-                />
+          <!-- 兑换记录子内容 -->
+          <div v-if="quotaSubTab === 'history'">
+            <!-- 需要先输入 API Key -->
+            <div v-if="!apiId" class="py-8 text-center">
+              <div class="mb-4 text-gray-500 dark:text-gray-400">
+                <i class="fas fa-key mb-4 block text-4xl opacity-50" />
+                <p>请先在「统计查询」页面输入您的 API Key</p>
               </div>
-
               <button
-                class="w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-3 font-medium text-white transition-all hover:from-green-600 hover:to-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="!redeemCode.trim() || redeemLoading"
-                @click="handleRedeem"
+                class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
+                @click="currentTab = 'stats'"
               >
-                <i v-if="redeemLoading" class="fas fa-spinner fa-spin mr-2" />
-                <i v-else class="fas fa-check-circle mr-2" />
-                {{ redeemLoading ? '兑换中...' : '立即兑换' }}
+                前往输入 API Key
               </button>
             </div>
 
-            <!-- 兑换结果 -->
-            <div v-if="redeemResult" class="mt-6">
-              <div
-                :class="[
-                  'rounded-xl p-4',
-                  redeemResult.success
-                    ? redeemResult.hasWarnings
-                      ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300'
-                      : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
-                    : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
-                ]"
-              >
-                <div class="flex items-start gap-3">
-                  <i
-                    :class="[
-                      'mt-0.5 text-lg',
-                      redeemResult.success
-                        ? redeemResult.hasWarnings
-                          ? 'fas fa-exclamation-triangle'
-                          : 'fas fa-check-circle'
-                        : 'fas fa-times-circle'
-                    ]"
-                  />
-                  <div>
-                    <p class="font-medium">
-                      {{
-                        redeemResult.success
-                          ? redeemResult.hasWarnings
-                            ? '兑换成功（部分截断）'
-                            : '兑换成功'
-                          : '兑换失败'
-                      }}
-                    </p>
-                    <p class="mt-1 text-sm opacity-90">{{ redeemResult.message }}</p>
-                    <div v-if="redeemResult.success && redeemResult.data" class="mt-2 text-sm">
-                      <p v-if="redeemResult.data.quotaAdded">
-                        额度增加:
-                        <span class="font-medium">${{ redeemResult.data.quotaAdded }}</span>
-                      </p>
-                      <p v-if="redeemResult.data.timeAdded">
-                        有效期延长:
-                        <span class="font-medium"
-                          >{{ redeemResult.data.timeAdded
+            <!-- 记录列表 -->
+            <div v-else>
+              <div v-if="historyLoading" class="py-8 text-center">
+                <i class="fas fa-spinner fa-spin text-2xl text-gray-400" />
+                <p class="mt-2 text-gray-500 dark:text-gray-400">加载中...</p>
+              </div>
+
+              <div v-else-if="redemptionHistory.length === 0" class="py-8 text-center">
+                <i class="fas fa-inbox text-4xl text-gray-300 dark:text-gray-600" />
+                <p class="mt-2 text-gray-500 dark:text-gray-400">暂无兑换记录</p>
+              </div>
+
+              <div v-else class="space-y-3">
+                <div
+                  v-for="record in redemptionHistory"
+                  :key="record.id"
+                  class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0 flex-1">
+                      <div class="mb-1 flex items-center gap-2">
+                        <span
+                          :class="[
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                            record.cardType === 'quota'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                              : record.cardType === 'time'
+                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                          ]"
+                        >
+                          {{
+                            record.cardType === 'quota'
+                              ? '额度卡'
+                              : record.cardType === 'time'
+                                ? '时间卡'
+                                : '组合卡'
+                          }}
+                        </span>
+                        <span
+                          v-if="record.status === 'revoked'"
+                          class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                        >
+                          已撤销
+                        </span>
+                      </div>
+                      <p class="text-sm text-gray-600 dark:text-gray-300">
+                        <span v-if="record.quotaAdded">额度 +${{ record.quotaAdded }}</span>
+                        <span v-if="record.quotaAdded && record.timeAdded"> · </span>
+                        <span v-if="record.timeAdded"
+                          >有效期 +{{ record.timeAmount
                           }}{{
-                            redeemResult.data.timeUnit === 'days'
+                            record.timeUnit === 'days'
                               ? '天'
-                              : redeemResult.data.timeUnit === 'hours'
+                              : record.timeUnit === 'hours'
                                 ? '小时'
                                 : '月'
                           }}</span
                         >
                       </p>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 兑换记录子内容 -->
-        <div v-if="quotaSubTab === 'history'">
-          <!-- 需要先输入 API Key -->
-          <div v-if="!apiId" class="py-8 text-center">
-            <div class="mb-4 text-gray-500 dark:text-gray-400">
-              <i class="fas fa-key mb-4 block text-4xl opacity-50" />
-              <p>请先在「统计查询」页面输入您的 API Key</p>
-            </div>
-            <button
-              class="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-2.5 font-medium text-white transition-all hover:from-blue-600 hover:to-cyan-600"
-              @click="currentTab = 'stats'"
-            >
-              前往输入 API Key
-            </button>
-          </div>
-
-          <!-- 记录列表 -->
-          <div v-else>
-            <div v-if="historyLoading" class="py-8 text-center">
-              <i class="fas fa-spinner fa-spin text-2xl text-gray-400" />
-              <p class="mt-2 text-gray-500 dark:text-gray-400">加载中...</p>
-            </div>
-
-            <div v-else-if="redemptionHistory.length === 0" class="py-8 text-center">
-              <i class="fas fa-inbox text-4xl text-gray-300 dark:text-gray-600" />
-              <p class="mt-2 text-gray-500 dark:text-gray-400">暂无兑换记录</p>
-            </div>
-
-            <div v-else class="space-y-3">
-              <div
-                v-for="record in redemptionHistory"
-                :key="record.id"
-                class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
-              >
-                <div class="flex items-start justify-between gap-4">
-                  <div class="min-w-0 flex-1">
-                    <div class="mb-1 flex items-center gap-2">
-                      <span
-                        :class="[
-                          'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                          record.cardType === 'quota'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                            : record.cardType === 'time'
-                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                              : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                        ]"
-                      >
-                        {{
-                          record.cardType === 'quota'
-                            ? '额度卡'
-                            : record.cardType === 'time'
-                              ? '时间卡'
-                              : '组合卡'
-                        }}
-                      </span>
-                      <span
-                        v-if="record.status === 'revoked'"
-                        class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                      >
-                        已撤销
-                      </span>
+                    <div
+                      class="whitespace-nowrap text-right text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      {{ formatDateTime(record.redeemedAt) }}
                     </div>
-                    <p class="text-sm text-gray-600 dark:text-gray-300">
-                      <span v-if="record.quotaAdded">额度 +${{ record.quotaAdded }}</span>
-                      <span v-if="record.quotaAdded && record.timeAdded"> · </span>
-                      <span v-if="record.timeAdded"
-                        >有效期 +{{ record.timeAmount
-                        }}{{
-                          record.timeUnit === 'days'
-                            ? '天'
-                            : record.timeUnit === 'hours'
-                              ? '小时'
-                              : '月'
-                        }}</span
-                      >
-                    </p>
-                  </div>
-                  <div
-                    class="whitespace-nowrap text-right text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    {{ formatDateTime(record.redeemedAt) }}
                   </div>
                 </div>
               </div>
@@ -465,7 +370,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </main>
 
     <!-- API Key 测试弹窗 -->
     <UnifiedTestModal
@@ -533,12 +438,10 @@ import { useApiStatsStore } from '@/stores/apistats'
 import { useThemeStore } from '@/stores/theme'
 import { redeemCardByApiIdApi, getRedemptionHistoryByApiIdApi } from '@/utils/http_apis'
 import { formatDateTime, showToast } from '@/utils/tools'
-import LogoTitle from '@/components/common/LogoTitle.vue'
-import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
+import ApiStatsUsageWorkspace from '@/components/apistats/ApiStatsUsageWorkspace.vue'
 import StatsOverview from '@/components/apistats/StatsOverview.vue'
 import TokenDistribution from '@/components/apistats/TokenDistribution.vue'
-import LimitConfig from '@/components/apistats/LimitConfig.vue'
 import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
 import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import ServiceCostCards from '@/components/apistats/ServiceCostCards.vue'
@@ -551,8 +454,6 @@ const themeStore = useThemeStore()
 
 // 当前标签页
 const currentTab = ref('stats')
-
-// 主题相关
 const isDarkMode = computed(() => themeStore.isDarkMode)
 
 const {
@@ -833,373 +734,371 @@ watch(apiKey, (newValue) => {
 </script>
 
 <style scoped>
-/* 渐变背景 */
-.gradient-bg {
-  background: linear-gradient(
-    135deg,
-    var(--bg-gradient-start) 0%,
-    var(--bg-gradient-mid) 50%,
-    var(--bg-gradient-end) 100%
-  );
-  background-attachment: fixed;
+.api-stats-page {
+  --page-bg: #f1f0eb;
+  --page-card: #fafaf7;
+  --page-ink: #18201d;
+  --page-muted: #727a74;
+  --page-line: #d8dad3;
+  --page-forest: #1d3b33;
+  --page-green: #55a782;
   min-height: 100vh;
-  position: relative;
-}
-
-/* 暗色模式的渐变背景 */
-.gradient-bg-dark {
-  background: linear-gradient(
-    135deg,
-    var(--bg-gradient-start) 0%,
-    var(--bg-gradient-mid) 50%,
-    var(--bg-gradient-end) 100%
-  );
-  background-attachment: fixed;
-  min-height: 100vh;
-  position: relative;
-}
-
-.gradient-bg::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  color: var(--page-ink);
   background:
-    radial-gradient(circle at 20% 80%, rgba(var(--accent-rgb), 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(var(--primary-rgb), 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(var(--secondary-rgb), 0.1) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: 0;
+    radial-gradient(circle at 92% 0%, rgba(116, 169, 143, 0.13), transparent 29rem),
+    linear-gradient(rgba(29, 59, 51, 0.018) 1px, transparent 1px), var(--page-bg);
+  background-size:
+    auto,
+    100% 2rem,
+    auto;
+  font-family: 'Avenir Next', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-/* 暗色模式的背景覆盖 */
-.gradient-bg-dark::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+:global(.dark) .api-stats-page {
+  --page-bg: #171b19;
+  --page-card: #202623;
+  --page-ink: #eef2ed;
+  --page-muted: #9ca69f;
+  --page-line: #343c37;
+  --page-forest: #20463b;
+  --page-green: #6fc29d;
   background:
-    radial-gradient(circle at 20% 80%, rgba(var(--accent-rgb), 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(var(--primary-rgb), 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(var(--secondary-rgb), 0.1) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: 0;
+    radial-gradient(circle at 92% 0%, rgba(61, 110, 90, 0.16), transparent 29rem),
+    linear-gradient(rgba(238, 242, 237, 0.014) 1px, transparent 1px), var(--page-bg);
+  background-size:
+    auto,
+    100% 2rem,
+    auto;
 }
 
-/* 标题渐变 */
-.header-title {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.page-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid var(--page-line);
+  background: color-mix(in srgb, var(--page-bg) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.page-topbar-inner,
+.page-frame {
+  width: min(78rem, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+.page-topbar-inner {
+  min-height: 4.25rem;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto minmax(12rem, 1fr);
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.site-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.site-mark {
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--page-line);
+  border-radius: 50%;
+  background: var(--page-card);
+}
+
+.site-mark img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+.site-mark span {
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 2px solid var(--page-green);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--page-green) 13%, transparent);
+}
+
+.site-brand strong,
+.site-brand small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-brand strong {
+  font-size: 0.86rem;
+  letter-spacing: -0.02em;
+}
+
+.site-brand small {
+  margin-top: 0.08rem;
+  color: var(--page-muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+}
+
+.primary-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.primary-nav button {
+  border: 0;
+  border-radius: 0.4rem;
+  padding: 0.58rem 0.85rem;
+  color: var(--page-muted);
+  background: transparent;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.primary-nav button:hover,
+.primary-nav button.active {
+  color: var(--page-ink);
+  background: color-mix(in srgb, var(--page-card) 82%, transparent);
+}
+
+.primary-nav button.active {
   font-weight: 700;
-  letter-spacing: -0.025em;
+  box-shadow: inset 0 -2px var(--page-green);
 }
 
-/* 用户登录按钮 */
-.user-login-button {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+.topbar-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.topbar-actions > a {
+  border: 1px solid var(--page-line);
+  border-radius: 0.4rem;
+  padding: 0.48rem 0.65rem;
+  color: var(--page-muted);
+  background: color-mix(in srgb, var(--page-card) 68%, transparent);
+  font-size: 0.65rem;
   text-decoration: none;
-  box-shadow:
-    0 4px 12px rgba(52, 211, 153, 0.25),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  position: relative;
-  overflow: hidden;
-  font-weight: 600;
 }
 
-/* 暗色模式下的用户登录按钮 */
-:global(.dark) .user-login-button {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  border: 1px solid rgba(52, 211, 153, 0.4);
-  color: white;
-  box-shadow:
-    0 4px 12px rgba(52, 211, 153, 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+.theme-cycle-button {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--page-line);
+  border-radius: 0.4rem;
+  color: var(--page-muted);
+  background: color-mix(in srgb, var(--page-card) 68%, transparent);
+  font-size: 0.68rem;
+  cursor: pointer;
 }
 
-.user-login-button::before {
-  content: '';
+.theme-cycle-button:hover {
+  color: var(--page-ink);
+  border-color: color-mix(in srgb, var(--page-green) 45%, var(--page-line));
+}
+
+.topbar-actions > a:hover {
+  color: var(--page-ink);
+  border-color: color-mix(in srgb, var(--page-green) 45%, var(--page-line));
+}
+
+.page-frame {
+  padding: 2rem 0 5rem;
+}
+
+.stats-content {
+  min-height: calc(100vh - 8rem);
+}
+
+.query-error {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.8rem 0;
+  border: 1px solid #d8aaa4;
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  color: #8b403a;
+  background: #fff0ed;
+  font-size: 0.74rem;
+}
+
+:global(.dark) .query-error {
+  border-color: #70413d;
+  color: #e6a8a2;
+  background: #30201e;
+}
+
+.verified-key-bar,
+.legacy-period-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--page-line);
+}
+
+.verified-key-bar {
+  margin-top: 1.25rem;
+  padding: 0.65rem 0;
+  color: var(--page-muted);
+  font-size: 0.67rem;
+}
+
+.verified-key-bar > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.verified-key-bar > span i {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: var(--page-green);
+}
+
+.api-test-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--page-line);
+  border-radius: 0.4rem;
+  padding: 0.46rem 0.65rem;
+  color: var(--page-ink);
+  background: var(--page-card);
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+
+.api-test-trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.api-test-menu {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: calc(100% + 0.35rem);
   right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.user-login-button:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow:
-    0 8px 20px rgba(52, 211, 153, 0.35),
-    inset 0 1px 1px rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.user-login-button:hover::before {
-  opacity: 1;
-}
-
-/* 暗色模式下的悬停效果 */
-:global(.dark) .user-login-button:hover {
-  box-shadow:
-    0 8px 20px rgba(52, 211, 153, 0.4),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  border-color: rgba(52, 211, 153, 0.5);
-}
-
-.user-login-button:active {
-  transform: translateY(-1px) scale(1);
-}
-
-/* 确保图标和文字在所有模式下都清晰可见 */
-.user-login-button i,
-.user-login-button span {
-  position: relative;
-  z-index: 1;
-}
-
-/* 管理后台按钮 - 精致版本 */
-.admin-button-refined {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  text-decoration: none;
-  box-shadow:
-    0 4px 12px rgba(var(--primary-rgb), 0.25),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  position: relative;
+  z-index: 30;
+  min-width: 7rem;
   overflow: hidden;
-  font-weight: 600;
+  border: 1px solid var(--page-line);
+  border-radius: 0.45rem;
+  background: var(--page-card);
+  box-shadow: 0 0.8rem 2rem rgba(19, 29, 24, 0.12);
 }
 
-/* 暗色模式下的管理后台按钮 */
-:global(.dark) .admin-button-refined {
-  background: rgba(55, 65, 81, 0.8);
-  border: 1px solid rgba(107, 114, 128, 0.4);
-  color: #f3f4f6;
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.05);
+.api-test-menu button {
+  width: 100%;
+  border: 0;
+  padding: 0.58rem 0.7rem;
+  color: var(--page-ink);
+  background: transparent;
+  text-align: left;
+  font-size: 0.68rem;
+  cursor: pointer;
 }
 
-.admin-button-refined::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
+.api-test-menu button:hover {
+  background: color-mix(in srgb, var(--page-green) 8%, var(--page-card));
 }
 
-.admin-button-refined:hover {
-  transform: translateY(-2px) scale(1.02);
-  background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
-  box-shadow:
-    0 8px 20px rgba(var(--secondary-rgb), 0.35),
-    inset 0 1px 1px rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: white;
+.legacy-stats {
+  margin-top: 1.5rem;
+  border: 1px solid var(--page-line);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--page-card) 92%, transparent);
 }
 
-.admin-button-refined:hover::before {
-  opacity: 1;
+.legacy-period-bar {
+  padding: 1rem 1.2rem;
 }
 
-/* 暗色模式下的悬停效果 */
-:global(.dark) .admin-button-refined:hover {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  border-color: rgba(var(--secondary-rgb), 0.4);
-  box-shadow:
-    0 8px 20px rgba(var(--primary-rgb), 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  color: white;
+.legacy-period-bar strong,
+.legacy-period-bar span {
+  display: block;
 }
 
-.admin-button-refined:active {
-  transform: translateY(-1px) scale(1);
+.legacy-period-bar strong {
+  font-size: 0.85rem;
 }
 
-/* 确保图标和文字在所有模式下都清晰可见 */
-.admin-button-refined i,
-.admin-button-refined span {
-  position: relative;
-  z-index: 1;
+.legacy-period-bar span {
+  margin-top: 0.2rem;
+  color: var(--page-muted);
+  font-size: 0.64rem;
 }
 
-/* 时间范围按钮 */
+.legacy-period-switcher {
+  display: flex;
+  gap: 0.25rem;
+}
+
 .period-btn {
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
+  border: 1px solid var(--page-line);
+  border-radius: 0.35rem;
+  padding: 0.45rem 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.025em;
-  transition: all 0.3s ease;
-  border: none;
+  font-size: 0.66rem;
   cursor: pointer;
 }
 
 .period-btn.active {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  color: white;
-  box-shadow:
-    0 10px 15px -3px rgba(var(--primary-rgb), 0.3),
-    0 4px 6px -2px rgba(var(--primary-rgb), 0.05);
-  transform: translateY(-1px);
+  color: #f2f5f1;
+  border-color: var(--page-forest);
+  background: var(--page-forest);
 }
 
 .period-btn:not(.active) {
-  color: #374151;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(229, 231, 235, 0.5);
-}
-
-:global(html.dark) .period-btn:not(.active) {
-  color: #e5e7eb;
-  background: rgba(55, 65, 81, 0.4);
-  border: 1px solid rgba(75, 85, 99, 0.5);
+  color: var(--page-muted);
+  background: var(--page-card);
 }
 
 .period-btn:not(.active):hover {
-  background: rgba(255, 255, 255, 0.8);
-  color: #1f2937;
-  border-color: rgba(209, 213, 219, 0.8);
+  color: var(--page-ink);
+  border-color: color-mix(in srgb, var(--page-green) 45%, var(--page-line));
 }
 
-:global(html.dark) .period-btn:not(.active):hover {
-  background: rgba(75, 85, 99, 0.6);
-  color: #ffffff;
-  border-color: rgba(107, 114, 128, 0.8);
+.legacy-stats-body {
+  padding: 1.2rem;
 }
 
-/* 测试按钮样式 */
-.test-btn {
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
-  font-weight: 500;
-  letter-spacing: 0.025em;
-  transition: all 0.3s ease;
-  border: none;
-  cursor: pointer;
-  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
-  color: white;
-  box-shadow:
-    0 4px 10px -2px rgba(6, 182, 212, 0.3),
-    0 2px 4px -1px rgba(6, 182, 212, 0.1);
+.legacy-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
 }
 
-.test-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow:
-    0 8px 15px -3px rgba(6, 182, 212, 0.4),
-    0 4px 6px -2px rgba(6, 182, 212, 0.15);
+.tab-content:not(.stats-content) {
+  padding-top: 1rem;
 }
 
-.test-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Tab 胶囊按钮样式 */
-.tab-pill-button {
-  padding: 0.5rem 1rem;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.8);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  flex: 1;
-  justify-content: center;
-}
-
-/* 暗夜模式下的Tab按钮基础样式 */
-:global(html.dark) .tab-pill-button {
-  color: rgba(209, 213, 219, 0.8);
-}
-
-@media (min-width: 768px) {
-  .tab-pill-button {
-    padding: 0.625rem 1.25rem;
-    flex: none;
-  }
-}
-
-.tab-pill-button:hover {
-  color: white;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-:global(html.dark) .tab-pill-button:hover {
-  color: #f3f4f6;
-  background: rgba(100, 116, 139, 0.2);
-}
-
-.tab-pill-button.active {
-  background: white;
-  color: var(--secondary-color);
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-:global(html.dark) .tab-pill-button.active {
-  background: rgba(71, 85, 105, 0.9);
-  color: #f3f4f6;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.3),
-    0 2px 4px -1px rgba(0, 0, 0, 0.2);
-}
-
-.tab-pill-button i {
-  font-size: 0.875rem;
-}
-
-/* Tab 内容切换动画 */
 .tab-content {
-  animation: tabFadeIn 0.4s ease-out;
+  animation: tab-fade 0.28s ease-out;
 }
 
-@keyframes tabFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 动画效果 */
 .fade-in {
-  animation: fadeIn 0.6s ease-out;
+  animation: tab-fade 0.34s ease-out;
 }
 
-@keyframes fadeIn {
+@keyframes tab-fade {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -1215,5 +1114,70 @@ watch(apiKey, (newValue) => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 900px) {
+  .page-topbar-inner {
+    grid-template-columns: 1fr auto;
+    gap: 0.8rem;
+    padding: 0.65rem 0;
+  }
+
+  .primary-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+    border-top: 1px solid var(--page-line);
+    padding-top: 0.55rem;
+  }
+
+  .legacy-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-topbar-inner,
+  .page-frame {
+    width: min(100% - 1.25rem, 78rem);
+  }
+
+  .site-brand small,
+  .topbar-actions > a:first-of-type {
+    display: none;
+  }
+
+  .topbar-actions {
+    gap: 0.3rem;
+  }
+
+  .topbar-actions > a {
+    padding: 0.45rem 0.5rem;
+  }
+
+  .primary-nav {
+    justify-content: stretch;
+  }
+
+  .primary-nav button {
+    flex: 1;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+  }
+
+  .page-frame {
+    padding-top: 1.25rem;
+  }
+
+  .verified-key-bar,
+  .legacy-period-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .legacy-period-switcher,
+  .legacy-period-switcher button {
+    width: 100%;
+  }
 }
 </style>
