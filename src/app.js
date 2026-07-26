@@ -656,7 +656,7 @@ class Application {
         const apiKeyService = require('./services/apiKeyService')
         const claudeAccountService = require('./services/account/claudeAccountService')
 
-        const [expiredKeys, errorAccounts] = await Promise.all([
+        const [expiredKeys, errorAccounts, tempErrorAccounts] = await Promise.all([
           apiKeyService.cleanupExpiredKeys(),
           claudeAccountService.cleanupErrorAccounts(),
           claudeAccountService.cleanupTempErrorAccounts() // 新增：清理临时错误账户
@@ -665,7 +665,7 @@ class Application {
         await redis.cleanup()
 
         logger.success(
-          `🧹 Cleanup completed: ${expiredKeys} expired keys, ${errorAccounts} error accounts reset`
+          `🧹 Cleanup completed: ${expiredKeys} expired keys, ${errorAccounts} error accounts reset, ${tempErrorAccounts} temp error accounts reset`
         )
       } catch (error) {
         logger.error('❌ Cleanup task failed:', error)
