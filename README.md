@@ -16,7 +16,7 @@
 
 **🔐 自行搭建Claude API中转服务，支持多账户管理**
 
-[English](README_EN.md) • [快速开始](https://pincc.ai/) • [演示站点](https://demo.pincc.ai/admin-next/login) • [公告频道](https://t.me/claude_relay_service)
+[English](README_EN.md) • [日本語](README_JA.md) • [快速开始](https://pincc.ai/) • [演示站点](https://demo.pincc.ai/admin-next/login) • [公告频道](https://t.me/claude_relay_service)
 
 </div>
 
