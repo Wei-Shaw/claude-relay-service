@@ -25,6 +25,8 @@ export const getUserStatsApi = (apiId) =>
   request({ url: '/apiStats/api/user-stats', method: 'POST', data: { apiId } })
 export const getUserModelStatsApi = (apiId, period = 'daily') =>
   request({ url: '/apiStats/api/user-model-stats', method: 'POST', data: { apiId, period } })
+export const getApiStatsUsageWorkspaceApi = (data) =>
+  request({ url: '/apiStats/api/usage-workspace', method: 'POST', data })
 export const getBatchStatsApi = (apiIds) =>
   request({ url: '/apiStats/api/batch-stats', method: 'POST', data: { apiIds } })
 export const getBatchModelStatsApi = (apiIds, period = 'daily') =>

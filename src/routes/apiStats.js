@@ -2,9 +2,8 @@ const express = require('express')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const apiKeyService = require('../services/apiKeyService')
+const apiStatsUsageService = require('../services/apiStatsUsageService')
 const CostCalculator = require('../utils/costCalculator')
-const claudeAccountService = require('../services/account/claudeAccountService')
-const openaiAccountService = require('../services/account/openaiAccountService')
 const serviceRatesService = require('../services/serviceRatesService')
 const openaiResponsesTestService = require('../services/openaiResponsesTestService')
 const {
@@ -444,50 +443,6 @@ router.post('/api/user-stats', async (req, res) => {
       logger.warn(`Failed to get current usage for key ${keyId}:`, error)
     }
 
-    const boundAccountDetails = {}
-
-    const accountDetailTasks = []
-
-    if (fullKeyData.claudeAccountId) {
-      accountDetailTasks.push(
-        (async () => {
-          try {
-            const overview = await claudeAccountService.getAccountOverview(
-              fullKeyData.claudeAccountId
-            )
-
-            if (overview && overview.accountType === 'dedicated') {
-              boundAccountDetails.claude = overview
-            }
-          } catch (error) {
-            logger.warn(`⚠️ Failed to load Claude account overview for key ${keyId}:`, error)
-          }
-        })()
-      )
-    }
-
-    if (fullKeyData.openaiAccountId) {
-      accountDetailTasks.push(
-        (async () => {
-          try {
-            const overview = await openaiAccountService.getAccountOverview(
-              fullKeyData.openaiAccountId
-            )
-
-            if (overview && overview.accountType === 'dedicated') {
-              boundAccountDetails.openai = overview
-            }
-          } catch (error) {
-            logger.warn(`⚠️ Failed to load OpenAI account overview for key ${keyId}:`, error)
-          }
-        })()
-      )
-    }
-
-    if (accountDetailTasks.length > 0) {
-      await Promise.allSettled(accountDetailTasks)
-    }
-
     // 构建响应数据（只返回该API Key自己的信息，确保不泄露其他信息）
     const responseData = {
       id: keyId,
@@ -550,23 +505,6 @@ router.post('/api/user-stats', async (req, res) => {
         windowRemainingSeconds
       },
 
-      // 绑定的账户信息（只显示ID，不显示敏感信息）
-      accounts: {
-        claudeAccountId:
-          fullKeyData.claudeAccountId && fullKeyData.claudeAccountId !== ''
-            ? fullKeyData.claudeAccountId
-            : null,
-        geminiAccountId:
-          fullKeyData.geminiAccountId && fullKeyData.geminiAccountId !== ''
-            ? fullKeyData.geminiAccountId
-            : null,
-        openaiAccountId:
-          fullKeyData.openaiAccountId && fullKeyData.openaiAccountId !== ''
-            ? fullKeyData.openaiAccountId
-            : null,
-        details: Object.keys(boundAccountDetails).length > 0 ? boundAccountDetails : null
-      },
-
       // 模型和客户端限制信息
       restrictions: {
         enableModelRestriction: fullKeyData.enableModelRestriction || false,
@@ -598,6 +536,27 @@ router.post('/api/user-stats', async (req, res) => {
     return res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to retrieve API key statistics'
+    })
+  }
+})
+
+// 📋 API Key 自查询的周期用量与安全请求明细
+router.post('/api/usage-workspace', async (req, res) => {
+  try {
+    const data = await apiStatsUsageService.getUsageWorkspace(req.body || {})
+    return res.json({ success: true, data })
+  } catch (error) {
+    if (error?.statusCode && error.statusCode < 500) {
+      return res.status(error.statusCode).json({
+        error: 'Invalid usage query',
+        message: error.message
+      })
+    }
+
+    logger.error('❌ Failed to load API key usage workspace:', error)
+    return res.status(500).json({
+      error: 'Usage workspace error',
+      message: 'Failed to retrieve usage details'
     })
   }
 })
