@@ -43,6 +43,7 @@ jest.mock('../src/utils/errorSanitizer', () => ({ getSafeMessage: jest.fn() }))
 const apiStatsUsageService = require('../src/services/apiStatsUsageService')
 require('../src/routes/apiStats')
 
+const registeredPostPaths = mockRouter.post.mock.calls.map((call) => call[0])
 const handler = mockRouter.post.mock.calls.find((call) => call[0] === '/api/usage-workspace')?.[1]
 
 function createResponse() {
@@ -90,5 +91,10 @@ describe('API Stats usage workspace route', () => {
 
     expect(res.statusCode).toBe(401)
     expect(res.body).toEqual({ error: 'Invalid usage query', message: 'API Key 无效' })
+  })
+
+  test('does not register the removed aggregate query routes', () => {
+    expect(registeredPostPaths).not.toContain('/api/batch-stats')
+    expect(registeredPostPaths).not.toContain('/api/batch-model-stats')
   })
 })

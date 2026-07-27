@@ -27,10 +27,6 @@ export const getUserModelStatsApi = (apiId, period = 'daily') =>
   request({ url: '/apiStats/api/user-model-stats', method: 'POST', data: { apiId, period } })
 export const getApiStatsUsageWorkspaceApi = (data) =>
   request({ url: '/apiStats/api/usage-workspace', method: 'POST', data })
-export const getBatchStatsApi = (apiIds) =>
-  request({ url: '/apiStats/api/batch-stats', method: 'POST', data: { apiIds } })
-export const getBatchModelStatsApi = (apiIds, period = 'daily') =>
-  request({ url: '/apiStats/api/batch-model-stats', method: 'POST', data: { apiIds, period } })
 
 // 认证
 export const loginApi = (data) => request({ url: '/web/auth/login', method: 'POST', data })
