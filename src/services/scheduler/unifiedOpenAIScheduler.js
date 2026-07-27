@@ -12,6 +12,10 @@ class UnifiedOpenAIScheduler {
   }
 
   _isModelSupportedByAccount(account, accountType, requestedModel) {
+    if (accountType === 'openai-responses') {
+      return true
+    }
+
     const isCodexModel = requestedModel?.toLowerCase().includes('codex')
     const modelToCheck =
       accountType === 'openai' && requestedModel?.startsWith('gpt-5-') && !isCodexModel
@@ -20,10 +24,6 @@ class UnifiedOpenAIScheduler {
 
     if (!modelToCheck || !account.supportedModels) {
       return true
-    }
-
-    if (accountType === 'openai-responses') {
-      return openaiResponsesAccountService.isModelSupported(account.supportedModels, modelToCheck)
     }
 
     return !Array.isArray(account.supportedModels) || account.supportedModels.length === 0

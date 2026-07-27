@@ -207,6 +207,41 @@ describe('openaiResponsesRelayService 路径和连接清理', () => {
     )
     expect(req.body.model).toBe('gpt-4.1-mini')
   })
+
+  it('未命中账户映射时原样转发客户端模型', async () => {
+    openaiResponsesAccountService.getAccount.mockResolvedValue({
+      id: 'resp-1',
+      name: 'Responses 1',
+      baseApi: 'https://api.openai.com',
+      apiKey: 'test-key',
+      providerEndpoint: 'responses',
+      supportedModels: { 'gpt-5': 'upstream-gpt-5' },
+      proxy: null,
+      userAgent: null
+    })
+    axios.mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      data: { object: 'response', output_text: 'ok' },
+      headers: {}
+    })
+
+    const { req, res } = createReqRes()
+
+    await openaiResponsesRelayService.handleRequest(
+      req,
+      res,
+      { id: 'resp-1', name: 'Responses 1', disableAutoProtection: false },
+      { id: 'key-1' }
+    )
+
+    expect(axios).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ model: 'gpt-4.1-mini' })
+      })
+    )
+    expect(req.body.model).toBe('gpt-4.1-mini')
+  })
 })
 
 describe('openaiResponsesRelayService 其他4xx软暂停', () => {
