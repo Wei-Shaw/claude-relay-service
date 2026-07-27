@@ -62,11 +62,11 @@ describe('OpenAIResponsesAccountService 模型重定向', () => {
     const account = await openaiResponsesAccountService.getAccount('responses-1')
 
     expect(account.supportedModels).toEqual({ 'GPT-5': 'upstream-gpt-5' })
-    expect(openaiResponsesAccountService.isModelSupported(account.supportedModels, 'gpt-5')).toBe(
-      true
-    )
     expect(openaiResponsesAccountService.getMappedModel(account.supportedModels, 'gpt-5')).toBe(
       'upstream-gpt-5'
+    )
+    expect(openaiResponsesAccountService.getMappedModel(account.supportedModels, 'gpt-4.1')).toBe(
+      'gpt-4.1'
     )
   })
 })

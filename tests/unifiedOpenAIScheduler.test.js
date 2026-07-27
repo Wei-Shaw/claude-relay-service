@@ -7,12 +7,6 @@ jest.mock('../src/services/account/openaiResponsesAccountService', () => ({
   checkAndClearRateLimit: jest.fn(),
   getAllAccounts: jest.fn(),
   getAccount: jest.fn(),
-  isModelSupported: jest.fn((mapping, requestedModel) => {
-    if (!mapping || Object.keys(mapping).length === 0) return true
-    return Object.keys(mapping).some(
-      (model) => model.toLowerCase() === requestedModel.toLowerCase()
-    )
-  }),
   isSubscriptionExpired: jest.fn(() => false),
   markAccountRateLimited: jest.fn(),
   updateAccount: jest.fn()
@@ -87,7 +81,7 @@ describe('UnifiedOpenAIScheduler', () => {
   })
 
   describe('OpenAI-Responses 模型重定向调度', () => {
-    it('仅选择包含客户端请求模型映射的账户', async () => {
+    it('未命中模型映射的账户仍参与调度', async () => {
       openaiAccountService.getAllAccounts.mockResolvedValue([])
       openaiResponsesAccountService.getAllAccounts.mockResolvedValue([
         {
@@ -112,8 +106,11 @@ describe('UnifiedOpenAIScheduler', () => {
 
       const accounts = await unifiedOpenAIScheduler._getAllAvailableAccounts({}, 'gpt-5-2025-08-07')
 
-      expect(accounts).toHaveLength(1)
-      expect(accounts[0]).toEqual(expect.objectContaining({ accountId: 'responses-gpt-5' }))
+      expect(accounts).toHaveLength(2)
+      expect(accounts.map((account) => account.accountId)).toEqual([
+        'responses-gpt-4',
+        'responses-gpt-5'
+      ])
     })
 
     it('仍按规范化后的模型检查 OpenAI OAuth 账户', () => {

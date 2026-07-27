@@ -613,19 +613,6 @@ class OpenAIResponsesAccountService {
     return {}
   }
 
-  isModelSupported(modelMapping, requestedModel) {
-    if (!modelMapping || Object.keys(modelMapping).length === 0) {
-      return true
-    }
-
-    if (Object.prototype.hasOwnProperty.call(modelMapping, requestedModel)) {
-      return true
-    }
-
-    const requestedModelLower = requestedModel.toLowerCase()
-    return Object.keys(modelMapping).some((model) => model.toLowerCase() === requestedModelLower)
-  }
-
   getMappedModel(modelMapping, requestedModel) {
     if (!modelMapping || Object.keys(modelMapping).length === 0) {
       return requestedModel
