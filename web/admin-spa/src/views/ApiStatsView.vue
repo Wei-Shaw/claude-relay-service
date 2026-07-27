@@ -103,9 +103,7 @@
                   {{
                     canUseQuotaCard
                       ? '卡内额度或有效期将直接叠加到这个 Key。'
-                      : multiKeyMode
-                        ? '额度卡只能绑定一个 Key，请切换到单 Key 模式。'
-                        : '请先在上方输入并验证需要补充额度的 API Key。'
+                      : '请先在上方输入并验证需要补充额度的 API Key。'
                   }}
                 </p>
               </div>
@@ -237,7 +235,7 @@
           </div>
         </section>
 
-        <div v-if="statsData && !multiKeyMode" class="single-key-result fade-in">
+        <div v-if="statsData" class="single-key-result fade-in">
           <div class="verified-key-bar">
             <span><i />已验证 {{ statsData.name || '当前 API Key' }}</span>
             <div class="relative">
@@ -261,52 +259,6 @@
             </div>
           </div>
           <ApiStatsUsageWorkspace :api-key="apiKey" />
-        </div>
-
-        <!-- 聚合查询保留原有统计口径，请求明细仅支持单 Key 自查询。 -->
-        <div v-if="statsData && multiKeyMode" class="legacy-stats fade-in">
-          <div class="legacy-period-bar">
-            <div>
-              <strong>聚合用量</strong>
-              <span>多 Key 查询不展示单笔请求明细</span>
-            </div>
-            <div class="legacy-period-switcher">
-              <button
-                :class="['period-btn', { active: statsPeriod === 'daily' }]"
-                :disabled="loading"
-                @click="switchPeriod('daily')"
-              >
-                今日
-              </button>
-              <button
-                :class="['period-btn', { active: statsPeriod === 'monthly' }]"
-                :disabled="loading"
-                @click="switchPeriod('monthly')"
-              >
-                本月
-              </button>
-              <button
-                :class="['period-btn', { active: statsPeriod === 'alltime' }]"
-                :disabled="loading"
-                @click="switchPeriod('alltime')"
-              >
-                全部
-              </button>
-            </div>
-          </div>
-          <div class="legacy-stats-body">
-            <StatsOverview />
-            <div class="legacy-stats-grid">
-              <TokenDistribution class="h-full" />
-              <AggregatedStatsCard class="h-full" />
-            </div>
-            <ServiceCostCards class="mb-4 sm:mb-6" />
-            <div class="space-y-4 sm:space-y-6">
-              <ModelUsageStats period="daily" />
-              <ModelUsageStats period="monthly" />
-              <ModelUsageStats period="alltime" />
-            </div>
-          </div>
         </div>
       </div>
 
@@ -384,11 +336,6 @@ import { redeemCardByApiIdApi, getRedemptionHistoryByApiIdApi } from '@/utils/ht
 import { formatDateTime, showToast } from '@/utils/tools'
 import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
 import ApiStatsUsageWorkspace from '@/components/apistats/ApiStatsUsageWorkspace.vue'
-import StatsOverview from '@/components/apistats/StatsOverview.vue'
-import TokenDistribution from '@/components/apistats/TokenDistribution.vue'
-import AggregatedStatsCard from '@/components/apistats/AggregatedStatsCard.vue'
-import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
-import ServiceCostCards from '@/components/apistats/ServiceCostCards.vue'
 import TutorialView from './TutorialView.vue'
 import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 
@@ -400,27 +347,11 @@ const themeStore = useThemeStore()
 const currentTab = ref('stats')
 const isDarkMode = computed(() => themeStore.isDarkMode)
 
-const {
-  apiKey,
-  apiId,
-  loading,
-  oemLoading,
-  error,
-  statsPeriod,
-  statsData,
-  oemSettings,
-  multiKeyMode
-} = storeToRefs(apiStatsStore)
+const { apiKey, apiId, loading, oemLoading, error, statsData, oemSettings } =
+  storeToRefs(apiStatsStore)
 
-const {
-  queryStats,
-  switchPeriod,
-  loadStatsWithApiId,
-  loadOemSettings,
-  loadServiceRates,
-  loadApiKeyFromStorage,
-  reset
-} = apiStatsStore
+const { queryStats, loadStatsWithApiId, loadOemSettings, loadApiKeyFromStorage, reset } =
+  apiStatsStore
 
 // 测试弹窗状态
 const showTestModal = ref(false)
@@ -439,11 +370,8 @@ const redeemLoading = ref(false)
 const redeemResult = ref(null)
 const redemptionHistory = ref([])
 const historyLoading = ref(false)
-const canUseQuotaCard = computed(() =>
-  Boolean(apiId.value && statsData.value && !multiKeyMode.value)
-)
+const canUseQuotaCard = computed(() => Boolean(apiId.value && statsData.value))
 const quotaStatusText = computed(() => {
-  if (multiKeyMode.value) return '聚合模式不可兑换'
   if (canUseQuotaCard.value) return statsData.value?.name || 'API Key 已验证'
   return '先验证 API Key'
 })
@@ -635,8 +563,8 @@ onMounted(async () => {
   // 初始化主题（因为该页面不在 MainLayout 内）
   themeStore.initTheme()
 
-  // 加载 OEM 设置和服务倍率
-  await Promise.all([loadOemSettings(), loadServiceRates()])
+  // 加载 OEM 设置
+  await loadOemSettings()
   checkNotice()
 
   // 检查 URL 参数
@@ -1370,8 +1298,7 @@ watch(apiId, (newValue, previousValue) => {
   white-space: nowrap;
 }
 
-.verified-key-bar,
-.legacy-period-bar {
+.verified-key-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1445,73 +1372,6 @@ watch(apiId, (newValue, previousValue) => {
   background: color-mix(in srgb, var(--page-green) 8%, var(--page-card));
 }
 
-.legacy-stats {
-  margin-top: 1.5rem;
-  border: 1px solid var(--page-line);
-  border-radius: 0.75rem;
-  background: color-mix(in srgb, var(--page-card) 92%, transparent);
-}
-
-.legacy-period-bar {
-  padding: 1rem 1.2rem;
-}
-
-.legacy-period-bar strong,
-.legacy-period-bar span {
-  display: block;
-}
-
-.legacy-period-bar strong {
-  font-size: 0.85rem;
-}
-
-.legacy-period-bar span {
-  margin-top: 0.2rem;
-  color: var(--page-muted);
-  font-size: 0.64rem;
-}
-
-.legacy-period-switcher {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.period-btn {
-  border: 1px solid var(--page-line);
-  border-radius: 0.35rem;
-  padding: 0.45rem 0.7rem;
-  font-weight: 500;
-  font-size: 0.66rem;
-  cursor: pointer;
-}
-
-.period-btn.active {
-  color: #f2f5f1;
-  border-color: var(--page-forest);
-  background: var(--page-forest);
-}
-
-.period-btn:not(.active) {
-  color: var(--page-muted);
-  background: var(--page-card);
-}
-
-.period-btn:not(.active):hover {
-  color: var(--page-ink);
-  border-color: color-mix(in srgb, var(--page-green) 45%, var(--page-line));
-}
-
-.legacy-stats-body {
-  padding: 1.2rem;
-}
-
-.legacy-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin: 1rem 0;
-}
-
 .tab-content:not(.stats-content) {
   padding-top: 1rem;
 }
@@ -1558,10 +1418,6 @@ watch(apiId, (newValue, previousValue) => {
     justify-content: center;
     border-top: 1px solid var(--page-line);
     padding-top: 0.55rem;
-  }
-
-  .legacy-stats-grid {
-    grid-template-columns: 1fr;
   }
 
   .quota-workbench-head {
@@ -1614,7 +1470,6 @@ watch(apiId, (newValue, previousValue) => {
   }
 
   .verified-key-bar,
-  .legacy-period-bar,
   .quota-workbench-head {
     align-items: flex-start;
     flex-direction: column;
@@ -1675,11 +1530,6 @@ watch(apiId, (newValue, previousValue) => {
   .quota-history-list article p {
     grid-column: 1 / -1;
     grid-row: 2;
-  }
-
-  .legacy-period-switcher,
-  .legacy-period-switcher button {
-    width: 100%;
   }
 }
 </style>

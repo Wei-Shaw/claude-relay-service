@@ -9,24 +9,14 @@
     <div class="query-form">
       <div class="query-form-head">
         <label for="api-stats-key">
-          {{ multiKeyMode ? 'API Keys' : 'API Key' }}
-          <small>{{ multiKeyMode ? '每行一个，最多 30 个' : '仅用于本次安全查询' }}</small>
+          API Key
+          <small>仅用于本次安全查询</small>
         </label>
-        <div aria-label="查询模式" class="mode-switch-group">
-          <button :class="{ active: !multiKeyMode }" type="button" @click="multiKeyMode = false">
-            单 Key
-          </button>
-          <button :class="{ active: multiKeyMode }" type="button" @click="multiKeyMode = true">
-            聚合
-            <b v-if="multiKeyMode && parsedApiKeys.length">{{ parsedApiKeys.length }}</b>
-          </button>
-        </div>
       </div>
 
-      <div class="query-entry" :class="{ multiline: multiKeyMode }">
+      <div class="query-entry">
         <div class="query-field">
           <input
-            v-if="!multiKeyMode"
             id="api-stats-key"
             v-model="apiKey"
             :disabled="loading"
@@ -34,32 +24,13 @@
             :type="showPassword ? 'text' : 'password'"
             @keyup.enter="queryStats"
           />
-          <textarea
-            v-else
-            id="api-stats-key"
-            v-model="apiKey"
-            :disabled="loading"
-            placeholder="cr_xxx&#10;cr_yyy"
-            rows="4"
-            @keyup.ctrl.enter="queryStats"
-          />
           <button
-            v-if="!multiKeyMode"
             class="field-action"
             :title="showPassword ? '隐藏 Key' : '显示 Key'"
             type="button"
             @click="showPassword = !showPassword"
           >
             <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" />
-          </button>
-          <button
-            v-else-if="apiKey && !loading"
-            class="field-action top"
-            title="清空输入"
-            type="button"
-            @click="clearInput"
-          >
-            <i class="fas fa-times" />
           </button>
         </div>
 
@@ -77,11 +48,7 @@
 
       <p class="security-notice">
         <i class="fas fa-shield-halved" />
-        {{
-          multiKeyMode
-            ? 'Key 仅用于汇总统计，不会存储；聚合模式不展示单笔请求。'
-            : 'Key 仅用于验证并读取你自己的用量，不会存储。'
-        }}
+        Key 仅用于验证并读取你自己的用量，不会存储。
       </p>
     </div>
   </section>
@@ -93,24 +60,12 @@ import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 
 const apiStatsStore = useApiStatsStore()
-const { apiKey, loading, multiKeyMode } = storeToRefs(apiStatsStore)
-const { queryStats, clearInput } = apiStatsStore
+const { apiKey, loading } = storeToRefs(apiStatsStore)
+const { queryStats } = apiStatsStore
 
 const showPassword = ref(false)
 
-const parsedApiKeys = computed(() => {
-  if (!multiKeyMode.value || !apiKey.value) return []
-  const keys = apiKey.value
-    .split(/[,\n]+/)
-    .map((key) => key.trim())
-    .filter((key) => key.length > 0)
-  return [...new Set(keys)].slice(0, 30)
-})
-
-const hasValidInput = computed(() => {
-  if (multiKeyMode.value) return parsedApiKeys.value.length > 0
-  return apiKey.value && apiKey.value.trim().length > 0
-})
+const hasValidInput = computed(() => apiKey.value && apiKey.value.trim().length > 0)
 </script>
 
 <style scoped>
@@ -179,52 +134,17 @@ const hasValidInput = computed(() => {
   font-weight: 400;
 }
 
-.mode-switch-group {
-  display: flex;
-  gap: 0.15rem;
-  padding: 0.18rem;
-  border: 1px solid var(--page-line, #d8dad3);
-  border-radius: 0.42rem;
-}
-
-.mode-switch-group button {
-  border: 0;
-  border-radius: 0.28rem;
-  padding: 0.38rem 0.55rem;
-  color: var(--page-muted, #727a74);
-  background: transparent;
-  font-size: 0.62rem;
-  cursor: pointer;
-}
-
-.mode-switch-group button.active {
-  color: var(--page-ink, #18201d);
-  background: var(--page-card, #fafaf7);
-  box-shadow: 0 1px 3px rgba(23, 31, 27, 0.08);
-  font-weight: 700;
-}
-
-.mode-switch-group b {
-  margin-left: 0.25rem;
-  color: var(--page-green, #55a782);
-}
-
 .query-entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.55rem;
 }
 
-.query-entry.multiline {
-  align-items: stretch;
-}
-
 .query-field {
   position: relative;
 }
 
-.query-field input,
-.query-field textarea {
+.query-field input {
   width: 100%;
   border: 1px solid var(--page-line, #d8dad3);
   border-radius: 0.48rem;
@@ -241,20 +161,13 @@ const hasValidInput = computed(() => {
     box-shadow 0.18s ease;
 }
 
-.query-field textarea {
-  min-height: 6.5rem;
-  resize: vertical;
-}
-
-.query-field input:focus,
-.query-field textarea:focus {
+.query-field input:focus {
   outline: none;
   border-color: var(--page-green, #55a782);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--page-green, #55a782) 14%, transparent);
 }
 
-.query-field input::placeholder,
-.query-field textarea::placeholder {
+.query-field input::placeholder {
   color: color-mix(in srgb, var(--page-muted, #727a74) 70%, transparent);
 }
 
@@ -267,11 +180,6 @@ const hasValidInput = computed(() => {
   color: var(--page-muted, #727a74);
   background: transparent;
   cursor: pointer;
-}
-
-.field-action.top {
-  top: 0.75rem;
-  transform: none;
 }
 
 .query-submit {
