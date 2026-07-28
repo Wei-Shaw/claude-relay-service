@@ -513,6 +513,12 @@ const authenticateApiKey = async (req, res, next) => {
       })
     }
 
+    // Preserve the validated key identity for request details when a later restriction rejects it.
+    req.apiKey = {
+      id: validation.keyData.id,
+      name: validation.keyData.name
+    }
+
     const skipKeyRestrictions = isTokenCountRequest(req)
 
     // 🔒 检查客户端限制（使用新的验证器）

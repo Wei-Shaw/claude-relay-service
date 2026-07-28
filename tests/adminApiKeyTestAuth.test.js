@@ -57,7 +57,7 @@ function createResponse() {
   }
 }
 
-describe('admin API key test authentication', () => {
+describe('API key authentication', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     credentialService.consumeCredential.mockReturnValue({ keyId: 'key-1', service: 'claude' })
@@ -111,5 +111,46 @@ describe('admin API key test authentication', () => {
     expect(req.isAdminApiKeyTest).toBe(true)
     expect(skippedInsideHandler).toBe(true)
     expect(shouldSkipApiKeyUsage()).toBe(false)
+  })
+
+  test('preserves the API key identity when the daily cost limit rejects the request', async () => {
+    credentialService.consumeCredential.mockReturnValue(null)
+    apiKeyService.validateApiKey.mockResolvedValue({
+      valid: true,
+      keyData: {
+        id: 'key-limited',
+        name: 'Limited Key',
+        permissions: [],
+        concurrencyLimit: 0,
+        rateLimitWindow: 0,
+        rateLimitRequests: 0,
+        rateLimitCost: 0,
+        tokenLimit: 0,
+        dailyCostLimit: 180,
+        dailyCost: 180.13917515,
+        totalCostLimit: 0,
+        weeklyOpusCostLimit: 0,
+        enableClientRestriction: false,
+        allowedClients: []
+      }
+    })
+    const next = jest.fn()
+    const req = {
+      originalUrl: '/openai/models',
+      headers: { authorization: 'Bearer cr_limited_key' },
+      body: {}
+    }
+    const res = createResponse()
+
+    await authenticateApiKey(req, res, next)
+
+    expect(res.status).toHaveBeenCalledWith(402)
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.objectContaining({ code: 'daily_cost_limit_exceeded' })
+      })
+    )
+    expect(req.apiKey).toEqual({ id: 'key-limited', name: 'Limited Key' })
+    expect(next).not.toHaveBeenCalled()
   })
 })
