@@ -169,6 +169,164 @@ class AtomicUsageReporter {
 
 const usageReporter = new AtomicUsageReporter()
 
+// 获取绑定的 Azure OpenAI 账户，不可用时降级到账户池
+async function resolveAzureAccount(req, sessionId) {
+  let account = null
+  if (req.apiKey?.azureOpenaiAccountId) {
+    account = await azureOpenaiAccountService.getAccount(req.apiKey.azureOpenaiAccountId)
+    if (account) {
+      const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+        account.id,
+        'azure-openai'
+      )
+      if (isTempUnavailable) {
+        logger.warn(`⏱️ Bound Azure OpenAI account temporarily unavailable, falling back to pool`)
+        account = null
+      }
+    }
+    if (!account) {
+      logger.warn(`Bound Azure OpenAI account not found: ${req.apiKey.azureOpenaiAccountId}`)
+    }
+  }
+
+  // 如果没有绑定账户或账户不可用，选择一个可用账户
+  if (!account || account.isActive !== 'true') {
+    account = await azureOpenaiAccountService.selectAvailableAccount(sessionId)
+  }
+  return account
+}
+
+// 检查上游响应状态码（仅对认证/限流/服务端错误暂停，不对 400/404 等客户端错误暂停）
+async function pauseAccountOnUpstreamError(req, account, endpoint, response) {
+  const azureAutoProtectionDisabled =
+    account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+  const shouldPause =
+    account?.id &&
+    !azureAutoProtectionDisabled &&
+    (response.status === 401 ||
+      response.status === 403 ||
+      response.status === 429 ||
+      response.status >= 500)
+  if (shouldPause) {
+    const customTtl =
+      response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
+    await upstreamErrorHelper
+      .markTempUnavailable(
+        account.id,
+        'azure-openai',
+        response.status,
+        customTtl,
+        buildAzureErrorHistoryContext(req, account, endpoint, response)
+      )
+      .catch(() => {})
+  }
+}
+
+// 上报用量统计
+function reportAzureUsage(req, requestId, account, usageData, actualModel, { stream, statusCode }) {
+  const modelToRecord = actualModel || req.body.model || 'unknown'
+  return usageReporter.reportOnce(
+    requestId,
+    usageData,
+    req.apiKey.id,
+    modelToRecord,
+    account.id,
+    createRequestDetailMeta(req, {
+      requestBody: req.body,
+      stream,
+      statusCode
+    })
+  )
+}
+
+// Azure OpenAI 转发处理器工厂（chat/completions、responses、embeddings 共用流程）
+function createAzureOpenaiHandler({ endpoint, requestIdPrefix, logTitle, errorLabel, streamable }) {
+  return async (req, res) => {
+    const requestId = `${requestIdPrefix}_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`
+    const sessionId = req.sessionId || req.headers['x-session-id'] || null
+
+    const logMeta = {
+      apiKeyId: req.apiKey?.id,
+      sessionId,
+      model: req.body.model
+    }
+    if (streamable) {
+      logMeta.stream = req.body.stream || false
+      logMeta.messages = req.body.messages?.length || 0
+    } else {
+      logMeta.input = Array.isArray(req.body.input) ? req.body.input.length : 1
+    }
+    logger.info(`🚀 ${logTitle} ${requestId}`, logMeta)
+
+    try {
+      if (isAzureModelRestricted(req.apiKey, req.body?.model || '')) {
+        return sendModelNotAllowed(res, req.body.model)
+      }
+
+      const account = await resolveAzureAccount(req, sessionId)
+      const isStream = streamable ? req.body.stream || false : false
+
+      // 发送请求到 Azure OpenAI
+      const response = await azureOpenaiRelayService.handleAzureOpenAIRequest({
+        account,
+        requestBody: req.body,
+        headers: req.headers,
+        isStream,
+        endpoint
+      })
+
+      await pauseAccountOnUpstreamError(req, account, endpoint, response)
+
+      if (isStream) {
+        // 处理流式响应
+        await azureOpenaiRelayService.handleStreamResponse(response, res, {
+          onEnd: async ({ usageData, actualModel }) => {
+            if (usageData) {
+              await reportAzureUsage(req, requestId, account, usageData, actualModel, {
+                stream: true,
+                statusCode: res.statusCode
+              })
+            }
+          },
+          onError: (error) => {
+            logger.error(`Stream error for request ${requestId}:`, error)
+          }
+        })
+      } else {
+        // 处理非流式响应
+        const { usageData, actualModel } = azureOpenaiRelayService.handleNonStreamResponse(
+          response,
+          res
+        )
+
+        if (usageData) {
+          await reportAzureUsage(req, requestId, account, usageData, actualModel, {
+            stream: false,
+            statusCode: response.status
+          })
+        }
+      }
+    } catch (error) {
+      logger.error(`${errorLabel} ${requestId}:`, error)
+
+      if (!res.headersSent) {
+        const statusCode = error.response?.status || 500
+        res._upstreamResponseBody = error.response?.data
+        const errorMessage =
+          error.response?.data?.error?.message || error.message || 'Internal server error'
+
+        res.status(statusCode).json({
+          error: {
+            message: errorMessage,
+            type: 'azure_openai_error',
+            code: error.code || 'unknown'
+          }
+        })
+      }
+    }
+  }
+}
+
 // 健康检查
 router.get('/health', (req, res) => {
   res.status(200).json({
@@ -203,403 +361,43 @@ router.get('/models', authenticateApiKey, async (req, res) => {
 })
 
 // 处理聊天完成请求
-router.post('/chat/completions', authenticateApiKey, async (req, res) => {
-  const requestId = `azure_req_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`
-  const sessionId = req.sessionId || req.headers['x-session-id'] || null
-
-  logger.info(`🚀 Azure OpenAI Chat Request ${requestId}`, {
-    apiKeyId: req.apiKey?.id,
-    sessionId,
-    model: req.body.model,
-    stream: req.body.stream || false,
-    messages: req.body.messages?.length || 0
+router.post(
+  '/chat/completions',
+  authenticateApiKey,
+  createAzureOpenaiHandler({
+    endpoint: 'chat/completions',
+    requestIdPrefix: 'azure_req',
+    logTitle: 'Azure OpenAI Chat Request',
+    errorLabel: 'Azure OpenAI request failed',
+    streamable: true
   })
-
-  try {
-    if (isAzureModelRestricted(req.apiKey, req.body?.model || '')) {
-      return sendModelNotAllowed(res, req.body.model)
-    }
-
-    // 获取绑定的 Azure OpenAI 账户
-    let account = null
-    if (req.apiKey?.azureOpenaiAccountId) {
-      account = await azureOpenaiAccountService.getAccount(req.apiKey.azureOpenaiAccountId)
-      if (account) {
-        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
-          account.id,
-          'azure-openai'
-        )
-        if (isTempUnavailable) {
-          logger.warn(`⏱️ Bound Azure OpenAI account temporarily unavailable, falling back to pool`)
-          account = null
-        }
-      }
-      if (!account) {
-        logger.warn(`Bound Azure OpenAI account not found: ${req.apiKey.azureOpenaiAccountId}`)
-      }
-    }
-
-    // 如果没有绑定账户或账户不可用，选择一个可用账户
-    if (!account || account.isActive !== 'true') {
-      account = await azureOpenaiAccountService.selectAvailableAccount(sessionId)
-    }
-
-    // 发送请求到 Azure OpenAI
-    const response = await azureOpenaiRelayService.handleAzureOpenAIRequest({
-      account,
-      requestBody: req.body,
-      headers: req.headers,
-      isStream: req.body.stream || false,
-      endpoint: 'chat/completions'
-    })
-
-    // 检查上游响应状态码（仅对认证/限流/服务端错误暂停，不对 400/404 等客户端错误暂停）
-    const azureAutoProtectionDisabled =
-      account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
-    const shouldPause =
-      account?.id &&
-      !azureAutoProtectionDisabled &&
-      (response.status === 401 ||
-        response.status === 403 ||
-        response.status === 429 ||
-        response.status >= 500)
-    if (shouldPause) {
-      const customTtl =
-        response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
-      await upstreamErrorHelper
-        .markTempUnavailable(
-          account.id,
-          'azure-openai',
-          response.status,
-          customTtl,
-          buildAzureErrorHistoryContext(req, account, 'chat/completions', response)
-        )
-        .catch(() => {})
-    }
-
-    // 处理流式响应
-    if (req.body.stream) {
-      await azureOpenaiRelayService.handleStreamResponse(response, res, {
-        onEnd: async ({ usageData, actualModel }) => {
-          if (usageData) {
-            const modelToRecord = actualModel || req.body.model || 'unknown'
-            await usageReporter.reportOnce(
-              requestId,
-              usageData,
-              req.apiKey.id,
-              modelToRecord,
-              account.id,
-              createRequestDetailMeta(req, {
-                requestBody: req.body,
-                stream: true,
-                statusCode: res.statusCode
-              })
-            )
-          }
-        },
-        onError: (error) => {
-          logger.error(`Stream error for request ${requestId}:`, error)
-        }
-      })
-    } else {
-      // 处理非流式响应
-      const { usageData, actualModel } = azureOpenaiRelayService.handleNonStreamResponse(
-        response,
-        res
-      )
-
-      if (usageData) {
-        const modelToRecord = actualModel || req.body.model || 'unknown'
-        await usageReporter.reportOnce(
-          requestId,
-          usageData,
-          req.apiKey.id,
-          modelToRecord,
-          account.id,
-          createRequestDetailMeta(req, {
-            requestBody: req.body,
-            stream: false,
-            statusCode: response.status
-          })
-        )
-      }
-    }
-  } catch (error) {
-    logger.error(`Azure OpenAI request failed ${requestId}:`, error)
-
-    if (!res.headersSent) {
-      const statusCode = error.response?.status || 500
-      res._upstreamResponseBody = error.response?.data
-      const errorMessage =
-        error.response?.data?.error?.message || error.message || 'Internal server error'
-
-      res.status(statusCode).json({
-        error: {
-          message: errorMessage,
-          type: 'azure_openai_error',
-          code: error.code || 'unknown'
-        }
-      })
-    }
-  }
-})
+)
 
 // 处理响应请求 (gpt-5, gpt-5-mini, codex-mini models)
-router.post('/responses', authenticateApiKey, async (req, res) => {
-  const requestId = `azure_resp_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`
-  const sessionId = req.sessionId || req.headers['x-session-id'] || null
-
-  logger.info(`🚀 Azure OpenAI Responses Request ${requestId}`, {
-    apiKeyId: req.apiKey?.id,
-    sessionId,
-    model: req.body.model,
-    stream: req.body.stream || false,
-    messages: req.body.messages?.length || 0
+router.post(
+  '/responses',
+  authenticateApiKey,
+  createAzureOpenaiHandler({
+    endpoint: 'responses',
+    requestIdPrefix: 'azure_resp',
+    logTitle: 'Azure OpenAI Responses Request',
+    errorLabel: 'Azure OpenAI responses request failed',
+    streamable: true
   })
-
-  try {
-    if (isAzureModelRestricted(req.apiKey, req.body?.model || '')) {
-      return sendModelNotAllowed(res, req.body.model)
-    }
-
-    // 获取绑定的 Azure OpenAI 账户
-    let account = null
-    if (req.apiKey?.azureOpenaiAccountId) {
-      account = await azureOpenaiAccountService.getAccount(req.apiKey.azureOpenaiAccountId)
-      if (account) {
-        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
-          account.id,
-          'azure-openai'
-        )
-        if (isTempUnavailable) {
-          logger.warn(`⏱️ Bound Azure OpenAI account temporarily unavailable, falling back to pool`)
-          account = null
-        }
-      }
-      if (!account) {
-        logger.warn(`Bound Azure OpenAI account not found: ${req.apiKey.azureOpenaiAccountId}`)
-      }
-    }
-
-    // 如果没有绑定账户或账户不可用，选择一个可用账户
-    if (!account || account.isActive !== 'true') {
-      account = await azureOpenaiAccountService.selectAvailableAccount(sessionId)
-    }
-
-    // 发送请求到 Azure OpenAI
-    const response = await azureOpenaiRelayService.handleAzureOpenAIRequest({
-      account,
-      requestBody: req.body,
-      headers: req.headers,
-      isStream: req.body.stream || false,
-      endpoint: 'responses'
-    })
-
-    // 检查上游响应状态码（仅对认证/限流/服务端错误暂停，不对 400/404 等客户端错误暂停）
-    const azureAutoProtectionDisabled =
-      account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
-    const shouldPause =
-      account?.id &&
-      !azureAutoProtectionDisabled &&
-      (response.status === 401 ||
-        response.status === 403 ||
-        response.status === 429 ||
-        response.status >= 500)
-    if (shouldPause) {
-      const customTtl =
-        response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
-      await upstreamErrorHelper
-        .markTempUnavailable(
-          account.id,
-          'azure-openai',
-          response.status,
-          customTtl,
-          buildAzureErrorHistoryContext(req, account, 'responses', response)
-        )
-        .catch(() => {})
-    }
-
-    // 处理流式响应
-    if (req.body.stream) {
-      await azureOpenaiRelayService.handleStreamResponse(response, res, {
-        onEnd: async ({ usageData, actualModel }) => {
-          if (usageData) {
-            const modelToRecord = actualModel || req.body.model || 'unknown'
-            await usageReporter.reportOnce(
-              requestId,
-              usageData,
-              req.apiKey.id,
-              modelToRecord,
-              account.id,
-              createRequestDetailMeta(req, {
-                requestBody: req.body,
-                stream: true,
-                statusCode: res.statusCode
-              })
-            )
-          }
-        },
-        onError: (error) => {
-          logger.error(`Stream error for request ${requestId}:`, error)
-        }
-      })
-    } else {
-      // 处理非流式响应
-      const { usageData, actualModel } = azureOpenaiRelayService.handleNonStreamResponse(
-        response,
-        res
-      )
-
-      if (usageData) {
-        const modelToRecord = actualModel || req.body.model || 'unknown'
-        await usageReporter.reportOnce(
-          requestId,
-          usageData,
-          req.apiKey.id,
-          modelToRecord,
-          account.id,
-          createRequestDetailMeta(req, {
-            requestBody: req.body,
-            stream: false,
-            statusCode: response.status
-          })
-        )
-      }
-    }
-  } catch (error) {
-    logger.error(`Azure OpenAI responses request failed ${requestId}:`, error)
-
-    if (!res.headersSent) {
-      const statusCode = error.response?.status || 500
-      res._upstreamResponseBody = error.response?.data
-      const errorMessage =
-        error.response?.data?.error?.message || error.message || 'Internal server error'
-
-      res.status(statusCode).json({
-        error: {
-          message: errorMessage,
-          type: 'azure_openai_error',
-          code: error.code || 'unknown'
-        }
-      })
-    }
-  }
-})
+)
 
 // 处理嵌入请求
-router.post('/embeddings', authenticateApiKey, async (req, res) => {
-  const requestId = `azure_embed_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`
-  const sessionId = req.sessionId || req.headers['x-session-id'] || null
-
-  logger.info(`🚀 Azure OpenAI Embeddings Request ${requestId}`, {
-    apiKeyId: req.apiKey?.id,
-    sessionId,
-    model: req.body.model,
-    input: Array.isArray(req.body.input) ? req.body.input.length : 1
+router.post(
+  '/embeddings',
+  authenticateApiKey,
+  createAzureOpenaiHandler({
+    endpoint: 'embeddings',
+    requestIdPrefix: 'azure_embed',
+    logTitle: 'Azure OpenAI Embeddings Request',
+    errorLabel: 'Azure OpenAI embeddings request failed',
+    streamable: false
   })
-
-  try {
-    if (isAzureModelRestricted(req.apiKey, req.body?.model || '')) {
-      return sendModelNotAllowed(res, req.body.model)
-    }
-
-    // 获取绑定的 Azure OpenAI 账户
-    let account = null
-    if (req.apiKey?.azureOpenaiAccountId) {
-      account = await azureOpenaiAccountService.getAccount(req.apiKey.azureOpenaiAccountId)
-      if (account) {
-        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
-          account.id,
-          'azure-openai'
-        )
-        if (isTempUnavailable) {
-          logger.warn(`⏱️ Bound Azure OpenAI account temporarily unavailable, falling back to pool`)
-          account = null
-        }
-      }
-      if (!account) {
-        logger.warn(`Bound Azure OpenAI account not found: ${req.apiKey.azureOpenaiAccountId}`)
-      }
-    }
-
-    // 如果没有绑定账户或账户不可用，选择一个可用账户
-    if (!account || account.isActive !== 'true') {
-      account = await azureOpenaiAccountService.selectAvailableAccount(sessionId)
-    }
-
-    // 发送请求到 Azure OpenAI
-    const response = await azureOpenaiRelayService.handleAzureOpenAIRequest({
-      account,
-      requestBody: req.body,
-      headers: req.headers,
-      isStream: false,
-      endpoint: 'embeddings'
-    })
-
-    // 检查上游响应状态码（仅对认证/限流/服务端错误暂停，不对 400/404 等客户端错误暂停）
-    const azureAutoProtectionDisabled =
-      account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
-    const shouldPause =
-      account?.id &&
-      !azureAutoProtectionDisabled &&
-      (response.status === 401 ||
-        response.status === 403 ||
-        response.status === 429 ||
-        response.status >= 500)
-    if (shouldPause) {
-      const customTtl =
-        response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
-      await upstreamErrorHelper
-        .markTempUnavailable(
-          account.id,
-          'azure-openai',
-          response.status,
-          customTtl,
-          buildAzureErrorHistoryContext(req, account, 'embeddings', response)
-        )
-        .catch(() => {})
-    }
-
-    // 处理响应
-    const { usageData, actualModel } = azureOpenaiRelayService.handleNonStreamResponse(
-      response,
-      res
-    )
-
-    if (usageData) {
-      const modelToRecord = actualModel || req.body.model || 'unknown'
-      await usageReporter.reportOnce(
-        requestId,
-        usageData,
-        req.apiKey.id,
-        modelToRecord,
-        account.id,
-        createRequestDetailMeta(req, {
-          requestBody: req.body,
-          stream: false,
-          statusCode: response.status
-        })
-      )
-    }
-  } catch (error) {
-    logger.error(`Azure OpenAI embeddings request failed ${requestId}:`, error)
-
-    if (!res.headersSent) {
-      const statusCode = error.response?.status || 500
-      res._upstreamResponseBody = error.response?.data
-      const errorMessage =
-        error.response?.data?.error?.message || error.message || 'Internal server error'
-
-      res.status(statusCode).json({
-        error: {
-          message: errorMessage,
-          type: 'azure_openai_error',
-          code: error.code || 'unknown'
-        }
-      })
-    }
-  }
-})
+)
 
 // 获取使用统计
 router.get('/usage', authenticateApiKey, async (req, res) => {

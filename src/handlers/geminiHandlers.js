@@ -1188,6 +1188,524 @@ async function handleKeyInfo(req, res) {
 }
 
 // ============================================================================
+// 共享辅助函数（v1internal 与标准 Gemini API 处理函数共用）
+// ============================================================================
+
+// 为 axios 配置附加代理 Agent
+function applyProxyToAxiosConfig(axiosConfig, proxyConfig) {
+  if (proxyConfig) {
+    axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
+    axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+  }
+}
+
+// 上报 Gemini 上游错误（组合临时不可用标记与错误历史上下文）
+const reportGeminiUpstreamError = (
+  req,
+  error,
+  { accountId, accountType, sessionHash, account, status, errorBody } = {}
+) =>
+  handleGeminiUpstreamError(
+    status !== undefined ? status : error.response?.status,
+    accountId,
+    accountType,
+    sessionHash,
+    error.response?.headers,
+    account?.disableAutoProtection,
+    buildGeminiErrorHistoryContext(
+      req,
+      accountId,
+      accountType,
+      errorBody !== undefined ? errorBody : error.response?.data || error.message
+    )
+  )
+
+// 非流式接口的统一错误响应（gemini-api 账户返回净化后的上游错误）
+function sendGeminiErrorResponse(res, error, accountType) {
+  if (accountType === 'gemini-api') {
+    const safeErrorResponse = buildGeminiApiClientError(error.response?.status || null, error, {
+      headers: error.response?.headers,
+      fallbackStatus: 503
+    })
+    res.status(safeErrorResponse.status).json(safeErrorResponse.body)
+  } else {
+    res.status(500).json({
+      error: {
+        message: getSafeMessage(error) || 'Internal server error',
+        type: 'api_error'
+      }
+    })
+  }
+}
+
+// 将流式错误写回客户端（OAuth 账户格式）
+function writeOauthStreamError(res, error) {
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: {
+        message: getSafeMessage(error) || 'Stream error',
+        type: 'api_error'
+      }
+    })
+  } else {
+    if (!res.destroyed) {
+      try {
+        res.write(
+          `data: ${JSON.stringify({
+            error: {
+              message: getSafeMessage(error) || 'Stream error',
+              type: 'stream_error',
+              code: error.code
+            }
+          })}\n\n`
+        )
+        res.write('data: [DONE]\n\n')
+      } catch (writeError) {
+        logger.error('Error sending error event:', writeError)
+      }
+    }
+    res.end()
+  }
+}
+
+// 客户端断开连接时中止上游流式请求并执行注册的清理逻辑
+// 注意：必须监听 res 的 close（req 的 close 在请求体读完时就会触发，注册晚了还会错过），
+// 且仅在响应未正常结束时才视为客户端断开
+function abortOnClientDisconnect(res, abortController) {
+  const cleanups = []
+  res.once('close', () => {
+    if (res.writableEnded) {
+      return
+    }
+    logger.info('Client disconnected, aborting stream request')
+    if (abortController && !abortController.signal.aborted) {
+      abortController.abort()
+    }
+    for (const cleanup of cleanups) {
+      try {
+        cleanup()
+      } catch (cleanupError) {
+        logger.error('Error during client disconnect cleanup:', cleanupError)
+      }
+    }
+  })
+  return {
+    addCleanup(fn) {
+      cleanups.push(fn)
+    }
+  }
+}
+
+// 设置 SSE 响应头并启动心跳，返回 touch/stop 控制器
+function createSSEHeartbeat(res) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+
+  const HEARTBEAT_INTERVAL = 15000
+  let lastDataTime = Date.now()
+  let heartbeatTimer = setInterval(() => {
+    const timeSinceLastData = Date.now() - lastDataTime
+    if (timeSinceLastData >= HEARTBEAT_INTERVAL && !res.destroyed) {
+      res.write('\n')
+      logger.info(`💓 Sent SSE keepalive (gap: ${(timeSinceLastData / 1000).toFixed(1)}s)`)
+    }
+  }, HEARTBEAT_INTERVAL)
+
+  return {
+    touch() {
+      lastDataTime = Date.now()
+    },
+    stop() {
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer)
+        heartbeatTimer = null
+      }
+    }
+  }
+}
+
+// 校验调度结果为 OAuth 账户并加载账户（v1internal 专用）
+async function acquireV1InternalOauthAccount(req, res, sessionHash, requestedModel, options = {}) {
+  const { logAccountNotFound = false, onSelect } = options
+  const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
+    req.apiKey,
+    sessionHash,
+    requestedModel
+  )
+  const { accountId, accountType } = schedulerResult
+  if (onSelect) {
+    onSelect(accountId, accountType)
+  }
+
+  // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
+  if (accountType === 'gemini-api') {
+    logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
+    res.status(400).json({
+      error: {
+        message:
+          'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
+        type: 'invalid_account_type'
+      }
+    })
+    return null
+  }
+
+  const account = await geminiAccountService.getAccount(accountId)
+  if (!account) {
+    if (logAccountNotFound) {
+      logger.error(`❌ Gemini account not found: ${accountId}`)
+    }
+    res.status(404).json({
+      error: {
+        message: 'Gemini account not found',
+        type: 'account_not_found'
+      }
+    })
+    return null
+  }
+
+  return { accountId, accountType, account }
+}
+
+// v1internal 简单端点公共前置流程：权限校验、模型限制、账户选择
+async function prepareV1InternalOauthRequest(req, res) {
+  if (!ensureGeminiPermission(req, res)) {
+    return null
+  }
+
+  const sessionHash = sessionHelper.generateSessionHash(req.body)
+
+  // 从路径参数或请求体中获取模型名
+  const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
+  if (!ensureGeminiModelAllowed(req, res, requestedModel)) {
+    return null
+  }
+
+  const acquired = await acquireV1InternalOauthAccount(req, res, sessionHash, requestedModel)
+  if (!acquired) {
+    return null
+  }
+
+  return { ...acquired, sessionHash, requestedModel }
+}
+
+// 解析账户代理配置并创建 OAuth 客户端
+async function createOauthContext(account) {
+  const proxyConfig = parseProxyConfig(account)
+  const client = await geminiAccountService.getOauthClient(
+    account.accessToken,
+    account.refreshToken,
+    proxyConfig,
+    account.oauthProvider
+  )
+  return { proxyConfig, client }
+}
+
+// 解析 v1internal generateContent 请求数据（兼容 OpenAI 与直接 Gemini 格式）
+function resolveV1InternalRequestData(body) {
+  if (body.request) {
+    return body.request
+  }
+  if (body.messages) {
+    // OpenAI 格式的请求，构建 Gemini 格式的 request 对象
+    return {
+      contents: body.messages.map((msg) => ({
+        role: msg.role === 'assistant' ? 'model' : msg.role,
+        parts: [{ text: msg.content }]
+      })),
+      generationConfig: {
+        temperature: body.temperature !== undefined ? body.temperature : 0.7,
+        maxOutputTokens: body.max_tokens !== undefined ? body.max_tokens : 4096,
+        topP: body.top_p !== undefined ? body.top_p : 0.95,
+        topK: body.top_k !== undefined ? body.top_k : 40
+      }
+    }
+  }
+  if (body.contents) {
+    // 直接的 Gemini 格式请求（没有 request 包装）
+    return body
+  }
+  return undefined
+}
+
+// 校验请求数据必须包含 contents
+function ensureRequestContents(res, actualRequestData) {
+  if (!actualRequestData || !actualRequestData.contents) {
+    res.status(400).json({
+      error: {
+        message: 'Request contents are required',
+        type: 'invalid_request_error'
+      }
+    })
+    return false
+  }
+  return true
+}
+
+// 解析生效的项目ID：优先账户配置，降级临时ID，必要时从 loadCodeAssist 获取或为 Antigravity 生成
+async function resolveEffectiveProjectId(account, accountId, client, proxyConfig) {
+  let effectiveProjectId = account.projectId || account.tempProjectId || null
+  const oauthProvider = account.oauthProvider || 'gemini-cli'
+
+  if (!effectiveProjectId && oauthProvider !== 'antigravity') {
+    try {
+      logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
+      const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
+
+      if (loadResponse.cloudaicompanionProject) {
+        effectiveProjectId = loadResponse.cloudaicompanionProject
+        // 保存临时项目ID
+        await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
+        logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
+      }
+    } catch (loadError) {
+      logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
+    }
+  }
+
+  if (!effectiveProjectId && oauthProvider === 'antigravity') {
+    // Antigravity 账号允许没有 projectId：生成一个稳定的临时 projectId 并缓存
+    effectiveProjectId = `ag-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
+    await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
+  }
+
+  return { effectiveProjectId, oauthProvider }
+}
+
+// 项目ID缺失时的 403 响应
+function sendProjectIdRequiredError(res) {
+  res.status(403).json({
+    error: {
+      message:
+        'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
+      type: 'configuration_required'
+    }
+  })
+}
+
+// 记录项目ID决策日志
+function logProjectIdDecision(
+  title,
+  account,
+  effectiveProjectId,
+  tempFieldName = 'accountTempProjectId'
+) {
+  logger.info(title, {
+    accountProjectId: account.projectId,
+    [tempFieldName]: account.tempProjectId,
+    effectiveProjectId,
+    decision: account.projectId
+      ? '使用账户配置'
+      : account.tempProjectId
+        ? '使用临时项目ID'
+        : '从loadCodeAssist获取'
+  })
+}
+
+// 按 OAuth Provider 分发 generateContent 调用
+function dispatchGenerateContent(
+  oauthProvider,
+  client,
+  model,
+  actualRequestData,
+  userPromptId,
+  effectiveProjectId,
+  apiKeyId,
+  proxyConfig
+) {
+  return oauthProvider === 'antigravity'
+    ? geminiAccountService.generateContentAntigravity(
+        client,
+        { model, request: actualRequestData },
+        userPromptId,
+        effectiveProjectId,
+        apiKeyId,
+        proxyConfig
+      )
+    : geminiAccountService.generateContent(
+        client,
+        { model, request: actualRequestData },
+        userPromptId,
+        effectiveProjectId,
+        apiKeyId,
+        proxyConfig
+      )
+}
+
+// 按 OAuth Provider 分发 streamGenerateContent 调用
+function dispatchGenerateContentStream(
+  oauthProvider,
+  client,
+  model,
+  actualRequestData,
+  userPromptId,
+  effectiveProjectId,
+  apiKeyId,
+  signal,
+  proxyConfig
+) {
+  return oauthProvider === 'antigravity'
+    ? geminiAccountService.generateContentStreamAntigravity(
+        client,
+        { model, request: actualRequestData },
+        userPromptId,
+        effectiveProjectId,
+        apiKeyId,
+        signal,
+        proxyConfig
+      )
+    : geminiAccountService.generateContentStream(
+        client,
+        { model, request: actualRequestData },
+        userPromptId,
+        effectiveProjectId,
+        apiKeyId,
+        signal,
+        proxyConfig
+      )
+}
+
+// 构建标准 Gemini API 请求数据
+function buildStandardRequestData(body) {
+  const { contents, generationConfig, safetySettings, systemInstruction, tools, toolConfig } = body
+
+  const actualRequestData = {
+    contents,
+    generationConfig: generationConfig || {
+      temperature: 0.7,
+      maxOutputTokens: 4096,
+      topP: 0.95,
+      topK: 40
+    }
+  }
+
+  // 只有在 safetySettings 存在且非空时才添加
+  if (safetySettings && safetySettings.length > 0) {
+    actualRequestData.safetySettings = safetySettings
+  }
+
+  // 添加工具配置
+  if (tools) {
+    actualRequestData.tools = tools
+  }
+
+  if (toolConfig) {
+    actualRequestData.toolConfig = toolConfig
+  }
+
+  // 处理 system instruction
+  if (systemInstruction) {
+    if (typeof systemInstruction === 'string' && systemInstruction.trim()) {
+      actualRequestData.systemInstruction = {
+        role: 'user',
+        parts: [{ text: systemInstruction }]
+      }
+    } else if (systemInstruction.parts && systemInstruction.parts.length > 0) {
+      const hasContent = systemInstruction.parts.some(
+        (part) => part.text && part.text.trim() !== ''
+      )
+      if (hasContent) {
+        actualRequestData.systemInstruction = {
+          role: 'user',
+          parts: systemInstruction.parts
+        }
+      }
+    }
+  }
+
+  return actualRequestData
+}
+
+// 标准 Gemini API 公共前置流程：权限、模型、请求体构建与账户加载
+async function prepareStandardGeminiRequest(req, res, action, onSelect) {
+  if (!ensureGeminiPermission(req, res)) {
+    return null
+  }
+
+  // 从路径参数中获取模型名
+  const model = req.params.modelName || 'gemini-2.0-flash-exp'
+  if (!ensureGeminiModelAllowed(req, res, model)) {
+    return null
+  }
+
+  const sessionHash = sessionHelper.generateSessionHash(req.body)
+
+  // 验证必需参数
+  const { contents } = req.body
+  if (!contents || !Array.isArray(contents) || contents.length === 0) {
+    res.status(400).json({
+      error: {
+        message: 'Contents array is required',
+        type: 'invalid_request_error'
+      }
+    })
+    return null
+  }
+
+  // 构建内部 API 需要的请求格式
+  const actualRequestData = buildStandardRequestData(req.body)
+
+  // 使用统一调度选择账号
+  const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
+    req.apiKey,
+    sessionHash,
+    model,
+    { allowApiAccounts: true }
+  )
+  const { accountId, accountType } = schedulerResult
+  const isApiAccount = accountType === 'gemini-api'
+  if (onSelect) {
+    onSelect({ accountId, accountType, sessionHash })
+  }
+
+  const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
+
+  let account
+  if (isApiAccount) {
+    account = await geminiApiAccountService.getAccount(accountId)
+    if (!account) {
+      res.status(404).json({
+        error: {
+          message: 'Gemini API account not found',
+          type: 'account_not_found'
+        }
+      })
+      return null
+    }
+
+    // API Key 账户：清理 functionResponse 中标准 Gemini API 不支持的字段（如 id）
+    actualRequestData.contents = sanitizeFunctionResponsesForApiKey(actualRequestData.contents)
+
+    logger.info(`Standard Gemini API ${action} request (${version}) - API Key Account`, {
+      model,
+      accountId,
+      apiKeyId: req.apiKey?.id || 'unknown'
+    })
+  } else {
+    account = await geminiAccountService.getAccount(accountId)
+
+    logger.info(`Standard Gemini API ${action} request (${version}) - OAuth Account`, {
+      model,
+      projectId: account.projectId,
+      apiKeyId: req.apiKey?.id || 'unknown'
+    })
+  }
+
+  return {
+    model,
+    sessionHash,
+    actualRequestData,
+    accountId,
+    accountType,
+    isApiAccount,
+    account,
+    version
+  }
+}
+
+// ============================================================================
 // 处理函数 - v1internal 格式（Gemini CLI 内部格式）
 // ============================================================================
 
@@ -1197,49 +1715,11 @@ async function handleKeyInfo(req, res) {
 function handleSimpleEndpoint(apiMethod) {
   return async (req, res) => {
     try {
-      if (!ensureGeminiPermission(req, res)) {
+      const prepared = await prepareV1InternalOauthRequest(req, res)
+      if (!prepared) {
         return undefined
       }
-
-      const sessionHash = sessionHelper.generateSessionHash(req.body)
-
-      // 从路径参数或请求体中获取模型名
-      const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
-      if (!ensureGeminiModelAllowed(req, res, requestedModel)) {
-        return undefined
-      }
-
-      const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-        req.apiKey,
-        sessionHash,
-        requestedModel
-      )
-      const { accountId, accountType } = schedulerResult
-
-      // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
-      if (accountType === 'gemini-api') {
-        logger.error(
-          `❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`
-        )
-        return res.status(400).json({
-          error: {
-            message:
-              'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
-            type: 'invalid_account_type'
-          }
-        })
-      }
-
-      const account = await geminiAccountService.getAccount(accountId)
-      if (!account) {
-        return res.status(404).json({
-          error: {
-            message: 'Gemini account not found',
-            type: 'account_not_found'
-          }
-        })
-      }
-      const { accessToken, refreshToken } = account
+      const { account } = prepared
 
       const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
       logger.info(`${apiMethod} request (${version})`, {
@@ -1247,15 +1727,8 @@ function handleSimpleEndpoint(apiMethod) {
         requestBody: req.body
       })
 
-      // 解析账户的代理配置
-      const proxyConfig = parseProxyConfig(account)
-
-      const client = await geminiAccountService.getOauthClient(
-        accessToken,
-        refreshToken,
-        proxyConfig,
-        account.oauthProvider
-      )
+      // 解析账户的代理配置并创建 OAuth 客户端
+      const { proxyConfig, client } = await createOauthContext(account)
 
       // 直接转发请求体，不做特殊处理
       const response = await geminiAccountService.forwardToCodeAssist(
@@ -1282,47 +1755,12 @@ function handleSimpleEndpoint(apiMethod) {
  */
 async function handleLoadCodeAssist(req, res) {
   try {
-    if (!ensureGeminiPermission(req, res)) {
+    const prepared = await prepareV1InternalOauthRequest(req, res)
+    if (!prepared) {
       return undefined
     }
-
-    const sessionHash = sessionHelper.generateSessionHash(req.body)
-
-    // 从路径参数或请求体中获取模型名
-    const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
-    if (!ensureGeminiModelAllowed(req, res, requestedModel)) {
-      return undefined
-    }
-
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
-      sessionHash,
-      requestedModel
-    )
-    const { accountId, accountType } = schedulerResult
-
-    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
-    if (accountType === 'gemini-api') {
-      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
-      return res.status(400).json({
-        error: {
-          message:
-            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
-          type: 'invalid_account_type'
-        }
-      })
-    }
-
-    const account = await geminiAccountService.getAccount(accountId)
-    if (!account) {
-      return res.status(404).json({
-        error: {
-          message: 'Gemini account not found',
-          type: 'account_not_found'
-        }
-      })
-    }
-    const { accessToken, refreshToken, projectId } = account
+    const { accountId, account } = prepared
+    const { projectId } = account
 
     const { metadata, cloudaicompanionProject } = req.body
 
@@ -1334,15 +1772,8 @@ async function handleLoadCodeAssist(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
-
-    const client = await geminiAccountService.getOauthClient(
-      accessToken,
-      refreshToken,
-      proxyConfig,
-      account.oauthProvider
-    )
+    // 解析账户的代理配置并创建 OAuth 客户端
+    const { proxyConfig, client } = await createOauthContext(account)
 
     // 智能处理项目ID
     const effectiveProjectId = projectId || cloudaicompanionProject || null
@@ -1388,49 +1819,15 @@ async function handleLoadCodeAssist(req, res) {
  */
 async function handleOnboardUser(req, res) {
   try {
-    if (!ensureGeminiPermission(req, res)) {
+    const prepared = await prepareV1InternalOauthRequest(req, res)
+    if (!prepared) {
       return undefined
     }
+    const { account } = prepared
+    const { projectId } = account
 
     // 提取请求参数
     const { tierId, cloudaicompanionProject, metadata } = req.body
-    const sessionHash = sessionHelper.generateSessionHash(req.body)
-
-    // 从路径参数或请求体中获取模型名
-    const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
-    if (!ensureGeminiModelAllowed(req, res, requestedModel)) {
-      return undefined
-    }
-
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
-      sessionHash,
-      requestedModel
-    )
-    const { accountId, accountType } = schedulerResult
-
-    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
-    if (accountType === 'gemini-api') {
-      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
-      return res.status(400).json({
-        error: {
-          message:
-            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
-          type: 'invalid_account_type'
-        }
-      })
-    }
-
-    const account = await geminiAccountService.getAccount(accountId)
-    if (!account) {
-      return res.status(404).json({
-        error: {
-          message: 'Gemini account not found',
-          type: 'account_not_found'
-        }
-      })
-    }
-    const { accessToken, refreshToken, projectId } = account
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
     logger.info(`OnboardUser request (${version})`, {
@@ -1441,15 +1838,8 @@ async function handleOnboardUser(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
-
-    const client = await geminiAccountService.getOauthClient(
-      accessToken,
-      refreshToken,
-      proxyConfig,
-      account.oauthProvider
-    )
+    // 解析账户的代理配置并创建 OAuth 客户端
+    const { proxyConfig, client } = await createOauthContext(account)
 
     // 智能处理项目ID
     const effectiveProjectId = projectId || cloudaicompanionProject || null
@@ -1507,49 +1897,12 @@ async function handleOnboardUser(req, res) {
  */
 async function handleRetrieveUserQuota(req, res) {
   try {
-    // 1. 权限检查
-    if (!ensureGeminiPermission(req, res)) {
+    // 1-5. 权限校验、模型限制、账户选择与加载
+    const prepared = await prepareV1InternalOauthRequest(req, res)
+    if (!prepared) {
       return undefined
     }
-
-    // 2. 会话哈希
-    const sessionHash = sessionHelper.generateSessionHash(req.body)
-
-    // 3. 账户选择
-    const requestedModel = req.body.model || req.params.modelName || 'gemini-2.5-flash'
-    if (!ensureGeminiModelAllowed(req, res, requestedModel)) {
-      return undefined
-    }
-
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
-      sessionHash,
-      requestedModel
-    )
-    const { accountId, accountType } = schedulerResult
-
-    // 4. 账户类型验证 - v1internal 路由只支持 OAuth 账户
-    if (accountType === 'gemini-api') {
-      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
-      return res.status(400).json({
-        error: {
-          message:
-            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
-          type: 'invalid_account_type'
-        }
-      })
-    }
-
-    // 5. 获取账户
-    const account = await geminiAccountService.getAccount(accountId)
-    if (!account) {
-      return res.status(404).json({
-        error: {
-          message: 'Gemini account not found',
-          type: 'account_not_found'
-        }
-      })
-    }
+    const { account } = prepared
     const { accessToken, refreshToken, projectId } = account
 
     // 6. 从请求体提取项目字段（注意：字段名是 "project"，不是 "cloudaicompanionProject"）
@@ -1692,10 +2045,7 @@ async function handleCountTokens(req, res) {
         headers: { 'Content-Type': 'application/json' }
       }
 
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
-      }
+      applyProxyToAxiosConfig(axiosConfig, proxyConfig)
 
       try {
         const apiResponse = await axios(axiosConfig)
@@ -1727,35 +2077,9 @@ async function handleCountTokens(req, res) {
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
     logger.error(`Error in countTokens endpoint (${version})`, { error: error.message })
-    await handleGeminiUpstreamError(
-      error.response?.status,
-      accountId,
-      accountType,
-      sessionHash,
-      error.response?.headers,
-      account?.disableAutoProtection,
-      buildGeminiErrorHistoryContext(
-        req,
-        accountId,
-        accountType,
-        error.response?.data || error.message
-      )
-    )
+    await reportGeminiUpstreamError(req, error, { accountId, accountType, sessionHash, account })
 
-    if (accountType === 'gemini-api') {
-      const safeErrorResponse = buildGeminiApiClientError(error.response?.status || null, error, {
-        headers: error.response?.headers,
-        fallbackStatus: 503
-      })
-      res.status(safeErrorResponse.status).json(safeErrorResponse.body)
-    } else {
-      res.status(500).json({
-        error: {
-          message: getSafeMessage(error) || 'Internal server error',
-          type: 'api_error'
-        }
-      })
-    }
+    sendGeminiErrorResponse(res, error, accountType)
   }
   return undefined
 }
@@ -1774,7 +2098,7 @@ async function handleGenerateContent(req, res) {
       return undefined
     }
 
-    const { project, user_prompt_id, request: requestData } = req.body
+    const { project, user_prompt_id } = req.body
     // 从路径参数或请求体中获取模型名
     const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
     if (!ensureGeminiModelAllowed(req, res, model)) {
@@ -1783,71 +2107,26 @@ async function handleGenerateContent(req, res) {
 
     sessionHash = sessionHelper.generateSessionHash(req.body)
 
-    // 处理不同格式的请求
-    let actualRequestData = requestData
-    if (!requestData) {
-      if (req.body.messages) {
-        // 这是 OpenAI 格式的请求，构建 Gemini 格式的 request 对象
-        actualRequestData = {
-          contents: req.body.messages.map((msg) => ({
-            role: msg.role === 'assistant' ? 'model' : msg.role,
-            parts: [{ text: msg.content }]
-          })),
-          generationConfig: {
-            temperature: req.body.temperature !== undefined ? req.body.temperature : 0.7,
-            maxOutputTokens: req.body.max_tokens !== undefined ? req.body.max_tokens : 4096,
-            topP: req.body.top_p !== undefined ? req.body.top_p : 0.95,
-            topK: req.body.top_k !== undefined ? req.body.top_k : 40
-          }
-        }
-      } else if (req.body.contents) {
-        // 直接的 Gemini 格式请求（没有 request 包装）
-        actualRequestData = req.body
-      }
-    }
+    // 处理不同格式的请求（兼容 OpenAI 与直接 Gemini 格式）
+    const actualRequestData = resolveV1InternalRequestData(req.body)
 
     // 验证必需参数
-    if (!actualRequestData || !actualRequestData.contents) {
-      return res.status(400).json({
-        error: {
-          message: 'Request contents are required',
-          type: 'invalid_request_error'
-        }
-      })
+    if (!ensureRequestContents(res, actualRequestData)) {
+      return undefined
     }
 
     // 使用统一调度选择账号（v1internal 不允许 API 账户）
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
-      sessionHash,
-      model
-    )
-    ;({ accountId, accountType } = schedulerResult)
-
-    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
-    if (accountType === 'gemini-api') {
-      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
-      return res.status(400).json({
-        error: {
-          message:
-            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
-          type: 'invalid_account_type'
-        }
-      })
+    const acquired = await acquireV1InternalOauthAccount(req, res, sessionHash, model, {
+      logAccountNotFound: true,
+      onSelect: (id, type) => {
+        accountId = id
+        accountType = type
+      }
+    })
+    if (!acquired) {
+      return undefined
     }
-
-    account = await geminiAccountService.getAccount(accountId)
-    if (!account) {
-      logger.error(`❌ Gemini account not found: ${accountId}`)
-      return res.status(404).json({
-        error: {
-          message: 'Gemini account not found',
-          type: 'account_not_found'
-        }
-      })
-    }
-
-    const { accessToken, refreshToken } = account
+    ;({ account } = acquired)
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
     logger.info(`GenerateContent request (${version})`, {
@@ -1857,84 +2136,35 @@ async function handleGenerateContent(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
-
-    const client = await geminiAccountService.getOauthClient(
-      accessToken,
-      refreshToken,
-      proxyConfig,
-      account.oauthProvider
-    )
+    // 解析账户的代理配置并创建 OAuth 客户端
+    const { proxyConfig, client } = await createOauthContext(account)
 
     // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
-    let effectiveProjectId = account.projectId || account.tempProjectId || null
-
-    const oauthProvider = account.oauthProvider || 'gemini-cli'
-
-    // 如果没有任何项目ID，尝试调用 loadCodeAssist 获取
-    if (!effectiveProjectId && oauthProvider !== 'antigravity') {
-      try {
-        logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
-        const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
-
-        if (loadResponse.cloudaicompanionProject) {
-          effectiveProjectId = loadResponse.cloudaicompanionProject
-          // 保存临时项目ID
-          await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
-          logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
-        }
-      } catch (loadError) {
-        logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
-      }
-    }
-
-    if (!effectiveProjectId && oauthProvider === 'antigravity') {
-      // Antigravity 账号允许没有 projectId：生成一个稳定的临时 projectId 并缓存
-      effectiveProjectId = `ag-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
-      await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
-    }
+    const { effectiveProjectId, oauthProvider } = await resolveEffectiveProjectId(
+      account,
+      accountId,
+      client,
+      proxyConfig
+    )
 
     // 如果还是没有项目ID，返回错误
     if (!effectiveProjectId) {
-      return res.status(403).json({
-        error: {
-          message:
-            'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
-          type: 'configuration_required'
-        }
-      })
+      sendProjectIdRequiredError(res)
+      return undefined
     }
 
-    logger.info('📋 项目ID处理逻辑', {
-      accountProjectId: account.projectId,
-      accountTempProjectId: account.tempProjectId,
-      effectiveProjectId,
-      decision: account.projectId
-        ? '使用账户配置'
-        : account.tempProjectId
-          ? '使用临时项目ID'
-          : '从loadCodeAssist获取'
-    })
+    logProjectIdDecision('📋 项目ID处理逻辑', account, effectiveProjectId)
 
-    const response =
-      oauthProvider === 'antigravity'
-        ? await geminiAccountService.generateContentAntigravity(
-            client,
-            { model, request: actualRequestData },
-            user_prompt_id,
-            effectiveProjectId,
-            req.apiKey?.id,
-            proxyConfig
-          )
-        : await geminiAccountService.generateContent(
-            client,
-            { model, request: actualRequestData },
-            user_prompt_id,
-            effectiveProjectId,
-            req.apiKey?.id,
-            proxyConfig
-          )
+    const response = await dispatchGenerateContent(
+      oauthProvider,
+      client,
+      model,
+      actualRequestData,
+      user_prompt_id,
+      effectiveProjectId,
+      req.apiKey?.id,
+      proxyConfig
+    )
 
     // 记录使用统计
     if (response?.response?.usageMetadata) {
@@ -1989,20 +2219,7 @@ async function handleGenerateContent(req, res) {
       requestMethod: error.config?.method,
       stack: error.stack
     })
-    await handleGeminiUpstreamError(
-      error.response?.status,
-      accountId,
-      accountType,
-      sessionHash,
-      error.response?.headers,
-      account?.disableAutoProtection,
-      buildGeminiErrorHistoryContext(
-        req,
-        accountId,
-        accountType,
-        error.response?.data || error.message
-      )
-    )
+    await reportGeminiUpstreamError(req, error, { accountId, accountType, sessionHash, account })
     res.status(500).json({
       error: {
         message: getSafeMessage(error) || 'Internal server error',
@@ -2028,7 +2245,7 @@ async function handleStreamGenerateContent(req, res) {
       return undefined
     }
 
-    const { project, user_prompt_id, request: requestData } = req.body
+    const { project, user_prompt_id } = req.body
     // 从路径参数或请求体中获取模型名
     const model = req.body.model || req.params.modelName || 'gemini-2.5-flash'
     if (!ensureGeminiModelAllowed(req, res, model)) {
@@ -2037,71 +2254,26 @@ async function handleStreamGenerateContent(req, res) {
 
     sessionHash = sessionHelper.generateSessionHash(req.body)
 
-    // 处理不同格式的请求
-    let actualRequestData = requestData
-    if (!requestData) {
-      if (req.body.messages) {
-        // 这是 OpenAI 格式的请求，构建 Gemini 格式的 request 对象
-        actualRequestData = {
-          contents: req.body.messages.map((msg) => ({
-            role: msg.role === 'assistant' ? 'model' : msg.role,
-            parts: [{ text: msg.content }]
-          })),
-          generationConfig: {
-            temperature: req.body.temperature !== undefined ? req.body.temperature : 0.7,
-            maxOutputTokens: req.body.max_tokens !== undefined ? req.body.max_tokens : 4096,
-            topP: req.body.top_p !== undefined ? req.body.top_p : 0.95,
-            topK: req.body.top_k !== undefined ? req.body.top_k : 40
-          }
-        }
-      } else if (req.body.contents) {
-        // 直接的 Gemini 格式请求（没有 request 包装）
-        actualRequestData = req.body
-      }
-    }
+    // 处理不同格式的请求（兼容 OpenAI 与直接 Gemini 格式）
+    const actualRequestData = resolveV1InternalRequestData(req.body)
 
     // 验证必需参数
-    if (!actualRequestData || !actualRequestData.contents) {
-      return res.status(400).json({
-        error: {
-          message: 'Request contents are required',
-          type: 'invalid_request_error'
-        }
-      })
+    if (!ensureRequestContents(res, actualRequestData)) {
+      return undefined
     }
 
     // 使用统一调度选择账号（v1internal 不允许 API 账户）
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
-      sessionHash,
-      model
-    )
-    ;({ accountId, accountType } = schedulerResult)
-
-    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
-    if (accountType === 'gemini-api') {
-      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
-      return res.status(400).json({
-        error: {
-          message:
-            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
-          type: 'invalid_account_type'
-        }
-      })
+    const acquired = await acquireV1InternalOauthAccount(req, res, sessionHash, model, {
+      logAccountNotFound: true,
+      onSelect: (id, type) => {
+        accountId = id
+        accountType = type
+      }
+    })
+    if (!acquired) {
+      return undefined
     }
-
-    account = await geminiAccountService.getAccount(accountId)
-    if (!account) {
-      logger.error(`❌ Gemini account not found: ${accountId}`)
-      return res.status(404).json({
-        error: {
-          message: 'Gemini account not found',
-          type: 'account_not_found'
-        }
-      })
-    }
-
-    const { accessToken, refreshToken } = account
+    ;({ account } = acquired)
 
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
     logger.info(`StreamGenerateContent request (${version})`, {
@@ -2111,102 +2283,45 @@ async function handleStreamGenerateContent(req, res) {
       apiKeyId: req.apiKey?.id || 'unknown'
     })
 
-    // 创建中止控制器
+    // 创建中止控制器，并在客户端断开时中止上游请求
     abortController = new AbortController()
+    const disconnectGuard = abortOnClientDisconnect(res, abortController)
 
-    // 处理客户端断开连接
-    req.on('close', () => {
-      if (abortController && !abortController.signal.aborted) {
-        logger.info('Client disconnected, aborting stream request')
-        abortController.abort()
-      }
-    })
-
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
-
-    const client = await geminiAccountService.getOauthClient(
-      accessToken,
-      refreshToken,
-      proxyConfig,
-      account.oauthProvider
-    )
+    // 解析账户的代理配置并创建 OAuth 客户端
+    const { proxyConfig, client } = await createOauthContext(account)
 
     // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
-    let effectiveProjectId = account.projectId || account.tempProjectId || null
-
-    const oauthProvider = account.oauthProvider || 'gemini-cli'
-
-    // 如果没有任何项目ID，尝试调用 loadCodeAssist 获取
-    if (!effectiveProjectId && oauthProvider !== 'antigravity') {
-      try {
-        logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
-        const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
-
-        if (loadResponse.cloudaicompanionProject) {
-          effectiveProjectId = loadResponse.cloudaicompanionProject
-          // 保存临时项目ID
-          await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
-          logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
-        }
-      } catch (loadError) {
-        logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
-      }
-    }
-
-    if (!effectiveProjectId && oauthProvider === 'antigravity') {
-      effectiveProjectId = `ag-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
-      await geminiAccountService.updateTempProjectId(accountId, effectiveProjectId)
-    }
+    const { effectiveProjectId, oauthProvider } = await resolveEffectiveProjectId(
+      account,
+      accountId,
+      client,
+      proxyConfig
+    )
 
     // 如果还是没有项目ID，返回错误
     if (!effectiveProjectId) {
-      return res.status(403).json({
-        error: {
-          message:
-            'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
-          type: 'configuration_required'
-        }
-      })
+      sendProjectIdRequiredError(res)
+      return undefined
     }
 
-    logger.info('📋 流式请求项目ID处理逻辑', {
-      accountProjectId: account.projectId,
-      accountTempProjectId: account.tempProjectId,
+    logProjectIdDecision('📋 流式请求项目ID处理逻辑', account, effectiveProjectId)
+
+    const streamResponse = await dispatchGenerateContentStream(
+      oauthProvider,
+      client,
+      model,
+      actualRequestData,
+      user_prompt_id,
       effectiveProjectId,
-      decision: account.projectId
-        ? '使用账户配置'
-        : account.tempProjectId
-          ? '使用临时项目ID'
-          : '从loadCodeAssist获取'
-    })
+      req.apiKey?.id,
+      abortController.signal,
+      proxyConfig
+    )
 
-    const streamResponse =
-      oauthProvider === 'antigravity'
-        ? await geminiAccountService.generateContentStreamAntigravity(
-            client,
-            { model, request: actualRequestData },
-            user_prompt_id,
-            effectiveProjectId,
-            req.apiKey?.id,
-            abortController.signal,
-            proxyConfig
-          )
-        : await geminiAccountService.generateContentStream(
-            client,
-            { model, request: actualRequestData },
-            user_prompt_id,
-            effectiveProjectId,
-            req.apiKey?.id,
-            abortController.signal,
-            proxyConfig
-          )
-
-    // 设置 SSE 响应头
-    res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
-    res.setHeader('Connection', 'keep-alive')
-    res.setHeader('X-Accel-Buffering', 'no')
+    // 设置 SSE 响应头并启动心跳；客户端断开时停止心跳并销毁上游流
+    const heartbeat = createSSEHeartbeat(res)
+    disconnectGuard.addCleanup(() => heartbeat.stop())
+    disconnectGuard.addCleanup(() => streamResponse.destroy?.())
 
     // 处理流式响应并捕获usage数据
     let streamBuffer = '' // 移动到 data 事件处理器外部，保持状态
@@ -2217,24 +2332,9 @@ async function handleStreamGenerateContent(req, res) {
     }
     let usageReported = false
 
-    // SSE 心跳机制
-    let heartbeatTimer = null
-    let lastDataTime = Date.now()
-    const HEARTBEAT_INTERVAL = 15000
-
-    const sendHeartbeat = () => {
-      const timeSinceLastData = Date.now() - lastDataTime
-      if (timeSinceLastData >= HEARTBEAT_INTERVAL && !res.destroyed) {
-        res.write('\n')
-        logger.info(`💓 Sent SSE keepalive (gap: ${(timeSinceLastData / 1000).toFixed(1)}s)`)
-      }
-    }
-
-    heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
-
     streamResponse.on('data', (chunk) => {
       try {
-        lastDataTime = Date.now()
+        heartbeat.touch()
 
         // 立即转发原始数据
         if (!res.destroyed) {
@@ -2296,10 +2396,7 @@ async function handleStreamGenerateContent(req, res) {
     streamResponse.on('end', () => {
       logger.info('Stream completed successfully')
 
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
+      heartbeat.stop()
 
       res.end()
 
@@ -2350,38 +2447,8 @@ async function handleStreamGenerateContent(req, res) {
 
     streamResponse.on('error', (error) => {
       logger.error('Stream error:', error)
-
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
-
-      if (!res.headersSent) {
-        res.status(500).json({
-          error: {
-            message: getSafeMessage(error) || 'Stream error',
-            type: 'api_error'
-          }
-        })
-      } else {
-        if (!res.destroyed) {
-          try {
-            res.write(
-              `data: ${JSON.stringify({
-                error: {
-                  message: getSafeMessage(error) || 'Stream error',
-                  type: 'stream_error',
-                  code: error.code
-                }
-              })}\n\n`
-            )
-            res.write('data: [DONE]\n\n')
-          } catch (writeError) {
-            logger.error('Error sending error event:', writeError)
-          }
-        }
-        res.end()
-      }
+      heartbeat.stop()
+      writeOauthStreamError(res, error)
     })
   } catch (error) {
     const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
@@ -2394,20 +2461,7 @@ async function handleStreamGenerateContent(req, res) {
       requestMethod: error.config?.method,
       stack: error.stack
     })
-    await handleGeminiUpstreamError(
-      error.response?.status,
-      accountId,
-      accountType,
-      sessionHash,
-      error.response?.headers,
-      account?.disableAutoProtection,
-      buildGeminiErrorHistoryContext(
-        req,
-        accountId,
-        accountType,
-        error.response?.data || error.message
-      )
-    )
+    await reportGeminiUpstreamError(req, error, { accountId, accountType, sessionHash, account })
 
     if (!res.headersSent) {
       res.status(500).json({
@@ -2440,127 +2494,20 @@ async function handleStandardGenerateContent(req, res) {
   let isApiAccount = false
 
   try {
-    if (!ensureGeminiPermission(req, res)) {
+    const prepared = await prepareStandardGeminiRequest(req, res, 'generateContent', (sel) => {
+      ;({ accountId, accountType, sessionHash } = sel)
+    })
+    if (!prepared) {
       return undefined
     }
-
-    // 从路径参数中获取模型名
-    const model = req.params.modelName || 'gemini-2.0-flash-exp'
-    if (!ensureGeminiModelAllowed(req, res, model)) {
-      return undefined
-    }
-
-    sessionHash = sessionHelper.generateSessionHash(req.body)
-
-    // 标准 Gemini API 请求体直接包含 contents 等字段
-    const { contents, generationConfig, safetySettings, systemInstruction, tools, toolConfig } =
-      req.body
-
-    // 验证必需参数
-    if (!contents || !Array.isArray(contents) || contents.length === 0) {
-      return res.status(400).json({
-        error: {
-          message: 'Contents array is required',
-          type: 'invalid_request_error'
-        }
-      })
-    }
-
-    // 构建内部 API 需要的请求格式
-    const actualRequestData = {
-      contents,
-      generationConfig: generationConfig || {
-        temperature: 0.7,
-        maxOutputTokens: 4096,
-        topP: 0.95,
-        topK: 40
-      }
-    }
-
-    // 只有在 safetySettings 存在且非空时才添加
-    if (safetySettings && safetySettings.length > 0) {
-      actualRequestData.safetySettings = safetySettings
-    }
-
-    // 添加工具配置
-    if (tools) {
-      actualRequestData.tools = tools
-    }
-
-    if (toolConfig) {
-      actualRequestData.toolConfig = toolConfig
-    }
-
-    // 处理 system instruction
-    if (systemInstruction) {
-      if (typeof systemInstruction === 'string' && systemInstruction.trim()) {
-        actualRequestData.systemInstruction = {
-          role: 'user',
-          parts: [{ text: systemInstruction }]
-        }
-      } else if (systemInstruction.parts && systemInstruction.parts.length > 0) {
-        const hasContent = systemInstruction.parts.some(
-          (part) => part.text && part.text.trim() !== ''
-        )
-        if (hasContent) {
-          actualRequestData.systemInstruction = {
-            role: 'user',
-            parts: systemInstruction.parts
-          }
-        }
-      }
-    }
-
-    // 使用统一调度选择账号
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
-      sessionHash,
-      model,
-      { allowApiAccounts: true }
-    )
-    ;({ accountId, accountType } = schedulerResult)
-
-    isApiAccount = accountType === 'gemini-api'
-    const actualAccountId = accountId
-
-    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
-
-    if (isApiAccount) {
-      account = await geminiApiAccountService.getAccount(actualAccountId)
-      if (!account) {
-        return res.status(404).json({
-          error: {
-            message: 'Gemini API account not found',
-            type: 'account_not_found'
-          }
-        })
-      }
-
-      // API Key 账户：清理 functionResponse 中标准 Gemini API 不支持的字段（如 id）
-      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(actualRequestData.contents)
-
-      logger.info(`Standard Gemini API generateContent request (${version}) - API Key Account`, {
-        model,
-        accountId: actualAccountId,
-        apiKeyId: req.apiKey?.id || 'unknown'
-      })
-    } else {
-      account = await geminiAccountService.getAccount(actualAccountId)
-
-      logger.info(`Standard Gemini API generateContent request (${version}) - OAuth Account`, {
-        model,
-        projectId: account.projectId,
-        apiKeyId: req.apiKey?.id || 'unknown'
-      })
-    }
-
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
+    const { model, actualRequestData } = prepared
+    ;({ account, isApiAccount } = prepared)
 
     let response
 
     if (isApiAccount) {
       // Gemini API 账户：直接使用 API Key 请求
+      const proxyConfig = parseProxyConfig(account)
       const apiUrl = buildGeminiApiUrl(account.baseUrl, model, 'generateContent', account.apiKey)
 
       logger.info('📤 Gemini upstream request', {
@@ -2578,10 +2525,7 @@ async function handleStandardGenerateContent(req, res) {
         }
       }
 
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
-      }
+      applyProxyToAxiosConfig(axiosConfig, proxyConfig)
 
       try {
         const apiResponse = await axios(axiosConfig)
@@ -2596,80 +2540,40 @@ async function handleStandardGenerateContent(req, res) {
       }
     } else {
       // OAuth 账户
-      const { accessToken, refreshToken } = account
-      const oauthProvider = account.oauthProvider || 'gemini-cli'
-      const client = await geminiAccountService.getOauthClient(
-        accessToken,
-        refreshToken,
-        proxyConfig,
-        oauthProvider
+      const { proxyConfig, client } = await createOauthContext(account)
+
+      // 智能处理项目ID：优先使用配置的 projectId，降级到临时 tempProjectId
+      const { effectiveProjectId, oauthProvider } = await resolveEffectiveProjectId(
+        account,
+        accountId,
+        client,
+        proxyConfig
       )
 
-      let effectiveProjectId = account.projectId || account.tempProjectId || null
-
-      if (oauthProvider === 'antigravity') {
-        if (!effectiveProjectId) {
-          // Antigravity 账号允许没有 projectId：生成一个稳定的临时 projectId 并缓存
-          effectiveProjectId = `ag-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
-          await geminiAccountService.updateTempProjectId(actualAccountId, effectiveProjectId)
-        }
-      } else if (!effectiveProjectId) {
-        try {
-          logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
-          const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
-
-          if (loadResponse.cloudaicompanionProject) {
-            effectiveProjectId = loadResponse.cloudaicompanionProject
-            await geminiAccountService.updateTempProjectId(actualAccountId, effectiveProjectId)
-            logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
-          }
-        } catch (loadError) {
-          logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
-        }
-      }
-
       if (!effectiveProjectId) {
-        return res.status(403).json({
-          error: {
-            message:
-              'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
-            type: 'configuration_required'
-          }
-        })
+        sendProjectIdRequiredError(res)
+        return undefined
       }
 
-      logger.info('📋 Standard API 项目ID处理逻辑', {
-        accountProjectId: account.projectId,
-        tempProjectId: account.tempProjectId,
+      logProjectIdDecision(
+        '📋 Standard API 项目ID处理逻辑',
+        account,
         effectiveProjectId,
-        decision: account.projectId
-          ? '使用账户配置'
-          : account.tempProjectId
-            ? '使用临时项目ID'
-            : '从loadCodeAssist获取'
-      })
+        'tempProjectId'
+      )
 
       const userPromptId = `${crypto.randomUUID()}########0`
 
-      if (oauthProvider === 'antigravity') {
-        response = await geminiAccountService.generateContentAntigravity(
-          client,
-          { model, request: actualRequestData },
-          userPromptId,
-          effectiveProjectId,
-          req.apiKey?.id,
-          proxyConfig
-        )
-      } else {
-        response = await geminiAccountService.generateContent(
-          client,
-          { model, request: actualRequestData },
-          userPromptId,
-          effectiveProjectId,
-          req.apiKey?.id,
-          proxyConfig
-        )
-      }
+      response = await dispatchGenerateContent(
+        oauthProvider,
+        client,
+        model,
+        actualRequestData,
+        userPromptId,
+        effectiveProjectId,
+        req.apiKey?.id,
+        proxyConfig
+      )
     }
 
     // 记录使用统计
@@ -2710,35 +2614,9 @@ async function handleStandardGenerateContent(req, res) {
       responseData: error.response?.data,
       stack: error.stack
     })
-    await handleGeminiUpstreamError(
-      error.response?.status,
-      accountId,
-      accountType,
-      sessionHash,
-      error.response?.headers,
-      account?.disableAutoProtection,
-      buildGeminiErrorHistoryContext(
-        req,
-        accountId,
-        accountType,
-        error.response?.data || error.message
-      )
-    )
+    await reportGeminiUpstreamError(req, error, { accountId, accountType, sessionHash, account })
 
-    if (accountType === 'gemini-api') {
-      const safeErrorResponse = buildGeminiApiClientError(error.response?.status || null, error, {
-        headers: error.response?.headers,
-        fallbackStatus: 503
-      })
-      res.status(safeErrorResponse.status).json(safeErrorResponse.body)
-    } else {
-      res.status(500).json({
-        error: {
-          message: getSafeMessage(error) || 'Internal server error',
-          type: 'api_error'
-        }
-      })
-    }
+    sendGeminiErrorResponse(res, error, accountType)
   }
 }
 
@@ -2754,142 +2632,29 @@ async function handleStandardStreamGenerateContent(req, res) {
   let isApiAccount = false
 
   try {
-    if (!ensureGeminiPermission(req, res)) {
-      return undefined
-    }
-
-    // 从路径参数中获取模型名
-    const model = req.params.modelName || 'gemini-2.0-flash-exp'
-    if (!ensureGeminiModelAllowed(req, res, model)) {
-      return undefined
-    }
-
-    sessionHash = sessionHelper.generateSessionHash(req.body)
-
-    // 标准 Gemini API 请求体直接包含 contents 等字段
-    const { contents, generationConfig, safetySettings, systemInstruction, tools, toolConfig } =
-      req.body
-
-    // 验证必需参数
-    if (!contents || !Array.isArray(contents) || contents.length === 0) {
-      return res.status(400).json({
-        error: {
-          message: 'Contents array is required',
-          type: 'invalid_request_error'
-        }
-      })
-    }
-
-    // 构建内部 API 需要的请求格式
-    const actualRequestData = {
-      contents,
-      generationConfig: generationConfig || {
-        temperature: 0.7,
-        maxOutputTokens: 4096,
-        topP: 0.95,
-        topK: 40
+    const prepared = await prepareStandardGeminiRequest(
+      req,
+      res,
+      'streamGenerateContent',
+      (sel) => {
+        ;({ accountId, accountType, sessionHash } = sel)
       }
-    }
-
-    if (safetySettings && safetySettings.length > 0) {
-      actualRequestData.safetySettings = safetySettings
-    }
-
-    if (tools) {
-      actualRequestData.tools = tools
-    }
-
-    if (toolConfig) {
-      actualRequestData.toolConfig = toolConfig
-    }
-
-    // 处理 system instruction
-    if (systemInstruction) {
-      if (typeof systemInstruction === 'string' && systemInstruction.trim()) {
-        actualRequestData.systemInstruction = {
-          role: 'user',
-          parts: [{ text: systemInstruction }]
-        }
-      } else if (systemInstruction.parts && systemInstruction.parts.length > 0) {
-        const hasContent = systemInstruction.parts.some(
-          (part) => part.text && part.text.trim() !== ''
-        )
-        if (hasContent) {
-          actualRequestData.systemInstruction = {
-            role: 'user',
-            parts: systemInstruction.parts
-          }
-        }
-      }
-    }
-
-    // 使用统一调度选择账号
-    const schedulerResult = await unifiedGeminiScheduler.selectAccountForApiKey(
-      req.apiKey,
-      sessionHash,
-      model,
-      { allowApiAccounts: true }
     )
-    ;({ accountId, accountType } = schedulerResult)
-
-    isApiAccount = accountType === 'gemini-api'
-    const actualAccountId = accountId
-
-    const version = req.path.includes('v1beta') ? 'v1beta' : 'v1'
-
-    if (isApiAccount) {
-      account = await geminiApiAccountService.getAccount(actualAccountId)
-      if (!account) {
-        return res.status(404).json({
-          error: {
-            message: 'Gemini API account not found',
-            type: 'account_not_found'
-          }
-        })
-      }
-
-      // API Key 账户：清理 functionResponse 中标准 Gemini API 不支持的字段（如 id）
-      actualRequestData.contents = sanitizeFunctionResponsesForApiKey(actualRequestData.contents)
-
-      logger.info(
-        `Standard Gemini API streamGenerateContent request (${version}) - API Key Account`,
-        {
-          model,
-          accountId: actualAccountId,
-          apiKeyId: req.apiKey?.id || 'unknown'
-        }
-      )
-    } else {
-      account = await geminiAccountService.getAccount(actualAccountId)
-
-      logger.info(
-        `Standard Gemini API streamGenerateContent request (${version}) - OAuth Account`,
-        {
-          model,
-          projectId: account.projectId,
-          apiKeyId: req.apiKey?.id || 'unknown'
-        }
-      )
+    if (!prepared) {
+      return undefined
     }
+    const { model, actualRequestData } = prepared
+    ;({ account, isApiAccount } = prepared)
 
-    // 创建中止控制器
+    // 创建中止控制器，并在客户端断开时中止上游请求
     abortController = new AbortController()
-
-    // 处理客户端断开连接
-    req.on('close', () => {
-      if (abortController && !abortController.signal.aborted) {
-        logger.info('Client disconnected, aborting stream request')
-        abortController.abort()
-      }
-    })
-
-    // 解析账户的代理配置
-    const proxyConfig = parseProxyConfig(account)
+    const disconnectGuard = abortOnClientDisconnect(res, abortController)
 
     let streamResponse
 
     if (isApiAccount) {
       // Gemini API 账户：直接使用 API Key 请求流式接口
+      const proxyConfig = parseProxyConfig(account)
       const apiUrl = buildGeminiApiUrl(
         account.baseUrl,
         model,
@@ -2903,7 +2668,7 @@ async function handleStandardStreamGenerateContent(req, res) {
       logger.info('📤 Gemini upstream request', {
         targetUrl: apiUrl.replace(/key=[^&]+/, 'key=***'),
         model,
-        accountId: actualAccountId
+        accountId
       })
 
       const axiosConfig = {
@@ -2919,10 +2684,7 @@ async function handleStandardStreamGenerateContent(req, res) {
         signal: abortController.signal
       }
 
-      if (proxyConfig) {
-        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
-        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
-      }
+      applyProxyToAxiosConfig(axiosConfig, proxyConfig)
 
       try {
         const apiResponse = await axios(axiosConfig)
@@ -2937,89 +2699,46 @@ async function handleStandardStreamGenerateContent(req, res) {
       }
     } else {
       // OAuth 账户
-      const { accessToken, refreshToken } = account
-      const client = await geminiAccountService.getOauthClient(
-        accessToken,
-        refreshToken,
-        proxyConfig,
-        account.oauthProvider
+      const { proxyConfig, client } = await createOauthContext(account)
+
+      const { effectiveProjectId, oauthProvider } = await resolveEffectiveProjectId(
+        account,
+        accountId,
+        client,
+        proxyConfig
       )
 
-      let effectiveProjectId = account.projectId || account.tempProjectId || null
-
-      const oauthProvider = account.oauthProvider || 'gemini-cli'
-
-      if (oauthProvider === 'antigravity') {
-        if (!effectiveProjectId) {
-          effectiveProjectId = `ag-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
-          await geminiAccountService.updateTempProjectId(actualAccountId, effectiveProjectId)
-        }
-      } else if (!effectiveProjectId) {
-        try {
-          logger.info('📋 No projectId available, attempting to fetch from loadCodeAssist...')
-          const loadResponse = await geminiAccountService.loadCodeAssist(client, null, proxyConfig)
-
-          if (loadResponse.cloudaicompanionProject) {
-            effectiveProjectId = loadResponse.cloudaicompanionProject
-            await geminiAccountService.updateTempProjectId(actualAccountId, effectiveProjectId)
-            logger.info(`📋 Fetched and cached temporary projectId: ${effectiveProjectId}`)
-          }
-        } catch (loadError) {
-          logger.warn('Failed to fetch projectId from loadCodeAssist:', loadError.message)
-        }
-      }
-
       if (!effectiveProjectId) {
-        return res.status(403).json({
-          error: {
-            message:
-              'This account requires a project ID to be configured. Please configure a project ID in the account settings.',
-            type: 'configuration_required'
-          }
-        })
+        sendProjectIdRequiredError(res)
+        return undefined
       }
 
-      logger.info('📋 Standard API 流式项目ID处理逻辑', {
-        accountProjectId: account.projectId,
-        tempProjectId: account.tempProjectId,
+      logProjectIdDecision(
+        '📋 Standard API 流式项目ID处理逻辑',
+        account,
         effectiveProjectId,
-        decision: account.projectId
-          ? '使用账户配置'
-          : account.tempProjectId
-            ? '使用临时项目ID'
-            : '从loadCodeAssist获取'
-      })
+        'tempProjectId'
+      )
 
       const userPromptId = `${crypto.randomUUID()}########0`
 
-      if (oauthProvider === 'antigravity') {
-        streamResponse = await geminiAccountService.generateContentStreamAntigravity(
-          client,
-          { model, request: actualRequestData },
-          userPromptId,
-          effectiveProjectId,
-          req.apiKey?.id,
-          abortController.signal,
-          proxyConfig
-        )
-      } else {
-        streamResponse = await geminiAccountService.generateContentStream(
-          client,
-          { model, request: actualRequestData },
-          userPromptId,
-          effectiveProjectId,
-          req.apiKey?.id,
-          abortController.signal,
-          proxyConfig
-        )
-      }
+      streamResponse = await dispatchGenerateContentStream(
+        oauthProvider,
+        client,
+        model,
+        actualRequestData,
+        userPromptId,
+        effectiveProjectId,
+        req.apiKey?.id,
+        abortController.signal,
+        proxyConfig
+      )
     }
 
-    // 设置 SSE 响应头
-    res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
-    res.setHeader('Connection', 'keep-alive')
-    res.setHeader('X-Accel-Buffering', 'no')
+    // 设置 SSE 响应头并启动心跳；客户端断开时停止心跳并销毁上游流
+    const heartbeat = createSSEHeartbeat(res)
+    disconnectGuard.addCleanup(() => heartbeat.stop())
+    disconnectGuard.addCleanup(() => streamResponse.destroy?.())
 
     // 处理流式响应
     let totalUsage = {
@@ -3027,20 +2746,6 @@ async function handleStandardStreamGenerateContent(req, res) {
       candidatesTokenCount: 0,
       totalTokenCount: 0
     }
-
-    let heartbeatTimer = null
-    let lastDataTime = Date.now()
-    const HEARTBEAT_INTERVAL = 15000
-
-    const sendHeartbeat = () => {
-      const timeSinceLastData = Date.now() - lastDataTime
-      if (timeSinceLastData >= HEARTBEAT_INTERVAL && !res.destroyed) {
-        res.write('\n')
-        logger.info(`💓 Sent SSE keepalive (gap: ${(timeSinceLastData / 1000).toFixed(1)}s)`)
-      }
-    }
-
-    heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
 
     let sseBuffer = ''
 
@@ -3115,7 +2820,7 @@ async function handleStandardStreamGenerateContent(req, res) {
 
     streamResponse.on('data', (chunk) => {
       try {
-        lastDataTime = Date.now()
+        heartbeat.touch()
 
         sseBuffer += chunk.toString()
         const events = sseBuffer.split(/\r?\n\r?\n/)
@@ -3141,10 +2846,7 @@ async function handleStandardStreamGenerateContent(req, res) {
         sseBuffer = ''
       }
 
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
+      heartbeat.stop()
 
       res.end()
 
@@ -3183,41 +2885,12 @@ async function handleStandardStreamGenerateContent(req, res) {
 
     streamResponse.on('error', (error) => {
       logger.error('Stream error:', error)
-
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer)
-        heartbeatTimer = null
-      }
+      heartbeat.stop()
 
       if (isApiAccount) {
         writeGeminiApiStreamError(res, error, { fallbackStatus: 503 })
       } else {
-        if (!res.headersSent) {
-          res.status(500).json({
-            error: {
-              message: getSafeMessage(error) || 'Stream error',
-              type: 'api_error'
-            }
-          })
-        } else {
-          if (!res.destroyed) {
-            try {
-              res.write(
-                `data: ${JSON.stringify({
-                  error: {
-                    message: getSafeMessage(error) || 'Stream error',
-                    type: 'stream_error',
-                    code: error.code
-                  }
-                })}\n\n`
-              )
-              res.write('data: [DONE]\n\n')
-            } catch (writeError) {
-              logger.error('Error sending error event:', writeError)
-            }
-          }
-          res.end()
-        }
+        writeOauthStreamError(res, error)
       }
     })
   } catch (error) {
@@ -3231,23 +2904,18 @@ async function handleStandardStreamGenerateContent(req, res) {
       responseData: normalizedError.parsedBody || normalizedError.rawBody,
       stack: error.stack
     })
-    await handleGeminiUpstreamError(
-      normalizedError.status || error.response?.status,
+    await reportGeminiUpstreamError(req, error, {
       accountId,
       accountType,
       sessionHash,
-      error.response?.headers,
-      account?.disableAutoProtection,
-      buildGeminiErrorHistoryContext(
-        req,
-        accountId,
-        accountType,
+      account,
+      status: normalizedError.status || error.response?.status,
+      errorBody:
         normalizedError.parsedBody ||
-          normalizedError.rawBody ||
-          error.response?.data ||
-          error.message
-      )
-    )
+        normalizedError.rawBody ||
+        error.response?.data ||
+        error.message
+    })
 
     if (!res.headersSent) {
       if (accountType === 'gemini-api') {
@@ -3290,6 +2958,8 @@ module.exports = {
   applyRateLimitTracking,
   parseProxyConfig,
   normalizeAxiosStreamError,
+  abortOnClientDisconnect,
+  createSSEHeartbeat,
 
   // OpenAI 兼容格式处理函数
   handleMessages,
