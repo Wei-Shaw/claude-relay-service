@@ -242,6 +242,48 @@ describe('openaiResponsesRelayService 路径和连接清理', () => {
     )
     expect(req.body.model).toBe('gpt-4.1-mini')
   })
+
+  it('记录客户端、本地映射、上游请求和上游响应四个模型值', async () => {
+    axios.mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      data: {
+        object: 'response',
+        model: 'gpt-5.6-luna',
+        usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 }
+      },
+      headers: {}
+    })
+
+    const { req, res } = createReqRes()
+    req.body.model = 'codex-auto-review'
+    req._originalRequestedModel = 'codex-auto-review'
+
+    await openaiResponsesRelayService.handleRequest(
+      req,
+      res,
+      { id: 'resp-1', name: 'Responses 1', disableAutoProtection: false },
+      { id: 'key-1' }
+    )
+
+    expect(apiKeyService.recordUsage).toHaveBeenCalledWith(
+      'key-1',
+      10,
+      5,
+      0,
+      0,
+      'gpt-5.6-luna',
+      'resp-1',
+      'openai-responses',
+      null,
+      expect.objectContaining({
+        requestedModel: 'codex-auto-review',
+        mappedModel: 'codex-auto-review',
+        outboundModel: 'codex-auto-review',
+        responseModel: 'gpt-5.6-luna'
+      })
+    )
+  })
 })
 
 describe('openaiResponsesRelayService 其他4xx软暂停', () => {
@@ -348,6 +390,59 @@ describe('openaiResponsesRelayService 流式响应生命周期', () => {
     openaiResponsesAccountService.updateAccountUsage.mockResolvedValue()
     openaiResponsesAccountService.updateUsageQuota.mockResolvedValue()
     unifiedOpenAIScheduler.markAccountRateLimited.mockResolvedValue()
+  })
+
+  it('流式 response.completed 保留四个模型阶段值', async () => {
+    const upstream = new PassThrough()
+    const res = createStreamingResponse()
+    const req = createStreamingRequest('request-model-trace')
+    req.body.model = 'codex-auto-review'
+
+    await openaiResponsesRelayService._handleStreamResponse(
+      { status: 200, headers: {}, data: upstream },
+      res,
+      { id: 'account-1' },
+      { id: 'key-1' },
+      'codex-auto-review',
+      jest.fn(),
+      req,
+      {
+        requestedModel: 'codex-auto-review',
+        mappedModel: 'codex-auto-review',
+        outboundModel: 'codex-auto-review',
+        responseModel: null
+      }
+    )
+
+    upstream.end(
+      `data: ${JSON.stringify({
+        type: 'response.completed',
+        response: {
+          model: 'gpt-5.6-luna',
+          usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 }
+        }
+      })}\n\n`
+    )
+    await flushAsyncWork()
+    await flushAsyncWork()
+
+    expect(apiKeyService.recordUsage).toHaveBeenCalledWith(
+      'key-1',
+      10,
+      5,
+      0,
+      0,
+      'gpt-5.6-luna',
+      'account-1',
+      'openai-responses',
+      null,
+      expect.objectContaining({
+        requestedModel: 'codex-auto-review',
+        mappedModel: 'codex-auto-review',
+        outboundModel: 'codex-auto-review',
+        responseModel: 'gpt-5.6-luna'
+      })
+    )
   })
 
   it('response.completed 写入后 close 仍继续完成计费', async () => {

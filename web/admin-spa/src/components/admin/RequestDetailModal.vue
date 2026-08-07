@@ -100,6 +100,22 @@
                 </p>
               </div>
               <div>
+                <p class="field-label">客户端请求模型</p>
+                <p class="field-value break-all">{{ detail.requestedModel || '-' }}</p>
+              </div>
+              <div>
+                <p class="field-label">本地映射模型</p>
+                <p class="field-value break-all">{{ detail.mappedModel || '-' }}</p>
+              </div>
+              <div>
+                <p class="field-label">实际上游请求模型</p>
+                <p class="field-value break-all">{{ detail.outboundModel || '-' }}</p>
+              </div>
+              <div>
+                <p class="field-label">上游响应模型</p>
+                <p class="field-value break-all">{{ detail.responseModel || '-' }}</p>
+              </div>
+              <div>
                 <p class="field-label">推理</p>
                 <p class="field-value">{{ formatReasoning(detail.reasoningDisplay) }}</p>
                 <p class="field-sub">

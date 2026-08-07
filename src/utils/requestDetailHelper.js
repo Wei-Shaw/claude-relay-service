@@ -571,6 +571,7 @@ function createRequestDetailMeta(req, overrides = {}) {
   const reqStartedAt = toFiniteNumber(req?.requestStartedAt)
   const effectiveStart = requestStartedAt ?? reqStartedAt
   const requestBody = overrides.requestBody !== undefined ? overrides.requestBody : req?.body
+  const modelTrace = req?._modelTrace && typeof req._modelTrace === 'object' ? req._modelTrace : {}
 
   return {
     requestId: overrides.requestId || req?.requestId || null,
@@ -585,7 +586,11 @@ function createRequestDetailMeta(req, overrides = {}) {
     requestStartedAt: effectiveStart ? new Date(effectiveStart).toISOString() : null,
     requestBody,
     actualModel: overrides.actualModel || null,
-    requestedModel: overrides.requestedModel || null,
+    requestedModel:
+      overrides.requestedModel ?? modelTrace.requestedModel ?? req?._originalRequestedModel ?? null,
+    mappedModel: overrides.mappedModel ?? modelTrace.mappedModel ?? null,
+    outboundModel: overrides.outboundModel ?? modelTrace.outboundModel ?? null,
+    responseModel: overrides.responseModel ?? modelTrace.responseModel ?? null,
     displayModel: overrides.displayModel || null
   }
 }

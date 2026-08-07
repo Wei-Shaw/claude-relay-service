@@ -279,6 +279,35 @@ describe('apiKeyService openai responses config', () => {
     )
   })
 
+  test('_captureRequestDetail forwards all four model trace fields', async () => {
+    await apiKeyService._captureRequestDetail(
+      'key-1',
+      {
+        model: 'gpt-5.6-luna',
+        actualModel: 'gpt-5.6-luna',
+        accountId: 'acct-1',
+        accountType: 'openai-responses'
+      },
+      {
+        requestId: 'req-model-trace',
+        requestedModel: 'codex-auto-review',
+        mappedModel: 'codex-auto-review',
+        outboundModel: 'codex-auto-review',
+        responseModel: 'gpt-5.6-luna'
+      }
+    )
+
+    expect(requestDetailService.captureRequestDetail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'req-model-trace',
+        requestedModel: 'codex-auto-review',
+        mappedModel: 'codex-auto-review',
+        outboundModel: 'codex-auto-review',
+        responseModel: 'gpt-5.6-luna'
+      })
+    )
+  })
+
   test('admin tests keep account stats but skip API key quota and usage writes', async () => {
     CostCalculator.calculateCost.mockReturnValue({
       costs: { input: 0.01, output: 0.02, total: 0.03 },

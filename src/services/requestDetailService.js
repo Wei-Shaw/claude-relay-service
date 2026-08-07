@@ -579,6 +579,9 @@ function mergeRequestDetailRecords(existing = null, incoming = {}) {
     'model',
     'actualModel',
     'requestedModel',
+    'mappedModel',
+    'outboundModel',
+    'responseModel',
     'displayModel',
     'pricingSource',
     'errorType',
@@ -707,6 +710,7 @@ function buildLifecycleDetail(req = {}, res = {}, options = {}) {
     req._relayAccountContext && typeof req._relayAccountContext === 'object'
       ? req._relayAccountContext
       : {}
+  const modelTrace = req._modelTrace && typeof req._modelTrace === 'object' ? req._modelTrace : {}
 
   return {
     requestId: req.requestId || null,
@@ -722,6 +726,10 @@ function buildLifecycleDetail(req = {}, res = {}, options = {}) {
     accountId: relayAccountContext.accountId || null,
     accountType: relayAccountContext.accountType || null,
     model,
+    requestedModel: modelTrace.requestedModel || req._originalRequestedModel || model,
+    mappedModel: modelTrace.mappedModel || null,
+    outboundModel: modelTrace.outboundModel || null,
+    responseModel: modelTrace.responseModel || null,
     completed: options.completed !== false,
     clientAborted: options.clientAborted === true,
     errorType: options.errorType || responseError.errorType || null,
@@ -1555,6 +1563,9 @@ class RequestDetailService {
       model: detail.model || 'unknown',
       actualModel: detail.actualModel || detail.model || 'unknown',
       requestedModel: detail.requestedModel || null,
+      mappedModel: detail.mappedModel || null,
+      outboundModel: detail.outboundModel || null,
+      responseModel: detail.responseModel || null,
       displayModel: detail.displayModel || detail.model || 'unknown',
       inputTokens,
       outputTokens,
