@@ -81,6 +81,10 @@ describe('requestDetailService', () => {
       accountId: 'acct_1',
       accountType: 'openai',
       model: 'gpt-5.4',
+      requestedModel: 'codex-auto-review',
+      mappedModel: 'codex-auto-review',
+      outboundModel: 'codex-auto-review',
+      responseModel: 'gpt-5.6-luna',
       inputTokens: 10,
       outputTokens: 4,
       cacheReadTokens: 3,
@@ -107,10 +111,59 @@ describe('requestDetailService', () => {
     const storedPayload = JSON.parse(multi.set.mock.calls[0][1])
     expect(storedPayload.requestBodySnapshot.apiKey).toContain('***')
     expect(storedPayload.endpoint).toBe('/openai/v1/responses')
+    expect(storedPayload.requestedModel).toBe('codex-auto-review')
+    expect(storedPayload.mappedModel).toBe('codex-auto-review')
+    expect(storedPayload.outboundModel).toBe('codex-auto-review')
+    expect(storedPayload.responseModel).toBe('gpt-5.6-luna')
     expect(storedPayload.reasoningDisplay).toBe('medium')
     expect(storedPayload.reasoningSource).toBe('reasoning.effort')
     expect(multi.zadd).toHaveBeenCalled()
     expect(exec).toHaveBeenCalled()
+  })
+
+  test('later lifecycle merges preserve the four model trace fields', async () => {
+    const multi = {
+      set: jest.fn().mockReturnThis(),
+      zadd: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([])
+    }
+    const existing = {
+      requestId: 'req_model_trace',
+      timestamp: '2026-04-07T12:00:00.000Z',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      statusCode: 200,
+      model: 'gpt-5.6-luna',
+      requestedModel: 'codex-auto-review',
+      mappedModel: 'codex-auto-review',
+      outboundModel: 'codex-auto-review',
+      responseModel: 'gpt-5.6-luna'
+    }
+
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false
+    })
+    redis.getClient.mockReturnValue({
+      get: jest.fn().mockResolvedValue(JSON.stringify(existing)),
+      multi: jest.fn(() => multi)
+    })
+
+    await requestDetailService.captureRequestDetail({
+      requestId: 'req_model_trace',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      statusCode: 200
+    })
+
+    const storedPayload = JSON.parse(multi.set.mock.calls[0][1])
+    expect(storedPayload.model).toBe('gpt-5.6-luna')
+    expect(storedPayload.requestedModel).toBe('codex-auto-review')
+    expect(storedPayload.mappedModel).toBe('codex-auto-review')
+    expect(storedPayload.outboundModel).toBe('codex-auto-review')
+    expect(storedPayload.responseModel).toBe('gpt-5.6-luna')
   })
 
   test('stores full request and upstream response only for errors when enabled', async () => {

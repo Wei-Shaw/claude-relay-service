@@ -336,6 +336,7 @@ const handleResponses = async (req, res) => {
     }
 
     const originalRequestedModel = req.body?.model || ''
+    req._originalRequestedModel = originalRequestedModel || null
     if (
       apiKeyData.enableModelRestriction &&
       isModelRestricted(originalRequestedModel, apiKeyData.restrictedModels)
@@ -430,6 +431,13 @@ const handleResponses = async (req, res) => {
     }
 
     const upstreamRequestedModel = req.body?.model || requestedModel
+    const modelTrace = {
+      requestedModel: req._originalRequestedModel,
+      mappedModel: schedulerModel || requestedModel,
+      outboundModel: upstreamRequestedModel,
+      responseModel: null
+    }
+    req._modelTrace = modelTrace
 
     // 基于白名单构造上游所需的请求头，确保键为小写且值受控
     const incoming = req.headers || {}
@@ -719,7 +727,8 @@ const handleResponses = async (req, res) => {
         const responseData = upstream.data
 
         // 从响应中获取实际的 model 和 usage
-        actualModel = responseData.model || upstreamRequestedModel || 'gpt-4'
+        modelTrace.responseModel = responseData.model || null
+        actualModel = modelTrace.responseModel || upstreamRequestedModel || 'gpt-4'
         usageData = responseData.usage
 
         logger.debug(`📊 Non-stream response - Model: ${actualModel}, Usage:`, usageData)
@@ -745,7 +754,8 @@ const handleResponses = async (req, res) => {
             createRequestDetailMeta(req, {
               requestBody: req.body,
               stream: false,
-              statusCode: upstream.status
+              statusCode: upstream.status,
+              ...modelTrace
             })
           )
 
@@ -808,6 +818,7 @@ const handleResponses = async (req, res) => {
         // 从响应中获取真实的 model
         if (eventData.response.model) {
           actualModel = eventData.response.model
+          modelTrace.responseModel = eventData.response.model
           logger.debug(`📊 Captured actual model: ${actualModel}`)
         }
 
@@ -892,7 +903,8 @@ const handleResponses = async (req, res) => {
             createRequestDetailMeta(req, {
               requestBody: req.body,
               stream: true,
-              statusCode: res.statusCode
+              statusCode: res.statusCode,
+              ...modelTrace
             })
           )
 

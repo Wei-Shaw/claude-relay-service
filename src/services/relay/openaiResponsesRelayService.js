@@ -319,6 +319,13 @@ class OpenAIResponsesRelayService {
       })
       targetPath = requestMeta.targetPath || targetPath
       const { targetUrl, headers, requestOptions } = requestMeta
+      const modelTrace = {
+        requestedModel: req._originalRequestedModel ?? requestedModel ?? null,
+        mappedModel: mappedModel ?? null,
+        outboundModel: requestOptions.data?.model ?? null,
+        responseModel: null
+      }
+      req._modelTrace = modelTrace
 
       // 记录请求信息
       logger.info('📤 OpenAI-Responses relay request', {
@@ -513,13 +520,22 @@ class OpenAIResponsesRelayService {
           apiKeyData,
           req.body?.model,
           handleClientDisconnect,
-          req
+          req,
+          modelTrace
         )
       }
 
       // 处理非流式响应
       removeClientDisconnectListener()
-      return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model, req)
+      return this._handleNormalResponse(
+        response,
+        res,
+        account,
+        apiKeyData,
+        req.body?.model,
+        req,
+        modelTrace
+      )
     } catch (error) {
       removeClientDisconnectListener()
 
@@ -666,7 +682,8 @@ class OpenAIResponsesRelayService {
     apiKeyData,
     requestedModel,
     handleClientDisconnect,
-    req
+    req,
+    modelTrace = null
   ) {
     // 设置 SSE 响应头
     res.setHeader('Content-Type', 'text/event-stream')
@@ -682,6 +699,16 @@ class OpenAIResponsesRelayService {
     let streamEnded = false
     let clientDisconnected = false
     let lifecycleFinalized = false
+    const requestModelTrace = {
+      requestedModel:
+        modelTrace?.requestedModel ?? req?._originalRequestedModel ?? requestedModel ?? null,
+      mappedModel: modelTrace?.mappedModel ?? requestedModel ?? null,
+      outboundModel: modelTrace?.outboundModel ?? requestedModel ?? null,
+      responseModel: modelTrace?.responseModel ?? null
+    }
+    if (req) {
+      req._modelTrace = requestModelTrace
+    }
     const lifecycleStart = await apiKeyService.recordUsageAttempt(apiKeyData.id, {
       model: requestedModel || 'unknown',
       accountId: account.id,
@@ -689,7 +716,8 @@ class OpenAIResponsesRelayService {
       requestMeta: createRequestDetailMeta(req, {
         requestBody: req?.body,
         stream: true,
-        statusCode: response.status
+        statusCode: response.status,
+        ...requestModelTrace
       }),
       status: 'started',
       statusMessage: 'upstream_stream_started'
@@ -709,7 +737,8 @@ class OpenAIResponsesRelayService {
       createRequestDetailMeta(req, {
         requestBody: req?.body,
         stream: true,
-        statusCode
+        statusCode,
+        ...requestModelTrace
       })
 
     const finalizeLifecycleRecord = async (status, updates = {}) => {
@@ -791,6 +820,7 @@ class OpenAIResponsesRelayService {
               // 从响应中获取真实的 model
               if (eventData.response.model) {
                 actualModel = eventData.response.model
+                requestModelTrace.responseModel = eventData.response.model
                 logger.debug(`📊 Captured actual model from response.completed: ${actualModel}`)
               }
 
@@ -886,7 +916,8 @@ class OpenAIResponsesRelayService {
           const requestDetailMeta = createRequestDetailMeta(req, {
             requestBody: req.body,
             stream: true,
-            statusCode: res.statusCode
+            statusCode: res.statusCode,
+            ...requestModelTrace
           })
           requestDetailMeta.lifecycleRecordId = lifecycleRecordId
           requestDetailMeta.requestLifecycleId = lifecycleRecordId
@@ -1016,14 +1047,32 @@ class OpenAIResponsesRelayService {
   }
 
   // 处理非流式响应
-  async _handleNormalResponse(response, res, account, apiKeyData, requestedModel, req = null) {
+  async _handleNormalResponse(
+    response,
+    res,
+    account,
+    apiKeyData,
+    requestedModel,
+    req = null,
+    modelTrace = null
+  ) {
     const responseData = response.data
 
     // 提取 usage 数据和实际 model
     // 支持两种格式：直接的 usage 或嵌套在 response 中的 usage
     const usageData = responseData?.usage || responseData?.response?.usage
-    const actualModel =
-      responseData?.model || responseData?.response?.model || requestedModel || 'gpt-4'
+    const responseModel = responseData?.model || responseData?.response?.model || null
+    const actualModel = responseModel || requestedModel || 'gpt-4'
+    const requestModelTrace = {
+      requestedModel:
+        modelTrace?.requestedModel ?? req?._originalRequestedModel ?? requestedModel ?? null,
+      mappedModel: modelTrace?.mappedModel ?? requestedModel ?? null,
+      outboundModel: modelTrace?.outboundModel ?? requestedModel ?? null,
+      responseModel
+    }
+    if (req) {
+      req._modelTrace = requestModelTrace
+    }
 
     // 记录使用统计
     if (usageData) {
@@ -1055,7 +1104,8 @@ class OpenAIResponsesRelayService {
           createRequestDetailMeta(req, {
             requestBody: req?.body,
             stream: false,
-            statusCode: response.status
+            statusCode: response.status,
+            ...requestModelTrace
           })
         )
 
