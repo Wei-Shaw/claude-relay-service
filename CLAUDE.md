@@ -12,13 +12,13 @@ Claude Relay Service — 多平台 AI API 中转服务，作为客户端与上�
 
 ### Clean Architecture 分层映射
 
-| 层级 | 目录 | 职责 |
-|------|------|------|
-| **框架层** | `src/routes/`, `src/middleware/` | HTTP 路由、请求验证、响应格式化 |
-| **接口适配层** | `src/handlers/`, `src/services/openaiToClaude.js` | 请求/响应格式转换 |
-| **用例层** | `src/services/*Scheduler.js`, `*RelayService.js` | 调度逻辑、转发编排 |
-| **实体层** | `src/services/*AccountService.js`, `src/models/` | 账户管理、数据模型 |
-| **基础设施层** | `src/utils/`, `config/` | 日志、缓存、加密、代理 |
+| 层级           | 目录                                              | 职责                            |
+| -------------- | ------------------------------------------------- | ------------------------------- |
+| **框架层**     | `src/routes/`, `src/middleware/`                  | HTTP 路由、请求验证、响应格式化 |
+| **接口适配层** | `src/handlers/`, `src/services/openaiToClaude.js` | 请求/响应格式转换               |
+| **用例层**     | `src/services/*Scheduler.js`, `*RelayService.js`  | 调度逻辑、转发编排              |
+| **实体层**     | `src/services/*AccountService.js`, `src/models/`  | 账户管理、数据模型              |
+| **基础设施层** | `src/utils/`, `config/`                           | 日志、缓存、加密、代理          |
 
 ### 开发原则
 
@@ -42,7 +42,7 @@ Claude Relay Service — 多平台 AI API 中转服务，作为客户端与上�
 src/
 ├── routes/              # HTTP 路由
 │   ├── api.js           # Claude API 主路由
-│   ├── admin/           # 管理后台路由（24个子文件）
+│   ├── admin/           # 管理后台路由（27个子文件）
 │   ├── geminiRoutes.js, standardGeminiRoutes.js
 │   ├── openaiRoutes.js, openaiClaudeRoutes.js, openaiGeminiRoutes.js
 │   ├── azureOpenaiRoutes.js, droidRoutes.js
@@ -51,13 +51,13 @@ src/
 ├── handlers/             # geminiHandlers.js
 ├── services/             # 业务服务
 │   ├── relay/                 # 各平台转发服务（9个）
-│   ├── account/               # 各平台账户管理（11个）
+│   ├── account/               # 各平台账户管理（12个）
 │   ├── scheduler/             # 统一调度器（4个）
 │   ├── apiKeyService.js       # API Key 管理
 │   ├── pricingService.js      # 定价和成本
-│   └── ...                    # 其余 ~30 个业务服务
+│   └── ...                    # 其余 32 个业务服务
 ├── models/redis.js       # Redis 数据模型
-├── utils/                # 35+ 工具文件（logger, proxy, oauth, cache, stream...）
+├── utils/                # 49 个工具文件（logger, proxy, oauth, cache, stream...）
 config/config.js          # 主配置
 scripts/                  # 运维脚本
 cli/                      # CLI 工具
@@ -75,6 +75,7 @@ data/init.json            # 管理员凭据
 ```
 
 关键机制：
+
 - **粘性会话**: 基于请求内容 hash 绑定账户，同一会话用同一账户
 - **并发控制**: Redis Sorted Set 实现，支持排队等待（非直接 429）
 - **529 处理**: 自动标记过载账户，配置时长内排除
@@ -116,12 +117,12 @@ data/init.json            # 管理员凭据
 
 暗黑模式配色对照：
 
-| 元素 | 明亮模式 | 暗黑模式 |
-|------|----------|----------|
-| 文本 | `text-gray-700` | `dark:text-gray-200` |
-| 背景 | `bg-white` | `dark:bg-gray-800` |
-| 边框 | `border-gray-200` | `dark:border-gray-700` |
-| 状态色 | `text-blue-500` / `text-green-600` / `text-red-500` | 保持一致 |
+| 元素   | 明亮模式                                            | 暗黑模式               |
+| ------ | --------------------------------------------------- | ---------------------- |
+| 文本   | `text-gray-700`                                     | `dark:text-gray-200`   |
+| 背景   | `bg-white`                                          | `dark:bg-gray-800`     |
+| 边框   | `border-gray-200`                                   | `dark:border-gray-700` |
+| 状态色 | `text-blue-500` / `text-green-600` / `text-red-500` | 保持一致               |
 
 ### 代码修改原则
 
@@ -134,7 +135,7 @@ data/init.json            # 管理员凭据
 ```bash
 npm install && npm run setup    # 初始化
 npm run dev                     # 开发模式（nodemon 热重载，自动 lint）
-npm start                       # 生产模式（先 lint 再启动）
+npm start                       # 生产模式（直接启动 node src/app.js，不含 lint）
 npm run lint                    # ESLint 检查并自动修复
 npm run lint:check              # ESLint 仅检查不修复
 npm run format                  # Prettier 格式化所有后端文件
@@ -165,18 +166,18 @@ cd web/admin-spa && npm run dev # 前端开发模式（Vite HMR）
 
 ## 故障排除
 
-| 问题 | 排查方向 |
-|------|----------|
-| Redis 连接失败 | 检查 REDIS_HOST/PORT/PASSWORD |
-| 管理员登录失败 | 检查 data/init.json，运行 `npm run setup` |
-| API Key 格式错误 | 确保使用 `cr_` 前缀格式（可通过 API_KEY_PREFIX 配置） |
-| Token 刷新失败 | 检查 refreshToken 有效性和代理配置，查看 `logs/token-refresh-error.log` |
-| 调度器选账户失败 | 检查账户 status:'active'，确认类型与路由匹配，查看粘性会话绑定 |
-| 并发计数泄漏 | 系统每分钟自动清理，重启也会清理 |
-| 粘性会话失效 | 检查 Redis 中 session 数据，Nginx 代理需添加 `underscores_in_headers on` |
-| LDAP 认证失败 | 检查 LDAP_URL/BIND_DN/BIND_PASSWORD，自签名证书设 `LDAP_TLS_REJECT_UNAUTHORIZED=false` |
-| Webhook 通知失败 | 确认 WEBHOOK_ENABLED=true，检查 WEBHOOK_URLS 格式，查看 `logs/webhook-*.log` |
-| 成本统计不准确 | 运行 `npm run init:costs`，检查 pricingService 模型价格 |
+| 问题             | 排查方向                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| Redis 连接失败   | 检查 REDIS_HOST/PORT/PASSWORD                                                          |
+| 管理员登录失败   | 检查 data/init.json，运行 `npm run setup`                                              |
+| API Key 格式错误 | 确保使用 `cr_` 前缀格式（可通过 API_KEY_PREFIX 配置）                                  |
+| Token 刷新失败   | 检查 refreshToken 有效性和代理配置，查看 `logs/token-refresh-error.log`                |
+| 调度器选账户失败 | 检查账户 status:'active'，确认类型与路由匹配，查看粘性会话绑定                         |
+| 并发计数泄漏     | 系统每分钟自动清理，重启也会清理                                                       |
+| 粘性会话失效     | 检查 Redis 中 session 数据，Nginx 代理需添加 `underscores_in_headers on`               |
+| LDAP 认证失败    | 检查 LDAP_URL/BIND_DN/BIND_PASSWORD，自签名证书设 `LDAP_TLS_REJECT_UNAUTHORIZED=false` |
+| Webhook 通知失败 | 确认 WEBHOOK_ENABLED=true，检查 WEBHOOK_URLS 格式，查看 `logs/webhook-*.log`           |
+| 成本统计不准确   | 运行 `npm run init:costs`，检查 pricingService 模型价格                                |
 
 日志：`logs/` 目录。Web 界面 `/admin-next/` 可实时查看。
 
