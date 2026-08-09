@@ -448,34 +448,15 @@
                     结果
                   </th>
                   <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    推理
-                  </th>
-                  <th
                     class="min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     接口
                   </th>
                   <th
-                    class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[184px] px-3 py-4 text-left text-xs font-bold tracking-wider text-gray-700 dark:text-gray-300"
+                    title="输入 / 输出；缓存读取 / 缓存创建"
                   >
-                    输入
-                  </th>
-                  <th
-                    class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    输出
-                  </th>
-                  <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    缓存读取
-                  </th>
-                  <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    缓存创建
+                    Tokens
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -529,7 +510,23 @@
                       {{ record.accountTypeName || record.accountType || '-' }}
                     </div>
                   </td>
-                  <td class="table-cell">{{ record.model }}</td>
+                  <td class="table-cell min-w-[140px]">
+                    <div class="font-semibold text-gray-900 dark:text-gray-100">
+                      {{ record.model }}
+                    </div>
+                    <div class="mt-1.5">
+                      <span
+                        :class="reasoningBadgeClass(record.reasoningDisplay)"
+                        :title="`推理强度：${formatReasoning(record.reasoningDisplay)}`"
+                      >
+                        <i aria-hidden="true" class="fas fa-brain text-[9px]" />
+                        <span class="font-medium opacity-60">推理</span>
+                        <span class="tracking-wide">
+                          {{ formatReasoning(record.reasoningDisplay) }}
+                        </span>
+                      </span>
+                    </div>
+                  </td>
                   <td class="table-cell">
                     <span :class="statusBadgeClass(record)">
                       {{ record.statusCode || '-' }} {{ record.outcomeName || '未知' }}
@@ -538,26 +535,43 @@
                       {{ record.failureStageName || '-' }}
                     </div>
                   </td>
-                  <td class="table-cell">{{ formatReasoning(record.reasoningDisplay) }}</td>
                   <td class="table-cell">
                     <div>{{ record.endpoint || '-' }}</div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">
                       {{ record.method || 'POST' }}
                     </div>
                   </td>
-                  <td class="table-cell text-blue-600 dark:text-blue-400">
-                    {{ formatNumber(record.inputTokens) }}
-                  </td>
-                  <td class="table-cell text-green-600 dark:text-green-400">
-                    {{ formatNumber(record.outputTokens) }}
-                  </td>
-                  <td class="table-cell text-cyan-600 dark:text-cyan-400">
-                    {{ formatNumber(record.cacheReadTokens) }}
-                  </td>
-                  <td class="table-cell text-purple-600 dark:text-purple-400">
-                    {{
-                      formatCacheCreate(record.cacheCreateTokens, record.cacheCreateNotApplicable)
-                    }}
+                  <td class="table-cell min-w-[184px] whitespace-nowrap">
+                    <div class="flex items-baseline gap-2 font-semibold tabular-nums">
+                      <span class="text-blue-600 dark:text-blue-400" title="输入 Token">
+                        {{ formatNumber(record.inputTokens) }}
+                      </span>
+                      <span class="font-normal text-gray-300 dark:text-gray-600">/</span>
+                      <span class="text-green-600 dark:text-green-400" title="输出 Token">
+                        {{ formatNumber(record.outputTokens) }}
+                      </span>
+                    </div>
+                    <div
+                      class="mt-1 flex items-center gap-1.5 text-xs font-medium tabular-nums text-gray-400 dark:text-gray-500"
+                    >
+                      <span>缓存</span>
+                      <span class="text-cyan-600/80 dark:text-cyan-400/80" title="缓存读取 Token">
+                        ↓ {{ formatNumber(record.cacheReadTokens) }}
+                      </span>
+                      <span class="text-gray-300 dark:text-gray-600">·</span>
+                      <span
+                        class="text-purple-600/80 dark:text-purple-400/80"
+                        title="缓存创建 Token"
+                      >
+                        ↑
+                        {{
+                          formatCacheCreate(
+                            record.cacheCreateTokens,
+                            record.cacheCreateNotApplicable
+                          )
+                        }}
+                      </span>
+                    </div>
                   </td>
                   <td class="table-cell">{{ formatPercent(record.cacheHitRate) }}</td>
                   <td class="table-cell text-amber-600 dark:text-amber-400">
@@ -588,6 +602,18 @@
                   <p class="text-sm font-bold text-gray-900 dark:text-gray-100">
                     {{ record.model }}
                   </p>
+                  <div class="mt-1.5">
+                    <span
+                      :class="reasoningBadgeClass(record.reasoningDisplay)"
+                      :title="`推理强度：${formatReasoning(record.reasoningDisplay)}`"
+                    >
+                      <i aria-hidden="true" class="fas fa-brain text-[9px]" />
+                      <span class="font-medium opacity-60">推理</span>
+                      <span class="tracking-wide">
+                        {{ formatReasoning(record.reasoningDisplay) }}
+                      </span>
+                    </span>
+                  </div>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     {{ formatDate(record.timestamp) }}
                   </p>
@@ -610,8 +636,7 @@
               <div class="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <div>API Key：{{ record.apiKeyName || '-' }}</div>
                 <div>账户：{{ record.accountName || '-' }}</div>
-                <div>阶段：{{ record.failureStageName || '-' }}</div>
-                <div>推理：{{ formatReasoning(record.reasoningDisplay) }}</div>
+                <div class="col-span-2">阶段：{{ record.failureStageName || '-' }}</div>
                 <div>输入：{{ formatNumber(record.inputTokens) }}</div>
                 <div>输出：{{ formatNumber(record.outputTokens) }}</div>
                 <div>缓存读：{{ formatNumber(record.cacheReadTokens) }}</div>
@@ -1146,6 +1171,16 @@ const formatRetentionHours = (value) => {
 const formatDuration = (value) => `${Number(value || 0)}ms`
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
 const formatReasoning = (value) => value || '-'
+const reasoningBadgeClass = (value) => {
+  const base =
+    'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm'
+
+  if (!value || value === '-') {
+    return `${base} border-gray-200/80 bg-gray-50 text-gray-400 shadow-none dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-500`
+  }
+
+  return `${base} border-cyan-200/80 bg-gradient-to-r from-cyan-50 to-sky-50 text-cyan-700 shadow-cyan-950/5 dark:border-cyan-800/70 dark:from-cyan-950/50 dark:to-sky-950/40 dark:text-cyan-300`
+}
 const statusBadgeClass = (record = {}) => {
   const base =
     'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap'
@@ -1371,13 +1406,13 @@ onMounted(() => {
 }
 
 .table-container table {
-  min-width: 1640px;
+  min-width: 1540px;
   border-collapse: collapse;
   table-layout: auto;
 }
 
 .request-table {
-  width: max(100%, 1640px);
+  width: max(100%, 1540px);
 }
 
 .table-container::-webkit-scrollbar {
