@@ -225,6 +225,15 @@ describe('bedrockRelayService', () => {
     )
   })
 
+  test('maps the Claude Code Sonnet 5 alias to the official Bedrock profile', () => {
+    expect(relay._selectModel({ model: 'claude-sonnet-5' }, null)).toBe(
+      'global.anthropic.claude-sonnet-5'
+    )
+    expect(relay._selectModel({ model: 'claude-sonnet-5[1m]' }, null)).toBe(
+      'global.anthropic.claude-sonnet-5'
+    )
+  })
+
   test('preserves adaptive thinking and effort for Opus 5', () => {
     const payload = relay._convertToBedrockFormat(
       {
@@ -268,6 +277,21 @@ describe('bedrockRelayService', () => {
     expect(payload).not.toHaveProperty('model')
     expect(payload).not.toHaveProperty('stream')
     expect(request.thinking).toEqual({ type: 'enabled', budget_tokens: 31999 })
+  })
+
+  test('upgrades legacy extended thinking requests for Sonnet 5', () => {
+    const payload = relay._convertToBedrockFormat(
+      {
+        model: 'claude-sonnet-5',
+        max_tokens: 32000,
+        messages: [{ role: 'user', content: 'Hello' }],
+        thinking: { type: 'enabled', budget_tokens: 31999 }
+      },
+      'global.anthropic.claude-sonnet-5'
+    )
+
+    expect(payload.thinking).toEqual({ type: 'adaptive' })
+    expect(payload.output_config).toEqual({ effort: 'high' })
   })
 
   test('keeps fixed-budget thinking for models without adaptive thinking', () => {

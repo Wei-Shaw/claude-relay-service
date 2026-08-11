@@ -46,6 +46,7 @@ const BEDROCK_MODELS = [
     label: 'Claude Haiku 4.5'
   },
   { value: 'global.anthropic.claude-opus-5', label: 'Claude Opus 5' },
+  { value: 'global.anthropic.claude-sonnet-5', label: 'Claude Sonnet 5' },
   { value: 'us.anthropic.claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
   { value: 'global.anthropic.claude-opus-4-6-v1', label: 'Claude Opus 4.6' },
   { value: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Claude Sonnet 4.5' },

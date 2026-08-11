@@ -598,6 +598,9 @@ class BedrockRelayService {
       // Claude Opus 5
       'claude-opus-5': 'global.anthropic.claude-opus-5',
 
+      // Claude Sonnet 5
+      'claude-sonnet-5': 'global.anthropic.claude-sonnet-5',
+
       // Claude Opus 4.6
       'claude-opus-4-6': 'global.anthropic.claude-opus-4-6-v1',
 
@@ -713,13 +716,14 @@ class BedrockRelayService {
 
   _supportsAdaptiveThinking(modelId) {
     const normalizedModel = (modelId || '').replace(/\[1m\]$/, '')
-    return ['claude-opus-5', 'claude-opus-4-6', 'claude-sonnet-4-6'].some((model) =>
-      normalizedModel.includes(model)
+    return ['claude-opus-5', 'claude-sonnet-5', 'claude-opus-4-6', 'claude-sonnet-4-6'].some(
+      (model) => normalizedModel.includes(model)
     )
   }
 
   _requiresAdaptiveThinking(modelId) {
-    return (modelId || '').replace(/\[1m\]$/, '').includes('claude-opus-5')
+    const normalizedModel = (modelId || '').replace(/\[1m\]$/, '')
+    return ['claude-opus-5', 'claude-sonnet-5'].some((model) => normalizedModel.includes(model))
   }
 
   // 转换Claude格式请求到Bedrock格式
