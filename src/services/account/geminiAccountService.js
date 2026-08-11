@@ -52,12 +52,24 @@ function normalizeOauthProvider(oauthProvider) {
     : OAUTH_PROVIDER_GEMINI_CLI
 }
 
-function getOauthProviderConfig(oauthProvider) {
+// requireCredentials=true：授权/换 token/刷新 等真 OAuth 路径必须有完整 env
+// requireCredentials=false：允许双空（无凭证直转发）；半套 env 一律 fail-fast，禁止静默降级
+function getOauthProviderConfig(oauthProvider, { requireCredentials = true } = {}) {
   const normalized = normalizeOauthProvider(oauthProvider)
   const config = OAUTH_PROVIDERS[normalized] || OAUTH_PROVIDERS[OAUTH_PROVIDER_GEMINI_CLI]
-  if (!config.clientId || !config.clientSecret) {
-    const envPrefix =
-      normalized === OAUTH_PROVIDER_ANTIGRAVITY ? 'ANTIGRAVITY_OAUTH' : 'GEMINI_OAUTH'
+  const hasClientId = !!config.clientId
+  const hasClientSecret = !!config.clientSecret
+  const envPrefix =
+    normalized === OAUTH_PROVIDER_ANTIGRAVITY ? 'ANTIGRAVITY_OAUTH' : 'GEMINI_OAUTH'
+
+  // 半套配置（只配了 ID 或只配了 SECRET）一律报错，避免被当成“无凭证”静默降级
+  if (hasClientId !== hasClientSecret) {
+    throw new Error(
+      `${envPrefix}_CLIENT_ID / ${envPrefix}_CLIENT_SECRET 必须成对配置，当前只配置了其中一个`
+    )
+  }
+
+  if (requireCredentials && (!hasClientId || !hasClientSecret)) {
     throw new Error(
       `${envPrefix}_CLIENT_ID / ${envPrefix}_CLIENT_SECRET 未配置，无法进行 Gemini OAuth`
     )
@@ -202,10 +214,16 @@ setInterval(
 )
 
 // 创建 OAuth2 客户端（支持代理配置）
-function createOAuth2Client(redirectUri = null, proxyConfig = null, oauthProvider = null) {
+// requireCredentials：授权/换 token/刷新 必须 true；持有现成 access_token 的转发可为 false
+function createOAuth2Client(
+  redirectUri = null,
+  proxyConfig = null,
+  oauthProvider = null,
+  { requireCredentials = true } = {}
+) {
   // 如果没有提供 redirectUri，使用默认值
   const uri = redirectUri || 'http://localhost:45462'
-  const oauthConfig = getOauthProviderConfig(oauthProvider)
+  const oauthConfig = getOauthProviderConfig(oauthProvider, { requireCredentials })
 
   // 准备客户端选项
   const clientOptions = {
@@ -380,7 +398,8 @@ async function createAccount(accountData) {
   const id = uuidv4()
   const now = new Date().toISOString()
   const oauthProvider = normalizeOauthProvider(accountData.oauthProvider)
-  const oauthConfig = getOauthProviderConfig(oauthProvider)
+  // 创建/导入只需要 scopes，不强制 OAuth 凭证 env
+  const oauthConfig = getOauthProviderConfig(oauthProvider, { requireCredentials: false })
 
   // 处理凭证数据
   let geminiOauth = null
@@ -971,7 +990,10 @@ async function refreshAccountToken(accountId) {
       // 重新获取账户数据（可能已被其他进程刷新）
       const updatedAccount = await getAccount(accountId)
       if (updatedAccount && updatedAccount.accessToken) {
-        const oauthConfig = getOauthProviderConfig(updatedAccount.oauthProvider)
+        // 仅回填 scope，不触发凭证校验（真正刷新走 refreshAccessToken）
+        const oauthConfig = getOauthProviderConfig(updatedAccount.oauthProvider, {
+          requireCredentials: false
+        })
         const accessToken = decrypt(updatedAccount.accessToken)
         return {
           access_token: accessToken,
@@ -1171,17 +1193,24 @@ async function getAccountRateLimitInfo(accountId) {
 }
 
 // 获取配置的OAuth客户端 - 参考GeminiCliSimulator的getOauthClient方法（支持代理）
+// 有 CLIENT_ID/SECRET 时：强制 refresh 拿新 token（旧行为）
+// 无凭证 env 时：不触发 refresh，直接使用账户已有 access_token 转发（secret 移除后的兼容）
 async function getOauthClient(accessToken, refreshToken, proxyConfig = null, oauthProvider = null) {
   const normalizedProvider = normalizeOauthProvider(oauthProvider)
-  const oauthConfig = getOauthProviderConfig(normalizedProvider)
-  const client = createOAuth2Client(null, proxyConfig, normalizedProvider)
+  const oauthConfig = getOauthProviderConfig(normalizedProvider, { requireCredentials: false })
+  const hasClientCreds = !!(oauthConfig.clientId && oauthConfig.clientSecret)
+  const client = createOAuth2Client(null, proxyConfig, normalizedProvider, {
+    requireCredentials: false
+  })
 
   const creds = {
     access_token: accessToken,
     refresh_token: refreshToken,
     scope: oauthConfig.scopes.join(' '),
     token_type: 'Bearer',
-    expiry_date: 1754269905646
+    // 有 client 凭证时设过去时间，驱动 google-auth-library 走 refresh
+    // 无凭证时设未来时间，避免 isTokenExpiring 触发无 client_secret 的 refresh
+    expiry_date: hasClientCreds ? 1754269905646 : Date.now() + 60 * 60 * 1000
   }
 
   if (proxyConfig) {
