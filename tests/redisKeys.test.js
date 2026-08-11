@@ -307,8 +307,11 @@ describe('TTL config 派生 fallback', () => {
       result = fn(isolatedTTL)
     })
     for (const k of Object.keys(env)) {
-      if (saved[k] === undefined) delete process.env[k]
-      else process.env[k] = saved[k]
+      if (saved[k] === undefined) {
+        delete process.env[k]
+      } else {
+        process.env[k] = saved[k]
+      }
     }
     return result
   }
