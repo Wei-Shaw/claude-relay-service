@@ -6,6 +6,8 @@ const { parseVendorPrefixedModel } = require('../../utils/modelHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const proxyResolver = require('../../utils/proxyResolver')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 class CcrRelayService {
   constructor() {
@@ -26,6 +28,7 @@ class CcrRelayService {
     let account = null
     let queueLockAcquired = false
     let queueRequestId = null
+    let proxyResolution = null
 
     try {
       // 📬 用户消息队列处理
@@ -122,8 +125,9 @@ class CcrRelayService {
         model: mappedModel
       }
 
-      // 创建代理agent
-      const proxyAgent = ccrAccountService._createProxyAgent(account.proxy)
+      // 创建代理agent（保留 proxyId/contextKey 供被动健康检查上报）
+      proxyResolution = proxyResolver.resolveAgent(account, 'ccr')
+      const proxyAgent = proxyResolution.agent
 
       // 创建AbortController用于取消请求
       abortController = new AbortController()
@@ -260,12 +264,27 @@ class CcrRelayService {
       )
 
       // 检查错误状态并相应处理
+      const errorContext =
+        response.status >= 400
+          ? upstreamErrorHelper.buildErrorContext({
+              url: requestConfig.url,
+              method: requestConfig.method,
+              requestHeaders: requestConfig.headers,
+              requestBody: requestConfig.data,
+              model: requestConfig.data?.model,
+              responseStatus: response.status,
+              responseHeaders: response.headers,
+              responseBody: response.data
+            })
+          : null
       if (response.status === 401) {
         logger.warn(`🚫 Unauthorized error detected for CCR account ${accountId}`)
         const autoProtectionDisabled =
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!autoProtectionDisabled) {
-          await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 401).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, 'ccr', 401, null, errorContext)
+            .catch(() => {})
         }
       } else if (response.status === 429) {
         logger.warn(`🚫 Rate limit detected for CCR account ${accountId}`)
@@ -283,7 +302,8 @@ class CcrRelayService {
               accountId,
               'ccr',
               429,
-              upstreamErrorHelper.parseRetryAfter(response.headers)
+              upstreamErrorHelper.parseRetryAfter(response.headers),
+              errorContext
             )
             .catch(() => {})
         }
@@ -293,7 +313,9 @@ class CcrRelayService {
         const autoProtectionDisabled =
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!autoProtectionDisabled) {
-          await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 529).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, 'ccr', 529, null, errorContext)
+            .catch(() => {})
         }
       } else if (response.status >= 500) {
         logger.warn(`🔥 Server error (${response.status}) detected for CCR account ${accountId}`)
@@ -301,7 +323,7 @@ class CcrRelayService {
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'ccr', response.status)
+            .markTempUnavailable(accountId, 'ccr', response.status, null, errorContext)
             .catch(() => {})
         }
       } else if (response.status === 200 || response.status === 201) {
@@ -319,6 +341,9 @@ class CcrRelayService {
       // 更新最后使用时间
       await this._updateLastUsedTime(accountId)
 
+      // 被动健康检查：拿到 HTTP 响应即代理传输成功（含 4xx/5xx，不归咎代理）
+      proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, null)
+
       const responseBody =
         typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
       logger.debug(`[DEBUG] Final response body to return: ${responseBody}`)
@@ -330,6 +355,8 @@ class CcrRelayService {
         accountId
       }
     } catch (error) {
+      // 被动健康检查：上报连接级故障（classifyBusinessTraffic 内会区分传输错误 vs 上游响应）
+      proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, error)
       // 处理特定错误
       if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
         logger.info('Request aborted due to client disconnect')
@@ -346,7 +373,18 @@ class CcrRelayService {
         const autoProtectionDisabled =
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!autoProtectionDisabled) {
-          await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 503).catch(() => {})
+          const errorContext = upstreamErrorHelper.buildErrorContext({
+            url: error.config?.url,
+            method: error.config?.method,
+            requestHeaders: error.config?.headers,
+            requestBody: error.config?.data,
+            model: error.config?.data?.model,
+            responseStatus: 503,
+            message: error.message
+          })
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, 'ccr', 503, null, errorContext)
+            .catch(() => {})
         }
       }
 
@@ -383,6 +421,7 @@ class CcrRelayService {
     let account = null
     let queueLockAcquired = false
     let queueRequestId = null
+    let proxyResolution = null
 
     try {
       // 📬 用户消息队列处理
@@ -487,7 +526,9 @@ class CcrRelayService {
       }
 
       // 创建代理agent
-      const proxyAgent = ccrAccountService._createProxyAgent(account.proxy)
+      // 创建代理agent（保留 proxyId/contextKey 供被动健康检查上报）
+      proxyResolution = proxyResolver.resolveAgent(account, 'ccr')
+      const proxyAgent = proxyResolution.agent
 
       // 发送流式请求
       await this._makeCcrStreamRequest(
@@ -534,7 +575,18 @@ class CcrRelayService {
           const autoProtectionDisabled =
             account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
           if (!autoProtectionDisabled) {
-            await upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 503).catch(() => {})
+            const errorContext = upstreamErrorHelper.buildErrorContext({
+              url: error.config?.url,
+              method: error.config?.method,
+              requestHeaders: error.config?.headers,
+              requestBody: error.config?.data,
+              model: error.config?.data?.model,
+              responseStatus: 503,
+              message: error.message
+            })
+            await upstreamErrorHelper
+              .markTempUnavailable(accountId, 'ccr', 503, null, errorContext)
+              .catch(() => {})
           }
         }
       }
@@ -647,9 +699,23 @@ class CcrRelayService {
             const autoProtectionDisabled =
               account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
 
+            // 流式：响应体为流，此处未读取，记录请求与响应状态/头
+            const errorContext = upstreamErrorHelper.buildErrorContext({
+              url: requestConfig.url,
+              method: requestConfig.method,
+              requestHeaders: requestConfig.headers,
+              requestBody: requestConfig.data,
+              model: requestConfig.data?.model,
+              responseStatus: response.status,
+              responseHeaders: response.headers
+            })
+
+            // skipHistory：响应体为流，待 end 处收齐后带响应体补记一条，避免重复
             if (response.status === 401) {
               if (!autoProtectionDisabled) {
-                upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 401).catch(() => {})
+                upstreamErrorHelper
+                  .markTempUnavailable(accountId, 'ccr', 401, null, errorContext, true)
+                  .catch(() => {})
               }
             } else if (response.status === 429) {
               ccrAccountService.markAccountRateLimited(accountId)
@@ -659,7 +725,9 @@ class CcrRelayService {
                     accountId,
                     'ccr',
                     429,
-                    upstreamErrorHelper.parseRetryAfter(response.headers)
+                    upstreamErrorHelper.parseRetryAfter(response.headers),
+                    errorContext,
+                    true
                   )
                   .catch(() => {})
               }
@@ -670,12 +738,14 @@ class CcrRelayService {
             } else if (response.status === 529) {
               ccrAccountService.markAccountOverloaded(accountId)
               if (!autoProtectionDisabled) {
-                upstreamErrorHelper.markTempUnavailable(accountId, 'ccr', 529).catch(() => {})
+                upstreamErrorHelper
+                  .markTempUnavailable(accountId, 'ccr', 529, null, errorContext, true)
+                  .catch(() => {})
               }
             } else if (response.status >= 500) {
               if (!autoProtectionDisabled) {
                 upstreamErrorHelper
-                  .markTempUnavailable(accountId, 'ccr', response.status)
+                  .markTempUnavailable(accountId, 'ccr', response.status, null, errorContext, true)
                   .catch(() => {})
               }
             }
@@ -696,18 +766,69 @@ class CcrRelayService {
               responseStream.writeHead(response.status, errorHeaders)
             }
 
-            // 直接透传错误数据，不进行包装
+            // 直接透传错误数据，不进行包装；同时累积错误体用于历史记录（上限 64KB 防内存膨胀）
+            let ccrErrorBody = ''
+            let ccrErrorRecorded = false
+            // 保证补记：无论 end 还是 close（含上游中断）都记一条带“已收到响应体”的历史，避免中断时整条丢失
+            const recordCcrErrorHistoryOnce = () => {
+              const shouldRecord =
+                response.status === 401 ||
+                response.status === 429 ||
+                response.status === 529 ||
+                response.status >= 500
+              if (ccrErrorRecorded || autoProtectionDisabled || !shouldRecord) {
+                return
+              }
+              ccrErrorRecorded = true
+              upstreamErrorHelper
+                .recordErrorHistory(
+                  accountId,
+                  'ccr',
+                  response.status,
+                  null,
+                  upstreamErrorHelper.buildErrorContext({
+                    url: requestConfig.url,
+                    method: requestConfig.method,
+                    requestHeaders: requestConfig.headers,
+                    requestBody: requestConfig.data,
+                    model: requestConfig.data?.model,
+                    responseStatus: response.status,
+                    responseHeaders: response.headers,
+                    responseBody: ccrErrorBody
+                  })
+                )
+                .catch(() => {})
+            }
             response.data.on('data', (chunk) => {
+              if (ccrErrorBody.length < 65536) {
+                ccrErrorBody += chunk.toString()
+              }
               if (isStreamWritable(responseStream)) {
                 responseStream.write(chunk)
               }
             })
 
+            // close 一定会触发（正常结束或中断），作为补记兜底
+            response.data.on('close', () => {
+              recordCcrErrorHistoryOnce()
+            })
+
             response.data.on('end', () => {
+              recordCcrErrorHistoryOnce()
               if (isStreamWritable(responseStream)) {
                 responseStream.end()
               }
               resolve() // 不抛出异常，正常完成流处理
+            })
+
+            // error 直出：同样补记（避免整条丢失），并兜底处理未挂载 error 监听导致的未捕获异常
+            response.data.on('error', (err) => {
+              logger.error(`❌ CCR error-stream data error | account: ${accountId}:`, err)
+              recordCcrErrorHistoryOnce()
+              if (isStreamWritable(responseStream)) {
+                responseStream.end()
+              }
+              resolve()
             })
             return
           }
@@ -959,7 +1080,7 @@ class CcrRelayService {
     try {
       const redis = require('../../models/redis')
       const client = redis.getClientSafe()
-      await client.hset(`ccr_account:${accountId}`, 'lastUsedAt', new Date().toISOString())
+      await client.hset(RedisKeys.accounts.ccr(accountId), 'lastUsedAt', new Date().toISOString())
     } catch (error) {
       logger.error(`❌ Failed to update last used time for CCR account ${accountId}:`, error)
     }

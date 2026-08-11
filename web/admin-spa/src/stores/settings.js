@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { getOemSettingsApi, updateOemSettingsApi } from '@/utils/http_apis'
+import { formatLocalDateTime } from '@/utils/time'
 
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
@@ -17,13 +18,12 @@ export const useSettingsStore = defineStore('settings', () => {
   const loading = ref(false)
   const saving = ref(false)
 
-  // Actions
+  // Actions —— 本 store 只管表单状态与读写；favicon/document.title 等全站显示副作用统一由 authStore 负责，这里不碰 DOM（曾因两套 favicon 逻辑用不同选择器/rel 产生重复 link 与清空残留）
   const loadOemSettings = async () => {
     loading.value = true
     const res = await getOemSettingsApi()
     if (res.success) {
       oemSettings.value = { ...oemSettings.value, ...res.data }
-      applyOemSettings()
     }
     loading.value = false
     return res
@@ -34,7 +34,6 @@ export const useSettingsStore = defineStore('settings', () => {
     const res = await updateOemSettingsApi(settings)
     if (res.success) {
       oemSettings.value = { ...oemSettings.value, ...res.data }
-      applyOemSettings()
     }
     saving.value = false
     return res
@@ -54,35 +53,10 @@ export const useSettingsStore = defineStore('settings', () => {
     return await saveOemSettings(defaultSettings)
   }
 
-  // 应用OEM设置到页面
-  const applyOemSettings = () => {
-    // 更新页面标题
-    if (oemSettings.value.siteName) {
-      document.title = `${oemSettings.value.siteName} - 管理后台`
-    }
-
-    // 更新favicon
-    if (oemSettings.value.siteIconData || oemSettings.value.siteIcon) {
-      const favicon = document.querySelector('link[rel="icon"]') || document.createElement('link')
-      favicon.rel = 'icon'
-      favicon.href = oemSettings.value.siteIconData || oemSettings.value.siteIcon
-      if (!document.querySelector('link[rel="icon"]')) {
-        document.head.appendChild(favicon)
-      }
-    }
-  }
-
   // 格式化日期时间
   const formatDateTime = (dateString) => {
     if (!dateString) return ''
-    return new Date(dateString).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
+    return formatLocalDateTime(dateString)
   }
 
   // 验证文件上传
@@ -126,7 +100,6 @@ export const useSettingsStore = defineStore('settings', () => {
     loadOemSettings,
     saveOemSettings,
     resetOemSettings,
-    applyOemSettings,
     formatDateTime,
     validateIconFile,
     fileToBase64

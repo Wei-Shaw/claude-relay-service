@@ -10,9 +10,12 @@ const {
   isAccountDisabledError
 } = require('../../utils/errorSanitizer')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const proxyResolver = require('../../utils/proxyResolver')
 const userMessageQueueService = require('../userMessageQueueService')
+const { onClientDisconnect } = require('../../utils/clientDisconnect')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const { filterForClaude } = require('../../utils/headerFilter')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -30,11 +33,13 @@ class ClaudeConsoleRelayService {
     options = {}
   ) {
     let abortController = null
+    let detachClientDisconnect = () => {}
     let account = null
     const requestId = uuidv4() // 用于并发追踪
     let concurrencyAcquired = false
     let queueLockAcquired = false
     let queueRequestId = null
+    let proxyResolution = null
 
     try {
       // 📬 用户消息队列处理：如果是用户消息请求，需要获取队列锁
@@ -165,26 +170,24 @@ class ClaudeConsoleRelayService {
 
       // 模型兼容性检查已经在调度器中完成，这里不需要再检查
 
-      // 创建代理agent
-      const proxyAgent = claudeConsoleAccountService._createProxyAgent(account.proxy)
+      // 创建代理agent（保留 proxyId/contextKey 供被动健康检查上报）
+      proxyResolution = proxyResolver.resolveAgent(account, 'claude_console')
+      const proxyAgent = proxyResolution.agent
 
       // 创建AbortController用于取消请求
       abortController = new AbortController()
 
-      // 设置客户端断开监听器
-      const handleClientDisconnect = () => {
-        logger.info('🔌 Client disconnected, aborting Claude Console Claude request')
-        if (abortController && !abortController.signal.aborted) {
-          abortController.abort()
-        }
-      }
-
-      // 监听客户端断开事件
-      if (clientRequest) {
-        clientRequest.once('close', handleClientDisconnect)
-      }
+      // 监听客户端断开：判据收口在 utils/clientDisconnect（禁用 req 'close'，它在请求体读完时即触发）
       if (clientResponse) {
-        clientResponse.once('close', handleClientDisconnect)
+        detachClientDisconnect = onClientDisconnect(
+          clientResponse,
+          () => {
+            if (abortController && !abortController.signal.aborted) {
+              abortController.abort()
+            }
+          },
+          'Claude Console Claude request'
+        )
       }
 
       // 构建完整的API URL
@@ -285,12 +288,7 @@ class ClaudeConsoleRelayService {
       }
 
       // 移除监听器（请求成功完成）
-      if (clientRequest) {
-        clientRequest.removeListener('close', handleClientDisconnect)
-      }
-      if (clientResponse) {
-        clientResponse.removeListener('close', handleClientDisconnect)
-      }
+      detachClientDisconnect()
 
       logger.debug(`🔗 Claude Console API response: ${response.status}`)
       logger.debug(`[DEBUG] Response headers: ${JSON.stringify(response.headers)}`)
@@ -329,6 +327,21 @@ class ClaudeConsoleRelayService {
       // 检查是否为账户禁用/不可用的 400 错误
       const accountDisabledError = isAccountDisabledError(response.status, response.data)
 
+      // 错误响应上下文（仅错误时构造，避免正常响应的序列化开销）
+      const errorContext =
+        response.status >= 400
+          ? upstreamErrorHelper.buildErrorContext({
+              url: requestConfig.url,
+              method: requestConfig.method,
+              requestHeaders: requestConfig.headers,
+              requestBody: requestConfig.data,
+              model: requestConfig.data?.model,
+              responseStatus: response.status,
+              responseHeaders: response.headers,
+              responseBody: response.data
+            })
+          : null
+
       // 检查错误状态并相应处理
       if (response.status === 401) {
         logger.warn(
@@ -336,7 +349,7 @@ class ClaudeConsoleRelayService {
         )
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', 401)
+            .markTempUnavailable(accountId, 'claude-console', 401, null, errorContext)
             .catch(() => {})
         }
       } else if (accountDisabledError) {
@@ -365,7 +378,8 @@ class ClaudeConsoleRelayService {
               accountId,
               'claude-console',
               429,
-              upstreamErrorHelper.parseRetryAfter(response.headers)
+              upstreamErrorHelper.parseRetryAfter(response.headers),
+              errorContext
             )
             .catch(() => {})
         }
@@ -376,7 +390,7 @@ class ClaudeConsoleRelayService {
         if (!autoProtectionDisabled) {
           await claudeConsoleAccountService.markAccountOverloaded(accountId)
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', 529)
+            .markTempUnavailable(accountId, 'claude-console', 529, null, errorContext)
             .catch(() => {})
         }
       } else if (response.status >= 500) {
@@ -385,7 +399,7 @@ class ClaudeConsoleRelayService {
         )
         if (!autoProtectionDisabled) {
           await upstreamErrorHelper
-            .markTempUnavailable(accountId, 'claude-console', response.status)
+            .markTempUnavailable(accountId, 'claude-console', response.status, null, errorContext)
             .catch(() => {})
         }
       } else if (response.status === 200 || response.status === 201) {
@@ -428,6 +442,9 @@ class ClaudeConsoleRelayService {
 
       logger.debug(`[DEBUG] Final response body to return: ${responseBody.substring(0, 200)}...`)
 
+      // 被动健康检查：拿到 HTTP 响应即代理传输成功（含 4xx/5xx，不归咎代理）
+      proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, null)
+
       return {
         statusCode: response.status,
         headers: response.headers,
@@ -435,16 +452,17 @@ class ClaudeConsoleRelayService {
         accountId
       }
     } catch (error) {
-      // 处理特定错误
+      // 客户端断开导致的主动 abort 不是代理/上游故障，先拦截再 report，否则会污染代理健康与错误日志
       if (
         error.name === 'AbortError' ||
         error.name === 'CanceledError' ||
-        error.code === 'ECONNABORTED' ||
         error.code === 'ERR_CANCELED'
       ) {
         logger.info('Request aborted due to client disconnect')
         throw new Error('Client disconnected')
       }
+      // 被动健康检查：上报连接级故障（classifyBusinessTraffic 区分传输错误 vs 上游响应）
+      proxyResolver.report(proxyResolution?.proxyId, proxyResolution?.contextKey, error)
 
       logger.error(
         `❌ Claude Console relay request failed (Account: ${account?.name || accountId}):`,
@@ -504,6 +522,7 @@ class ClaudeConsoleRelayService {
     let leaseRefreshInterval = null // 租约刷新定时器
     let queueLockAcquired = false
     let queueRequestId = null
+    let proxyResolution = null
 
     try {
       // 📬 用户消息队列处理：如果是用户消息请求，需要获取队列锁
@@ -651,8 +670,9 @@ class ClaudeConsoleRelayService {
 
       // 模型兼容性检查已经在调度器中完成，这里不需要再检查
 
-      // 创建代理agent
-      const proxyAgent = claudeConsoleAccountService._createProxyAgent(account.proxy)
+      // 创建代理agent（保留 proxyId/contextKey 供被动健康检查上报）
+      proxyResolution = proxyResolver.resolveAgent(account, 'claude_console')
+      const proxyAgent = proxyResolution.agent
 
       // 发送流式请求
       await this._makeClaudeConsoleStreamRequest(
@@ -686,18 +706,23 @@ class ClaudeConsoleRelayService {
 
       // 更新最后使用时间
       await this._updateLastUsedTime(accountId)
+
+      // 被动健康检查：流式正常完成 = 代理传输成功
+      proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, null)
     } catch (error) {
-      // 客户端主动断开连接是正常情况，使用 INFO 级别
+      // 客户端断开导致的主动 abort 不是代理/上游故障，先拦截再 report，否则会污染代理健康与错误日志
       if (error.message === 'Client disconnected') {
         logger.info(
           `🔌 Claude Console stream relay ended: Client disconnected (Account: ${account?.name || accountId})`
         )
-      } else {
-        logger.error(
-          `❌ Claude Console stream relay failed (Account: ${account?.name || accountId}):`,
-          error
-        )
+        throw error
       }
+      // 被动健康检查：上报连接级故障（客户端断开/上游响应由 classifyBusinessTraffic 区分，不误熔断）
+      proxyResolver.report(proxyResolution?.proxyId, proxyResolution?.contextKey, error)
+      logger.error(
+        `❌ Claude Console stream relay failed (Account: ${account?.name || accountId}):`,
+        error
+      )
       throw error
     } finally {
       // 🛑 清理租约刷新定时器
@@ -849,13 +874,25 @@ class ClaudeConsoleRelayService {
                 errorDataForCheck
               )
 
+              // 错误响应上下文（流式：响应体取已收集的 errorDataForCheck）
+              const errorContext = upstreamErrorHelper.buildErrorContext({
+                url: requestConfig.url,
+                method: requestConfig.method,
+                requestHeaders: requestConfig.headers,
+                requestBody: requestConfig.data,
+                model: requestConfig.data?.model,
+                responseStatus: response.status,
+                responseHeaders: response.headers,
+                responseBody: errorDataForCheck
+              })
+
               if (response.status === 401) {
                 logger.warn(
                   `🚫 [Stream] Unauthorized error detected for Claude Console account ${accountId}${autoProtectionDisabled ? ' (auto-protection disabled, skipping status change)' : ''}`
                 )
                 if (!autoProtectionDisabled) {
                   await upstreamErrorHelper
-                    .markTempUnavailable(accountId, 'claude-console', 401)
+                    .markTempUnavailable(accountId, 'claude-console', 401, null, errorContext)
                     .catch(() => {})
                 }
               } else if (accountDisabledError) {
@@ -884,7 +921,8 @@ class ClaudeConsoleRelayService {
                       accountId,
                       'claude-console',
                       429,
-                      upstreamErrorHelper.parseRetryAfter(response.headers)
+                      upstreamErrorHelper.parseRetryAfter(response.headers),
+                      errorContext
                     )
                     .catch(() => {})
                 }
@@ -895,7 +933,7 @@ class ClaudeConsoleRelayService {
                 if (!autoProtectionDisabled) {
                   await claudeConsoleAccountService.markAccountOverloaded(accountId)
                   await upstreamErrorHelper
-                    .markTempUnavailable(accountId, 'claude-console', 529)
+                    .markTempUnavailable(accountId, 'claude-console', 529, null, errorContext)
                     .catch(() => {})
                 }
               } else if (response.status >= 500) {
@@ -904,7 +942,13 @@ class ClaudeConsoleRelayService {
                 )
                 if (!autoProtectionDisabled) {
                   await upstreamErrorHelper
-                    .markTempUnavailable(accountId, 'claude-console', response.status)
+                    .markTempUnavailable(
+                      accountId,
+                      'claude-console',
+                      response.status,
+                      null,
+                      errorContext
+                    )
                     .catch(() => {})
                 }
               }
@@ -1293,10 +1337,22 @@ class ClaudeConsoleRelayService {
           if (error.response) {
             const catchAutoProtectionDisabled =
               account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+            // 错误响应上下文（catch：响应体可能为流，仅在字符串时记录）
+            const errorContext = upstreamErrorHelper.buildErrorContext({
+              url: requestConfig.url,
+              method: requestConfig.method,
+              requestHeaders: requestConfig.headers,
+              requestBody: requestConfig.data,
+              model: requestConfig.data?.model,
+              responseStatus: error.response.status,
+              responseHeaders: error.response.headers,
+              responseBody:
+                typeof error.response.data === 'string' ? error.response.data : undefined
+            })
             if (error.response.status === 401) {
               if (!catchAutoProtectionDisabled) {
                 upstreamErrorHelper
-                  .markTempUnavailable(accountId, 'claude-console', 401)
+                  .markTempUnavailable(accountId, 'claude-console', 401, null, errorContext)
                   .catch(() => {})
               }
             } else if (error.response.status === 429) {
@@ -1311,7 +1367,8 @@ class ClaudeConsoleRelayService {
                     accountId,
                     'claude-console',
                     429,
-                    upstreamErrorHelper.parseRetryAfter(error.response.headers)
+                    upstreamErrorHelper.parseRetryAfter(error.response.headers),
+                    errorContext
                   )
                   .catch(() => {})
               }
@@ -1319,7 +1376,7 @@ class ClaudeConsoleRelayService {
               if (!catchAutoProtectionDisabled) {
                 claudeConsoleAccountService.markAccountOverloaded(accountId)
                 upstreamErrorHelper
-                  .markTempUnavailable(accountId, 'claude-console', 529)
+                  .markTempUnavailable(accountId, 'claude-console', 529, null, errorContext)
                   .catch(() => {})
               }
             }
@@ -1378,7 +1435,7 @@ class ClaudeConsoleRelayService {
   async _updateLastUsedTime(accountId) {
     try {
       const client = require('../../models/redis').getClientSafe()
-      const accountKey = `claude_console_account:${accountId}`
+      const accountKey = RedisKeys.accounts.claudeConsole(accountId)
       const exists = await client.exists(accountKey)
 
       if (!exists) {
@@ -1476,11 +1533,12 @@ class ClaudeConsoleRelayService {
       const payload = createClaudeTestPayload(model, { stream: true })
 
       const extraHeaders = account.userAgent ? { 'User-Agent': account.userAgent } : {}
+      const testProxyResolution = proxyResolver.resolveAgent(account, 'claude_console')
       const requestOptions = {
         apiUrl,
         responseStream,
         payload,
-        proxyAgent: claudeConsoleAccountService._createProxyAgent(account.proxy),
+        proxyAgent: testProxyResolution.agent,
         extraHeaders
       }
 
@@ -1491,6 +1549,8 @@ class ClaudeConsoleRelayService {
       }
 
       await sendStreamTestRequest(requestOptions)
+      // 被动健康检查：测试请求正常完成 = 代理传输成功
+      proxyResolver.report(testProxyResolution.proxyId, testProxyResolution.contextKey, null)
     } catch (error) {
       logger.error(`❌ Test account connection failed:`, error)
       if (!responseStream.headersSent) {

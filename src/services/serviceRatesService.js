@@ -5,10 +5,11 @@
  */
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const { RedisKeys } = require('../constants/redisKeys')
 
 class ServiceRatesService {
   constructor() {
-    this.CONFIG_KEY = 'system:service_rates'
+    this.CONFIG_KEY = RedisKeys.system.serviceRates
     this.cachedRates = null
     this.cacheExpiry = 0
     this.CACHE_TTL = 60 * 1000 // 1分钟缓存
@@ -25,6 +26,7 @@ class ServiceRatesService {
         codex: 1.0,
         gemini: 1.0,
         droid: 1.0,
+        grok: 1.0,
         bedrock: 1.0,
         azure: 1.0,
         ccr: 1.0
@@ -189,6 +191,16 @@ class ServiceRatesService {
       return 'droid'
     }
 
+    // Grok / xAI 系列
+    if (
+      modelLower.includes('grok') ||
+      modelLower.includes('xai') ||
+      modelLower.includes('composer-2') ||
+      modelLower.startsWith('composer')
+    ) {
+      return 'grok'
+    }
+
     // Bedrock 系列（通常带有 aws 或特定前缀）
     if (
       modelLower.includes('bedrock') ||
@@ -226,7 +238,8 @@ class ServiceRatesService {
       openai: 'codex',
       azure: 'azure',
       'azure-openai': 'azure',
-      droid: 'droid'
+      droid: 'droid',
+      grok: 'grok'
     }
 
     return mapping[accountType] || null

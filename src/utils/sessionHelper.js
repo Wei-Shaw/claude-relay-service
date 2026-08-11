@@ -1,6 +1,8 @@
 const crypto = require('crypto')
+
 const logger = require('./logger')
 const metadataUserIdHelper = require('./metadataUserIdHelper')
+const { RedisKeys } = require('../constants/redisKeys')
 
 class SessionHelper {
   /**
@@ -145,7 +147,7 @@ class SessionHelper {
    * @returns {string} - Redis键名
    */
   getSessionRedisKey(sessionHash) {
-    return `sticky_session:${sessionHash}`
+    return RedisKeys.session.sticky(sessionHash)
   }
 
   /**

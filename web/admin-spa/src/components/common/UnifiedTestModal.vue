@@ -1,12 +1,12 @@
 <template>
-  <Teleport to="body">
+  <ModalTransition>
     <div
       v-if="show"
       class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
     >
       <div class="absolute inset-0" @click="handleClose" />
       <div
-        class="relative z-10 mx-3 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4"
+        class="modal-panel relative z-10 mx-3 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4"
       >
         <!-- 顶部栏 -->
         <div
@@ -36,7 +36,7 @@
               <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {{ modalTitle }}
               </h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
                 {{ modalSubtitle }}
               </p>
             </div>
@@ -65,7 +65,7 @@
                 :value="maskedApiKey"
               />
               <div class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
-                <i class="fas fa-lock text-xs" />
+                <i class="fas fa-lock text-sm" />
               </div>
             </div>
           </div>
@@ -77,7 +77,7 @@
               <span class="text-gray-500 dark:text-gray-400">平台类型</span>
               <span
                 :class="[
-                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-medium',
                   platformBadgeClass
                 ]"
               >
@@ -93,7 +93,7 @@
               <span class="text-gray-500 dark:text-gray-400">账号类型</span>
               <span
                 :class="[
-                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-medium',
                   credentialTypeBadgeClass
                 ]"
               >
@@ -105,7 +105,7 @@
             <div v-if="mode === 'apikey'" class="flex items-center justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">测试端点</span>
               <span
-                class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
               >
                 <i class="fas fa-link" />
                 {{ apikeyServiceConfig.displayEndpoint }}
@@ -121,22 +121,23 @@
                   :models="availableModels"
                 />
               </div>
-              <div class="text-right text-xs text-gray-400 dark:text-gray-500">
+              <div class="text-right text-sm text-gray-400 dark:text-gray-500">
                 {{ selectedModel }}
               </div>
             </div>
             <!-- [apikey] 最大输出 Token -->
             <div v-if="mode === 'apikey'" class="text-sm">
-              <div class="mb-1 flex items-center justify-between">
+              <div class="mb-1 flex items-center justify-between gap-3">
                 <span class="text-gray-500 dark:text-gray-400">最大输出 Token</span>
-                <select
-                  v-model="maxTokens"
-                  class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-                >
-                  <option v-for="opt in maxTokensOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
+                <div class="w-28">
+                  <CustomDropdown
+                    v-model="maxTokens"
+                    accent="blue"
+                    :options="maxTokensOptions"
+                    placeholder="Token"
+                    size="sm"
+                  />
+                </div>
               </div>
             </div>
             <!-- [apikey] 测试服务 -->
@@ -181,7 +182,7 @@
                 <p :class="['font-medium', state.statusTextClass.value]">
                   {{ state.statusTitle.value }}
                 </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">{{ statusDescription }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ statusDescription }}</p>
               </div>
             </div>
           </div>
@@ -194,10 +195,10 @@
             <div
               class="flex items-center justify-between border-b border-gray-200 bg-gray-100 px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
             >
-              <span class="text-xs font-medium text-gray-600 dark:text-gray-400">AI 响应</span>
+              <span class="text-sm font-medium text-gray-600 dark:text-gray-400">AI 响应</span>
               <span
                 v-if="state.responseText.value"
-                class="text-xs text-gray-500 dark:text-gray-500"
+                class="text-sm text-gray-500 dark:text-gray-500"
               >
                 {{ state.responseText.value.length }} 字符
               </span>
@@ -232,7 +233,7 @@
           <!-- 测试时间 -->
           <div
             v-if="state.testDuration.value > 0"
-            class="mb-4 flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-400"
+            class="mb-4 flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400"
           >
             <i class="fas fa-clock" />
             <span>耗时 {{ (state.testDuration.value / 1000).toFixed(2) }} 秒</span>
@@ -277,11 +278,12 @@
         </div>
       </div>
     </div>
-  </Teleport>
+  </ModalTransition>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { APP_CONFIG } from '@/utils/tools'
 import { getModelsApi } from '@/utils/http_apis'
 import { useTestState } from '@/utils/useTestState'
@@ -303,62 +305,77 @@ const state = useTestState()
 
 // ========== 模型相关 ==========
 const selectedModel = ref('')
-const modelsFromApi = ref({ claude: [], gemini: [], openai: [], platforms: {} })
+const modelsFromApi = ref({
+  claude: [],
+  gemini: [],
+  openai: [],
+  platforms: {},
+  defaultModels: null
+})
+
+// 后台配置的默认测试模型（account 模式按平台，apikey 模式按服务）
+const configuredDefault = computed(() => {
+  const cfg = modelsFromApi.value.defaultModels
+  if (!cfg) return null
+  if (props.mode === 'account') {
+    return cfg.account?.[props.account?.platform] || null
+  }
+  return cfg.apikey?.[props.serviceType] || null
+})
+
+// 标记模型配置是否已成功加载（弹窗常驻挂载、onMounted 只跑一次，失败需在打开时重试）
+const modelsLoaded = ref(false)
 
 const loadModels = async () => {
   const result = await getModelsApi()
   if (result.success && result.data) {
     modelsFromApi.value = result.data
+    modelsLoaded.value = true
   }
 }
 
 onMounted(loadModels)
 
+// 把默认模型钉在列表首位（保证可选中、是默认值、"返回列表"也回到它）
+const pinDefaultModel = (list, defaultModel, defaultLabel) => {
+  if (!defaultModel) return list
+  const rest = list.filter((m) => m.value !== defaultModel)
+  const head = list.find((m) => m.value === defaultModel) || {
+    value: defaultModel,
+    label: defaultLabel || defaultModel
+  }
+  return [head, ...rest]
+}
+
 const availableModels = computed(() => {
   if (props.mode === 'account') {
     const platform = props.account?.platform
     if (!platform) return []
-    // azure-openai 使用 deploymentName
-    if (platform === 'azure-openai') {
+    // azure-openai 使用 deploymentName（AccountsView 标准化成 azure_openai，两种写法都兼容）
+    if (platform === 'azure-openai' || platform === 'azure_openai') {
       return [{ value: props.account.deploymentName, label: props.account.deploymentName }]
     }
-    return modelsFromApi.value.platforms?.[platform] || []
+    const list = modelsFromApi.value.platforms?.[platform] || []
+    // 后台配置了默认模型则钉到首位（defaultModel 取 models[0] 即用它）
+    return pinDefaultModel(list, configuredDefault.value)
   }
-  // apikey 模式
-  return modelsFromApi.value[props.serviceType] || []
+  // apikey 模式: 仅用后台配置的默认置顶（未加载时无默认、列表为空，由 watch 在加载后回填）
+  const list = modelsFromApi.value[props.serviceType] || []
+  return pinDefaultModel(list, configuredDefault.value)
 })
 
-// 各平台回退默认模型（模型列表未加载时使用）
-const platformFallbackModels = {
-  claude: 'claude-sonnet-4-5-20250929',
-  'claude-console': 'claude-sonnet-4-5-20250929',
-  gemini: 'gemini-2.5-pro',
-  'gemini-api': 'gemini-2.5-flash',
-  'openai-responses': 'gpt-5',
-  droid: 'claude-sonnet-4-5-20250929',
-  ccr: 'claude-sonnet-4-5-20250929'
-}
-
 const defaultModel = computed(() => {
-  if (props.mode === 'account') {
-    const platform = props.account?.platform
-    if (platform === 'azure-openai') return props.account?.deploymentName
-    // bedrock 优先用列表，列表为空时按凭证类型回退
-    if (platform === 'bedrock') {
-      const models = availableModels.value
-      if (models.length > 0) return models[0].value
-      if (props.account?.credentialType === 'bearer_token')
-        return 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'
-      return 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
-    }
-    const models = availableModels.value
-    if (models.length > 0) return models[0].value
-    return platformFallbackModels[platform] || platformFallbackModels.claude
+  // azure 用账户的 deploymentName（不在测试模型配置内）
+  const accountPlatform = props.account?.platform
+  if (
+    props.mode === 'account' &&
+    (accountPlatform === 'azure-openai' || accountPlatform === 'azure_openai')
+  ) {
+    return props.account?.deploymentName || ''
   }
-  // apikey 模式: 优先用列表，回退用 serviceConfig 的 defaultModel
-  const models = availableModels.value
-  if (models.length > 0) return models[0].value
-  return apikeyServiceConfig.value.defaultModel
+  // 其余取已加载列表首项（后台配置默认已置顶）；未加载时为空，由 watch 在加载后回填
+  // 不保留任何前端硬编码 fallback：避免在 /apiStats/models 返回前把旧默认绕过后端发出
+  return availableModels.value[0]?.value || ''
 })
 
 // ========== apikey 模式专用 ==========
@@ -372,23 +389,21 @@ const maxTokensOptions = [
   { value: 4096, label: '4096' }
 ]
 
+// 默认模型不在此硬编码：统一由后台"测试模型"配置（/apiStats/models 的 defaultModels）提供
 const apikeyServiceConfigs = {
   claude: {
     name: 'Claude',
     endpoint: '/api-key/test',
-    defaultModel: 'claude-sonnet-4-5-20250929',
     displayEndpoint: '/api/v1/messages'
   },
   gemini: {
     name: 'Gemini',
     endpoint: '/api-key/test-gemini',
-    defaultModel: 'gemini-2.5-pro',
     displayEndpoint: '/gemini/v1/models/:model:streamGenerateContent'
   },
   openai: {
     name: 'OpenAI (Codex)',
     endpoint: '/api-key/test-openai',
-    defaultModel: 'gpt-5',
     displayEndpoint: '/openai/responses'
   }
 }
@@ -404,7 +419,10 @@ const maskedApiKey = computed(() => {
   return key.substring(0, 6) + '****' + key.substring(key.length - 4)
 })
 
-const disableTest = computed(() => props.mode === 'apikey' && !props.apiKeyValue)
+// selectedModel 为空 = 后台测试模型配置尚未加载完；此时禁用测试，避免发出未经后台解析的请求
+const disableTest = computed(
+  () => !selectedModel.value || (props.mode === 'apikey' && !props.apiKeyValue)
+)
 
 // ========== account 模式 - 平台信息 ==========
 const platformConfigs = {
@@ -529,6 +547,7 @@ const getAccountEndpoint = () => {
     'gemini-api': `${APP_CONFIG.apiPrefix}/admin/gemini-api-accounts/${props.account.id}/test`,
     'openai-responses': `${APP_CONFIG.apiPrefix}/admin/openai-responses-accounts/${props.account.id}/test`,
     'azure-openai': `${APP_CONFIG.apiPrefix}/admin/azure-openai-accounts/${props.account.id}/test`,
+    azure_openai: `${APP_CONFIG.apiPrefix}/admin/azure-openai-accounts/${props.account.id}/test`,
     droid: `${APP_CONFIG.apiPrefix}/admin/droid-accounts/${props.account.id}/test`,
     ccr: `${APP_CONFIG.apiPrefix}/admin/ccr-accounts/${props.account.id}/test`
   }
@@ -579,6 +598,8 @@ watch(
   (newVal) => {
     if (newVal) {
       state.resetState()
+      // 首轮加载失败时每次打开重试拉取（成功后由 watch(defaultModel) 回填 selectedModel、解除按钮禁用）
+      if (!modelsLoaded.value) loadModels()
       selectedModel.value = defaultModel.value
       if (props.mode === 'apikey') {
         testPrompt.value = 'hi'
@@ -595,4 +616,12 @@ watch(
   },
   { deep: true }
 )
+
+// /apiStats/models 异步返回、后台配置默认加载完成后回填默认选择：
+// 仅当弹窗打开且用户尚未选择（selectedModel 为空）时同步，避免覆盖手动选择
+watch(defaultModel, (newVal) => {
+  if (props.show && newVal && !selectedModel.value) {
+    selectedModel.value = newVal
+  }
+})
 </script>

@@ -14,6 +14,8 @@
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 
+const { RedisKeys: RedisRegistry } = require('../constants/redisKeys')
+
 // ============================================================================
 // 常量配置
 // ============================================================================
@@ -41,22 +43,22 @@ const BATCH_SIZE = 100
 
 const RedisKeys = {
   /** 费用排序索引 Sorted Set */
-  rankKey: (timeRange) => `cost_rank:${timeRange}`,
+  rankKey: (timeRange) => RedisRegistry.costRank.rank(timeRange),
 
   /** 临时索引 key（用于原子替换） */
-  tempRankKey: (timeRange) => `cost_rank:${timeRange}:temp:${Date.now()}`,
+  tempRankKey: (timeRange) => RedisRegistry.costRank.temp(timeRange),
 
   /** 索引元数据 Hash */
-  metaKey: (timeRange) => `cost_rank_meta:${timeRange}`,
+  metaKey: (timeRange) => RedisRegistry.costRank.meta(timeRange),
 
   /** 更新锁 */
-  lockKey: (timeRange) => `cost_rank_lock:${timeRange}`,
+  lockKey: (timeRange) => RedisRegistry.costRank.lock(timeRange),
 
   /** 每日费用 */
-  dailyCost: (keyId, date) => `usage:cost:daily:${keyId}:${date}`,
+  dailyCost: (keyId, date) => RedisRegistry.usage.costDaily(keyId, date),
 
   /** 总费用 */
-  totalCost: (keyId) => `usage:cost:total:${keyId}`
+  totalCost: (keyId) => RedisRegistry.usage.costTotal(keyId)
 }
 
 // ============================================================================

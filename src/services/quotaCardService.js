@@ -7,12 +7,13 @@ const logger = require('../utils/logger')
 const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
 
+const { RedisKeys } = require('../constants/redisKeys')
+
 class QuotaCardService {
   constructor() {
-    this.CARD_PREFIX = 'quota_card:'
-    this.REDEMPTION_PREFIX = 'redemption:'
     this.CARD_CODE_PREFIX = 'CC' // 卡号前缀
     this.LIMITS_CONFIG_KEY = 'system:quota_card_limits'
+    this.MAX_BATCH_COUNT = 1000 // 单次批量创建上限（DoS 防护，路由层与本层共用同一来源）
   }
 
   /**
@@ -62,15 +63,31 @@ class QuotaCardService {
   }
 
   /**
-   * 生成卡号（16位，格式：CC_XXXX_XXXX_XXXX）
+   * 清洗卡号前缀（大写字母数字，最长 16 位，空串表示无前缀）
    */
-  _generateCardCode() {
+  _sanitizePrefix(prefix) {
+    // 非字符串一律按无前缀处理，避免 null/对象被 String() 转成脏前缀
+    if (typeof prefix !== 'string') {
+      return ''
+    }
+    return prefix
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 16)
+  }
+
+  /**
+   * 生成卡号（格式：PREFIX_XXXX_XXXX_XXXX，无前缀时为 XXXX_XXXX_XXXX）
+   */
+  _generateCardCode(prefix = this.CARD_CODE_PREFIX) {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // 排除容易混淆的字符
     let code = ''
     for (let i = 0; i < 12; i++) {
       code += chars.charAt(crypto.randomInt(chars.length))
     }
-    return `${this.CARD_CODE_PREFIX}_${code.slice(0, 4)}_${code.slice(4, 8)}_${code.slice(8, 12)}`
+    const body = `${code.slice(0, 4)}_${code.slice(4, 8)}_${code.slice(8, 12)}`
+    const cleanPrefix = this._sanitizePrefix(prefix)
+    return cleanPrefix ? `${cleanPrefix}_${body}` : body
   }
 
   /**
@@ -94,7 +111,8 @@ class QuotaCardService {
         timeUnit = 'days',
         expiresAt = null,
         note = '',
-        createdBy = 'admin'
+        createdBy = 'admin',
+        codePrefix
       } = options
 
       // 验证
@@ -111,7 +129,7 @@ class QuotaCardService {
       }
 
       const cardId = uuidv4()
-      const cardCode = this._generateCardCode()
+      const cardCode = this._generateCardCode(codePrefix)
 
       const cardData = {
         id: cardId,
@@ -138,14 +156,14 @@ class QuotaCardService {
       }
 
       // 保存卡数据
-      await redis.client.hset(`${this.CARD_PREFIX}${cardId}`, cardData)
+      await redis.client.hset(RedisKeys.quotaCard.byId(cardId), cardData)
 
       // 建立卡号到 ID 的映射（用于快速查找）
-      await redis.client.set(`quota_card_code:${cardCode}`, cardId)
+      await redis.client.set(RedisKeys.quotaCard.byCode(cardCode), cardId)
 
       // 添加到卡列表索引
-      await redis.client.sadd('quota_cards:all', cardId)
-      await redis.client.sadd(`quota_cards:status:${cardData.status}`, cardId)
+      await redis.client.sadd(RedisKeys.quotaCard.all, cardId)
+      await redis.client.sadd(RedisKeys.quotaCard.status(cardData.status), cardId)
 
       logger.success(`🎫 Created ${type} card: ${cardCode} (${cardId})`)
 
@@ -175,12 +193,17 @@ class QuotaCardService {
    * @returns {Array} 创建的卡列表
    */
   async createCardsBatch(options = {}, count = 1) {
+    // 兜底：即使绕过路由直接调用，也拒绝非法数量，避免死循环与海量写入 DoS
+    const total = Number(count)
+    if (!Number.isInteger(total) || total < 1 || total > this.MAX_BATCH_COUNT) {
+      throw new Error(`count must be an integer between 1 and ${this.MAX_BATCH_COUNT}`)
+    }
     const cards = []
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < total; i++) {
       const card = await this.createCard(options)
       cards.push(card)
     }
-    logger.success(`🎫 Batch created ${count} cards`)
+    logger.success(`🎫 Batch created ${total} cards`)
     return cards
   }
 
@@ -189,7 +212,7 @@ class QuotaCardService {
    */
   async getCardByCode(code) {
     try {
-      const cardId = await redis.client.get(`quota_card_code:${code}`)
+      const cardId = await redis.client.get(RedisKeys.quotaCard.byCode(code))
       if (!cardId) {
         return null
       }
@@ -205,7 +228,7 @@ class QuotaCardService {
    */
   async getCardById(cardId) {
     try {
-      const cardData = await redis.client.hgetall(`${this.CARD_PREFIX}${cardId}`)
+      const cardData = await redis.client.hgetall(RedisKeys.quotaCard.byId(cardId))
       if (!cardData || Object.keys(cardData).length === 0) {
         return null
       }
@@ -246,17 +269,16 @@ class QuotaCardService {
    */
   async getAllCards(options = {}) {
     try {
-      const { status, limit = 100, offset = 0 } = options
+      const { status, type, search, limit = 100, offset = 0 } = options
 
       let cardIds
       if (status) {
-        cardIds = await redis.client.smembers(`quota_cards:status:${status}`)
+        cardIds = await redis.client.smembers(RedisKeys.quotaCard.status(status))
       } else {
-        cardIds = await redis.client.smembers('quota_cards:all')
+        cardIds = await redis.client.smembers(RedisKeys.quotaCard.all)
       }
 
-      // 排序（按创建时间倒序）
-      const cards = []
+      let cards = []
       for (const cardId of cardIds) {
         const card = await this.getCardById(cardId)
         if (card) {
@@ -264,6 +286,22 @@ class QuotaCardService {
         }
       }
 
+      // 类型筛选
+      if (type) {
+        cards = cards.filter((card) => card.type === type)
+      }
+
+      // 关键字搜索（卡号 / 备注 / 核销用户）
+      const keyword = (search || '').trim().toLowerCase()
+      if (keyword) {
+        cards = cards.filter((card) =>
+          [card.code, card.note, card.redeemedByUsername].some((field) =>
+            (field || '').toLowerCase().includes(keyword)
+          )
+        )
+      }
+
+      // 排序（按创建时间倒序）
       cards.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
       // 分页
@@ -300,7 +338,12 @@ class QuotaCardService {
 
       // 检查卡状态
       if (card.status !== 'unused') {
-        const statusMap = { used: '已使用', expired: '已过期', revoked: '已撤销' }
+        const statusMap = {
+          redeemed: '已核销',
+          expired: '已过期',
+          revoked: '已撤销',
+          disabled: '已禁用'
+        }
         throw new Error(`卡片${statusMap[card.status] || card.status}，无法兑换`)
       }
 
@@ -396,7 +439,11 @@ class QuotaCardService {
           const maxExpiry = new Date()
           maxExpiry.setDate(maxExpiry.getDate() + limits.maxExpiryDays)
           if (new Date(result.newExpiresAt) > maxExpiry) {
-            await redis.client.hset(`apikey:${apiKeyId}`, 'expiresAt', maxExpiry.toISOString())
+            await redis.client.hset(
+              RedisKeys.apiKey.byId(apiKeyId),
+              'expiresAt',
+              maxExpiry.toISOString()
+            )
             afterExpiry = maxExpiry.toISOString()
             // 计算实际增加的天数，截断时统一用天
             const actualDays = Math.max(
@@ -416,7 +463,7 @@ class QuotaCardService {
       }
 
       // 更新卡状态
-      await redis.client.hset(`${this.CARD_PREFIX}${card.id}`, {
+      await redis.client.hset(RedisKeys.quotaCard.byId(card.id), {
         status: 'redeemed',
         redeemedBy: userId,
         redeemedByUsername: username,
@@ -426,8 +473,8 @@ class QuotaCardService {
       })
 
       // 更新状态索引
-      await redis.client.srem(`quota_cards:status:unused`, card.id)
-      await redis.client.sadd(`quota_cards:status:redeemed`, card.id)
+      await redis.client.srem(RedisKeys.quotaCard.status('unused'), card.id)
+      await redis.client.sadd(RedisKeys.quotaCard.status('redeemed'), card.id)
 
       // 创建核销记录
       const redemptionData = {
@@ -450,12 +497,12 @@ class QuotaCardService {
         status: 'active' // active | revoked
       }
 
-      await redis.client.hset(`${this.REDEMPTION_PREFIX}${redemptionId}`, redemptionData)
+      await redis.client.hset(RedisKeys.redemption.byId(redemptionId), redemptionData)
 
       // 添加到核销记录索引
-      await redis.client.sadd('redemptions:all', redemptionId)
-      await redis.client.sadd(`redemptions:user:${userId}`, redemptionId)
-      await redis.client.sadd(`redemptions:apikey:${apiKeyId}`, redemptionId)
+      await redis.client.sadd(RedisKeys.redemption.all, redemptionId)
+      await redis.client.sadd(RedisKeys.redemption.byUser(userId), redemptionId)
+      await redis.client.sadd(RedisKeys.redemption.byApikey(apiKeyId), redemptionId)
 
       logger.success(`✅ Card ${card.code} redeemed by ${username || userId} to key ${apiKeyId}`)
 
@@ -489,7 +536,7 @@ class QuotaCardService {
   async revokeRedemption(redemptionId, revokedBy, reason = '') {
     try {
       // 获取核销记录
-      const redemptionData = await redis.client.hgetall(`${this.REDEMPTION_PREFIX}${redemptionId}`)
+      const redemptionData = await redis.client.hgetall(RedisKeys.redemption.byId(redemptionId))
       if (!redemptionData || Object.keys(redemptionData).length === 0) {
         throw new Error('Redemption record not found')
       }
@@ -515,7 +562,7 @@ class QuotaCardService {
       // 如果需要回退时间，可以在这里添加逻辑
 
       // 更新核销记录状态
-      await redis.client.hset(`${this.REDEMPTION_PREFIX}${redemptionId}`, {
+      await redis.client.hset(RedisKeys.redemption.byId(redemptionId), {
         status: 'revoked',
         revokedAt: now,
         revokedBy,
@@ -525,7 +572,7 @@ class QuotaCardService {
 
       // 更新卡状态
       const { cardId } = redemptionData
-      await redis.client.hset(`${this.CARD_PREFIX}${cardId}`, {
+      await redis.client.hset(RedisKeys.quotaCard.byId(cardId), {
         status: 'revoked',
         revokedAt: now,
         revokedBy,
@@ -533,8 +580,8 @@ class QuotaCardService {
       })
 
       // 更新状态索引
-      await redis.client.srem(`quota_cards:status:redeemed`, cardId)
-      await redis.client.sadd(`quota_cards:status:revoked`, cardId)
+      await redis.client.srem(RedisKeys.quotaCard.status('redeemed'), cardId)
+      await redis.client.sadd(RedisKeys.quotaCard.status('revoked'), cardId)
 
       logger.success(`🔄 Revoked redemption ${redemptionId} by ${revokedBy}`)
 
@@ -561,20 +608,20 @@ class QuotaCardService {
    */
   async getRedemptions(options = {}) {
     try {
-      const { userId, apiKeyId, limit = 100, offset = 0 } = options
+      const { userId, apiKeyId, search, limit = 100, offset = 0 } = options
 
       let redemptionIds
       if (userId) {
-        redemptionIds = await redis.client.smembers(`redemptions:user:${userId}`)
+        redemptionIds = await redis.client.smembers(RedisKeys.redemption.byUser(userId))
       } else if (apiKeyId) {
-        redemptionIds = await redis.client.smembers(`redemptions:apikey:${apiKeyId}`)
+        redemptionIds = await redis.client.smembers(RedisKeys.redemption.byApikey(apiKeyId))
       } else {
-        redemptionIds = await redis.client.smembers('redemptions:all')
+        redemptionIds = await redis.client.smembers(RedisKeys.redemption.all)
       }
 
-      const redemptions = []
+      let redemptions = []
       for (const id of redemptionIds) {
-        const data = await redis.client.hgetall(`${this.REDEMPTION_PREFIX}${id}`)
+        const data = await redis.client.hgetall(RedisKeys.redemption.byId(id))
         if (data && Object.keys(data).length > 0) {
           redemptions.push({
             id: data.id,
@@ -600,6 +647,16 @@ class QuotaCardService {
             actualDeducted: parseFloat(data.actualDeducted || 0)
           })
         }
+      }
+
+      // 关键字搜索（卡号 / 用户 / API Key）
+      const keyword = (search || '').trim().toLowerCase()
+      if (keyword) {
+        redemptions = redemptions.filter((item) =>
+          [item.cardCode, item.username, item.userId, item.apiKeyName, item.apiKeyId].some(
+            (field) => (field || '').toLowerCase().includes(keyword)
+          )
+        )
       }
 
       // 排序（按时间倒序）
@@ -628,26 +685,75 @@ class QuotaCardService {
     try {
       const card = await this.getCardById(cardId)
       if (!card) {
-        throw new Error('Card not found')
+        const err = new Error('Card not found')
+        err.statusCode = 404
+        throw err
       }
 
-      if (card.status !== 'unused') {
-        throw new Error('Only unused cards can be deleted')
+      // 未使用 / 已禁用 的卡都可删除（已禁用本质是暂停的未使用卡，无核销记录、不涉及金额）
+      if (card.status !== 'unused' && card.status !== 'disabled') {
+        const err = new Error('Only unused or disabled cards can be deleted')
+        err.statusCode = 409
+        throw err
       }
 
       // 删除卡数据
-      await redis.client.del(`${this.CARD_PREFIX}${cardId}`)
-      await redis.client.del(`quota_card_code:${card.code}`)
+      await redis.client.del(RedisKeys.quotaCard.byId(cardId))
+      await redis.client.del(RedisKeys.quotaCard.byCode(card.code))
 
-      // 从索引中移除
-      await redis.client.srem('quota_cards:all', cardId)
-      await redis.client.srem(`quota_cards:status:unused`, cardId)
+      // 从索引中移除（按卡当前状态精确移除，避免残留索引）
+      await redis.client.srem(RedisKeys.quotaCard.all, cardId)
+      await redis.client.srem(RedisKeys.quotaCard.status(card.status), cardId)
 
       logger.success(`🗑️ Deleted card ${card.code}`)
 
       return { success: true, cardCode: card.code }
     } catch (error) {
-      logger.error('❌ Failed to delete card:', error)
+      // 业务拒绝（带 statusCode 的 404/409）不记错误日志，避免污染日志/被监控误判为故障
+      if (!error.statusCode || error.statusCode >= 500) {
+        logger.error('❌ Failed to delete card:', error)
+      }
+      throw error
+    }
+  }
+
+  /**
+   * 启用/禁用未使用的卡（unused ⇄ disabled）
+   */
+  async setCardEnabled(cardId, enabled) {
+    try {
+      const card = await this.getCardById(cardId)
+      if (!card) {
+        const err = new Error('Card not found')
+        err.statusCode = 404
+        throw err
+      }
+
+      // 只允许在 未使用 / 已禁用 之间切换，已核销/已撤销/已过期的卡状态由系统流转，不可手动改
+      if (enabled) {
+        if (card.status !== 'disabled') {
+          const err = new Error('Only disabled cards can be enabled')
+          err.statusCode = 409
+          throw err
+        }
+        await this._updateCardStatus(cardId, 'unused')
+        logger.success(`✅ Enabled card ${card.code}`)
+        return { success: true, cardCode: card.code, status: 'unused' }
+      }
+
+      if (card.status !== 'unused') {
+        const err = new Error('Only unused cards can be disabled')
+        err.statusCode = 409
+        throw err
+      }
+      await this._updateCardStatus(cardId, 'disabled')
+      logger.success(`🚫 Disabled card ${card.code}`)
+      return { success: true, cardCode: card.code, status: 'disabled' }
+    } catch (error) {
+      // 业务拒绝（带 statusCode 的 404/409）不记错误日志，避免污染日志/被监控误判为故障
+      if (!error.statusCode || error.statusCode >= 500) {
+        logger.error('❌ Failed to toggle card status:', error)
+      }
       throw error
     }
   }
@@ -662,11 +768,11 @@ class QuotaCardService {
     }
 
     const oldStatus = card.status
-    await redis.client.hset(`${this.CARD_PREFIX}${cardId}`, 'status', newStatus)
+    await redis.client.hset(RedisKeys.quotaCard.byId(cardId), 'status', newStatus)
 
     // 更新状态索引
-    await redis.client.srem(`quota_cards:status:${oldStatus}`, cardId)
-    await redis.client.sadd(`quota_cards:status:${newStatus}`, cardId)
+    await redis.client.srem(RedisKeys.quotaCard.status(oldStatus), cardId)
+    await redis.client.sadd(RedisKeys.quotaCard.status(newStatus), cardId)
   }
 
   /**
@@ -674,23 +780,25 @@ class QuotaCardService {
    */
   async getCardStats() {
     try {
-      const [unused, redeemed, revoked, expired] = await Promise.all([
-        redis.client.scard('quota_cards:status:unused'),
-        redis.client.scard('quota_cards:status:redeemed'),
-        redis.client.scard('quota_cards:status:revoked'),
-        redis.client.scard('quota_cards:status:expired')
+      const [unused, redeemed, revoked, expired, disabled] = await Promise.all([
+        redis.client.scard(RedisKeys.quotaCard.status('unused')),
+        redis.client.scard(RedisKeys.quotaCard.status('redeemed')),
+        redis.client.scard(RedisKeys.quotaCard.status('revoked')),
+        redis.client.scard(RedisKeys.quotaCard.status('expired')),
+        redis.client.scard(RedisKeys.quotaCard.status('disabled'))
       ])
 
       return {
-        total: unused + redeemed + revoked + expired,
+        total: unused + redeemed + revoked + expired + disabled,
         unused,
         redeemed,
         revoked,
-        expired
+        expired,
+        disabled
       }
     } catch (error) {
       logger.error('❌ Failed to get card stats:', error)
-      return { total: 0, unused: 0, redeemed: 0, revoked: 0, expired: 0 }
+      return { total: 0, unused: 0, redeemed: 0, revoked: 0, expired: 0, disabled: 0 }
     }
   }
 }

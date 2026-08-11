@@ -5,16 +5,13 @@ const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 const LRUCache = require('../../utils/lruCache')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 class OpenAIResponsesAccountService {
   constructor() {
     // 加密相关常量
     this.ENCRYPTION_ALGORITHM = 'aes-256-cbc'
     this.ENCRYPTION_SALT = 'openai-responses-salt'
-
-    // Redis 键前缀
-    this.ACCOUNT_KEY_PREFIX = 'openai_responses_account:'
-    this.SHARED_ACCOUNTS_KEY = 'shared_openai_responses_accounts'
 
     // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
     this._encryptionKeyCache = null
@@ -123,7 +120,7 @@ class OpenAIResponsesAccountService {
   // 获取账户
   async getAccount(accountId) {
     const client = redis.getClientSafe()
-    const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+    const key = RedisKeys.accounts.openaiResponses(accountId)
     const accountData = await client.hgetall(key)
 
     if (!accountData || !accountData.id) {
@@ -190,10 +187,23 @@ class OpenAIResponsesAccountService {
       updates.disableAutoProtection = updates.disableAutoProtection.toString()
     }
 
+    // 开启 disableAutoProtection 时立即清理已有自动停用状态并恢复调度（手动停用不受影响）
+    const enablingAutoProtection = updates.disableAutoProtection === 'true'
+    if (enablingAutoProtection) {
+      const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(account)
+      if (recoveryPatch) {
+        Object.assign(updates, recoveryPatch)
+      }
+    }
+
     // 更新 Redis
     const client = redis.getClientSafe()
-    const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+    const key = RedisKeys.accounts.openaiResponses(accountId)
     await client.hset(key, updates)
+
+    if (enablingAutoProtection) {
+      await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'openai-responses')
+    }
 
     logger.info(`📝 Updated OpenAI-Responses account: ${account.name}`)
 
@@ -203,13 +213,13 @@ class OpenAIResponsesAccountService {
   // 删除账户
   async deleteAccount(accountId) {
     const client = redis.getClientSafe()
-    const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+    const key = RedisKeys.accounts.openaiResponses(accountId)
 
     // 从共享账户列表中移除
-    await client.srem(this.SHARED_ACCOUNTS_KEY, accountId)
+    await client.srem(RedisKeys.accounts.sharedOpenaiResponses, accountId)
 
     // 从索引中移除
-    await redis.removeFromIndex('openai_responses_account:index', accountId)
+    await redis.removeFromIndex(RedisKeys.accounts.openaiResponsesIndex, accountId)
 
     // 删除账户数据
     await client.del(key)
@@ -225,15 +235,15 @@ class OpenAIResponsesAccountService {
 
     // 使用索引获取所有账户ID
     const accountIds = await redis.getAllIdsByIndex(
-      'openai_responses_account:index',
-      `${this.ACCOUNT_KEY_PREFIX}*`,
+      RedisKeys.accounts.openaiResponsesIndex,
+      RedisKeys.accounts.openaiResponsesPattern,
       /^openai_responses_account:(.+)$/
     )
     if (accountIds.length === 0) {
       return []
     }
 
-    const keys = accountIds.map((id) => `${this.ACCOUNT_KEY_PREFIX}${id}`)
+    const keys = accountIds.map((id) => RedisKeys.accounts.openaiResponses(id))
     // Pipeline 批量查询所有账户数据
     const pipeline = client.pipeline()
     keys.forEach((key) => pipeline.hgetall(key))
@@ -301,7 +311,15 @@ class OpenAIResponsesAccountService {
         `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountRateLimited`
       )
       upstreamErrorHelper
-        .recordErrorHistory(accountId, 'openai-responses', 429, 'rate_limit')
+        .recordErrorHistory(
+          accountId,
+          'openai-responses',
+          429,
+          'rate_limit',
+          upstreamErrorHelper.buildErrorContext({
+            reason: 'auto_protection_disabled_rate_limit'
+          })
+        )
         .catch(() => {})
       return
     }
@@ -338,7 +356,15 @@ class OpenAIResponsesAccountService {
         `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
       )
       upstreamErrorHelper
-        .recordErrorHistory(accountId, 'openai-responses', 401, 'auth_error')
+        .recordErrorHistory(
+          accountId,
+          'openai-responses',
+          401,
+          'auth_error',
+          upstreamErrorHelper.buildErrorContext({
+            reason: 'auto_protection_disabled_unauthorized'
+          })
+        )
         .catch(() => {})
       return
     }
@@ -465,7 +491,7 @@ class OpenAIResponsesAccountService {
         dailyUsage: newUsage.toString()
       }
 
-      // 检查是否超出额度
+      // [人工决策-2026-06-02 23:30:05] 方案甲：预算独立轴，disableAutoProtection 不覆盖预算，配额始终标记
       if (dailyQuota > 0 && newUsage >= dailyQuota) {
         updates.status = 'quotaExceeded'
         updates.quotaStoppedAt = new Date().toISOString()
@@ -500,6 +526,20 @@ class OpenAIResponsesAccountService {
   // 记录使用量（为了兼容性的别名）
   async recordUsage(accountId, tokens = 0) {
     return this.updateAccountUsage(accountId, tokens)
+  }
+
+  // [人工决策-2026-06-02 23:30:05] 方案甲：每日预算是否超额（活算，不看 status 标志，避免日重置后卡死）
+  // 同步纯判断：dailyQuota>0 且当天 dailyUsage>=dailyQuota 才算超额；非当天视为已重置（新一天预算刷新）
+  isAccountQuotaExceeded(account) {
+    const dailyQuota = parseFloat(account?.dailyQuota) || 0
+    if (dailyQuota <= 0) {
+      return false
+    }
+    const today = redis.getDateStringInTimezone()
+    if (account.lastResetDate !== today) {
+      return false
+    }
+    return (parseFloat(account.dailyUsage) || 0) >= dailyQuota
   }
 
   // 重置账户状态（清除所有异常状态）
@@ -666,17 +706,17 @@ class OpenAIResponsesAccountService {
   // 保存账户到 Redis
   async _saveAccount(accountId, accountData) {
     const client = redis.getClientSafe()
-    const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+    const key = RedisKeys.accounts.openaiResponses(accountId)
 
     // 保存账户数据
     await client.hset(key, accountData)
 
     // 添加到索引
-    await redis.addToIndex('openai_responses_account:index', accountId)
+    await redis.addToIndex(RedisKeys.accounts.openaiResponsesIndex, accountId)
 
     // 添加到共享账户列表
     if (accountData.accountType === 'shared') {
-      await client.sadd(this.SHARED_ACCOUNTS_KEY, accountId)
+      await client.sadd(RedisKeys.accounts.sharedOpenaiResponses, accountId)
     }
   }
 }

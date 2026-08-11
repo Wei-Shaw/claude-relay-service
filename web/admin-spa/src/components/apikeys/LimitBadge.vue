@@ -1,13 +1,13 @@
 <template>
   <div class="inline-flex items-center gap-1.5 rounded-md px-2 py-1" :class="badgeClass">
     <div class="flex items-center gap-1">
-      <i :class="['text-xs', iconClass]" />
-      <span class="text-xs font-medium">{{ label }}</span>
+      <i :class="['text-sm', iconClass]" />
+      <span class="text-sm font-medium">{{ label }}</span>
     </div>
     <div class="flex items-center gap-1">
-      <span class="text-xs font-semibold">${{ current.toFixed(2) }}</span>
-      <span class="text-xs text-gray-500 dark:text-gray-400">/</span>
-      <span class="text-xs">${{ limit.toFixed(2) }}</span>
+      <span class="text-sm font-semibold">${{ current.toFixed(2) }}</span>
+      <span class="text-sm text-gray-500 dark:text-gray-400">/</span>
+      <span class="text-sm">${{ limit.toFixed(2) }}</span>
     </div>
     <!-- 小型进度条 -->
     <div class="h-1 w-12 rounded-full bg-gray-200 dark:bg-gray-600">

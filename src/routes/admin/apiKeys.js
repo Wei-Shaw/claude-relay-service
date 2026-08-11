@@ -1,6 +1,7 @@
 const express = require('express')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
+const { RedisKeys, TTL } = require('../../constants/redisKeys')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const CostCalculator = require('../../utils/costCalculator')
@@ -10,7 +11,7 @@ const requestBodyRuleService = require('../../services/requestBodyRuleService')
 const router = express.Router()
 
 // 有效的权限值列表
-const VALID_PERMISSIONS = ['claude', 'gemini', 'openai', 'droid']
+const VALID_PERMISSIONS = ['claude', 'gemini', 'openai', 'droid', 'grok']
 
 /**
  * 验证权限数组格式
@@ -877,6 +878,7 @@ router.get('/accounts/binding-counts', authenticateAdmin, async (req, res) => {
       azureOpenaiAccountId: {},
       bedrockAccountId: {},
       droidAccountId: {},
+      grokAccountId: {},
       ccrAccountId: {}
     }
 
@@ -923,6 +925,12 @@ router.get('/accounts/binding-counts', authenticateAdmin, async (req, res) => {
       if (key.droidAccountId) {
         const id = key.droidAccountId
         bindingCounts.droidAccountId[id] = (bindingCounts.droidAccountId[id] || 0) + 1
+      }
+
+      // Grok 账户
+      if (key.grokAccountId) {
+        const id = key.grokAccountId
+        bindingCounts.grokAccountId[id] = (bindingCounts.grokAccountId[id] || 0) + 1
       }
 
       // CCR 账户
@@ -1095,7 +1103,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     searchPatterns.push(`usage:${keyId}:model:monthly:*:${currentMonth}`)
   } else {
     // all - 使用 alltime key（无 TTL，数据完整），避免 daily/monthly 键过期导致数据丢失
-    searchPatterns.push(`usage:${keyId}:model:alltime:*`)
+    searchPatterns.push(RedisKeys.usage.keyAlltimePattern(keyId))
   }
 
   // 使用 SCAN 收集所有匹配的 keys
@@ -1136,7 +1144,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     }
 
     // 始终查询 allTimeCost（用于展示和限额校验）
-    const totalCostKey = `usage:cost:total:${keyId}`
+    const totalCostKey = RedisKeys.usage.costTotal(keyId)
     allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
 
     // 只在启用了 Claude 周费用限制时查询（字段名沿用 weeklyOpusCostLimit）
@@ -1148,10 +1156,10 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
 
     // 只在启用了窗口限制时查询窗口数据
     if (rateLimitWindow > 0) {
-      const requestCountKey = `rate_limit:requests:${keyId}`
-      const tokenCountKey = `rate_limit:tokens:${keyId}`
-      const costCountKey = `rate_limit:cost:${keyId}`
-      const windowStartKey = `rate_limit:window_start:${keyId}`
+      const requestCountKey = RedisKeys.rateLimit.requests(keyId)
+      const tokenCountKey = RedisKeys.rateLimit.tokens(keyId)
+      const costCountKey = RedisKeys.rateLimit.cost(keyId)
+      const windowStartKey = RedisKeys.rateLimit.windowStart(keyId)
 
       currentWindowRequests = parseInt((await client.get(requestCountKey)) || '0')
       currentWindowTokens = parseInt((await client.get(tokenCountKey)) || '0')
@@ -1162,7 +1170,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       if (windowStart) {
         const now = Date.now()
         windowStartTime = parseInt(windowStart)
-        const windowDuration = rateLimitWindow * 60 * 1000 // 转换为毫秒
+        const windowDuration = TTL.rateLimitWindowMs(rateLimitWindow) // 转换为毫秒
         windowEndTime = windowStartTime + windowDuration
 
         // 如果窗口还有效
@@ -1475,6 +1483,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       openaiAccountId,
       bedrockAccountId,
       droidAccountId,
+      grokAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -1680,6 +1689,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       openaiAccountId,
       bedrockAccountId,
       droidAccountId,
+      grokAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -1738,6 +1748,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       openaiAccountId,
       bedrockAccountId,
       droidAccountId,
+      grokAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -1803,6 +1814,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           openaiAccountId,
           bedrockAccountId,
           droidAccountId,
+          grokAccountId,
           permissions,
           concurrencyLimit,
           rateLimitWindow,
@@ -2005,6 +2017,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         if (updates.droidAccountId !== undefined) {
           finalUpdates.droidAccountId = updates.droidAccountId || ''
         }
+        if (updates.grokAccountId !== undefined) {
+          finalUpdates.grokAccountId = updates.grokAccountId || ''
+        }
 
         // 处理标签操作
         if (updates.tags !== undefined) {
@@ -2039,7 +2054,10 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
 
         // 执行更新
-        await apiKeyService.updateApiKey(keyId, finalUpdates)
+        await apiKeyService.updateApiKey(keyId, finalUpdates, {
+          operator: req.admin?.username || 'admin',
+          operatorType: 'admin'
+        })
 
         // 重置配置变更后触发单 Key 回填
         if (
@@ -2108,6 +2126,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       openaiAccountId,
       bedrockAccountId,
       droidAccountId,
+      grokAccountId,
       permissions,
       enableModelRestriction,
       restrictedModels,
@@ -2208,6 +2227,10 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     if (droidAccountId !== undefined) {
       // 空字符串表示解绑，null或空字符串都设置为空字符串
       updates.droidAccountId = droidAccountId || ''
+    }
+
+    if (grokAccountId !== undefined) {
+      updates.grokAccountId = grokAccountId || ''
     }
 
     if (permissions !== undefined) {
@@ -2415,7 +2438,12 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       }
     }
 
-    await apiKeyService.updateApiKey(keyId, updates)
+    await apiKeyService.updateApiKey(keyId, updates, {
+      operator: req.admin?.username || 'admin',
+      operatorType: 'admin',
+      // 仅请求体显式带 isActive 时记禁用/激活流水；改过期时间顺带写 isActive 不记，避免污染
+      recordIsActiveHistory: isActive !== undefined
+    })
 
     // 重置配置变更后触发单 Key 回填
     if (resetConfigChanged) {
@@ -2433,6 +2461,12 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     return res.json({ success: true, message: 'API key updated successfully' })
   } catch (error) {
     logger.error('❌ Failed to update API key:', error)
+    // 已删除的 Key 不能走普通更新（须先恢复）——业务拒绝，返回 409 而非通用 500
+    if (error.message === 'Cannot update a deleted API key; restore it first') {
+      return res
+        .status(409)
+        .json({ error: '该 API Key 已删除，请先恢复后再编辑', message: error.message })
+    }
     return res.status(500).json({ error: 'Failed to update API key', message: error.message })
   }
 })
@@ -2461,12 +2495,7 @@ router.patch('/api-keys/:keyId/expiration', authenticateAdmin, async (req, res) 
         updates.isActivated = 'true'
         updates.activatedAt = now.toISOString()
         updates.expiresAt = newExpiresAt.toISOString()
-
-        logger.success(
-          `🔓 API key manually activated by admin: ${keyId} (${
-            keyData.name
-          }), expires at ${newExpiresAt.toISOString()}`
-        )
+        // 成功日志移到 updateApiKey 成功之后再记，避免已删除 key 被 409 拒绝后仍留下"已激活"的假审计记录
       } else {
         return res.status(400).json({
           error: 'Cannot activate',
@@ -2484,16 +2513,26 @@ router.patch('/api-keys/:keyId/expiration', authenticateAdmin, async (req, res) 
 
       // 如果设置了过期时间，确保key是激活状态
       if (expiresAt) {
-        updates.expiresAt = new Date(expiresAt).toISOString()
+        const expireDate = new Date(expiresAt)
+        updates.expiresAt = expireDate.toISOString()
         // 如果之前是未激活状态，现在激活它
         if (keyData.isActivated !== 'true') {
           updates.isActivated = 'true'
           updates.activatedAt = new Date().toISOString()
         }
+        // [人工决策-2026-08-11 11:12:34] 过期编辑与续期 PUT 对齐：未来过期则恢复 isActive，过去则保持禁用语义
+        updates.isActive = expireDate > new Date()
       } else {
         // 清除过期时间（永不过期）
         updates.expiresAt = ''
+        // [人工决策-2026-08-11 11:12:34] 永不过期与续期 PUT null 路径对齐，恢复启用
+        updates.isActive = true
       }
+    }
+
+    // activateNow 路径：首次激活后过期时间已在未来，同步恢复 isActive
+    if (activateNow === true && updates.expiresAt) {
+      updates.isActive = true
     }
 
     if (Object.keys(updates).length === 0) {
@@ -2501,9 +2540,21 @@ router.patch('/api-keys/:keyId/expiration', authenticateAdmin, async (req, res) 
     }
 
     // 更新API Key
-    await apiKeyService.updateApiKey(keyId, updates)
+    await apiKeyService.updateApiKey(keyId, updates, {
+      operator: req.admin?.username || 'admin',
+      operatorType: 'admin',
+      // 本路由只改过期/首次激活字段，不记禁用激活流水
+      recordIsActiveHistory: false
+    })
 
-    logger.success(`📝 Updated API key expiration: ${keyId} (${keyData.name})`)
+    // 更新成功后再记审计日志（区分手动激活 / 仅改过期时间）——失败时不会留下假成功记录
+    if (activateNow === true) {
+      logger.success(
+        `🔓 API key manually activated by admin: ${keyId} (${keyData.name}), expires at ${updates.expiresAt}`
+      )
+    } else {
+      logger.success(`📝 Updated API key expiration: ${keyId} (${keyData.name})`)
+    }
     return res.json({
       success: true,
       message: 'API key expiration updated successfully',
@@ -2511,8 +2562,112 @@ router.patch('/api-keys/:keyId/expiration', authenticateAdmin, async (req, res) 
     })
   } catch (error) {
     logger.error('❌ Failed to update API key expiration:', error)
+    // 已删除的 Key 不能走普通更新（须先恢复）——业务拒绝，返回 409 而非通用 500
+    if (error.message === 'Cannot update a deleted API key; restore it first') {
+      return res
+        .status(409)
+        .json({ error: '该 API Key 已删除，请先恢复后再编辑', message: error.message })
+    }
     return res.status(500).json({
       error: 'Failed to update API key expiration',
+      message: error.message
+    })
+  }
+})
+
+// 快捷调整 API Key：增加总额度上限 / 延长有效期（合并操作）
+router.post('/api-keys/:keyId/quick-adjust', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const { addCostLimit, extendAmount, extendUnit } = req.body
+    const operator = req.admin?.username || 'admin'
+    const historyOptions = {
+      recordHistory: true,
+      // 管理员快捷调整专属：恢复启用 + activation 立即激活；核销等旁路不传
+      restoreActiveOnExtend: true,
+      operator,
+      operatorType: 'admin'
+    }
+
+    const keyData = await redis.getApiKey(keyId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      return res.status(404).json({ error: 'API key not found' })
+    }
+
+    // 至少要有一项调整
+    const wantAddCost = addCostLimit !== undefined && addCostLimit !== null && addCostLimit !== ''
+    const wantExtend = extendAmount !== undefined && extendAmount !== null && extendAmount !== ''
+    if (!wantAddCost && !wantExtend) {
+      return res.status(400).json({ error: '请至少提供增加额度或延长有效期其中一项' })
+    }
+
+    const result = {}
+
+    // 增加总额度上限（后付费）；预付费 key 的余额走充值，不能改上限
+    if (wantAddCost) {
+      const amount = parseFloat(addCostLimit)
+      if (isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ error: '增加额度必须是大于 0 的数字' })
+      }
+      if (keyData.billingMode === 'prepaid') {
+        return res.status(400).json({
+          error: '该 API Key 为预付费模式，请通过充值调整余额，不能修改额度上限'
+        })
+      }
+      const r = await apiKeyService.addTotalCostLimit(keyId, amount, historyOptions)
+      result.newTotalCostLimit = r.newTotalCostLimit
+    }
+
+    // 延长有效期
+    if (wantExtend) {
+      const amount = parseFloat(extendAmount)
+      if (isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ error: '延长时长必须是大于 0 的数字' })
+      }
+      const unit = ['days', 'hours', 'months'].includes(extendUnit) ? extendUnit : 'days'
+      const r = await apiKeyService.extendExpiry(keyId, amount, unit, historyOptions)
+      result.newExpiresAt = r.newExpiresAt
+      result.isActive = r.isActive
+      result.isActivated = r.isActivated
+      result.activatedAt = r.activatedAt
+    }
+
+    logger.success(`⚡ Quick-adjusted API key: ${keyId} (${keyData.name}) by ${operator}`)
+    return res.json({ success: true, message: '快捷调整成功', ...result })
+  } catch (error) {
+    logger.error('❌ Failed to quick-adjust API key:', error)
+    if (error.message === 'Cannot update a deleted API key; restore it first') {
+      return res.status(409).json({ error: error.message })
+    }
+    return res.status(500).json({ error: 'Failed to quick-adjust API key', message: error.message })
+  }
+})
+
+// 分页查询 API Key 变更流水（快捷调整 / 禁用激活）
+router.get('/api-keys/:keyId/change-history', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const keyData = await redis.getApiKey(keyId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      return res.status(404).json({ error: 'API key not found' })
+    }
+
+    const page = parseInt(req.query.page, 10) || 1
+    const pageSize = parseInt(req.query.pageSize, 10) || 20
+    const data = await apiKeyService.getChangeHistory(keyId, { page, pageSize })
+
+    return res.json({
+      success: true,
+      data: {
+        keyId,
+        keyName: keyData.name || '',
+        ...data
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get API key change history:', error)
+    return res.status(500).json({
+      error: 'Failed to get API key change history',
       message: error.message
     })
   }
@@ -2635,24 +2790,32 @@ router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
   }
 })
 
-// 📋 获取已删除的API Keys
+// 📋 获取已删除的API Keys（分页）
 router.get('/api-keys/deleted', authenticateAdmin, async (req, res) => {
   try {
-    const deletedApiKeys = await apiKeyService.getAllApiKeysFast(true) // Include deleted
-    const onlyDeleted = deletedApiKeys.filter((key) => key.isDeleted === true)
+    const pageNum = Math.max(1, parseInt(req.query.page) || 1)
+    const pageSizeNum = [10, 20, 50, 100].includes(parseInt(req.query.pageSize))
+      ? parseInt(req.query.pageSize)
+      : 20
+    const search = typeof req.query.search === 'string' ? req.query.search : ''
 
-    // Add additional metadata for deleted keys
-    const enrichedKeys = onlyDeleted.map((key) => ({
+    const { items, pagination } = await apiKeyService.getDeletedApiKeysPaginated({
+      page: pageNum,
+      pageSize: pageSizeNum,
+      search
+    })
+
+    // 标记为已删除且可恢复（deletedAt/deletedBy/deletedByType 已包含在 items 中）
+    const enrichedKeys = items.map((key) => ({
       ...key,
-      isDeleted: key.isDeleted === true,
-      deletedAt: key.deletedAt,
-      deletedBy: key.deletedBy,
-      deletedByType: key.deletedByType,
-      canRestore: true // 已删除的API Key可以恢复
+      isDeleted: true,
+      canRestore: true
     }))
 
-    logger.success(`📋 Admin retrieved ${enrichedKeys.length} deleted API keys`)
-    return res.json({ success: true, apiKeys: enrichedKeys, total: enrichedKeys.length })
+    logger.success(
+      `📋 Admin retrieved ${enrichedKeys.length}/${pagination.total} deleted API keys (page ${pagination.page})`
+    )
+    return res.json({ success: true, apiKeys: enrichedKeys, pagination, total: pagination.total })
   } catch (error) {
     logger.error('❌ Failed to get deleted API keys:', error)
     return res
@@ -2775,6 +2938,59 @@ router.delete('/api-keys/deleted/clear-all', authenticateAdmin, async (req, res)
       error: '清空已删除的 API Keys 失败',
       message: error.message
     })
+  }
+})
+
+// 🧹 批量彻底删除选中的已删除 API Keys（物理删除，逐个调用 permanentDeleteApiKey）
+router.delete('/api-keys/deleted/batch', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyIds } = req.body
+    const adminUsername = req.session?.admin?.username || 'unknown'
+
+    if (!keyIds || !Array.isArray(keyIds) || keyIds.length === 0) {
+      return res
+        .status(400)
+        .json({ error: 'Invalid request', message: 'keyIds 必须是一个非空数组' })
+    }
+    // [人工决策-2026-06-02 23:50:32] 高位安全阈值(非界面限制)：每个 key 的彻底删除很重
+    // (SCAN + 删 usage key + 34 天日索引 + 9×24 小时索引清理)，串行跑超大数组会把 Redis/事件循环
+    // 拖进长时间重负载。界面每页最多勾 100 个，1000 对正常使用无感，仅挡误传/恶意的异常超大数组。
+    if (keyIds.length > 1000) {
+      return res
+        .status(400)
+        .json({ error: 'Too many keys', message: '单次批量彻底删除最多 1000 个 API Keys' })
+    }
+    const invalidKeys = keyIds.filter((id) => !id || typeof id !== 'string')
+    if (invalidKeys.length > 0) {
+      return res.status(400).json({ error: 'Invalid key IDs', message: '包含无效的API Key ID' })
+    }
+
+    const results = { successCount: 0, failedCount: 0, errors: [] }
+    for (const keyId of keyIds) {
+      try {
+        // permanentDeleteApiKey 内部已校验"必须处于软删除态"，非法项会被下面 catch 记为失败
+        await apiKeyService.permanentDeleteApiKey(keyId)
+        results.successCount++
+      } catch (error) {
+        results.failedCount++
+        results.errors.push({ keyId, error: error.message || '彻底删除失败' })
+        logger.error(`❌ Batch permanent delete failed for key ${keyId}:`, error)
+      }
+    }
+
+    logger.success(
+      `🧹 Admin ${adminUsername} batch permanently deleted ${results.successCount}/${keyIds.length} API keys`
+    )
+
+    // success 诚实反映结果：一个都没删成功(全失败)时返回 false，避免调用方把"全部失败"误判为成功
+    return res.json({
+      success: results.successCount > 0,
+      message: '批量彻底删除完成',
+      data: results
+    })
+  } catch (error) {
+    logger.error('❌ Failed to batch permanently delete API keys:', error)
+    return res.status(500).json({ error: 'Batch permanent delete failed', message: error.message })
   }
 })
 

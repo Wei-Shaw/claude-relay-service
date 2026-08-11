@@ -7,6 +7,7 @@ const { maskToken } = require('../../utils/tokenMask')
 const ProxyHelper = require('../../utils/proxyHelper')
 const { createEncryptor, isTruthy } = require('../../utils/commonHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 /**
  * Droid 账户管理服务
@@ -293,6 +294,15 @@ class DroidAccountService {
       const accountData = await redis.getDroidAccount(accountId)
       if (!accountData) {
         return { marked: false, error: '账户不存在' }
+      }
+
+      // disableAutoProtection：关闭自动防护时不把 API Key 标记为异常（保持可用、透传上游错误）
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(`🛡️ Droid 账号 ${accountId} 已关闭自动防护，跳过将 API Key ${keyId} 标记为异常`)
+        return { marked: false, skipped: true }
       }
 
       const entries = this._parseApiKeyEntries(accountData.apiKeys)
@@ -1081,11 +1091,10 @@ class DroidAccountService {
           const existingEntry = mergedApiKeys[existingIndex]
           mergedApiKeys[existingIndex] = {
             ...existingEntry,
-            status: updateItem.status || existingEntry.status || 'active',
-            errorMessage:
-              updateItem.errorMessage !== undefined
-                ? updateItem.errorMessage
-                : existingEntry.errorMessage || '',
+            // [人工决策-2026-06-02 23:30:05] review#4 代码级保证：key 级 status/errorMessage 只由自动流程(markApiKeyAsError)写入，
+            //   更新模式一律忽略外部传入的 status/errorMessage（防伪造 key 级 error），仅接受 lastUsedAt/usageCount
+            status: existingEntry.status || 'active',
+            errorMessage: existingEntry.errorMessage || '',
             lastUsedAt:
               updateItem.lastUsedAt !== undefined
                 ? updateItem.lastUsedAt
@@ -1157,6 +1166,28 @@ class DroidAccountService {
       }
     }
 
+    // 开启 disableAutoProtection 时立即清理已有自动停用状态并恢复调度（手动停用不受影响）
+    const enablingAutoProtection =
+      sanitizedUpdates.disableAutoProtection === true ||
+      sanitizedUpdates.disableAutoProtection === 'true'
+    if (enablingAutoProtection) {
+      const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(account)
+      if (recoveryPatch) {
+        Object.assign(sanitizedUpdates, recoveryPatch)
+      }
+      // 无条件重置因上游错误被标记 error 的 API Key（即便账户尚未硬停，也清理 per-key 根因）
+      const hasErroredKey = mergedApiKeys.some((entry) => entry && entry.status === 'error')
+      if (hasErroredKey) {
+        const resetEntries = mergedApiKeys.map((entry) =>
+          entry && entry.status === 'error'
+            ? { ...entry, status: 'active', errorMessage: '' }
+            : entry
+        )
+        sanitizedUpdates.apiKeys = resetEntries.length ? JSON.stringify(resetEntries) : ''
+        sanitizedUpdates.apiKeyCount = String(resetEntries.length)
+      }
+    }
+
     const encryptedUpdates = { ...sanitizedUpdates }
 
     if (sanitizedUpdates.refreshToken !== undefined) {
@@ -1192,6 +1223,11 @@ class DroidAccountService {
     }
 
     await redis.setDroidAccount(accountId, updatedData)
+
+    if (enablingAutoProtection) {
+      await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'droid')
+    }
+
     logger.info(`✅ Updated Droid account: ${accountId}`)
 
     return this.getAccount(accountId)
@@ -1300,11 +1336,28 @@ class DroidAccountService {
     } catch (error) {
       logger.error(`❌ Failed to refresh Droid account token: ${accountId}`, error)
 
-      // 更新账户状态为错误
-      await this.updateAccount(accountId, {
-        status: 'error',
-        errorMessage: error.message || 'Token refresh failed'
-      })
+      // disableAutoProtection：关闭自动防护时不把账户写成 error（保持可调度、透传上游错误）
+      if (account?.disableAutoProtection === true || account?.disableAutoProtection === 'true') {
+        logger.info(`🛡️ Droid 账号 ${accountId} 已关闭自动防护，token 刷新失败时跳过写 error 状态`)
+        upstreamErrorHelper
+          .recordErrorHistory(
+            accountId,
+            'droid',
+            0,
+            'token_refresh_failed',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'token_refresh_failed',
+              message: error.message
+            })
+          )
+          .catch(() => {})
+      } else {
+        // 更新账户状态为错误
+        await this.updateAccount(accountId, {
+          status: 'error',
+          errorMessage: error.message || 'Token refresh failed'
+        })
+      }
 
       throw error
     }
@@ -1390,7 +1443,14 @@ class DroidAccountService {
           return false
         }
 
-        if (!isActive || !isSchedulable || status !== 'active') {
+        if (!isActive || !isSchedulable) {
+          return false
+        }
+        // [人工决策-2026-06-02 23:30:05] 开 disableAutoProtection = 暴力打：忽略 status!=='active'；
+        //   isActive/schedulable(手动停用)、订阅过期仍生效
+        const autoOff =
+          account.disableAutoProtection === true || account.disableAutoProtection === 'true'
+        if (!autoOff && status !== 'active') {
           return false
         }
 
@@ -1492,7 +1552,7 @@ class DroidAccountService {
 
     try {
       const client = redis.getClientSafe()
-      await client.hset(`droid:account:${accountId}`, 'lastUsedAt', new Date().toISOString())
+      await client.hset(RedisKeys.accounts.droid(accountId), 'lastUsedAt', new Date().toISOString())
     } catch (error) {
       logger.warn(`⚠️ Failed to update lastUsedAt for Droid account ${accountId}:`, error)
     }
@@ -1507,7 +1567,7 @@ class DroidAccountService {
       }
 
       const client = redis.getClientSafe()
-      const accountKey = `droid:account:${accountId}`
+      const accountKey = RedisKeys.accounts.droid(accountId)
 
       const updates = {
         status: 'active',

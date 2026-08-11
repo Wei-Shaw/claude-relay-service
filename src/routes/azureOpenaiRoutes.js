@@ -217,8 +217,19 @@ router.post('/chat/completions', authenticateApiKey, async (req, res) => {
     if (shouldPause) {
       const customTtl =
         response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
+      const errorContext = upstreamErrorHelper.buildErrorContext({
+        url: response.config?.url,
+        method: response.config?.method || 'POST',
+        requestHeaders: req.headers,
+        requestBody: req.body,
+        model: req.body?.model,
+        sessionId,
+        responseStatus: response.status,
+        responseHeaders: response.headers,
+        responseBody: response.data
+      })
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl, errorContext)
         .catch(() => {})
     }
 
@@ -348,8 +359,19 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
     if (shouldPause) {
       const customTtl =
         response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
+      const errorContext = upstreamErrorHelper.buildErrorContext({
+        url: response.config?.url,
+        method: response.config?.method || 'POST',
+        requestHeaders: req.headers,
+        requestBody: req.body,
+        model: req.body?.model,
+        sessionId,
+        responseStatus: response.status,
+        responseHeaders: response.headers,
+        responseBody: response.data
+      })
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl, errorContext)
         .catch(() => {})
     }
 
@@ -478,8 +500,19 @@ router.post('/embeddings', authenticateApiKey, async (req, res) => {
     if (shouldPause) {
       const customTtl =
         response.status === 429 ? upstreamErrorHelper.parseRetryAfter(response.headers) : null
+      const errorContext = upstreamErrorHelper.buildErrorContext({
+        url: response.config?.url,
+        method: response.config?.method || 'POST',
+        requestHeaders: req.headers,
+        requestBody: req.body,
+        model: req.body?.model,
+        sessionId,
+        responseStatus: response.status,
+        responseHeaders: response.headers,
+        responseBody: response.data
+      })
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl)
+        .markTempUnavailable(account.id, 'azure-openai', response.status, customTtl, errorContext)
         .catch(() => {})
     }
 

@@ -14,7 +14,8 @@ body {
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
-    Roboto,
+    Helvetica,
+    Arial,
     sans-serif;
   background: linear-gradient(
     135deg,
@@ -25,7 +26,8 @@ body {
   background-attachment: fixed;
   min-height: 100vh;
   margin: 0;
-  overflow-x: hidden;
+  /* clip 不触发「另一轴 visible→auto」规则；hidden 会把 overflow-y 算成 auto，登录页 100vh 时易冒出竖向滚动条 */
+  overflow-x: clip;
 }
 
 body::before {

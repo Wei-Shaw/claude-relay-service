@@ -12,19 +12,17 @@
           <el-radio-button label="hour"> 按小时 </el-radio-button>
         </el-radio-group>
 
-        <el-select
-          v-model="trendPeriod"
-          size="small"
-          style="width: 120px"
-          @change="handlePeriodChange"
-        >
-          <el-option
-            v-for="period in periodOptions"
-            :key="period.days"
-            :label="`最近${period.days}天`"
-            :value="period.days"
+        <div class="w-[130px]">
+          <CustomDropdown
+            v-model="trendPeriod"
+            accent="blue"
+            icon="fa-calendar-alt"
+            :options="periodDropdownOptions"
+            placeholder="时间范围"
+            size="sm"
+            @change="handlePeriodChange"
           />
-        </el-select>
+        </div>
       </div>
     </div>
 
@@ -49,10 +47,10 @@ let chart = null
 const trendPeriod = ref(7)
 const granularity = ref('day')
 
-const periodOptions = [
-  { days: 1, label: '24小时' },
-  { days: 7, label: '7天' },
-  { days: 30, label: '30天' }
+const periodDropdownOptions = [
+  { value: 1, label: '最近1天' },
+  { value: 7, label: '最近7天' },
+  { value: 30, label: '最近30天' }
 ]
 
 const createChart = () => {

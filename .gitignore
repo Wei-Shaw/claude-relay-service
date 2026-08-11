@@ -28,6 +28,8 @@ redis_data/
 logs/
 logs1/
 *.log
+# 跨平台轮转审计文件误落到仓库根的兜底(logger 已做审计文件自愈, 正常不会再出现)
+/*.log.json
 startup.log
 app.log
 

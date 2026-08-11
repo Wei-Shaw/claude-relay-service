@@ -9,6 +9,9 @@ export const getModelPricingStatusApi = () =>
   request({ url: '/admin/models/pricing/status', method: 'GET' })
 export const refreshModelPricingApi = () =>
   request({ url: '/admin/models/pricing/refresh', method: 'POST' })
+// 模型价格（公开只读，api-stats 用户页）
+export const getPublicModelPricingApi = () =>
+  request({ url: '/apiStats/model-pricing', method: 'GET' })
 
 // API Stats
 export const getKeyIdApi = (apiKey) =>
@@ -17,6 +20,8 @@ export const getUserStatsApi = (apiId) =>
   request({ url: '/apiStats/api/user-stats', method: 'POST', data: { apiId } })
 export const getUserModelStatsApi = (apiId, period = 'daily') =>
   request({ url: '/apiStats/api/user-model-stats', method: 'POST', data: { apiId, period } })
+export const getPublicApiKeyUsageRecordsApi = (apiId, params = {}) =>
+  request({ url: '/apiStats/api/user-usage-records', method: 'GET', params: { apiId, ...params } })
 export const getBatchStatsApi = (apiIds) =>
   request({ url: '/apiStats/api/batch-stats', method: 'POST', data: { apiIds } })
 export const getBatchModelStatsApi = (apiIds, period = 'daily') =>
@@ -32,6 +37,34 @@ export const changePasswordApi = (data) =>
 export const getOemSettingsApi = () => request({ url: '/admin/oem-settings', method: 'GET' })
 export const updateOemSettingsApi = (data) =>
   request({ url: '/admin/oem-settings', method: 'PUT', data })
+
+// 代理池管理
+export const getProxyPoolOverviewApi = () =>
+  request({ url: '/admin/proxy-pool/overview', method: 'GET' })
+export const getProxiesApi = () => request({ url: '/admin/proxy-pool/proxies', method: 'GET' })
+export const createProxyApi = (data) =>
+  request({ url: '/admin/proxy-pool/proxies', method: 'POST', data })
+export const updateProxyApi = (id, data) =>
+  request({ url: `/admin/proxy-pool/proxies/${id}`, method: 'PUT', data })
+export const deleteProxyApi = (id) =>
+  request({ url: `/admin/proxy-pool/proxies/${id}`, method: 'DELETE' })
+export const healthCheckProxyApi = (id) =>
+  request({ url: `/admin/proxy-pool/proxies/${id}/health-check`, method: 'POST' })
+export const qualityCheckProxyApi = (id) =>
+  request({ url: `/admin/proxy-pool/proxies/${id}/quality-check`, method: 'POST' })
+export const getProxyHealthHistoryApi = (id) =>
+  request({ url: `/admin/proxy-pool/proxies/${id}/health-history`, method: 'GET' })
+export const getProxyGroupsApi = () => request({ url: '/admin/proxy-pool/groups', method: 'GET' })
+export const createProxyGroupApi = (data) =>
+  request({ url: '/admin/proxy-pool/groups', method: 'POST', data })
+export const updateProxyGroupApi = (id, data) =>
+  request({ url: `/admin/proxy-pool/groups/${id}`, method: 'PUT', data })
+export const deleteProxyGroupApi = (id) =>
+  request({ url: `/admin/proxy-pool/groups/${id}`, method: 'DELETE' })
+export const getProxyPoolSettingsApi = () =>
+  request({ url: '/admin/proxy-pool/settings', method: 'GET' })
+export const updateProxyPoolSettingsApi = (data) =>
+  request({ url: '/admin/proxy-pool/settings', method: 'PUT', data })
 
 // 服务倍率配置（公开接口）
 export const getServiceRatesApi = () => request({ url: '/apiStats/service-rates', method: 'GET' })
@@ -95,7 +128,8 @@ export const getApiKeysBatchStatsApi = (data) =>
   request({ url: '/admin/api-keys/batch-stats', method: 'POST', data })
 export const getApiKeysBatchLastUsageApi = (data) =>
   request({ url: '/admin/api-keys/batch-last-usage', method: 'POST', data })
-export const getDeletedApiKeysApi = () => request({ url: '/admin/api-keys/deleted', method: 'GET' })
+export const getDeletedApiKeysApi = (params) =>
+  request({ url: '/admin/api-keys/deleted', method: 'GET', params })
 export const getApiKeysCostSortStatusApi = () =>
   request({ url: '/admin/api-keys/cost-sort-status', method: 'GET' })
 export const restoreApiKeyApi = (id) =>
@@ -104,10 +138,16 @@ export const permanentDeleteApiKeyApi = (id) =>
   request({ url: `/admin/api-keys/${id}/permanent`, method: 'DELETE' })
 export const clearAllDeletedApiKeysApi = () =>
   request({ url: '/admin/api-keys/deleted/clear-all', method: 'DELETE' })
+export const batchPermanentDeleteApiKeysApi = (data) =>
+  request({ url: '/admin/api-keys/deleted/batch', method: 'DELETE', data })
 export const batchDeleteApiKeysApi = (data) =>
   request({ url: '/admin/api-keys/batch', method: 'DELETE', data })
 export const updateApiKeyExpirationApi = (id, data) =>
   request({ url: `/admin/api-keys/${id}/expiration`, method: 'PATCH', data })
+export const quickAdjustApiKeyApi = (id, data) =>
+  request({ url: `/admin/api-keys/${id}/quick-adjust`, method: 'POST', data })
+export const getApiKeyChangeHistoryApi = (id, params) =>
+  request({ url: `/admin/api-keys/${id}/change-history`, method: 'GET', params })
 export const batchCreateApiKeysApi = (data) =>
   request({ url: '/admin/api-keys/batch', method: 'POST', data })
 export const batchUpdateApiKeysApi = (data) =>
@@ -135,6 +175,14 @@ export const claudeOAuthWithCookieApi = (data) =>
   request({ url: '/admin/claude-accounts/oauth-with-cookie', method: 'POST', data })
 export const claudeSetupTokenWithCookieApi = (data) =>
   request({ url: '/admin/claude-accounts/setup-token-with-cookie', method: 'POST', data })
+
+// Claude 账户定时测试配置
+export const getClaudeAccountTestConfigApi = (id) =>
+  request({ url: `/admin/claude-accounts/${id}/test-config`, method: 'GET' })
+export const updateClaudeAccountTestConfigApi = (id, data) =>
+  request({ url: `/admin/claude-accounts/${id}/test-config`, method: 'PUT', data })
+export const getClaudeAccountTestHistoryApi = (id) =>
+  request({ url: `/admin/claude-accounts/${id}/test-history`, method: 'GET' })
 
 // Claude Console 账户
 export const getClaudeConsoleAccountsApi = () =>
@@ -211,6 +259,29 @@ export const exchangeDroidCodeApi = (data) =>
 export const getDroidAccountByIdApi = (id) =>
   request({ url: `/admin/droid-accounts/${id}`, method: 'GET' })
 
+// Grok / xAI 账户
+export const getGrokAccountsApi = () => request({ url: '/admin/grok-accounts', method: 'GET' })
+export const createGrokAccountApi = (data) =>
+  request({ url: '/admin/grok-accounts', method: 'POST', data })
+export const updateGrokAccountApi = (id, data) =>
+  request({ url: `/admin/grok-accounts/${id}`, method: 'PUT', data })
+export const generateGrokAuthUrlApi = (data) =>
+  request({ url: '/admin/grok-accounts/generate-auth-url', method: 'POST', data })
+export const exchangeGrokCodeApi = (data) =>
+  request({ url: '/admin/grok-accounts/exchange-code', method: 'POST', data })
+export const createGrokAccountFromOAuthApi = (data) =>
+  request({ url: '/admin/grok-accounts/create-from-oauth', method: 'POST', data })
+export const getGrokAccountByIdApi = (id) =>
+  request({ url: `/admin/grok-accounts/${id}`, method: 'GET' })
+export const refreshGrokAccountTokenApi = (id) =>
+  request({ url: `/admin/grok-accounts/${id}/refresh-token`, method: 'POST' })
+export const getGrokAccountQuotaApi = (id) =>
+  request({ url: `/admin/grok-accounts/${id}/quota`, method: 'GET' })
+export const importGrokSsoAccountsApi = (data) =>
+  request({ url: '/admin/grok-accounts/sso-to-oauth', method: 'POST', data })
+export const getGrokMediaEligibilityApi = (id) =>
+  request({ url: `/admin/grok-accounts/${id}/media-eligibility`, method: 'GET' })
+
 // CCR 账户
 export const getCcrAccountsApi = () => request({ url: '/admin/ccr-accounts', method: 'GET' })
 export const createCcrAccountApi = (data) =>
@@ -259,11 +330,14 @@ export const createQuotaCardApi = (data) =>
   request({ url: '/admin/quota-cards', method: 'POST', data })
 export const deleteQuotaCardApi = (id) =>
   request({ url: `/admin/quota-cards/${id}`, method: 'DELETE' })
+export const toggleQuotaCardApi = (id, enabled) =>
+  request({ url: `/admin/quota-cards/${id}/toggle`, method: 'POST', data: { enabled } })
 export const getQuotaCardsWithParamsApi = (params) =>
   request({ url: '/admin/quota-cards', method: 'GET', params })
 export const getQuotaCardsStatsApi = () =>
   request({ url: '/admin/quota-cards/stats', method: 'GET' })
-export const getRedemptionsApi = () => request({ url: '/admin/redemptions', method: 'GET' })
+export const getRedemptionsApi = (params = {}) =>
+  request({ url: '/admin/redemptions', method: 'GET', params })
 export const revokeRedemptionApi = (id, data) =>
   request({ url: `/admin/redemptions/${id}/revoke`, method: 'POST', data })
 export const getQuotaCardLimitsApi = () =>
@@ -345,6 +419,12 @@ export const getClaudeRelayConfigApi = (config) =>
 export const updateClaudeRelayConfigApi = (data, config) =>
   request({ url: '/admin/claude-relay-config', method: 'PUT', data, ...config })
 
+// 连通性测试默认模型配置
+export const getTestModelConfigApi = (config) =>
+  request({ url: '/admin/test-model-config', method: 'GET', ...config })
+export const updateTestModelConfigApi = (data, config) =>
+  request({ url: '/admin/test-model-config', method: 'PUT', data, ...config })
+
 // 服务倍率配置（管理端）
 export const getAdminServiceRatesApi = (config) =>
   request({ url: '/admin/service-rates', method: 'GET', ...config })
@@ -357,3 +437,71 @@ export const getClaudeCodeVersionApi = () =>
   request({ url: '/admin/claude-code-version', method: 'GET' })
 export const clearClaudeCodeVersionApi = () =>
   request({ url: '/admin/claude-code-version/clear', method: 'POST' })
+
+// 支付 - 用户侧（充值页）。涉及具体 key 的接口都用【完整 apiKey】验证持有（POST），不传裸 apiId
+export const getPaymentPlansApi = () => request({ url: '/payment/plans', method: 'GET' })
+// 用完整 apiKey 换取短期会话 token（仅此一次上行明文 apiKey）
+export const createPaymentSessionApi = (apiKey) =>
+  request({ url: '/payment/session', method: 'POST', data: { apiKey } })
+export const getPaymentBalanceApi = (token) =>
+  request({ url: '/payment/balance', method: 'POST', data: { token } })
+export const createPaymentOrderApi = (data) =>
+  request({ url: '/payment/orders', method: 'POST', data })
+export const getMyPaymentOrdersApi = (data = {}) =>
+  request({ url: '/payment/orders/query', method: 'POST', data })
+export const getPaymentOrderApi = (id, token) =>
+  request({ url: `/payment/orders/${id}/get`, method: 'POST', data: { token } })
+export const verifyPaymentOrderApi = (id, token) =>
+  request({ url: `/payment/orders/${id}/verify`, method: 'POST', data: { token } })
+export const cancelPaymentOrderApi = (id, token) =>
+  request({ url: `/payment/orders/${id}/cancel`, method: 'POST', data: { token } })
+
+// 支付 - 管理侧
+export const getPaymentConfigApi = () => request({ url: '/admin/payment/config', method: 'GET' })
+export const updatePaymentConfigApi = (data) =>
+  request({ url: '/admin/payment/config', method: 'PUT', data })
+export const getPaymentPlansAdminApi = () => request({ url: '/admin/payment/plans', method: 'GET' })
+export const createPaymentPlanApi = (data) =>
+  request({ url: '/admin/payment/plans', method: 'POST', data })
+export const updatePaymentPlanApi = (id, data) =>
+  request({ url: `/admin/payment/plans/${id}`, method: 'PUT', data })
+export const deletePaymentPlanApi = (id) =>
+  request({ url: `/admin/payment/plans/${id}`, method: 'DELETE' })
+export const getPaymentProvidersApi = () =>
+  request({ url: '/admin/payment/providers', method: 'GET' })
+export const getPaymentProviderApi = (id) =>
+  request({ url: `/admin/payment/providers/${id}`, method: 'GET' })
+export const createPaymentProviderApi = (data) =>
+  request({ url: '/admin/payment/providers', method: 'POST', data })
+export const updatePaymentProviderApi = (id, data) =>
+  request({ url: `/admin/payment/providers/${id}`, method: 'PUT', data })
+export const deletePaymentProviderApi = (id) =>
+  request({ url: `/admin/payment/providers/${id}`, method: 'DELETE' })
+export const getPaymentOrdersAdminApi = (params = {}) =>
+  request({ url: '/admin/payment/orders', method: 'GET', params })
+export const verifyPaymentOrderAdminApi = (id) =>
+  request({ url: `/admin/payment/orders/${id}/verify`, method: 'POST' })
+export const manualCompletePaymentOrderApi = (id, data) =>
+  request({ url: `/admin/payment/orders/${id}/manual-complete`, method: 'POST', data })
+export const refundPaymentOrderApi = (id) =>
+  request({ url: `/admin/payment/orders/${id}/refund`, method: 'POST' })
+export const resolvePaymentRefundApi = (id, outcome) =>
+  request({ url: `/admin/payment/orders/${id}/refund/resolve`, method: 'POST', data: { outcome } })
+export const getPaymentDashboardApi = () =>
+  request({ url: '/admin/payment/dashboard', method: 'GET' })
+export const getPaymentOrderAuditApi = (id) =>
+  request({ url: `/admin/payment/orders/${id}/audit`, method: 'GET' })
+
+// 账户导入/导出（迁移）
+// 导出返回原始 Response，便于读取 Content-Disposition 文件名与 X-Export-*-Count 计数头
+export const exportAccountsApi = ({ format = 'crs', ids = null } = {}) => {
+  const params = { format, include_secrets: true }
+  if (Array.isArray(ids) && ids.length > 0) {
+    params.ids = ids.join(',')
+  }
+  return request({ url: '/admin/accounts/export', method: 'GET', params, responseType: 'response' })
+}
+export const inspectAccountImportApi = (data) =>
+  request({ url: '/admin/accounts/import/inspect', method: 'POST', data })
+export const importAccountsApi = (data) =>
+  request({ url: '/admin/accounts/import', method: 'POST', data })

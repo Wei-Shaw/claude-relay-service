@@ -9,14 +9,14 @@
           ← 返回
         </button>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+          <p class="text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
             账户请求详情时间线
           </p>
           <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">
             {{ accountDisplayName }}
           </h2>
-          <p class="text-xs text-gray-500 dark:text-gray-400">ID: {{ accountId }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">渠道：{{ platformDisplayName }}</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">ID: {{ accountId }}</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">渠道：{{ platformDisplayName }}</p>
         </div>
       </div>
       <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
@@ -30,7 +30,7 @@
       <div
         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
-        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总请求</p>
+        <p class="text-sm uppercase text-gray-500 dark:text-gray-400">总请求</p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
           {{ formatNumber(summary.totalRequests) }}
         </p>
@@ -38,7 +38,7 @@
       <div
         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
-        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总 Token</p>
+        <p class="text-sm uppercase text-gray-500 dark:text-gray-400">总 Token</p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
           {{ formatNumber(summary.totalTokens) }}
         </p>
@@ -46,7 +46,7 @@
       <div
         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
-        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">总费用</p>
+        <p class="text-sm uppercase text-gray-500 dark:text-gray-400">总费用</p>
         <p class="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
           {{ formatCost(summary.totalCost) }}
         </p>
@@ -54,7 +54,7 @@
       <div
         class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       >
-        <p class="text-xs uppercase text-gray-500 dark:text-gray-400">平均费用/次</p>
+        <p class="text-sm uppercase text-gray-500 dark:text-gray-400">平均费用/次</p>
         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
           {{ formatCost(summary.avgCost) }}
         </p>
@@ -74,43 +74,42 @@
           start-placeholder="开始时间"
           type="datetimerange"
           unlink-panels
-          value-format="YYYY-MM-DDTHH:mm:ss[Z]"
+          value-format="YYYY-MM-DD HH:mm:ss"
         />
 
-        <el-select
-          v-model="filters.model"
-          class="w-[180px]"
-          clearable
-          filterable
-          placeholder="所有模型"
-        >
-          <el-option
-            v-for="modelOption in availableModels"
-            :key="modelOption"
-            :label="modelOption"
-            :value="modelOption"
+        <div class="w-[180px]">
+          <CustomDropdown
+            v-model="filters.model"
+            accent="blue"
+            clearable
+            icon="fa-cube"
+            :options="modelDropdownOptions"
+            placeholder="所有模型"
+            searchable
           />
-        </el-select>
+        </div>
 
-        <el-select
-          v-model="filters.apiKeyId"
-          class="w-[220px]"
-          clearable
-          filterable
-          placeholder="所有 API Key"
-        >
-          <el-option
-            v-for="apiKey in availableApiKeys"
-            :key="apiKey.id"
-            :label="apiKey.name || apiKey.id"
-            :value="apiKey.id"
+        <div class="w-[220px]">
+          <CustomDropdown
+            v-model="filters.apiKeyId"
+            accent="purple"
+            clearable
+            icon="fa-key"
+            :options="apiKeyDropdownOptions"
+            placeholder="所有 API Key"
+            searchable
           />
-        </el-select>
+        </div>
 
-        <el-select v-model="filters.sortOrder" class="w-[140px]" placeholder="排序">
-          <el-option label="时间降序" value="desc" />
-          <el-option label="时间升序" value="asc" />
-        </el-select>
+        <div class="w-[140px]">
+          <CustomDropdown
+            v-model="filters.sortOrder"
+            accent="indigo"
+            icon="fa-sort-amount-down"
+            :options="sortOrderOptions"
+            placeholder="排序"
+          />
+        </div>
 
         <el-button @click="resetFilters"> <i class="fas fa-undo mr-2" /> 重置 </el-button>
         <el-button :loading="exporting" type="primary" @click="exportCsv">
@@ -142,47 +141,47 @@
               <thead class="bg-gray-50 dark:bg-gray-800">
                 <tr>
                   <th
-                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                    class="px-4 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
                     时间
                   </th>
                   <th
-                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                    class="px-4 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
                     API Key
                   </th>
                   <th
-                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                    class="px-4 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
                     模型
                   </th>
                   <th
-                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                    class="px-4 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
                     输入
                   </th>
                   <th
-                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                    class="px-4 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
                     输出
                   </th>
                   <th
-                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                    class="px-4 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
                     缓存(创/读)
                   </th>
                   <th
-                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                    class="px-4 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
                     总 Token
                   </th>
                   <th
-                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                    class="px-4 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
                     费用
                   </th>
                   <th
-                    class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
+                    class="px-4 py-3 text-right text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300"
                   >
                     操作
                   </th>
@@ -200,7 +199,7 @@
                       <span class="font-semibold">
                         {{ record.apiKeyName || record.apiKeyId || '未知 Key' }}
                       </span>
-                      <span class="text-xs text-gray-500 dark:text-gray-400">
+                      <span class="text-sm text-gray-500 dark:text-gray-400">
                         ID: {{ record.apiKeyId }}
                       </span>
                     </div>
@@ -249,10 +248,10 @@
                   <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {{ record.apiKeyName || record.apiKeyId || '未知 Key' }}
                   </p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
                     ID: {{ record.apiKeyId }} · {{ formatDate(record.timestamp) }}
                   </p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
                     渠道：{{ platformDisplayName }}
                   </p>
                 </div>
@@ -299,7 +298,6 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { getAccountUsageRecordsByIdApi } from '@/utils/http_apis'
 import { showToast, formatNumber, formatDate } from '@/utils/tools'
@@ -315,6 +313,20 @@ const exporting = ref(false)
 const records = ref([])
 const availableModels = ref([])
 const availableApiKeys = ref([])
+
+const modelDropdownOptions = computed(() =>
+  availableModels.value.map((model) => ({ value: model, label: model }))
+)
+const apiKeyDropdownOptions = computed(() =>
+  availableApiKeys.value.map((apiKey) => ({
+    value: apiKey.id,
+    label: apiKey.name || apiKey.id
+  }))
+)
+const sortOrderOptions = [
+  { value: 'desc', label: '时间降序' },
+  { value: 'asc', label: '时间升序' }
+]
 
 const pagination = reactive({
   currentPage: 1,
@@ -384,8 +396,9 @@ const buildParams = (page) => {
   if (filters.model) params.model = filters.model
   if (filters.apiKeyId) params.apiKeyId = filters.apiKeyId
   if (filters.dateRange && filters.dateRange.length === 2) {
-    params.startDate = dayjs(filters.dateRange[0]).toISOString()
-    params.endDate = dayjs(filters.dateRange[1]).toISOString()
+    // 传本地时间字符串，由后端按系统配置时区解析（禁止 toISOString 当成 UTC）
+    params.startDate = filters.dateRange[0]
+    params.endDate = filters.dateRange[1]
   }
   if (platform.value) {
     params.platform = platform.value
@@ -430,14 +443,15 @@ const syncResponseState = (data) => {
 
 const fetchRecords = async (page = pagination.currentPage) => {
   loading.value = true
-  try {
-    const response = await getAccountUsageRecordsByIdApi(accountId.value, buildParams(page))
-    syncResponseState(response.data || {})
-  } catch (error) {
-    showToast(`加载请求记录失败：${error.message || '未知错误'}`, 'error')
-  } finally {
+  // request.js 为 resolve-only：失败也 resolve 成 { success:false }，不会抛异常，必须显式判 success
+  const response = await getAccountUsageRecordsByIdApi(accountId.value, buildParams(page))
+  if (!response.success) {
+    showToast(`加载请求记录失败：${response.message || '未知错误'}`, 'error')
     loading.value = false
+    return
   }
+  syncResponseState(response.data || {})
+  loading.value = false
 }
 
 const handlePageChange = (page) => {
@@ -488,6 +502,11 @@ const exportCsv = async () => {
         ...buildParams(page),
         pageSize: 200
       })
+      // resolve-only：接口失败需中断导出并提示，否则会误导出空 CSV
+      if (!response.success) {
+        showToast(`导出失败：${response.message || '未知错误'}`, 'error')
+        return
+      }
       const payload = response.data || {}
       aggregated.push(...(payload.records || []))
       totalPages = payload.pagination?.totalPages || 1

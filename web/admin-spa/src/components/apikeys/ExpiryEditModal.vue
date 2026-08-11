@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <ModalTransition>
     <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
       <!-- 背景遮罩 -->
       <div
@@ -39,13 +39,13 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">当前状态</p>
+                <p class="mb-1 text-sm font-medium text-gray-600 dark:text-gray-400">当前状态</p>
                 <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
                   <!-- 未激活状态 -->
                   <template v-if="apiKey.expirationMode === 'activation' && !apiKey.isActivated">
                     <i class="fas fa-pause-circle mr-1 text-blue-500" />
                     未激活
-                    <span class="ml-2 text-xs font-normal text-gray-600">
+                    <span class="ml-2 text-sm font-normal text-gray-600">
                       (激活后
                       {{ apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30) }}
                       {{ apiKey.activationUnit === 'hours' ? '小时' : '天' }}过期)
@@ -56,7 +56,7 @@
                     {{ formatExpireDate(apiKey.expiresAt) }}
                     <span
                       v-if="getExpiryStatus(apiKey.expiresAt)"
-                      class="ml-2 text-xs font-normal"
+                      class="ml-2 text-sm font-normal"
                       :class="getExpiryStatus(apiKey.expiresAt).class"
                     >
                       ({{ getExpiryStatus(apiKey.expiresAt).text }})
@@ -95,7 +95,7 @@
               {{ apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30) }}
               {{ apiKey.activationUnit === 'hours' ? '小时' : '天' }}过期)
             </button>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               <i class="fas fa-info-circle mr-1" />
               点击立即激活此 API Key，激活后将在
               {{ apiKey.activationDays || (apiKey.activationUnit === 'hours' ? 24 : 30) }}
@@ -149,7 +149,7 @@
               type="datetime-local"
               @change="updateCustomExpiryPreview"
             />
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               选择一个未来的日期和时间作为过期时间
             </p>
           </div>
@@ -161,7 +161,7 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="mb-1 text-xs font-medium text-blue-700 dark:text-blue-400">
+                <p class="mb-1 text-sm font-medium text-blue-700 dark:text-blue-400">
                   <i class="fas fa-arrow-right mr-1" />
                   新的过期时间
                 </p>
@@ -170,7 +170,7 @@
                     {{ formatExpireDate(localForm.expiresAt) }}
                     <span
                       v-if="getExpiryStatus(localForm.expiresAt)"
-                      class="ml-2 text-xs font-normal"
+                      class="ml-2 text-sm font-normal"
                       :class="getExpiryStatus(localForm.expiresAt).class"
                     >
                       ({{ getExpiryStatus(localForm.expiresAt).text }})
@@ -211,24 +211,30 @@
         </div>
       </div>
     </div>
+  </ModalTransition>
 
-    <!-- ConfirmModal -->
-    <ConfirmModal
-      :cancel-text="confirmModalConfig.cancelText"
-      :confirm-text="confirmModalConfig.confirmText"
-      :message="confirmModalConfig.message"
-      :show="showConfirmModal"
-      :title="confirmModalConfig.title"
-      :type="confirmModalConfig.type"
-      @cancel="handleCancelModal"
-      @confirm="handleConfirmModal"
-    />
-  </Teleport>
+  <!-- ConfirmModal -->
+  <ConfirmModal
+    :cancel-text="confirmModalConfig.cancelText"
+    :confirm-text="confirmModalConfig.confirmText"
+    :message="confirmModalConfig.message"
+    :show="showConfirmModal"
+    :title="confirmModalConfig.title"
+    :type="confirmModalConfig.type"
+    @cancel="handleCancelModal"
+    @confirm="handleConfirmModal"
+  />
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import {
+  formatDateTimeLocalValue,
+  getDateTimeLocalMinValue,
+  localDateTimeInputToISOString
+} from '@/utils/time'
 
 const props = defineProps({
   show: {
@@ -299,9 +305,7 @@ const quickOptions = [
 
 // 计算最小日期时间
 const minDateTime = computed(() => {
-  const now = new Date()
-  now.setMinutes(now.getMinutes() + 1)
-  return now.toISOString().slice(0, 16)
+  return getDateTimeLocalMinValue(1)
 })
 
 // 监听显示状态，初始化表单
@@ -330,7 +334,7 @@ const initializeForm = () => {
 
   if (props.apiKey.expiresAt) {
     localForm.expireDuration = 'custom'
-    localForm.customExpireDate = new Date(props.apiKey.expiresAt).toISOString().slice(0, 16)
+    localForm.customExpireDate = formatDateTimeLocalValue(props.apiKey.expiresAt)
     localForm.expiresAt = props.apiKey.expiresAt
   } else {
     localForm.expireDuration = ''
@@ -381,7 +385,7 @@ const selectQuickOption = (value) => {
 // 更新自定义过期时间
 const updateCustomExpiryPreview = () => {
   if (localForm.customExpireDate) {
-    localForm.expiresAt = new Date(localForm.customExpireDate).toISOString()
+    localForm.expiresAt = localDateTimeInputToISOString(localForm.customExpireDate)
   }
 }
 

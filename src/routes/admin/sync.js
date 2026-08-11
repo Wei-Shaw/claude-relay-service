@@ -8,6 +8,7 @@ const router = express.Router()
 
 const { authenticateAdmin } = require('../../middleware/auth')
 const redis = require('../../models/redis')
+const { RedisKeys } = require('../../constants/redisKeys')
 const claudeAccountService = require('../../services/account/claudeAccountService')
 const claudeConsoleAccountService = require('../../services/account/claudeConsoleAccountService')
 const openaiAccountService = require('../../services/account/openaiAccountService')
@@ -289,8 +290,8 @@ router.get('/sync/export-accounts', authenticateAdmin, async (req, res) => {
     const openaiOAuthAccounts = []
     {
       const openaiIds = await redis.getAllIdsByIndex(
-        'openai:account:index',
-        'openai:account:*',
+        RedisKeys.accounts.openaiIndex,
+        RedisKeys.accounts.openaiPattern,
         /^openai:account:(.+)$/
       )
       for (const id of openaiIds) {
@@ -393,8 +394,8 @@ router.get('/sync/export-accounts', authenticateAdmin, async (req, res) => {
     // ===== OpenAI Responses API Key accounts =====
     const openaiResponsesAccounts = []
     const openaiResponseIds = await redis.getAllIdsByIndex(
-      'openai_responses_account:index',
-      'openai_responses_account:*',
+      RedisKeys.accounts.openaiResponsesIndex,
+      RedisKeys.accounts.openaiResponsesPattern,
       /^openai_responses_account:(.+)$/
     )
     for (const id of openaiResponseIds) {

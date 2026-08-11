@@ -3,8 +3,14 @@ const geminiApiAccountService = require('../account/geminiApiAccountService')
 const accountGroupService = require('../accountGroupService')
 const redis = require('../../models/redis')
 const logger = require('../../utils/logger')
-const { isSchedulable, isActive, sortAccountsByPriority } = require('../../utils/commonHelper')
+const {
+  isSchedulable,
+  isActive,
+  isAutoProtectionDisabled,
+  sortAccountsByPriority
+} = require('../../utils/commonHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { RedisKeys, TTL } = require('../../constants/redisKeys')
 
 const OAUTH_PROVIDER_GEMINI_CLI = 'gemini-cli'
 const OAUTH_PROVIDER_ANTIGRAVITY = 'antigravity'
@@ -20,19 +26,15 @@ function normalizeOauthProvider(oauthProvider) {
 }
 
 class UnifiedGeminiScheduler {
-  constructor() {
-    this.SESSION_MAPPING_PREFIX = 'unified_gemini_session_mapping:'
-  }
-
   _getSessionMappingKey(sessionHash, oauthProvider = null) {
     if (!sessionHash) {
       return null
     }
     if (!oauthProvider) {
-      return `${this.SESSION_MAPPING_PREFIX}${sessionHash}`
+      return RedisKeys.session.unifiedGeminiMapping(sessionHash)
     }
     const normalized = normalizeOauthProvider(oauthProvider)
-    return `${this.SESSION_MAPPING_PREFIX}${normalized}:${sessionHash}`
+    return RedisKeys.session.unifiedGeminiMappingByProvider(normalized, sessionHash)
   }
 
   // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
@@ -49,6 +51,35 @@ class UnifiedGeminiScheduler {
   _isActive(activeValue) {
     // 兼容布尔值 true 和字符串 'true'
     return activeValue === true || activeValue === 'true'
+  }
+
+  // 🔧 模型支持检查（无 requestedModel 或未配置 supportedModels 时视为支持）
+  _isGeminiModelSupported(account, requestedModel) {
+    if (!requestedModel || !account.supportedModels || account.supportedModels.length === 0) {
+      return true
+    }
+    const normalizedModel = requestedModel.replace('models/', '')
+    return account.supportedModels.some((model) => model.replace('models/', '') === normalizedModel)
+  }
+
+  // [人工决策-2026-06-03 14:51:27] Gemini OAuth token 失效统一处理(单一实现：共享池与 _isAccountAvailable 都调它,
+  //   dedicated/group 经 _isAccountAvailable 间接复用,避免两套实现漂移)。
+  //   返回有效 token 的账户(过期可刷新者返回刷新后的最新账户);死号或刷新失败返回 null。
+  async _ensureGeminiTokenValid(account, accountId) {
+    if (!geminiAccountService.isTokenExpired(account)) {
+      return account
+    }
+    if (!account.refreshToken) {
+      logger.warn(`⚠️ Gemini account ${accountId} token expired and no refresh token available`)
+      return null
+    }
+    try {
+      await geminiAccountService.refreshAccountToken(accountId)
+      return await geminiAccountService.getAccount(accountId)
+    } catch (refreshError) {
+      logger.warn(`⚠️ Gemini account ${accountId} token refresh failed: ${refreshError.message}`)
+      return null
+    }
   }
 
   // 🎯 统一调度Gemini账号
@@ -68,7 +99,13 @@ class UnifiedGeminiScheduler {
         if (apiKeyData.geminiAccountId.startsWith('api:')) {
           const accountId = apiKeyData.geminiAccountId.replace('api:', '')
           const boundAccount = await geminiApiAccountService.getAccount(accountId)
-          if (boundAccount && isActive(boundAccount.isActive) && boundAccount.status !== 'error') {
+          // [人工决策-2026-06-02 23:30:05] 专属绑定走与共享池一致的校验：
+          //   _isAccountAvailable(硬门 isActive/schedulable + 开关绕过 status/temp/限流) + 模型支持
+          const usable =
+            !!boundAccount &&
+            (await this._isAccountAvailable(accountId, 'gemini-api')) &&
+            this._isGeminiModelSupported(boundAccount, requestedModel)
+          if (usable) {
             logger.info(
               `🎯 Using bound Gemini-API account: ${boundAccount.name} (${accountId}) for API key ${apiKeyData.name}`
             )
@@ -79,14 +116,8 @@ class UnifiedGeminiScheduler {
               accountType: 'gemini-api'
             }
           } else {
-            // 提供详细的不可用原因
-            const reason = !boundAccount
-              ? 'account not found'
-              : boundAccount.isActive !== 'true'
-                ? `isActive=${boundAccount.isActive}`
-                : `status=${boundAccount.status}`
             logger.warn(
-              `⚠️ Bound Gemini-API account ${accountId} is not available (${reason}), falling back to pool`
+              `⚠️ Bound Gemini-API account ${accountId} is not available (schedulable/status/temp/rate/model), falling back to pool`
             )
           }
         }
@@ -101,29 +132,30 @@ class UnifiedGeminiScheduler {
         // 普通 Gemini OAuth 专属账户
         else {
           const boundAccount = await geminiAccountService.getAccount(apiKeyData.geminiAccountId)
-          if (
-            boundAccount &&
-            this._isActive(boundAccount.isActive) &&
-            boundAccount.status !== 'error'
-          ) {
-            if (
-              normalizedOauthProvider &&
-              normalizeOauthProvider(boundAccount.oauthProvider) !== normalizedOauthProvider
-            ) {
-              logger.warn(
-                `⚠️ Bound Gemini OAuth account ${boundAccount.name} oauthProvider=${normalizeOauthProvider(boundAccount.oauthProvider)} does not match requested oauthProvider=${normalizedOauthProvider}, falling back to pool`
-              )
-            } else {
-              logger.info(
-                `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId}) for API key ${apiKeyData.name}`
-              )
-              // 更新账户的最后使用时间
-              await geminiAccountService.markAccountUsed(apiKeyData.geminiAccountId)
-              return {
-                accountId: apiKeyData.geminiAccountId,
-                accountType: 'gemini'
-              }
+          const providerMismatch =
+            !!boundAccount &&
+            !!normalizedOauthProvider &&
+            normalizeOauthProvider(boundAccount.oauthProvider) !== normalizedOauthProvider
+          // [人工决策-2026-06-02 23:30:05] 专属绑定走 _isAccountAvailable(硬门 + 开关绕过上游错误) + 模型 + oauthProvider 校验
+          const usable =
+            !!boundAccount &&
+            !providerMismatch &&
+            (await this._isAccountAvailable(apiKeyData.geminiAccountId, 'gemini')) &&
+            this._isGeminiModelSupported(boundAccount, requestedModel)
+          if (usable) {
+            logger.info(
+              `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId}) for API key ${apiKeyData.name}`
+            )
+            // 更新账户的最后使用时间
+            await geminiAccountService.markAccountUsed(apiKeyData.geminiAccountId)
+            return {
+              accountId: apiKeyData.geminiAccountId,
+              accountType: 'gemini'
             }
+          } else if (providerMismatch) {
+            logger.warn(
+              `⚠️ Bound Gemini OAuth account ${boundAccount.name} oauthProvider=${normalizeOauthProvider(boundAccount.oauthProvider)} does not match requested oauthProvider=${normalizedOauthProvider}, falling back to pool`
+            )
           } else {
             logger.warn(
               `⚠️ Bound Gemini account ${apiKeyData.geminiAccountId} is not available, falling back to pool`
@@ -241,128 +273,66 @@ class UnifiedGeminiScheduler {
       if (apiKeyData.geminiAccountId.startsWith('api:')) {
         const accountId = apiKeyData.geminiAccountId.replace('api:', '')
         const boundAccount = await geminiApiAccountService.getAccount(accountId)
-        if (boundAccount && isActive(boundAccount.isActive) && boundAccount.status !== 'error') {
-          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
-            accountId,
-            'gemini-api'
-          )
-          if (isTempUnavailable) {
-            logger.warn(
-              `⏱️ Bound Gemini-API account ${boundAccount.name} (${accountId}) temporarily unavailable, falling back to pool`
-            )
-          }
-          const isRateLimited = await this.isAccountRateLimited(accountId)
-          if (!isRateLimited && !isTempUnavailable) {
-            // 检查模型支持
-            if (
-              requestedModel &&
-              boundAccount.supportedModels &&
-              boundAccount.supportedModels.length > 0
-            ) {
-              const normalizedModel = requestedModel.replace('models/', '')
-              const modelSupported = boundAccount.supportedModels.some(
-                (model) => model.replace('models/', '') === normalizedModel
-              )
-              if (!modelSupported) {
-                logger.warn(
-                  `⚠️ Bound Gemini-API account ${boundAccount.name} does not support model ${requestedModel}`
-                )
-                return availableAccounts
-              }
+        // [人工决策-2026-06-02 23:30:05] 专属绑定统一委托 _isAccountAvailable（硬门 + 开关绕过上游错误）+ 模型，避免重抄漂移
+        const usable =
+          !!boundAccount &&
+          (await this._isAccountAvailable(accountId, 'gemini-api')) &&
+          this._isGeminiModelSupported(boundAccount, requestedModel)
+        if (usable) {
+          logger.info(`🎯 Using bound Gemini-API account: ${boundAccount.name} (${accountId})`)
+          return [
+            {
+              ...boundAccount,
+              accountId,
+              accountType: 'gemini-api',
+              priority: parseInt(boundAccount.priority) || 50,
+              lastUsedAt: boundAccount.lastUsedAt || '0'
             }
-
-            logger.info(`🎯 Using bound Gemini-API account: ${boundAccount.name} (${accountId})`)
-            return [
-              {
-                ...boundAccount,
-                accountId,
-                accountType: 'gemini-api',
-                priority: parseInt(boundAccount.priority) || 50,
-                lastUsedAt: boundAccount.lastUsedAt || '0'
-              }
-            ]
-          }
-        } else {
-          // 提供详细的不可用原因
-          const reason = !boundAccount
-            ? 'account not found'
-            : boundAccount.isActive !== 'true'
-              ? `isActive=${boundAccount.isActive}`
-              : `status=${boundAccount.status}`
-          logger.warn(
-            `⚠️ Bound Gemini-API account ${accountId} is not available in _getAllAvailableAccounts (${reason})`
-          )
+          ]
         }
+        logger.warn(
+          `⚠️ Bound Gemini-API account ${accountId} is not available in _getAllAvailableAccounts, falling back to pool`
+        )
       }
       // 普通 Gemini OAuth 账户
       else if (!apiKeyData.geminiAccountId.startsWith('group:')) {
         const boundAccount = await geminiAccountService.getAccount(apiKeyData.geminiAccountId)
-        if (
-          boundAccount &&
-          this._isActive(boundAccount.isActive) &&
-          boundAccount.status !== 'error'
-        ) {
-          if (
-            normalizedOauthProvider &&
-            normalizeOauthProvider(boundAccount.oauthProvider) !== normalizedOauthProvider
-          ) {
-            return availableAccounts
-          }
-          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
-            boundAccount.id,
-            'gemini'
-          )
-          if (isTempUnavailable) {
-            logger.warn(
-              `⏱️ Bound Gemini account ${boundAccount.name} (${boundAccount.id}) temporarily unavailable, falling back to pool`
-            )
-          }
-          const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
-          if (!isRateLimited && !isTempUnavailable) {
-            // 检查模型支持
-            if (
-              requestedModel &&
-              boundAccount.supportedModels &&
-              boundAccount.supportedModels.length > 0
-            ) {
-              // 处理可能带有 models/ 前缀的模型名
-              const normalizedModel = requestedModel.replace('models/', '')
-              const modelSupported = boundAccount.supportedModels.some(
-                (model) => model.replace('models/', '') === normalizedModel
-              )
-              if (!modelSupported) {
-                logger.warn(
-                  `⚠️ Bound Gemini account ${boundAccount.name} does not support model ${requestedModel}`
-                )
-                return availableAccounts
-              }
-            }
-
-            logger.info(
-              `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId})`
-            )
-            return [
-              {
-                ...boundAccount,
-                accountId: boundAccount.id,
-                accountType: 'gemini',
-                priority: parseInt(boundAccount.priority) || 50,
-                lastUsedAt: boundAccount.lastUsedAt || '0'
-              }
-            ]
-          }
-        } else {
-          logger.warn(`⚠️ Bound Gemini account ${apiKeyData.geminiAccountId} is not available`)
+        const providerMismatch =
+          !!boundAccount &&
+          !!normalizedOauthProvider &&
+          normalizeOauthProvider(boundAccount.oauthProvider) !== normalizedOauthProvider
+        if (providerMismatch) {
+          return availableAccounts
         }
+        // [人工决策-2026-06-02 23:30:05] 专属绑定统一委托 _isAccountAvailable（硬门 + 开关绕过上游错误）+ 模型，避免重抄漂移
+        const usable =
+          !!boundAccount &&
+          (await this._isAccountAvailable(apiKeyData.geminiAccountId, 'gemini')) &&
+          this._isGeminiModelSupported(boundAccount, requestedModel)
+        if (usable) {
+          logger.info(
+            `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId})`
+          )
+          return [
+            {
+              ...boundAccount,
+              accountId: boundAccount.id,
+              accountType: 'gemini',
+              priority: parseInt(boundAccount.priority) || 50,
+              lastUsedAt: boundAccount.lastUsedAt || '0'
+            }
+          ]
+        }
+        logger.warn(`⚠️ Bound Gemini account ${apiKeyData.geminiAccountId} is not available`)
       }
     }
 
     // 获取所有Gemini OAuth账户（共享池）
     const geminiAccounts = await geminiAccountService.getAllAccounts()
-    for (const account of geminiAccounts) {
+    for (let account of geminiAccounts) {
+      const autoOff = isAutoProtectionDisabled(account)
       if (
         isActive(account.isActive) &&
-        account.status !== 'error' &&
         (account.accountType === 'shared' || !account.accountType) && // 兼容旧数据
         isSchedulable(account.schedulable)
       ) {
@@ -372,22 +342,28 @@ class UnifiedGeminiScheduler {
         ) {
           continue
         }
-        // 检查是否可调度
 
-        // 检查token是否过期
-        const isExpired = geminiAccountService.isTokenExpired(account)
-        if (isExpired && !account.refreshToken) {
-          logger.warn(
-            `⚠️ Gemini account ${account.name} token expired and no refresh token available`
-          )
+        // token 失效：统一走 _ensureGeminiTokenValid(单一实现)；过期可刷新者刷新后用最新账户
+        const freshAccount = await this._ensureGeminiTokenValid(account, account.id)
+        if (!freshAccount) {
+          continue
+        }
+        account = freshAccount
+
+        if (!autoOff && account.status === 'error') {
           continue
         }
 
-        // 检查临时不可用
-        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(account.id, 'gemini')
-        if (isTempUnavailable) {
-          logger.debug(`⏭️ Skipping Gemini account ${account.name} - temporarily unavailable`)
-          continue
+        // [人工决策-2026-06-02 23:30:05] 开关 ON：跳过 temp_unavailable / 限流自动暂停；模型/token 校验保留
+        if (!autoOff) {
+          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+            account.id,
+            'gemini'
+          )
+          if (isTempUnavailable) {
+            logger.debug(`⏭️ Skipping Gemini account ${account.name} - temporarily unavailable`)
+            continue
+          }
         }
 
         // 检查模型支持
@@ -405,8 +381,8 @@ class UnifiedGeminiScheduler {
           }
         }
 
-        // 检查是否被限流
-        const isRateLimited = await this.isAccountRateLimited(account.id)
+        // 检查是否被限流（开关 ON 时跳过限流过滤）
+        const isRateLimited = autoOff ? false : await this.isAccountRateLimited(account.id)
         if (!isRateLimited) {
           availableAccounts.push({
             ...account,
@@ -423,11 +399,12 @@ class UnifiedGeminiScheduler {
     if (allowApiAccounts) {
       const geminiApiAccounts = await geminiApiAccountService.getAllAccounts()
       for (const account of geminiApiAccounts) {
+        const autoOff = isAutoProtectionDisabled(account)
         if (
           isActive(account.isActive) &&
-          account.status !== 'error' &&
           (account.accountType === 'shared' || !account.accountType) &&
-          isSchedulable(account.schedulable)
+          isSchedulable(account.schedulable) &&
+          (autoOff || account.status !== 'error')
         ) {
           // 检查模型支持
           if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
@@ -443,18 +420,22 @@ class UnifiedGeminiScheduler {
             }
           }
 
-          // 检查临时不可用
-          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
-            account.id,
-            'gemini-api'
-          )
-          if (isTempUnavailable) {
-            logger.debug(`⏭️ Skipping Gemini-API account ${account.name} - temporarily unavailable`)
-            continue
+          // [人工决策-2026-06-02 23:30:05] apikey 开关 ON：暴力打，跳过 temp_unavailable / 限流；模型校验保留
+          if (!autoOff) {
+            const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
+              account.id,
+              'gemini-api'
+            )
+            if (isTempUnavailable) {
+              logger.debug(
+                `⏭️ Skipping Gemini-API account ${account.name} - temporarily unavailable`
+              )
+              continue
+            }
           }
 
-          // 检查是否被限流
-          const isRateLimited = await this.isAccountRateLimited(account.id)
+          // 检查是否被限流（开关 ON 时跳过限流过滤）
+          const isRateLimited = autoOff ? false : await this.isAccountRateLimited(account.id)
           if (!isRateLimited) {
             availableAccounts.push({
               ...account,
@@ -479,12 +460,25 @@ class UnifiedGeminiScheduler {
     try {
       if (accountType === 'gemini') {
         const account = await geminiAccountService.getAccount(accountId)
-        if (!account || !isActive(account.isActive) || account.status === 'error') {
+        if (!account || !isActive(account.isActive)) {
           return false
         }
-        // 检查是否可调度
+        // [人工决策-2026-06-02 23:30:05] 开 disableAutoProtection = 暴力打：忽略上游错误类自动暂停
+        //   (status error、temp_unavailable、限流)；手动停用(isActive/schedulable)始终生效。
         if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 Gemini account ${accountId} is not schedulable`)
+          return false
+        }
+        // [人工决策-2026-06-03 14:51:27] token 失效：统一走 _ensureGeminiTokenValid(单一实现);死号/刷新失败=不可用
+        const validatedAccount = await this._ensureGeminiTokenValid(account, accountId)
+        if (!validatedAccount) {
+          return false
+        }
+        const currentAccount = validatedAccount
+        if (isAutoProtectionDisabled(currentAccount)) {
+          return true
+        }
+        if (currentAccount.status === 'error') {
           return false
         }
         const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
@@ -498,12 +492,19 @@ class UnifiedGeminiScheduler {
         return !(await this.isAccountRateLimited(accountId))
       } else if (accountType === 'gemini-api') {
         const account = await geminiApiAccountService.getAccount(accountId)
-        if (!account || !isActive(account.isActive) || account.status === 'error') {
+        if (!account || !isActive(account.isActive)) {
           return false
         }
-        // 检查是否可调度
+        // [人工决策-2026-06-02 23:30:05] apikey 类开 disableAutoProtection = 暴力打：忽略上游错误类自动暂停
+        //   (status error、temp_unavailable、限流)；手动停用(isActive/schedulable)始终生效。
         if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 Gemini-API account ${accountId} is not schedulable`)
+          return false
+        }
+        if (isAutoProtectionDisabled(account)) {
+          return true
+        }
+        if (account.status === 'error') {
           return false
         }
         const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
@@ -546,9 +547,7 @@ class UnifiedGeminiScheduler {
     const client = redis.getClientSafe()
     const mappingData = JSON.stringify({ accountId, accountType })
     // 依据配置设置TTL（小时）
-    const appConfig = require('../../../config/config')
-    const ttlHours = appConfig.session?.stickyTtlHours || 1
-    const ttlSeconds = Math.max(1, Math.floor(ttlHours * 60 * 60))
+    const ttlSeconds = Math.max(1, Math.floor(TTL.stickySession()))
     const key = this._getSessionMappingKey(sessionHash, oauthProvider)
     if (!key) {
       return
@@ -588,13 +587,13 @@ class UnifiedGeminiScheduler {
       }
 
       const appConfig = require('../../../config/config')
-      const ttlHours = appConfig.session?.stickyTtlHours || 1
-      const renewalThresholdMinutes = appConfig.session?.renewalThresholdMinutes || 0
+      const ttlHours = appConfig.session.stickyTtlHours
+      const { renewalThresholdMinutes } = appConfig.session
       if (!renewalThresholdMinutes) {
         return true
       }
 
-      const fullTTL = Math.max(1, Math.floor(ttlHours * 60 * 60))
+      const fullTTL = Math.max(1, Math.floor(TTL.stickySession()))
       const threshold = Math.max(0, Math.floor(renewalThresholdMinutes * 60))
 
       if (remainingTTL < threshold) {
@@ -766,57 +765,19 @@ class UnifiedGeminiScheduler {
           continue
         }
 
-        // 检查账户是否可用
-        if (
-          isActive(account.isActive) &&
-          account.status !== 'error' &&
-          isSchedulable(account.schedulable)
-        ) {
-          // 对于 Gemini OAuth 账户，检查 token 是否过期
-          if (accountType === 'gemini') {
-            const isExpired = geminiAccountService.isTokenExpired(account)
-            if (isExpired && !account.refreshToken) {
-              logger.warn(
-                `⚠️ Gemini account ${account.name} in group token expired and no refresh token available`
-              )
-              continue
-            }
-          }
-
-          // 检查模型支持
-          if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
-            // 处理可能带有 models/ 前缀的模型名
-            const normalizedModel = requestedModel.replace('models/', '')
-            const modelSupported = account.supportedModels.some(
-              (model) => model.replace('models/', '') === normalizedModel
-            )
-            if (!modelSupported) {
-              logger.debug(
-                `⏭️ Skipping ${accountType} account ${account.name} in group - doesn't support model ${requestedModel}`
-              )
-              continue
-            }
-          }
-
-          // 检查是否被限流
-          const isRateLimited = await this.isAccountRateLimited(account.id, accountType)
-          if (!isRateLimited) {
-            const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
-              account.id,
-              accountType
-            )
-            if (isTempUnavailable) {
-              logger.debug(`⏭️ Skipping group member ${account.name} - temporarily unavailable`)
-              continue
-            }
-            availableAccounts.push({
-              ...account,
-              accountId: account.id,
-              accountType,
-              priority: parseInt(account.priority) || 50,
-              lastUsedAt: account.lastUsedAt || '0'
-            })
-          }
+        // [人工决策-2026-06-03 14:51:27] 分组成员统一委托 _isAccountAvailable(硬门+开关绕过上游错误,含 token 失效硬门) + 模型,
+        //   与共享/复检同一判定,不再内联手抄
+        const usable =
+          (await this._isAccountAvailable(account.id, accountType)) &&
+          this._isGeminiModelSupported(account, requestedModel)
+        if (usable) {
+          availableAccounts.push({
+            ...account,
+            accountId: account.id,
+            accountType,
+            priority: parseInt(account.priority) || 50,
+            lastUsedAt: account.lastUsedAt || '0'
+          })
         }
       }
 

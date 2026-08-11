@@ -4,13 +4,10 @@ const redis = require('../../models/redis')
 const logger = require('../../utils/logger')
 const { createEncryptor } = require('../../utils/commonHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 class CcrAccountService {
   constructor() {
-    // Redis键前缀
-    this.ACCOUNT_KEY_PREFIX = 'ccr_account:'
-    this.SHARED_ACCOUNTS_KEY = 'shared_ccr_accounts'
-
     // 使用 commonHelper 的加密器
     this._encryptor = createEncryptor('ccr-account-salt')
 
@@ -94,16 +91,16 @@ class CcrAccountService {
 
     const client = redis.getClientSafe()
     logger.debug(
-      `[DEBUG] Saving CCR account data to Redis with key: ${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      `[DEBUG] Saving CCR account data to Redis with key: ${RedisKeys.accounts.ccr(accountId)}`
     )
     logger.debug(`[DEBUG] CCR Account data to save: ${JSON.stringify(accountData, null, 2)}`)
 
-    await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, accountData)
-    await redis.addToIndex('ccr_account:index', accountId)
+    await client.hset(RedisKeys.accounts.ccr(accountId), accountData)
+    await redis.addToIndex(RedisKeys.accounts.ccrIndex, accountId)
 
     // 如果是共享账户，添加到共享账户集合
     if (accountType === 'shared') {
-      await client.sadd(this.SHARED_ACCOUNTS_KEY, accountId)
+      await client.sadd(RedisKeys.accounts.sharedCcr, accountId)
     }
 
     logger.success(`🏢 Created CCR account: ${name} (${accountId})`)
@@ -134,11 +131,11 @@ class CcrAccountService {
   async getAllAccounts() {
     try {
       const accountIds = await redis.getAllIdsByIndex(
-        'ccr_account:index',
-        `${this.ACCOUNT_KEY_PREFIX}*`,
+        RedisKeys.accounts.ccrIndex,
+        RedisKeys.accounts.ccrPattern,
         /^ccr_account:(.+)$/
       )
-      const keys = accountIds.map((id) => `${this.ACCOUNT_KEY_PREFIX}${id}`)
+      const keys = accountIds.map((id) => RedisKeys.accounts.ccr(id))
       const accounts = []
       const dataList = await redis.batchHgetallChunked(keys)
 
@@ -162,6 +159,8 @@ class CcrAccountService {
               : parseInt(accountData.rateLimitDuration),
             isActive: accountData.isActive === 'true',
             proxy: accountData.proxy ? JSON.parse(accountData.proxy) : null,
+            proxyGroupId: accountData.proxyGroupId || null,
+            proxyId: accountData.proxyId || null,
             accountType: accountData.accountType || 'shared',
             createdAt: accountData.createdAt,
             lastUsedAt: accountData.lastUsedAt,
@@ -195,7 +194,7 @@ class CcrAccountService {
   async getAccount(accountId) {
     const client = redis.getClientSafe()
     logger.debug(`[DEBUG] Getting CCR account data for ID: ${accountId}`)
-    const accountData = await client.hgetall(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
+    const accountData = await client.hgetall(RedisKeys.accounts.ccr(accountId))
 
     if (!accountData || Object.keys(accountData).length === 0) {
       logger.debug(`[DEBUG] No CCR account data found for ID: ${accountId}`)
@@ -285,6 +284,14 @@ class CcrAccountService {
       if (updates.proxy !== undefined) {
         updatedData.proxy = updates.proxy ? JSON.stringify(updates.proxy) : ''
       }
+      // 代理池分组绑定（普通字符串，空字符串表示未绑定）
+      if (updates.proxyGroupId !== undefined) {
+        updatedData.proxyGroupId = updates.proxyGroupId
+      }
+      // 代理池单代理绑定（普通字符串，空字符串表示未绑定）
+      if (updates.proxyId !== undefined) {
+        updatedData.proxyId = updates.proxyId
+      }
       if (updates.isActive !== undefined) {
         updatedData.isActive = updates.isActive.toString()
       }
@@ -309,15 +316,29 @@ class CcrAccountService {
         updatedData.disableAutoProtection = updates.disableAutoProtection.toString()
       }
 
-      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updatedData)
+      // 开启 disableAutoProtection 时立即清理已有自动停用状态并恢复调度（手动停用不受影响）
+      const enablingAutoProtection =
+        updates.disableAutoProtection === true || updates.disableAutoProtection === 'true'
+      if (enablingAutoProtection) {
+        const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(existingAccount)
+        if (recoveryPatch) {
+          Object.assign(updatedData, recoveryPatch)
+        }
+      }
+
+      await client.hset(RedisKeys.accounts.ccr(accountId), updatedData)
+
+      if (enablingAutoProtection) {
+        await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'ccr')
+      }
 
       // 处理共享账户集合变更
       if (updates.accountType !== undefined) {
         updatedData.accountType = updates.accountType
         if (updates.accountType === 'shared') {
-          await client.sadd(this.SHARED_ACCOUNTS_KEY, accountId)
+          await client.sadd(RedisKeys.accounts.sharedCcr, accountId)
         } else {
-          await client.srem(this.SHARED_ACCOUNTS_KEY, accountId)
+          await client.srem(RedisKeys.accounts.sharedCcr, accountId)
         }
       }
 
@@ -335,13 +356,13 @@ class CcrAccountService {
       const client = redis.getClientSafe()
 
       // 从共享账户集合中移除
-      await client.srem(this.SHARED_ACCOUNTS_KEY, accountId)
+      await client.srem(RedisKeys.accounts.sharedCcr, accountId)
 
       // 从索引中移除
-      await redis.removeFromIndex('ccr_account:index', accountId)
+      await redis.removeFromIndex(RedisKeys.accounts.ccrIndex, accountId)
 
       // 删除账户数据
-      const result = await client.del(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
+      const result = await client.del(RedisKeys.accounts.ccr(accountId))
 
       if (result === 0) {
         throw new Error('CCR Account not found or already deleted')
@@ -369,7 +390,17 @@ class CcrAccountService {
         logger.info(
           `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountRateLimited`
         )
-        upstreamErrorHelper.recordErrorHistory(accountId, 'ccr', 429, 'rate_limit').catch(() => {})
+        upstreamErrorHelper
+          .recordErrorHistory(
+            accountId,
+            'ccr',
+            429,
+            'rate_limit',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_rate_limit'
+            })
+          )
+          .catch(() => {})
         return { success: true, skipped: true }
       }
 
@@ -382,7 +413,7 @@ class CcrAccountService {
       }
 
       const now = new Date().toISOString()
-      await client.hmset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, {
+      await client.hmset(RedisKeys.accounts.ccr(accountId), {
         status: 'rate_limited',
         rateLimitedAt: now,
         rateLimitStatus: 'active',
@@ -401,7 +432,7 @@ class CcrAccountService {
   async removeAccountRateLimit(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.ccr(accountId)
 
       // 获取账户当前状态和额度信息
       const [, quotaStoppedAt] = await client.hmget(accountKey, 'status', 'quotaStoppedAt')
@@ -440,7 +471,7 @@ class CcrAccountService {
   async isAccountRateLimited(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.ccr(accountId)
       const [rateLimitedAt, rateLimitDuration] = await client.hmget(
         accountKey,
         'rateLimitedAt',
@@ -482,12 +513,22 @@ class CcrAccountService {
         logger.info(
           `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountOverloaded`
         )
-        upstreamErrorHelper.recordErrorHistory(accountId, 'ccr', 529, 'overload').catch(() => {})
+        upstreamErrorHelper
+          .recordErrorHistory(
+            accountId,
+            'ccr',
+            529,
+            'overload',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_overload'
+            })
+          )
+          .catch(() => {})
         return { success: true, skipped: true }
       }
 
       const now = new Date().toISOString()
-      await client.hmset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, {
+      await client.hmset(RedisKeys.accounts.ccr(accountId), {
         status: 'overloaded',
         overloadedAt: now,
         errorMessage: 'Account overloaded'
@@ -505,7 +546,7 @@ class CcrAccountService {
   async removeAccountOverload(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.ccr(accountId)
 
       // 删除过载相关字段
       await client.hdel(accountKey, 'overloadedAt')
@@ -527,7 +568,7 @@ class CcrAccountService {
   async isAccountOverloaded(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.ccr(accountId)
       const status = await client.hget(accountKey, 'status')
       return status === 'overloaded'
     } catch (error) {
@@ -550,11 +591,21 @@ class CcrAccountService {
         logger.info(
           `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
         )
-        upstreamErrorHelper.recordErrorHistory(accountId, 'ccr', 401, 'auth_error').catch(() => {})
+        upstreamErrorHelper
+          .recordErrorHistory(
+            accountId,
+            'ccr',
+            401,
+            'auth_error',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_unauthorized'
+            })
+          )
+          .catch(() => {})
         return { success: true, skipped: true }
       }
 
-      await client.hmset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, {
+      await client.hmset(RedisKeys.accounts.ccr(accountId), {
         status: 'unauthorized',
         errorMessage: 'API key invalid or unauthorized'
       })
@@ -692,6 +743,8 @@ class CcrAccountService {
         return false
       }
 
+      // [人工决策-2026-06-02 23:30:05] 方案甲：预算独立轴，disableAutoProtection 不覆盖预算，配额始终标记
+
       const dailyQuota = parseFloat(account.dailyQuota || '0')
       // 如果未设置额度限制，则不限制
       if (dailyQuota <= 0) {
@@ -717,7 +770,7 @@ class CcrAccountService {
       if (isExceeded) {
         // 标记账户因额度停用
         const client = redis.getClientSafe()
-        await client.hmset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, {
+        await client.hmset(RedisKeys.accounts.ccr(accountId), {
           status: 'quota_exceeded',
           errorMessage: `Daily quota exceeded: $${dailyUsage.toFixed(2)} / $${dailyQuota.toFixed(2)}`,
           quotaStoppedAt: new Date().toISOString()
@@ -754,7 +807,7 @@ class CcrAccountService {
   async resetDailyUsage(accountId) {
     try {
       const client = redis.getClientSafe()
-      await client.hmset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, {
+      await client.hmset(RedisKeys.accounts.ccr(accountId), {
         dailyUsage: '0',
         lastResetDate: redis.getDateStringInTimezone(),
         quotaStoppedAt: ''
@@ -774,6 +827,8 @@ class CcrAccountService {
         return false
       }
 
+      // [人工决策-2026-06-02 23:30:05] 方案甲：预算独立轴，disableAutoProtection 不覆盖预算，配额始终生效
+
       const dailyQuota = parseFloat(account.dailyQuota || '0')
       // 如果未设置额度限制，则不限制
       if (dailyQuota <= 0) {
@@ -792,7 +847,7 @@ class CcrAccountService {
       if (isExceeded && !account.quotaStoppedAt) {
         // 标记账户因额度停用
         const client = redis.getClientSafe()
-        await client.hmset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, {
+        await client.hmset(RedisKeys.accounts.ccr(accountId), {
           status: 'quota_exceeded',
           errorMessage: `Daily quota exceeded: $${dailyUsage.toFixed(2)} / $${dailyQuota.toFixed(2)}`,
           quotaStoppedAt: new Date().toISOString()
@@ -870,7 +925,7 @@ class CcrAccountService {
       }
 
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.ccr(accountId)
 
       const updates = {
         status: 'active',

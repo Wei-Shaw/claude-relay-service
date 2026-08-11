@@ -6,6 +6,7 @@ const config = require('../../../config/config')
 const bedrockRelayService = require('../relay/bedrockRelayService')
 const LRUCache = require('../../utils/lruCache')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 class BedrockAccountService {
   constructor() {
@@ -43,7 +44,8 @@ class BedrockAccountService {
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
       schedulable = true, // 是否可被调度
       credentialType = 'access_key', // 'access_key', 'bearer_token'（默认为 access_key）
-      disableAutoProtection = false // 是否关闭自动防护（429/401/400/529 不自动禁用）
+      disableAutoProtection = false, // 是否关闭自动防护（429/401/400/529 不自动禁用）
+      proxy = null // 账户静态代理（对象，随账户 JSON 存储）
     } = options
 
     const accountId = uuidv4()
@@ -67,7 +69,8 @@ class BedrockAccountService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       type: 'bedrock', // 标识这是Bedrock账户
-      disableAutoProtection // 关闭自动防护
+      disableAutoProtection, // 关闭自动防护
+      proxy // 账户静态代理
     }
 
     // 加密存储AWS凭证
@@ -81,8 +84,8 @@ class BedrockAccountService {
     }
 
     const client = redis.getClientSafe()
-    await client.set(`bedrock_account:${accountId}`, JSON.stringify(accountData))
-    await redis.addToIndex('bedrock_account:index', accountId)
+    await client.set(RedisKeys.accounts.bedrock(accountId), JSON.stringify(accountData))
+    await redis.addToIndex(RedisKeys.accounts.bedrockIndex, accountId)
 
     logger.info(`✅ 创建Bedrock账户成功 - ID: ${accountId}, 名称: ${name}, 区域: ${region}`)
 
@@ -109,7 +112,7 @@ class BedrockAccountService {
   async getAccount(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountData = await client.get(`bedrock_account:${accountId}`)
+      const accountData = await client.get(RedisKeys.accounts.bedrock(accountId))
       if (!accountData) {
         return { success: false, error: 'Account not found' }
       }
@@ -214,11 +217,11 @@ class BedrockAccountService {
     try {
       const _client = redis.getClientSafe()
       const accountIds = await redis.getAllIdsByIndex(
-        'bedrock_account:index',
-        'bedrock_account:*',
+        RedisKeys.accounts.bedrockIndex,
+        RedisKeys.accounts.bedrockPattern,
         /^bedrock_account:(.+)$/
       )
-      const keys = accountIds.map((id) => `bedrock_account:${id}`)
+      const keys = accountIds.map((id) => RedisKeys.accounts.bedrock(id))
       const accounts = []
       const dataList = await redis.batchGetChunked(keys)
 
@@ -242,6 +245,10 @@ class BedrockAccountService {
 
             // ✅ 前端显示订阅过期时间（业务字段）
             expiresAt: account.subscriptionExpiresAt || null,
+
+            // 代理池绑定（供账户表单回显）
+            proxyGroupId: account.proxyGroupId || null,
+            proxyId: account.proxyId || null,
 
             createdAt: account.createdAt,
             updatedAt: account.updatedAt,
@@ -278,105 +285,156 @@ class BedrockAccountService {
 
   // ✏️ 更新账户信息
   async updateAccount(accountId, updates = {}) {
+    // 读-改-写需原子：bedrock 账户存为 JSON 字符串、只能整对象覆盖，并发写会互相丢更新。
+    // 用独立连接 WATCH/MULTI 乐观锁——WATCH 期间该 key 被任意写入方（含 create/delete/其它 update）改动，EXEC 即返回 null，重读重试
+    const key = RedisKeys.accounts.bedrock(accountId)
+    const txClient = redis.getClientSafe().duplicate()
+    // 是否开启 disableAutoProtection（仅依赖 updates，循环外算一次）
+    const enablingAutoProtection =
+      updates.disableAutoProtection === true || updates.disableAutoProtection === 'true'
+    const MAX_ATTEMPTS = 5
     try {
-      // 获取原始账户数据（不解密凭证）
-      const client = redis.getClientSafe()
-      const accountData = await client.get(`bedrock_account:${accountId}`)
-      if (!accountData) {
-        return { success: false, error: 'Account not found' }
-      }
-
-      const account = JSON.parse(accountData)
-
-      // 更新字段
-      if (updates.name !== undefined) {
-        account.name = updates.name
-      }
-      if (updates.description !== undefined) {
-        account.description = updates.description
-      }
-      if (updates.region !== undefined) {
-        account.region = updates.region
-      }
-      if (updates.defaultModel !== undefined) {
-        account.defaultModel = updates.defaultModel
-      }
-      if (updates.isActive !== undefined) {
-        account.isActive = updates.isActive
-      }
-      if (updates.accountType !== undefined) {
-        account.accountType = updates.accountType
-      }
-      if (updates.priority !== undefined) {
-        account.priority = updates.priority
-      }
-      if (updates.schedulable !== undefined) {
-        account.schedulable = updates.schedulable
-      }
-      if (updates.credentialType !== undefined) {
-        account.credentialType = updates.credentialType
-      }
-
-      // 更新AWS凭证
-      if (updates.awsCredentials !== undefined) {
-        if (updates.awsCredentials) {
-          account.awsCredentials = this._encryptAwsCredentials(updates.awsCredentials)
-        } else {
-          delete account.awsCredentials
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+        await txClient.watch(key)
+        // 获取原始账户数据（不解密凭证）
+        const accountData = await txClient.get(key)
+        if (!accountData) {
+          await txClient.unwatch()
+          return { success: false, error: 'Account not found' }
         }
-      } else if (account.awsCredentials && account.awsCredentials.accessKeyId) {
-        // 如果没有提供新凭证但现有凭证是明文格式，重新加密
-        const plainCredentials = account.awsCredentials
-        account.awsCredentials = this._encryptAwsCredentials(plainCredentials)
-        logger.info(`🔐 重新加密Bedrock账户凭证 - ID: ${accountId}`)
-      }
 
-      // 更新 Bearer Token
-      if (updates.bearerToken !== undefined) {
-        if (updates.bearerToken) {
-          account.bearerToken = this._encryptAwsCredentials({ token: updates.bearerToken })
-        } else {
-          delete account.bearerToken
+        const account = JSON.parse(accountData)
+
+        // 更新字段
+        if (updates.name !== undefined) {
+          account.name = updates.name
+        }
+        if (updates.description !== undefined) {
+          account.description = updates.description
+        }
+        if (updates.region !== undefined) {
+          account.region = updates.region
+        }
+        if (updates.defaultModel !== undefined) {
+          account.defaultModel = updates.defaultModel
+        }
+        if (updates.isActive !== undefined) {
+          account.isActive = updates.isActive
+        }
+        if (updates.accountType !== undefined) {
+          account.accountType = updates.accountType
+        }
+        if (updates.priority !== undefined) {
+          account.priority = updates.priority
+        }
+        if (updates.schedulable !== undefined) {
+          account.schedulable = updates.schedulable
+        }
+        if (updates.credentialType !== undefined) {
+          account.credentialType = updates.credentialType
+        }
+
+        // 更新AWS凭证
+        if (updates.awsCredentials !== undefined) {
+          if (updates.awsCredentials) {
+            account.awsCredentials = this._encryptAwsCredentials(updates.awsCredentials)
+          } else {
+            delete account.awsCredentials
+          }
+        } else if (account.awsCredentials && account.awsCredentials.accessKeyId) {
+          // 如果没有提供新凭证但现有凭证是明文格式，重新加密
+          const plainCredentials = account.awsCredentials
+          account.awsCredentials = this._encryptAwsCredentials(plainCredentials)
+          logger.info(`🔐 重新加密Bedrock账户凭证 - ID: ${accountId}`)
+        }
+
+        // 更新 Bearer Token
+        if (updates.bearerToken !== undefined) {
+          if (updates.bearerToken) {
+            account.bearerToken = this._encryptAwsCredentials({ token: updates.bearerToken })
+          } else {
+            delete account.bearerToken
+          }
+        }
+
+        // ✅ 直接保存 subscriptionExpiresAt（如果提供）
+        // Bedrock 没有 token 刷新逻辑，不会覆盖此字段
+        if (updates.subscriptionExpiresAt !== undefined) {
+          account.subscriptionExpiresAt = updates.subscriptionExpiresAt
+        }
+
+        // 自动防护开关
+        if (updates.disableAutoProtection !== undefined) {
+          account.disableAutoProtection = updates.disableAutoProtection
+        }
+
+        // 代理池绑定与静态代理（随账户更新一起持久化，bedrock 为 JSON，proxy 存对象）
+        if (updates.proxyGroupId !== undefined) {
+          account.proxyGroupId = updates.proxyGroupId
+        }
+        if (updates.proxyId !== undefined) {
+          account.proxyId = updates.proxyId
+        }
+        if (updates.proxy !== undefined) {
+          account.proxy = updates.proxy
+        }
+
+        // 开启 disableAutoProtection 时立即清理已有自动停用状态并恢复调度（手动停用不受影响）
+        if (enablingAutoProtection) {
+          const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(account)
+          if (recoveryPatch) {
+            Object.assign(account, recoveryPatch)
+          }
+        }
+
+        account.updatedAt = new Date().toISOString()
+
+        const execResult = await txClient.multi().set(key, JSON.stringify(account)).exec()
+        // EXEC 返回 null：WATCH 期间 key 被并发修改、事务被丢弃，重读重试
+        if (execResult === null) {
+          logger.warn(
+            `⚠️ Bedrock账户更新并发冲突，重试 - ID: ${accountId}, 第 ${attempt}/${MAX_ATTEMPTS} 次`
+          )
+          continue
+        }
+
+        if (enablingAutoProtection) {
+          await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'bedrock')
+        }
+
+        logger.info(`✅ 更新Bedrock账户成功 - ID: ${accountId}, 名称: ${account.name}`)
+
+        return {
+          success: true,
+          data: {
+            id: account.id,
+            name: account.name,
+            description: account.description,
+            region: account.region,
+            defaultModel: account.defaultModel,
+            isActive: account.isActive,
+            accountType: account.accountType,
+            priority: account.priority,
+            schedulable: account.schedulable,
+            credentialType: account.credentialType,
+            updatedAt: account.updatedAt,
+            type: 'bedrock'
+          }
         }
       }
 
-      // ✅ 直接保存 subscriptionExpiresAt（如果提供）
-      // Bedrock 没有 token 刷新逻辑，不会覆盖此字段
-      if (updates.subscriptionExpiresAt !== undefined) {
-        account.subscriptionExpiresAt = updates.subscriptionExpiresAt
-      }
-
-      // 自动防护开关
-      if (updates.disableAutoProtection !== undefined) {
-        account.disableAutoProtection = updates.disableAutoProtection
-      }
-
-      account.updatedAt = new Date().toISOString()
-
-      await client.set(`bedrock_account:${accountId}`, JSON.stringify(account))
-
-      logger.info(`✅ 更新Bedrock账户成功 - ID: ${accountId}, 名称: ${account.name}`)
-
-      return {
-        success: true,
-        data: {
-          id: account.id,
-          name: account.name,
-          description: account.description,
-          region: account.region,
-          defaultModel: account.defaultModel,
-          isActive: account.isActive,
-          accountType: account.accountType,
-          priority: account.priority,
-          schedulable: account.schedulable,
-          credentialType: account.credentialType,
-          updatedAt: account.updatedAt,
-          type: 'bedrock'
-        }
-      }
+      logger.error(
+        `❌ 更新Bedrock账户失败 - ID: ${accountId}, 并发冲突重试 ${MAX_ATTEMPTS} 次仍失败`
+      )
+      return { success: false, error: '账户更新存在并发冲突，请重试' }
     } catch (error) {
       logger.error(`❌ 更新Bedrock账户失败 - ID: ${accountId}`, error)
       return { success: false, error: error.message }
+    } finally {
+      // 独立事务连接用完即关；关闭失败也打印堆栈，不静默吞错
+      txClient.quit().catch((quitError) => {
+        logger.error(`释放 Bedrock 更新事务连接失败 - ID: ${accountId}`, quitError)
+      })
     }
   }
 
@@ -389,8 +447,8 @@ class BedrockAccountService {
       }
 
       const client = redis.getClientSafe()
-      await client.del(`bedrock_account:${accountId}`)
-      await redis.removeFromIndex('bedrock_account:index', accountId)
+      await client.del(RedisKeys.accounts.bedrock(accountId))
+      await redis.removeFromIndex(RedisKeys.accounts.bedrockIndex, accountId)
 
       logger.info(`✅ 删除Bedrock账户成功 - ID: ${accountId}`)
 

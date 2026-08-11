@@ -16,8 +16,14 @@ const AccountsView = () => import('@/views/AccountsView.vue')
 const AccountUsageRecordsView = () => import('@/views/AccountUsageRecordsView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
+const ApiStatsQueryTab = () => import('@/views/apistats/StatsTab.vue')
+const ApiStatsQuotaTab = () => import('@/views/apistats/QuotaTab.vue')
+const ApiStatsRechargeTab = () => import('@/views/apistats/RechargeTab.vue')
+const ApiStatsPricingTab = () => import('@/views/apistats/PricingTab.vue')
+const ApiStatsTutorialTab = () => import('@/views/apistats/TutorialTab.vue')
 const QuotaCardsView = () => import('@/views/QuotaCardsView.vue')
 const RequestDetailsView = () => import('@/views/RequestDetailsView.vue')
+const ProxyPoolView = () => import('@/views/ProxyPoolView.vue')
 
 const routes = [
   {
@@ -60,9 +66,60 @@ const routes = [
   },
   {
     path: '/api-stats',
-    name: 'ApiStats',
     component: ApiStatsView,
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: false },
+    children: [
+      {
+        path: '',
+        redirect: (to) => ({ name: 'ApiStatsQuery', query: to.query })
+      },
+      {
+        path: 'stats',
+        name: 'ApiStatsQuery',
+        component: ApiStatsQueryTab,
+        meta: { requiresAuth: false, tab: 'stats', subtitle: 'API Key 使用统计' }
+      },
+      {
+        path: 'quota',
+        name: 'ApiStatsQuota',
+        component: ApiStatsQuotaTab,
+        meta: {
+          requiresAuth: false,
+          tab: 'quota',
+          subtitle: '额度卡',
+          quotaSubTab: 'redeem'
+        }
+      },
+      {
+        path: 'quota/history',
+        name: 'ApiStatsQuotaHistory',
+        component: ApiStatsQuotaTab,
+        meta: {
+          requiresAuth: false,
+          tab: 'quota',
+          subtitle: '额度卡',
+          quotaSubTab: 'history'
+        }
+      },
+      {
+        path: 'recharge',
+        name: 'ApiStatsRecharge',
+        component: ApiStatsRechargeTab,
+        meta: { requiresAuth: false, tab: 'recharge', subtitle: '充值' }
+      },
+      {
+        path: 'pricing',
+        name: 'ApiStatsPricing',
+        component: ApiStatsPricingTab,
+        meta: { requiresAuth: false, tab: 'pricing', subtitle: '模型价格' }
+      },
+      {
+        path: 'tutorial',
+        name: 'ApiStatsTutorial',
+        component: ApiStatsTutorialTab,
+        meta: { requiresAuth: false, tab: 'tutorial', subtitle: '使用教程' }
+      }
+    ]
   },
   {
     path: '/dashboard',
@@ -131,8 +188,17 @@ const routes = [
     children: [
       {
         path: '',
+        redirect: (to) => ({
+          name: 'Settings',
+          params: { section: 'branding' },
+          query: to.query
+        })
+      },
+      {
+        path: ':section',
         name: 'Settings',
-        component: SettingsView
+        component: SettingsView,
+        meta: { requiresAuth: true }
       }
     ]
   },
@@ -161,6 +227,18 @@ const routes = [
     ]
   },
   {
+    path: '/payment-manage',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'PaymentManage',
+        component: () => import('@/views/PaymentManageView.vue')
+      }
+    ]
+  },
+  {
     path: '/request-details',
     component: MainLayout,
     meta: { requiresAuth: true },
@@ -169,6 +247,18 @@ const routes = [
         path: '',
         name: 'RequestDetails',
         component: RequestDetailsView
+      }
+    ]
+  },
+  {
+    path: '/proxy-pool',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'ProxyPool',
+        component: ProxyPoolView
       }
     ]
   },

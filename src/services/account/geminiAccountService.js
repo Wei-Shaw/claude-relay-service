@@ -17,32 +17,22 @@ const {
 const tokenRefreshService = require('../tokenRefreshService')
 const { createEncryptor } = require('../../utils/commonHelper')
 const antigravityClient = require('../antigravityClient')
-
-// Gemini 账户键前缀
-const GEMINI_ACCOUNT_KEY_PREFIX = 'gemini_account:'
-const SHARED_GEMINI_ACCOUNTS_KEY = 'shared_gemini_accounts'
-const ACCOUNT_SESSION_MAPPING_PREFIX = 'gemini_session_account_mapping:'
+const { RedisKeys } = require('../../constants/redisKeys')
 
 // Gemini OAuth 配置 - 支持 Gemini CLI 与 Antigravity 两种 OAuth 应用
 const OAUTH_PROVIDER_GEMINI_CLI = 'gemini-cli'
 const OAUTH_PROVIDER_ANTIGRAVITY = 'antigravity'
 
+// OAuth clientId/clientSecret 只从环境变量读取，禁止硬编码（GitHub push protection 会拦截）
 const OAUTH_PROVIDERS = {
   [OAUTH_PROVIDER_GEMINI_CLI]: {
-    // Gemini CLI OAuth 配置（公开）
-    clientId:
-      process.env.GEMINI_OAUTH_CLIENT_ID ||
-      '681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com',
-    clientSecret: process.env.GEMINI_OAUTH_CLIENT_SECRET || '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',
+    clientId: process.env.GEMINI_OAUTH_CLIENT_ID,
+    clientSecret: process.env.GEMINI_OAUTH_CLIENT_SECRET,
     scopes: ['https://www.googleapis.com/auth/cloud-platform']
   },
   [OAUTH_PROVIDER_ANTIGRAVITY]: {
-    // Antigravity OAuth 配置（参考 gcli2api）
-    clientId:
-      process.env.ANTIGRAVITY_OAUTH_CLIENT_ID ||
-      '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com',
-    clientSecret:
-      process.env.ANTIGRAVITY_OAUTH_CLIENT_SECRET || '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',
+    clientId: process.env.ANTIGRAVITY_OAUTH_CLIENT_ID,
+    clientSecret: process.env.ANTIGRAVITY_OAUTH_CLIENT_SECRET,
     scopes: [
       'https://www.googleapis.com/auth/cloud-platform',
       'https://www.googleapis.com/auth/userinfo.email',
@@ -51,17 +41,6 @@ const OAUTH_PROVIDERS = {
       'https://www.googleapis.com/auth/experimentsandconfigs'
     ]
   }
-}
-
-if (!process.env.GEMINI_OAUTH_CLIENT_SECRET) {
-  logger.warn(
-    '⚠️ GEMINI_OAUTH_CLIENT_SECRET 未设置，使用内置默认值（建议在生产环境通过环境变量覆盖）'
-  )
-}
-if (!process.env.ANTIGRAVITY_OAUTH_CLIENT_SECRET) {
-  logger.warn(
-    '⚠️ ANTIGRAVITY_OAUTH_CLIENT_SECRET 未设置，使用内置默认值（建议在生产环境通过环境变量覆盖）'
-  )
 }
 
 function normalizeOauthProvider(oauthProvider) {
@@ -73,9 +52,28 @@ function normalizeOauthProvider(oauthProvider) {
     : OAUTH_PROVIDER_GEMINI_CLI
 }
 
-function getOauthProviderConfig(oauthProvider) {
+// requireCredentials=true：授权/换 token/刷新 等真 OAuth 路径必须有完整 env
+// requireCredentials=false：允许双空（无凭证直转发）；半套 env 一律 fail-fast，禁止静默降级
+function getOauthProviderConfig(oauthProvider, { requireCredentials = true } = {}) {
   const normalized = normalizeOauthProvider(oauthProvider)
-  return OAUTH_PROVIDERS[normalized] || OAUTH_PROVIDERS[OAUTH_PROVIDER_GEMINI_CLI]
+  const config = OAUTH_PROVIDERS[normalized] || OAUTH_PROVIDERS[OAUTH_PROVIDER_GEMINI_CLI]
+  const hasClientId = !!config.clientId
+  const hasClientSecret = !!config.clientSecret
+  const envPrefix = normalized === OAUTH_PROVIDER_ANTIGRAVITY ? 'ANTIGRAVITY_OAUTH' : 'GEMINI_OAUTH'
+
+  // 半套配置（只配了 ID 或只配了 SECRET）一律报错，避免被当成“无凭证”静默降级
+  if (hasClientId !== hasClientSecret) {
+    throw new Error(
+      `${envPrefix}_CLIENT_ID / ${envPrefix}_CLIENT_SECRET 必须成对配置，当前只配置了其中一个`
+    )
+  }
+
+  if (requireCredentials && (!hasClientId || !hasClientSecret)) {
+    throw new Error(
+      `${envPrefix}_CLIENT_ID / ${envPrefix}_CLIENT_SECRET 未配置，无法进行 Gemini OAuth`
+    )
+  }
+  return config
 }
 
 // 🌐 TCP Keep-Alive Agent 配置
@@ -215,10 +213,16 @@ setInterval(
 )
 
 // 创建 OAuth2 客户端（支持代理配置）
-function createOAuth2Client(redirectUri = null, proxyConfig = null, oauthProvider = null) {
+// requireCredentials：授权/换 token/刷新 必须 true；持有现成 access_token 的转发可为 false
+function createOAuth2Client(
+  redirectUri = null,
+  proxyConfig = null,
+  oauthProvider = null,
+  { requireCredentials = true } = {}
+) {
   // 如果没有提供 redirectUri，使用默认值
   const uri = redirectUri || 'http://localhost:45462'
-  const oauthConfig = getOauthProviderConfig(oauthProvider)
+  const oauthConfig = getOauthProviderConfig(oauthProvider, { requireCredentials })
 
   // 准备客户端选项
   const clientOptions = {
@@ -284,58 +288,6 @@ async function generateAuthUrl(
     codeVerifier: codeVerifier.codeVerifier,
     redirectUri: finalRedirectUri,
     oauthProvider: normalizedProvider
-  }
-}
-
-// 轮询检查 OAuth 授权状态
-async function pollAuthorizationStatus(sessionId, maxAttempts = 60, interval = 2000) {
-  let attempts = 0
-  const client = redisClient.getClientSafe()
-
-  while (attempts < maxAttempts) {
-    try {
-      const sessionData = await client.get(`oauth_session:${sessionId}`)
-      if (!sessionData) {
-        throw new Error('OAuth session not found')
-      }
-
-      const session = JSON.parse(sessionData)
-      if (session.code) {
-        // 授权码已获取，交换 tokens
-        const tokens = await exchangeCodeForTokens(session.code)
-
-        // 清理 session
-        await client.del(`oauth_session:${sessionId}`)
-
-        return {
-          success: true,
-          tokens
-        }
-      }
-
-      if (session.error) {
-        // 授权失败
-        await client.del(`oauth_session:${sessionId}`)
-        return {
-          success: false,
-          error: session.error
-        }
-      }
-
-      // 等待下一次轮询
-      await new Promise((resolve) => setTimeout(resolve, interval))
-      attempts++
-    } catch (error) {
-      logger.error('Error polling authorization status:', error)
-      throw error
-    }
-  }
-
-  // 超时
-  await client.del(`oauth_session:${sessionId}`)
-  return {
-    success: false,
-    error: 'Authorization timeout'
   }
 }
 
@@ -445,7 +397,8 @@ async function createAccount(accountData) {
   const id = uuidv4()
   const now = new Date().toISOString()
   const oauthProvider = normalizeOauthProvider(accountData.oauthProvider)
-  const oauthConfig = getOauthProviderConfig(oauthProvider)
+  // 创建/导入只需要 scopes，不强制 OAuth 凭证 env
+  const oauthConfig = getOauthProviderConfig(oauthProvider, { requireCredentials: false })
 
   // 处理凭证数据
   let geminiOauth = null
@@ -539,12 +492,12 @@ async function createAccount(accountData) {
 
   // 保存到 Redis
   const client = redisClient.getClientSafe()
-  await client.hset(`${GEMINI_ACCOUNT_KEY_PREFIX}${id}`, account)
-  await redisClient.addToIndex('gemini_account:index', id)
+  await client.hset(RedisKeys.accounts.gemini(id), account)
+  await redisClient.addToIndex(RedisKeys.accounts.geminiIndex, id)
 
   // 如果是共享账户，添加到共享账户集合
   if (account.accountType === 'shared') {
-    await client.sadd(SHARED_GEMINI_ACCOUNTS_KEY, id)
+    await client.sadd(RedisKeys.accounts.sharedGemini, id)
   }
 
   logger.info(`Created Gemini account: ${id}`)
@@ -565,7 +518,7 @@ async function createAccount(accountData) {
 // 获取账户
 async function getAccount(accountId) {
   const client = redisClient.getClientSafe()
-  const accountData = await client.hgetall(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`)
+  const accountData = await client.hgetall(RedisKeys.accounts.gemini(accountId))
 
   if (!accountData || Object.keys(accountData).length === 0) {
     return null
@@ -650,9 +603,9 @@ async function updateAccount(accountId, updates) {
   const client = redisClient.getClientSafe()
   if (updates.accountType && updates.accountType !== existingAccount.accountType) {
     if (updates.accountType === 'shared') {
-      await client.sadd(SHARED_GEMINI_ACCOUNTS_KEY, accountId)
+      await client.sadd(RedisKeys.accounts.sharedGemini, accountId)
     } else {
-      await client.srem(SHARED_GEMINI_ACCOUNTS_KEY, accountId)
+      await client.srem(RedisKeys.accounts.sharedGemini, accountId)
     }
   }
 
@@ -679,6 +632,15 @@ async function updateAccount(accountId, updates) {
       updates.disableAutoProtection === true || updates.disableAutoProtection === 'true'
         ? 'true'
         : 'false'
+  }
+
+  // 开启 disableAutoProtection 时立即清理已有自动停用状态并恢复调度（手动停用不受影响）
+  const enablingAutoProtection = updates.disableAutoProtection === 'true'
+  if (enablingAutoProtection) {
+    const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(existingAccount)
+    if (recoveryPatch) {
+      Object.assign(updates, recoveryPatch)
+    }
   }
 
   // 如果通过 geminiOauth 更新，也要检查是否新增了 refresh token
@@ -721,7 +683,11 @@ async function updateAccount(accountId, updates) {
     }
   }
 
-  await client.hset(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+  await client.hset(RedisKeys.accounts.gemini(accountId), updates)
+
+  if (enablingAutoProtection) {
+    await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'gemini')
+  }
 
   logger.info(`Updated Gemini account: ${accountId}`)
 
@@ -749,20 +715,20 @@ async function deleteAccount(accountId) {
 
   // 从 Redis 删除
   const client = redisClient.getClientSafe()
-  await client.del(`${GEMINI_ACCOUNT_KEY_PREFIX}${accountId}`)
-  await redisClient.removeFromIndex('gemini_account:index', accountId)
+  await client.del(RedisKeys.accounts.gemini(accountId))
+  await redisClient.removeFromIndex(RedisKeys.accounts.geminiIndex, accountId)
 
   // 从共享账户集合中移除
   if (account.accountType === 'shared') {
-    await client.srem(SHARED_GEMINI_ACCOUNTS_KEY, accountId)
+    await client.srem(RedisKeys.accounts.sharedGemini, accountId)
   }
 
   // 清理会话映射（使用反向索引）
-  const sessionHashes = await client.smembers(`gemini_account_sessions:${accountId}`)
+  const sessionHashes = await client.smembers(RedisKeys.session.geminiAccountSessions(accountId))
   if (sessionHashes.length > 0) {
     const pipeline = client.pipeline()
-    sessionHashes.forEach((hash) => pipeline.del(`${ACCOUNT_SESSION_MAPPING_PREFIX}${hash}`))
-    pipeline.del(`gemini_account_sessions:${accountId}`)
+    sessionHashes.forEach((hash) => pipeline.del(RedisKeys.session.geminiMapping(hash)))
+    pipeline.del(RedisKeys.session.geminiAccountSessions(accountId))
     await pipeline.exec()
   }
 
@@ -774,11 +740,11 @@ async function deleteAccount(accountId) {
 async function getAllAccounts() {
   const _client = redisClient.getClientSafe()
   const accountIds = await redisClient.getAllIdsByIndex(
-    'gemini_account:index',
-    `${GEMINI_ACCOUNT_KEY_PREFIX}*`,
+    RedisKeys.accounts.geminiIndex,
+    RedisKeys.accounts.geminiPattern,
     /^gemini_account:(.+)$/
   )
-  const keys = accountIds.map((id) => `${GEMINI_ACCOUNT_KEY_PREFIX}${id}`)
+  const keys = accountIds.map((id) => RedisKeys.accounts.gemini(id))
   const accounts = []
   const dataList = await redisClient.batchHgetallChunked(keys)
 
@@ -850,7 +816,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   // 首先检查是否有粘性会话
   const client = redisClient.getClientSafe()
   if (sessionHash) {
-    const mappedAccountId = await client.get(`${ACCOUNT_SESSION_MAPPING_PREFIX}${sessionHash}`)
+    const mappedAccountId = await client.get(RedisKeys.session.geminiMapping(sessionHash))
 
     if (mappedAccountId) {
       const account = await getAccount(mappedAccountId)
@@ -862,7 +828,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   }
 
   // 获取 API Key 信息
-  const apiKeyData = await client.hgetall(`api_key:${apiKeyId}`)
+  const apiKeyData = await client.hgetall(RedisKeys.apiKey.legacyData(apiKeyId))
 
   // 检查是否绑定了 Gemini 账户
   if (apiKeyData.geminiAccountId) {
@@ -882,12 +848,12 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
       // 创建粘性会话映射
       if (sessionHash) {
         await client.setex(
-          `${ACCOUNT_SESSION_MAPPING_PREFIX}${sessionHash}`,
+          RedisKeys.session.geminiMapping(sessionHash),
           3600, // 1小时过期
           account.id
         )
-        await client.sadd(`gemini_account_sessions:${account.id}`, sessionHash)
-        await client.expire(`gemini_account_sessions:${account.id}`, 3600)
+        await client.sadd(RedisKeys.session.geminiAccountSessions(account.id), sessionHash)
+        await client.expire(RedisKeys.session.geminiAccountSessions(account.id), 3600)
       }
 
       return account
@@ -895,7 +861,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   }
 
   // 从共享账户池选择
-  const sharedAccountIds = await client.smembers(SHARED_GEMINI_ACCOUNTS_KEY)
+  const sharedAccountIds = await client.smembers(RedisKeys.accounts.sharedGemini)
   const availableAccounts = []
 
   for (const accountId of sharedAccountIds) {
@@ -946,9 +912,9 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
 
   // 创建粘性会话映射
   if (sessionHash) {
-    await client.setex(`${ACCOUNT_SESSION_MAPPING_PREFIX}${sessionHash}`, 3600, selectedAccount.id)
-    await client.sadd(`gemini_account_sessions:${selectedAccount.id}`, sessionHash)
-    await client.expire(`gemini_account_sessions:${selectedAccount.id}`, 3600)
+    await client.setex(RedisKeys.session.geminiMapping(sessionHash), 3600, selectedAccount.id)
+    await client.sadd(RedisKeys.session.geminiAccountSessions(selectedAccount.id), sessionHash)
+    await client.expire(RedisKeys.session.geminiAccountSessions(selectedAccount.id), 3600)
   }
 
   return selectedAccount
@@ -1023,7 +989,10 @@ async function refreshAccountToken(accountId) {
       // 重新获取账户数据（可能已被其他进程刷新）
       const updatedAccount = await getAccount(accountId)
       if (updatedAccount && updatedAccount.accessToken) {
-        const oauthConfig = getOauthProviderConfig(updatedAccount.oauthProvider)
+        // 仅回填 scope，不触发凭证校验（真正刷新走 refreshAccessToken）
+        const oauthConfig = getOauthProviderConfig(updatedAccount.oauthProvider, {
+          requireCredentials: false
+        })
         const accessToken = decrypt(updatedAccount.accessToken)
         return {
           access_token: accessToken,
@@ -1084,10 +1053,29 @@ async function refreshAccountToken(accountId) {
     // 标记账户为错误状态（只有在账户存在时）
     if (account) {
       try {
-        await updateAccount(accountId, {
-          status: 'error',
-          errorMessage: error.message
-        })
+        // disableAutoProtection：关闭自动防护时不把账户写成 error（保持可调度、透传上游错误）
+        if (account.disableAutoProtection === true || account.disableAutoProtection === 'true') {
+          logger.info(
+            `🛡️ Gemini account ${accountId} has auto-protection disabled, skipping error status on token refresh failure`
+          )
+          upstreamErrorHelper
+            .recordErrorHistory(
+              accountId,
+              'gemini',
+              0,
+              'token_refresh_failed',
+              upstreamErrorHelper.buildErrorContext({
+                reason: 'token_refresh_failed',
+                message: error.message
+              })
+            )
+            .catch(() => {})
+        } else {
+          await updateAccount(accountId, {
+            status: 'error',
+            errorMessage: error.message
+          })
+        }
 
         // 发送Webhook通知
         try {
@@ -1126,6 +1114,31 @@ async function markAccountUsed(accountId) {
 
 // 设置账户限流状态
 async function setAccountRateLimited(accountId, isLimited = true) {
+  // disableAutoProtection 检查（仅在设置限流时）：跳过限流标记，仅记录错误历史
+  if (isLimited) {
+    const account = await getAccount(accountId)
+    if (
+      account &&
+      (account.disableAutoProtection === true || account.disableAutoProtection === 'true')
+    ) {
+      logger.info(
+        `🛡️ Account ${accountId} has auto-protection disabled, skipping setAccountRateLimited`
+      )
+      upstreamErrorHelper
+        .recordErrorHistory(
+          accountId,
+          'gemini',
+          429,
+          'rate_limit',
+          upstreamErrorHelper.buildErrorContext({
+            reason: 'auto_protection_disabled_rate_limit'
+          })
+        )
+        .catch(() => {})
+      return
+    }
+  }
+
   const updates = isLimited
     ? {
         rateLimitStatus: 'limited',
@@ -1179,17 +1192,24 @@ async function getAccountRateLimitInfo(accountId) {
 }
 
 // 获取配置的OAuth客户端 - 参考GeminiCliSimulator的getOauthClient方法（支持代理）
+// 有 CLIENT_ID/SECRET 时：强制 refresh 拿新 token（旧行为）
+// 无凭证 env 时：不触发 refresh，直接使用账户已有 access_token 转发（secret 移除后的兼容）
 async function getOauthClient(accessToken, refreshToken, proxyConfig = null, oauthProvider = null) {
   const normalizedProvider = normalizeOauthProvider(oauthProvider)
-  const oauthConfig = getOauthProviderConfig(normalizedProvider)
-  const client = createOAuth2Client(null, proxyConfig, normalizedProvider)
+  const oauthConfig = getOauthProviderConfig(normalizedProvider, { requireCredentials: false })
+  const hasClientCreds = !!(oauthConfig.clientId && oauthConfig.clientSecret)
+  const client = createOAuth2Client(null, proxyConfig, normalizedProvider, {
+    requireCredentials: false
+  })
 
   const creds = {
     access_token: accessToken,
     refresh_token: refreshToken,
     scope: oauthConfig.scopes.join(' '),
     token_type: 'Bearer',
-    expiry_date: 1754269905646
+    // 有 client 凭证时设过去时间，驱动 google-auth-library 走 refresh
+    // 无凭证时设未来时间，避免 isTokenExpiring 触发无 client_secret 的 refresh
+    expiry_date: hasClientCreds ? 1754269905646 : Date.now() + 60 * 60 * 1000
   }
 
   if (proxyConfig) {
@@ -1886,7 +1906,6 @@ async function resetAccountStatus(accountId) {
 
 module.exports = {
   generateAuthUrl,
-  pollAuthorizationStatus,
   exchangeCodeForTokens,
   refreshAccessToken,
   createAccount,

@@ -21,7 +21,7 @@
               API Keys 概况
             </span>
             <span
-              class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-800 dark:text-blue-200"
+              class="rounded-full bg-blue-100 px-2 py-1 text-sm font-semibold text-blue-700 dark:bg-blue-800 dark:text-blue-200"
             >
               {{ aggregatedStats.activeKeys }}/{{ aggregatedStats.totalKeys }}
             </span>
@@ -31,13 +31,13 @@
               <div class="text-lg font-bold text-gray-900 dark:text-gray-100">
                 {{ aggregatedStats.totalKeys }}
               </div>
-              <div class="text-xs text-gray-600 dark:text-gray-400">总计 Keys</div>
+              <div class="text-sm text-gray-600 dark:text-gray-400">总计 Keys</div>
             </div>
             <div class="text-center">
               <div class="text-lg font-bold text-green-600">
                 {{ aggregatedStats.activeKeys }}
               </div>
-              <div class="text-xs text-gray-600 dark:text-gray-400">激活 Keys</div>
+              <div class="text-sm text-gray-600 dark:text-gray-400">激活 Keys</div>
             </div>
           </div>
         </div>
@@ -52,7 +52,7 @@
           </div>
           <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-xs text-gray-600 dark:text-gray-400">
+              <span class="text-sm text-gray-600 dark:text-gray-400">
                 <i class="fas fa-database mr-1 text-gray-400" />
                 总请求数
               </span>
@@ -61,7 +61,7 @@
               </span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-xs text-gray-600 dark:text-gray-400">
+              <span class="text-sm text-gray-600 dark:text-gray-400">
                 <i class="fas fa-coins mr-1 text-yellow-500" />
                 总 Tokens
               </span>
@@ -70,7 +70,7 @@
               </span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-xs text-gray-600 dark:text-gray-400">
+              <span class="text-sm text-gray-600 dark:text-gray-400">
                 <i class="fas fa-dollar-sign mr-1 text-green-500" />
                 总费用
               </span>
@@ -94,7 +94,7 @@
 
         <!-- 提示信息 -->
         <div
-          class="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          class="rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-400"
         >
           <i class="fas fa-info-circle mr-1" />
           每个 API Key 有独立的限制设置，聚合模式下不显示单个限制配置
@@ -109,7 +109,7 @@
             <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
               >每日费用限制</span
             >
-            <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+            <span class="text-sm text-gray-500 dark:text-gray-400 md:text-sm">
               <span v-if="statsData.limits.dailyCostLimit > 0">
                 ${{ statsData.limits.currentDailyCost.toFixed(4) }} / ${{
                   statsData.limits.dailyCostLimit.toFixed(2)
@@ -141,7 +141,7 @@
             <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
               >总费用限制</span
             >
-            <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+            <span class="text-sm text-gray-500 dark:text-gray-400 md:text-sm">
               <span v-if="statsData.limits.totalCostLimit > 0">
                 ${{ statsData.limits.currentTotalCost.toFixed(4) }} / ${{
                   statsData.limits.totalCostLimit.toFixed(2)
@@ -173,7 +173,7 @@
             <span class="text-sm font-medium text-gray-600 dark:text-gray-400 md:text-base"
               >Claude 模型周费用限制</span
             >
-            <span class="text-xs text-gray-500 dark:text-gray-400 md:text-sm">
+            <span class="text-sm text-gray-500 dark:text-gray-400 md:text-sm">
               ${{ statsData.limits.weeklyOpusCost.toFixed(4) }} / ${{
                 statsData.limits.weeklyOpusCostLimit.toFixed(2)
               }}
@@ -188,7 +188,7 @@
           </div>
           <p
             v-if="statsData.limits.weeklyResetDay"
-            class="mt-1 text-xs text-gray-400 dark:text-gray-500"
+            class="mt-1 text-sm text-gray-400 dark:text-gray-500"
           >
             每{{
               ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][
@@ -224,7 +224,7 @@
             :window-start-time="statsData.limits.windowStartTime"
           />
 
-          <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
             <i class="fas fa-info-circle mr-1" />
             <span v-if="statsData.limits.rateLimitCost > 0">
               请求次数和费用限制为"或"的关系，任一达到限制即触发限流
@@ -253,11 +253,11 @@
             <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">模型限制</span>
             <span class="text-sm font-medium text-gray-900 md:text-base">
               <span v-if="hasModelRestrictions" class="text-orange-600">
-                <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
+                <i class="fas fa-exclamation-triangle mr-1 text-sm md:text-sm" />
                 限制 {{ statsData.restrictions.restrictedModels.length }} 个模型
               </span>
               <span v-else class="text-green-600">
-                <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
+                <i class="fas fa-check-circle mr-1 text-sm md:text-sm" />
                 允许所有模型
               </span>
             </span>
@@ -267,11 +267,11 @@
               <span class="text-sm text-gray-600 dark:text-gray-400 md:text-base">客户端限制</span>
               <span class="text-sm font-medium text-gray-900 md:text-base">
                 <span v-if="hasClientRestrictions" class="text-orange-600">
-                  <i class="fas fa-exclamation-triangle mr-1 text-xs md:text-sm" />
+                  <i class="fas fa-exclamation-triangle mr-1 text-sm md:text-sm" />
                   限 {{ statsData.restrictions.allowedClients.length }} 种客户端使用
                 </span>
                 <span v-else class="text-green-600">
-                  <i class="fas fa-check-circle mr-1 text-xs md:text-sm" />
+                  <i class="fas fa-check-circle mr-1 text-sm md:text-sm" />
                   允许所有客户端
                 </span>
               </span>
@@ -283,7 +283,7 @@
               <span
                 v-for="client in statsData.restrictions.allowedClients"
                 :key="client"
-                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-blue-700 shadow-sm dark:bg-gray-800 dark:text-blue-300 md:text-sm"
+                class="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-sm text-blue-700 shadow-sm dark:bg-gray-800 dark:text-blue-300 md:text-sm"
               >
                 <i class="fas fa-id-badge" />
                 {{ client }}
@@ -309,20 +309,20 @@
         <h4
           class="mb-2 flex items-center text-sm font-bold text-amber-800 dark:text-amber-300 md:mb-3 md:text-base"
         >
-          <i class="fas fa-robot mr-1 text-xs md:mr-2 md:text-sm" />
+          <i class="fas fa-robot mr-1 text-sm md:mr-2 md:text-sm" />
           受限模型列表
         </h4>
         <div class="max-h-64 space-y-1 overflow-y-auto pr-1 md:max-h-80 md:space-y-2">
           <div
             v-for="model in statsData.restrictions.restrictedModels"
             :key="model"
-            class="rounded border border-amber-200 bg-white px-2 py-1 text-xs dark:border-amber-700 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
+            class="rounded border border-amber-200 bg-white px-2 py-1 text-sm dark:border-amber-700 dark:bg-gray-800 md:px-3 md:py-2 md:text-sm"
           >
-            <i class="fas fa-ban mr-1 text-xs text-red-500 md:mr-2" />
+            <i class="fas fa-ban mr-1 text-sm text-red-500 md:mr-2" />
             <span class="break-all text-gray-800 dark:text-gray-200">{{ model }}</span>
           </div>
         </div>
-        <p class="mt-2 text-xs text-amber-700 dark:text-amber-400 md:mt-3">
+        <p class="mt-2 text-sm text-amber-700 dark:text-amber-400 md:mt-3">
           <i class="fas fa-info-circle mr-1" />
           此 API Key 不能访问以上列出的模型
         </p>

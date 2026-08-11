@@ -78,24 +78,41 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 把 OEM 数据应用到状态/页头/标题/favicon；保存成功后可用 PUT 返回的归一化数据直接同步，无需二次 GET（也就没有 GET 失败却提示成功的窗口）
+  function applyOemSettings(data) {
+    if (!data) {
+      return
+    }
+    oemSettings.value = { ...oemSettings.value, ...data }
+
+    // 图标字段存在才处理：有值则创建/更新 favicon；被清空（重置/删除图标）则移除动态 link，回退浏览器默认（项目无默认 favicon 文件）
+    if ('siteIcon' in data || 'siteIconData' in data) {
+      const iconHref = data.siteIconData || data.siteIcon
+      const existing = document.querySelector("link[rel*='icon']")
+      if (iconHref) {
+        const link = existing || document.createElement('link')
+        link.type = 'image/x-icon'
+        link.rel = 'shortcut icon'
+        link.href = iconHref
+        if (!existing) {
+          document.getElementsByTagName('head')[0].appendChild(link)
+        }
+      } else if (existing) {
+        existing.remove()
+      }
+    }
+
+    if (data.siteName) {
+      document.title = `${data.siteName} - 管理后台`
+    }
+  }
+
   async function loadOemSettings() {
     oemLoading.value = true
     try {
       const result = await getOemSettingsApi()
       if (result.success && result.data) {
-        oemSettings.value = { ...oemSettings.value, ...result.data }
-
-        if (result.data.siteIconData || result.data.siteIcon) {
-          const link = document.querySelector("link[rel*='icon']") || document.createElement('link')
-          link.type = 'image/x-icon'
-          link.rel = 'shortcut icon'
-          link.href = result.data.siteIconData || result.data.siteIcon
-          document.getElementsByTagName('head')[0].appendChild(link)
-        }
-
-        if (result.data.siteName) {
-          document.title = `${result.data.siteName} - 管理后台`
-        }
+        applyOemSettings(result.data)
       }
     } catch (error) {
       console.error('加载OEM设置失败:', error)
@@ -123,6 +140,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     checkAuth,
-    loadOemSettings
+    loadOemSettings,
+    applyOemSettings
   }
 })

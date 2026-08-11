@@ -1,6 +1,6 @@
 <template>
-  <Teleport to="body">
-    <div class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
+  <ModalTransition @after-leave="onClosed">
+    <div v-if="visible" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto p-8"
       >
@@ -50,7 +50,7 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-blue-600">创建数量</p>
+                <p class="text-sm font-medium text-blue-600">创建数量</p>
                 <p class="mt-1 text-2xl font-bold text-blue-900">
                   {{ apiKeys.length }}
                 </p>
@@ -68,7 +68,7 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-green-600">基础名称</p>
+                <p class="text-sm font-medium text-green-600">基础名称</p>
                 <p class="mt-1 truncate text-lg font-bold text-green-900">
                   {{ baseName }}
                 </p>
@@ -86,7 +86,7 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-purple-600">权限范围</p>
+                <p class="text-sm font-medium text-purple-600">权限范围</p>
                 <p class="mt-1 text-lg font-bold text-purple-900">
                   {{ getPermissionText() }}
                 </p>
@@ -104,7 +104,7 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-xs font-medium text-orange-600">过期时间</p>
+                <p class="text-sm font-medium text-orange-600">过期时间</p>
                 <p class="mt-1 text-lg font-bold text-orange-900">
                   {{ getExpiryText() }}
                 </p>
@@ -124,14 +124,14 @@
             <label class="text-sm font-semibold text-gray-700">API Keys 预览</label>
             <div class="flex items-center gap-2">
               <button
-                class="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                class="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
                 type="button"
                 @click="togglePreview"
               >
                 <i :class="['fas', showPreview ? 'fa-eye-slash' : 'fa-eye']" />
                 {{ showPreview ? '隐藏' : '显示' }}预览
               </button>
-              <span class="text-xs text-gray-500">（最多显示前10个）</span>
+              <span class="text-sm text-gray-500">（最多显示前10个）</span>
             </div>
           </div>
 
@@ -139,7 +139,7 @@
             v-if="showPreview"
             class="custom-scrollbar max-h-48 overflow-y-auto rounded-lg bg-gray-900 p-4"
           >
-            <pre class="font-mono text-xs text-gray-300">{{ getPreviewText() }}</pre>
+            <pre class="font-mono text-sm text-gray-300">{{ getPreviewText() }}</pre>
           </div>
         </div>
 
@@ -162,7 +162,7 @@
 
         <!-- 额外提示 -->
         <div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-          <p class="flex items-start text-xs text-blue-700">
+          <p class="flex items-start text-sm text-blue-700">
             <i class="fas fa-info-circle mr-2 mt-0.5 flex-shrink-0" />
             <span>
               下载的文件格式为文本文件（.txt），每行包含一个 API Key。
@@ -172,23 +172,25 @@
         </div>
       </div>
     </div>
+  </ModalTransition>
 
-    <!-- ConfirmModal -->
-    <ConfirmModal
-      :cancel-text="confirmModalConfig.cancelText"
-      :confirm-text="confirmModalConfig.confirmText"
-      :message="confirmModalConfig.message"
-      :show="showConfirmModal"
-      :title="confirmModalConfig.title"
-      :type="confirmModalConfig.type"
-      @cancel="handleCancelModal"
-      @confirm="handleConfirmModal"
-    />
-  </Teleport>
+  <!-- ConfirmModal -->
+  <ConfirmModal
+    :cancel-text="confirmModalConfig.cancelText"
+    :confirm-text="confirmModalConfig.confirmText"
+    :message="confirmModalConfig.message"
+    :show="showConfirmModal"
+    :title="confirmModalConfig.title"
+    :type="confirmModalConfig.type"
+    @cancel="handleCancelModal"
+    @confirm="handleConfirmModal"
+  />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { showToast } from '@/utils/tools'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
@@ -200,6 +202,16 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+
+// 弹窗进入/退出动画：挂载后置 visible 触发进入，关闭时先播退出动画再通知父级卸载
+const visible = ref(false)
+onMounted(() => {
+  visible.value = true
+})
+const requestClose = () => {
+  visible.value = false
+}
+const onClosed = () => emit('close')
 
 const showPreview = ref(false)
 
@@ -336,7 +348,7 @@ const handleClose = async () => {
     'warning'
   )
   if (confirmed) {
-    emit('close')
+    requestClose()
   }
 }
 
@@ -350,7 +362,7 @@ const handleDirectClose = async () => {
     'warning'
   )
   if (confirmed) {
-    emit('close')
+    requestClose()
   }
 }
 </script>

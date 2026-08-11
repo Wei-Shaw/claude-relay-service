@@ -154,34 +154,35 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   // 辅助函数：获取系统时区某一天的起止UTC时间
   // 输入：一个时间点（Date 对象，通常由当前时刻推算而来）
-  // 输出：该时间点在系统时区（UTC+8）所属日期的0点/23:59对应的UTC时间
+  // 输出：该时间点在系统配置时区所属日期的0点/23:59对应的UTC时间
   function getSystemTimezoneDay(localDate, startOfDay = true) {
-    // 固定使用UTC+8，因为后端系统时区是UTC+8
-    // 通过时间戳偏移取 UTC+8 的日历日期，不能用 getFullYear/getDate（那是浏览器本地时区的日期，
-    // 浏览器时区 ≠ UTC+8 时会在系统时区已跨日、本地未跨日的窗口内漏掉整天数据）
-    const shifted = new Date(localDate.getTime() + 8 * 60 * 60 * 1000)
+    // 使用后端下发的系统配置时区偏移（TIMEZONE_OFFSET，小时），默认 +8
+    // 通过时间戳偏移取系统时区的日历日期，不能用 getFullYear/getDate（那是浏览器本地时区的日期，
+    // 浏览器时区 ≠ 系统时区时会在系统时区已跨日、本地未跨日的窗口内漏掉整天数据）
+    const tz = dashboardData.value.systemTimezone ?? 8
+    const offsetMs = tz * 60 * 60 * 1000
+    const shifted = new Date(localDate.getTime() + offsetMs)
     const year = shifted.getUTCFullYear()
     const month = shifted.getUTCMonth()
     const day = shifted.getUTCDate()
 
     if (startOfDay) {
-      // 系统时区（UTC+8）的 YYYY-MM-DD 00:00:00
-      // 对应的UTC时间是前一天的16:00
-      return new Date(Date.UTC(year, month, day - 1, 16, 0, 0, 0))
+      // 系统时区的 YYYY-MM-DD 00:00:00 对应的 UTC 时间 = 该墙钟时刻减去时区偏移
+      return new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - offsetMs)
     } else {
-      // 系统时区（UTC+8）的 YYYY-MM-DD 23:59:59
-      // 对应的UTC时间是当天的15:59:59
-      return new Date(Date.UTC(year, month, day, 15, 59, 59, 999))
+      // 系统时区的 YYYY-MM-DD 23:59:59.999 对应的 UTC 时间
+      return new Date(Date.UTC(year, month, day, 23, 59, 59, 999) - offsetMs)
     }
   }
 
-  // 辅助函数：把日期选择器的系统时区（UTC+8）墙钟字符串转换为 ISO 字符串
+  // 辅助函数：把日期选择器的系统配置时区墙钟字符串转换为 ISO 字符串
   // 不能把无时区字符串原样发给后端——后端会按服务器本地时区解析，产生偏移
   function systemTimeStringToISO(timeStr) {
+    const tz = dashboardData.value.systemTimezone ?? 8
     const [datePart, timePart = '00:00:00'] = timeStr.split(' ')
     const [year, month, day] = datePart.split('-').map(Number)
     const [hours, minutes, seconds] = timePart.split(':').map(Number)
-    return new Date(Date.UTC(year, month - 1, day, hours - 8, minutes, seconds)).toISOString()
+    return new Date(Date.UTC(year, month - 1, day, hours - tz, minutes, seconds)).toISOString()
   }
 
   // 公共函数：根据预设计算时间范围
@@ -260,6 +261,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
         const systemAverages = dashboardResponse.data.systemAverages || {}
         const realtimeMetrics = dashboardResponse.data.realtimeMetrics || {}
         const systemHealth = dashboardResponse.data.systemHealth || {}
+        // 记录旧时区：首屏 store 初始化时用默认 +8 算过一次预设范围，
+        // 后端真实时区（可能非 +8）到达后若不同，需按真实时区重算，否则首屏图表按 +8 查询发生跨日偏移
+        const prevTimezone = dashboardData.value.systemTimezone
 
         dashboardData.value = {
           totalApiKeys: overview.totalApiKeys || 0,
@@ -301,7 +305,16 @@ export const useDashboardStore = defineStore('dashboard', () => {
           isHistoricalMetrics: realtimeMetrics.isHistorical || false,
           systemStatus: systemHealth.redisConnected ? '正常' : '异常',
           uptime: systemHealth.uptime || 0,
-          systemTimezone: dashboardResponse.data.systemTimezone || 8
+          systemTimezone: dashboardResponse.data.systemTimezone ?? 8
+        }
+
+        // 时区变更且当前是预设范围：按真实时区静默重算范围（自定义范围是用户输入的墙钟串，不重算）
+        // skipSave 避免污染本地偏好；silent 避免在此处触发额外图表刷新（由调用方统一刷新）
+        if (
+          dashboardData.value.systemTimezone !== prevTimezone &&
+          dateFilter.value.type === 'preset'
+        ) {
+          setDateFilterPreset(dateFilter.value.preset, { silent: true, skipSave: true })
         }
       }
 
@@ -539,9 +552,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
 
     const formatDateForDisplay = (date) => {
-      // 按系统时区（UTC+8）格式化显示，与查询范围的日期归属保持一致，
+      // 按系统配置时区格式化显示，与查询范围的日期归属保持一致，
       // 也保证 customRange 里的字符串能按系统时区语义回转（systemTimeStringToISO）
-      const systemTime = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+      const tz = dashboardData.value.systemTimezone ?? 8
+      const systemTime = new Date(date.getTime() + tz * 60 * 60 * 1000)
       const year = systemTime.getUTCFullYear()
       const month = String(systemTime.getUTCMonth() + 1).padStart(2, '0')
       const day = String(systemTime.getUTCDate()).padStart(2, '0')

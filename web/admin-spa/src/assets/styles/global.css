@@ -53,8 +53,10 @@
   background-color: var(--glass-strong-color) !important;
 }
 
-.dark .bg-gray-700,
-.dark\:bg-gray-700:is(.dark *) {
+/* 排除开关（toggle）轨道：它用 dark:bg-gray-700 作关态底色，需让 peer-checked:bg-* 在选中时变色，
+   不能被本条 !important 钉死，否则暗黑模式下开/关同色（见各 *View 的 peer 开关） */
+.dark .bg-gray-700:not([class*='peer-checked:bg-']),
+.dark\:bg-gray-700:is(.dark *):not([class*='peer-checked:bg-']) {
   background-color: var(--bg-gradient-mid) !important;
 }
 
@@ -137,8 +139,13 @@ body {
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
-    Roboto,
+    Helvetica,
+    Arial,
     sans-serif;
+  font-weight: 500;
+  font-feature-settings: 'tnum';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background: linear-gradient(
     135deg,
     var(--bg-gradient-start) 0%,
@@ -148,7 +155,8 @@ body {
   background-attachment: fixed;
   min-height: 100vh;
   margin: 0;
-  overflow-x: hidden;
+  /* clip 不触发「另一轴 visible→auto」规则；hidden 会把 overflow-y 算成 auto，登录页 100vh 时易冒出竖向滚动条 */
+  overflow-x: clip;
   color: var(--text-primary);
   transition:
     background 0.3s ease,
@@ -633,6 +641,99 @@ body::before {
 .slide-up-leave-to {
   opacity: 0;
   transform: translateY(-30px);
+}
+
+/* iOS 风格弹窗过渡（配合 <ModalTransition> 组件） */
+/* 遮罩：淡入淡出 */
+.ios-modal-enter-active {
+  transition: opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.ios-modal-leave-active {
+  transition: opacity 0.2s ease-in;
+}
+
+.ios-modal-enter-from,
+.ios-modal-leave-to {
+  opacity: 0;
+}
+
+/* 面板：弹簧式缩放 + 轻微上移，营造 iOS 卡片弹出感 */
+.ios-modal-enter-active .modal-content,
+.ios-modal-enter-active .modal-panel {
+  transition:
+    transform 0.42s cubic-bezier(0.34, 1.4, 0.5, 1),
+    opacity 0.3s ease;
+}
+
+.ios-modal-leave-active .modal-content,
+.ios-modal-leave-active .modal-panel {
+  transition:
+    transform 0.2s cubic-bezier(0.4, 0, 1, 1),
+    opacity 0.2s ease;
+}
+
+.ios-modal-enter-from .modal-content,
+.ios-modal-enter-from .modal-panel,
+.ios-modal-leave-to .modal-content,
+.ios-modal-leave-to .modal-panel {
+  opacity: 0;
+  transform: scale(0.92) translateY(16px);
+}
+
+/* 统一 Element Plus el-dialog 为 iOS 风格弹簧动画（覆盖 EP 默认 dialog-fade） */
+/* 去掉 EP 包裹层默认位移，缩放交给面板自身，原点才在卡片中心 */
+.dialog-fade-enter-active .el-overlay-dialog,
+.dialog-fade-leave-active .el-overlay-dialog {
+  animation: none;
+}
+
+.dialog-fade-enter-active .el-dialog {
+  animation: ios-dialog-in 0.42s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+.dialog-fade-leave-active .el-dialog {
+  animation: ios-dialog-out 0.2s cubic-bezier(0.4, 0, 1, 1);
+}
+
+@keyframes ios-dialog-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes ios-dialog-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.92) translateY(16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ios-modal-enter-active,
+  .ios-modal-leave-active,
+  .ios-modal-enter-active .modal-content,
+  .ios-modal-enter-active .modal-panel,
+  .ios-modal-leave-active .modal-content,
+  .ios-modal-leave-active .modal-panel {
+    transition-duration: 0.01ms !important;
+  }
+
+  .dialog-fade-enter-active .el-dialog,
+  .dialog-fade-leave-active .el-dialog {
+    animation-duration: 0.01ms !important;
+  }
 }
 
 .toast {

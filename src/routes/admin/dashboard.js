@@ -6,7 +6,9 @@ const bedrockAccountService = require('../../services/account/bedrockAccountServ
 const ccrAccountService = require('../../services/account/ccrAccountService')
 const geminiAccountService = require('../../services/account/geminiAccountService')
 const droidAccountService = require('../../services/account/droidAccountService')
+const grokAccountService = require('../../services/account/grokAccountService')
 const openaiResponsesAccountService = require('../../services/account/openaiResponsesAccountService')
+const azureOpenaiAccountService = require('../../services/account/azureOpenaiAccountService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
@@ -37,6 +39,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       ccrAccounts,
       openaiResponsesAccounts,
       droidAccounts,
+      grokAccounts,
+      azureOpenaiAccounts,
       todayStats,
       systemAverages,
       realtimeMetrics
@@ -49,6 +53,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       ccrAccountService.getAllAccounts(),
       openaiResponsesAccountService.getAllAccounts(true),
       droidAccountService.getAllAccounts(),
+      grokAccountService.getAllAccounts(),
+      azureOpenaiAccountService.getAllAccounts(),
       redis.getTodayStats(),
       redis.getSystemAverages(),
       redis.getRealtimeSystemMetrics()
@@ -135,6 +141,28 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       }
     }
 
+    // Grok 账户统计
+    let normalGrokAccounts = 0,
+      abnormalGrokAccounts = 0,
+      pausedGrokAccounts = 0,
+      rateLimitedGrokAccounts = 0
+    for (const acc of grokAccounts) {
+      const isActive = normalizeBoolean(acc.isActive)
+      const isBlocked = acc.status === 'blocked' || acc.status === 'unauthorized'
+      const isSchedulable = normalizeBoolean(acc.schedulable)
+      const isRateLimited = isRateLimitedFlag(acc.rateLimitStatus)
+
+      if (!isActive || isBlocked) {
+        abnormalGrokAccounts++
+      } else if (!isSchedulable) {
+        pausedGrokAccounts++
+      } else if (isRateLimited) {
+        rateLimitedGrokAccounts++
+      } else {
+        normalGrokAccounts++
+      }
+    }
+
     // 计算使用统计
     let totalTokensUsed = 0,
       totalRequestsUsed = 0,
@@ -185,6 +213,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
     const openaiStats = countAccountStats(openaiAccounts, { isStringType: true })
     const ccrStats = countAccountStats(ccrAccounts)
     const openaiResponsesStats = countAccountStats(openaiResponsesAccounts, { isStringType: true })
+    const azureOpenaiStats = countAccountStats(azureOpenaiAccounts, { isStringType: true })
 
     const dashboard = {
       overview: {
@@ -198,7 +227,10 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           bedrockAccounts.length +
           openaiAccounts.length +
           openaiResponsesAccounts.length +
-          ccrAccounts.length,
+          azureOpenaiAccounts.length +
+          ccrAccounts.length +
+          droidAccounts.length +
+          grokAccounts.length,
         normalAccounts:
           claudeStats.normal +
           claudeConsoleStats.normal +
@@ -206,7 +238,10 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           bedrockStats.normal +
           openaiStats.normal +
           openaiResponsesStats.normal +
-          ccrStats.normal,
+          azureOpenaiStats.normal +
+          ccrStats.normal +
+          normalDroidAccounts +
+          normalGrokAccounts,
         abnormalAccounts:
           claudeStats.abnormal +
           claudeConsoleStats.abnormal +
@@ -214,8 +249,10 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           bedrockStats.abnormal +
           openaiStats.abnormal +
           openaiResponsesStats.abnormal +
+          azureOpenaiStats.abnormal +
           ccrStats.abnormal +
-          abnormalDroidAccounts,
+          abnormalDroidAccounts +
+          abnormalGrokAccounts,
         pausedAccounts:
           claudeStats.paused +
           claudeConsoleStats.paused +
@@ -223,8 +260,10 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           bedrockStats.paused +
           openaiStats.paused +
           openaiResponsesStats.paused +
+          azureOpenaiStats.paused +
           ccrStats.paused +
-          pausedDroidAccounts,
+          pausedDroidAccounts +
+          pausedGrokAccounts,
         rateLimitedAccounts:
           claudeStats.rateLimited +
           claudeConsoleStats.rateLimited +
@@ -232,8 +271,10 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           bedrockStats.rateLimited +
           openaiStats.rateLimited +
           openaiResponsesStats.rateLimited +
+          azureOpenaiStats.rateLimited +
           ccrStats.rateLimited +
-          rateLimitedDroidAccounts,
+          rateLimitedDroidAccounts +
+          rateLimitedGrokAccounts,
         // 各平台详细统计
         accountsByPlatform: {
           claude: {
@@ -285,12 +326,26 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
             paused: openaiResponsesStats.paused,
             rateLimited: openaiResponsesStats.rateLimited
           },
+          azure_openai: {
+            total: azureOpenaiAccounts.length,
+            normal: azureOpenaiStats.normal,
+            abnormal: azureOpenaiStats.abnormal,
+            paused: azureOpenaiStats.paused,
+            rateLimited: azureOpenaiStats.rateLimited
+          },
           droid: {
             total: droidAccounts.length,
             normal: normalDroidAccounts,
             abnormal: abnormalDroidAccounts,
             paused: pausedDroidAccounts,
             rateLimited: rateLimitedDroidAccounts
+          },
+          grok: {
+            total: grokAccounts.length,
+            normal: normalGrokAccounts,
+            abnormal: abnormalGrokAccounts,
+            paused: pausedGrokAccounts,
+            rateLimited: rateLimitedGrokAccounts
           }
         },
         // 保留旧字段以兼容
@@ -301,8 +356,10 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           bedrockStats.normal +
           openaiStats.normal +
           openaiResponsesStats.normal +
+          azureOpenaiStats.normal +
           ccrStats.normal +
-          normalDroidAccounts,
+          normalDroidAccounts +
+          normalGrokAccounts,
         totalClaudeAccounts: claudeAccounts.length + claudeConsoleAccounts.length,
         activeClaudeAccounts: claudeStats.normal + claudeConsoleStats.normal,
         rateLimitedClaudeAccounts: claudeStats.rateLimited + claudeConsoleStats.rateLimited,
@@ -341,9 +398,11 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
         claudeAccountsHealthy: claudeStats.normal + claudeConsoleStats.normal > 0,
         geminiAccountsHealthy: geminiStats.normal > 0,
         droidAccountsHealthy: normalDroidAccounts > 0,
+        grokAccountsHealthy: normalGrokAccounts > 0,
         uptime: process.uptime()
       },
-      systemTimezone: config.system.timezoneOffset || 8
+      // 显式 0（UTC）为合法偏移，用 ?? 而非 || 避免被当成 falsy 替换成 8
+      systemTimezone: config.system.timezoneOffset ?? 8
     }
 
     return res.json({ success: true, data: dashboard })

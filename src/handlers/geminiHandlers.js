@@ -20,6 +20,7 @@ const { parseSSELine } = require('../utils/sseParser')
 const axios = require('axios')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 const ProxyHelper = require('../utils/proxyHelper')
+const proxyResolver = require('../utils/proxyResolver')
 const upstreamErrorHelper = require('../utils/upstreamErrorHelper')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
 
@@ -30,17 +31,35 @@ const handleGeminiUpstreamError = async (
   accountType,
   sessionHash,
   headers,
-  disableAutoProtection = false
+  disableAutoProtection = false,
+  errorObj = null
 ) => {
   if (!accountId || !errorStatus) {
     return
   }
   const autoProtectionDisabled = disableAutoProtection === true || disableAutoProtection === 'true'
+  // 从 axios 错误对象采集 URL/方法/请求体/响应体（脱敏在 buildErrorContext 内完成）
+  const errorContext = upstreamErrorHelper.buildErrorContext({
+    url: errorObj?.config?.url,
+    method: errorObj?.config?.method,
+    requestHeaders: errorObj?.config?.headers,
+    requestBody: errorObj?.config?.data,
+    responseStatus: errorStatus,
+    responseHeaders: headers,
+    responseBody: errorObj?.response?.data,
+    sessionId: sessionHash
+  })
   try {
     if (errorStatus === 429) {
       if (!autoProtectionDisabled) {
         const ttl = upstreamErrorHelper.parseRetryAfter(headers)
-        await upstreamErrorHelper.markTempUnavailable(accountId, accountType || 'gemini', 429, ttl)
+        await upstreamErrorHelper.markTempUnavailable(
+          accountId,
+          accountType || 'gemini',
+          429,
+          ttl,
+          errorContext
+        )
         // 同时设置 rate-limit 状态，保持与 /messages handler 一致
         await unifiedGeminiScheduler
           .markAccountRateLimited(accountId, accountType || 'gemini', sessionHash)
@@ -56,7 +75,9 @@ const handleGeminiUpstreamError = async (
         await upstreamErrorHelper.markTempUnavailable(
           accountId,
           accountType || 'gemini',
-          errorStatus
+          errorStatus,
+          null,
+          errorContext
         )
       }
     }
@@ -374,6 +395,12 @@ async function normalizeAxiosStreamError(error) {
  * 解析账户代理配置
  */
 function parseProxyConfig(account) {
+  // 代理池绑定优先：已绑定则池子权威（pooled 为配置对象=用它；null=绑定但无可用，本次不走代理）
+  const pooled = proxyResolver.resolveProxyConfigForAccount(account, 'gemini')
+  if (pooled !== undefined) {
+    return pooled
+  }
+  // 未绑定池子 -> 账户静态 proxy（旧逻辑）
   let proxyConfig = null
   if (account.proxy) {
     try {
@@ -619,7 +646,7 @@ async function handleMessages(req, res) {
           maxTokens: max_tokens,
           stream,
           accessToken: account.accessToken,
-          proxy: account.proxy,
+          proxy: parseProxyConfig(account),
           apiKeyId: apiKeyData.id,
           signal: abortController.signal,
           projectId: effectiveProjectId,
@@ -637,7 +664,7 @@ async function handleMessages(req, res) {
           maxTokens: max_tokens,
           stream,
           accessToken: account.accessToken,
-          proxy: account.proxy,
+          proxy: parseProxyConfig(account),
           apiKeyId: apiKeyData.id,
           signal: abortController.signal,
           projectId: effectiveProjectId,
@@ -793,7 +820,8 @@ async function handleMessages(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error
     )
 
     // 返回错误响应
@@ -915,10 +943,10 @@ async function handleModels(req, res) {
         oauthProvider === 'antigravity'
           ? await geminiAccountService.fetchAvailableModelsAntigravity(
               account.accessToken,
-              account.proxy,
+              parseProxyConfig(account),
               account.refreshToken
             )
-          : await getAvailableModels(account.accessToken, account.proxy)
+          : await getAvailableModels(account.accessToken, parseProxyConfig(account))
     }
 
     res.json({
@@ -1788,7 +1816,8 @@ async function handleGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error
     )
     res.status(500).json({
       error: {
@@ -2183,7 +2212,8 @@ async function handleStreamGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error
     )
 
     if (!res.headersSent) {
@@ -2488,7 +2518,8 @@ async function handleStandardGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error
     )
 
     res.status(500).json({
@@ -2979,7 +3010,8 @@ async function handleStandardStreamGenerateContent(req, res) {
       accountType,
       sessionHash,
       error.response?.headers,
-      account?.disableAutoProtection
+      account?.disableAutoProtection,
+      error
     )
 
     if (!res.headersSent) {

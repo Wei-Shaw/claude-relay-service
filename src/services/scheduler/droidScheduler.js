@@ -6,17 +6,51 @@ const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const {
   isTruthy,
   isAccountHealthy,
+  isAutoProtectionDisabled,
   sortAccountsByPriority,
   normalizeEndpointType
 } = require('../../utils/commonHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 class DroidScheduler {
-  constructor() {
-    this.STICKY_PREFIX = 'droid'
-  }
-
   _isAccountSchedulable(account) {
     return isTruthy(account?.schedulable ?? true)
+  }
+
+  // [人工决策-2026-06-03 14:51:27] droid 账户同步硬门单一判定（完整清单）：schedulable(手动停用)、订阅过期、endpoint 兼容
+  //   始终生效；开关 ON 仅跳过 status 健康检查。temp_unavailable 为异步,由各路径单独 await（不并入此处）。
+  //   group/dedicated/syncFiltered 三条路径统一调用此函数,避免订阅/endpoint 等硬门在某条路径漏检漂移。
+  _passesDroidSyncGates(account, normalizedEndpoint) {
+    if (!account || !this._isAccountSchedulable(account)) {
+      return false
+    }
+    // [人工决策-2026-06-03 14:51:27] isActive(手动停用) 是硬门,开关 ON 也不豁免。
+    //   注意 isAccountHealthy 把 isActive+status 绑在一起,所以此处必须单独硬挡 isActive,
+    //   否则下面 `autoOff || isAccountHealthy` 在开关 ON 时会连 isActive=false 一起放行。
+    if (!isTruthy(account.isActive)) {
+      return false
+    }
+    if (droidAccountService.isSubscriptionExpired(account)) {
+      return false
+    }
+    if (!this._matchesEndpoint(account, normalizedEndpoint)) {
+      return false
+    }
+    // status 健康检查(error/unauthorized/blocked/temp_error)属上游错误类,开关 ON 跳过
+    return isAutoProtectionDisabled(account) || isAccountHealthy(account)
+  }
+
+  // [人工决策-2026-06-03 14:51:27] droid 账户完整可调度判定(唯一真相,含异步 temp_unavailable)：
+  //   sync 硬门(_passesDroidSyncGates) + temp_unavailable(开关 ON 跳过)。group/dedicated/共享池三路径统一调用此函数,
+  //   不再各自在外面叠 temp,避免"两段式 gate"漂移。
+  async _isDroidAccountUsable(account, normalizedEndpoint) {
+    if (!this._passesDroidSyncGates(account, normalizedEndpoint)) {
+      return false
+    }
+    if (isAutoProtectionDisabled(account)) {
+      return true
+    }
+    return !(await upstreamErrorHelper.isTempUnavailable(account.id, 'droid'))
   }
 
   _matchesEndpoint(account, endpointType) {
@@ -38,10 +72,10 @@ class DroidScheduler {
     }
     const normalizedEndpoint = normalizeEndpointType(endpointType)
     const apiKeyPart = apiKeyId || 'default'
-    return `${this.STICKY_PREFIX}:${normalizedEndpoint}:${apiKeyPart}:${sessionHash}`
+    return RedisKeys.session.droidSticky(normalizedEndpoint, apiKeyPart, sessionHash)
   }
 
-  async _loadGroupAccounts(groupId) {
+  async _loadGroupAccounts(groupId, normalizedEndpoint) {
     const memberIds = await accountGroupService.getGroupMembers(groupId)
     if (!memberIds || memberIds.length === 0) {
       return []
@@ -60,17 +94,10 @@ class DroidScheduler {
 
     const result = []
     for (const account of accounts) {
-      if (!account || !isAccountHealthy(account) || !this._isAccountSchedulable(account)) {
-        continue
+      // 统一走 _isDroidAccountUsable（完整可调度判定单点：sync 硬门 + 异步 temp）
+      if (await this._isDroidAccountUsable(account, normalizedEndpoint)) {
+        result.push(account)
       }
-      const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(account.id, 'droid')
-      if (isTempUnavailable) {
-        logger.debug(
-          `⏭️ Skipping Droid group member ${account.name || account.id} - temporarily unavailable`
-        )
-        continue
-      }
-      result.push(account)
     }
     return result
   }
@@ -112,14 +139,14 @@ class DroidScheduler {
       } else {
         const account = await droidAccountService.getAccount(binding)
         if (account) {
-          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(account.id, 'droid')
-          if (isTempUnavailable) {
-            logger.warn(
-              `⏱️ Bound Droid account ${account.name || account.id} temporarily unavailable, falling back to pool`
-            )
-          } else {
+          // 专属绑定走与共享池一致的完整判定 _isDroidAccountUsable（sync 硬门 + temp）
+          if (await this._isDroidAccountUsable(account, normalizedEndpoint)) {
             candidates = [account]
             isDedicatedBinding = true
+          } else {
+            logger.warn(
+              `⏱️ Bound Droid account ${account.name || account.id} not usable (schedulable/subscription/endpoint/health/temp), falling back to pool`
+            )
           }
         }
       }
@@ -129,26 +156,13 @@ class DroidScheduler {
       candidates = await droidAccountService.getSchedulableAccounts(normalizedEndpoint)
     }
 
-    const syncFiltered = candidates.filter(
-      (account) =>
-        account &&
-        isAccountHealthy(account) &&
-        this._isAccountSchedulable(account) &&
-        this._matchesEndpoint(account, normalizedEndpoint)
+    // 统一走 _isDroidAccountUsable（完整可调度判定单点：sync 硬门 + 异步 temp）
+    const usabilityResults = await Promise.all(
+      candidates.map(async (account) =>
+        (await this._isDroidAccountUsable(account, normalizedEndpoint)) ? account : null
+      )
     )
-    const filteredResults = await Promise.all(
-      syncFiltered.map(async (account) => {
-        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(account.id, 'droid')
-        if (isTempUnavailable) {
-          logger.debug(
-            `⏭️ Skipping Droid account ${account.name || account.id} - temporarily unavailable`
-          )
-          return null
-        }
-        return account
-      })
-    )
-    const filtered = filteredResults.filter(Boolean)
+    const filtered = usabilityResults.filter(Boolean)
 
     if (filtered.length === 0) {
       throw new Error(

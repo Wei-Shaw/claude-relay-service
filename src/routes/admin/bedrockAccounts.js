@@ -6,6 +6,7 @@
 const express = require('express')
 const router = express.Router()
 const bedrockAccountService = require('../../services/account/bedrockAccountService')
+const testModelConfigService = require('../../services/testModelConfigService')
 const apiKeyService = require('../../services/apiKeyService')
 const accountGroupService = require('../../services/accountGroupService')
 const redis = require('../../models/redis')
@@ -13,6 +14,7 @@ const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { stripReadonlyAccountFields } = require('../../utils/commonHelper')
 
 // ☁️ Bedrock 账户管理
 
@@ -126,7 +128,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
       defaultModel,
       priority,
       accountType,
-      credentialType
+      credentialType,
+      proxy
     } = req.body
 
     if (!name) {
@@ -161,7 +164,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
       defaultModel,
       priority: priority || 50,
       accountType: accountType || 'shared',
-      credentialType: credentialType || 'access_key'
+      credentialType: credentialType || 'access_key',
+      proxy
     })
 
     if (!result.success) {
@@ -188,7 +192,8 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = mapExpiryField(updates, 'Bedrock', accountId)
+    // review#3：剥离外部传入的状态类字段，禁止伪造自动停用证据
+    const mappedUpdates = stripReadonlyAccountFields(mapExpiryField(updates, 'Bedrock', accountId))
 
     // 验证priority的有效性（1-100）
     if (
@@ -356,7 +361,9 @@ router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params
 
-    await bedrockAccountService.testAccountConnection(accountId, res)
+    // 请求显式指定优先，否则用后台配置的默认测试模型（单一事实源）
+    const model = await testModelConfigService.resolveAccountModel('bedrock', req.body.model)
+    await bedrockAccountService.testAccountConnection(accountId, res, model)
   } catch (error) {
     logger.error('❌ Failed to test Bedrock account:', error)
     // 错误已在服务层处理，这里仅做日志记录

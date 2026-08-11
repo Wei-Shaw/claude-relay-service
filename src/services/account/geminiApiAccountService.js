@@ -5,16 +5,13 @@ const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 const LRUCache = require('../../utils/lruCache')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 class GeminiApiAccountService {
   constructor() {
     // 加密相关常量
     this.ENCRYPTION_ALGORITHM = 'aes-256-cbc'
     this.ENCRYPTION_SALT = 'gemini-api-salt'
-
-    // Redis 键前缀
-    this.ACCOUNT_KEY_PREFIX = 'gemini_api_account:'
-    this.SHARED_ACCOUNTS_KEY = 'shared_gemini_api_accounts'
 
     // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
     this._encryptionKeyCache = null
@@ -102,7 +99,7 @@ class GeminiApiAccountService {
   // 获取账户
   async getAccount(accountId) {
     const client = redis.getClientSafe()
-    const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+    const key = RedisKeys.accounts.geminiApi(accountId)
     const accountData = await client.hgetall(key)
 
     if (!accountData || !accountData.id) {
@@ -168,10 +165,23 @@ class GeminiApiAccountService {
           : 'false'
     }
 
+    // 开启 disableAutoProtection 时立即清理已有自动停用状态并恢复调度（手动停用不受影响）
+    const enablingAutoProtection = updates.disableAutoProtection === 'true'
+    if (enablingAutoProtection) {
+      const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(account)
+      if (recoveryPatch) {
+        Object.assign(updates, recoveryPatch)
+      }
+    }
+
     // 更新 Redis
     const client = redis.getClientSafe()
-    const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+    const key = RedisKeys.accounts.geminiApi(accountId)
     await client.hset(key, updates)
+
+    if (enablingAutoProtection) {
+      await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'gemini-api')
+    }
 
     logger.info(`📝 Updated Gemini-API account: ${account.name}`)
 
@@ -181,13 +191,13 @@ class GeminiApiAccountService {
   // 删除账户
   async deleteAccount(accountId) {
     const client = redis.getClientSafe()
-    const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+    const key = RedisKeys.accounts.geminiApi(accountId)
 
     // 从共享账户列表中移除
-    await client.srem(this.SHARED_ACCOUNTS_KEY, accountId)
+    await client.srem(RedisKeys.accounts.sharedGeminiApi, accountId)
 
     // 从索引中移除
-    await redis.removeFromIndex('gemini_api_account:index', accountId)
+    await redis.removeFromIndex(RedisKeys.accounts.geminiApiIndex, accountId)
 
     // 删除账户数据
     await client.del(key)
@@ -200,7 +210,7 @@ class GeminiApiAccountService {
   // 获取所有账户
   async getAllAccounts(includeInactive = false) {
     const client = redis.getClientSafe()
-    const accountIds = await client.smembers(this.SHARED_ACCOUNTS_KEY)
+    const accountIds = await client.smembers(RedisKeys.accounts.sharedGeminiApi)
     const accounts = []
 
     for (const accountId of accountIds) {
@@ -241,11 +251,11 @@ class GeminiApiAccountService {
 
     // 直接从 Redis 获取所有账户（包括非共享账户）
     const allAccountIds = await redis.getAllIdsByIndex(
-      'gemini_api_account:index',
-      `${this.ACCOUNT_KEY_PREFIX}*`,
+      RedisKeys.accounts.geminiApiIndex,
+      RedisKeys.accounts.geminiApiPattern,
       /^gemini_api_account:(.+)$/
     )
-    const keys = allAccountIds.map((id) => `${this.ACCOUNT_KEY_PREFIX}${id}`)
+    const keys = allAccountIds.map((id) => RedisKeys.accounts.geminiApi(id))
     const dataList = await redis.batchHgetallChunked(keys)
     for (let i = 0; i < allAccountIds.length; i++) {
       const accountId = allAccountIds[i]
@@ -327,7 +337,15 @@ class GeminiApiAccountService {
           `🛡️ Account ${accountId} has auto-protection disabled, skipping setAccountRateLimited`
         )
         upstreamErrorHelper
-          .recordErrorHistory(accountId, 'gemini-api', 429, 'rate_limit')
+          .recordErrorHistory(
+            accountId,
+            'gemini-api',
+            429,
+            'rate_limit',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_rate_limit'
+            })
+          )
           .catch(() => {})
         return
       }
@@ -377,7 +395,15 @@ class GeminiApiAccountService {
         `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
       )
       upstreamErrorHelper
-        .recordErrorHistory(accountId, 'gemini-api', 401, 'auth_error')
+        .recordErrorHistory(
+          accountId,
+          'gemini-api',
+          401,
+          'auth_error',
+          upstreamErrorHelper.buildErrorContext({
+            reason: 'auto_protection_disabled_unauthorized'
+          })
+        )
         .catch(() => {})
       return
     }
@@ -619,17 +645,17 @@ class GeminiApiAccountService {
   // 保存账户到 Redis
   async _saveAccount(accountId, accountData) {
     const client = redis.getClientSafe()
-    const key = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+    const key = RedisKeys.accounts.geminiApi(accountId)
 
     // 保存账户数据
     await client.hset(key, accountData)
 
     // 添加到索引
-    await redis.addToIndex('gemini_api_account:index', accountId)
+    await redis.addToIndex(RedisKeys.accounts.geminiApiIndex, accountId)
 
     // 添加到共享账户列表
     if (accountData.accountType === 'shared') {
-      await client.sadd(this.SHARED_ACCOUNTS_KEY, accountId)
+      await client.sadd(RedisKeys.accounts.sharedGeminiApi, accountId)
     }
   }
 }

@@ -1,16 +1,15 @@
 <template>
   <div class="request-details-container">
-    <div class="card p-4 sm:p-6">
+    <!-- 去掉内层 .card：外层 MainLayout 已是卡片，避免卡片套卡片 -->
+    <div class="relative">
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
+            <!-- 页面标题「请求明细」与主 Tab 重复，已移除；保留采集状态/保留时长徽章 -->
             <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
-                请求明细
-              </h3>
               <span
                 :class="[
-                  'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
+                  'inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold',
                   captureEnabled
                     ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                     : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
@@ -25,7 +24,7 @@
                 {{ captureEnabled ? '采集已开启' : '采集已关闭' }}
               </span>
               <span
-                class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
               >
                 <span class="mr-2 h-2 w-2 rounded-full bg-blue-500" />
                 {{ formatRetentionHours(retentionHours) }}
@@ -63,7 +62,7 @@
               </button>
               <el-tooltip placement="top">
                 <template #content>
-                  <div class="max-w-xs text-xs leading-relaxed">
+                  <div class="max-w-xs text-sm leading-relaxed">
                     清理所有已保存的历史请求体预览数据；仅影响历史预览，不影响当前请求体预览开关设置
                   </div>
                 </template>
@@ -168,98 +167,62 @@
                 </div>
 
                 <div class="request-filter-row request-filter-row-secondary">
-                  <div class="toolbar-control group">
-                    <div
-                      class="toolbar-control-glow bg-gradient-to-r from-indigo-500 to-blue-500"
-                    ></div>
-                    <el-select
+                  <div class="toolbar-control">
+                    <CustomDropdown
                       v-model="filters.apiKeyId"
-                      class="toolbar-element w-full"
+                      accent="indigo"
                       clearable
-                      filterable
+                      icon="fa-key"
+                      :options="apiKeyDropdownOptions"
                       placeholder="所有 API Key"
-                    >
-                      <el-option
-                        v-for="item in availableApiKeys"
-                        :key="item.id"
-                        :label="item.name"
-                        :value="item.id"
-                      />
-                    </el-select>
+                      searchable
+                    />
                   </div>
 
-                  <div class="toolbar-control group">
-                    <div
-                      class="toolbar-control-glow bg-gradient-to-r from-purple-500 to-pink-500"
-                    ></div>
-                    <el-select
+                  <div class="toolbar-control">
+                    <CustomDropdown
                       v-model="filters.accountId"
-                      class="toolbar-element w-full"
+                      accent="purple"
                       clearable
-                      filterable
+                      icon="fa-server"
+                      :options="accountDropdownOptions"
                       placeholder="所有账户"
-                    >
-                      <el-option
-                        v-for="item in availableAccounts"
-                        :key="item.id"
-                        :label="`${item.name}（${item.accountTypeName}）`"
-                        :value="item.id"
-                      />
-                    </el-select>
+                      searchable
+                    />
                   </div>
 
-                  <div class="toolbar-control group">
-                    <div
-                      class="toolbar-control-glow bg-gradient-to-r from-emerald-500 to-green-500"
-                    ></div>
-                    <el-select
+                  <div class="toolbar-control">
+                    <CustomDropdown
                       v-model="filters.model"
-                      class="toolbar-element w-full"
+                      accent="green"
                       clearable
-                      filterable
+                      icon="fa-cube"
+                      :options="modelDropdownOptions"
                       placeholder="所有模型"
-                    >
-                      <el-option
-                        v-for="item in availableModels"
-                        :key="item"
-                        :label="item"
-                        :value="item"
-                      />
-                    </el-select>
+                      searchable
+                    />
                   </div>
 
-                  <div class="toolbar-control group">
-                    <div
-                      class="toolbar-control-glow bg-gradient-to-r from-orange-500 to-amber-500"
-                    ></div>
-                    <el-select
+                  <div class="toolbar-control">
+                    <CustomDropdown
                       v-model="filters.endpoint"
-                      class="toolbar-element w-full"
+                      accent="orange"
                       clearable
-                      filterable
+                      icon="fa-link"
+                      :options="endpointDropdownOptions"
                       placeholder="所有接口"
-                    >
-                      <el-option
-                        v-for="item in availableEndpoints"
-                        :key="item"
-                        :label="item"
-                        :value="item"
-                      />
-                    </el-select>
+                      searchable
+                    />
                   </div>
 
-                  <div class="toolbar-control group">
-                    <div
-                      class="toolbar-control-glow bg-gradient-to-r from-slate-500 to-gray-500"
-                    ></div>
-                    <el-select
+                  <div class="toolbar-control">
+                    <CustomDropdown
                       v-model="filters.sortOrder"
-                      class="toolbar-element w-full"
+                      accent="gray"
+                      icon="fa-sort-amount-down"
+                      :options="sortOrderOptions"
                       placeholder="时间排序"
-                    >
-                      <el-option label="时间降序" value="desc" />
-                      <el-option label="时间升序" value="asc" />
-                    </el-select>
+                    />
                   </div>
                 </div>
               </div>
@@ -312,7 +275,7 @@
 
                 <el-tooltip placement="top">
                   <template #content>
-                    <div class="max-w-xs text-xs leading-relaxed">
+                    <div class="max-w-xs text-sm leading-relaxed">
                       清理所有已保存的历史请求体预览数据；仅影响历史预览，不影响当前请求体预览开关设置
                     </div>
                   </template>
@@ -366,72 +329,72 @@
               >
                 <tr>
                   <th
-                    class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[170px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     统计时间
                   </th>
                   <th
-                    class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[170px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     API Key
                   </th>
                   <th
-                    class="min-w-[170px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[170px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     使用账户
                   </th>
                   <th
-                    class="min-w-[140px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[140px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     模型
                   </th>
                   <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[110px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     推理
                   </th>
                   <th
-                    class="min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[180px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     接口
                   </th>
                   <th
-                    class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[96px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     输入
                   </th>
                   <th
-                    class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[96px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     输出
                   </th>
                   <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[110px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     缓存读取
                   </th>
                   <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[110px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     缓存创建
                   </th>
                   <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[110px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     缓存命中率
                   </th>
                   <th
-                    class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[100px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     费用
                   </th>
                   <th
-                    class="min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[100px] px-3 py-4 text-left text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     耗时
                   </th>
                   <th
-                    class="min-w-[96px] px-3 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[96px] px-3 py-4 text-right text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
                     操作
                   </th>
@@ -447,7 +410,7 @@
                 >
                   <td class="table-cell">
                     <div class="font-medium">{{ formatDate(record.timestamp) }}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
                       {{ record.requestId }}
                     </div>
                   </td>
@@ -455,7 +418,7 @@
                     <div class="font-semibold">
                       {{ record.apiKeyName || record.apiKeyId || '-' }}
                     </div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
                       {{ record.apiKeyId || '-' }}
                     </div>
                   </td>
@@ -463,7 +426,7 @@
                     <div class="font-semibold">
                       {{ record.accountName || record.accountId || '-' }}
                     </div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
                       {{ record.accountTypeName || record.accountType || '-' }}
                     </div>
                   </td>
@@ -471,7 +434,7 @@
                   <td class="table-cell">{{ formatReasoning(record.reasoningDisplay) }}</td>
                   <td class="table-cell">
                     <div>{{ record.endpoint || '-' }}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
                       {{ record.method || 'POST' }}
                     </div>
                   </td>
@@ -496,7 +459,7 @@
                   <td class="table-cell">{{ formatDuration(record.durationMs) }}</td>
                   <td class="table-cell text-right">
                     <button
-                      class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
+                      class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
                       @click="openDetail(record.requestId)"
                     >
                       详情
@@ -518,15 +481,15 @@
                   <p class="text-sm font-bold text-gray-900 dark:text-gray-100">
                     {{ record.model }}
                   </p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
                     {{ formatDate(record.timestamp) }}
                   </p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
                     {{ record.endpoint || '-' }}
                   </p>
                 </div>
                 <button
-                  class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
+                  class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
                   @click="openDetail(record.requestId)"
                 >
                   详情
@@ -549,7 +512,7 @@
                 <div class="text-amber-600 dark:text-amber-400">
                   费用：{{ formatCost(record.cost) }}
                 </div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">{{ record.requestId }}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">{{ record.requestId }}</div>
               </div>
             </div>
           </div>
@@ -586,14 +549,13 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
-import { debounce } from 'lodash-es'
 import { useRouter } from 'vue-router'
 import {
   getRequestDetailsApi,
   getRequestDetailBodyPreviewStatsApi,
   purgeRequestDetailBodyPreviewApi
 } from '@/utils/http_apis'
-import { showToast, formatDate, formatNumber } from '@/utils/tools'
+import { showToast, formatDate, formatNumber, debounce } from '@/utils/tools'
 import RequestDetailModal from '@/components/admin/RequestDetailModal.vue'
 
 const router = useRouter()
@@ -613,6 +575,26 @@ const availableApiKeys = ref([])
 const availableAccounts = ref([])
 const availableModels = ref([])
 const availableEndpoints = ref([])
+
+const apiKeyDropdownOptions = computed(() =>
+  availableApiKeys.value.map((item) => ({ value: item.id, label: item.name }))
+)
+const accountDropdownOptions = computed(() =>
+  availableAccounts.value.map((item) => ({
+    value: item.id,
+    label: `${item.name}（${item.accountTypeName}）`
+  }))
+)
+const modelDropdownOptions = computed(() =>
+  availableModels.value.map((item) => ({ value: item, label: item }))
+)
+const endpointDropdownOptions = computed(() =>
+  availableEndpoints.value.map((item) => ({ value: item, label: item }))
+)
+const sortOrderOptions = [
+  { value: 'desc', label: '时间降序' },
+  { value: 'asc', label: '时间升序' }
+]
 
 const pagination = reactive({
   currentPage: 1,
@@ -879,7 +861,7 @@ const handleRequestDetailBodyPreviewPurge = async () => {
   }
 }
 
-const goToSettings = () => router.push('/settings')
+const goToSettings = () => router.push('/settings/branding')
 const openDetail = (requestId) => {
   activeRequestId.value = requestId
   detailVisible.value = true
@@ -1054,10 +1036,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.request-details-container {
-  min-height: calc(100vh - 300px);
-}
-
 .summary-card {
   border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 16px;
@@ -1072,7 +1050,7 @@ onMounted(() => {
 }
 
 .summary-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: rgb(107 114 128);
 }
@@ -1090,7 +1068,7 @@ onMounted(() => {
 
 .summary-sub {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: 14px;
   color: rgb(100 116 139);
 }
 
@@ -1136,8 +1114,7 @@ onMounted(() => {
   opacity: 0.16;
 }
 
-.toolbar-control :deep(.el-input__wrapper),
-.toolbar-control :deep(.el-select__wrapper) {
+.toolbar-control :deep(.el-input__wrapper) {
   min-height: 40px;
   border-radius: 10px;
   border: 1px solid rgb(229 231 235);
@@ -1145,19 +1122,16 @@ onMounted(() => {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
-.toolbar-control :deep(.el-input__wrapper:hover),
-.toolbar-control :deep(.el-select__wrapper:hover) {
+.toolbar-control :deep(.el-input__wrapper:hover) {
   border-color: rgb(209 213 219);
 }
 
-.toolbar-control :deep(.el-input__wrapper.is-focus),
-.toolbar-control :deep(.el-select__wrapper.is-focused) {
+.toolbar-control :deep(.el-input__wrapper.is-focus) {
   border-color: rgb(6 182 212);
   box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.15);
 }
 
-.dark .toolbar-control :deep(.el-input__wrapper),
-.dark .toolbar-control :deep(.el-select__wrapper) {
+.dark .toolbar-control :deep(.el-input__wrapper) {
   border-color: rgb(75 85 99);
   background: rgb(31 41 55);
 }
@@ -1179,7 +1153,7 @@ onMounted(() => {
 
 .table-cell {
   padding: 14px 16px;
-  font-size: 13px;
+  font-size: 14px;
   color: rgb(31 41 55);
   vertical-align: top;
 }

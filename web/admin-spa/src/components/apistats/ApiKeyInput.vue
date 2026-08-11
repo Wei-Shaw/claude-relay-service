@@ -44,7 +44,7 @@
               <span class="ml-2 hidden sm:inline">聚合</span>
               <span
                 v-if="multiKeyMode && parsedApiKeys.length > 0"
-                class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-semibold"
+                class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-sm font-semibold"
               >
                 {{ parsedApiKeys.length }}
               </span>
@@ -502,7 +502,7 @@ const hasValidInput = computed(() => {
 
   .security-notice {
     padding: 10px 14px;
-    font-size: 0.8rem;
+    font-size: 0.875rem;
   }
 }
 
@@ -517,7 +517,7 @@ const hasValidInput = computed(() => {
   }
 
   .hint-text {
-    font-size: 0.7rem;
+    font-size: 0.875rem;
     padding: 4px 8px;
   }
 }
@@ -532,7 +532,7 @@ const hasValidInput = computed(() => {
   }
 
   .wide-card-title p {
-    font-size: 0.8rem;
+    font-size: 0.875rem;
   }
 
   .wide-card-input {

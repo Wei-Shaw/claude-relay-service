@@ -4,6 +4,7 @@
  */
 
 const CLAUDE_MODELS = [
+  { value: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
   { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
   { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
   { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5' },
@@ -37,6 +38,7 @@ const OPENAI_MODELS = [
   { value: 'gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark' },
   { value: 'gpt-5.4', label: 'GPT-5.4' },
   { value: 'gpt-5.4-pro', label: 'GPT-5.4 Pro' },
+  { value: 'gpt-5.5', label: 'GPT-5.5' },
   { value: 'codex-mini', label: 'Codex Mini' }
 ]
 
@@ -45,6 +47,22 @@ const BEDROCK_MODELS = [
   { value: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Claude Sonnet 4.5' },
   { value: 'us.anthropic.claude-sonnet-4-20250514-v1:0', label: 'Claude Sonnet 4' },
   { value: 'us.anthropic.claude-3-5-haiku-20241022-v1:0', label: 'Claude 3.5 Haiku' }
+]
+
+const GROK_MODELS = [
+  { value: 'grok-4.5', label: 'Grok 4.5' },
+  { value: 'grok-4.3', label: 'Grok 4.3' },
+  { value: 'grok-build-0.1', label: 'Grok Build 0.1' },
+  { value: 'grok-composer-2.5-fast', label: 'Grok Composer 2.5 Fast' },
+  { value: 'grok-4.20-0309-reasoning', label: 'Grok 4.20 Reasoning' },
+  { value: 'grok-4.20-0309-non-reasoning', label: 'Grok 4.20 Non Reasoning' },
+  { value: 'grok-4.20-multi-agent-0309', label: 'Grok 4.20 Multi Agent' },
+  { value: 'grok-imagine', label: 'Grok Imagine' },
+  { value: 'grok-imagine-image', label: 'Grok Imagine Image' },
+  { value: 'grok-imagine-image-quality', label: 'Grok Imagine Image Quality' },
+  { value: 'grok-imagine-edit', label: 'Grok Imagine Edit' },
+  { value: 'grok-imagine-video', label: 'Grok Imagine Video' },
+  { value: 'grok-imagine-video-1.5', label: 'Grok Imagine Video 1.5' }
 ]
 
 // 其他模型（用于账户编辑的模型映射）
@@ -65,7 +83,8 @@ const PLATFORM_TEST_MODELS = {
   'openai-responses': OPENAI_MODELS,
   'azure-openai': [],
   droid: CLAUDE_MODELS,
-  ccr: CLAUDE_MODELS
+  ccr: CLAUDE_MODELS,
+  grok: GROK_MODELS
 }
 
 module.exports = {
@@ -73,6 +92,7 @@ module.exports = {
   GEMINI_MODELS,
   OPENAI_MODELS,
   BEDROCK_MODELS,
+  GROK_MODELS,
   OTHER_MODELS,
   PLATFORM_TEST_MODELS,
   // 按服务分组
@@ -84,10 +104,19 @@ module.exports = {
         return GEMINI_MODELS
       case 'openai':
         return OPENAI_MODELS
+      case 'grok':
+      case 'xai':
+        return GROK_MODELS
       default:
         return []
     }
   },
   // 获取所有模型（用于账户编辑）
-  getAllModels: () => [...CLAUDE_MODELS, ...GEMINI_MODELS, ...OPENAI_MODELS, ...OTHER_MODELS]
+  getAllModels: () => [
+    ...CLAUDE_MODELS,
+    ...GEMINI_MODELS,
+    ...OPENAI_MODELS,
+    ...GROK_MODELS,
+    ...OTHER_MODELS
+  ]
 }

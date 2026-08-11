@@ -2,15 +2,9 @@ const { v4: uuidv4 } = require('uuid')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
 
-class AccountGroupService {
-  constructor() {
-    this.GROUPS_KEY = 'account_groups'
-    this.GROUP_PREFIX = 'account_group:'
-    this.GROUP_MEMBERS_PREFIX = 'account_group_members:'
-    this.REVERSE_INDEX_PREFIX = 'account_groups_reverse:'
-    this.REVERSE_INDEX_MIGRATED_KEY = 'account_groups_reverse:migrated'
-  }
+const { RedisKeys } = require('../constants/redisKeys')
 
+class AccountGroupService {
   /**
    * 确保反向索引存在（启动时自动调用）
    * 检查是否已迁移，如果没有则自动回填
@@ -23,7 +17,7 @@ class AccountGroupService {
       }
 
       // 检查是否已迁移
-      const migrated = await client.get(this.REVERSE_INDEX_MIGRATED_KEY)
+      const migrated = await client.get(RedisKeys.accountGroup.reverseMigrated)
       if (migrated === 'true') {
         logger.debug('📁 账户分组反向索引已存在，跳过回填')
         return
@@ -31,34 +25,34 @@ class AccountGroupService {
 
       logger.info('📁 开始回填账户分组反向索引...')
 
-      const allGroupIds = await client.smembers(this.GROUPS_KEY)
+      const allGroupIds = await client.smembers(RedisKeys.accountGroup.groups)
       if (allGroupIds.length === 0) {
-        await client.set(this.REVERSE_INDEX_MIGRATED_KEY, 'true')
+        await client.set(RedisKeys.accountGroup.reverseMigrated, 'true')
         return
       }
 
       let totalOperations = 0
 
       for (const groupId of allGroupIds) {
-        const group = await client.hgetall(`${this.GROUP_PREFIX}${groupId}`)
+        const group = await client.hgetall(RedisKeys.accountGroup.group(groupId))
         if (!group || !group.platform) {
           continue
         }
 
-        const members = await client.smembers(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
+        const members = await client.smembers(RedisKeys.accountGroup.members(groupId))
         if (members.length === 0) {
           continue
         }
 
         const pipeline = client.pipeline()
         for (const accountId of members) {
-          pipeline.sadd(`${this.REVERSE_INDEX_PREFIX}${group.platform}:${accountId}`, groupId)
+          pipeline.sadd(RedisKeys.accountGroup.reverse(group.platform, accountId), groupId)
         }
         await pipeline.exec()
         totalOperations += members.length
       }
 
-      await client.set(this.REVERSE_INDEX_MIGRATED_KEY, 'true')
+      await client.set(RedisKeys.accountGroup.reverseMigrated, 'true')
       logger.success(`📁 账户分组反向索引回填完成，共 ${totalOperations} 条`)
     } catch (error) {
       logger.error('❌ 账户分组反向索引回填失败:', error)
@@ -83,8 +77,8 @@ class AccountGroupService {
       }
 
       // 验证平台类型
-      if (!['claude', 'gemini', 'openai', 'droid'].includes(platform)) {
-        throw new Error('平台类型必须是 claude、gemini、openai 或 droid')
+      if (!['claude', 'gemini', 'openai', 'droid', 'grok'].includes(platform)) {
+        throw new Error('平台类型必须是 claude、gemini、openai、droid 或 grok')
       }
 
       const client = redis.getClientSafe()
@@ -101,10 +95,10 @@ class AccountGroupService {
       }
 
       // 保存分组数据
-      await client.hmset(`${this.GROUP_PREFIX}${groupId}`, group)
+      await client.hmset(RedisKeys.accountGroup.group(groupId), group)
 
       // 添加到分组集合
-      await client.sadd(this.GROUPS_KEY, groupId)
+      await client.sadd(RedisKeys.accountGroup.groups, groupId)
 
       logger.success(`创建账户分组成功: ${name} (${platform})`)
 
@@ -124,7 +118,7 @@ class AccountGroupService {
   async updateGroup(groupId, updates) {
     try {
       const client = redis.getClientSafe()
-      const groupKey = `${this.GROUP_PREFIX}${groupId}`
+      const groupKey = RedisKeys.accountGroup.group(groupId)
 
       // 检查分组是否存在
       const exists = await client.exists(groupKey)
@@ -193,11 +187,11 @@ class AccountGroupService {
       }
 
       // 删除分组数据
-      await client.del(`${this.GROUP_PREFIX}${groupId}`)
-      await client.del(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
+      await client.del(RedisKeys.accountGroup.group(groupId))
+      await client.del(RedisKeys.accountGroup.members(groupId))
 
       // 从分组集合中移除
-      await client.srem(this.GROUPS_KEY, groupId)
+      await client.srem(RedisKeys.accountGroup.groups, groupId)
 
       logger.success(`删除账户分组成功: ${group.name}`)
     } catch (error) {
@@ -214,14 +208,14 @@ class AccountGroupService {
   async getGroup(groupId) {
     try {
       const client = redis.getClientSafe()
-      const groupData = await client.hgetall(`${this.GROUP_PREFIX}${groupId}`)
+      const groupData = await client.hgetall(RedisKeys.accountGroup.group(groupId))
 
       if (!groupData || Object.keys(groupData).length === 0) {
         return null
       }
 
       // 获取成员数量
-      const memberCount = await client.scard(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
+      const memberCount = await client.scard(RedisKeys.accountGroup.members(groupId))
 
       return {
         ...groupData,
@@ -241,7 +235,7 @@ class AccountGroupService {
   async getAllGroups(platform = null) {
     try {
       const client = redis.getClientSafe()
-      const groupIds = await client.smembers(this.GROUPS_KEY)
+      const groupIds = await client.smembers(RedisKeys.accountGroup.groups)
 
       const groups = []
       for (const groupId of groupIds) {
@@ -288,10 +282,10 @@ class AccountGroupService {
       }
 
       // 添加到分组成员集合
-      await client.sadd(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
+      await client.sadd(RedisKeys.accountGroup.members(groupId), accountId)
 
       // 维护反向索引
-      await client.sadd(`account_groups_reverse:${group.platform}:${accountId}`, groupId)
+      await client.sadd(RedisKeys.accountGroup.reverse(group.platform, accountId), groupId)
 
       logger.success(`添加账户到分组成功: ${accountId} -> ${group.name}`)
     } catch (error) {
@@ -311,7 +305,7 @@ class AccountGroupService {
       const client = redis.getClientSafe()
 
       // 从分组成员集合中移除
-      await client.srem(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
+      await client.srem(RedisKeys.accountGroup.members(groupId), accountId)
 
       // 维护反向索引
       let groupPlatform = platform
@@ -320,7 +314,7 @@ class AccountGroupService {
         groupPlatform = group?.platform
       }
       if (groupPlatform) {
-        await client.srem(`account_groups_reverse:${groupPlatform}:${accountId}`, groupId)
+        await client.srem(RedisKeys.accountGroup.reverse(groupPlatform, accountId), groupId)
       }
 
       logger.success(`从分组移除账户成功: ${accountId}`)
@@ -338,7 +332,7 @@ class AccountGroupService {
   async getGroupMembers(groupId) {
     try {
       const client = redis.getClientSafe()
-      const members = await client.smembers(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
+      const members = await client.smembers(RedisKeys.accountGroup.members(groupId))
       return members || []
     } catch (error) {
       logger.error('❌ 获取分组成员失败:', error)
@@ -372,11 +366,11 @@ class AccountGroupService {
       const groupKey = `group:${groupId}`
 
       // 获取所有API Key
-      const apiKeyIds = await client.smembers('api_keys')
+      const apiKeyIds = await client.smembers(RedisKeys.apiKey.legacyAll)
       const boundApiKeys = []
 
       for (const keyId of apiKeyIds) {
-        const keyData = await client.hgetall(`api_key:${keyId}`)
+        const keyData = await client.hgetall(RedisKeys.apiKey.legacyData(keyId))
         if (
           keyData &&
           (keyData.claudeAccountId === groupKey ||
@@ -406,10 +400,10 @@ class AccountGroupService {
   async getAccountGroup(accountId) {
     try {
       const client = redis.getClientSafe()
-      const allGroupIds = await client.smembers(this.GROUPS_KEY)
+      const allGroupIds = await client.smembers(RedisKeys.accountGroup.groups)
 
       for (const groupId of allGroupIds) {
-        const isMember = await client.sismember(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
+        const isMember = await client.sismember(RedisKeys.accountGroup.members(groupId), accountId)
         if (isMember) {
           return await this.getGroup(groupId)
         }
@@ -430,11 +424,11 @@ class AccountGroupService {
   async getAccountGroups(accountId) {
     try {
       const client = redis.getClientSafe()
-      const allGroupIds = await client.smembers(this.GROUPS_KEY)
+      const allGroupIds = await client.smembers(RedisKeys.accountGroup.groups)
       const memberGroups = []
 
       for (const groupId of allGroupIds) {
-        const isMember = await client.sismember(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
+        const isMember = await client.sismember(RedisKeys.accountGroup.members(groupId), accountId)
         if (isMember) {
           const group = await this.getGroup(groupId)
           if (group) {
@@ -484,21 +478,21 @@ class AccountGroupService {
   async removeAccountFromAllGroups(accountId, platform = null) {
     try {
       const client = redis.getClientSafe()
-      const allGroupIds = await client.smembers(this.GROUPS_KEY)
+      const allGroupIds = await client.smembers(RedisKeys.accountGroup.groups)
 
       for (const groupId of allGroupIds) {
-        await client.srem(`${this.GROUP_MEMBERS_PREFIX}${groupId}`, accountId)
+        await client.srem(RedisKeys.accountGroup.members(groupId), accountId)
       }
 
       // 清理反向索引
       if (platform) {
-        await client.del(`account_groups_reverse:${platform}:${accountId}`)
+        await client.del(RedisKeys.accountGroup.reverse(platform, accountId))
       } else {
         // 如果没有指定平台，清理所有可能的平台
-        const platforms = ['claude', 'gemini', 'openai', 'droid']
+        const platforms = ['claude', 'gemini', 'openai', 'droid', 'grok']
         const pipeline = client.pipeline()
         for (const p of platforms) {
-          pipeline.del(`account_groups_reverse:${p}:${accountId}`)
+          pipeline.del(RedisKeys.accountGroup.reverse(p, accountId))
         }
         await pipeline.exec()
       }
@@ -531,7 +525,7 @@ class AccountGroupService {
       // Pipeline 批量获取所有账户的分组ID
       const pipeline = client.pipeline()
       for (const accountId of accountIds) {
-        pipeline.smembers(`${this.REVERSE_INDEX_PREFIX}${platform}:${accountId}`)
+        pipeline.smembers(RedisKeys.accountGroup.reverse(platform, accountId))
       }
       const groupIdResults = await pipeline.exec()
 
@@ -551,7 +545,7 @@ class AccountGroupService {
 
       // 如果反向索引全空，回退到原方法（兼容未迁移的数据）
       if (!hasAnyGroups) {
-        const migrated = await client.get(this.REVERSE_INDEX_MIGRATED_KEY)
+        const migrated = await client.get(RedisKeys.accountGroup.reverseMigrated)
         if (migrated !== 'true') {
           logger.debug('📁 Reverse index not migrated, falling back to getAccountGroups')
           const result = new Map()
@@ -586,7 +580,7 @@ class AccountGroupService {
               groupIds.forEach((id) => uniqueGroupIds.add(id))
               // 异步补建反向索引
               client
-                .sadd(`${this.REVERSE_INDEX_PREFIX}${platform}:${accountId}`, ...groupIds)
+                .sadd(RedisKeys.accountGroup.reverse(platform, accountId), ...groupIds)
                 .catch(() => {})
             }
           } catch {
@@ -601,9 +595,9 @@ class AccountGroupService {
         const detailPipeline = client.pipeline()
         const groupIdArray = Array.from(uniqueGroupIds)
         for (const groupId of groupIdArray) {
-          detailPipeline.hgetall(`${this.GROUP_PREFIX}${groupId}`)
+          detailPipeline.hgetall(RedisKeys.accountGroup.group(groupId))
           if (!skipMemberCount) {
-            detailPipeline.scard(`${this.GROUP_MEMBERS_PREFIX}${groupId}`)
+            detailPipeline.scard(RedisKeys.accountGroup.members(groupId))
           }
         }
         const detailResults = await detailPipeline.exec()

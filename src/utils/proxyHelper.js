@@ -91,8 +91,9 @@ class ProxyHelper {
       let agent = null
 
       // 根据代理类型创建 Agent
-      if (proxy.type === 'socks5') {
-        const socksUrl = `socks5h://${auth}${proxy.host}:${proxy.port}`
+      if (proxy.type === 'socks5' || proxy.type === 'socks4') {
+        const scheme = proxy.type === 'socks5' ? 'socks5h' : 'socks4'
+        const socksUrl = `${scheme}://${auth}${proxy.host}:${proxy.port}`
         const socksOptions = { ...agentCommonOptions }
 
         // 设置 IP 协议族（如果指定）
@@ -188,7 +189,7 @@ class ProxyHelper {
       }
 
       // 检查支持的类型
-      if (!['socks5', 'http', 'https'].includes(proxy.type)) {
+      if (!['socks5', 'socks4', 'http', 'https'].includes(proxy.type)) {
         return false
       }
 
@@ -253,6 +254,33 @@ class ProxyHelper {
       return proxyDesc
     } catch (error) {
       return 'Invalid proxy config'
+    }
+  }
+
+  /**
+   * 从代理 URL 字符串创建 Agent（支持 http/https/socks4/socks5），用于代理池
+   * @param {string} url - 形如 socks5://user:pass@host:port
+   * @param {object} options - 额外选项（同 createProxyAgent）
+   * @returns {Agent|null} 代理 Agent 实例或 null
+   */
+  static createProxyAgentFromUrl(url, options = {}) {
+    if (!url || typeof url !== 'string') {
+      return null
+    }
+    try {
+      const u = new URL(url.trim())
+      const type = u.protocol.replace(':', '')
+      const proxyConfig = {
+        type,
+        host: u.hostname,
+        port: parseInt(u.port, 10),
+        username: u.username ? decodeURIComponent(u.username) : undefined,
+        password: u.password ? decodeURIComponent(u.password) : undefined
+      }
+      return ProxyHelper.createProxyAgent(proxyConfig, options)
+    } catch (error) {
+      logger.warn('⚠️ Failed to create proxy agent from url:', error.message)
+      return null
     }
   }
 

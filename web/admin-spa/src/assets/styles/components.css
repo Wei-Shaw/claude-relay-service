@@ -340,7 +340,7 @@
 
   /* 标签按钮 */
   .tab-btn {
-    font-size: 12px;
+    font-size: 14px;
     padding: 10px 6px;
   }
 
@@ -376,7 +376,7 @@
 
   /* 表格 */
   .table-container table {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .table-container th,
