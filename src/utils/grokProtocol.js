@@ -230,7 +230,7 @@ const messagesToResponsesInput = (messages) => {
         continue
       }
       text = JSON.stringify(message.content)
-    } else if (message.content != null) {
+    } else if (message.content !== null && message.content !== undefined) {
       text = JSON.stringify(message.content)
     }
     input.push({
@@ -307,8 +307,8 @@ const maybeInjectFreeCacheTools = (responsesBody, account) => {
 // /responses/compact → 普通 Responses 总结轮
 const buildGrokCompactRequestBody = (body) => {
   const payload = { ...(body || {}) }
-  let input = payload.input
-  if (input == null) {
+  let { input } = payload
+  if (input === null || input === undefined) {
     input = []
   } else if (typeof input === 'string') {
     input = [

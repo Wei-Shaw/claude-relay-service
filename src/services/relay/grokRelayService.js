@@ -4,7 +4,6 @@
  */
 
 const axios = require('axios')
-const crypto = require('crypto')
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 const redis = require('../../models/redis')
@@ -250,7 +249,7 @@ class GrokRelayService {
         const stripped = stripEncryptedReasoningContent(body)
         if (stripped.changed) {
           logger.warn(`[GrokRelay] invalid encrypted_content retry account=${account.id}`)
-          body = stripped.body
+          ;({ body } = stripped)
           response = await axios(applyProxy(buildRequestOptions(body)))
         }
       }
@@ -519,7 +518,7 @@ class GrokRelayService {
     req,
     options = {}
   ) {
-    let data = response.data
+    let { data } = response
     // compact 响应改写
     if (options.isCompact) {
       data = convertGrokResponseToOpenAICompact(data)

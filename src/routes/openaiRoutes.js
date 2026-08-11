@@ -1050,7 +1050,7 @@ async function handleImages(req, res) {
     sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
 
     const authResult = await getOpenAIAuthToken(apiKeyData, sessionId, 'gpt-5.4-mini')
-    const { accessToken, accountType, proxy, account } = authResult
+    const { accessToken, accountType, account } = authResult
     ;({ accountId } = authResult)
     if (accountType === 'openai-responses' || !accessToken) {
       return res.status(400).json({
@@ -1107,7 +1107,8 @@ async function handleImages(req, res) {
       'user-agent': 'codex_cli_rs/0.144.5',
       version: '0.144.5'
     }
-    const proxyAgent = createProxyAgent(proxy)
+    // 与 /responses 主路径一致：经 proxyResolver 拿 agent（支持代理池/账户代理）
+    const proxyAgent = proxyResolver.resolveAgent(account, 'codex').agent
     const axiosConfig = {
       headers,
       timeout: config.requestTimeout || 600000,

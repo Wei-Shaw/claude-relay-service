@@ -375,7 +375,7 @@ router.get('/grok-accounts/:id/media-eligibility', authenticateAdmin, async (req
 // 连通性测试
 router.post('/grok-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
   try {
-    const accountId = req.params.accountId
+    const { accountId } = req.params
     const account = await grokAccountService.ensureFreshToken(accountId)
     if (!account) {
       return res.status(404).json({ error: 'Account not found' })

@@ -1092,7 +1092,7 @@ class GrokAccountService {
     if (!account) {
       return { eligible: false, reason: 'not_found', account: null }
     }
-    let result = this.getMediaGenerationEligibility(account)
+    const result = this.getMediaGenerationEligibility(account)
     if (result.reason === 'billing_unobserved' && account.authType === 'oauth') {
       try {
         const quota = await this.queryQuota(accountId)

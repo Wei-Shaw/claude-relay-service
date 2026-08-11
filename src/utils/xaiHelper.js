@@ -255,7 +255,7 @@ const buildVideoUrl = (baseUrl, requestId, validator = null) => {
   if (!id) {
     throw new Error('request id is required')
   }
-  if (id === '.' || id === '..' || /[\x00\r\n]/.test(id)) {
+  if (id === '.' || id === '..' || id.includes('\0') || id.includes('\r') || id.includes('\n')) {
     throw new Error('invalid request id')
   }
   return joinBasePath(validatedBaseUrl(baseUrl, validator), `/videos/${encodeURIComponent(id)}`)

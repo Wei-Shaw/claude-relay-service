@@ -166,7 +166,7 @@ class SsoDeviceFlow {
       })
       this.captureCookies(response)
 
-      const status = response.status
+      const { status } = response
       const bodyBuf = Buffer.from(response.data || [])
       if (bodyBuf.length > 2 * 1024 * 1024) {
         throw new Error('xAI OAuth response exceeds 2 MiB')
@@ -175,7 +175,7 @@ class SsoDeviceFlow {
 
       // 3xx 跟随 Location（不自动跳转，便于读 cookie）
       if (status >= 300 && status < 400) {
-        const location = response.headers.location
+        const { location } = response.headers
         if (!location) {
           throw new Error('xAI OAuth redirect missing Location')
         }
