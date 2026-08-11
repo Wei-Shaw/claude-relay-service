@@ -59,8 +59,7 @@ function getOauthProviderConfig(oauthProvider, { requireCredentials = true } = {
   const config = OAUTH_PROVIDERS[normalized] || OAUTH_PROVIDERS[OAUTH_PROVIDER_GEMINI_CLI]
   const hasClientId = !!config.clientId
   const hasClientSecret = !!config.clientSecret
-  const envPrefix =
-    normalized === OAUTH_PROVIDER_ANTIGRAVITY ? 'ANTIGRAVITY_OAUTH' : 'GEMINI_OAUTH'
+  const envPrefix = normalized === OAUTH_PROVIDER_ANTIGRAVITY ? 'ANTIGRAVITY_OAUTH' : 'GEMINI_OAUTH'
 
   // 半套配置（只配了 ID 或只配了 SECRET）一律报错，避免被当成“无凭证”静默降级
   if (hasClientId !== hasClientSecret) {

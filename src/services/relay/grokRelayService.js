@@ -185,9 +185,7 @@ class GrokRelayService {
             `[GrokRelay] chat→responses bridge account=${account.id} reason=${bridge.reason}`
           )
         } else if (!bridge.ok) {
-          logger.debug(
-            `[GrokRelay] chat raw forward account=${account.id} reason=${bridge.reason}`
-          )
+          logger.debug(`[GrokRelay] chat raw forward account=${account.id} reason=${bridge.reason}`)
         }
       }
 
@@ -251,27 +249,23 @@ class GrokRelayService {
       ) {
         const stripped = stripEncryptedReasoningContent(body)
         if (stripped.changed) {
-          logger.warn(
-            `[GrokRelay] invalid encrypted_content retry account=${account.id}`
-          )
+          logger.warn(`[GrokRelay] invalid encrypted_content retry account=${account.id}`)
           body = stripped.body
           response = await axios(applyProxy(buildRequestOptions(body)))
         }
       }
 
       // failover：405/401/429/5xx 等换号重试一次
-      if (
-        response.status >= 400 &&
-        shouldFailoverGrokStatus(response.status) &&
-        !forcedAccountId
-      ) {
+      if (response.status >= 400 && shouldFailoverGrokStatus(response.status) && !forcedAccountId) {
         if (response.status === 429) {
           const retryAfter = upstreamErrorHelper.parseRetryAfter?.(response.headers) || 3600
           await grokAccountService.markAccountRateLimited(
             account.id,
             Math.ceil(retryAfter / 60) || 60
           )
-          if (!(account.disableAutoProtection === true || account.disableAutoProtection === 'true')) {
+          if (
+            !(account.disableAutoProtection === true || account.disableAutoProtection === 'true')
+          ) {
             await upstreamErrorHelper
               .markTempUnavailable(account.id, 'grok', 429, retryAfter)
               .catch((e) => console.error(e))
@@ -289,16 +283,11 @@ class GrokRelayService {
 
         // 换号重试（排除当前号）
         try {
-          const next = await grokScheduler.selectAccount(
-            apiKeyData,
-            requestedModel,
-            sessionHash,
-            { mediaGeneration }
-          )
+          const next = await grokScheduler.selectAccount(apiKeyData, requestedModel, sessionHash, {
+            mediaGeneration
+          })
           if (next && next.id !== account.id) {
-            logger.warn(
-              `[GrokRelay] failover ${response.status} ${account.id} -> ${next.id}`
-            )
+            logger.warn(`[GrokRelay] failover ${response.status} ${account.id} -> ${next.id}`)
             account = (await grokAccountService.ensureFreshToken(next.id)) || next
             token = account.authType === 'apikey' ? account.apiKey : account.accessToken
             headers.Authorization = `Bearer ${token}`
@@ -307,7 +296,11 @@ class GrokRelayService {
             }
             targetUrl = this._buildTargetUrl(
               account,
-              endpointKind === 'responses_compact' ? 'responses' : effectiveEndpointKind === 'responses' ? 'responses' : endpointKind,
+              endpointKind === 'responses_compact'
+                ? 'responses'
+                : effectiveEndpointKind === 'responses'
+                  ? 'responses'
+                  : endpointKind,
               req
             )
             proxyResolution = proxyResolver.resolveAgent(account, 'grok')

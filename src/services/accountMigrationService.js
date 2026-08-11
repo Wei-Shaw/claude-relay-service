@@ -340,8 +340,7 @@ async function readGrokSnapshot(id) {
       priority: toInt(a.priority, 50),
       accountType: a.accountType || 'shared',
       schedulable: a.schedulable !== false && a.schedulable !== 'false',
-      disableAutoProtection:
-        a.disableAutoProtection === true || a.disableAutoProtection === 'true'
+      disableAutoProtection: a.disableAutoProtection === true || a.disableAutoProtection === 'true'
     }
   }
 }

@@ -43,10 +43,7 @@ const normalizeSSOToken = (value) => {
     raw = raw.slice(4).trim()
   }
   // 去掉引号
-  if (
-    (raw.startsWith('"') && raw.endsWith('"')) ||
-    (raw.startsWith("'") && raw.endsWith("'"))
-  ) {
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
     raw = raw.slice(1, -1).trim()
   }
   return raw
@@ -227,7 +224,11 @@ class SsoDeviceFlow {
     } catch (error) {
       throw new Error(`parse xAI device flow response: ${error.message}`)
     }
-    if (!device.device_code || !device.user_code || !isTrustedXaiAuthUrl(device.verification_uri_complete)) {
+    if (
+      !device.device_code ||
+      !device.user_code ||
+      !isTrustedXaiAuthUrl(device.verification_uri_complete)
+    ) {
       throw new Error('xAI device flow response is incomplete')
     }
     const intervalSec = device.interval > 0 ? device.interval : 5

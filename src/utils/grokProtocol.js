@@ -171,7 +171,11 @@ const messagesToResponsesInput = (messages) => {
       })
       continue
     }
-    if (message.role === 'assistant' && Array.isArray(message.tool_calls) && message.tool_calls.length) {
+    if (
+      message.role === 'assistant' &&
+      Array.isArray(message.tool_calls) &&
+      message.tool_calls.length
+    ) {
       if (message.content) {
         input.push({
           type: 'message',
@@ -281,8 +285,7 @@ const maybeInjectFreeCacheTools = (responsesBody, account) => {
     return responsesBody
   }
   const enabled =
-    account.grokClientToolCacheEnabled === true ||
-    account.grokClientToolCacheEnabled === 'true'
+    account.grokClientToolCacheEnabled === true || account.grokClientToolCacheEnabled === 'true'
   if (!enabled) {
     return responsesBody
   }
@@ -291,9 +294,7 @@ const maybeInjectFreeCacheTools = (responsesBody, account) => {
   }
   const plan = String(account.planType || account.subscriptionTier || '').toLowerCase()
   const isFree =
-    plan === 'free' ||
-    plan === 'basic' ||
-    (plan.includes('free') && !plan.includes('super'))
+    plan === 'free' || plan === 'basic' || (plan.includes('free') && !plan.includes('super'))
   if (!isFree && plan !== '') {
     return responsesBody
   }
@@ -359,9 +360,7 @@ const convertGrokResponseToOpenAICompact = (responseBody) => {
   const compactItem = {
     id: `cmp_${Date.now()}`,
     type: 'compaction',
-    summary: summaryText
-      ? [{ type: 'summary_text', text: summaryText }]
-      : []
+    summary: summaryText ? [{ type: 'summary_text', text: summaryText }] : []
   }
   return {
     id: response.id || `resp_compact_${Date.now()}`,

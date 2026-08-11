@@ -61,8 +61,7 @@ const CLI_HEADERS = {
 
 const allowUnsafeUrlOverrides = () => xaiConfig().allowUnsafeUrlOverrides === true
 
-const effectiveAuthorizeUrl = () =>
-  xaiConfig().oauthAuthorizeUrl || XAI_DEFAULTS.authorizeUrl
+const effectiveAuthorizeUrl = () => xaiConfig().oauthAuthorizeUrl || XAI_DEFAULTS.authorizeUrl
 const effectiveTokenUrl = () => xaiConfig().oauthTokenUrl || XAI_DEFAULTS.tokenUrl
 const effectiveClientId = () => xaiConfig().oauthClientId || XAI_DEFAULTS.clientId
 const effectiveScope = () => xaiConfig().oauthScope || XAI_DEFAULTS.scope

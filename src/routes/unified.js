@@ -39,11 +39,7 @@ function detectBackendFromModel(modelName) {
   }
 
   // Grok / xAI 模型
-  if (
-    model.startsWith('grok') ||
-    model.startsWith('composer') ||
-    model.includes('imagine')
-  ) {
+  if (model.startsWith('grok') || model.startsWith('composer') || model.includes('imagine')) {
     return 'grok'
   }
 

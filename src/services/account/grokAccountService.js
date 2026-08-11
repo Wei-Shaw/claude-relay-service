@@ -69,9 +69,7 @@ const parseJsonField = (raw, fallback = null) => {
 const normalizeBaseUrl = (raw, accountType) => {
   const trimmed = String(raw || '').trim()
   if (!trimmed) {
-    return accountType === 'oauth'
-      ? xaiHelper.effectiveCliBaseUrl()
-      : xaiHelper.effectiveBaseUrl()
+    return accountType === 'oauth' ? xaiHelper.effectiveCliBaseUrl() : xaiHelper.effectiveBaseUrl()
   }
   if (accountType === 'oauth' && xaiHelper.isOfficialBaseUrl(trimmed)) {
     return xaiHelper.validateTrustedBaseUrl(trimmed)
@@ -164,13 +162,7 @@ class GrokAccountService {
     await client.del(RedisKeys.session.oauth(sessionId))
   }
 
-  async exchangeCode({
-    sessionId,
-    code,
-    state = '',
-    redirectUri = '',
-    proxy = null
-  } = {}) {
+  async exchangeCode({ sessionId, code, state = '', redirectUri = '', proxy = null } = {}) {
     const session = await this._loadOAuthSession(sessionId)
     if (!session) {
       throw new Error('Grok OAuth session not found or expired')
@@ -405,9 +397,7 @@ class GrokAccountService {
         : '',
       userAgent: options.userAgent || '',
       baseUrl,
-      mediaBaseUrl: options.mediaBaseUrl
-        ? String(options.mediaBaseUrl).replace(/\/+$/, '')
-        : '',
+      mediaBaseUrl: options.mediaBaseUrl ? String(options.mediaBaseUrl).replace(/\/+$/, '') : '',
       clientId: options.clientId || xaiHelper.effectiveClientId(),
       email: options.email ? encrypt(options.email) : '',
       subscriptionTier: options.subscriptionTier || '',
@@ -945,8 +935,7 @@ class GrokAccountService {
       throw new Error('Account not found')
     }
 
-    const token =
-      account.authType === 'apikey' ? account.apiKey : account.accessToken
+    const token = account.authType === 'apikey' ? account.apiKey : account.accessToken
     if (!token) {
       throw new Error('No credential available for quota probe')
     }
@@ -1132,9 +1121,7 @@ class GrokAccountService {
         }
         // 有成功月度/周度观测且非 free
         const hasObservation =
-          quota.monthly && !quota.monthly.error
-            ? true
-            : quota.weekly && !quota.weekly.error
+          quota.monthly && !quota.monthly.error ? true : quota.weekly && !quota.weekly.error
         if (!hasObservation) {
           return { eligible: false, reason: 'billing_inconclusive', account }
         }
@@ -1267,14 +1254,10 @@ class GrokAccountService {
       failed: results.filter((item) => !item.created)
     }
   }
-/**
+  /**
    * OAuth 批量对账：扫描近过期/缺 token 账户，可选 dry-run 或 apply 刷新
    */
-  async reconcileOAuthAccounts({
-    mode = 'dry_run',
-    limit = 50,
-    nearExpiryMinutes = 60
-  } = {}) {
+  async reconcileOAuthAccounts({ mode = 'dry_run', limit = 50, nearExpiryMinutes = 60 } = {}) {
     const apply = mode === 'apply'
     const pageSize = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500)
     const all = await this.getAllAccounts(true)

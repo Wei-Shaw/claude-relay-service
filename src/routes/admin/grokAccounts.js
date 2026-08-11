@@ -386,8 +386,7 @@ router.post('/grok-accounts/:accountId/test', authenticateAdmin, async (req, res
       (await testModelConfigService.resolveAccountModel?.('grok', req.body?.model)) ||
       'grok-4.5'
     const mappedModel = xaiHelper.mapModel(model)
-    const token =
-      account.authType === 'apikey' ? account.apiKey : account.accessToken
+    const token = account.authType === 'apikey' ? account.apiKey : account.accessToken
     if (!token) {
       return res.status(400).json({ error: 'No credential available' })
     }

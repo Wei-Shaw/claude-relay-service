@@ -84,21 +84,17 @@ router.get(['/v1/models', '/models'], authenticateApiKey, async (req, res) => {
 })
 
 // Chat Completions
-router.post(
-  ['/v1/chat/completions', '/chat/completions'],
-  authenticateApiKey,
-  async (req, res) => {
-    try {
-      if (denyIfNoPermission(req, res)) {
-        return
-      }
-      await grokRelayService.relayChatCompletions(req, res, req.apiKey, resolveSessionHash(req))
-    } catch (error) {
-      console.error(error)
-      sendRouteError(res, error)
+router.post(['/v1/chat/completions', '/chat/completions'], authenticateApiKey, async (req, res) => {
+  try {
+    if (denyIfNoPermission(req, res)) {
+      return
     }
+    await grokRelayService.relayChatCompletions(req, res, req.apiKey, resolveSessionHash(req))
+  } catch (error) {
+    console.error(error)
+    sendRouteError(res, error)
   }
-)
+})
 
 // Responses
 router.post(['/v1/responses', '/responses'], authenticateApiKey, async (req, res) => {
@@ -108,9 +104,9 @@ router.post(['/v1/responses', '/responses'], authenticateApiKey, async (req, res
     }
     await grokRelayService.relayResponses(req, res, req.apiKey, resolveSessionHash(req))
   } catch (error) {
-      console.error(error)
-      sendRouteError(res, error)
-    }
+    console.error(error)
+    sendRouteError(res, error)
+  }
 })
 
 // Responses compact（Grok 无原生 compact，服务侧改写）
@@ -162,9 +158,9 @@ router.post(['/v1/images/edits', '/images/edits'], authenticateApiKey, async (re
     }
     await grokRelayService.relayMedia(req, res, req.apiKey, 'images_edits', resolveSessionHash(req))
   } catch (error) {
-      console.error(error)
-      sendRouteError(res, error)
-    }
+    console.error(error)
+    sendRouteError(res, error)
+  }
 })
 
 // Videos
@@ -195,17 +191,11 @@ router.post(['/v1/videos/edits', '/videos/edits'], authenticateApiKey, async (re
     if (denyIfNoPermission(req, res)) {
       return
     }
-    await grokRelayService.relayMedia(
-      req,
-      res,
-      req.apiKey,
-      'videos_edits',
-      resolveSessionHash(req)
-    )
+    await grokRelayService.relayMedia(req, res, req.apiKey, 'videos_edits', resolveSessionHash(req))
   } catch (error) {
-      console.error(error)
-      sendRouteError(res, error)
-    }
+    console.error(error)
+    sendRouteError(res, error)
+  }
 })
 
 router.post(

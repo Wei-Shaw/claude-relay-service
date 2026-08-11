@@ -212,9 +212,7 @@ class GrokScheduler {
         (item) => item.accountType === 'shared' || !item.accountType || item.accountType === ''
       )
       const hydrated = await Promise.all(
-        sharedListed.map((item) =>
-          grokAccountService.getAccount(item.id, { decryptSecrets: true })
-        )
+        sharedListed.map((item) => grokAccountService.getAccount(item.id, { decryptSecrets: true }))
       )
       for (const account of hydrated) {
         if (!account) {
