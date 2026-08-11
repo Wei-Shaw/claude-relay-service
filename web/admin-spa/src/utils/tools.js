@@ -152,6 +152,12 @@ export const formatNumber = (num) => {
   return num.toLocaleString()
 }
 
+export const formatDurationSeconds = (milliseconds) => {
+  const value = Number(milliseconds)
+  const seconds = Number.isFinite(value) ? value / 1000 : 0
+  return `${Number(seconds.toFixed(3))}s`
+}
+
 // 日期格式化
 export const formatDate = (date, format = 'YYYY-MM-DD HH:mm:ss') => {
   if (!date) return ''

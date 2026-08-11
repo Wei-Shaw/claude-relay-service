@@ -251,7 +251,7 @@ import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { debounce } from 'lodash-es'
 import { getServiceQualityApi } from '@/utils/http_apis'
-import { formatNumber, showToast } from '@/utils/tools'
+import { formatDurationSeconds, formatNumber, showToast } from '@/utils/tools'
 
 const GroupTable = defineComponent({
   name: 'GroupTable',
@@ -262,7 +262,7 @@ const GroupTable = defineComponent({
   emits: ['drill'],
   setup(props, { emit }) {
     const formatPercentLocal = (value) => `${Number(value || 0).toFixed(2)}%`
-    const formatDurationLocal = (value) => `${Number(value || 0)}ms`
+    const formatDurationLocal = formatDurationSeconds
     return () =>
       h('section', { class: 'quality-panel' }, [
         h('div', { class: 'panel-header' }, [h('h4', props.title)]),
@@ -362,7 +362,7 @@ const maxLatencyBucketCount = computed(() =>
 )
 
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
-const formatDuration = (value) => `${Number(value || 0)}ms`
+const formatDuration = formatDurationSeconds
 const bucketWidth = (count) =>
   `${Math.max(4, (Number(count || 0) / maxLatencyBucketCount.value) * 100)}%`
 

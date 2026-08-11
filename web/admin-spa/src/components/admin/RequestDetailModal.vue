@@ -288,7 +288,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { getRequestDetailApi, replayRequestDetailApi } from '@/utils/http_apis'
-import { showToast, formatNumber, formatRequestCost as formatCost } from '@/utils/tools'
+import {
+  showToast,
+  formatDurationSeconds,
+  formatNumber,
+  formatRequestCost as formatCost
+} from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -558,7 +563,7 @@ const copySnapshot = async () => {
 }
 
 const formatDate = (value) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-')
-const formatDuration = (value) => `${Number(value || 0)}ms`
+const formatDuration = formatDurationSeconds
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
 const formatCacheCreate = (value, notApplicable = false) =>
   notApplicable ? '-' : formatNumber(value)
