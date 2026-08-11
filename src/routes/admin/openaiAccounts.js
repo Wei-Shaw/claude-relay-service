@@ -13,8 +13,10 @@ const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const ProxyHelper = require('../../utils/proxyHelper')
+const proxyResolver = require('../../utils/proxyResolver')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { stripReadonlyAccountFields } = require('../../utils/commonHelper')
 
 const router = express.Router()
 
@@ -43,7 +45,13 @@ function generateOpenAIPKCE() {
 // 生成 OpenAI OAuth 授权 URL
 router.post('/generate-auth-url', authenticateAdmin, async (req, res) => {
   try {
-    const { proxy } = req.body
+    const { proxy, proxyGroupId, proxyId } = req.body
+    // 账户绑代理池时授权请求也走池代理（未绑池回退静态 proxy）
+    const effectiveProxy = proxyResolver.resolveAuthProxy(
+      { proxyGroupId, proxyId, platform: 'openai' },
+      'openai',
+      proxy
+    )
 
     // 生成 PKCE 参数
     const pkce = generateOpenAIPKCE()
@@ -59,7 +67,8 @@ router.post('/generate-auth-url', authenticateAdmin, async (req, res) => {
       codeVerifier: pkce.codeVerifier,
       codeChallenge: pkce.codeChallenge,
       state,
-      proxy: proxy || null,
+      proxy: effectiveProxy,
+      proxyBound: !!(proxyGroupId || proxyId), // 代理来源是否池绑定，供 exchange 一致性校验
       platform: 'openai',
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
@@ -124,6 +133,15 @@ router.post('/exchange-code', authenticateAdmin, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: '会话已过期或无效'
+      })
+    }
+
+    // 一致性校验：会话来源为池绑定但无已解析代理，拒绝（不允许授权直连暴露真实出口）
+    if (sessionData.proxyBound && !sessionData.proxy) {
+      await redis.deleteOAuthSession(sessionId)
+      return res.status(409).json({
+        success: false,
+        message: '账户绑定的代理池当前无可用代理，已阻止授权请求直连（避免暴露真实出口）'
       })
     }
 
@@ -482,7 +500,8 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = mapExpiryField(updates, 'OpenAI', id)
+    // review#3：剥离外部传入的状态类字段，禁止伪造自动停用证据
+    const mappedUpdates = stripReadonlyAccountFields(mapExpiryField(updates, 'OpenAI', id))
 
     const { needsImmediateRefresh, requireRefreshSuccess } = mappedUpdates
 

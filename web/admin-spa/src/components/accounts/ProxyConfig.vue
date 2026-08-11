@@ -24,7 +24,7 @@
           <p class="text-sm text-gray-700 dark:text-gray-300">
             配置代理以访问受限的网络资源。支持 SOCKS5 和 HTTP 代理。
           </p>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             请确保代理服务器稳定可用，否则会影响账户的正常使用。
           </p>
         </div>
@@ -34,7 +34,7 @@
       <div>
         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
           快速配置
-          <span class="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">
+          <span class="ml-1 text-sm font-normal text-gray-500 dark:text-gray-400">
             (粘贴完整代理URL自动填充)
           </span>
         </label>
@@ -57,11 +57,11 @@
             <i class="fas fa-times" />
           </button>
         </div>
-        <p v-if="parseError" class="mt-1 text-xs text-red-500">
+        <p v-if="parseError" class="mt-1 text-sm text-red-500">
           <i class="fas fa-exclamation-circle mr-1" />
           {{ parseError }}
         </p>
-        <p v-else-if="parseSuccess" class="mt-1 text-xs text-green-500">
+        <p v-else-if="parseSuccess" class="mt-1 text-sm text-green-500">
           <i class="fas fa-check-circle mr-1" />
           代理配置已自动填充
         </p>
@@ -73,14 +73,13 @@
         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
           >代理类型</label
         >
-        <select
+        <CustomDropdown
           v-model="proxy.type"
-          class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-        >
-          <option value="socks5">SOCKS5</option>
-          <option value="http">HTTP</option>
-          <option value="https">HTTPS</option>
-        </select>
+          accent="blue"
+          icon="fa-network-wired"
+          :options="proxyTypeOptions"
+          placeholder="选择代理类型"
+        />
       </div>
 
       <div class="grid grid-cols-2 gap-4">
@@ -162,7 +161,7 @@
       <div
         class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/30"
       >
-        <p class="text-xs text-blue-700 dark:text-blue-300">
+        <p class="text-sm text-blue-700 dark:text-blue-300">
           <i class="fas fa-info-circle mr-1" />
           <strong>提示：</strong
           >代理设置将用于所有与此账户相关的API请求。请确保代理服务器支持HTTPS流量转发。
@@ -193,6 +192,11 @@ const emit = defineEmits(['update:modelValue'])
 
 // 内部代理数据
 const proxy = ref({ ...props.modelValue })
+const proxyTypeOptions = [
+  { value: 'socks5', label: 'SOCKS5' },
+  { value: 'http', label: 'HTTP' },
+  { value: 'https', label: 'HTTPS' }
+]
 
 // UI状态
 const showAuth = ref(!!(proxy.value.username || proxy.value.password))

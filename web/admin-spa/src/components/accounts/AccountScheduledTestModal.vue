@@ -1,12 +1,12 @@
 <template>
-  <Teleport to="body">
+  <ModalTransition>
     <div
       v-if="show"
       class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
     >
       <div class="absolute inset-0" @click="handleClose" />
       <div
-        class="relative z-10 mx-3 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4"
+        class="modal-panel relative z-10 mx-3 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4"
       >
         <!-- 顶部栏 -->
         <div
@@ -20,7 +20,7 @@
             </div>
             <div>
               <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">定时测试配置</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
                 {{ account?.name || '未知账户' }}
               </p>
             </div>
@@ -47,7 +47,7 @@
             <div class="mb-5 flex items-center justify-between">
               <div>
                 <p class="font-medium text-gray-700 dark:text-gray-300">启用定时测试</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">按计划自动测试账户连通性</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">按计划自动测试账户连通性</p>
               </div>
               <button
                 :class="[
@@ -77,7 +77,7 @@
                 placeholder="0 8 * * *"
                 type="text"
               />
-              <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
                 格式: 分 时 日 月 周 (例: "0 8 * * *" = 每天8:00)
               </p>
             </div>
@@ -92,7 +92,7 @@
                   v-for="preset in cronPresets"
                   :key="preset.value"
                   :class="[
-                    'rounded-lg border px-3 py-1.5 text-xs font-medium transition',
+                    'rounded-lg border px-3 py-1.5 text-sm font-medium transition',
                     config.cronExpression === preset.value
                       ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/30 dark:text-blue-300'
                       : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700',
@@ -130,7 +130,7 @@
                 <div
                   v-for="(record, index) in testHistory"
                   :key="index"
-                  class="flex items-center justify-between text-xs"
+                  class="flex items-center justify-between text-sm"
                 >
                   <div class="flex items-center gap-2">
                     <i
@@ -197,14 +197,19 @@
         </div>
       </div>
     </div>
-  </Teleport>
+  </ModalTransition>
 </template>
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { APP_CONFIG } from '@/utils/tools'
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { showToast } from '@/utils/tools'
-import { getModelsApi } from '@/utils/http_apis'
+import {
+  getModelsApi,
+  getClaudeAccountTestConfigApi,
+  updateClaudeAccountTestConfigApi,
+  getClaudeAccountTestHistoryApi
+} from '@/utils/http_apis'
 import ModelSelector from '@/components/common/ModelSelector.vue'
 
 const props = defineProps({
@@ -226,7 +231,7 @@ const saving = ref(false)
 const config = ref({
   enabled: false,
   cronExpression: '0 8 * * *',
-  model: 'claude-sonnet-4-5-20250929'
+  model: ''
 })
 const testHistory = ref([])
 
@@ -242,12 +247,20 @@ const cronPresets = [
 
 // 模型选项（从 API 动态获取）
 const modelOptions = ref([])
+// 后台"测试模型"全局配置中的 claude 默认（单一事实源），用于无 per-account 配置时的默认值
+const globalDefaultModel = ref('')
 
 const loadModels = async () => {
   const result = await getModelsApi()
   if (result.success && result.data) {
     const platform = props.account?.platform
     modelOptions.value = result.data.platforms?.[platform] || result.data.claude || []
+    // 后台"测试模型"全局默认按当前账户平台取，与后端 accountTestSchedulerService 的 platform 解析一致；
+    // 平台缺省默认值不存在时回退 claude（保持原行为，避免空回显）
+    globalDefaultModel.value =
+      result.data.defaultModels?.account?.[platform] ||
+      result.data.defaultModels?.account?.claude ||
+      ''
   }
 }
 
@@ -265,104 +278,56 @@ function formatTimestamp(timestamp) {
   })
 }
 
-// 加载配置
+// 加载配置（仅 claude 平台支持）
 async function loadConfig() {
-  if (!props.account) return
+  if (!props.account || props.account.platform !== 'claude') return
 
   loading.value = true
+  // request 不会 reject，failure 走 !success 分支；finally 兜底保证 loading 复位
   try {
-    const authToken = localStorage.getItem('authToken')
-    const platform = props.account.platform
-
-    // 根据平台获取配置端点
-    let endpoint = ''
-    if (platform === 'claude') {
-      endpoint = `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test-config`
-    } else {
-      // 其他平台暂不支持
-      loading.value = false
+    const id = props.account.id
+    const configRes = await getClaudeAccountTestConfigApi(id)
+    if (!configRes.success) {
+      showToast('加载配置失败: ' + (configRes.message || ''), 'error')
       return
     }
-
-    // 获取配置
-    const configRes = await fetch(endpoint, {
-      headers: {
-        Authorization: authToken ? `Bearer ${authToken}` : ''
-      }
-    })
-
-    if (configRes.ok) {
-      const data = await configRes.json()
-      if (data.success && data.data?.config) {
-        config.value = {
-          enabled: data.data.config.enabled || false,
-          cronExpression: data.data.config.cronExpression || '0 8 * * *',
-          model: data.data.config.model || 'claude-sonnet-4-5-20250929'
-        }
+    if (configRes.data?.config) {
+      config.value = {
+        enabled: configRes.data.config.enabled || false,
+        cronExpression: configRes.data.config.cronExpression || '0 8 * * *',
+        model: configRes.data.config.model || globalDefaultModel.value
       }
     }
 
-    // 获取测试历史
-    const historyEndpoint = endpoint.replace('/test-config', '/test-history')
-    const historyRes = await fetch(historyEndpoint, {
-      headers: {
-        Authorization: authToken ? `Bearer ${authToken}` : ''
-      }
-    })
-
-    if (historyRes.ok) {
-      const historyData = await historyRes.json()
-      if (historyData.success && historyData.data?.history) {
-        testHistory.value = historyData.data.history
-      }
+    const historyRes = await getClaudeAccountTestHistoryApi(id)
+    if (historyRes.success && historyRes.data?.history) {
+      testHistory.value = historyRes.data.history
     }
-  } catch (err) {
-    showToast('加载配置失败: ' + err.message, 'error')
   } finally {
     loading.value = false
   }
 }
 
-// 保存配置
+// 保存配置（仅 claude 平台支持）
 async function saveConfig() {
-  if (!props.account) return
+  if (!props.account || props.account.platform !== 'claude') return
 
   saving.value = true
   try {
-    const authToken = localStorage.getItem('authToken')
-    const platform = props.account.platform
-
-    let endpoint = ''
-    if (platform === 'claude') {
-      endpoint = `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test-config`
-    } else {
-      saving.value = false
-      return
-    }
-
-    const res = await fetch(endpoint, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: authToken ? `Bearer ${authToken}` : ''
-      },
-      body: JSON.stringify({
-        enabled: config.value.enabled,
-        cronExpression: config.value.cronExpression,
-        model: config.value.model
-      })
+    const res = await updateClaudeAccountTestConfigApi(props.account.id, {
+      enabled: config.value.enabled,
+      cronExpression: config.value.cronExpression,
+      model: config.value.model
     })
-
-    if (res.ok) {
+    if (res.success) {
       showToast('配置已保存', 'success')
       emit('saved')
-      handleClose()
+      // 直接 emit('close')：handleClose 的 saving 守卫只用于拦截手动关闭，
+      // 此处 saving 仍为 true（finally 才复位），走 handleClose 会被守卫挡住而关不掉
+      emit('close')
     } else {
-      const errorData = await res.json().catch(() => ({}))
-      showToast(errorData.message || '保存失败', 'error')
+      showToast(res.message || '保存失败', 'error')
     }
-  } catch (err) {
-    showToast('保存失败: ' + err.message, 'error')
   } finally {
     saving.value = false
   }
@@ -382,10 +347,11 @@ watch(
       config.value = {
         enabled: false,
         cronExpression: '0 8 * * *',
-        model: 'claude-sonnet-4-5-20250929'
+        model: globalDefaultModel.value
       }
       testHistory.value = []
-      loadConfig()
+      // 组件持久挂载，模型列表/默认值随账户平台变化，每次打开都按当前平台重载（onMounted 只跑一次会沿用上次平台）
+      loadModels().then(loadConfig)
     }
   }
 )

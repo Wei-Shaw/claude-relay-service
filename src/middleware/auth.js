@@ -10,6 +10,7 @@ const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { calculateWaitTimeStats } = require('../utils/statsHelper')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
+const { RedisKeys, TTL } = require('../constants/redisKeys')
 
 // 工具函数
 function sleep(ms) {
@@ -1065,13 +1066,13 @@ const authenticateApiKey = async (req, res, next) => {
       (rateLimitRequests > 0 || validation.keyData.tokenLimit > 0 || rateLimitCost > 0)
 
     if (hasRateLimits) {
-      const windowStartKey = `rate_limit:window_start:${validation.keyData.id}`
-      const requestCountKey = `rate_limit:requests:${validation.keyData.id}`
-      const tokenCountKey = `rate_limit:tokens:${validation.keyData.id}`
-      const costCountKey = `rate_limit:cost:${validation.keyData.id}` // 新增：费用计数器
+      const windowStartKey = RedisKeys.rateLimit.windowStart(validation.keyData.id)
+      const requestCountKey = RedisKeys.rateLimit.requests(validation.keyData.id)
+      const tokenCountKey = RedisKeys.rateLimit.tokens(validation.keyData.id)
+      const costCountKey = RedisKeys.rateLimit.cost(validation.keyData.id) // 新增：费用计数器
 
       const now = Date.now()
-      const windowDuration = rateLimitWindow * 60 * 1000 // 转换为毫秒
+      const windowDuration = TTL.rateLimitWindowMs(rateLimitWindow) // 转换为毫秒
 
       // 获取窗口开始时间
       let windowStart = await redis.getClient().get(windowStartKey)
@@ -1184,9 +1185,28 @@ const authenticateApiKey = async (req, res, next) => {
       }
     }
 
+    // 💳 预付费 key：只看余额、余额耗尽即停，跳过所有后付费限额（daily/total/weeklyOpus）
+    // [人工决策-2026-06-02 21:32:07] prepaid key 计费只看余额、不看 totalCostLimit；被充值即转 prepaid。
+    const isPrepaid = validation.keyData.billingMode === 'prepaid'
+    if (isPrepaid) {
+      const balanceLedger = require('../services/payment/balanceLedger')
+      const prepaidBalance = await balanceLedger.get(validation.keyData.id)
+      if (prepaidBalance <= 0) {
+        logger.security(`💰 Prepaid balance exhausted for key: ${validation.keyData.id}`)
+        return res.status(402).json({
+          error: {
+            type: 'insufficient_quota',
+            message: '预付费余额不足，请充值',
+            code: 'prepaid_balance_exhausted'
+          },
+          balance: prepaidBalance
+        })
+      }
+    }
+
     // 检查每日费用限制
     const dailyCostLimit = validation.keyData.dailyCostLimit || 0
-    if (dailyCostLimit > 0) {
+    if (!isPrepaid && dailyCostLimit > 0) {
       const dailyCost = validation.keyData.dailyCost || 0
 
       if (dailyCost >= dailyCostLimit) {
@@ -1219,7 +1239,7 @@ const authenticateApiKey = async (req, res, next) => {
 
     // 检查总费用限制
     const totalCostLimit = validation.keyData.totalCostLimit || 0
-    if (totalCostLimit > 0) {
+    if (!isPrepaid && totalCostLimit > 0) {
       const totalCost = validation.keyData.totalCost || 0
 
       if (totalCost >= totalCostLimit) {
@@ -1250,7 +1270,7 @@ const authenticateApiKey = async (req, res, next) => {
 
     // 检查 Claude 周费用限制
     const weeklyOpusCostLimit = validation.keyData.weeklyOpusCostLimit || 0
-    if (weeklyOpusCostLimit > 0) {
+    if (!isPrepaid && weeklyOpusCostLimit > 0) {
       // 从请求中获取模型信息
       const requestBody = req.body || {}
       const model = requestBody.model || ''

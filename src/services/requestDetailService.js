@@ -19,15 +19,17 @@ const {
   resolveRequestDetailReasoning,
   CACHE_HIT_FORMULA
 } = require('../utils/requestDetailHelper')
+const { parseDateTimeQuery } = require('../utils/dateTime')
 
+const { RedisKeys, TTL } = require('../constants/redisKeys')
+
+// 仅保留供外部 require 的导出前缀（注册表无对应 bare-prefix builder）
 const REQUEST_DETAIL_ITEM_PREFIX = 'request_detail:item:'
 const REQUEST_DETAIL_DAY_INDEX_PREFIX = 'request_detail:index:day:'
-const REQUEST_DETAIL_QUERY_SNAPSHOT_PREFIX = 'request_detail:query_snapshot:'
 const DEFAULT_RETENTION_HOURS = 6
 const MAX_RETENTION_HOURS = 30 * 24
 const REQUEST_DETAIL_QUERY_BATCH_SIZE = 200
 const REQUEST_DETAIL_SCAN_BATCH_SIZE = 200
-const REQUEST_DETAIL_QUERY_SNAPSHOT_TTL_SECONDS = 30
 const MAX_REQUEST_DETAIL_SNAPSHOT_POINTERS = 25000
 const MAX_REQUEST_DETAIL_SNAPSHOT_BYTES = 2 * 1024 * 1024
 
@@ -196,6 +198,11 @@ function prepareRecordForDisplay(record = {}) {
   }
 }
 
+// Request detail 的 day index 按 UTC 自然日建键：
+// - zset score 存真实 timestampMs，真正时间范围过滤仍基于毫秒比较
+// - day index 只是把候选请求按“UTC 那一天”粗分桶，减少查询扫描面
+// - 该口径已写入历史 key（request_detail:index:day:YYYY-MM-DD），不能直接切到业务时区，
+//   否则查询会同时错过旧桶并混淆新旧数据；若将来要切时区，必须走双写/迁移
 function formatDayKey(date) {
   return date.toISOString().slice(0, 10)
 }
@@ -210,7 +217,7 @@ function listDayKeys(startDate, endDate) {
   )
 
   while (cursor <= endCursor) {
-    keys.push(`${REQUEST_DETAIL_DAY_INDEX_PREFIX}${formatDayKey(cursor)}`)
+    keys.push(RedisKeys.requestDetail.dayIndex(formatDayKey(cursor)))
     cursor.setUTCDate(cursor.getUTCDate() + 1)
   }
 
@@ -763,10 +770,10 @@ class RequestDetailService {
         bodyPreviewEnabled: settings.bodyPreviewEnabled
       })
       const timestampMs = toMillis(normalized.timestamp) || Date.now()
-      const itemKey = `${REQUEST_DETAIL_ITEM_PREFIX}${requestId}`
-      const dayKey = `${REQUEST_DETAIL_DAY_INDEX_PREFIX}${formatDayKey(new Date(timestampMs))}`
-      const ttlSeconds = Math.max(3600, settings.retentionHours * 3600)
-      const indexTtlSeconds = ttlSeconds + 86400
+      const itemKey = RedisKeys.requestDetail.item(requestId)
+      const dayKey = RedisKeys.requestDetail.dayIndex(formatDayKey(new Date(timestampMs)))
+      const ttlSeconds = TTL.requestDetailItem(settings.retentionHours)
+      const indexTtlSeconds = TTL.requestDetailIndex(ttlSeconds)
 
       await client
         .multi()
@@ -832,7 +839,7 @@ class RequestDetailService {
       const [nextCursor, keys] = await client.scan(
         cursor,
         'MATCH',
-        `${REQUEST_DETAIL_ITEM_PREFIX}*`,
+        RedisKeys.requestDetail.itemPattern,
         'COUNT',
         REQUEST_DETAIL_SCAN_BATCH_SIZE
       )
@@ -1176,9 +1183,7 @@ class RequestDetailService {
       return []
     }
 
-    const itemKeys = pointerBatch.map(
-      ({ requestId }) => `${REQUEST_DETAIL_ITEM_PREFIX}${requestId}`
-    )
+    const itemKeys = pointerBatch.map(({ requestId }) => RedisKeys.requestDetail.item(requestId))
     const rawItems = await client.mget(itemKeys)
     const records = []
 
@@ -1342,7 +1347,7 @@ class RequestDetailService {
 
     let rawSnapshot
     try {
-      rawSnapshot = await client.get(`${REQUEST_DETAIL_QUERY_SNAPSHOT_PREFIX}${snapshotId}`)
+      rawSnapshot = await client.get(RedisKeys.requestDetail.querySnapshot(snapshotId))
     } catch (error) {
       logger.warn(`⚠️ Failed to read request detail query snapshot: ${error.message}`)
       return null
@@ -1359,8 +1364,8 @@ class RequestDetailService {
     if (typeof client.expire === 'function') {
       try {
         await client.expire(
-          `${REQUEST_DETAIL_QUERY_SNAPSHOT_PREFIX}${snapshotId}`,
-          REQUEST_DETAIL_QUERY_SNAPSHOT_TTL_SECONDS
+          RedisKeys.requestDetail.querySnapshot(snapshotId),
+          TTL.requestDetailQuerySnapshot
         )
       } catch (error) {
         logger.warn(`⚠️ Failed to renew request detail query snapshot TTL: ${error.message}`)
@@ -1413,10 +1418,10 @@ class RequestDetailService {
     const snapshotId = makeRequestDetailQuerySnapshotId()
     try {
       await client.set(
-        `${REQUEST_DETAIL_QUERY_SNAPSHOT_PREFIX}${snapshotId}`,
+        RedisKeys.requestDetail.querySnapshot(snapshotId),
         serializedSnapshot,
         'EX',
-        REQUEST_DETAIL_QUERY_SNAPSHOT_TTL_SECONDS
+        TTL.requestDetailQuerySnapshot
       )
     } catch (error) {
       logger.warn(`⚠️ Failed to store request detail query snapshot: ${error.message}`)
@@ -1472,13 +1477,18 @@ class RequestDetailService {
 
     const now = new Date()
     const retentionStart = new Date(now.getTime() - settings.retentionHours * 3600 * 1000)
-    const startDate = filters.startDate ? new Date(filters.startDate) : retentionStart
-    const endDate = filters.endDate ? new Date(filters.endDate) : now
+    const startDate = filters.startDate ? parseDateTimeQuery(filters.startDate) : retentionStart
+    const endDate = filters.endDate ? parseDateTimeQuery(filters.endDate) : now
 
-    const effectiveStart = startDate < retentionStart ? retentionStart : startDate
-    const effectiveEnd = endDate > now ? now : endDate
+    const effectiveStart = startDate && startDate < retentionStart ? retentionStart : startDate
+    const effectiveEnd = endDate && endDate > now ? now : endDate
 
-    if (Number.isNaN(effectiveStart.getTime()) || Number.isNaN(effectiveEnd.getTime())) {
+    if (
+      !effectiveStart ||
+      !effectiveEnd ||
+      Number.isNaN(effectiveStart.getTime()) ||
+      Number.isNaN(effectiveEnd.getTime())
+    ) {
       throw new RequestDetailValidationError('Invalid date range')
     }
 
@@ -1576,7 +1586,7 @@ class RequestDetailService {
       }
     }
 
-    const raw = await client.get(`${REQUEST_DETAIL_ITEM_PREFIX}${requestId}`)
+    const raw = await client.get(RedisKeys.requestDetail.item(requestId))
     const parsed = safeJsonParse(raw)
     if (!parsed) {
       return {

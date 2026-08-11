@@ -7,13 +7,13 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+            <p class="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               总API Keys
             </p>
             <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
               {{ dashboardData.totalApiKeys }}
             </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               活跃: {{ dashboardData.activeApiKeys || 0 }}
             </p>
           </div>
@@ -26,7 +26,7 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div class="flex-1">
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+            <p class="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               服务账户
             </p>
             <div class="flex flex-wrap items-baseline gap-x-2">
@@ -44,8 +44,8 @@
                   class="inline-flex items-center gap-0.5"
                   :title="`Claude: ${dashboardData.accountsByPlatform.claude.total} 个 (正常: ${dashboardData.accountsByPlatform.claude.normal})`"
                 >
-                  <i class="fas fa-brain text-xs text-indigo-600" />
-                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                  <i class="fas fa-brain text-sm text-indigo-600" />
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform.claude.total
                   }}</span>
                 </div>
@@ -58,8 +58,8 @@
                   class="inline-flex items-center gap-0.5"
                   :title="`Console: ${dashboardData.accountsByPlatform['claude-console'].total} 个 (正常: ${dashboardData.accountsByPlatform['claude-console'].normal})`"
                 >
-                  <i class="fas fa-terminal text-xs text-purple-600" />
-                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                  <i class="fas fa-terminal text-sm text-purple-600" />
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform['claude-console'].total
                   }}</span>
                 </div>
@@ -72,8 +72,8 @@
                   class="inline-flex items-center gap-0.5"
                   :title="`Gemini: ${dashboardData.accountsByPlatform.gemini.total} 个 (正常: ${dashboardData.accountsByPlatform.gemini.normal})`"
                 >
-                  <i class="fas fa-robot text-xs text-yellow-600" />
-                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                  <i class="fas fa-robot text-sm text-yellow-600" />
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform.gemini.total
                   }}</span>
                 </div>
@@ -86,8 +86,8 @@
                   class="inline-flex items-center gap-0.5"
                   :title="`Bedrock: ${dashboardData.accountsByPlatform.bedrock.total} 个 (正常: ${dashboardData.accountsByPlatform.bedrock.normal})`"
                 >
-                  <i class="fab fa-aws text-xs text-orange-600" />
-                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                  <i class="fab fa-aws text-sm text-orange-600" />
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform.bedrock.total
                   }}</span>
                 </div>
@@ -100,8 +100,8 @@
                   class="inline-flex items-center gap-0.5"
                   :title="`OpenAI: ${dashboardData.accountsByPlatform.openai.total} 个 (正常: ${dashboardData.accountsByPlatform.openai.normal})`"
                 >
-                  <i class="fas fa-openai text-xs text-gray-100" />
-                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                  <i class="fas fa-openai text-sm text-gray-100" />
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform.openai.total
                   }}</span>
                 </div>
@@ -114,8 +114,8 @@
                   class="inline-flex items-center gap-0.5"
                   :title="`Azure OpenAI: ${dashboardData.accountsByPlatform.azure_openai.total} 个 (正常: ${dashboardData.accountsByPlatform.azure_openai.normal})`"
                 >
-                  <i class="fab fa-microsoft text-xs text-blue-600" />
-                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                  <i class="fab fa-microsoft text-sm text-blue-600" />
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform.azure_openai.total
                   }}</span>
                 </div>
@@ -128,14 +128,28 @@
                   class="inline-flex items-center gap-0.5"
                   :title="`OpenAI Responses: ${dashboardData.accountsByPlatform['openai-responses'].total} 个 (正常: ${dashboardData.accountsByPlatform['openai-responses'].normal})`"
                 >
-                  <i class="fas fa-server text-xs text-cyan-600" />
-                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                  <i class="fas fa-server text-sm text-cyan-600" />
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                     dashboardData.accountsByPlatform['openai-responses'].total
+                  }}</span>
+                </div>
+                <!-- Grok 账户 -->
+                <div
+                  v-if="
+                    dashboardData.accountsByPlatform.grok &&
+                    dashboardData.accountsByPlatform.grok.total > 0
+                  "
+                  class="inline-flex items-center gap-0.5"
+                  :title="`Grok: ${dashboardData.accountsByPlatform.grok.total} 个 (正常: ${dashboardData.accountsByPlatform.grok.normal})`"
+                >
+                  <i class="fas fa-bolt text-sm text-violet-600" />
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
+                    dashboardData.accountsByPlatform.grok.total
                   }}</span>
                 </div>
               </div>
             </div>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               正常: {{ dashboardData.normalAccounts || 0 }}
               <span v-if="dashboardData.abnormalAccounts > 0" class="text-red-600">
                 | 异常: {{ dashboardData.abnormalAccounts }}
@@ -160,13 +174,13 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+            <p class="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               今日请求
             </p>
             <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
               {{ dashboardData.todayRequests }}
             </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               总请求: {{ formatNumber(dashboardData.totalRequests || 0) }}
             </p>
           </div>
@@ -179,13 +193,13 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+            <p class="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               系统状态
             </p>
             <p class="text-2xl font-bold text-green-600 sm:text-3xl">
               {{ dashboardData.systemStatus }}
             </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               运行时间: {{ formattedUptime }}
             </p>
           </div>
@@ -201,13 +215,13 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+            <p class="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               账户余额/配额
             </p>
             <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">
               {{ formatCurrencyUsd(balanceSummary.totalBalance || 0) }}
             </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               低余额: {{ balanceSummary.lowBalanceCount || 0 }} | 总成本:
               {{ formatCurrencyUsd(balanceSummary.totalCost || 0) }}
             </p>
@@ -218,11 +232,11 @@
         </div>
 
         <div class="mt-3 flex items-center justify-between gap-3">
-          <p class="text-xs text-gray-500 dark:text-gray-400">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
             更新时间: {{ formatLastUpdate(balanceSummaryUpdatedAt) }}
           </p>
           <button
-            class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500"
+            class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500"
             :disabled="loadingBalanceSummary"
             @click="loadBalanceSummary"
           >
@@ -235,7 +249,7 @@
       <div class="card p-4 sm:p-6">
         <div class="mb-3 flex items-center justify-between">
           <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">低余额账户</h3>
-          <span class="text-xs text-gray-500 dark:text-gray-400">
+          <span class="text-sm text-gray-500 dark:text-gray-400">
             {{ lowBalanceAccounts.length }} 个
           </span>
         </div>
@@ -263,12 +277,12 @@
                 {{ account.name || account.accountId }}
               </div>
               <span
-                class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                class="rounded bg-gray-100 px-2 py-0.5 text-sm text-gray-600 dark:bg-gray-700 dark:text-gray-300"
               >
                 {{ getBalancePlatformLabel(account.platform) }}
               </span>
             </div>
-            <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            <div class="mt-1 text-sm text-gray-600 dark:text-gray-400">
               <span v-if="account.balance">余额: {{ account.balance.formattedAmount }}</span>
               <span v-else
                 >今日成本: {{ formatCurrencyUsd(account.statistics?.dailyCost || 0) }}</span
@@ -276,7 +290,7 @@
             </div>
             <div v-if="account.quota && typeof account.quota.percentage === 'number'" class="mt-2">
               <div
-                class="mb-1 flex items-center justify-between text-xs text-gray-600 dark:text-gray-400"
+                class="mb-1 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400"
               >
                 <span>配额使用</span>
                 <span class="text-red-600 dark:text-red-400">
@@ -302,7 +316,7 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div class="mr-8 flex-1">
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+            <p class="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               今日Token
             </p>
             <div class="mb-2 flex flex-wrap items-baseline gap-2">
@@ -320,7 +334,7 @@
                 >/ {{ costsData.todayCosts.formatted.totalCost }}</span
               >
             </div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
               <div class="flex flex-wrap items-center justify-between gap-x-4">
                 <span
                   >输入:
@@ -358,7 +372,7 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div class="mr-8 flex-1">
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+            <p class="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               总Token消耗
             </p>
             <div class="mb-2 flex flex-wrap items-baseline gap-2">
@@ -376,7 +390,7 @@
                 >/ {{ costsData.totalCosts.formatted.totalCost }}</span
               >
             </div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
               <div class="flex flex-wrap items-center justify-between gap-x-4">
                 <span
                   >输入:
@@ -414,14 +428,14 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+            <p class="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               实时RPM
-              <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
+              <span class="text-sm text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
             </p>
             <p class="text-2xl font-bold text-orange-600 sm:text-3xl">
               {{ dashboardData.realtimeRPM || 0 }}
             </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               每分钟请求数
               <span v-if="dashboardData.isHistoricalMetrics" class="text-yellow-600">
                 <i class="fas fa-exclamation-circle" /> 历史数据
@@ -437,14 +451,14 @@
       <div class="stat-card">
         <div class="flex items-center justify-between">
           <div>
-            <p class="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
+            <p class="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400 sm:text-sm">
               实时TPM
-              <span class="text-xs text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
+              <span class="text-sm text-gray-400">({{ dashboardData.metricsWindow }}分钟)</span>
             </p>
             <p class="text-2xl font-bold text-rose-600 sm:text-3xl">
               {{ formatNumber(dashboardData.realtimeTPM || 0) }}
             </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               每分钟Token数
               <span v-if="dashboardData.isHistoricalMetrics" class="text-yellow-600">
                 <i class="fas fa-exclamation-circle" /> 历史数据
@@ -527,7 +541,7 @@
               value-format="YYYY-MM-DD HH:mm:ss"
               @change="onCustomDateRangeChange"
             />
-            <span v-if="trendGranularity === 'hour'" class="text-xs text-orange-600">
+            <span v-if="trendGranularity === 'hour'" class="text-sm text-orange-600">
               <i class="fas fa-info-circle" /> 最多24小时
             </span>
           </div>
@@ -545,11 +559,11 @@
                 <span
                   class="ml-2.5 flex select-none items-center gap-1 text-sm font-medium text-gray-600 dark:text-gray-300"
                 >
-                  <i class="fas fa-redo-alt text-xs text-gray-500 dark:text-gray-400" />
+                  <i class="fas fa-redo-alt text-sm text-gray-500 dark:text-gray-400" />
                   <span>自动刷新</span>
                   <span
                     v-if="autoRefreshEnabled"
-                    class="ml-1 font-mono text-xs text-blue-600 transition-opacity"
+                    class="ml-1 font-mono text-sm text-blue-600 transition-opacity"
                     :class="refreshCountdown > 0 ? 'opacity-100' : 'opacity-0'"
                   >
                     {{ refreshCountdown }}s
@@ -565,7 +579,7 @@
               title="立即刷新数据"
               @click="refreshAllData()"
             >
-              <i :class="['fas fa-sync-alt text-xs', { 'animate-spin': isRefreshing }]" />
+              <i :class="['fas fa-sync-alt text-sm', { 'animate-spin': isRefreshing }]" />
               <span class="hidden sm:inline">{{ isRefreshing ? '刷新中' : '刷新' }}</span>
             </button>
           </div>
@@ -596,27 +610,27 @@
               <thead class="sticky top-0 bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th
-                    class="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 sm:px-4"
+                    class="px-2 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300 sm:px-4"
                   >
                     模型
                   </th>
                   <th
-                    class="hidden px-2 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 sm:table-cell sm:px-4"
+                    class="hidden px-2 py-2 text-right text-sm font-medium text-gray-700 dark:text-gray-300 sm:table-cell sm:px-4"
                   >
                     请求数
                   </th>
                   <th
-                    class="px-2 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 sm:px-4"
+                    class="px-2 py-2 text-right text-sm font-medium text-gray-700 dark:text-gray-300 sm:px-4"
                   >
                     总Token
                   </th>
                   <th
-                    class="px-2 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 sm:px-4"
+                    class="px-2 py-2 text-right text-sm font-medium text-gray-700 dark:text-gray-300 sm:px-4"
                   >
                     费用
                   </th>
                   <th
-                    class="hidden px-2 py-2 text-right text-xs font-medium text-gray-700 dark:text-gray-300 sm:table-cell sm:px-4"
+                    class="hidden px-2 py-2 text-right text-sm font-medium text-gray-700 dark:text-gray-300 sm:table-cell sm:px-4"
                   >
                     占比
                   </th>
@@ -628,31 +642,31 @@
                   :key="stat.model"
                   class="hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
-                  <td class="px-2 py-2 text-xs text-gray-900 dark:text-gray-100 sm:px-4 sm:text-sm">
+                  <td class="px-2 py-2 text-sm text-gray-900 dark:text-gray-100 sm:px-4 sm:text-sm">
                     <span class="block max-w-[100px] truncate sm:max-w-none" :title="stat.model">
                       {{ stat.model }}
                     </span>
                   </td>
                   <td
-                    class="hidden px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400 sm:table-cell sm:px-4 sm:text-sm"
+                    class="hidden px-2 py-2 text-right text-sm text-gray-600 dark:text-gray-400 sm:table-cell sm:px-4 sm:text-sm"
                   >
                     {{ formatNumber(stat.requests) }}
                   </td>
                   <td
-                    class="px-2 py-2 text-right text-xs text-gray-600 dark:text-gray-400 sm:px-4 sm:text-sm"
+                    class="px-2 py-2 text-right text-sm text-gray-600 dark:text-gray-400 sm:px-4 sm:text-sm"
                   >
                     {{ formatNumber(stat.allTokens) }}
                   </td>
                   <td
-                    class="px-2 py-2 text-right text-xs font-medium text-green-600 sm:px-4 sm:text-sm"
+                    class="px-2 py-2 text-right text-sm font-medium text-green-600 sm:px-4 sm:text-sm"
                   >
                     {{ stat.formatted ? stat.formatted.total : '$0.000000' }}
                   </td>
                   <td
-                    class="hidden px-2 py-2 text-right text-xs font-medium sm:table-cell sm:px-4 sm:text-sm"
+                    class="hidden px-2 py-2 text-right text-sm font-medium sm:table-cell sm:px-4 sm:text-sm"
                   >
                     <span
-                      class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                      class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-sm font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                     >
                       {{ calculatePercentage(stat.allTokens, dashboardModelStats) }}%
                     </span>
@@ -685,7 +699,7 @@
           <div class="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
             <button
               :class="[
-                'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
+                'rounded-md px-2 py-1 text-sm font-medium transition-colors sm:px-3 sm:text-sm',
                 apiKeysTrendMetric === 'requests'
                   ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
@@ -697,7 +711,7 @@
             </button>
             <button
               :class="[
-                'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
+                'rounded-md px-2 py-1 text-sm font-medium transition-colors sm:px-3 sm:text-sm',
                 apiKeysTrendMetric === 'tokens'
                   ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
                   : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
@@ -709,7 +723,7 @@
             </button>
           </div>
         </div>
-        <div class="mb-4 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
+        <div class="mb-4 text-sm text-gray-600 dark:text-gray-400 sm:text-sm">
           <span v-if="apiKeysTrendData.totalApiKeys > 10">
             共 {{ apiKeysTrendData.totalApiKeys }} 个 API Key，显示使用量前 10 个
           </span>
@@ -729,7 +743,7 @@
             <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
               账号使用趋势
             </h3>
-            <span class="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+            <span class="text-sm text-gray-500 dark:text-gray-400 sm:text-sm">
               当前分组：{{ accountUsageTrendData.groupLabel || '未选择' }}
             </span>
           </div>
@@ -739,7 +753,7 @@
                 v-for="option in accountGroupOptions"
                 :key="option.value"
                 :class="[
-                  'rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
+                  'rounded-md px-2 py-1 text-sm font-medium transition-colors sm:px-3 sm:text-sm',
                   accountUsageGroup === option.value
                     ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-800'
                     : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
@@ -752,7 +766,7 @@
           </div>
         </div>
         <div
-          class="mb-4 flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400 sm:text-sm"
+          class="mb-4 flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400 sm:text-sm"
         >
           <span>共 {{ accountUsageTrendData.totalAccounts || 0 }} 个账号</span>
           <span
@@ -832,7 +846,8 @@ const accountGroupOptions = [
   { value: 'claude', label: 'Claude' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Gemini' },
-  { value: 'droid', label: 'Droid' }
+  { value: 'droid', label: 'Droid' },
+  { value: 'grok', label: 'Grok' }
 ]
 
 const accountTrendUpdating = ref(false)
@@ -858,6 +873,7 @@ const getBalancePlatformLabel = (platform) => {
     azure_openai: 'Azure OpenAI',
     bedrock: 'Bedrock',
     droid: 'Droid',
+    grok: 'Grok',
     ccr: 'CCR'
   }
   return map[platform] || platform
@@ -1671,7 +1687,10 @@ async function refreshAllData() {
 
   isRefreshing.value = true
   try {
-    await Promise.all([loadDashboardData(), refreshChartsData(), loadBalanceSummary()])
+    // 先加载仪表板数据：它携带后端真实系统时区，并在时区变化时按真实时区重算预设范围，
+    // 之后再刷新图表，避免首屏图表用默认 +8 计算范围导致跨日偏移。
+    await loadDashboardData()
+    await Promise.all([refreshChartsData(), loadBalanceSummary()])
   } finally {
     isRefreshing.value = false
   }
@@ -1800,7 +1819,7 @@ onUnmounted(() => {
 <style scoped>
 /* 日期选择器基本样式调整 - 让Element Plus官方暗黑模式生效 */
 .custom-date-picker {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* 旋转动画 */

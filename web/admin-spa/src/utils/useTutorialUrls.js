@@ -41,12 +41,15 @@ export function useTutorialUrls() {
   const openaiBaseUrl = computed(() => getBaseUrlPrefix() + '/openai')
   const droidClaudeBaseUrl = computed(() => getBaseUrlPrefix() + '/droid/claude')
   const droidOpenaiBaseUrl = computed(() => getBaseUrlPrefix() + '/droid/openai')
+  // Grok OpenAI 兼容 v1 根（Codex/Grok Build 的 base_url 指这里）
+  const grokBaseUrl = computed(() => getBaseUrlPrefix() + '/grok/v1')
 
   return {
     currentBaseUrl,
     geminiBaseUrl,
     openaiBaseUrl,
     droidClaudeBaseUrl,
-    droidOpenaiBaseUrl
+    droidOpenaiBaseUrl,
+    grokBaseUrl
   }
 }

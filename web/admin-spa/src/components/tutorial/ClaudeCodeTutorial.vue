@@ -9,7 +9,7 @@
         class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
       >
         <span
-          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-sm font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
           >2</span
         >
         安装 Claude Code
@@ -28,7 +28,7 @@
           {{ platform === 'windows' ? '打开 PowerShell 或 CMD' : '打开终端' }}，运行以下命令：
         </p>
         <div
-          class="mb-4 overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
+          class="mb-4 overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-sm text-green-400 sm:p-4 sm:text-sm"
         >
           <div class="mb-2"># 全局安装 Claude Code</div>
           <div class="whitespace-nowrap text-gray-300">
@@ -49,7 +49,7 @@
           <h6 class="mb-2 text-sm font-medium text-blue-800 dark:text-blue-300 sm:text-base">
             提示
           </h6>
-          <ul class="space-y-1 text-xs text-blue-700 dark:text-blue-300 sm:text-sm">
+          <ul class="space-y-1 text-sm text-blue-700 dark:text-blue-300 sm:text-sm">
             <template v-if="platform === 'windows'">
               <li>• 建议使用 PowerShell 而不是 CMD，功能更强大</li>
               <li>• 如果遇到权限问题，以管理员身份运行 PowerShell</li>
@@ -75,7 +75,7 @@
           安装完成后，输入以下命令检查是否安装成功：
         </p>
         <div
-          class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
         >
           <div class="whitespace-nowrap text-gray-300">claude --version</div>
         </div>
@@ -91,7 +91,7 @@
         class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
       >
         <span
-          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-sm font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
           >3</span
         >
         设置环境变量
@@ -123,7 +123,7 @@
                 在 PowerShell 中运行以下命令：
               </p>
               <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">
                   $env:ANTHROPIC_BASE_URL = "{{ currentBaseUrl }}"
@@ -132,7 +132,7 @@
                   $env:ANTHROPIC_AUTH_TOKEN = "你的API密钥"
                 </div>
               </div>
-              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
+              <p class="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
                 💡 记得将 "你的API密钥" 替换为在上方 "API Keys" 标签页中创建的实际密钥。
               </p>
             </div>
@@ -147,7 +147,7 @@
                 在 PowerShell 中运行以下命令设置用户级环境变量：
               </p>
               <div
-                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="mb-2"># 设置用户级环境变量（永久生效）</div>
                 <div class="whitespace-nowrap text-gray-300">
@@ -160,7 +160,7 @@
                   "你的API密钥", [System.EnvironmentVariableTarget]::User)
                 </div>
               </div>
-              <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
+              <p class="mt-2 text-sm text-blue-700 dark:text-blue-300">
                 💡 设置后需要重新打开 PowerShell 窗口才能生效。
               </p>
             </div>
@@ -176,7 +176,7 @@
               </h6>
               <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">在终端中运行以下命令：</p>
               <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">
                   export ANTHROPIC_BASE_URL="{{ currentBaseUrl }}"
@@ -185,7 +185,7 @@
                   export ANTHROPIC_AUTH_TOKEN="你的API密钥"
                 </div>
               </div>
-              <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
+              <p class="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
                 💡 记得将 "你的API密钥" 替换为在上方 "API Keys" 标签页中创建的实际密钥。
               </p>
             </div>
@@ -202,7 +202,7 @@
                 }}）：
               </p>
               <div
-                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+                class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">
                   export ANTHROPIC_BASE_URL="{{ currentBaseUrl }}"
@@ -213,7 +213,7 @@
               </div>
               <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">然后执行：</p>
               <div
-                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+                class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
               >
                 <div class="whitespace-nowrap text-gray-300">
                   source {{ platform === 'macos' ? '~/.zshrc' : '~/.bashrc' }}
@@ -243,12 +243,12 @@
                 : '~/.claude/config.json'
             }}</code>
           </p>
-          <p class="text-xs text-indigo-600 dark:text-indigo-400">
+          <p class="text-sm text-indigo-600 dark:text-indigo-400">
             💡 如果该文件不存在，请手动创建。
           </p>
         </div>
         <div
-          class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
         >
           <div class="whitespace-nowrap text-gray-300">{</div>
           <div class="whitespace-nowrap text-gray-300">"primaryApiKey": "crs"</div>
@@ -271,7 +271,7 @@
               {{ platform === 'windows' ? '在 PowerShell 中验证：' : '在终端中验证：' }}
             </h6>
             <div
-              class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <template v-if="platform === 'windows'">
                 <div class="whitespace-nowrap text-gray-300">echo $env:ANTHROPIC_BASE_URL</div>
@@ -293,7 +293,7 @@
             <div>{{ currentBaseUrl }}</div>
             <div>cr_xxxxxxxxxxxxxxxxxx</div>
           </div>
-          <p class="text-xs text-blue-700 dark:text-blue-300">
+          <p class="text-sm text-blue-700 dark:text-blue-300">
             💡 如果输出为空或显示变量名本身，说明环境变量设置失败，请重新设置。
           </p>
         </div>
@@ -306,7 +306,7 @@
         class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
       >
         <span
-          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
           >4</span
         >
         开始使用 Claude Code
@@ -324,7 +324,7 @@
               启动 Claude Code
             </h6>
             <div
-              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <div class="whitespace-nowrap text-gray-300">claude</div>
             </div>
@@ -335,7 +335,7 @@
               在特定项目中使用
             </h6>
             <div
-              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <div class="mb-2"># 进入你的项目目录</div>
               <div class="whitespace-nowrap text-gray-300">
@@ -376,7 +376,7 @@
                 <li>以管理员身份运行 PowerShell</li>
                 <li>
                   或者配置 npm 使用用户目录：<code
-                    class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
+                    class="rounded bg-gray-200 px-1 text-sm dark:bg-gray-700 sm:text-sm"
                     >npm config set prefix %APPDATA%\npm</code
                   >
                 </li>
@@ -401,7 +401,7 @@
           <div class="px-3 pb-3 text-gray-600 dark:text-gray-400 sm:px-4 sm:pb-4">
             <p class="mb-2">如果遇到执行策略限制，运行：</p>
             <div
-              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <div class="whitespace-nowrap text-gray-300">
                 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -426,7 +426,7 @@
                 <li>或者注销并重新登录 Windows</li>
                 <li>
                   验证设置：<code
-                    class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
+                    class="rounded bg-gray-200 px-1 text-sm dark:bg-gray-700 sm:text-sm"
                     >echo $env:ANTHROPIC_BASE_URL</code
                   >
                 </li>
@@ -435,13 +435,13 @@
                 <li>重新打开终端窗口</li>
                 <li>
                   或者执行
-                  <code class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
+                  <code class="rounded bg-gray-200 px-1 text-sm dark:bg-gray-700 sm:text-sm"
                     >source {{ platform === 'macos' ? '~/.zshrc' : '~/.bashrc' }}</code
                   >
                 </li>
                 <li>
                   验证设置：<code
-                    class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700 sm:text-sm"
+                    class="rounded bg-gray-200 px-1 text-sm dark:bg-gray-700 sm:text-sm"
                     >echo $ANTHROPIC_BASE_URL</code
                   >
                 </li>
@@ -462,7 +462,7 @@
           <div class="px-3 pb-3 text-gray-600 dark:text-gray-400 sm:px-4 sm:pb-4">
             <p class="mb-2">WSL2 可以通过 /mnt/ 路径访问 Windows 文件：</p>
             <div
-              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <div class="whitespace-nowrap text-gray-300">cd /mnt/c/Users/你的用户名/项目目录</div>
             </div>

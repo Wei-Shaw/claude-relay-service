@@ -1,6 +1,9 @@
 <template>
-  <Teleport to="body">
-    <div class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+  <ModalTransition @after-leave="onClosed">
+    <div
+      v-if="visible"
+      class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+    >
       <div
         class="modal-content mx-auto flex max-h-[90vh] w-full max-w-4xl flex-col p-4 sm:p-6 md:p-8"
       >
@@ -17,7 +20,7 @@
           </div>
           <button
             class="p-1 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
-            @click="$emit('close')"
+            @click="requestClose"
           >
             <i class="fas fa-times text-lg sm:text-xl" />
           </button>
@@ -44,7 +47,7 @@
           <!-- 标签编辑 -->
           <div>
             <label
-              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
+              class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
             >
               标签 (批量操作)
             </label>
@@ -73,7 +76,7 @@
               <div v-if="tagOperation !== 'none'" class="space-y-3">
                 <!-- 已选择的标签 -->
                 <div v-if="form.tags.length > 0">
-                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                  <div class="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                     {{
                       tagOperation === 'replace'
                         ? '新标签列表:'
@@ -94,7 +97,7 @@
                         type="button"
                         @click="removeTag(index)"
                       >
-                        <i class="fas fa-times text-xs" />
+                        <i class="fas fa-times text-sm" />
                       </button>
                     </span>
                   </div>
@@ -102,7 +105,7 @@
 
                 <!-- 可选择的已有标签 -->
                 <div v-if="unselectedTags.length > 0">
-                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                  <div class="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                     点击选择已有标签:
                   </div>
                   <div class="flex flex-wrap gap-2">
@@ -113,7 +116,7 @@
                       type="button"
                       @click="selectTag(tag)"
                     >
-                      <i class="fas fa-tag text-xs text-gray-500 dark:text-gray-400" />
+                      <i class="fas fa-tag text-sm text-gray-500 dark:text-gray-400" />
                       {{ tag }}
                     </button>
                   </div>
@@ -121,7 +124,7 @@
 
                 <!-- 创建新标签 -->
                 <div>
-                  <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                  <div class="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                     创建新标签:
                   </div>
                   <div class="flex gap-2">
@@ -153,7 +156,7 @@
               <div
                 class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-blue-500"
               >
-                <i class="fas fa-tachometer-alt text-xs text-white" />
+                <i class="fas fa-tachometer-alt text-sm text-white" />
               </div>
               <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">速率限制设置</h4>
             </div>
@@ -161,7 +164,7 @@
             <div class="space-y-2">
               <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     时间窗口 (分钟)
                   </label>
                   <input
@@ -174,7 +177,7 @@
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >请求次数限制</label
                   >
                   <input
@@ -187,7 +190,7 @@
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >费用限制 (美元)</label
                   >
                   <input
@@ -245,7 +248,7 @@
               step="0.01"
               type="number"
             />
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               设置 Claude 模型的周费用限制，仅对 Claude 模型请求生效
             </p>
             <div
@@ -253,36 +256,26 @@
               class="mt-2 flex gap-3"
             >
               <div class="flex-1">
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                   >重置日</label
                 >
-                <select
+                <CustomDropdown
                   v-model="form.weeklyResetDay"
-                  class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                >
-                  <option value="">不修改</option>
-                  <option :value="1">周一</option>
-                  <option :value="2">周二</option>
-                  <option :value="3">周三</option>
-                  <option :value="4">周四</option>
-                  <option :value="5">周五</option>
-                  <option :value="6">周六</option>
-                  <option :value="7">周日</option>
-                </select>
+                  accent="blue"
+                  :options="weeklyResetDayOptions"
+                  placeholder="不修改"
+                />
               </div>
               <div class="flex-1">
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                   >重置时间 (UTC+8)</label
                 >
-                <select
+                <CustomDropdown
                   v-model="form.weeklyResetHour"
-                  class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                >
-                  <option value="">不修改</option>
-                  <option v-for="h in 24" :key="h - 1" :value="h - 1">
-                    {{ String(h - 1).padStart(2, '0') }}:00
-                  </option>
-                </select>
+                  accent="blue"
+                  :options="weeklyResetHourOptions"
+                  placeholder="不修改"
+                />
               </div>
             </div>
           </div>
@@ -372,7 +365,7 @@
                   :class="[
                     'fas',
                     accountsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt',
-                    'text-xs'
+                    'text-sm'
                   ]"
                 />
                 <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
@@ -461,7 +454,7 @@
             <button
               class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               type="button"
-              @click="$emit('close')"
+              @click="requestClose"
             >
               取消
             </button>
@@ -478,11 +471,13 @@
         </form>
       </div>
     </div>
-  </Teleport>
+  </ModalTransition>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { showToast } from '@/utils/tools'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import * as httpApis from '@/utils/http_apis'
@@ -512,6 +507,16 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success'])
 
+// 弹窗进入/退出动画：挂载后置 visible 触发进入，关闭时先播退出动画再通知父级卸载
+const visible = ref(false)
+onMounted(() => {
+  visible.value = true
+})
+const requestClose = () => {
+  visible.value = false
+}
+const onClosed = () => emit('close')
+
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
 const accountsLoading = ref(false)
@@ -533,6 +538,25 @@ const availableTags = ref([])
 const tagOperation = ref('none') // 'replace', 'add', 'remove', 'none'
 
 const selectedCount = computed(() => props.selectedKeys.length)
+
+const weeklyResetDayOptions = [
+  { value: '', label: '不修改' },
+  { value: 1, label: '周一' },
+  { value: 2, label: '周二' },
+  { value: 3, label: '周三' },
+  { value: 4, label: '周四' },
+  { value: 5, label: '周五' },
+  { value: 6, label: '周六' },
+  { value: 7, label: '周日' }
+]
+
+const weeklyResetHourOptions = [
+  { value: '', label: '不修改' },
+  ...Array.from({ length: 24 }, (_, hour) => ({
+    value: hour,
+    label: `${String(hour).padStart(2, '0')}:00`
+  }))
+]
 
 // 计算未选择的标签
 const unselectedTags = computed(() => {
@@ -868,7 +892,7 @@ const batchUpdateApiKeys = async () => {
       }
 
       emit('success')
-      emit('close')
+      requestClose()
     } else {
       showToast(result.message || '批量编辑失败', 'error')
     }

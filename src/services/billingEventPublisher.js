@@ -1,6 +1,8 @@
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 
+const { RedisKeys, LIMITS } = require('../constants/redisKeys')
+
 /**
  * 计费事件发布器 - 使用 Redis Stream 解耦计费系统
  *
@@ -11,8 +13,8 @@ const logger = require('../utils/logger')
  */
 class BillingEventPublisher {
   constructor() {
-    this.streamKey = 'billing:events'
-    this.maxLength = 100000 // 保留最近 10 万条事件
+    this.streamKey = RedisKeys.billingEvents
+    this.maxLength = LIMITS.billingEventsStream // 保留最近 10 万条事件
     this.enabled = process.env.BILLING_EVENTS_ENABLED !== 'false' // 默认开启
   }
 

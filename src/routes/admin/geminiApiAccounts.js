@@ -1,11 +1,14 @@
 const express = require('express')
 const geminiApiAccountService = require('../../services/account/geminiApiAccountService')
+const testModelConfigService = require('../../services/testModelConfigService')
 const apiKeyService = require('../../services/apiKeyService')
 const accountGroupService = require('../../services/accountGroupService')
 const redis = require('../../models/redis')
+const { RedisKeys } = require('../../constants/redisKeys')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
+const { stripReadonlyAccountFields } = require('../../utils/commonHelper')
 
 const router = express.Router()
 
@@ -62,9 +65,9 @@ router.get('/gemini-api-accounts', authenticateAdmin, async (req, res) => {
 
     const statsPipeline = client.pipeline()
     for (const accountId of accountIds) {
-      statsPipeline.hgetall(`account_usage:${accountId}`)
-      statsPipeline.hgetall(`account_usage:daily:${accountId}:${today}`)
-      statsPipeline.hgetall(`account_usage:monthly:${accountId}:${currentMonth}`)
+      statsPipeline.hgetall(RedisKeys.accountUsage.total(accountId))
+      statsPipeline.hgetall(RedisKeys.accountUsage.daily(accountId, today))
+      statsPipeline.hgetall(RedisKeys.accountUsage.monthly(accountId, currentMonth))
     }
     const statsResults = await statsPipeline.exec()
 
@@ -219,7 +222,8 @@ router.get('/gemini-api-accounts/:id', authenticateAdmin, async (req, res) => {
 router.put('/gemini-api-accounts/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params
-    const updates = req.body
+    // review#3：剥离外部传入的状态类字段，禁止伪造自动停用证据
+    const updates = stripReadonlyAccountFields(req.body)
 
     // 验证priority的有效性（1-100）
     if (updates.priority !== undefined) {
@@ -459,7 +463,7 @@ const sanitizeMaxTokens = (value) =>
 
 router.post('/gemini-api-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
   const { accountId } = req.params
-  const { model = 'gemini-2.5-flash', prompt = 'hi' } = req.body
+  const { prompt = 'hi' } = req.body
   const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
   const { createGeminiTestPayload, extractErrorMessage } = require('../../utils/testPayloadHelper')
   const { buildGeminiApiUrl } = require('../../handlers/geminiHandlers')
@@ -481,6 +485,8 @@ router.post('/gemini-api-accounts/:accountId/test', authenticateAdmin, async (re
   }
 
   try {
+    // 请求显式指定优先，否则用后台配置的默认测试模型（单一事实源）
+    const model = await testModelConfigService.resolveAccountModel('gemini-api', req.body.model)
     const account = await geminiApiAccountService.getAccount(accountId)
     if (!account) {
       return res.status(404).json({ error: 'Account not found' })

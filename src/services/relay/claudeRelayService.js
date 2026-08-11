@@ -2,6 +2,7 @@ const https = require('https')
 const zlib = require('zlib')
 const path = require('path')
 const ProxyHelper = require('../../utils/proxyHelper')
+const proxyResolver = require('../../utils/proxyResolver')
 const { filterForClaude } = require('../../utils/headerFilter')
 const claudeAccountService = require('../account/claudeAccountService')
 const unifiedClaudeScheduler = require('../scheduler/unifiedClaudeScheduler')
@@ -19,6 +20,7 @@ const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const metadataUserIdHelper = require('../../utils/metadataUserIdHelper')
+const { RedisKeys, TTL } = require('../../constants/redisKeys')
 const {
   getHttpsAgentForStream,
   getHttpsAgentForNonStream,
@@ -643,8 +645,9 @@ class ClaudeRelayService {
       bodyStoreIdNonStream = ++this._bodyStoreIdCounter
       this.bodyStore.set(bodyStoreIdNonStream, originalBodyString)
 
-      // 获取代理配置
-      const proxyAgent = await this._getProxyAgent(accountId)
+      // 获取代理配置（保留 proxyId/contextKey 供被动健康检查上报）
+      const proxyResolution = await this._getProxyAgent(accountId)
+      const proxyAgent = proxyResolution.agent
 
       // 设置客户端断开监听器
       const handleClientDisconnect = () => {
@@ -708,6 +711,9 @@ class ClaudeRelayService {
       let requestOptions = options
       let { response, retryCount } = await makeRequestWithRetries(requestOptions)
 
+      // 被动健康检查：拿到 HTTP 响应即代理传输成功（含 4xx/5xx，不归咎代理）
+      proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, null)
+
       if (
         this._isClaudeCodeCredentialError(response.body) &&
         requestOptions.useRandomizedToolNames !== true
@@ -765,6 +771,19 @@ class ClaudeRelayService {
           response.body
         )
 
+        // 错误响应上下文（用于错误历史记录，整段错误分支复用）
+        const errorContext = upstreamErrorHelper.buildErrorContext({
+          url: this.claudeApiUrl,
+          method: 'POST',
+          requestHeaders: clientHeaders,
+          requestBody,
+          model: requestBody?.model,
+          sessionId: sessionHash,
+          responseStatus: response.statusCode,
+          responseHeaders: response.headers,
+          responseBody: response.body
+        })
+
         // 检查是否为401状态码（未授权）
         if (response.statusCode === 401) {
           logger.warn(`🔐 Unauthorized error (401) detected for account ${accountId}`)
@@ -783,7 +802,9 @@ class ClaudeRelayService {
               `❌ Account ${accountId} encountered 401 error (${errorCount} errors), temporarily pausing`
             )
           }
-          await upstreamErrorHelper.markTempUnavailable(accountId, accountType, 401).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, accountType, 401, null, errorContext)
+            .catch(() => {})
           // 清除粘性会话，让后续请求路由到其他账户
           if (sessionHash) {
             await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch(() => {})
@@ -803,7 +824,9 @@ class ClaudeRelayService {
           logger.error(
             `🚫 Forbidden error (403) detected for account ${accountId}${retryCount > 0 ? ` after ${retryCount} retries` : ''}, temporarily pausing`
           )
-          await upstreamErrorHelper.markTempUnavailable(accountId, accountType, 403).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, accountType, 403, null, errorContext)
+            .catch(() => {})
           // 清除粘性会话，让后续请求路由到其他账户
           if (sessionHash) {
             await unifiedClaudeScheduler.clearSessionMapping(sessionHash).catch(() => {})
@@ -826,12 +849,21 @@ class ClaudeRelayService {
           } else {
             logger.info(`🚫 529 error handling is disabled, skipping account overload marking`)
           }
-          await upstreamErrorHelper.markTempUnavailable(accountId, accountType, 529).catch(() => {})
+          await upstreamErrorHelper
+            .markTempUnavailable(accountId, accountType, 529, null, errorContext)
+            .catch(() => {})
         }
         // 检查是否为5xx状态码
         else if (response.statusCode >= 500 && response.statusCode < 600) {
           logger.warn(`🔥 Server error (${response.statusCode}) detected for account ${accountId}`)
-          await this._handleServerError(accountId, response.statusCode, sessionHash)
+          await this._handleServerError(
+            accountId,
+            response.statusCode,
+            sessionHash,
+            '',
+            accountType,
+            errorContext
+          )
         }
         // 检查是否为429状态码
         else if (response.statusCode === 429) {
@@ -1530,14 +1562,31 @@ class ClaudeRelayService {
   }
 
   // 🌐 获取代理Agent（使用统一的代理工具）
+  // 返回 { agent, proxyId, contextKey }：proxyId 仅池子抽样代理非空，供被动健康检查上报；
+  // 静态 proxy/无代理时 proxyId=null（report 内部据此短路，不影响池子统计）。
   async _getProxyAgent(accountId, account = null) {
     try {
       // 优先使用传入的 account 对象，避免重复查询
       const accountData = account || (await claudeAccountService.getAccount(accountId))
 
-      if (!accountData || !accountData.proxy) {
+      if (!accountData) {
+        return { agent: null, proxyId: null, contextKey: 'claude' }
+      }
+
+      // 代理池模式：账户绑定 proxyGroupId 则从池子加权随机选；否则走账户静态 proxy（旧逻辑）
+      if (accountData.proxyGroupId) {
+        const { agent, proxyId, contextKey } = proxyResolver.resolveAgent(accountData, 'claude')
+        if (agent) {
+          logger.info(`🌐 Using pooled proxy for Claude request proxyId=${proxyId || 'fallback'}`)
+        } else {
+          logger.debug('🌐 No available proxy from pool for Claude account')
+        }
+        return { agent, proxyId, contextKey: contextKey || 'claude' }
+      }
+
+      if (!accountData.proxy) {
         logger.debug('🌐 No proxy configured for Claude account')
-        return null
+        return { agent: null, proxyId: null, contextKey: 'claude' }
       }
 
       const proxyAgent = ProxyHelper.createProxyAgent(accountData.proxy)
@@ -1546,10 +1595,10 @@ class ClaudeRelayService {
           `🌐 Using proxy for Claude request: ${ProxyHelper.getProxyDescription(accountData.proxy)}`
         )
       }
-      return proxyAgent
+      return { agent: proxyAgent, proxyId: null, contextKey: 'claude' }
     } catch (error) {
       logger.warn('⚠️ Failed to create proxy agent:', error)
-      return null
+      return { agent: null, proxyId: null, contextKey: 'claude' }
     }
   }
 
@@ -1863,6 +1912,7 @@ class ClaudeRelayService {
     let queueLockAcquired = false
     let queueRequestId = null
     let selectedAccountId = null
+    let proxyResolution = null
 
     try {
       // 调试日志：查看API Key数据（流式请求）
@@ -2051,8 +2101,9 @@ class ClaudeRelayService {
       const bodyStoreId = ++this._bodyStoreIdCounter
       this.bodyStore.set(bodyStoreId, originalBodyString)
 
-      // 获取代理配置
-      const proxyAgent = await this._getProxyAgent(accountId)
+      // 获取代理配置（解构改造后返回的 { agent, proxyId, contextKey }）
+      proxyResolution = await this._getProxyAgent(accountId)
+      const proxyAgent = proxyResolution.agent
 
       // 发送流式请求并捕获usage数据
       await this._makeClaudeStreamRequestWithUsageCapture(
@@ -2095,7 +2146,12 @@ class ClaudeRelayService {
           }
         }
       )
+
+      // 被动健康检查：流式正常完成 = 代理传输成功
+      proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, null)
     } catch (error) {
+      // 被动健康检查：上报连接级故障（客户端断开/上游响应由 classifyBusinessTraffic 区分，不误熔断）
+      proxyResolver.report(proxyResolution?.proxyId, proxyResolution?.contextKey, error)
       // 客户端主动断开连接是正常情况，使用 INFO 级别
       if (error.message === 'Client disconnected') {
         logger.info(`🔌 Claude stream relay ended: Client disconnected`)
@@ -2303,12 +2359,24 @@ class ClaudeRelayService {
                   sessionHash,
                   rateLimitResetTimestamp
                 )
+                const errorContext429 = upstreamErrorHelper.buildErrorContext({
+                  url: this.claudeApiUrl,
+                  method: 'POST',
+                  requestHeaders: clientHeaders,
+                  requestBody: body,
+                  model: body?.model,
+                  sessionId: sessionHash,
+                  responseStatus: 429,
+                  responseHeaders: res.headers,
+                  responseBody: errorBody429
+                })
                 await upstreamErrorHelper
                   .markTempUnavailable(
                     accountId,
                     accountType,
                     429,
-                    upstreamErrorHelper.parseRetryAfter(res.headers)
+                    upstreamErrorHelper.parseRetryAfter(res.headers),
+                    errorContext429
                   )
                   .catch(() => {})
                 logger.warn(`🚫 [Stream] Rate limit detected for account ${accountId}, status 429`)
@@ -2440,8 +2508,23 @@ class ClaudeRelayService {
             }
           }
 
+          // errorData 必须在 handleErrorResponse 之前声明并初始化：该函数会被立即调用，
+          // 其 403 分支同步读取 errorData（org-disabled 判断），声明在后会触发 TDZ ReferenceError 而吞掉账户保护
+          let errorData = ''
+
           // 将错误处理逻辑封装在一个异步函数中
           const handleErrorResponse = async () => {
+            // 错误响应上下文（流式：标记发生在响应体接收完成前，此处响应体不可得，仅记录请求与响应状态/头）
+            const errorContext = upstreamErrorHelper.buildErrorContext({
+              url: this.claudeApiUrl,
+              method: 'POST',
+              requestHeaders: clientHeaders,
+              requestBody: body,
+              model: body?.model,
+              sessionId: sessionHash,
+              responseStatus: res.statusCode,
+              responseHeaders: res.headers
+            })
             if (res.statusCode === 401) {
               logger.warn(`🔐 [Stream] Unauthorized error (401) detected for account ${accountId}`)
 
@@ -2457,8 +2540,9 @@ class ClaudeRelayService {
                   `❌ [Stream] Account ${accountId} encountered 401 error (${errorCount} errors), temporarily pausing`
                 )
               }
+              // skipHistory：响应体在 end 处收齐后补记，避免重复
               await upstreamErrorHelper
-                .markTempUnavailable(accountId, accountType, 401)
+                .markTempUnavailable(accountId, accountType, 401, null, errorContext, true)
                 .catch(() => {})
               // 清除粘性会话，让后续请求路由到其他账户
               if (sessionHash) {
@@ -2483,8 +2567,9 @@ class ClaudeRelayService {
                 logger.error(
                   `🚫 [Stream] Forbidden error (403) detected for account ${accountId}${retryCount > 0 ? ` after ${retryCount} retries` : ''}, temporarily pausing`
                 )
+                // skipHistory：响应体在 end 处收齐后补记，避免重复
                 await upstreamErrorHelper
-                  .markTempUnavailable(accountId, accountType, 403)
+                  .markTempUnavailable(accountId, accountType, 403, null, errorContext, true)
                   .catch(() => {})
               }
               // 清除粘性会话，让后续请求路由到其他账户
@@ -2512,14 +2597,23 @@ class ClaudeRelayService {
                   `🚫 [Stream] 529 error handling is disabled, skipping account overload marking`
                 )
               }
+              // skipHistory：响应体在 end 处收齐后补记，避免重复
               await upstreamErrorHelper
-                .markTempUnavailable(accountId, accountType, 529)
+                .markTempUnavailable(accountId, accountType, 529, null, errorContext, true)
                 .catch(() => {})
             } else if (res.statusCode >= 500 && res.statusCode < 600) {
               logger.warn(
                 `🔥 [Stream] Server error (${res.statusCode}) detected for account ${accountId}`
               )
-              await this._handleServerError(accountId, res.statusCode, sessionHash, '[Stream]')
+              await this._handleServerError(
+                accountId,
+                res.statusCode,
+                sessionHash,
+                '[Stream]',
+                accountType,
+                errorContext,
+                true
+              )
             }
           }
 
@@ -2531,10 +2625,60 @@ class ClaudeRelayService {
           logger.error(
             `❌ Claude API returned error status: ${res.statusCode} | Account: ${account?.name || accountId}`
           )
-          let errorData = ''
+          let streamErrorRecorded = false
+          // 保证补记：无论流以 end 还是 close（含上游中断）结束，都记一条带“已收到响应体”的历史，
+          // 避免中断时连简版记录都丢失（标记已 skipHistory，这里是唯一的历史写入点）
+          const recordStreamErrorHistoryOnce = () => {
+            if (
+              streamErrorRecorded ||
+              !(
+                res.statusCode === 401 ||
+                res.statusCode === 403 ||
+                res.statusCode === 529 ||
+                (res.statusCode >= 500 && res.statusCode < 600)
+              )
+            ) {
+              return
+            }
+            streamErrorRecorded = true
+            upstreamErrorHelper
+              .recordErrorHistory(
+                accountId,
+                accountType,
+                res.statusCode,
+                null,
+                upstreamErrorHelper.buildErrorContext({
+                  url: this.claudeApiUrl,
+                  method: 'POST',
+                  requestHeaders: clientHeaders,
+                  requestBody: body,
+                  model: body?.model,
+                  sessionId: sessionHash,
+                  responseStatus: res.statusCode,
+                  responseHeaders: res.headers,
+                  responseBody: errorData
+                })
+              )
+              .catch(() => {})
+          }
 
           res.on('data', (chunk) => {
             errorData += chunk.toString()
+          })
+
+          // close 一定会触发（正常结束或中断），作为补记兜底
+          res.on('close', () => {
+            recordStreamErrorHistoryOnce()
+          })
+
+          // error 直出：补记并 settle（与 end 分支一致地 reject），避免 promise 挂起或未捕获异常
+          res.on('error', (streamErr) => {
+            logger.error(`❌ Claude error-stream data error | account: ${accountId}:`, streamErr)
+            recordStreamErrorHistoryOnce()
+            if (isStreamWritable(responseStream)) {
+              responseStream.end()
+            }
+            reject(streamErr)
           })
 
           res.on('end', async () => {
@@ -2542,6 +2686,8 @@ class ClaudeRelayService {
               `❌ Claude API error response (Account: ${account?.name || accountId}):`,
               errorData
             )
+            // 响应体此时已收齐，优先在这里补记（close 兜底防止 end 未触发）
+            recordStreamErrorHistoryOnce()
             if (
               this._isClaudeCodeCredentialError(errorData) &&
               requestOptions.useRandomizedToolNames !== true &&
@@ -2982,12 +3128,23 @@ class ClaudeRelayService {
                 sessionHash,
                 parsedResetTimestamp
               )
+              const errorContext429Stream = upstreamErrorHelper.buildErrorContext({
+                url: this.claudeApiUrl,
+                method: 'POST',
+                requestHeaders: clientHeaders,
+                requestBody: body,
+                model: body?.model,
+                sessionId: sessionHash,
+                responseStatus: res.statusCode,
+                responseHeaders: res.headers
+              })
               await upstreamErrorHelper
                 .markTempUnavailable(
                   accountId,
                   accountType,
                   429,
-                  upstreamErrorHelper.parseRetryAfter(res.headers)
+                  upstreamErrorHelper.parseRetryAfter(res.headers),
+                  errorContext429Stream
                 )
                 .catch(() => {})
             }
@@ -3145,7 +3302,9 @@ class ClaudeRelayService {
     statusCode,
     sessionHash = null,
     context = '',
-    accountType = 'claude-official'
+    accountType = 'claude-official',
+    errorContext = null,
+    skipHistory = false
   ) {
     try {
       await claudeAccountService.recordServerError(accountId, statusCode)
@@ -3167,7 +3326,9 @@ class ClaudeRelayService {
           accountType,
           sessionHash,
           null,
-          statusCode
+          statusCode,
+          errorContext,
+          skipHistory
         )
       } catch (markError) {
         logger.error(`❌ Failed to mark account temporarily unavailable: ${accountId}`, markError)
@@ -3209,7 +3370,7 @@ class ClaudeRelayService {
   // 🔐 记录401未授权错误
   async recordUnauthorizedError(accountId) {
     try {
-      const key = `claude_account:${accountId}:401_errors`
+      const key = RedisKeys.accounts.claude401Errors(accountId)
 
       // 增加错误计数，设置5分钟过期时间
       await redis.client.incr(key)
@@ -3224,7 +3385,7 @@ class ClaudeRelayService {
   // 🔍 获取401错误计数
   async getUnauthorizedErrorCount(accountId) {
     try {
-      const key = `claude_account:${accountId}:401_errors`
+      const key = RedisKeys.accounts.claude401Errors(accountId)
 
       const count = await redis.client.get(key)
       return parseInt(count) || 0
@@ -3237,7 +3398,7 @@ class ClaudeRelayService {
   // 🧹 清除401错误计数
   async clearUnauthorizedErrors(accountId) {
     try {
-      const key = `claude_account:${accountId}:401_errors`
+      const key = RedisKeys.accounts.claude401Errors(accountId)
 
       await redis.client.del(key)
       logger.info(`✅ Cleared 401 error count for account ${accountId}`)
@@ -3252,8 +3413,8 @@ class ClaudeRelayService {
       return null
     }
 
-    const CACHE_KEY = 'claude_code_user_agent:daily'
-    const TTL = 90000 // 25小时
+    const CACHE_KEY = RedisKeys.claudeCode.userAgentDaily
+    const CACHE_TTL = TTL.claudeCodeUserAgent // 25小时
 
     // ⚠️ 重要：这里通过正则表达式判断是否为 Claude Code 客户端
     // 如果未来 Claude Code 的 User-Agent 格式发生变化，需要更新这个正则表达式
@@ -3266,19 +3427,19 @@ class ClaudeRelayService {
     if (clientUA && CLAUDE_CODE_UA_PATTERN.test(clientUA)) {
       if (!cachedUA) {
         // 没有缓存，直接存储
-        await redis.client.setex(CACHE_KEY, TTL, clientUA)
+        await redis.client.setex(CACHE_KEY, CACHE_TTL, clientUA)
         logger.info(`📱 Captured unified Claude Code User-Agent: ${clientUA}`)
         cachedUA = clientUA
       } else {
         // 有缓存，比较版本号，保存更新的版本
         const shouldUpdate = this.compareClaudeCodeVersions(clientUA, cachedUA)
         if (shouldUpdate) {
-          await redis.client.setex(CACHE_KEY, TTL, clientUA)
+          await redis.client.setex(CACHE_KEY, CACHE_TTL, clientUA)
           logger.info(`🔄 Updated to newer Claude Code User-Agent: ${clientUA} (was: ${cachedUA})`)
           cachedUA = clientUA
         } else {
           // 当前版本不比缓存版本新，仅刷新TTL
-          await redis.client.expire(CACHE_KEY, TTL)
+          await redis.client.expire(CACHE_KEY, CACHE_TTL)
         }
       }
     }
@@ -3416,8 +3577,9 @@ class ClaudeRelayService {
       throw new Error('Failed to get valid access token')
     }
 
-    // 获取代理配置
-    const proxyAgent = await this._getProxyAgent(accountId)
+    // 获取代理配置（解构改造后返回的 { agent, proxyId, contextKey }）
+    const proxyResolution = await this._getProxyAgent(accountId)
+    const proxyAgent = proxyResolution.agent
 
     return { account, accessToken, proxyAgent }
   }

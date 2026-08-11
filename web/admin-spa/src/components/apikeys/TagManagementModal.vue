@@ -1,110 +1,111 @@
 <template>
-  <Teleport to="body">
-    <Transition name="modal">
+  <ModalTransition>
+    <div
+      v-if="show"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      @click.self="handleClose"
+    >
       <div
-        v-if="show"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-        @click.self="handleClose"
+        class="modal-panel w-full max-w-lg rounded-2xl bg-white shadow-2xl dark:bg-gray-800"
+        @click.stop
       >
-        <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl dark:bg-gray-800" @click.stop>
-          <!-- 头部 -->
-          <div
-            class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700"
+        <!-- 头部 -->
+        <div
+          class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700"
+        >
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <i class="fas fa-tags mr-2 text-purple-500" />
+            标签管理
+          </h3>
+          <button
+            class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+            @click="handleClose"
           >
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              <i class="fas fa-tags mr-2 text-purple-500" />
-              标签管理
-            </h3>
+            <i class="fas fa-times" />
+          </button>
+        </div>
+
+        <!-- 内容 -->
+        <div class="max-h-[60vh] overflow-y-auto px-6 py-4">
+          <!-- 新增标签 -->
+          <div class="mb-4 flex gap-2">
+            <input
+              v-model="newTagInput"
+              class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              placeholder="输入新标签名称"
+              type="text"
+              @keyup.enter="createTag"
+            />
             <button
-              class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-              @click="handleClose"
+              class="rounded-lg bg-purple-500 px-4 py-2 text-sm font-medium text-white hover:bg-purple-600 disabled:opacity-50"
+              :disabled="!newTagInput.trim() || creating || processing"
+              @click="createTag"
             >
-              <i class="fas fa-times" />
+              <i v-if="creating" class="fas fa-spinner fa-spin mr-1" />
+              <i v-else class="fas fa-plus mr-1" />
+              新增
             </button>
           </div>
 
-          <!-- 内容 -->
-          <div class="max-h-[60vh] overflow-y-auto px-6 py-4">
-            <!-- 新增标签 -->
-            <div class="mb-4 flex gap-2">
-              <input
-                v-model="newTagInput"
-                class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="输入新标签名称"
-                type="text"
-                @keyup.enter="createTag"
-              />
-              <button
-                class="rounded-lg bg-purple-500 px-4 py-2 text-sm font-medium text-white hover:bg-purple-600 disabled:opacity-50"
-                :disabled="!newTagInput.trim() || creating || processing"
-                @click="createTag"
-              >
-                <i v-if="creating" class="fas fa-spinner fa-spin mr-1" />
-                <i v-else class="fas fa-plus mr-1" />
-                新增
-              </button>
-            </div>
+          <div v-if="loading" class="py-8 text-center">
+            <i class="fas fa-spinner fa-spin text-2xl text-gray-400" />
+            <p class="mt-2 text-gray-500 dark:text-gray-400">加载中...</p>
+          </div>
 
-            <div v-if="loading" class="py-8 text-center">
-              <i class="fas fa-spinner fa-spin text-2xl text-gray-400" />
-              <p class="mt-2 text-gray-500 dark:text-gray-400">加载中...</p>
-            </div>
+          <div v-else-if="tags.length === 0" class="py-8 text-center">
+            <i class="fas fa-tag text-4xl text-gray-300 dark:text-gray-600" />
+            <p class="mt-2 text-gray-500 dark:text-gray-400">暂无标签</p>
+          </div>
 
-            <div v-else-if="tags.length === 0" class="py-8 text-center">
-              <i class="fas fa-tag text-4xl text-gray-300 dark:text-gray-600" />
-              <p class="mt-2 text-gray-500 dark:text-gray-400">暂无标签</p>
-            </div>
-
-            <div v-else class="space-y-2">
-              <div
-                v-for="tag in tags"
-                :key="tag.name"
-                class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-700/50"
-              >
-                <div class="flex items-center gap-3">
-                  <i class="fas fa-tag text-purple-500" />
-                  <span class="font-medium text-gray-700 dark:text-gray-200">{{ tag.name }}</span>
-                  <span
-                    class="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                  >
-                    {{ tag.count }} 个 Key
-                  </span>
-                </div>
-                <div class="flex gap-1">
-                  <button
-                    class="rounded-lg p-2 text-gray-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
-                    :disabled="processing"
-                    title="重命名"
-                    @click="startRename(tag)"
-                  >
-                    <i class="fas fa-edit" />
-                  </button>
-                  <button
-                    class="rounded-lg p-2 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                    :disabled="processing"
-                    title="删除标签"
-                    @click="confirmDelete(tag)"
-                  >
-                    <i class="fas fa-trash" />
-                  </button>
-                </div>
+          <div v-else class="space-y-2">
+            <div
+              v-for="tag in tags"
+              :key="tag.name"
+              class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-700/50"
+            >
+              <div class="flex items-center gap-3">
+                <i class="fas fa-tag text-purple-500" />
+                <span class="font-medium text-gray-700 dark:text-gray-200">{{ tag.name }}</span>
+                <span
+                  class="rounded-full bg-purple-100 px-2 py-0.5 text-sm text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                >
+                  {{ tag.count }} 个 Key
+                </span>
+              </div>
+              <div class="flex gap-1">
+                <button
+                  class="rounded-lg p-2 text-gray-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
+                  :disabled="processing"
+                  title="重命名"
+                  @click="startRename(tag)"
+                >
+                  <i class="fas fa-edit" />
+                </button>
+                <button
+                  class="rounded-lg p-2 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                  :disabled="processing"
+                  title="删除标签"
+                  @click="confirmDelete(tag)"
+                >
+                  <i class="fas fa-trash" />
+                </button>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- 底部 -->
-          <div class="flex justify-end border-t border-gray-200 px-6 py-4 dark:border-gray-700">
-            <button
-              class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-              @click="handleClose"
-            >
-              关闭
-            </button>
-          </div>
+        <!-- 底部 -->
+        <div class="flex justify-end border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+          <button
+            class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            @click="handleClose"
+          >
+            关闭
+          </button>
         </div>
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+  </ModalTransition>
 
   <!-- 删除确认弹窗 -->
   <ConfirmModal
@@ -119,13 +120,13 @@
   />
 
   <!-- 重命名弹窗 -->
-  <Teleport to="body">
+  <ModalTransition>
     <div
       v-if="showRenameModal"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       @click.self="showRenameModal = false"
     >
-      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
+      <div class="modal-panel w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
         <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">重命名标签</h3>
         <div class="mb-4">
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -157,11 +158,13 @@
         </div>
       </div>
     </div>
-  </Teleport>
+  </ModalTransition>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
+
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import {
   getApiKeyTagsDetailsApi,
   createApiKeyTagApi,
@@ -279,14 +282,3 @@ watch(
   }
 )
 </script>
-
-<style scoped>
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.2s ease;
-}
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-</style>

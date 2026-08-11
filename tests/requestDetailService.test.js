@@ -105,6 +105,11 @@ describe('requestDetailService', () => {
     expect(storedPayload.reasoningDisplay).toBe('medium')
     expect(storedPayload.reasoningSource).toBe('reasoning.effort')
     expect(multi.zadd).toHaveBeenCalled()
+    expect(multi.zadd).toHaveBeenCalledWith(
+      'request_detail:index:day:2026-04-07',
+      Date.parse('2026-04-07T12:00:00.000Z'),
+      'req_capture_1'
+    )
     expect(exec).toHaveBeenCalled()
   })
 
@@ -1805,6 +1810,36 @@ describe('requestDetailService', () => {
     expect(result.records).toHaveLength(1)
     expect(result.records[0].timestamp).toBe('2026-04-07T12:00:00.000Z')
     expect(result.availableFilters.dateRange.earliest).toBe('2026-04-07T12:00:00.000Z')
+  })
+
+  test('listRequestDetails accepts local datetime strings without timezone suffix', async () => {
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 24,
+      requestDetailBodyPreviewEnabled: true
+    })
+
+    const targetTs = new Date(2026, 3, 7, 12, 30, 0, 0).getTime()
+    redis.getClient.mockReturnValue({
+      zrangebyscore: jest.fn().mockResolvedValue(['req_local', String(targetTs)]),
+      mget: jest.fn().mockResolvedValue([
+        JSON.stringify({
+          requestId: 'req_local',
+          timestamp: '2026-04-07T12:30:00.000Z',
+          endpoint: '/v1/messages',
+          method: 'POST',
+          model: 'claude-sonnet-4-6'
+        })
+      ])
+    })
+
+    const result = await requestDetailService.listRequestDetails({
+      startDate: '2026-04-07 00:00:00',
+      endDate: '2026-04-07 23:59:59'
+    })
+
+    expect(result.records).toHaveLength(1)
+    expect(result.records[0].requestId).toBe('req_local')
   })
 
   test('purgeRequestBodySnapshots removes snapshots while keeping records', async () => {

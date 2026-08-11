@@ -1,5 +1,10 @@
 import { ref, computed, onUnmounted } from 'vue'
 
+import { createHttp } from '@/utils/http'
+
+// 测试请求专用 fetch 客户端: 不限时（流式可长时间运行），返回原始 Response
+const testHttp = createHttp({ timeout: 0 })
+
 export const useTestState = () => {
   // ========== 状态 ==========
   const testStatus = ref('idle') // idle, testing, success, error
@@ -138,10 +143,12 @@ export const useTestState = () => {
     abortController.value = new AbortController()
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await testHttp({
+        url: endpoint,
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify(payload),
+        data: payload,
+        responseType: 'response',
         signal: abortController.value.signal
       })
 

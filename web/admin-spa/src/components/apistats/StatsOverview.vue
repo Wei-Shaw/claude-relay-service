@@ -68,7 +68,7 @@
             <p class="info-label">名称</p>
             <p class="info-value flex items-center gap-1 break-all">
               {{ statsData.name }}
-              <i class="fas fa-copy text-xs text-gray-400" />
+              <i class="fas fa-copy text-sm text-gray-400" />
             </p>
           </div>
           <div class="info-item">
@@ -98,7 +98,7 @@
               <span
                 v-for="(rate, service) in statsData.serviceRates"
                 :key="service"
-                class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+                class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-sm font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
               >
                 {{ service }}: {{ rate }}x
               </span>
@@ -115,7 +115,7 @@
                 <span class="text-amber-600 dark:text-amber-400">
                   <i class="fas fa-pause-circle mr-1" />未激活
                 </span>
-                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">
                   首次使用后
                   {{ statsData.activationDays || (statsData.activationUnit === 'hours' ? 24 : 30) }}
                   {{ statsData.activationUnit === 'hours' ? '小时' : '天' }}过期
@@ -149,9 +149,20 @@
       <!-- 使用统计概览 -->
       <div class="card-section">
         <header class="section-header">
-          <i class="header-icon fas fa-chart-bar text-green-500" />
-          <h3 class="header-title">使用统计概览</h3>
-          <span class="header-tag">{{ statsPeriod === 'daily' ? '今日' : '本月' }}</span>
+          <div class="flex min-w-0 items-center gap-3">
+            <i class="header-icon fas fa-chart-bar text-green-500" />
+            <h3 class="header-title">使用统计概览</h3>
+            <span class="header-tag">{{ periodText }}</span>
+          </div>
+          <button
+            v-if="showTimelineButton"
+            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all hover:from-blue-600 hover:to-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="timelineDisabled"
+            @click="emit('open-timeline')"
+          >
+            <i class="fas fa-stream" />
+            查看请求时间线
+          </button>
         </header>
         <div class="metric-grid">
           <div class="metric-card">
@@ -237,7 +248,7 @@
                 {{ Math.min(100, Math.max(0, Math.round(account.sessionWindow?.progress || 0))) }}%
               </span>
             </div>
-            <div class="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+            <div class="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
               <span>
                 {{
                   formatSessionWindowRange(
@@ -284,7 +295,7 @@
             </div>
             <p
               v-else
-              class="rounded-xl bg-gray-100 px-3 py-2 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-300"
+              class="rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-300"
             >
               暂无额度使用数据
             </p>
@@ -302,6 +313,20 @@ import { storeToRefs } from 'pinia'
 import dayjs from 'dayjs'
 import { useApiStatsStore } from '@/stores/apistats'
 import { copyText, formatNumber, formatDate } from '@/utils/tools'
+import { formatLocalDateTime } from '@/utils/time'
+
+const props = defineProps({
+  showTimelineButton: {
+    type: Boolean,
+    default: false
+  },
+  timelineDisabled: {
+    type: Boolean,
+    default: false
+  }
+})
+
+const emit = defineEmits(['open-timeline'])
 
 const apiStatsStore = useApiStatsStore()
 const {
@@ -321,6 +346,12 @@ const topContributors = computed(() => {
     .slice(0, 3)
 })
 
+const periodText = computed(() => {
+  if (statsPeriod.value === 'daily') return '今日'
+  if (statsPeriod.value === 'monthly') return '本月'
+  return '全部'
+})
+
 // 是否有自定义服务倍率
 const hasServiceRates = computed(() => {
   return statsData.value?.serviceRates && Object.keys(statsData.value.serviceRates).length > 0
@@ -334,14 +365,7 @@ const calculateContribution = (stat) => {
 
 const formatExpireDate = (dateString) => {
   if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return formatLocalDateTime(dateString, 'YYYY-MM-DD HH:mm') || ''
 }
 
 const isApiKeyExpired = (expiresAt) => {
@@ -363,6 +387,7 @@ const formatPermissions = (permissions) => {
     gemini: 'Gemini',
     codex: 'Codex',
     droid: 'Droid',
+    grok: 'Grok',
     bedrock: 'Bedrock',
     azure: 'Azure',
     ccr: 'CCR'
@@ -563,7 +588,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .header-tag {
-  @apply ml-auto rounded-full px-2 py-0.5 text-xs font-medium;
+  @apply ml-auto rounded-full px-2 py-0.5 text-sm font-medium;
   background: rgba(var(--primary-rgb), 0.1);
   color: var(--primary-color);
 }
@@ -597,7 +622,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .info-label {
-  @apply text-xs uppercase tracking-wide;
+  @apply text-sm uppercase tracking-wide;
   color: var(--text-secondary, #64748b);
 }
 
@@ -615,7 +640,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .contributor-item {
-  @apply flex items-center justify-between rounded-lg px-3 py-2 text-xs;
+  @apply flex items-center justify-between rounded-lg px-3 py-2 text-sm;
   background: rgba(var(--primary-rgb), 0.05);
   color: var(--text-secondary, #64748b);
 }
@@ -644,7 +669,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .metric-label {
-  @apply mt-1 text-xs;
+  @apply mt-1 text-sm;
   color: var(--text-secondary, #64748b);
 }
 
@@ -680,7 +705,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .account-sub {
-  @apply text-xs;
+  @apply text-sm;
   color: var(--text-secondary, #64748b);
 }
 
@@ -689,7 +714,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .rate-badge {
-  @apply rounded-full px-2 py-0.5 text-xs font-medium;
+  @apply rounded-full px-2 py-0.5 text-sm font-medium;
   background: rgba(var(--primary-rgb), 0.1);
 }
 
@@ -711,7 +736,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .progress-value {
-  @apply text-xs font-semibold;
+  @apply text-sm font-semibold;
   color: var(--text-secondary, #475569);
 }
 
@@ -734,7 +759,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .quota-tag {
-  @apply inline-flex min-w-[34px] justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold;
+  @apply inline-flex min-w-[34px] justify-center rounded-full px-2 py-0.5 text-sm font-semibold;
 }
 
 .tag-indigo {
@@ -746,7 +771,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .quota-percent {
-  @apply text-xs font-semibold;
+  @apply text-sm font-semibold;
   color: var(--text-secondary, #475569);
 }
 
@@ -755,7 +780,7 @@ const getCodexWindowLabel = (type) => (type === 'secondary' ? '周限' : '5h')
 }
 
 .quota-foot {
-  @apply mt-1 text-[11px];
+  @apply mt-1 text-sm;
   color: var(--text-tertiary, #94a3b8);
 }
 

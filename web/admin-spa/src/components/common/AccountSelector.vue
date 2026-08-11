@@ -77,7 +77,7 @@
                 <span class="text-gray-700 dark:text-gray-300">{{ option.label }}</span>
                 <span
                   v-if="option.description"
-                  class="ml-2 text-xs text-gray-400 dark:text-gray-500"
+                  class="ml-2 text-sm text-gray-400 dark:text-gray-500"
                 >
                   {{ option.description }}
                 </span>
@@ -96,7 +96,7 @@
             <!-- 分组选项 -->
             <div v-if="filteredGroups.length > 0">
               <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                class="bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
                 调度分组
               </div>
@@ -109,7 +109,7 @@
               >
                 <div class="flex items-center justify-between">
                   <span class="text-gray-700 dark:text-gray-300">{{ group.name }}</span>
-                  <span class="text-xs text-gray-500 dark:text-gray-400"
+                  <span class="text-sm text-gray-500 dark:text-gray-400"
                     >{{ group.memberCount || 0 }} 个成员</span
                   >
                 </div>
@@ -119,7 +119,7 @@
             <!-- OAuth 账号 -->
             <div v-if="filteredOAuthAccounts.length > 0">
               <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                class="bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
                 {{
                   platform === 'claude'
@@ -144,7 +144,7 @@
                   <div>
                     <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
                     <span
-                      class="ml-2 rounded-full px-2 py-0.5 text-xs"
+                      class="ml-2 rounded-full px-2 py-0.5 text-sm"
                       :class="
                         account.isActive
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -156,7 +156,7 @@
                       {{ getAccountStatusText(account) }}
                     </span>
                   </div>
-                  <span class="text-xs text-gray-400 dark:text-gray-500">
+                  <span class="text-sm text-gray-400 dark:text-gray-500">
                     {{ formatDate(account.createdAt) }}
                   </span>
                 </div>
@@ -166,7 +166,7 @@
             <!-- Console 账号（仅 Claude） -->
             <div v-if="platform === 'claude' && filteredConsoleAccounts.length > 0">
               <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                class="bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
                 Claude Console 专属账号
               </div>
@@ -183,7 +183,7 @@
                   <div>
                     <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
                     <span
-                      class="ml-2 rounded-full px-2 py-0.5 text-xs"
+                      class="ml-2 rounded-full px-2 py-0.5 text-sm"
                       :class="
                         account.isActive
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -195,7 +195,7 @@
                       {{ getAccountStatusText(account) }}
                     </span>
                   </div>
-                  <span class="text-xs text-gray-400 dark:text-gray-500">
+                  <span class="text-sm text-gray-400 dark:text-gray-500">
                     {{ formatDate(account.createdAt) }}
                   </span>
                 </div>
@@ -205,7 +205,7 @@
             <!-- OpenAI-Responses 账号（仅 OpenAI） -->
             <div v-if="platform === 'openai' && filteredOpenAIResponsesAccounts.length > 0">
               <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                class="bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
                 OpenAI-Responses 专属账号
               </div>
@@ -222,7 +222,7 @@
                   <div>
                     <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
                     <span
-                      class="ml-2 rounded-full px-2 py-0.5 text-xs"
+                      class="ml-2 rounded-full px-2 py-0.5 text-sm"
                       :class="
                         account.isActive === 'true' || account.isActive === true
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -234,7 +234,7 @@
                       {{ getAccountStatusText(account) }}
                     </span>
                   </div>
-                  <span class="text-xs text-gray-400 dark:text-gray-500">
+                  <span class="text-sm text-gray-400 dark:text-gray-500">
                     {{ formatDate(account.createdAt) }}
                   </span>
                 </div>
@@ -244,7 +244,7 @@
             <!-- Gemini-API 账号（仅 Gemini） -->
             <div v-if="platform === 'gemini' && filteredGeminiApiAccounts.length > 0">
               <div
-                class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                class="bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
                 Gemini-API 专属账号
               </div>
@@ -261,7 +261,7 @@
                   <div>
                     <span class="text-gray-700 dark:text-gray-300">{{ account.name }}</span>
                     <span
-                      class="ml-2 rounded-full px-2 py-0.5 text-xs"
+                      class="ml-2 rounded-full px-2 py-0.5 text-sm"
                       :class="
                         account.isActive === 'true' || account.isActive === true
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -273,7 +273,7 @@
                       {{ getAccountStatusText(account) }}
                     </span>
                   </div>
-                  <span class="text-xs text-gray-400 dark:text-gray-500">
+                  <span class="text-sm text-gray-400 dark:text-gray-500">
                     {{ formatDate(account.createdAt) }}
                   </span>
                 </div>

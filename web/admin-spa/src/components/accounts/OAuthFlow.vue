@@ -63,7 +63,7 @@
                     sessionKey
                     <span
                       v-if="parsedSessionKeyCount > 1"
-                      class="rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
+                      class="rounded-full bg-blue-500 px-2 py-0.5 text-sm text-white"
                     >
                       {{ parsedSessionKeyCount }} 个
                     </span>
@@ -83,7 +83,7 @@
                   />
                   <p
                     v-if="parsedSessionKeyCount > 1"
-                    class="mt-1 text-xs text-blue-600 dark:text-blue-400"
+                    class="mt-1 text-sm text-blue-600 dark:text-blue-400"
                   >
                     <i class="fas fa-info-circle mr-1" />
                     将批量创建 {{ parsedSessionKeyCount }} 个账户
@@ -99,7 +99,7 @@
                     <i class="fas fa-lightbulb mr-1" />如何获取 sessionKey
                   </h5>
                   <ol
-                    class="list-inside list-decimal space-y-1 text-xs text-amber-700 dark:text-amber-300"
+                    class="list-inside list-decimal space-y-1 text-sm text-amber-700 dark:text-amber-300"
                   >
                     <li>在浏览器中登录 <strong>claude.ai</strong></li>
                     <li>
@@ -114,7 +114,7 @@
                     <li>找到键为 <strong>sessionKey</strong> 的那一行</li>
                     <li>复制其 <strong>Value</strong>（值）列的内容</li>
                   </ol>
-                  <p class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                  <p class="mt-2 text-sm text-amber-600 dark:text-amber-400">
                     <i class="fas fa-info-circle mr-1" />
                     sessionKey 通常以
                     <code class="rounded bg-gray-200 px-1 dark:bg-gray-700">sk-ant-sid01-</code>
@@ -164,7 +164,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div
-                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white"
                     >
                       1
                     </div>
@@ -185,7 +185,7 @@
                       <div v-else class="space-y-3">
                         <div class="flex items-center gap-2">
                           <input
-                            class="form-input flex-1 bg-gray-50 font-mono text-xs dark:bg-gray-700"
+                            class="form-input flex-1 bg-gray-50 font-mono text-sm dark:bg-gray-700"
                             readonly
                             type="text"
                             :value="authUrl"
@@ -199,7 +199,7 @@
                           </button>
                         </div>
                         <button
-                          class="text-xs text-blue-600 hover:text-blue-700"
+                          class="text-sm text-blue-600 hover:text-blue-700"
                           @click="regenerateAuthUrl"
                         >
                           <i class="fas fa-sync-alt mr-1" />重新生成
@@ -215,7 +215,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div
-                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white"
                     >
                       2
                     </div>
@@ -229,7 +229,7 @@
                       <div
                         class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
                       >
-                        <p class="text-xs text-yellow-800 dark:text-yellow-300">
+                        <p class="text-sm text-yellow-800 dark:text-yellow-300">
                           <i class="fas fa-exclamation-triangle mr-1" />
                           <strong>注意：</strong
                           >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
@@ -245,7 +245,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div
-                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                      class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white"
                     >
                       3
                     </div>
@@ -271,7 +271,7 @@
                             rows="3"
                           />
                         </div>
-                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                           <i class="fas fa-info-circle mr-1" />
                           请粘贴从Claude页面复制的Authorization Code
                         </p>
@@ -320,7 +320,7 @@
               >
                 <div class="flex items-start gap-3">
                   <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-bold text-white"
                   >
                     1
                   </div>
@@ -341,7 +341,7 @@
                     <div v-else class="space-y-3">
                       <div class="flex items-center gap-2">
                         <input
-                          class="form-input flex-1 bg-gray-50 font-mono text-xs dark:bg-gray-700"
+                          class="form-input flex-1 bg-gray-50 font-mono text-sm dark:bg-gray-700"
                           readonly
                           type="text"
                           :value="authUrl"
@@ -355,7 +355,7 @@
                         </button>
                       </div>
                       <button
-                        class="text-xs text-green-600 hover:text-green-700"
+                        class="text-sm text-green-600 hover:text-green-700"
                         @click="regenerateAuthUrl"
                       >
                         <i class="fas fa-sync-alt mr-1" />重新生成
@@ -371,7 +371,7 @@
               >
                 <div class="flex items-start gap-3">
                   <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-bold text-white"
                   >
                     2
                   </div>
@@ -385,7 +385,7 @@
                     <div
                       class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
                     >
-                      <p class="text-xs text-yellow-800 dark:text-yellow-300">
+                      <p class="text-sm text-yellow-800 dark:text-yellow-300">
                         <i class="fas fa-exclamation-triangle mr-1" />
                         <strong>注意：</strong
                         >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
@@ -401,7 +401,7 @@
               >
                 <div class="flex items-start gap-3">
                   <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-bold text-white"
                   >
                     3
                   </div>
@@ -427,7 +427,7 @@
                         />
                       </div>
                       <div class="mt-2 space-y-1">
-                        <p class="text-xs text-gray-600 dark:text-gray-400">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
                           <i class="fas fa-check-circle mr-1 text-green-500" />
                           请粘贴从Gemini页面复制的Authorization Code
                         </p>
@@ -466,7 +466,7 @@
               >
                 <div class="flex items-start gap-3">
                   <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-sm font-bold text-white"
                   >
                     1
                   </div>
@@ -487,7 +487,7 @@
                     <div v-else class="space-y-3">
                       <div class="flex items-center gap-2">
                         <input
-                          class="form-input flex-1 bg-gray-50 font-mono text-xs dark:bg-gray-700"
+                          class="form-input flex-1 bg-gray-50 font-mono text-sm dark:bg-gray-700"
                           readonly
                           type="text"
                           :value="authUrl"
@@ -501,7 +501,7 @@
                         </button>
                       </div>
                       <button
-                        class="text-xs text-orange-600 hover:text-orange-700"
+                        class="text-sm text-orange-600 hover:text-orange-700"
                         @click="regenerateAuthUrl"
                       >
                         <i class="fas fa-sync-alt mr-1" />重新生成
@@ -517,7 +517,7 @@
               >
                 <div class="flex items-start gap-3">
                   <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-sm font-bold text-white"
                   >
                     2
                   </div>
@@ -531,11 +531,11 @@
                     <div
                       class="mb-3 rounded border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/30"
                     >
-                      <p class="text-xs text-amber-800 dark:text-amber-300">
+                      <p class="text-sm text-amber-800 dark:text-amber-300">
                         <i class="fas fa-clock mr-1" />
                         <strong>重要提示：</strong>授权后页面可能会加载较长时间，请耐心等待。
                       </p>
-                      <p class="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                      <p class="mt-2 text-sm text-amber-700 dark:text-amber-400">
                         当浏览器地址栏变为
                         <strong class="font-mono">http://localhost:1455/...</strong>
                         开头时，表示授权已完成。
@@ -544,7 +544,7 @@
                     <div
                       class="rounded border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/30"
                     >
-                      <p class="text-xs text-yellow-800 dark:text-yellow-300">
+                      <p class="text-sm text-yellow-800 dark:text-yellow-300">
                         <i class="fas fa-exclamation-triangle mr-1" />
                         <strong>注意：</strong
                         >如果您设置了代理，请确保浏览器也使用相同的代理访问授权页面。
@@ -560,7 +560,7 @@
               >
                 <div class="flex items-start gap-3">
                   <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-sm font-bold text-white"
                   >
                     3
                   </div>
@@ -589,17 +589,17 @@
                       <div
                         class="rounded border border-blue-300 bg-blue-50 p-2 dark:border-blue-700 dark:bg-blue-900/30"
                       >
-                        <p class="text-xs text-blue-700 dark:text-blue-300">
+                        <p class="text-sm text-blue-700 dark:text-blue-300">
                           <i class="fas fa-lightbulb mr-1" />
                           <strong>提示：</strong>您可以直接复制整个链接或仅复制 code
                           参数值，系统会自动识别。
                         </p>
-                        <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                        <p class="mt-1 text-sm text-blue-600 dark:text-blue-400">
                           • 完整链接示例：<span class="font-mono"
                             >http://localhost:1455/auth/callback?code=ac_4hm8...</span
                           >
                         </p>
-                        <p class="text-xs text-blue-600">
+                        <p class="text-sm text-blue-600">
                           • 仅 Code 示例：<span class="font-mono"
                             >ac_4hm8iqmx9A2fzMy_cwye7U3W7...</span
                           >
@@ -639,7 +639,7 @@
               >
                 <div class="flex items-start gap-3">
                   <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-sm font-bold text-white"
                   >
                     1
                   </div>
@@ -659,7 +659,7 @@
                     </button>
                     <div v-else class="space-y-4">
                       <div class="space-y-2">
-                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+                        <label class="text-sm font-semibold text-gray-600 dark:text-gray-300"
                           >授权链接</label
                         >
                         <div
@@ -667,7 +667,7 @@
                         >
                           <div class="flex items-center gap-2">
                             <input
-                              class="form-input flex-1 bg-gray-50 font-mono text-xs dark:bg-gray-700"
+                              class="form-input flex-1 bg-gray-50 font-mono text-sm dark:bg-gray-700"
                               readonly
                               type="text"
                               :value="authUrl"
@@ -682,22 +682,22 @@
                           </div>
                           <div class="flex flex-wrap items-center gap-2">
                             <button
-                              class="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-white px-3 py-1.5 text-xs font-medium text-cyan-600 shadow-sm transition-colors hover:border-cyan-300 hover:bg-cyan-50 dark:border-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/60"
+                              class="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-white px-3 py-1.5 text-sm font-medium text-cyan-600 shadow-sm transition-colors hover:border-cyan-300 hover:bg-cyan-50 dark:border-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200 dark:hover:border-cyan-500 dark:hover:bg-cyan-900/60"
                               @click="openVerificationPage"
                             >
-                              <i class="fas fa-external-link-alt text-xs" /> 在新标签中打开
+                              <i class="fas fa-external-link-alt text-sm" /> 在新标签中打开
                             </button>
                             <button
-                              class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-cyan-600 transition-colors hover:text-cyan-700 dark:text-cyan-300 dark:hover:text-cyan-200"
+                              class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-cyan-600 transition-colors hover:text-cyan-700 dark:text-cyan-300 dark:hover:text-cyan-200"
                               @click="regenerateAuthUrl"
                             >
-                              <i class="fas fa-sync-alt text-xs" />重新生成
+                              <i class="fas fa-sync-alt text-sm" />重新生成
                             </button>
                           </div>
                         </div>
                       </div>
                       <div class="space-y-2">
-                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+                        <label class="text-sm font-semibold text-gray-600 dark:text-gray-300"
                           >授权验证码</label
                         >
                         <div
@@ -717,7 +717,7 @@
                         </div>
                       </div>
                       <div
-                        class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                        class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400"
                       >
                         <span>
                           <i class="fas fa-hourglass-half mr-1 text-cyan-500" />
@@ -735,7 +735,7 @@
               >
                 <div class="flex items-start gap-3">
                   <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-sm font-bold text-white"
                   >
                     2
                   </div>
@@ -759,7 +759,7 @@
               >
                 <div class="flex items-start gap-3">
                   <div
-                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-sm font-bold text-white"
                   >
                     3
                   </div>
@@ -767,8 +767,169 @@
                     <p class="mb-2 font-medium text-cyan-900 dark:text-cyan-200">
                       完成授权后点击下方“完成授权”按钮，系统会自动获取访问令牌。
                     </p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
                       若提示授权仍在等待确认，请稍候片刻后系统会自动重试。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grok OAuth 流程 -->
+    <div v-else-if="platform === 'grok'">
+      <div
+        class="rounded-lg border border-violet-200 bg-violet-50 p-6 dark:border-violet-700 dark:bg-violet-900/30"
+      >
+        <div class="flex items-start gap-4">
+          <div
+            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-violet-500"
+          >
+            <i class="fas fa-bolt text-white" />
+          </div>
+          <div class="flex-1">
+            <h4 class="mb-3 font-semibold text-violet-900 dark:text-violet-200">
+              Grok / xAI 账户授权
+            </h4>
+
+            <div class="mb-4">
+              <label class="mb-2 block text-sm font-medium text-violet-800 dark:text-violet-300">
+                选择导入方式
+              </label>
+              <div class="flex flex-wrap gap-4">
+                <label class="flex cursor-pointer items-center gap-2">
+                  <input
+                    v-model="authMethod"
+                    class="text-violet-600 focus:ring-violet-500"
+                    name="grok-auth-method"
+                    type="radio"
+                    value="manual"
+                  />
+                  <span class="text-sm text-violet-900 dark:text-violet-200">浏览器 OAuth</span>
+                </label>
+                <label class="flex cursor-pointer items-center gap-2">
+                  <input
+                    v-model="authMethod"
+                    class="text-violet-600 focus:ring-violet-500"
+                    name="grok-auth-method"
+                    type="radio"
+                    value="sso"
+                  />
+                  <span class="text-sm text-violet-900 dark:text-violet-200">SSO Cookie 导入</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- SSO Cookie 批量 -->
+            <div v-if="authMethod === 'sso'" class="space-y-4">
+              <p class="text-sm text-violet-800 dark:text-violet-300">
+                粘贴 accounts.x.ai 登录后的
+                <code class="rounded bg-violet-100 px-1 dark:bg-violet-900">sso</code>
+                Cookie（可多行批量）。系统走 device flow 兑换 Build OAuth token。
+              </p>
+              <textarea
+                v-model="ssoTokensInput"
+                class="form-input w-full resize-y font-mono text-sm"
+                placeholder="每行一个 sso cookie 值，或 sso=xxxxx"
+                rows="4"
+              />
+              <button
+                class="btn btn-primary px-4 py-2 text-sm"
+                :disabled="ssoImporting || !ssoTokensInput.trim()"
+                type="button"
+                @click="importGrokSso"
+              >
+                <div v-if="ssoImporting" class="loading-spinner mr-2" />
+                {{ ssoImporting ? '导入中...' : '批量导入 SSO' }}
+              </button>
+              <p v-if="ssoImportResult" class="text-sm text-violet-700 dark:text-violet-300">
+                成功 {{ ssoImportResult.created }} 个，失败 {{ ssoImportResult.failed }} 个
+              </p>
+            </div>
+
+            <!-- 浏览器 OAuth -->
+            <div v-else class="space-y-4">
+              <div
+                class="rounded-lg border border-violet-300 bg-white/80 p-4 dark:border-violet-600 dark:bg-gray-800/80"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-violet-600 text-sm font-bold text-white"
+                  >
+                    1
+                  </div>
+                  <div class="flex-1">
+                    <p class="mb-2 font-medium text-violet-900 dark:text-violet-200">
+                      生成授权链接并在浏览器完成登录
+                    </p>
+                    <button
+                      v-if="!authUrl"
+                      class="btn btn-primary px-4 py-2 text-sm"
+                      :disabled="loading"
+                      type="button"
+                      @click="generateAuthUrl"
+                    >
+                      <i v-if="!loading" class="fas fa-link mr-2" />
+                      <div v-else class="loading-spinner mr-2" />
+                      {{ loading ? '生成中...' : '生成授权链接' }}
+                    </button>
+                    <div v-else class="space-y-2">
+                      <div
+                        class="break-all rounded bg-gray-100 p-2 font-mono text-sm dark:bg-gray-900"
+                      >
+                        {{ authUrl }}
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        <button
+                          class="btn btn-secondary px-3 py-1 text-sm"
+                          type="button"
+                          @click="copyAuthUrl"
+                        >
+                          复制链接
+                        </button>
+                        <button
+                          class="btn btn-secondary px-3 py-1 text-sm"
+                          type="button"
+                          @click="windowOpenAuth"
+                        >
+                          打开链接
+                        </button>
+                        <button
+                          class="btn btn-secondary px-3 py-1 text-sm"
+                          type="button"
+                          @click="regenerateAuthUrl"
+                        >
+                          重新生成
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                class="rounded-lg border border-violet-300 bg-white/80 p-4 dark:border-violet-600 dark:bg-gray-800/80"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-violet-600 text-sm font-bold text-white"
+                  >
+                    2
+                  </div>
+                  <div class="flex-1">
+                    <p class="mb-2 font-medium text-violet-900 dark:text-violet-200">
+                      粘贴完整 callback URL（必须含 code 与 state）
+                    </p>
+                    <textarea
+                      v-model="authCode"
+                      class="form-input w-full font-mono text-sm"
+                      placeholder="http://127.0.0.1:56121/callback?code=...&state=..."
+                      rows="3"
+                    />
+                    <p class="mt-1 text-sm text-violet-700 dark:text-violet-300">
+                      请保留完整链接，不要只贴裸 code；state 用于服务端 CSRF 校验。
                     </p>
                   </div>
                 </div>
@@ -789,7 +950,10 @@
       </button>
       <!-- Cookie自动授权模式不显示此按钮（Claude平台） -->
       <button
-        v-if="!(platform === 'claude' && authMethod === 'cookie')"
+        v-if="
+          !(platform === 'claude' && authMethod === 'cookie') &&
+          !(platform === 'grok' && authMethod === 'sso')
+        "
         class="btn btn-primary flex-1 px-6 py-3 font-semibold"
         :disabled="!canExchange || exchanging"
         type="button"
@@ -815,6 +979,14 @@ const props = defineProps({
   proxy: {
     type: Object,
     default: null
+  },
+  proxyGroupId: {
+    type: String,
+    default: ''
+  },
+  proxyId: {
+    type: String,
+    default: ''
   }
 })
 
@@ -843,12 +1015,15 @@ const remainingSeconds = ref(0)
 let countdownTimer = null
 
 // Cookie自动授权相关状态
-const authMethod = ref('manual') // 'manual' | 'cookie'
+const authMethod = ref('manual') // 'manual' | 'cookie' | 'sso'(grok)
 const sessionKey = ref('')
 const cookieAuthLoading = ref(false)
 const cookieAuthError = ref('')
 const showSessionKeyHelp = ref(false)
 const batchProgress = ref({ current: 0, total: 0 }) // 批量进度
+const ssoTokensInput = ref('')
+const ssoImporting = ref(false)
+const ssoImportResult = ref(null)
 
 // 解析后的 sessionKey 数量
 const parsedSessionKeyCount = computed(() => {
@@ -858,10 +1033,36 @@ const parsedSessionKeyCount = computed(() => {
     .filter((s) => s.length > 0).length
 })
 
+// Grok 手动授权：必须是完整 callback / query（含 code + state），禁止裸 code
+const isGrokCallbackWithState = (raw) => {
+  const trimmed = String(raw || '').trim()
+  if (!trimmed) {
+    return false
+  }
+  try {
+    const url = new URL(trimmed)
+    return Boolean(url.searchParams.get('code') && url.searchParams.get('state'))
+  } catch {
+    // 兼容 code=...&state=... 或 ?code=...&state=...
+  }
+  const queryCandidate = trimmed.startsWith('?') ? trimmed.slice(1) : trimmed
+  if (!queryCandidate.includes('=')) {
+    return false
+  }
+  const params = new URLSearchParams(queryCandidate)
+  return Boolean(params.get('code') && params.get('state'))
+}
+
 // 计算是否可以交换code
 const canExchange = computed(() => {
   if (props.platform === 'droid') {
     return !!sessionId.value
+  }
+  if (props.platform === 'grok' && authMethod.value === 'sso') {
+    return false
+  }
+  if (props.platform === 'grok') {
+    return Boolean(authUrl.value && isGrokCallbackWithState(authCode.value))
   }
   return authUrl.value && authCode.value.trim()
 })
@@ -915,6 +1116,29 @@ watch(authCode, (newValue) => {
 
   // 如果是 URL 格式
   if (isUrl) {
+    // Grok：必须保留完整 callback（含 state），禁止任何分支改写成裸 code
+    if (props.platform === 'grok') {
+      try {
+        const url = new URL(trimmedValue)
+        const code = url.searchParams.get('code')
+        const state = url.searchParams.get('state')
+        if (!code) {
+          showToast('URL 中未找到授权码参数，请检查链接是否正确', 'error')
+          return
+        }
+        if (!state) {
+          showToast('回调 URL 缺少 state，请粘贴完整 callback 链接', 'error')
+          return
+        }
+        authCode.value = trimmedValue
+        showToast('已识别完整回调链接（含 state）', 'success')
+      } catch (error) {
+        console.error('Failed to parse Grok callback URL:', error)
+        showToast('链接格式错误，请检查是否为完整的 URL', 'error')
+      }
+      return
+    }
+
     // 检查是否是正确的 localhost 回调 URL
     if (
       trimmedValue.startsWith('http://localhost:45462') ||
@@ -943,8 +1167,7 @@ watch(authCode, (newValue) => {
       props.platform === 'gemini-antigravity' ||
       props.platform === 'openai'
     ) {
-      // Gemini 和 OpenAI 平台可能使用不同的回调URL
-      // 尝试从任何URL中提取code参数
+      // Gemini / OpenAI 回调 host 不固定，抽裸 code
       try {
         const url = new URL(trimmedValue)
         const code = url.searchParams.get('code')
@@ -952,6 +1175,8 @@ watch(authCode, (newValue) => {
         if (code) {
           authCode.value = code
           showToast('成功提取授权码！', 'success')
+        } else {
+          showToast('URL 中未找到授权码参数，请检查链接是否正确', 'error')
         }
       } catch (error) {
         // 不是有效的URL，保持原值
@@ -961,7 +1186,7 @@ watch(authCode, (newValue) => {
       showToast('请粘贴以 http://localhost:1455 或 http://localhost:45462 开头的链接', 'error')
     }
   }
-  // 如果不是 URL，保持原值（兼容直接输入授权码）
+  // 非 URL：Grok 由 canExchange/提交硬校验拦截裸 code；其他平台保持原值
 })
 
 // 生成授权URL
@@ -977,17 +1202,20 @@ const generateAuthUrl = async () => {
   copied.value = false
   loading.value = true
   try {
-    const proxyConfig = props.proxy?.enabled
-      ? {
-          proxy: {
+    // 总是带上池绑定字段，后端 resolveAuthProxy 决定优先级（绑池走池、未绑池回退静态 proxy）
+    const proxyConfig = {
+      proxyGroupId: props.proxyGroupId || '',
+      proxyId: props.proxyId || '',
+      proxy: props.proxy?.enabled
+        ? {
             type: props.proxy.type,
             host: props.proxy.host,
             port: parseInt(props.proxy.port),
             username: props.proxy.username || null,
             password: props.proxy.password || null
           }
-        }
-      : {}
+        : null
+    }
 
     if (props.platform === 'claude') {
       const result = await accountsStore.generateClaudeAuthUrl(proxyConfig)
@@ -1011,6 +1239,10 @@ const generateAuthUrl = async () => {
       verificationUriComplete.value = result.verificationUriComplete || result.verificationUri
       userCode.value = result.userCode
       startCountdown(result.expiresIn || 300)
+      sessionId.value = result.sessionId
+    } else if (props.platform === 'grok') {
+      const result = await accountsStore.generateGrokAuthUrl(proxyConfig)
+      authUrl.value = result.authUrl
       sessionId.value = result.sessionId
     }
   } catch (error) {
@@ -1122,19 +1354,20 @@ const exchangeCode = async () => {
       data = {
         sessionId: sessionId.value
       }
-    }
-
-    // 添加代理配置（如果启用）
-    if (props.proxy?.enabled) {
-      data.proxy = {
-        type: props.proxy.type,
-        host: props.proxy.host,
-        port: parseInt(props.proxy.port),
-        username: props.proxy.username || null,
-        password: props.proxy.password || null
+    } else if (props.platform === 'grok') {
+      // 再次硬校验：禁止裸 code 提交（绕过 state 校验）
+      const grokCode = authCode.value.trim()
+      if (!isGrokCallbackWithState(grokCode)) {
+        showToast('请粘贴完整 callback URL（必须含 code 与 state）', 'error')
+        return
+      }
+      data = {
+        sessionId: sessionId.value,
+        code: grokCode
       }
     }
 
+    // 交换阶段不再带静态 proxy：授权代理已在生成 URL 时解析并存入 session，统一从 session 取（绑池则走池）
     let tokenInfo
     if (props.platform === 'claude') {
       tokenInfo = await accountsStore.exchangeClaudeCode(data)
@@ -1161,6 +1394,8 @@ const exchangeCode = async () => {
       }
       tokenInfo = response.data
       stopCountdown()
+    } else if (props.platform === 'grok') {
+      tokenInfo = await accountsStore.exchangeGrokCode(data)
     }
 
     if (!tokenInfo) {
@@ -1216,7 +1451,9 @@ const handleCookieAuth = async () => {
     try {
       const result = await accountsStore.oauthWithCookie({
         sessionKey: sessionKeys[i],
-        proxy: proxyConfig
+        proxy: proxyConfig,
+        proxyGroupId: props.proxyGroupId || '',
+        proxyId: props.proxyId || ''
       })
       results.push(result)
     } catch (error) {
@@ -1262,6 +1499,63 @@ const onAuthMethodChange = () => {
   authUrl.value = ''
   authCode.value = ''
   sessionId.value = ''
+  ssoTokensInput.value = ''
+  ssoImportResult.value = null
+}
+
+const windowOpenAuth = () => {
+  if (authUrl.value) {
+    window.open(authUrl.value, '_blank', 'noopener')
+  }
+}
+
+const importGrokSso = async () => {
+  const lines = ssoTokensInput.value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length === 0) {
+    showToast('请输入至少一个 SSO cookie', 'warning')
+    return
+  }
+  ssoImporting.value = true
+  ssoImportResult.value = null
+  try {
+    const proxyConfig = props.proxy?.enabled
+      ? {
+          type: props.proxy.type,
+          host: props.proxy.host,
+          port: parseInt(props.proxy.port),
+          username: props.proxy.username || null,
+          password: props.proxy.password || null
+        }
+      : null
+    const result = await accountsStore.importGrokSsoAccounts({
+      ssoTokens: lines,
+      proxy: proxyConfig,
+      proxyGroupId: props.proxyGroupId || '',
+      proxyId: props.proxyId || ''
+    })
+    if (!result) {
+      showToast('SSO 导入失败', 'error')
+      return
+    }
+    ssoImportResult.value = {
+      created: result.created?.length || 0,
+      failed: result.failed?.length || 0
+    }
+    if (result.created?.length) {
+      showToast(`成功导入 ${result.created.length} 个 Grok 账户`, 'success')
+      // 通知父组件刷新；已创建账户直接 success 空 token 列表也可
+      emit('success', { __grokSsoImported: true, result })
+    } else {
+      showToast(result.failed?.[0]?.error || '全部导入失败', 'error')
+    }
+  } catch (error) {
+    showToast(error.message || 'SSO 导入失败', 'error')
+  } finally {
+    ssoImporting.value = false
+  }
 }
 
 // 暴露方法供父组件调用

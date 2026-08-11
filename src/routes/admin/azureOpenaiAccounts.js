@@ -8,6 +8,7 @@ const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const axios = require('axios')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { stripReadonlyAccountFields } = require('../../utils/commonHelper')
 
 const router = express.Router()
 
@@ -231,7 +232,8 @@ router.put('/azure-openai-accounts/:id', authenticateAdmin, async (req, res) => 
     const updates = req.body
 
     // ✅ 【新增】映射字段名:前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = mapExpiryField(updates, 'Azure OpenAI', id)
+    // review#3：剥离外部传入的状态类字段，禁止伪造自动停用证据
+    const mappedUpdates = stripReadonlyAccountFields(mapExpiryField(updates, 'Azure OpenAI', id))
 
     const account = await azureOpenaiAccountService.updateAccount(id, mappedUpdates)
 

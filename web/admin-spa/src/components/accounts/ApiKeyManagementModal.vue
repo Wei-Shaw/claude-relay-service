@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <ModalTransition>
     <div v-if="show" class="modal fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
       <div
         class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-4xl overflow-y-auto p-4 sm:p-6 md:p-8"
@@ -15,14 +15,14 @@
               <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
                 API Key 管理
               </h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+              <p class="text-sm text-gray-500 dark:text-gray-400 sm:text-sm">
                 {{ accountName }}
               </p>
             </div>
           </div>
           <div class="flex items-center gap-2">
             <button
-              class="flex items-center gap-2 rounded-lg border border-purple-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-purple-600 shadow-sm transition-all duration-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-600/60 dark:bg-purple-900/20 dark:text-purple-200 dark:hover:border-purple-500 dark:hover:bg-purple-900/40 dark:hover:text-purple-100 dark:focus:ring-purple-500/40 sm:text-sm"
+              class="flex items-center gap-2 rounded-lg border border-purple-200 bg-white/90 px-3 py-1.5 text-sm font-semibold text-purple-600 shadow-sm transition-all duration-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-600/60 dark:bg-purple-900/20 dark:text-purple-200 dark:hover:border-purple-500 dark:hover:bg-purple-900/40 dark:hover:text-purple-100 dark:focus:ring-purple-500/40 sm:text-sm"
               :disabled="loading || apiKeys.length === 0 || copyingAll"
               @click="copyAllApiKeys"
             >
@@ -76,7 +76,7 @@
                   <div class="flex gap-1">
                     <button
                       :class="[
-                        'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                        'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                         statusFilter === 'all'
                           ? 'bg-purple-500 text-white shadow-sm'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
@@ -87,7 +87,7 @@
                     </button>
                     <button
                       :class="[
-                        'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                        'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                         statusFilter === 'active'
                           ? 'bg-green-500 text-white shadow-sm'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
@@ -99,7 +99,7 @@
                     </button>
                     <button
                       :class="[
-                        'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                        'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                         statusFilter === 'error'
                           ? 'bg-red-500 text-white shadow-sm'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
@@ -128,7 +128,7 @@
                   <div class="flex gap-1">
                     <button
                       :class="[
-                        'rounded-md px-2.5 py-2 text-xs font-medium transition-colors',
+                        'rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
                         searchMode === 'fuzzy'
                           ? 'bg-purple-500 text-white shadow-sm'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
@@ -141,7 +141,7 @@
                     </button>
                     <button
                       :class="[
-                        'rounded-md px-2.5 py-2 text-xs font-medium transition-colors',
+                        'rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
                         searchMode === 'exact'
                           ? 'bg-purple-500 text-white shadow-sm'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
@@ -163,11 +163,11 @@
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <!-- 左侧：操作按钮 -->
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-xs font-medium text-gray-500 dark:text-gray-400"
+                  <span class="text-sm font-medium text-gray-500 dark:text-gray-400"
                     >批量操作：</span
                   >
                   <button
-                    class="group rounded-md bg-gradient-to-r from-red-500 to-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-600 hover:to-red-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="group rounded-md bg-gradient-to-r from-red-500 to-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:from-red-600 hover:to-red-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="errorKeysCount === 0 || batchDeleting"
                     title="删除所有异常状态的 API Key"
                     @click="deleteAllErrorKeys"
@@ -176,7 +176,7 @@
                     删除异常
                   </button>
                   <button
-                    class="group rounded-md bg-gradient-to-r from-red-600 to-red-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-red-700 hover:to-red-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="group rounded-md bg-gradient-to-r from-red-600 to-red-700 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:from-red-700 hover:to-red-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="apiKeys.length === 0 || batchDeleting"
                     title="删除所有 API Key"
                     @click="deleteAllKeys"
@@ -186,7 +186,7 @@
                   </button>
                   <div class="mx-1 h-5 w-px bg-gray-300 dark:bg-gray-600"></div>
                   <button
-                    class="rounded-md bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-600 hover:to-blue-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="rounded-md bg-gradient-to-r from-blue-500 to-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:from-blue-600 hover:to-blue-700 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="errorKeysCount === 0"
                     title="导出所有异常状态的 API Key"
                     @click="exportKeys('error')"
@@ -195,7 +195,7 @@
                     导出异常
                   </button>
                   <button
-                    class="rounded-md bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
+                    class="rounded-md bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-sm"
                     :disabled="apiKeys.length === 0"
                     title="导出所有 API Key"
                     @click="exportKeys('all')"
@@ -210,7 +210,7 @@
                   class="flex items-center gap-2 rounded-md bg-purple-50 px-3 py-1.5 dark:bg-purple-900/20"
                 >
                   <i class="fas fa-info-circle text-purple-500 dark:text-purple-400" />
-                  <span class="text-xs font-medium text-purple-700 dark:text-purple-300">
+                  <span class="text-sm font-medium text-purple-700 dark:text-purple-300">
                     显示 <strong>{{ filteredApiKeys.length }}</strong> 个
                   </span>
                 </div>
@@ -232,7 +232,7 @@
                 class="absolute -left-2 -top-2 z-10"
               >
                 <span
-                  class="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-sm"
+                  class="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-sm font-semibold shadow-sm"
                   :class="[
                     apiKey.status === 'error'
                       ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
@@ -248,14 +248,14 @@
                 <!-- API Key 信息 -->
                 <div class="flex items-start justify-between gap-2">
                   <span
-                    class="flex-1 break-all font-mono text-xs font-medium text-gray-900 dark:text-gray-100"
+                    class="flex-1 break-all font-mono text-sm font-medium text-gray-900 dark:text-gray-100"
                     :title="apiKey.key"
                   >
                     {{ maskApiKey(apiKey.key) }}
                   </span>
                   <div class="flex items-center gap-1">
                     <button
-                      class="text-xs text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                      class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                       title="复制 API Key"
                       @click="copyApiKey(apiKey.key)"
                     >
@@ -263,7 +263,7 @@
                     </button>
                     <button
                       v-if="apiKey.status === 'error' || apiKey.status === 'disabled'"
-                      class="text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      class="text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       :class="[
                         apiKey.status === 'error'
                           ? 'text-orange-500 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300'
@@ -277,7 +277,7 @@
                       <i v-else class="fas fa-redo"></i>
                     </button>
                     <button
-                      class="text-xs text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-600"
+                      class="text-sm text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-600"
                       :disabled="deleting === apiKey.key"
                       @click="deleteApiKey(apiKey)"
                     >
@@ -289,7 +289,7 @@
 
                 <!-- 统计信息（一行显示） -->
                 <div
-                  class="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400"
+                  class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400"
                 >
                   <div>
                     <span
@@ -381,22 +381,25 @@
         </div>
       </div>
     </div>
-    <ConfirmModal
-      :cancel-text="confirmModalConfig.cancelText"
-      :confirm-text="confirmModalConfig.confirmText"
-      :message="confirmModalConfig.message"
-      :show="showConfirmModal"
-      :title="confirmModalConfig.title"
-      :type="confirmModalConfig.type"
-      @cancel="handleCancelModal"
-      @confirm="handleConfirmModal"
-    />
-  </Teleport>
+  </ModalTransition>
+
+  <ConfirmModal
+    :cancel-text="confirmModalConfig.cancelText"
+    :confirm-text="confirmModalConfig.confirmText"
+    :message="confirmModalConfig.message"
+    :show="showConfirmModal"
+    :title="confirmModalConfig.title"
+    :type="confirmModalConfig.type"
+    @cancel="handleCancelModal"
+    @confirm="handleConfirmModal"
+  />
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { showToast } from '@/utils/tools'
+import { toLocalDateString } from '@/utils/time'
 import { getDroidAccountByIdApi, updateDroidAccountApi } from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
@@ -517,78 +520,81 @@ const errorKeysCount = computed(() => {
 // 加载 API Keys
 const loadApiKeys = async () => {
   loading.value = true
-  try {
-    const response = await getDroidAccountByIdApi(props.accountId)
-    const account = response.data
+  // request.js 为 resolve-only：失败也 resolve 成 { success:false }，不会抛异常，必须显式判 success
+  const response = await getDroidAccountByIdApi(props.accountId)
+  if (!response.success) {
+    showToast(response.message || '加载 API Key 失败', 'error')
+    loading.value = false
+    currentPage.value = 1
+    return
+  }
+  const account = response.data || {}
 
-    // 解析 apiKeys
-    let parsedKeys = []
-    if (Array.isArray(account.apiKeys)) {
-      parsedKeys = account.apiKeys
-    } else if (typeof account.apiKeys === 'string') {
-      try {
-        parsedKeys = JSON.parse(account.apiKeys)
-      } catch (error) {
-        console.error('Failed to parse apiKeys:', error)
-      }
+  // 解析 apiKeys
+  let parsedKeys = []
+  if (Array.isArray(account.apiKeys)) {
+    parsedKeys = account.apiKeys
+  } else if (typeof account.apiKeys === 'string') {
+    try {
+      const parsed = JSON.parse(account.apiKeys)
+      // JSON.parse 可能解出对象/数字等非数组结构（如 '{}'），非数组一律视为空，避免后续 .map 抛错
+      parsedKeys = Array.isArray(parsed) ? parsed : []
+    } catch (error) {
+      console.error('Failed to parse apiKeys:', error)
     }
+  }
 
-    // 转换为统一格式
-    const formattedKeys = parsedKeys.map((item) => {
-      if (typeof item === 'string') {
-        // 对于字符串类型的API Key，保持默认状态为active
-        return {
-          key: item,
-          usageCount: 0,
-          status: 'active',
-          lastUsedAt: null,
-          errorMessage: ''
-        }
-      } else if (typeof item === 'object' && item !== null) {
-        // 对于对象类型的API Key，保留所有状态信息
-        return {
-          key: item.key || item.apiKey || '',
-          usageCount: item.usageCount || item.count || 0,
-          status: item.status || 'active', // 保留后端返回的状态
-          lastUsedAt: item.lastUsedAt || item.lastUsed || null,
-          errorMessage: item.errorMessage || '' // 保留后端返回的错误信息
-        }
-      }
-      // 其他情况，默认为active状态
+  // 转换为统一格式
+  const formattedKeys = parsedKeys.map((item) => {
+    if (typeof item === 'string') {
+      // 对于字符串类型的API Key，保持默认状态为active
       return {
-        key: String(item),
+        key: item,
         usageCount: 0,
         status: 'active',
         lastUsedAt: null,
         errorMessage: ''
       }
-    })
+    } else if (typeof item === 'object' && item !== null) {
+      // 对于对象类型的API Key，保留所有状态信息
+      return {
+        key: item.key || item.apiKey || '',
+        usageCount: item.usageCount || item.count || 0,
+        status: item.status || 'active', // 保留后端返回的状态
+        lastUsedAt: item.lastUsedAt || item.lastUsed || null,
+        errorMessage: item.errorMessage || '' // 保留后端返回的错误信息
+      }
+    }
+    // 其他情况，默认为active状态
+    return {
+      key: String(item),
+      usageCount: 0,
+      status: 'active',
+      lastUsedAt: null,
+      errorMessage: ''
+    }
+  })
 
-    // 按最新使用时间排序（最近使用的在前，未使用的在后）
-    apiKeys.value = formattedKeys.sort((a, b) => {
-      // 如果都有 lastUsedAt，按时间降序排序
-      if (a.lastUsedAt && b.lastUsedAt) {
-        return new Date(b.lastUsedAt) - new Date(a.lastUsedAt)
-      }
-      // 如果 a 有时间，b 没有，a 排在前面
-      if (a.lastUsedAt && !b.lastUsedAt) {
-        return -1
-      }
-      // 如果 b 有时间，a 没有，b 排在前面
-      if (!a.lastUsedAt && b.lastUsedAt) {
-        return 1
-      }
-      // 如果都没有时间，按使用次数降序排序
-      return (b.usageCount || 0) - (a.usageCount || 0)
-    })
-  } catch (error) {
-    console.error('Failed to load API keys:', error)
-    showToast('加载 API Key 失败', 'error')
-  } finally {
-    loading.value = false
-    // 重置到第一页
-    currentPage.value = 1
-  }
+  // 按最新使用时间排序（最近使用的在前，未使用的在后）
+  apiKeys.value = formattedKeys.sort((a, b) => {
+    // 如果都有 lastUsedAt，按时间降序排序
+    if (a.lastUsedAt && b.lastUsedAt) {
+      return new Date(b.lastUsedAt) - new Date(a.lastUsedAt)
+    }
+    // 如果 a 有时间，b 没有，a 排在前面
+    if (a.lastUsedAt && !b.lastUsedAt) {
+      return -1
+    }
+    // 如果 b 有时间，a 没有，b 排在前面
+    if (!a.lastUsedAt && b.lastUsedAt) {
+      return 1
+    }
+    // 如果都没有时间，按使用次数降序排序
+    return (b.usageCount || 0) - (a.usageCount || 0)
+  })
+  loading.value = false
+  // 重置到第一页
+  currentPage.value = 1
 }
 
 // 删除 API Key
@@ -606,24 +612,22 @@ const deleteApiKey = async (apiKey) => {
   }
 
   deleting.value = apiKey.key
-  try {
-    // 准备更新数据：删除指定的 key
-    const updateData = {
-      removeApiKeys: [apiKey.key],
-      apiKeyUpdateMode: 'delete'
-    }
+  // 准备更新数据：删除指定的 key
+  const updateData = {
+    removeApiKeys: [apiKey.key],
+    apiKeyUpdateMode: 'delete'
+  }
 
-    await updateDroidAccountApi(props.accountId, updateData)
-
+  // resolve-only：失败不抛异常，必须显式判 success，否则会把失败当成功
+  const response = await updateDroidAccountApi(props.accountId, updateData)
+  if (response.success) {
     showToast('API Key 已删除', 'success')
     await loadApiKeys()
     emit('refresh')
-  } catch (error) {
-    console.error('Failed to delete API key:', error)
-    showToast(error.response?.data?.error || '删除 API Key 失败', 'error')
-  } finally {
-    deleting.value = null
+  } else {
+    showToast(response.message || '删除 API Key 失败', 'error')
   }
+  deleting.value = null
 }
 
 // 重置 API Key 状态
@@ -641,30 +645,28 @@ const resetApiKeyStatus = async (apiKey) => {
   }
 
   resetting.value = apiKey.key
-  try {
-    // 准备更新数据：重置指定 key 的状态
-    const updateData = {
-      apiKeys: [
-        {
-          key: apiKey.key,
-          status: 'active',
-          errorMessage: ''
-        }
-      ],
-      apiKeyUpdateMode: 'update'
-    }
+  // 准备更新数据：重置指定 key 的状态
+  const updateData = {
+    apiKeys: [
+      {
+        key: apiKey.key,
+        status: 'active',
+        errorMessage: ''
+      }
+    ],
+    apiKeyUpdateMode: 'update'
+  }
 
-    await updateDroidAccountApi(props.accountId, updateData)
-
+  // resolve-only：失败不抛异常，必须显式判 success
+  const response = await updateDroidAccountApi(props.accountId, updateData)
+  if (response.success) {
     showToast('API Key 状态已重置', 'success')
     await loadApiKeys()
     emit('refresh')
-  } catch (error) {
-    console.error('Failed to reset API key status:', error)
-    showToast(error.response?.data?.error || '重置 API Key 状态失败', 'error')
-  } finally {
-    resetting.value = null
+  } else {
+    showToast(response.message || '重置 API Key 状态失败', 'error')
   }
+  resetting.value = null
 }
 
 // 批量删除所有异常状态的 Key
@@ -688,24 +690,22 @@ const deleteAllErrorKeys = async () => {
   }
 
   batchDeleting.value = true
-  try {
-    const keysToDelete = errorKeys.map((key) => key.key)
-    const updateData = {
-      removeApiKeys: keysToDelete,
-      apiKeyUpdateMode: 'delete'
-    }
+  const keysToDelete = errorKeys.map((key) => key.key)
+  const updateData = {
+    removeApiKeys: keysToDelete,
+    apiKeyUpdateMode: 'delete'
+  }
 
-    await updateDroidAccountApi(props.accountId, updateData)
-
+  // resolve-only：失败不抛异常，必须显式判 success
+  const response = await updateDroidAccountApi(props.accountId, updateData)
+  if (response.success) {
     showToast(`成功删除 ${errorKeys.length} 个异常 API Key`, 'success')
     await loadApiKeys()
     emit('refresh')
-  } catch (error) {
-    console.error('Failed to delete error API keys:', error)
-    showToast(error.response?.data?.error || '批量删除失败', 'error')
-  } finally {
-    batchDeleting.value = false
+  } else {
+    showToast(response.message || '批量删除失败', 'error')
   }
+  batchDeleting.value = false
 }
 
 // 批量删除所有 Key
@@ -735,24 +735,22 @@ const deleteAllKeys = async () => {
   }
 
   batchDeleting.value = true
-  try {
-    const keysToDelete = apiKeys.value.map((key) => key.key)
-    const updateData = {
-      removeApiKeys: keysToDelete,
-      apiKeyUpdateMode: 'delete'
-    }
+  const keysToDelete = apiKeys.value.map((key) => key.key)
+  const updateData = {
+    removeApiKeys: keysToDelete,
+    apiKeyUpdateMode: 'delete'
+  }
 
-    await updateDroidAccountApi(props.accountId, updateData)
-
+  // resolve-only：失败不抛异常，必须显式判 success
+  const response = await updateDroidAccountApi(props.accountId, updateData)
+  if (response.success) {
     showToast(`成功删除所有 ${keysToDelete.length} 个 API Key`, 'success')
     await loadApiKeys()
     emit('refresh')
-  } catch (error) {
-    console.error('Failed to delete all API keys:', error)
-    showToast(error.response?.data?.error || '批量删除失败', 'error')
-  } finally {
-    batchDeleting.value = false
+  } else {
+    showToast(response.message || '批量删除失败', 'error')
   }
+  batchDeleting.value = false
 }
 
 // 导出 Key
@@ -762,10 +760,10 @@ const exportKeys = (type) => {
 
   if (type === 'error') {
     keysToExport = apiKeys.value.filter((key) => key.status === 'error')
-    filename = `error_api_keys_${props.accountName}_${new Date().toISOString().split('T')[0]}.txt`
+    filename = `error_api_keys_${props.accountName}_${toLocalDateString(new Date())}.txt`
   } else {
     keysToExport = apiKeys.value
-    filename = `all_api_keys_${props.accountName}_${new Date().toISOString().split('T')[0]}.txt`
+    filename = `all_api_keys_${props.accountName}_${toLocalDateString(new Date())}.txt`
   }
 
   if (keysToExport.length === 0) {

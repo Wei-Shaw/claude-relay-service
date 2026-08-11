@@ -9,9 +9,11 @@ const bcrypt = require('bcryptjs')
 const config = require('../config/config')
 const logger = require('./utils/logger')
 const redis = require('./models/redis')
+const { RedisKeys } = require('./constants/redisKeys')
 const pricingService = require('./services/pricingService')
 const cacheMonitor = require('./utils/cacheMonitor')
 const { getSafeMessage } = require('./utils/errorSanitizer')
+const migrations = require('./migrations/runner')
 
 // Import routes
 const apiRoutes = require('./routes/api')
@@ -25,9 +27,13 @@ const standardGeminiRoutes = require('./routes/standardGeminiRoutes')
 const openaiClaudeRoutes = require('./routes/openaiClaudeRoutes')
 const openaiRoutes = require('./routes/openaiRoutes')
 const droidRoutes = require('./routes/droidRoutes')
+const grokRoutes = require('./routes/grokRoutes')
 const userRoutes = require('./routes/userRoutes')
 const azureOpenaiRoutes = require('./routes/azureOpenaiRoutes')
 const webhookRoutes = require('./routes/webhook')
+const paymentRoutes = require('./routes/payment')
+const paymentWebhookRoutes = require('./routes/paymentWebhook')
+const { initPaymentProviders } = require('./services/payment/providers')
 
 // Import middleware
 const {
@@ -39,6 +45,19 @@ const {
   requestSizeLimit
 } = require('./middleware/auth')
 const { browserFallbackMiddleware } = require('./middleware/browserFallback')
+const { requestDecompress } = require('./middleware/requestDecompress')
+const { getBannerEndpoints } = require('./utils/startupBanner')
+
+// 业务时区当前时间 yyyy-MM-dd HH:mm:ss（读 config.system.timezoneOffset，与统计口径一致）
+const formatBusinessTime = () => {
+  const offsetHours = config.system?.timezoneOffset ?? 8
+  const tzDate = new Date(Date.now() + offsetHours * 3600000)
+  const pad = (n) => String(n).padStart(2, '0')
+  return (
+    `${tzDate.getUTCFullYear()}-${pad(tzDate.getUTCMonth() + 1)}-${pad(tzDate.getUTCDate())} ` +
+    `${pad(tzDate.getUTCHours())}:${pad(tzDate.getUTCMinutes())}:${pad(tzDate.getUTCSeconds())}`
+  )
+}
 
 class Application {
   constructor() {
@@ -53,23 +72,9 @@ class Application {
       await redis.connect()
       logger.success('Redis connected successfully')
 
-      // 📊 检查数据迁移（版本 > 1.1.250 时执行）
-      const { getAppVersion, versionGt } = require('./utils/commonHelper')
-      const currentVersion = getAppVersion()
-      const migratedVersion = await redis.getMigratedVersion()
-      if (versionGt(currentVersion, '1.1.250') && versionGt(currentVersion, migratedVersion)) {
-        logger.info(`🔄 检测到新版本 ${currentVersion}，检查数据迁移...`)
-        try {
-          if (await redis.needsGlobalStatsMigration()) {
-            await redis.migrateGlobalStats()
-          }
-          await redis.cleanupSystemMetrics() // 清理过期的系统分钟统计
-        } catch (err) {
-          logger.error('⚠️ 数据迁移出错，但不影响启动:', err.message)
-        }
-        await redis.setMigratedVersion(currentVersion)
-        logger.success(`✅ 数据迁移完成，版本: ${currentVersion}`)
-      }
+      // 📊 版本门控数据迁移（global stats + cleanupSystemMetrics + migrated:version 水位）
+      // 逐字复刻于 src/migrations/runner.js runVersionGated,语义不变
+      await migrations.runVersionGated(redis)
 
       // 📅 后台检查月份索引完整性（不阻塞启动）
       redis.ensureMonthlyMonthsIndex().catch((err) => {
@@ -82,6 +87,8 @@ class Application {
       })
 
       // 📊 迁移 alltime 模型统计（阻塞式，确保数据完整）
+      // 用内部 marker system:migration:alltime_model_stats_v1 自管幂等,失败吞错 → 下次重试(自愈)。
+      // 不纳入 migrations applied 台账:其"失败重试"语义强于台账"记了不再跑",接管会降级(见 migrations/registry.js 契约)
       await redis.migrateAlltimeModelStats()
 
       // 💳 初始化账户余额查询服务（Provider 注册）
@@ -91,7 +98,10 @@ class Application {
         registerAllProviders(accountBalanceService)
         logger.info('✅ 账户余额查询服务已初始化')
       } catch (error) {
-        logger.warn('⚠️ 账户余额查询服务初始化失败:', error.message)
+        logger.error('⚠️ 账户余额查询服务初始化失败:', {
+          error: error.message,
+          stack: error.stack
+        })
       }
 
       // 💰 初始化价格服务
@@ -157,6 +167,14 @@ class Application {
         logger.error('📁 Account group reverse index migration failed:', err)
       })
 
+      // 🌐 初始化代理池（冷加载 L1 + Pub/Sub 订阅 + 统计写回）
+      try {
+        const proxyPoolService = require('./services/proxyPool/proxyPoolService')
+        await proxyPoolService.start()
+      } catch (error) {
+        logger.error('⚠️ Proxy pool init failed (startup continues):', error)
+      }
+
       // 超早期拦截 /admin-next/ 请求 - 在所有中间件之前
       this.app.use((req, res, next) => {
         if (req.path === '/admin-next/' && req.method === 'GET') {
@@ -218,16 +236,16 @@ class Application {
       // 📝 请求日志（使用自定义logger而不是morgan）
       this.app.use(requestLogger)
 
-      // 🐛 HTTP调试拦截器（仅在启用调试时生效）
-      if (process.env.DEBUG_HTTP_TRAFFIC === 'true') {
-        try {
-          const { debugInterceptor } = require('./middleware/debugInterceptor')
-          this.app.use(debugInterceptor)
-          logger.info('🐛 HTTP调试拦截器已启用 - 日志输出到 logs/http-debug-*.log')
-        } catch (error) {
-          logger.warn('⚠️ 无法加载HTTP调试拦截器:', error.message)
-        }
-      }
+      // 💳 支付 webhook：必须在 body 解析前挂载，用原始字节验签（Stripe/支付宝/微信依赖原始 body）
+      initPaymentProviders()
+      this.app.use(
+        '/payment/webhook',
+        express.raw({ type: '*/*', limit: '2mb' }),
+        paymentWebhookRoutes
+      )
+
+      // 🗜️ 请求体解压：body-parser 只认 identity/gzip/deflate，zstd/br 需在其之前解开（Codex CLI 默认发 zstd）
+      this.app.use(requestDecompress)
 
       // 🔧 基础中间件
       this.app.use(
@@ -352,6 +370,7 @@ class Application {
       )
       this.app.use('/admin', adminRoutes)
       this.app.use('/users', userRoutes)
+      this.app.use('/payment', paymentRoutes)
       // 使用 web 路由（包含 auth 和页面重定向）
       this.app.use('/web', webRoutes)
       this.app.use('/apiStats', apiStatsRoutes)
@@ -364,6 +383,7 @@ class Application {
       this.app.use('/openai', openaiRoutes) // Codex API 路由（/openai/responses, /openai/v1/responses）
       // Droid 路由：支持多种 Factory.ai 端点
       this.app.use('/droid', droidRoutes) // Droid (Factory.ai) API 转发
+      this.app.use('/grok', grokRoutes) // Grok / xAI API 转发
       this.app.use('/azure', azureOpenaiRoutes)
       this.app.use('/admin/webhook', webhookRoutes)
 
@@ -518,7 +538,7 @@ class Application {
       const client = redis.getClient()
 
       // 获取所有 session:* 键
-      const sessionKeys = await redis.scanKeys('session:*')
+      const sessionKeys = await redis.scanKeys(RedisKeys.session.adminPattern)
       const dataList = await redis.batchHgetallChunked(sessionKeys)
 
       let validCount = 0
@@ -527,7 +547,7 @@ class Application {
       for (let i = 0; i < sessionKeys.length; i++) {
         const key = sessionKeys[i]
         // 跳过 admin_credentials（系统凭据）
-        if (key === 'session:admin_credentials') {
+        if (key === RedisKeys.session.adminCredentials) {
           continue
         }
 
@@ -604,16 +624,33 @@ class Application {
       await this.initialize()
 
       this.server = this.app.listen(config.server.port, config.server.host, () => {
-        logger.start(`Claude Relay Service started on ${config.server.host}:${config.server.port}`)
+        const { port } = config.server
+        // 依实际监听地址推导 Local / Network（对齐 llysc 输出契约，明确标注而非无差别罗列）
+        const { local, networks } = getBannerEndpoints(config.server.host)
+        const routes = [
+          { label: '🌐 Web interface', path: '/admin-next/api-stats' },
+          { label: '🔗 API endpoint', path: '/api/v1/messages' },
+          { label: '⚙️  Admin API', path: '/admin' },
+          { label: '🏥 Health check', path: '/health' },
+          { label: '📊 Metrics', path: '/metrics' }
+        ]
+
+        logger.start(`Claude Relay Service started on ${config.server.host}:${port}`)
         logger.info(
-          `🌐 Web interface: http://${config.server.host}:${config.server.port}/admin-next/api-stats`
+          `   - APP_ENV:  ${config.server.nodeEnv || process.env.NODE_ENV || 'development'}`
         )
-        logger.info(
-          `🔗 API endpoint: http://${config.server.host}:${config.server.port}/api/v1/messages`
-        )
-        logger.info(`⚙️  Admin API: http://${config.server.host}:${config.server.port}/admin`)
-        logger.info(`🏥 Health check: http://${config.server.host}:${config.server.port}/health`)
-        logger.info(`📊 Metrics: http://${config.server.host}:${config.server.port}/metrics`)
+        logger.info(`   - Locale:   ${new Date().toString()}`)
+        logger.info(`   - 业务时区: ${formatBusinessTime()}`)
+        for (const route of routes) {
+          logger.info(`${route.label}:`)
+          if (local) {
+            logger.info(`     - Local:   http://${local}:${port}${route.path}`)
+          }
+          // 多网卡逐条标注 Network，用户自行识别物理网卡/Docker/WSL/VPN
+          for (const host of networks) {
+            logger.info(`     - Network: http://${host}:${port}${route.path}`)
+          }
+        }
       })
 
       const serverTimeout = 600000 // 默认10分钟
@@ -698,6 +735,26 @@ class Application {
       `🔄 Cleanup tasks scheduled every ${config.system.cleanupInterval / 1000 / 60} minutes`
     )
 
+    // 💳 支付订单过期扫描 + 实例预留对账：每 5 分钟
+    // 1) expire：关单前主动 query 上游，已付则补单（防丢单），未付才 expired
+    // 2) reconcile：清实例当日额度 hash 里的孤儿/终态残留预留
+    setInterval(
+      async () => {
+        const paymentOrderService = require('./services/payment/paymentOrderService')
+        try {
+          await paymentOrderService.expireTimedOutOrders()
+        } catch (error) {
+          logger.error('❌ [payment] expire orders task failed:', error)
+        }
+        try {
+          await paymentOrderService.reconcileInstanceDailyReservations()
+        } catch (error) {
+          logger.error('❌ [payment] reconcile instance reservations task failed:', error)
+        }
+      },
+      5 * 60 * 1000
+    )
+
     // 🚨 启动限流状态自动清理服务
     // 每5分钟检查一次过期的限流状态，确保账号能及时恢复调度
     const rateLimitCleanupService = require('./services/rateLimitCleanupService')
@@ -711,7 +768,7 @@ class Application {
     // 每分钟主动清理所有过期的并发项，不依赖请求触发
     setInterval(async () => {
       try {
-        const keys = await redis.scanKeys('concurrency:*')
+        const keys = await redis.scanKeys(RedisKeys.concurrency.pattern)
         if (keys.length === 0) {
           return
         }
@@ -827,6 +884,10 @@ class Application {
     } else {
       logger.info('🧪 Account test scheduler service disabled')
     }
+
+    // 🌐 启动代理池健康检查服务（分布式选主，仅 leader 实例执行）
+    const proxyHealthService = require('./services/proxyPool/proxyHealthService')
+    proxyHealthService.start()
   }
 
   setupGracefulShutdown() {
@@ -890,10 +951,27 @@ class Application {
             logger.error('❌ Error stopping account test scheduler service:', error)
           }
 
+          // 🏷️ 停止 API Key 索引周期对账定时器
+          try {
+            require('./services/apiKeyIndexService').stopPeriodicDriftScan()
+            logger.info('🏷️ API Key index drift scan stopped')
+          } catch (error) {
+            logger.error('❌ Error stopping API Key index drift scan:', error)
+          }
+
+          // 🌐 停止代理池服务
+          try {
+            require('./services/proxyPool/proxyHealthService').stop()
+            require('./services/proxyPool/proxyPoolService').stop()
+            logger.info('🌐 Proxy pool services stopped')
+          } catch (error) {
+            logger.error('❌ Error stopping proxy pool services:', error)
+          }
+
           // 🔢 清理所有并发计数（Phase 1 修复：防止重启泄漏）
           try {
             logger.info('🔢 Cleaning up all concurrency counters...')
-            const keys = await redis.scanKeys('concurrency:*')
+            const keys = await redis.scanKeys(RedisKeys.concurrency.pattern)
             if (keys.length > 0) {
               await redis.batchDelChunked(keys)
               logger.info(`✅ Cleaned ${keys.length} concurrency keys`)

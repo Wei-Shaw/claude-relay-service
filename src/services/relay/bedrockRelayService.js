@@ -3,11 +3,33 @@ const {
   InvokeModelCommand,
   InvokeModelWithResponseStreamCommand
 } = require('@aws-sdk/client-bedrock-runtime')
+const path = require('path')
+
 const { fromEnv } = require('@aws-sdk/credential-providers')
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 const userMessageQueueService = require('../userMessageQueueService')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const proxyResolver = require('../../utils/proxyResolver')
+
+// 懒加载 NodeHttpHandler（@smithy/node-http-handler 是 bedrock client 的传递依赖，从其目录解析）
+let _NodeHttpHandler
+let _nodeHttpHandlerResolved = false
+const getNodeHttpHandler = () => {
+  if (_nodeHttpHandlerResolved) {
+    return _NodeHttpHandler
+  }
+  _nodeHttpHandlerResolved = true
+  try {
+    const bedrockDir = path.dirname(require.resolve('@aws-sdk/client-bedrock-runtime/package.json'))
+    const handlerPath = require.resolve('@smithy/node-http-handler', { paths: [bedrockDir] })
+    _NodeHttpHandler = require(handlerPath).NodeHttpHandler
+  } catch (error) {
+    logger.warn('⚠️ 无法加载 @smithy/node-http-handler，Bedrock 代理池绑定将不生效:', error.message)
+    _NodeHttpHandler = null
+  }
+  return _NodeHttpHandler
+}
 
 class BedrockRelayService {
   constructor() {
@@ -27,21 +49,39 @@ class BedrockRelayService {
     this.clients = new Map() // 缓存不同区域的客户端
   }
 
-  // 获取或创建Bedrock客户端
+  // 获取或创建Bedrock客户端。返回 { client, proxyId, contextKey }：proxyId 供被动健康检查上报。
   _getBedrockClient(region = null, bedrockAccount = null) {
     const targetRegion = region || this.defaultRegion
-    const clientKey = `${targetRegion}-${bedrockAccount?.id || 'default'}`
+    // 代理池：解析账户绑定的代理（分组加权随机/固定代理），注入 AWS SDK 的 NodeHttpHandler
+    const {
+      agent: proxyAgent,
+      proxyId,
+      contextKey
+    } = proxyResolver.resolveAgent(bedrockAccount, 'bedrock')
+    const resolvedContextKey = contextKey || 'bedrock'
+    // cacheKey 含 proxyId，使分组模式下不同抽样代理各自缓存，实现轮换
+    const proxyKeyPart = proxyId || (proxyAgent ? 'static' : 'none')
+    const clientKey = `${targetRegion}-${bedrockAccount?.id || 'default'}-${proxyKeyPart}`
 
     if (this.clients.has(clientKey)) {
-      return this.clients.get(clientKey)
+      return { client: this.clients.get(clientKey), proxyId, contextKey: resolvedContextKey }
     }
 
+    const requestTimeout = config.requestTimeout || 600000 // 与其他 relay 服务保持一致
+    const NodeHttpHandler = proxyAgent ? getNodeHttpHandler() : null
     const clientConfig = {
       region: targetRegion,
-      requestHandler: {
-        requestTimeout: config.requestTimeout || 600000, // 与其他 relay 服务保持一致
-        connectionTimeout: 10000
-      }
+      requestHandler: NodeHttpHandler
+        ? new NodeHttpHandler({
+            httpAgent: proxyAgent,
+            httpsAgent: proxyAgent,
+            requestTimeout,
+            connectionTimeout: 10000
+          })
+        : { requestTimeout, connectionTimeout: 10000 }
+    }
+    if (proxyAgent && NodeHttpHandler) {
+      logger.info(`🌐 [Bedrock] using pooled proxy proxyId=${proxyId || 'static'}`)
     }
 
     // 如果账户配置了特定的AWS凭证，使用它们
@@ -109,6 +149,8 @@ class BedrockRelayService {
     const accountId = bedrockAccount?.id
     let queueLockAcquired = false
     let queueRequestId = null
+    // 被动健康检查上报句柄（在 try 内 _getBedrockClient 后赋值，catch 也可见）
+    let proxyReport = null
 
     try {
       // 📬 用户消息队列处理
@@ -170,7 +212,8 @@ class BedrockRelayService {
 
       const modelId = this._selectModel(requestBody, bedrockAccount)
       const region = this._selectRegion(modelId, bedrockAccount)
-      const client = this._getBedrockClient(region, bedrockAccount)
+      const { client, proxyId, contextKey } = this._getBedrockClient(region, bedrockAccount)
+      proxyReport = { proxyId, contextKey }
 
       // 转换请求格式为Bedrock格式
       const bedrockPayload = this._convertToBedrockFormat(requestBody)
@@ -187,6 +230,9 @@ class BedrockRelayService {
       const startTime = Date.now()
       const response = await client.send(command)
       const duration = Date.now() - startTime
+
+      // 被动健康检查：拿到 SDK 响应即代理传输成功（上游错误由 _handleBedrockError 走 catch 分支区分）
+      proxyResolver.report(proxyId, contextKey, null)
 
       // 📬 请求已发送成功，立即释放队列锁（无需等待响应处理完成）
       // 因为限流基于请求发送时刻计算（RPM），不是请求完成时刻
@@ -220,7 +266,9 @@ class BedrockRelayService {
       }
     } catch (error) {
       logger.error('❌ Bedrock非流式请求失败:', error)
-      throw this._handleBedrockError(error, accountId, bedrockAccount)
+      // 被动健康检查：上报连接级故障（classifyBusinessTraffic 区分传输错误 vs 上游响应，不误熔断）
+      proxyResolver.report(proxyReport?.proxyId, proxyReport?.contextKey, error)
+      throw this._handleBedrockError(error, accountId, bedrockAccount, requestBody)
     } finally {
       // 📬 释放用户消息队列锁（兜底，正常情况下已在请求发送后提前释放）
       if (queueLockAcquired && queueRequestId && accountId) {
@@ -245,6 +293,8 @@ class BedrockRelayService {
     let queueLockAcquired = false
     let queueRequestId = null
     let abortController = null
+    // 被动健康检查上报句柄（在 try 内 _getBedrockClient 后赋值，catch 也可见）
+    let proxyReport = null
 
     try {
       // 📬 用户消息队列处理
@@ -312,7 +362,8 @@ class BedrockRelayService {
 
       const modelId = this._selectModel(requestBody, bedrockAccount)
       const region = this._selectRegion(modelId, bedrockAccount)
-      const client = this._getBedrockClient(region, bedrockAccount)
+      const { client, proxyId, contextKey } = this._getBedrockClient(region, bedrockAccount)
+      proxyReport = { proxyId, contextKey }
 
       // 转换请求格式为Bedrock格式
       const bedrockPayload = this._convertToBedrockFormat(requestBody)
@@ -339,6 +390,9 @@ class BedrockRelayService {
 
       const startTime = Date.now()
       const response = await client.send(command, { abortSignal: abortController.signal })
+
+      // 被动健康检查：拿到 SDK 流式响应即代理传输成功
+      proxyResolver.report(proxyReport?.proxyId, proxyReport?.contextKey, null)
 
       // 📬 请求已发送成功，立即释放队列锁（无需等待响应处理完成）
       // 因为限流基于请求发送时刻计算（RPM），不是请求完成时刻
@@ -432,7 +486,10 @@ class BedrockRelayService {
 
       logger.error('❌ Bedrock流式请求失败:', error)
 
-      const bedrockError = this._handleBedrockError(error, accountId, bedrockAccount)
+      // 被动健康检查：上报连接级故障（classifyBusinessTraffic 区分传输错误 vs 上游响应，不误熔断）
+      proxyResolver.report(proxyReport?.proxyId, proxyReport?.contextKey, error)
+
+      const bedrockError = this._handleBedrockError(error, accountId, bedrockAccount, requestBody)
       const statusCode = this._getErrorStatusCode(error)
 
       // 发送错误事件并关闭连接
@@ -759,22 +816,46 @@ class BedrockRelayService {
   }
 
   // 处理Bedrock错误
-  _handleBedrockError(error, accountId = null, bedrockAccount = null) {
+  _handleBedrockError(error, accountId = null, bedrockAccount = null, requestBody = null) {
     const autoProtectionDisabled =
       bedrockAccount?.disableAutoProtection === true ||
       bedrockAccount?.disableAutoProtection === 'true'
     if (accountId && !autoProtectionDisabled) {
+      // AWS SDK 无标准 HTTP 响应：采集请求体（含 model/messages）+ SDK 错误元数据
+      const errorContext = upstreamErrorHelper.buildErrorContext({
+        method: 'POST',
+        model: requestBody?.model,
+        requestBody,
+        responseStatus: this._getErrorStatusCode(error),
+        responseHeaders: error.$response?.headers,
+        responseBody: {
+          name: error.name,
+          message: error.message,
+          requestId: error.$metadata?.requestId,
+          httpStatusCode: error.$metadata?.httpStatusCode
+        },
+        reason: error.name,
+        message: error.message
+      })
       if (error.name === 'ThrottlingException') {
-        upstreamErrorHelper.markTempUnavailable(accountId, 'bedrock', 429).catch(() => {})
+        upstreamErrorHelper
+          .markTempUnavailable(accountId, 'bedrock', 429, null, errorContext)
+          .catch(() => {})
       } else if (error.name === 'AccessDeniedException') {
-        upstreamErrorHelper.markTempUnavailable(accountId, 'bedrock', 403).catch(() => {})
+        upstreamErrorHelper
+          .markTempUnavailable(accountId, 'bedrock', 403, null, errorContext)
+          .catch(() => {})
       } else if (
         error.name === 'ServiceUnavailableException' ||
         error.name === 'InternalServerException'
       ) {
-        upstreamErrorHelper.markTempUnavailable(accountId, 'bedrock', 500).catch(() => {})
+        upstreamErrorHelper
+          .markTempUnavailable(accountId, 'bedrock', 500, null, errorContext)
+          .catch(() => {})
       } else if (error.name === 'ModelNotReadyException') {
-        upstreamErrorHelper.markTempUnavailable(accountId, 'bedrock', 503).catch(() => {})
+        upstreamErrorHelper
+          .markTempUnavailable(accountId, 'bedrock', 503, null, errorContext)
+          .catch(() => {})
       }
     }
 

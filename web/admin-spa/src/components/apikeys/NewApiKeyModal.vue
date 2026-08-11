@@ -1,6 +1,6 @@
 <template>
-  <Teleport to="body">
-    <div class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
+  <ModalTransition @after-leave="onClosed">
+    <div v-if="visible" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-lg overflow-y-auto p-8"
       >
@@ -92,7 +92,7 @@
                 </button>
               </div>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               点击眼睛图标切换显示模式，使用下方按钮复制环境变量配置
             </p>
           </div>
@@ -126,23 +126,25 @@
         </div>
       </div>
     </div>
+  </ModalTransition>
 
-    <!-- ConfirmModal -->
-    <ConfirmModal
-      :cancel-text="confirmModalConfig.cancelText"
-      :confirm-text="confirmModalConfig.confirmText"
-      :message="confirmModalConfig.message"
-      :show="showConfirmModal"
-      :title="confirmModalConfig.title"
-      :type="confirmModalConfig.type"
-      @cancel="handleCancelModal"
-      @confirm="handleConfirmModal"
-    />
-  </Teleport>
+  <!-- ConfirmModal -->
+  <ConfirmModal
+    :cancel-text="confirmModalConfig.cancelText"
+    :confirm-text="confirmModalConfig.confirmText"
+    :message="confirmModalConfig.message"
+    :show="showConfirmModal"
+    :title="confirmModalConfig.title"
+    :type="confirmModalConfig.type"
+    @cancel="handleCancelModal"
+    @confirm="handleConfirmModal"
+  />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { showToast } from '@/utils/tools'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
@@ -154,6 +156,16 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+
+// 弹窗进入/退出动画：挂载后置 visible 触发进入，关闭时先播退出动画再通知父级卸载
+const visible = ref(false)
+onMounted(() => {
+  visible.value = true
+})
+const requestClose = () => {
+  visible.value = false
+}
+const onClosed = () => emit('close')
 
 const showFullKey = ref(false)
 
@@ -303,7 +315,7 @@ const handleClose = async () => {
     'warning'
   )
   if (confirmed) {
-    emit('close')
+    requestClose()
   }
 }
 
@@ -317,7 +329,7 @@ const handleDirectClose = async () => {
     'warning'
   )
   if (confirmed) {
-    emit('close')
+    requestClose()
   }
 }
 </script>

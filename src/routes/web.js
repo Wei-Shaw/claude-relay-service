@@ -6,6 +6,7 @@ const fs = require('fs')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const { RedisKeys } = require('../constants/redisKeys')
 
 const router = express.Router()
 
@@ -51,7 +52,7 @@ router.post('/auth/login', async (req, res) => {
           }
 
           // 重新存储到Redis，不设置过期时间
-          await redis.getClient().hset('session:admin_credentials', adminData)
+          await redis.getClient().hset(RedisKeys.session.adminCredentials, adminData)
 
           logger.info('✅ Admin credentials reloaded from init.json')
         } catch (error) {

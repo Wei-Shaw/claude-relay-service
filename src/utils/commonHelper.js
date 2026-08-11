@@ -4,6 +4,8 @@
 const crypto = require('crypto')
 const config = require('../../config/config')
 const LRUCache = require('./lruCache')
+const { getDateInTimezone, getDateStringInTimezone } = require('./timezone')
+const { RATE_LIMITED_MODEL_FAMILIES } = require('./modelHelper')
 
 // ============================================
 // 加密相关 - 工厂模式支持不同 salt
@@ -213,6 +215,11 @@ const getMappedModelName = (modelMapping, requestedModel) => {
 // 账户调度相关
 // ============================================
 
+// 账户是否关闭了上游错误自动防护（开关 ON = 调度判定忽略上游错误类自动暂停，暴力打上游）
+// 兼容布尔与字符串存储；只读 disableAutoProtection 单一字段
+const isAutoProtectionDisabled = (account) =>
+  !!account && (account.disableAutoProtection === true || account.disableAutoProtection === 'true')
+
 // 按优先级和最后使用时间排序账户
 const sortAccountsByPriority = (accounts) =>
   [...accounts].sort((a, b) => {
@@ -242,6 +249,51 @@ const composeStickySessionKey = (prefix, sessionHash, apiKeyId = null) => {
 // 过滤可用账户（激活 + 健康 + 可调度）
 const filterAvailableAccounts = (accounts) =>
   accounts.filter((acc) => acc && isAccountHealthy(acc) && isSchedulable(acc.schedulable))
+
+// 账户"状态类"字段：仅由系统内部（调度/限流/自动保护）写入，外部更新请求禁止写入，防止伪造自动停用证据
+// [人工决策-2026-06-02 23:30:05] review#3：账户更新入口字段白名单——剥离这些状态字段，只允许写配置类字段
+const READONLY_ACCOUNT_STATE_FIELDS = new Set([
+  'status',
+  'errorMessage',
+  'rateLimitStatus',
+  'rateLimitedAt',
+  'rateLimitEndAt',
+  'rateLimitResetAt',
+  'quotaStoppedAt',
+  'overloadStatus',
+  'overloadedAt',
+  'blockedStatus',
+  'blockedAt',
+  'autoStoppedAt',
+  'stoppedReason',
+  'rateLimitAutoStopped',
+  'fiveHourAutoStopped',
+  'fiveHourStoppedAt',
+  'quotaAutoStopped',
+  'tempErrorAutoStopped',
+  'blockedAutoStopped',
+  'unauthorizedAt',
+  // 各模型家族限流字段（opus/sonnet/haiku/fable 的 ${f}RateLimitedAt / ${f}RateLimitEndAt）
+  // 由限流流程写入，外部更新入口禁止伪造/清除，防止排除账号或抹掉真实限流
+  ...RATE_LIMITED_MODEL_FAMILIES.flatMap((family) => [
+    `${family}RateLimitedAt`,
+    `${family}RateLimitEndAt`
+  ])
+])
+
+// 剥离外部更新请求里的状态类字段（不修改原对象），返回新对象
+const stripReadonlyAccountFields = (updates) => {
+  if (!updates || typeof updates !== 'object') {
+    return updates
+  }
+  const cleaned = {}
+  for (const [key, value] of Object.entries(updates)) {
+    if (!READONLY_ACCOUNT_STATE_FIELDS.has(key)) {
+      cleaned[key] = value
+    }
+  }
+  return cleaned
+}
 
 // ============================================
 // 字符串处理
@@ -282,20 +334,6 @@ const safeParseFloat = (value, fallback = 0) => {
 
 // 限制数值范围
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
-
-// ============================================
-// 时间处理
-// ============================================
-
-// 获取时区偏移后的日期
-const getDateInTimezone = (date = new Date(), offset = config.system?.timezoneOffset || 8) =>
-  new Date(date.getTime() + offset * 3600000)
-
-// 获取时区日期字符串 YYYY-MM-DD
-const getDateStringInTimezone = (date = new Date()) => {
-  const d = getDateInTimezone(date)
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
-}
 
 // 检查是否过期
 const isExpired = (expiresAt) => {
@@ -386,9 +424,12 @@ module.exports = {
   isModelInMapping,
   getMappedModelName,
   // 调度
+  isAutoProtectionDisabled,
   sortAccountsByPriority,
   composeStickySessionKey,
   filterAvailableAccounts,
+  stripReadonlyAccountFields,
+  READONLY_ACCOUNT_STATE_FIELDS,
   // 字符串
   truncate,
   maskSensitive,

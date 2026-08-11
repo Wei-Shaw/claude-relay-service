@@ -1,7 +1,7 @@
 <template>
   <!-- 顶部导航 -->
   <div
-    class="glass-strong mb-4 rounded-xl p-3 shadow-xl sm:mb-6 sm:rounded-2xl sm:p-4 md:mb-8 md:rounded-3xl md:p-6"
+    class="glass-strong mb-6 rounded-xl p-3 shadow-xl sm:rounded-2xl sm:p-4 md:mb-8 md:rounded-3xl md:p-6"
     style="z-index: 10; position: relative"
   >
     <div class="flex flex-col items-center justify-between gap-3 sm:flex-row sm:gap-4">
@@ -18,18 +18,18 @@
           <template #after-title>
             <!-- 版本信息 -->
             <div class="flex items-center gap-1 sm:gap-2">
-              <span class="font-mono text-xs text-gray-400 dark:text-gray-500 sm:text-sm"
+              <span class="font-mono text-sm text-gray-400 dark:text-gray-500 sm:text-sm"
                 >v{{ versionInfo.current || '...' }}</span
               >
               <!-- 更新提示 -->
               <a
                 v-if="versionInfo.hasUpdate"
-                class="inline-flex animate-pulse items-center gap-1 rounded-full border border-green-600 bg-green-500 px-2 py-0.5 text-xs text-white transition-colors hover:bg-green-600"
+                class="inline-flex animate-pulse items-center gap-1 rounded-full border border-green-600 bg-green-500 px-2 py-0.5 text-sm text-white transition-colors hover:bg-green-600"
                 :href="versionInfo.releaseInfo?.htmlUrl || '#'"
                 target="_blank"
                 title="有新版本可用"
               >
-                <i class="fas fa-arrow-up text-[10px]" />
+                <i class="fas fa-arrow-up text-sm" />
                 <span>新版本</span>
               </a>
             </div>
@@ -57,7 +57,7 @@
             <i class="fas fa-user-circle text-sm sm:text-base" />
             <span class="hidden sm:inline">{{ currentUser.username || 'Admin' }}</span>
             <i
-              class="fas fa-chevron-down ml-1 text-xs transition-transform duration-200"
+              class="fas fa-chevron-down ml-1 text-sm transition-transform duration-200"
               :class="{ 'rotate-180': userMenuOpen }"
             />
           </button>
@@ -96,7 +96,7 @@
               </div>
               <div
                 v-else-if="versionInfo.checkingUpdate"
-                class="mt-2 text-center text-xs text-gray-500 dark:text-gray-400"
+                class="mt-2 text-center text-sm text-gray-500 dark:text-gray-400"
               >
                 <i class="fas fa-spinner fa-spin mr-1" />检查更新中...
               </div>
@@ -108,14 +108,14 @@
                     key="message"
                     class="inline-block rounded-lg border border-green-200 bg-green-100 px-3 py-1.5 dark:border-green-800 dark:bg-green-900/30"
                   >
-                    <p class="text-xs font-medium text-green-700 dark:text-green-400">
+                    <p class="text-sm font-medium text-green-700 dark:text-green-400">
                       <i class="fas fa-check-circle mr-1" />当前已是最新版本
                     </p>
                   </div>
                   <button
                     v-else
                     key="button"
-                    class="text-xs text-blue-500 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    class="text-sm text-blue-500 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                     @click="checkForUpdates()"
                   >
                     <i class="fas fa-sync-alt mr-1" />检查更新
@@ -148,130 +148,134 @@
   </div>
 
   <!-- 修改账户信息模态框 -->
-  <div
-    v-if="showChangePasswordModal"
-    class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
-  >
-    <div class="modal-content mx-auto flex max-h-[90vh] w-full max-w-md flex-col p-4 sm:p-6 md:p-8">
-      <div class="mb-6 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div
-            class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600"
-          >
-            <i class="fas fa-key text-white" />
-          </div>
-          <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">修改账户信息</h3>
-        </div>
-        <button
-          class="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
-          @click="closeChangePasswordModal"
-        >
-          <i class="fas fa-times text-xl" />
-        </button>
-      </div>
-
-      <form
-        class="modal-scroll-content custom-scrollbar flex-1 space-y-6"
-        @submit.prevent="changePassword"
+  <ModalTransition :teleport="false">
+    <div
+      v-if="showChangePasswordModal"
+      class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+    >
+      <div
+        class="modal-content mx-auto flex max-h-[90vh] w-full max-w-md flex-col p-4 sm:p-6 md:p-8"
       >
-        <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >当前用户名</label
-          >
-          <input
-            class="form-input w-full cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
-            disabled
-            type="text"
-            :value="currentUser.username || 'Admin'"
-          />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            当前用户名，输入新用户名以修改
-          </p>
-        </div>
-
-        <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >新用户名</label
-          >
-          <input
-            v-model="changePasswordForm.newUsername"
-            class="form-input w-full"
-            placeholder="输入新用户名（留空保持不变）"
-            type="text"
-          />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">留空表示不修改用户名</p>
-        </div>
-
-        <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >当前密码</label
-          >
-          <div class="relative">
-            <input
-              v-model="changePasswordForm.currentPassword"
-              class="form-input w-full pr-10"
-              placeholder="请输入当前密码"
-              required
-              :type="showCurrentPassword ? 'text' : 'password'"
-            />
-            <button
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-              type="button"
-              @click="showCurrentPassword = !showCurrentPassword"
+        <div class="mb-6 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600"
             >
-              <i :class="showCurrentPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" />
-            </button>
+              <i class="fas fa-key text-white" />
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">修改账户信息</h3>
           </div>
-        </div>
-
-        <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >新密码</label
-          >
-          <input
-            v-model="changePasswordForm.newPassword"
-            class="form-input w-full"
-            placeholder="请输入新密码"
-            required
-            type="password"
-          />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">密码长度至少8位</p>
-        </div>
-
-        <div>
-          <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >确认新密码</label
-          >
-          <input
-            v-model="changePasswordForm.confirmPassword"
-            class="form-input w-full"
-            placeholder="请再次输入新密码"
-            required
-            type="password"
-          />
-        </div>
-
-        <div class="flex gap-3 pt-4">
           <button
-            class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            type="button"
+            class="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
             @click="closeChangePasswordModal"
           >
-            取消
-          </button>
-          <button
-            class="btn btn-primary flex-1 px-6 py-3 font-semibold"
-            :disabled="changePasswordLoading"
-            type="submit"
-          >
-            <div v-if="changePasswordLoading" class="loading-spinner mr-2" />
-            <i v-else class="fas fa-save mr-2" />
-            {{ changePasswordLoading ? '保存中...' : '保存修改' }}
+            <i class="fas fa-times text-xl" />
           </button>
         </div>
-      </form>
+
+        <form
+          class="modal-scroll-content custom-scrollbar flex-1 space-y-6"
+          @submit.prevent="changePassword"
+        >
+          <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >当前用户名</label
+            >
+            <input
+              class="form-input w-full cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+              disabled
+              type="text"
+              :value="currentUser.username || 'Admin'"
+            />
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              当前用户名，输入新用户名以修改
+            </p>
+          </div>
+
+          <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >新用户名</label
+            >
+            <input
+              v-model="changePasswordForm.newUsername"
+              class="form-input w-full"
+              placeholder="输入新用户名（留空保持不变）"
+              type="text"
+            />
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">留空表示不修改用户名</p>
+          </div>
+
+          <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >当前密码</label
+            >
+            <div class="relative">
+              <input
+                v-model="changePasswordForm.currentPassword"
+                class="form-input w-full pr-10"
+                placeholder="请输入当前密码"
+                required
+                :type="showCurrentPassword ? 'text' : 'password'"
+              />
+              <button
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                type="button"
+                @click="showCurrentPassword = !showCurrentPassword"
+              >
+                <i :class="showCurrentPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >新密码</label
+            >
+            <input
+              v-model="changePasswordForm.newPassword"
+              class="form-input w-full"
+              placeholder="请输入新密码"
+              required
+              type="password"
+            />
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">密码长度至少8位</p>
+          </div>
+
+          <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >确认新密码</label
+            >
+            <input
+              v-model="changePasswordForm.confirmPassword"
+              class="form-input w-full"
+              placeholder="请再次输入新密码"
+              required
+              type="password"
+            />
+          </div>
+
+          <div class="flex gap-3 pt-4">
+            <button
+              class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              type="button"
+              @click="closeChangePasswordModal"
+            >
+              取消
+            </button>
+            <button
+              class="btn btn-primary flex-1 px-6 py-3 font-semibold"
+              :disabled="changePasswordLoading"
+              type="submit"
+            >
+              <div v-if="changePasswordLoading" class="loading-spinner mr-2" />
+              <i v-else class="fas fa-save mr-2" />
+              {{ changePasswordLoading ? '保存中...' : '保存修改' }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
-  </div>
+  </ModalTransition>
 
   <!-- ConfirmModal -->
   <ConfirmModal
@@ -296,6 +300,7 @@ import { checkUpdatesApi, changePasswordApi } from '@/utils/http_apis'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import ModalTransition from '@/components/common/ModalTransition.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

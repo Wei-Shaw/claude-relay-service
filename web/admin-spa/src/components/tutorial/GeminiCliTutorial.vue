@@ -9,7 +9,7 @@
         class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
       >
         <span
-          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-sm font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
           >2</span
         >
         配置 Gemini CLI 环境变量
@@ -31,7 +31,7 @@
               在 PowerShell 中运行以下命令：
             </p>
             <div
-              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <div class="whitespace-nowrap text-gray-300">
                 $env:GOOGLE_GEMINI_BASE_URL = "{{ geminiBaseUrl }}"
@@ -41,7 +41,7 @@
                 $env:GEMINI_MODEL = "gemini-2.5-pro"
               </div>
             </div>
-            <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
+            <p class="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
               💡 使用与 Claude Code 相同的 API 密钥即可。
             </p>
           </div>
@@ -56,7 +56,7 @@
               在 PowerShell 中运行以下命令：
             </p>
             <div
-              class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <div class="mb-2"># 设置用户级环境变量（永久生效）</div>
               <div class="whitespace-nowrap text-gray-300">
@@ -73,7 +73,7 @@
                 [System.EnvironmentVariableTarget]::User)
               </div>
             </div>
-            <p class="mt-2 text-xs text-blue-700 dark:text-blue-300">
+            <p class="mt-2 text-sm text-blue-700 dark:text-blue-300">
               💡 设置后需要重新打开 PowerShell 窗口才能生效。
             </p>
           </div>
@@ -89,7 +89,7 @@
             </h6>
             <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">在终端中运行以下命令：</p>
             <div
-              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <div class="whitespace-nowrap text-gray-300">
                 export GOOGLE_GEMINI_BASE_URL="{{ geminiBaseUrl }}"
@@ -99,7 +99,7 @@
                 export GEMINI_MODEL="gemini-2.5-pro"
               </div>
             </div>
-            <p class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
+            <p class="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
               💡 使用与 Claude Code 相同的 API 密钥即可。
             </p>
           </div>
@@ -116,7 +116,7 @@
               }}）：
             </p>
             <div
-              class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="mb-3 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <div class="whitespace-nowrap text-gray-300">
                 export GOOGLE_GEMINI_BASE_URL="{{ geminiBaseUrl }}"
@@ -128,7 +128,7 @@
             </div>
             <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">然后执行：</p>
             <div
-              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
             >
               <div class="whitespace-nowrap text-gray-300">
                 source {{ platform === 'macos' ? '~/.zshrc' : '~/.bashrc' }}
@@ -148,7 +148,7 @@
             {{ platform === 'windows' ? '在 PowerShell 中验证：' : '在终端中验证：' }}
           </p>
           <div
-            class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+            class="space-y-1 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
           >
             <template v-if="platform === 'windows'">
               <div class="whitespace-nowrap text-gray-300">echo $env:GOOGLE_GEMINI_BASE_URL</div>

@@ -1,6 +1,9 @@
 <template>
-  <Teleport to="body">
-    <div class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+  <ModalTransition @after-leave="onClosed">
+    <div
+      v-if="visible"
+      class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+    >
       <div class="modal-content mx-auto flex max-h-[90vh] w-full max-w-4xl flex-col p-4 sm:p-6">
         <div class="mb-4 flex items-center justify-between">
           <div class="flex items-center gap-2 sm:gap-3">
@@ -15,7 +18,7 @@
           </div>
           <button
             class="p-1 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-            @click="$emit('close')"
+            @click="requestClose"
           >
             <i class="fas fa-times text-lg sm:text-xl" />
           </button>
@@ -36,7 +39,7 @@
               ]"
             >
               <label
-                class="flex h-full items-center text-xs font-semibold text-gray-700 dark:text-gray-300 sm:text-sm"
+                class="flex h-full items-center text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-sm"
                 >创建类型</label
               >
               <div class="flex items-center gap-3 sm:gap-4">
@@ -48,9 +51,9 @@
                     value="single"
                   />
                   <span
-                    class="flex items-center text-xs text-gray-700 dark:text-gray-300 sm:text-sm"
+                    class="flex items-center text-sm text-gray-700 dark:text-gray-300 sm:text-sm"
                   >
-                    <i class="fas fa-key mr-1 text-xs" />
+                    <i class="fas fa-key mr-1 text-sm" />
                     单个创建
                   </span>
                 </label>
@@ -62,9 +65,9 @@
                     value="batch"
                   />
                   <span
-                    class="flex items-center text-xs text-gray-700 dark:text-gray-300 sm:text-sm"
+                    class="flex items-center text-sm text-gray-700 dark:text-gray-300 sm:text-sm"
                   >
-                    <i class="fas fa-layer-group mr-1 text-xs" />
+                    <i class="fas fa-layer-group mr-1 text-sm" />
                     批量创建
                   </span>
                 </label>
@@ -75,7 +78,7 @@
             <div v-if="form.createType === 'batch'" class="mt-3">
               <div class="flex items-center gap-4">
                 <div class="flex-1">
-                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                  <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                     >创建数量</label
                   >
                   <div class="flex items-center gap-2">
@@ -88,13 +91,13 @@
                       required
                       type="number"
                     />
-                    <div class="whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+                    <div class="whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       最大支持 500 个
                     </div>
                   </div>
                 </div>
               </div>
-              <p class="mt-2 flex items-start text-xs text-amber-600 dark:text-amber-400">
+              <p class="mt-2 flex items-start text-sm text-amber-600 dark:text-amber-400">
                 <i class="fas fa-info-circle mr-1 mt-0.5 flex-shrink-0" />
                 <span
                   >批量创建时，每个 Key 的名称会自动添加序号后缀，例如：{{
@@ -107,7 +110,7 @@
 
           <div>
             <label
-              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-2 sm:text-sm"
+              class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300 sm:mb-2 sm:text-sm"
               >名称 <span class="text-red-500">*</span></label
             >
             <div>
@@ -125,7 +128,7 @@
                 @input="errors.name = ''"
               />
             </div>
-            <p v-if="errors.name" class="mt-1 text-xs text-red-500 dark:text-red-400">
+            <p v-if="errors.name" class="mt-1 text-sm text-red-500 dark:text-red-400">
               {{ errors.name }}
             </p>
           </div>
@@ -138,7 +141,7 @@
             <div class="space-y-4">
               <!-- 已选择的标签 -->
               <div v-if="form.tags.length > 0">
-                <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                <div class="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                   已选择的标签:
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -153,7 +156,7 @@
                       type="button"
                       @click="removeTag(index)"
                     >
-                      <i class="fas fa-times text-xs" />
+                      <i class="fas fa-times text-sm" />
                     </button>
                   </span>
                 </div>
@@ -161,7 +164,7 @@
 
               <!-- 可选择的已有标签 -->
               <div v-if="unselectedTags.length > 0">
-                <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                <div class="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                   点击选择已有标签:
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -172,7 +175,7 @@
                     type="button"
                     @click="selectTag(tag)"
                   >
-                    <i class="fas fa-tag text-xs text-gray-500 dark:text-gray-400" />
+                    <i class="fas fa-tag text-sm text-gray-500 dark:text-gray-400" />
                     {{ tag }}
                   </button>
                 </div>
@@ -180,7 +183,7 @@
 
               <!-- 创建新标签 -->
               <div>
-                <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                <div class="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                   创建新标签:
                 </div>
                 <div class="flex gap-2">
@@ -201,7 +204,7 @@
                 </div>
               </div>
 
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
                 用于标记不同团队或用途，方便筛选管理
               </p>
             </div>
@@ -215,7 +218,7 @@
               <div
                 class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-blue-500"
               >
-                <i class="fas fa-tachometer-alt text-xs text-white" />
+                <i class="fas fa-tachometer-alt text-sm text-white" />
               </div>
               <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
                 速率限制设置 (可选)
@@ -225,7 +228,7 @@
             <div class="space-y-2">
               <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >时间窗口 (分钟)</label
                   >
                   <input
@@ -235,11 +238,11 @@
                     placeholder="无限制"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">时间段单位</p>
+                  <p class="ml-2 mt-0.5 text-sm text-gray-500 dark:text-gray-400">时间段单位</p>
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >请求次数限制</label
                   >
                   <input
@@ -249,11 +252,11 @@
                     placeholder="无限制"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">窗口内最大请求</p>
+                  <p class="ml-2 mt-0.5 text-sm text-gray-500 dark:text-gray-400">窗口内最大请求</p>
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >费用限制 (美元)</label
                   >
                   <input
@@ -264,16 +267,16 @@
                     step="0.01"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">窗口内最大费用</p>
+                  <p class="ml-2 mt-0.5 text-sm text-gray-500 dark:text-gray-400">窗口内最大费用</p>
                 </div>
               </div>
 
               <!-- 示例说明 -->
               <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                <h5 class="mb-1 text-xs font-semibold text-blue-800 dark:text-blue-400">
+                <h5 class="mb-1 text-sm font-semibold text-blue-800 dark:text-blue-400">
                   💡 使用示例
                 </h5>
-                <div class="space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
+                <div class="space-y-0.5 text-sm text-blue-700 dark:text-blue-300">
                   <div>
                     <strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求
                   </div>
@@ -293,28 +296,28 @@
             <div class="space-y-2">
               <div class="flex gap-2">
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.dailyCostLimit = '50'"
                 >
                   $50
                 </button>
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.dailyCostLimit = '100'"
                 >
                   $100
                 </button>
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.dailyCostLimit = '200'"
                 >
                   $200
                 </button>
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.dailyCostLimit = ''"
                 >
@@ -329,7 +332,7 @@
                 step="0.01"
                 type="number"
               />
-              <p class="dark:text灰-400 text-xs text-gray-500">
+              <p class="dark:text灰-400 text-sm text-gray-500">
                 设置此 API Key 每日的费用限制，超过限制将拒绝请求，0 或留空表示无限制
               </p>
             </div>
@@ -342,28 +345,28 @@
             <div class="space-y-2">
               <div class="flex gap-2">
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.totalCostLimit = '100'"
                 >
                   $100
                 </button>
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.totalCostLimit = '500'"
                 >
                   $500
                 </button>
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.totalCostLimit = '1000'"
                 >
                   $1000
                 </button>
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.totalCostLimit = ''"
                 >
@@ -378,7 +381,7 @@
                 step="0.01"
                 type="number"
               />
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
                 设置此 API Key 的累计总费用限制，达到限制后将拒绝所有后续请求，0 或留空表示无限制
               </p>
             </div>
@@ -391,28 +394,28 @@
             <div class="space-y-2">
               <div class="flex gap-2">
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.weeklyOpusCostLimit = '100'"
                 >
                   $100
                 </button>
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.weeklyOpusCostLimit = '500'"
                 >
                   $500
                 </button>
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.weeklyOpusCostLimit = '1000'"
                 >
                   $1000
                 </button>
                 <button
-                  class="rounded bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  class="rounded bg-gray-100 px-2 py-1 text-sm font-medium hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   type="button"
                   @click="form.weeklyOpusCostLimit = ''"
                 >
@@ -427,7 +430,7 @@
                 step="0.01"
                 type="number"
               />
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
                 设置 Claude 模型的周费用限制，仅对 Claude 模型请求生效，0 或留空表示无限制
               </p>
               <div
@@ -435,34 +438,26 @@
                 class="mt-2 flex gap-3"
               >
                 <div class="flex-1">
-                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                  <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                     >重置日</label
                   >
-                  <select
+                  <CustomDropdown
                     v-model="form.weeklyResetDay"
-                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  >
-                    <option :value="1">周一</option>
-                    <option :value="2">周二</option>
-                    <option :value="3">周三</option>
-                    <option :value="4">周四</option>
-                    <option :value="5">周五</option>
-                    <option :value="6">周六</option>
-                    <option :value="7">周日</option>
-                  </select>
+                    accent="blue"
+                    :options="weeklyResetDayOptions"
+                    placeholder="重置日"
+                  />
                 </div>
                 <div class="flex-1">
-                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                  <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                     >重置时间 (UTC+8)</label
                   >
-                  <select
+                  <CustomDropdown
                     v-model="form.weeklyResetHour"
-                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  >
-                    <option v-for="h in 24" :key="h - 1" :value="h - 1">
-                      {{ String(h - 1).padStart(2, '0') }}:00
-                    </option>
-                  </select>
+                    accent="blue"
+                    :options="weeklyResetHourOptions"
+                    placeholder="重置时间"
+                  />
                 </div>
               </div>
             </div>
@@ -479,7 +474,7 @@
               placeholder="0 表示无限制"
               type="number"
             />
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               设置此 API Key 可同时处理的最大请求数，0 或留空表示无限制
             </p>
           </div>
@@ -515,7 +510,7 @@
                   自定义服务倍率
                 </label>
               </div>
-              <span class="text-xs text-gray-500 dark:text-gray-400">
+              <span class="text-sm text-gray-500 dark:text-gray-400">
                 与全局倍率相乘，用于 VIP 折扣等（如全局1.5 × Key倍率0.8 = 1.2）
               </span>
             </div>
@@ -525,7 +520,7 @@
                 :key="service.key"
                 class="flex items-center gap-2"
               >
-                <span class="w-20 text-xs text-gray-600 dark:text-gray-400">{{
+                <span class="w-20 text-sm text-gray-600 dark:text-gray-400">{{
                   service.label
                 }}</span>
                 <input
@@ -536,7 +531,7 @@
                   step="0.1"
                   type="number"
                 />
-                <span class="text-xs text-gray-400">默认 1.0</span>
+                <span class="text-sm text-gray-400">默认 1.0</span>
               </div>
             </div>
           </div>
@@ -569,7 +564,7 @@
                   <span class="text-sm text-gray-700 dark:text-gray-300">首次使用后激活</span>
                 </label>
               </div>
-              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                 <span v-if="form.expirationMode === 'fixed'">
                   <i class="fas fa-info-circle mr-1" />
                   固定时间模式：Key 创建后立即生效，按设定时间过期（支持小时和天数）
@@ -583,24 +578,14 @@
 
             <!-- 固定时间模式 -->
             <div v-if="form.expirationMode === 'fixed'">
-              <select
+              <CustomDropdown
                 v-model="form.expireDuration"
-                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                accent="blue"
+                icon="fa-clock"
+                :options="expireDurationOptions"
+                placeholder="永不过期"
                 @change="updateExpireAt"
-              >
-                <option value="">永不过期</option>
-                <option value="1h">1 小时</option>
-                <option value="3h">3 小时</option>
-                <option value="6h">6 小时</option>
-                <option value="12h">12 小时</option>
-                <option value="1d">1 天</option>
-                <option value="7d">7 天</option>
-                <option value="30d">30 天</option>
-                <option value="90d">90 天</option>
-                <option value="180d">180 天</option>
-                <option value="365d">365 天</option>
-                <option value="custom">自定义日期</option>
-              </select>
+              />
               <div v-if="form.expireDuration === 'custom'" class="mt-3">
                 <input
                   v-model="form.customExpireDate"
@@ -610,7 +595,7 @@
                   @change="updateCustomExpireAt"
                 />
               </div>
-              <p v-if="form.expiresAt" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <p v-if="form.expiresAt" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                 将于 {{ formatExpireDate(form.expiresAt) }} 过期
               </p>
             </div>
@@ -626,27 +611,28 @@
                   :placeholder="form.activationUnit === 'hours' ? '输入小时数' : '输入天数'"
                   type="number"
                 />
-                <select
-                  v-model="form.activationUnit"
-                  class="form-input w-20 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  @change="updateActivationValue"
-                >
-                  <option value="hours">小时</option>
-                  <option value="days">天</option>
-                </select>
+                <div class="w-24">
+                  <CustomDropdown
+                    v-model="form.activationUnit"
+                    accent="blue"
+                    :options="activationUnitOptions"
+                    placeholder="单位"
+                    @change="updateActivationValue"
+                  />
+                </div>
               </div>
               <div class="mt-2 flex flex-wrap gap-2">
                 <button
                   v-for="value in getQuickTimeOptions()"
                   :key="value.value"
-                  class="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
                   type="button"
                   @click="form.activationDays = value.value"
                 >
                   {{ value.label }}
                 </button>
               </div>
-              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                 <i class="fas fa-clock mr-1" />
                 Key 将在首次使用后激活，激活后
                 {{ form.activationDays || (form.activationUnit === 'hours' ? 24 : 30) }}
@@ -700,8 +686,18 @@
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">Droid</span>
               </label>
+              <label class="flex cursor-pointer items-center">
+                <input
+                  v-model="form.permissions"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                  value="grok"
+                  @change="updatePermissions"
+                />
+                <span class="text-sm text-gray-700 dark:text-gray-300">Grok</span>
+              </label>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               不选择任何服务表示允许访问全部服务
             </p>
           </div>
@@ -722,7 +718,7 @@
                   :class="[
                     'fas',
                     accountsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt',
-                    'text-xs'
+                    'text-sm'
                   ]"
                 />
                 <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
@@ -799,8 +795,22 @@
                   platform="droid"
                 />
               </div>
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >Grok 专属账号</label
+                >
+                <AccountSelector
+                  v-model="form.grokAccountId"
+                  :accounts="localAccounts.grok"
+                  default-option-text="使用共享账号池"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('grok')"
+                  :groups="localAccounts.grokGroups"
+                  placeholder="请选择Grok账号"
+                  platform="grok"
+                />
+              </div>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               选择专属账号后，此API Key将只使用该账号，不选择则使用共享账号池
             </p>
           </div>
@@ -838,7 +848,7 @@
                       type="button"
                       @click="removeRestrictedModel(index)"
                     >
-                      <i class="fas fa-times text-xs" />
+                      <i class="fas fa-times text-sm" />
                     </button>
                   </span>
                   <span v-if="form.restrictedModels.length === 0" class="text-sm text-gray-400">
@@ -851,7 +861,7 @@
                     <button
                       v-for="model in availableQuickModels"
                       :key="model"
-                      class="flex-shrink-0 rounded-lg bg-gray-100 px-3 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-200 sm:text-sm"
+                      class="flex-shrink-0 rounded-lg bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-gray-200 sm:text-sm"
                       type="button"
                       @click="quickAddRestrictedModel(model)"
                     >
@@ -883,7 +893,7 @@
                     </button>
                   </div>
                 </div>
-                <p class="mt-2 text-xs text-gray-500">
+                <p class="mt-2 text-sm text-gray-500">
                   设置此API Key无法访问的模型，例如：claude-opus-4-20250514
                 </p>
               </div>
@@ -912,7 +922,7 @@
               class="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-700 dark:bg-green-900/20"
             >
               <div>
-                <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >允许的客户端</label
                 >
                 <div class="space-y-1">
@@ -928,7 +938,7 @@
                       <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                         client.name
                       }}</span>
-                      <span class="block text-xs text-gray-500 dark:text-gray-400">{{
+                      <span class="block text-sm text-gray-500 dark:text-gray-400">{{
                         client.description
                       }}</span>
                     </label>
@@ -942,7 +952,7 @@
             <button
               class="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               type="button"
-              @click="$emit('close')"
+              @click="requestClose"
             >
               取消
             </button>
@@ -959,24 +969,27 @@
         </form>
       </div>
     </div>
+  </ModalTransition>
 
-    <!-- ConfirmModal -->
-    <ConfirmModal
-      :cancel-text="confirmModalConfig.cancelText"
-      :confirm-text="confirmModalConfig.confirmText"
-      :message="confirmModalConfig.message"
-      :show="showConfirmModal"
-      :title="confirmModalConfig.title"
-      :type="confirmModalConfig.type"
-      @cancel="handleCancelModal"
-      @confirm="handleConfirmModal"
-    />
-  </Teleport>
+  <!-- ConfirmModal -->
+  <ConfirmModal
+    :cancel-text="confirmModalConfig.cancelText"
+    :confirm-text="confirmModalConfig.confirmText"
+    :message="confirmModalConfig.message"
+    :show="showConfirmModal"
+    :title="confirmModalConfig.title"
+    :type="confirmModalConfig.type"
+    @cancel="handleCancelModal"
+    @confirm="handleConfirmModal"
+  />
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { showToast } from '@/utils/tools'
+import { getDateTimeLocalMinValue, localDateTimeInputToISOString } from '@/utils/time'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
 import * as httpApis from '@/utils/http_apis'
@@ -992,15 +1005,36 @@ const props = defineProps({
       openai: [],
       bedrock: [],
       droid: [],
+      grok: [],
       claudeGroups: [],
       geminiGroups: [],
       openaiGroups: [],
-      droidGroups: []
+      droidGroups: [],
+      grokGroups: []
     })
   }
 })
 
 const emit = defineEmits(['close', 'success', 'batch-success'])
+
+// 弹窗进入/退出动画：挂载后置 visible 触发进入，关闭时先播退出动画再通知父级卸载
+const visible = ref(false)
+onMounted(() => {
+  visible.value = true
+})
+// 创建/批量成功的结果事件推迟到退出动画结束后再 emit，
+// 否则父组件会立刻打开结果弹窗，盖住旧弹窗尚未播完的退出动画
+let pendingResult = null
+const requestClose = () => {
+  visible.value = false
+}
+const onClosed = () => {
+  if (pendingResult) {
+    emit(pendingResult.event, pendingResult.payload)
+    pendingResult = null
+  }
+  emit('close')
+}
 
 const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
@@ -1046,10 +1080,12 @@ const localAccounts = ref({
   openai: [],
   bedrock: [],
   droid: [],
+  grok: [],
   claudeGroups: [],
   geminiGroups: [],
   openaiGroups: [],
-  droidGroups: []
+  droidGroups: [],
+  grokGroups: []
 })
 
 // 表单验证状态
@@ -1081,6 +1117,41 @@ const availableServices = [
   { key: 'ccr', label: 'CCR' }
 ]
 
+const weeklyResetDayOptions = [
+  { value: 1, label: '周一' },
+  { value: 2, label: '周二' },
+  { value: 3, label: '周三' },
+  { value: 4, label: '周四' },
+  { value: 5, label: '周五' },
+  { value: 6, label: '周六' },
+  { value: 7, label: '周日' }
+]
+
+const weeklyResetHourOptions = Array.from({ length: 24 }, (_, hour) => ({
+  value: hour,
+  label: `${String(hour).padStart(2, '0')}:00`
+}))
+
+const expireDurationOptions = [
+  { value: '', label: '永不过期' },
+  { value: '1h', label: '1 小时' },
+  { value: '3h', label: '3 小时' },
+  { value: '6h', label: '6 小时' },
+  { value: '12h', label: '12 小时' },
+  { value: '1d', label: '1 天' },
+  { value: '7d', label: '7 天' },
+  { value: '30d', label: '30 天' },
+  { value: '90d', label: '90 天' },
+  { value: '180d', label: '180 天' },
+  { value: '365d', label: '365 天' },
+  { value: 'custom', label: '自定义日期' }
+]
+
+const activationUnitOptions = [
+  { value: 'hours', label: '小时' },
+  { value: 'days', label: '天' }
+]
+
 // 表单数据
 const form = reactive({
   createType: 'single',
@@ -1109,6 +1180,7 @@ const form = reactive({
   openaiAccountId: '',
   bedrockAccountId: '',
   droidAccountId: '',
+  grokAccountId: '',
   enableModelRestriction: false,
   restrictedModels: [],
   modelInput: '',
@@ -1163,10 +1235,15 @@ onMounted(async () => {
         ...account,
         platform: account.platform || 'droid'
       })),
+      grok: (props.accounts.grok || []).map((account) => ({
+        ...account,
+        platform: account.platform || 'grok'
+      })),
       claudeGroups: props.accounts.claudeGroups || [],
       geminiGroups: props.accounts.geminiGroups || [],
       openaiGroups: props.accounts.openaiGroups || [],
-      droidGroups: props.accounts.droidGroups || []
+      droidGroups: props.accounts.droidGroups || [],
+      grokGroups: props.accounts.grokGroups || []
     }
   }
 
@@ -1186,6 +1263,7 @@ const refreshAccounts = async () => {
       openaiResponsesData,
       bedrockData,
       droidData,
+      grokData,
       groupsData
     ] = await Promise.all([
       httpApis.getClaudeAccountsApi(),
@@ -1196,6 +1274,7 @@ const refreshAccounts = async () => {
       httpApis.getOpenAIResponsesAccountsApi(), // 获取 OpenAI-Responses 账号
       httpApis.getBedrockAccountsApi(),
       httpApis.getDroidAccountsApi(),
+      httpApis.getGrokAccountsApi(),
       httpApis.getAccountGroupsApi()
     ])
 
@@ -1289,13 +1368,21 @@ const refreshAccounts = async () => {
       }))
     }
 
-    // 处理分组数据
+    if (grokData.success) {
+      localAccounts.value.grok = (grokData.data || []).map((account) => ({
+        ...account,
+        platform: 'grok',
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+
     if (groupsData.success) {
       const allGroups = groupsData.data || []
       localAccounts.value.claudeGroups = allGroups.filter((g) => g.platform === 'claude')
       localAccounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
       localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
       localAccounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
+      localAccounts.value.grokGroups = allGroups.filter((g) => g.platform === 'grok')
     }
 
     showToast('账号列表已刷新', 'success')
@@ -1308,9 +1395,7 @@ const refreshAccounts = async () => {
 
 // 计算最小日期时间
 const minDateTime = computed(() => {
-  const now = new Date()
-  now.setMinutes(now.getMinutes() + 1)
-  return now.toISOString().slice(0, 16)
+  return getDateTimeLocalMinValue(1)
 })
 
 // 更新过期时间
@@ -1354,7 +1439,7 @@ const updateExpireAt = () => {
 // 更新自定义过期时间
 const updateCustomExpireAt = () => {
   if (form.customExpireDate) {
-    form.expiresAt = new Date(form.customExpireDate).toISOString()
+    form.expiresAt = localDateTimeInputToISOString(form.customExpireDate)
   }
 }
 
@@ -1577,6 +1662,9 @@ const createApiKey = async () => {
     if (form.droidAccountId) {
       baseData.droidAccountId = form.droidAccountId
     }
+    if (form.grokAccountId) {
+      baseData.grokAccountId = form.grokAccountId
+    }
 
     if (form.createType === 'single') {
       // 单个创建
@@ -1589,8 +1677,8 @@ const createApiKey = async () => {
 
       if (result.success) {
         showToast('API Key 创建成功', 'success')
-        emit('success', result.data)
-        emit('close')
+        pendingResult = { event: 'success', payload: result.data }
+        requestClose()
       } else {
         showToast(result.message || '创建失败', 'error')
       }
@@ -1607,8 +1695,8 @@ const createApiKey = async () => {
 
       if (result.success) {
         showToast(`成功创建 ${result.data.length} 个 API Key`, 'success')
-        emit('batch-success', result.data)
-        emit('close')
+        pendingResult = { event: 'batch-success', payload: result.data }
+        requestClose()
       } else {
         showToast(result.message || '批量创建失败', 'error')
       }

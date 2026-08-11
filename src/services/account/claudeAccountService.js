@@ -23,6 +23,7 @@ const {
   normalizeOptionalNonNegativeInteger,
   normalizeTempUnavailablePolicyInput
 } = require('../../utils/tempUnavailablePolicy')
+const { RedisKeys, TTL } = require('../../constants/redisKeys')
 
 /**
  * Check if account is Pro (not Max)
@@ -94,6 +95,7 @@ class ClaudeAccountService {
       schedulable = true, // 是否可被调度
       subscriptionInfo = null, // 手动设置的订阅信息
       autoStopOnWarning = false, // 5小时使用量接近限制时自动停止调度
+      disableAutoProtection = false, // 关闭自动防护：上游错误不自动暂停/限流/标记不可用
       useUnifiedUserAgent = false, // 是否使用统一Claude Code版本的User-Agent
       useUnifiedClientId = false, // 是否使用统一的客户端标识
       unifiedClientId = '', // 统一的客户端标识
@@ -143,6 +145,7 @@ class ClaudeAccountService {
         errorMessage: '',
         schedulable: schedulable.toString(), // 是否可被调度
         autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
+        disableAutoProtection: disableAutoProtection.toString(), // 关闭自动防护
         useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
         useUnifiedClientId: useUnifiedClientId.toString(), // 是否使用统一的客户端标识
         unifiedClientId: unifiedClientId || '', // 统一的客户端标识
@@ -189,6 +192,7 @@ class ClaudeAccountService {
         errorMessage: '',
         schedulable: schedulable.toString(), // 是否可被调度
         autoStopOnWarning: autoStopOnWarning.toString(), // 5小时使用量接近限制时自动停止调度
+        disableAutoProtection: disableAutoProtection.toString(), // 关闭自动防护
         useUnifiedUserAgent: useUnifiedUserAgent.toString(), // 是否使用统一Claude Code版本的User-Agent
         // 手动设置的订阅信息
         subscriptionInfo: subscriptionInfo ? JSON.stringify(subscriptionInfo) : '',
@@ -248,6 +252,7 @@ class ClaudeAccountService {
           : null,
       scopes: claudeAiOauth ? claudeAiOauth.scopes : [],
       autoStopOnWarning,
+      disableAutoProtection,
       useUnifiedUserAgent,
       useUnifiedClientId,
       unifiedClientId,
@@ -433,9 +438,16 @@ class ClaudeAccountService {
             `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping error status on token refresh failure`
           )
           upstreamErrorHelper
-            .recordErrorHistory(accountId, 'claude-official', 0, 'token_refresh_failed', {
-              errorBody: error.message
-            })
+            .recordErrorHistory(
+              accountId,
+              'claude-official',
+              0,
+              'token_refresh_failed',
+              upstreamErrorHelper.buildErrorContext({
+                reason: 'token_refresh_failed',
+                message: error.message
+              })
+            )
             .catch(() => {})
         } else {
           accountData.status = 'error'
@@ -595,6 +607,8 @@ class ClaudeAccountService {
             email: account.email ? this._maskEmail(this._decryptSensitiveData(account.email)) : '',
             isActive: account.isActive === 'true',
             proxy: parsedProxy,
+            proxyGroupId: account.proxyGroupId || null,
+            proxyId: account.proxyId || null,
             status: account.status,
             errorMessage: account.errorMessage,
             accountType: account.accountType || 'shared', // 兼容旧数据，默认为共享
@@ -650,6 +664,8 @@ class ClaudeAccountService {
             schedulable: account.schedulable !== 'false', // 默认为true，兼容历史数据
             // 添加自动停止调度设置
             autoStopOnWarning: account.autoStopOnWarning === 'true', // 默认为false
+            // 关闭自动防护：上游错误不自动暂停/限流/标记不可用
+            disableAutoProtection: account.disableAutoProtection === 'true', // 默认为false
             // 添加5小时自动停止状态
             fiveHourAutoStopped: account.fiveHourAutoStopped === 'true',
             fiveHourStoppedAt: account.fiveHourStoppedAt || null,
@@ -752,6 +768,8 @@ class ClaudeAccountService {
         'password',
         'refreshToken',
         'proxy',
+        'proxyGroupId',
+        'proxyId',
         'isActive',
         'claudeAiOauth',
         'accountType',
@@ -759,6 +777,7 @@ class ClaudeAccountService {
         'schedulable',
         'subscriptionInfo',
         'autoStopOnWarning',
+        'disableAutoProtection',
         'useUnifiedUserAgent',
         'useUnifiedClientId',
         'unifiedClientId',
@@ -785,7 +804,7 @@ class ClaudeAccountService {
             updatedData[field] = value ? JSON.stringify(value) : ''
           } else if (field === 'priority' || field === 'maxConcurrency') {
             updatedData[field] = value.toString()
-          } else if (field === 'disableTempUnavailable') {
+          } else if (field === 'disableTempUnavailable' || field === 'disableAutoProtection') {
             updatedData[field] = parseBooleanLike(value) ? 'true' : 'false'
           } else if (
             field === 'tempUnavailable503TtlSeconds' ||
@@ -825,6 +844,24 @@ class ClaudeAccountService {
           } else {
             updatedData[field] = value !== null && value !== undefined ? value.toString() : ''
           }
+        }
+      }
+
+      // 开启 disableAutoProtection 时，立即清理已有的自动停用状态并恢复调度（手动停用不受影响）
+      const enablingAutoProtection =
+        updates.disableAutoProtection === true || updates.disableAutoProtection === 'true'
+      if (enablingAutoProtection) {
+        const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(accountData)
+        if (recoveryPatch) {
+          // 同一请求里显式手动写入的硬门字段（schedulable/isActive/status）拥有最高优先级，
+          // 恢复补丁不得覆盖——否则 { disableAutoProtection:true, schedulable:false } 会被补丁改回 true，
+          // 手动硬门失效（见 review：显式手动暂停必须压过自动恢复）。
+          for (const hardGateField of ['schedulable', 'isActive', 'status']) {
+            if (Object.prototype.hasOwnProperty.call(updates, hardGateField)) {
+              delete recoveryPatch[hardGateField]
+            }
+          }
+          Object.assign(updatedData, recoveryPatch)
         }
       }
 
@@ -898,6 +935,11 @@ class ClaudeAccountService {
       }
 
       await redis.setClaudeAccount(accountId, updatedData)
+
+      // 开启 disableAutoProtection 后清理临时冷却与过载 key，确保账户立即可被调度
+      if (enablingAutoProtection) {
+        await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'claude-official')
+      }
 
       if (shouldClearAutoStopFields) {
         const fieldsToRemove = [
@@ -1053,8 +1095,7 @@ class ClaudeAccountService {
 
       // 如果有会话哈希，建立新的映射
       if (sessionHash) {
-        // 从配置获取TTL（小时），转换为秒
-        const ttlSeconds = (config.session?.stickyTtlHours || 1) * 60 * 60
+        const ttlSeconds = TTL.stickySession()
         await redis.setSessionAccountMapping(sessionHash, selectedAccountId, ttlSeconds)
         logger.info(
           `🎯 Created new sticky session mapping: ${sortedAccounts[0].name} (${selectedAccountId}) for session ${sessionHash}`
@@ -1219,8 +1260,7 @@ class ClaudeAccountService {
 
       // 如果有会话哈希，建立新的映射
       if (sessionHash) {
-        // 从配置获取TTL（小时），转换为秒
-        const ttlSeconds = (config.session?.stickyTtlHours || 1) * 60 * 60
+        const ttlSeconds = TTL.stickySession()
         await redis.setSessionAccountMapping(sessionHash, selectedAccountId, ttlSeconds)
         logger.info(
           `🎯 Created new sticky session mapping for shared account: ${candidateAccounts[0].name} (${selectedAccountId}) for session ${sessionHash}`
@@ -1430,7 +1470,15 @@ class ClaudeAccountService {
           `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping rate limit marking`
         )
         upstreamErrorHelper
-          .recordErrorHistory(accountId, 'claude-official', 429, 'rate_limit')
+          .recordErrorHistory(
+            accountId,
+            'claude-official',
+            429,
+            'rate_limit',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_rate_limit'
+            })
+          )
           .catch(() => {})
         return { success: true, skipped: true }
       }
@@ -1518,6 +1566,28 @@ class ClaudeAccountService {
         throw new Error('Account not found')
       }
 
+      // disableAutoProtection 检查：跳过 Opus 限流标记，仅记录错误历史
+      if (
+        accountData.disableAutoProtection === true ||
+        accountData.disableAutoProtection === 'true'
+      ) {
+        logger.info(
+          `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping Opus rate limit marking`
+        )
+        upstreamErrorHelper
+          .recordErrorHistory(
+            accountId,
+            'claude-official',
+            429,
+            'rate_limit',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_rate_limit'
+            })
+          )
+          .catch(() => {})
+        return { success: true, skipped: true }
+      }
+
       const { atField, endField } = this._modelRateLimitFields(family)
       const updatedAccountData = { ...accountData }
       updatedAccountData[atField] = new Date().toISOString()
@@ -1558,7 +1628,7 @@ class ClaudeAccountService {
 
       await redis.setClaudeAccount(accountId, updatedAccountData)
 
-      const redisKey = `claude:account:${accountId}`
+      const redisKey = RedisKeys.accounts.claude(accountId)
       if (redis.client && typeof redis.client.hdel === 'function') {
         await redis.client.hdel(redisKey, atField, endField)
       }
@@ -1723,10 +1793,10 @@ class ClaudeAccountService {
         throw new Error('Account not found')
       }
 
-      const accountKey = `claude:account:${accountId}`
+      const accountKey = RedisKeys.accounts.claude(accountId)
 
       // 清除限流状态
-      const redisKey = `claude:account:${accountId}`
+      const redisKey = RedisKeys.accounts.claude(accountId)
       await redis.client.hdel(redisKey, 'rateLimitedAt', 'rateLimitStatus', 'rateLimitEndAt')
       delete accountData.rateLimitedAt
       delete accountData.rateLimitStatus
@@ -1999,7 +2069,7 @@ class ClaudeAccountService {
     try {
       if (redis.client && typeof redis.client.hdel === 'function') {
         await redis.client.hdel(
-          `claude:account:${accountId}`,
+          RedisKeys.accounts.claude(accountId),
           'fiveHourWarningWindow',
           'fiveHourWarningCount',
           'fiveHourWarningLastSentAt'
@@ -2568,7 +2638,15 @@ class ClaudeAccountService {
         )
         const statusCode = errorType === 'unauthorized' ? 401 : 403
         upstreamErrorHelper
-          .recordErrorHistory(accountId, 'claude-official', statusCode, errorType)
+          .recordErrorHistory(
+            accountId,
+            'claude-official',
+            statusCode,
+            errorType,
+            upstreamErrorHelper.buildErrorContext({
+              reason: `auto_protection_disabled_${errorType}`
+            })
+          )
           .catch(() => {})
         return { success: true, skipped: true }
       }
@@ -2585,7 +2663,7 @@ class ClaudeAccountService {
 
       // 如果有sessionHash，删除粘性会话映射
       if (sessionHash) {
-        await redis.client.del(`sticky_session:${sessionHash}`)
+        await redis.client.del(RedisKeys.session.sticky(sessionHash))
         logger.info(`🗑️ Deleted sticky session mapping for hash: ${sessionHash}`)
       }
 
@@ -2706,22 +2784,22 @@ class ClaudeAccountService {
         'autoStoppedAt',
         'stoppedReason'
       ]
-      await redis.client.hdel(`claude:account:${accountId}`, ...fieldsToDelete)
+      await redis.client.hdel(RedisKeys.accounts.claude(accountId), ...fieldsToDelete)
 
       // 清除401错误计数
-      const errorKey = `claude_account:${accountId}:401_errors`
+      const errorKey = RedisKeys.accounts.claude401Errors(accountId)
       await redis.client.del(errorKey)
 
       // 清除限流状态（如果存在）
-      const rateLimitKey = `ratelimit:${accountId}`
+      const rateLimitKey = RedisKeys.rateLimit.account(accountId)
       await redis.client.del(rateLimitKey)
 
       // 清除5xx错误计数
-      const serverErrorKey = `claude_account:${accountId}:5xx_errors`
+      const serverErrorKey = RedisKeys.accounts.claude5xxErrors(accountId)
       await redis.client.del(serverErrorKey)
 
       // 清除过载状态
-      const overloadKey = `account:overload:${accountId}`
+      const overloadKey = RedisKeys.account.overload(accountId)
       await redis.client.del(overloadKey)
 
       // 清除临时不可用状态
@@ -2776,7 +2854,7 @@ class ClaudeAccountService {
 
             // 显式从 Redis 中删除这些字段（因为 HSET 不会删除现有字段）
             await redis.client.hdel(
-              `claude:account:${account.id}`,
+              RedisKeys.accounts.claude(account.id),
               'errorMessage',
               'tempErrorAt',
               'tempErrorAutoStopped'
@@ -2804,7 +2882,7 @@ class ClaudeAccountService {
   // 记录5xx服务器错误
   async recordServerError(accountId, statusCode) {
     try {
-      const key = `claude_account:${accountId}:5xx_errors`
+      const key = RedisKeys.accounts.claude5xxErrors(accountId)
 
       // 增加错误计数，设置5分钟过期时间
       await redis.client.incr(key)
@@ -2824,7 +2902,7 @@ class ClaudeAccountService {
   // 获取5xx错误计数
   async getServerErrorCount(accountId) {
     try {
-      const key = `claude_account:${accountId}:5xx_errors`
+      const key = RedisKeys.accounts.claude5xxErrors(accountId)
 
       const count = await redis.client.get(key)
       return parseInt(count) || 0
@@ -2842,7 +2920,7 @@ class ClaudeAccountService {
   // 清除500错误计数
   async clearInternalErrors(accountId) {
     try {
-      const key = `claude_account:${accountId}:5xx_errors`
+      const key = RedisKeys.accounts.claude5xxErrors(accountId)
 
       await redis.client.del(key)
       logger.info(`✅ Cleared 5xx error count for account ${accountId}`)
@@ -2868,7 +2946,15 @@ class ClaudeAccountService {
           `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping temp error marking`
         )
         upstreamErrorHelper
-          .recordErrorHistory(accountId, 'claude-official', 500, 'server_error')
+          .recordErrorHistory(
+            accountId,
+            'claude-official',
+            500,
+            'server_error',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_server_error'
+            })
+          )
           .catch(() => {})
         return { success: true, skipped: true }
       }
@@ -2911,7 +2997,7 @@ class ClaudeAccountService {
 
                 // 显式删除 Redis 字段
                 await redis.client.hdel(
-                  `claude:account:${accountId}`,
+                  RedisKeys.accounts.claude(accountId),
                   'errorMessage',
                   'tempErrorAt',
                   'tempErrorAutoStopped'
@@ -2938,7 +3024,7 @@ class ClaudeAccountService {
 
       // 如果有sessionHash，删除粘性会话映射
       if (sessionHash) {
-        await redis.client.del(`sticky_session:${sessionHash}`)
+        await redis.client.del(RedisKeys.session.sticky(sessionHash))
         logger.info(`🗑️ Deleted sticky session mapping for hash: ${sessionHash}`)
       }
 
@@ -2999,8 +3085,16 @@ class ClaudeAccountService {
       accountData.sessionWindowStatus = status
       accountData.sessionWindowStatusUpdatedAt = nowIso
 
+      // 关闭自动防护时，账号不因 5 小时使用量接近限制而自动停止调度
+      const autoProtectionDisabled =
+        accountData.disableAutoProtection === true || accountData.disableAutoProtection === 'true'
+
       // 如果状态是 allowed_warning 且账户设置了自动停止调度
-      if (status === 'allowed_warning' && accountData.autoStopOnWarning === 'true') {
+      if (
+        status === 'allowed_warning' &&
+        accountData.autoStopOnWarning === 'true' &&
+        !autoProtectionDisabled
+      ) {
         const alreadyAutoStopped =
           accountData.schedulable === 'false' && accountData.fiveHourAutoStopped === 'true'
 
@@ -3091,7 +3185,15 @@ class ClaudeAccountService {
           `🛡️ Account ${accountData.name} (${accountId}) has auto-protection disabled, skipping overload marking`
         )
         upstreamErrorHelper
-          .recordErrorHistory(accountId, 'claude-official', 529, 'overload')
+          .recordErrorHistory(
+            accountId,
+            'claude-official',
+            529,
+            'overload',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_overload'
+            })
+          )
           .catch(() => {})
         return { success: true, skipped: true }
       }
@@ -3104,7 +3206,7 @@ class ClaudeAccountService {
         return { success: false, error: '529 error handling is disabled' }
       }
 
-      const overloadKey = `account:overload:${accountId}`
+      const overloadKey = RedisKeys.account.overload(accountId)
       const ttl = overloadMinutes * 60 // 转换为秒
 
       await redis.setex(
@@ -3148,7 +3250,7 @@ class ClaudeAccountService {
         return false
       }
 
-      const overloadKey = `account:overload:${accountId}`
+      const overloadKey = RedisKeys.account.overload(accountId)
       const overloadData = await redis.get(overloadKey)
 
       if (overloadData) {
@@ -3172,7 +3274,7 @@ class ClaudeAccountService {
         throw new Error('Account not found')
       }
 
-      const overloadKey = `account:overload:${accountId}`
+      const overloadKey = RedisKeys.account.overload(accountId)
       await redis.del(overloadKey)
 
       logger.info(`✅ Account ${accountData.name} (${accountId}) overload status removed`)
@@ -3489,7 +3591,7 @@ class ClaudeAccountService {
       return
     }
 
-    const accountKey = `claude:account:${accountId}`
+    const accountKey = RedisKeys.accounts.claude(accountId)
 
     try {
       await redis.client.hdel(accountKey, ...filteredFields)

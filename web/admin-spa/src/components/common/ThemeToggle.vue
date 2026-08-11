@@ -58,7 +58,7 @@
               background: `linear-gradient(135deg, ${themeStore.currentColorScheme.primary} 0%, ${themeStore.currentColorScheme.secondary} 100%)`
             }"
           />
-          <i class="fas fa-palette ml-1 text-xs opacity-60" />
+          <i class="fas fa-palette ml-1 text-sm opacity-60" />
         </button>
         <!-- 色系下拉菜单 -->
         <transition name="dropdown">
@@ -539,7 +539,7 @@ onUnmounted(() => {
 
 .theme-segment {
   @apply px-3 py-1.5;
-  @apply text-xs font-medium;
+  @apply text-sm font-medium;
   @apply text-gray-500 dark:text-gray-400;
   @apply transition-all duration-200;
   @apply rounded-full;
@@ -561,7 +561,7 @@ onUnmounted(() => {
 }
 
 .theme-segment i {
-  @apply text-xs;
+  @apply text-sm;
   transition: transform 0.2s ease;
 }
 

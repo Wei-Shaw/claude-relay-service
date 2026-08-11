@@ -7,14 +7,14 @@
         <i class="fas fa-coins mr-2 text-sm text-yellow-500 md:mr-3 md:text-base" />
         Token 使用分布
       </span>
-      <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
+      <span class="text-sm font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
         >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
       >
     </h3>
     <div class="space-y-2 md:space-y-3">
       <div class="flex items-center justify-between">
         <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
-          <i class="fas fa-arrow-right mr-1 text-xs text-green-500 md:mr-2 md:text-sm" />
+          <i class="fas fa-arrow-right mr-1 text-sm text-green-500 md:mr-2 md:text-sm" />
           输入 Token
         </span>
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
@@ -23,7 +23,7 @@
       </div>
       <div class="flex items-center justify-between">
         <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
-          <i class="fas fa-arrow-left mr-1 text-xs text-blue-500 md:mr-2 md:text-sm" />
+          <i class="fas fa-arrow-left mr-1 text-sm text-blue-500 md:mr-2 md:text-sm" />
           输出 Token
         </span>
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
@@ -32,7 +32,7 @@
       </div>
       <div class="flex items-center justify-between">
         <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
-          <i class="fas fa-save mr-1 text-xs text-purple-500 md:mr-2 md:text-sm" />
+          <i class="fas fa-save mr-1 text-sm text-purple-500 md:mr-2 md:text-sm" />
           缓存创建 Token
         </span>
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{
@@ -41,7 +41,7 @@
       </div>
       <div class="flex items-center justify-between">
         <span class="flex items-center text-sm text-gray-600 dark:text-gray-400 md:text-base">
-          <i class="fas fa-download mr-1 text-xs text-orange-500 md:mr-2 md:text-sm" />
+          <i class="fas fa-download mr-1 text-sm text-orange-500 md:mr-2 md:text-sm" />
           缓存读取 Token
         </span>
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100 md:text-base">{{

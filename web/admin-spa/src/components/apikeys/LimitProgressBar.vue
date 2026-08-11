@@ -3,7 +3,7 @@
     <!-- 检查是否为无限制状态 -->
     <div
       v-if="!limitValue || limitValue <= 0"
-      class="flex items-center justify-center rounded-lg px-3 py-2 text-xs"
+      class="flex items-center justify-center rounded-lg px-3 py-2 text-sm"
     >
       <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
         <i class="fas fa-infinity text-sm text-gray-500 dark:text-gray-400" />
@@ -12,9 +12,9 @@
     </div>
     <div v-else-if="isCompact" class="space-y-1.5">
       <!-- 使用额度和限额显示在进度条上方右对齐 -->
-      <div class="flex items-center justify-between text-[11px] font-medium">
+      <div class="flex items-center justify-between text-sm font-medium">
         <div class="flex items-center gap-1.5" :class="compactLabelClass">
-          <i :class="['text-[11px]', iconClass]" />
+          <i :class="['text-sm', iconClass]" />
           <span>{{ label }}</span>
         </div>
         <span class="text-gray-700 dark:text-gray-200"
@@ -52,11 +52,11 @@
       <!-- 文字层 - 使用双层文字技术确保可读性 -->
       <div class="relative z-10 flex h-full items-center justify-between px-3">
         <div class="flex items-center gap-1.5">
-          <i :class="['text-xs', iconClass]" />
-          <span class="text-xs font-semibold" :class="labelTextClass">{{ label }}</span>
+          <i :class="['text-sm', iconClass]" />
+          <span class="text-sm font-semibold" :class="labelTextClass">{{ label }}</span>
         </div>
         <div class="flex items-center gap-1.5">
-          <span class="text-xs font-bold tabular-nums" :class="currentValueClass">
+          <span class="text-sm font-bold tabular-nums" :class="currentValueClass">
             ${{ currentValue.toFixed(2) }} / ${{ limitValue.toFixed(2) }}
           </span>
         </div>

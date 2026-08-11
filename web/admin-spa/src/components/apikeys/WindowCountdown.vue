@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-1">
-    <div class="flex items-center justify-between text-xs">
+    <div class="flex items-center justify-between text-sm">
       <span class="text-gray-500">{{ label }}</span>
       <span v-if="windowState === 'active'" class="font-medium text-gray-700">
         <i class="fas fa-clock mr-1 text-blue-500" />
@@ -20,7 +20,7 @@
     <!-- 进度条（仅在有限制时显示） -->
     <div v-if="showProgress" class="space-y-0.5">
       <div v-if="hasRequestLimit" class="space-y-0.5">
-        <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center justify-between text-sm">
           <span class="text-gray-400">请求</span>
           <span class="text-gray-600"> {{ currentRequests || 0 }}/{{ requestLimit }} </span>
         </div>
@@ -35,7 +35,7 @@
 
       <!-- Token限制（向后兼容） -->
       <div v-if="hasTokenLimit" class="space-y-0.5">
-        <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center justify-between text-sm">
           <span class="text-gray-400">Token</span>
           <span class="text-gray-600">
             {{ formatTokenCount(currentTokens || 0) }}/{{ formatTokenCount(tokenLimit) }}
@@ -52,7 +52,7 @@
 
       <!-- 费用限制（新功能） -->
       <div v-if="hasCostLimit" class="space-y-0.5">
-        <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center justify-between text-sm">
           <span class="text-gray-400">费用</span>
           <span class="text-gray-600">
             ${{ (currentCost || 0).toFixed(2) }}/${{ costLimit.toFixed(2) }}
@@ -69,7 +69,7 @@
     </div>
 
     <!-- 额外提示信息 -->
-    <div v-if="windowState === 'active' && showTooltip" class="text-xs text-gray-500">
+    <div v-if="windowState === 'active' && showTooltip" class="text-sm text-gray-500">
       <i class="fas fa-info-circle mr-1" />
       <span v-if="remainingSeconds < 60">即将重置</span>
       <span v-else-if="remainingSeconds < 300"

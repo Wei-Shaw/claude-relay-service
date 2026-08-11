@@ -11,6 +11,8 @@ const {
   deleteCachedConfig
 } = require('../utils/performanceOptimizer')
 
+const { RedisKeys, TTL } = require('../constants/redisKeys')
+
 class ClaudeCodeHeadersService {
   constructor() {
     this.defaultHeaders = {
@@ -133,7 +135,7 @@ class ClaudeCodeHeadersService {
       }
 
       // 获取当前存储的 headers
-      const key = `claude_code_headers:${accountId}`
+      const key = RedisKeys.claudeCode.headers(accountId)
       const currentData = await redis.getClient().get(key)
 
       if (currentData) {
@@ -153,7 +155,7 @@ class ClaudeCodeHeadersService {
         updatedAt: new Date().toISOString()
       }
 
-      await redis.getClient().setex(key, 86400 * 7, JSON.stringify(data)) // 7天过期
+      await redis.getClient().setex(key, TTL.claudeCodeHeaders, JSON.stringify(data)) // 7天过期
 
       // 更新内存缓存，避免延迟
       setCachedConfig(key, extractedHeaders, this.headersCacheTtl)
@@ -168,7 +170,7 @@ class ClaudeCodeHeadersService {
    * 获取账号的 Claude Code headers（带内存缓存）
    */
   async getAccountHeaders(accountId) {
-    const cacheKey = `claude_code_headers:${accountId}`
+    const cacheKey = RedisKeys.claudeCode.headers(accountId)
 
     // 检查内存缓存
     const cached = getCachedConfig(cacheKey)
@@ -203,7 +205,7 @@ class ClaudeCodeHeadersService {
    */
   async clearAccountHeaders(accountId) {
     try {
-      const cacheKey = `claude_code_headers:${accountId}`
+      const cacheKey = RedisKeys.claudeCode.headers(accountId)
       await redis.getClient().del(cacheKey)
       // 删除内存缓存
       deleteCachedConfig(cacheKey)
@@ -218,7 +220,7 @@ class ClaudeCodeHeadersService {
    */
   async getAllAccountHeaders() {
     try {
-      const pattern = 'claude_code_headers:*'
+      const pattern = RedisKeys.claudeCode.headersPattern
       const keys = await redis.scanKeys(pattern)
 
       const results = {}

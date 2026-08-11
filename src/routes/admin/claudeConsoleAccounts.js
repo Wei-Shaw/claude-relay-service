@@ -15,6 +15,7 @@ const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { stripReadonlyAccountFields } = require('../../utils/commonHelper')
 
 // 获取所有Claude Console账户
 router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
@@ -214,7 +215,10 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = mapExpiryField(updates, 'Claude Console', accountId)
+    // review#3：剥离外部传入的状态类字段，禁止伪造自动停用证据
+    const mappedUpdates = stripReadonlyAccountFields(
+      mapExpiryField(updates, 'Claude Console', accountId)
+    )
 
     // 验证priority的有效性（1-100）
     if (
@@ -485,6 +489,7 @@ router.post('/claude-console-accounts/reset-all-usage', authenticateAdmin, async
 // 测试Claude Console账户连通性（流式响应）- 复用 claudeConsoleRelayService
 router.post('/claude-console-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
   const { accountId } = req.params
+  // Console 账户模型映射可任意，必须由调用方显式指定（前端测试弹窗会带上后台配置的默认模型）
   const model = typeof req.body?.model === 'string' ? req.body.model.trim() : ''
 
   if (!model) {

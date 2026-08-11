@@ -52,7 +52,8 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
       requestDetailCaptureEnabled,
       requestDetailRetentionHours,
       requestDetailBodyPreviewEnabled,
-      purgeRequestDetailBodySnapshots
+      purgeRequestDetailBodySnapshots,
+      errorHistoryCollectionEnabled
     } = req.body
 
     // 验证输入
@@ -201,6 +202,13 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'purgeRequestDetailBodySnapshots must be a boolean' })
     }
 
+    if (
+      errorHistoryCollectionEnabled !== undefined &&
+      typeof errorHistoryCollectionEnabled !== 'boolean'
+    ) {
+      return res.status(400).json({ error: 'errorHistoryCollectionEnabled must be a boolean' })
+    }
+
     const updateData = {}
     if (claudeCodeOnlyEnabled !== undefined) {
       updateData.claudeCodeOnlyEnabled = claudeCodeOnlyEnabled
@@ -243,6 +251,9 @@ router.put('/claude-relay-config', authenticateAdmin, async (req, res) => {
     }
     if (requestDetailBodyPreviewEnabled !== undefined) {
       updateData.requestDetailBodyPreviewEnabled = requestDetailBodyPreviewEnabled
+    }
+    if (errorHistoryCollectionEnabled !== undefined) {
+      updateData.errorHistoryCollectionEnabled = errorHistoryCollectionEnabled
     }
 
     const updatedConfig = await claudeRelayConfigService.updateConfig(

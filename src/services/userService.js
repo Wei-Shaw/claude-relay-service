@@ -3,10 +3,12 @@ const crypto = require('crypto')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 
+const { RedisKeys } = require('../constants/redisKeys')
+
 class UserService {
   constructor() {
+    // 仅保留供 SCAN pattern 使用的前缀（注册表无对应 pattern builder）
     this.userPrefix = 'user:'
-    this.usernamePrefix = 'username:'
     this.userSessionPrefix = 'user_session:'
   }
 
@@ -72,9 +74,9 @@ class UserService {
       }
 
       // 保存用户信息
-      await redis.set(`${this.userPrefix}${user.id}`, JSON.stringify(user))
-      await redis.set(`${this.usernamePrefix}${username}`, user.id)
-      await redis.addToIndex('user:index', user.id)
+      await redis.set(RedisKeys.user.byId(user.id), JSON.stringify(user))
+      await redis.set(RedisKeys.user.byName(username), user.id)
+      await redis.addToIndex(RedisKeys.user.index, user.id)
 
       // 如果是新用户，尝试转移匹配的API Keys
       if (isNewUser) {
@@ -92,12 +94,12 @@ class UserService {
   // 👤 通过用户名获取用户
   async getUserByUsername(username) {
     try {
-      const userId = await redis.get(`${this.usernamePrefix}${username}`)
+      const userId = await redis.get(RedisKeys.user.byName(username))
       if (!userId) {
         return null
       }
 
-      const userData = await redis.get(`${this.userPrefix}${userId}`)
+      const userData = await redis.get(RedisKeys.user.byId(userId))
       return userData ? JSON.parse(userData) : null
     } catch (error) {
       logger.error('❌ Error getting user by username:', error)
@@ -108,7 +110,7 @@ class UserService {
   // 👤 通过ID获取用户
   async getUserById(userId, calculateUsage = true) {
     try {
-      const userData = await redis.get(`${this.userPrefix}${userId}`)
+      const userData = await redis.get(RedisKeys.user.byId(userId))
       if (!userData) {
         return null
       }
@@ -194,11 +196,11 @@ class UserService {
     try {
       const { page = 1, limit = 20, role, isActive } = options
       const userIds = await redis.getAllIdsByIndex(
-        'user:index',
+        RedisKeys.user.index,
         `${this.userPrefix}*`,
         /^user:(.+)$/
       )
-      const keys = userIds.map((id) => `${this.userPrefix}${id}`)
+      const keys = userIds.map((id) => RedisKeys.user.byId(id))
       const dataList = await redis.batchGetChunked(keys)
 
       const users = []
@@ -266,7 +268,7 @@ class UserService {
       user.isActive = isActive
       user.updatedAt = new Date().toISOString()
 
-      await redis.set(`${this.userPrefix}${userId}`, JSON.stringify(user))
+      await redis.set(RedisKeys.user.byId(userId), JSON.stringify(user))
       logger.info(`🔄 Updated user status: ${user.username} -> ${isActive ? 'active' : 'disabled'}`)
 
       // 如果禁用用户，删除所有会话并禁用其所有API Keys
@@ -301,7 +303,7 @@ class UserService {
       user.role = role
       user.updatedAt = new Date().toISOString()
 
-      await redis.set(`${this.userPrefix}${userId}`, JSON.stringify(user))
+      await redis.set(RedisKeys.user.byId(userId), JSON.stringify(user))
       logger.info(`🔄 Updated user role: ${user.username} -> ${role}`)
 
       return user
@@ -329,7 +331,7 @@ class UserService {
       }
 
       user.lastLoginAt = new Date().toISOString()
-      await redis.set(`${this.userPrefix}${userId}`, JSON.stringify(user))
+      await redis.set(RedisKeys.user.byId(userId), JSON.stringify(user))
     } catch (error) {
       logger.error('❌ Error recording user login:', error)
     }
@@ -348,7 +350,7 @@ class UserService {
       }
 
       const ttl = Math.floor(config.userManagement.userSessionTimeout / 1000)
-      await redis.setex(`${this.userSessionPrefix}${sessionToken}`, ttl, JSON.stringify(session))
+      await redis.setex(RedisKeys.user.session(sessionToken), ttl, JSON.stringify(session))
 
       logger.info(`🎫 Created session for user: ${userId}`)
       return sessionToken
@@ -361,7 +363,7 @@ class UserService {
   // 🎫 验证用户会话
   async validateUserSession(sessionToken) {
     try {
-      const sessionData = await redis.get(`${this.userSessionPrefix}${sessionToken}`)
+      const sessionData = await redis.get(RedisKeys.user.session(sessionToken))
       if (!sessionData) {
         return null
       }
@@ -391,7 +393,7 @@ class UserService {
   // 🚫 使用户会话失效
   async invalidateUserSession(sessionToken) {
     try {
-      await redis.del(`${this.userSessionPrefix}${sessionToken}`)
+      await redis.del(RedisKeys.user.session(sessionToken))
       logger.info(`🚫 Invalidated session: ${sessionToken}`)
     } catch (error) {
       logger.error('❌ Error invalidating user session:', error)
@@ -435,7 +437,7 @@ class UserService {
       user.deletedAt = new Date().toISOString()
       user.updatedAt = new Date().toISOString()
 
-      await redis.set(`${this.userPrefix}${userId}`, JSON.stringify(user))
+      await redis.set(RedisKeys.user.byId(userId), JSON.stringify(user))
 
       // 删除所有会话
       await this.invalidateUserSessions(userId)
@@ -461,11 +463,11 @@ class UserService {
   async getUserStats() {
     try {
       const userIds = await redis.getAllIdsByIndex(
-        'user:index',
+        RedisKeys.user.index,
         `${this.userPrefix}*`,
         /^user:(.+)$/
       )
-      const keys = userIds.map((id) => `${this.userPrefix}${id}`)
+      const keys = userIds.map((id) => RedisKeys.user.byId(id))
       const dataList = await redis.batchGetChunked(keys)
 
       const stats = {

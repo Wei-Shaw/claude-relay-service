@@ -8,9 +8,27 @@ jest.mock(
   { virtual: true }
 )
 
+// 捕获挂到 MULTI 上的 hset：generateApiKey/updateApiKey 现在用 getClientSafe().multi() 原子写 hash + 索引
+const mockMultiHsetCalls = []
+const mockMulti = {
+  hset: (...args) => {
+    mockMultiHsetCalls.push(args)
+    return mockMulti
+  },
+  hdel: () => mockMulti,
+  expire: () => mockMulti,
+  zadd: () => mockMulti,
+  zrem: () => mockMulti,
+  sadd: () => mockMulti,
+  srem: () => mockMulti,
+  del: () => mockMulti,
+  exec: () => Promise.resolve([])
+}
+
 jest.mock('../src/models/redis', () => ({
   setApiKey: jest.fn(),
   getApiKey: jest.fn(),
+  getClientSafe: jest.fn(() => ({ multi: () => mockMulti })),
   incrementTokenUsage: jest.fn(),
   incrementDailyCost: jest.fn(),
   incrementAccountUsage: jest.fn(),
@@ -64,6 +82,7 @@ const apiKeyService = require('../src/services/apiKeyService')
 describe('apiKeyService openai responses config', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockMultiHsetCalls.length = 0
     redis.getApiKey.mockResolvedValue({
       id: 'key-1',
       name: 'Key',
@@ -84,7 +103,10 @@ describe('apiKeyService openai responses config', () => {
     redis.setApiKey.mockResolvedValue()
 
     const result = await apiKeyService.generateApiKey({ name: 'Test Key' })
-    const [, storedKeyData] = redis.setApiKey.mock.calls[0]
+    // hash 写入走原子 MULTI：取 multi.hset(`apikey:{id}`, keyData) 的 keyData
+    const storedKeyData = mockMultiHsetCalls.find(
+      (c) => typeof c[0] === 'string' && c[0].startsWith('apikey:') && typeof c[1] === 'object'
+    )[1]
 
     expect(storedKeyData.enableOpenAIResponsesCodexAdaptation).toBe('true')
     expect(storedKeyData.enableOpenAIResponsesPayloadRules).toBe('false')
@@ -111,7 +133,9 @@ describe('apiKeyService openai responses config', () => {
       openaiResponsesPayloadRules: [{ path: 'model', valueType: 'string', value: 'gpt-5' }]
     })
 
-    const [, storedKeyData] = redis.setApiKey.mock.calls[0]
+    const storedKeyData = mockMultiHsetCalls.find(
+      (c) => typeof c[0] === 'string' && c[0].startsWith('apikey:') && typeof c[1] === 'object'
+    )[1]
     expect(storedKeyData.enableOpenAIResponsesCodexAdaptation).toBe('false')
     expect(storedKeyData.enableOpenAIResponsesPayloadRules).toBe('true')
     expect(storedKeyData.openaiResponsesPayloadRules).toBe(

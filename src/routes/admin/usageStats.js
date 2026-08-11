@@ -7,13 +7,16 @@ const geminiAccountService = require('../../services/account/geminiAccountServic
 const geminiApiAccountService = require('../../services/account/geminiApiAccountService')
 const openaiAccountService = require('../../services/account/openaiAccountService')
 const openaiResponsesAccountService = require('../../services/account/openaiResponsesAccountService')
+const azureOpenaiAccountService = require('../../services/account/azureOpenaiAccountService')
 const droidAccountService = require('../../services/account/droidAccountService')
 const bedrockAccountService = require('../../services/account/bedrockAccountService')
 const redis = require('../../models/redis')
+const { RedisKeys, TTL } = require('../../constants/redisKeys')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const CostCalculator = require('../../utils/costCalculator')
 const pricingService = require('../../services/pricingService')
+const { parseDateTimeQuery } = require('../../utils/dateTime')
 
 const router = express.Router()
 
@@ -47,7 +50,7 @@ async function getUsageDataByIndex(indexKey, keyPattern, scanPattern) {
     return result
   }
   // 索引为空，检查空标记
-  const emptyMarker = await redis.client.get(`${indexKey}:empty`)
+  const emptyMarker = await redis.client.get(RedisKeys.emptyMarker(indexKey))
   if (emptyMarker === '1') {
     return []
   }
@@ -55,7 +58,7 @@ async function getUsageDataByIndex(indexKey, keyPattern, scanPattern) {
   const keys = await redis.scanKeys(scanPattern)
   if (keys.length === 0) {
     // 设置空标记，1小时过期
-    await redis.client.setex(`${indexKey}:empty`, 3600, '1')
+    await redis.client.setex(RedisKeys.emptyMarker(indexKey), TTL.emptyMarker, '1')
     return []
   }
   // 建立索引
@@ -112,6 +115,8 @@ const accountTypeNames = {
   'openai-responses': 'OpenAI Responses',
   gemini: 'Gemini',
   'gemini-api': 'Gemini API',
+  'azure-openai': 'Azure OpenAI',
+  azure_openai: 'Azure OpenAI',
   droid: 'Droid',
   bedrock: 'AWS Bedrock',
   unknown: '未知渠道'
@@ -125,14 +130,24 @@ const resolveAccountByPlatform = async (accountId, platform) => {
     'gemini-api': geminiApiAccountService,
     openai: openaiAccountService,
     'openai-responses': openaiResponsesAccountService,
+    'azure-openai': azureOpenaiAccountService,
+    azure_openai: azureOpenaiAccountService,
     droid: droidAccountService,
     ccr: ccrAccountService,
     bedrock: bedrockAccountService
   }
 
+  // Bedrock 的 getAccount 返回 { success, data } 包装，其余服务返回裸对象
+  const unwrap = (account) => {
+    if (account && typeof account === 'object' && 'success' in account) {
+      return account.success ? account.data : null
+    }
+    return account
+  }
+
   if (platform && serviceMap[platform]) {
     try {
-      const account = await serviceMap[platform].getAccount(accountId)
+      const account = unwrap(await serviceMap[platform].getAccount(accountId))
       if (account) {
         return { ...account, platform }
       }
@@ -143,7 +158,7 @@ const resolveAccountByPlatform = async (accountId, platform) => {
 
   for (const [platformName, service] of Object.entries(serviceMap)) {
     try {
-      const account = await service.getAccount(accountId)
+      const account = unwrap(await service.getAccount(accountId))
       if (account) {
         return { ...account, platform: platformName }
       }
@@ -340,7 +355,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
     let highestRequestDay = null
 
     const sumModelCostsForDay = async (dateKey) => {
-      const modelPattern = `account_usage:model:daily:${accountId}:*:${dateKey}`
+      const modelPattern = RedisKeys.accountUsage.modelDailyAnyPattern(accountId, dateKey)
       const modelResults = await redis.scanAndGetAllChunked(modelPattern)
       let summedCost = 0
 
@@ -392,7 +407,7 @@ router.get('/accounts/:accountId/usage-history', authenticateAdmin, async (req, 
       const label = `${monthLabel}/${dayLabel}`
 
       const client = redis.getClientSafe()
-      const dailyKey = `account_usage:daily:${accountId}:${dateKey}`
+      const dailyKey = RedisKeys.accountUsage.daily(accountId, dateKey)
       const dailyData = await client.hgetall(dailyKey)
 
       const inputTokens = parseInt(dailyData?.inputTokens) || 0
@@ -586,12 +601,12 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
       const fetchPromises = hourInfos.map(async (hourInfo) => {
         const [modelResults, usageResults] = await Promise.all([
           getUsageDataByIndex(
-            `usage:model:hourly:index:${hourInfo.hourKey}`,
+            RedisKeys.usage.modelHourlyIndex(hourInfo.hourKey),
             `usage:model:hourly:{id}:${hourInfo.hourKey}`,
             `usage:model:hourly:*:${hourInfo.hourKey}`
           ),
           getUsageDataByIndex(
-            `usage:hourly:index:${hourInfo.hourKey}`,
+            RedisKeys.usage.hourlyIndex(hourInfo.hourKey),
             `usage:hourly:{id}:${hourInfo.hourKey}`,
             `usage:hourly:*:${hourInfo.hourKey}`
           )
@@ -753,12 +768,12 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
       const fetchPromises = dayInfos.map(async (dayInfo) => {
         const [modelResults, usageResults] = await Promise.all([
           getUsageDataByIndex(
-            `usage:model:daily:index:${dayInfo.dateStr}`,
+            RedisKeys.usage.modelDailyIndex(dayInfo.dateStr),
             `usage:model:daily:{id}:${dayInfo.dateStr}`,
             `usage:model:daily:*:${dayInfo.dateStr}`
           ),
           getUsageDataByIndex(
-            `usage:daily:index:${dayInfo.dateStr}`,
+            RedisKeys.usage.dailyIndex(dayInfo.dateStr),
             `usage:daily:{id}:${dayInfo.dateStr}`,
             `usage:daily:*:${dayInfo.dateStr}`
           )
@@ -984,7 +999,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
         const dateStr = redis.getDateStringInTimezone(d)
         fetchPromises.push(
           getUsageDataByIndex(
-            `usage:keymodel:daily:index:${dateStr}`,
+            RedisKeys.usage.keymodelDailyIndex(dateStr),
             `usage:{keyId}:model:daily:{model}:${dateStr}`,
             `usage:*:model:daily:*:${dateStr}`
           )
@@ -1038,7 +1053,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
       let results
       if (period === 'daily') {
         results = await getUsageDataByIndex(
-          `usage:keymodel:daily:index:${today}`,
+          RedisKeys.usage.keymodelDailyIndex(today),
           `usage:{keyId}:model:daily:{model}:${today}`,
           `usage:*:model:daily:*:${today}`
         )
@@ -1438,12 +1453,12 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
       const fetchPromises = hourInfos.map(async (hourInfo) => {
         const [usageResults, modelResults] = await Promise.all([
           getUsageDataByIndex(
-            `account_usage:hourly:index:${hourInfo.hourKey}`,
+            RedisKeys.accountUsage.hourlyIndex(hourInfo.hourKey),
             `account_usage:hourly:{id}:${hourInfo.hourKey}`,
             `account_usage:hourly:*:${hourInfo.hourKey}`
           ),
           getUsageDataByIndex(
-            `account_usage:model:hourly:index:${hourInfo.hourKey}`,
+            RedisKeys.accountUsage.modelHourlyIndex(hourInfo.hourKey),
             `account_usage:model:hourly:{accountId}:{model}:${hourInfo.hourKey}`,
             `account_usage:model:hourly:*:${hourInfo.hourKey}`
           )
@@ -1605,14 +1620,14 @@ router.get('/account-usage-trend', authenticateAdmin, async (req, res) => {
       // 使用索引获取数据
       const usagePromises = dayInfos.map((d) =>
         getUsageDataByIndex(
-          `account_usage:daily:index:${d.dateStr}`,
+          RedisKeys.accountUsage.dailyIndex(d.dateStr),
           `account_usage:daily:{id}:${d.dateStr}`,
           `account_usage:daily:*:${d.dateStr}`
         )
       )
       const modelPromises = dayInfos.map((d) =>
         getUsageDataByIndex(
-          `account_usage:model:daily:index:${d.dateStr}`,
+          RedisKeys.accountUsage.modelDailyIndex(d.dateStr),
           `account_usage:model:daily:{accountId}:{model}:${d.dateStr}`,
           `account_usage:model:daily:*:${d.dateStr}`
         )
@@ -1861,12 +1876,12 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
       const fetchPromises = hourInfos.map(async (hourInfo) => {
         const [usageResults, modelResults] = await Promise.all([
           getUsageDataByIndex(
-            `usage:hourly:index:${hourInfo.hourKey}`,
+            RedisKeys.usage.hourlyIndex(hourInfo.hourKey),
             `usage:hourly:{id}:${hourInfo.hourKey}`,
             `usage:hourly:*:${hourInfo.hourKey}`
           ),
           getUsageDataByIndex(
-            `usage:keymodel:hourly:index:${hourInfo.hourKey}`,
+            RedisKeys.usage.keymodelHourlyIndex(hourInfo.hourKey),
             `usage:{keyId}:model:hourly:{model}:${hourInfo.hourKey}`,
             `usage:*:model:hourly:*:${hourInfo.hourKey}`
           )
@@ -2051,12 +2066,12 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
       const fetchPromises = dayInfos.map(async (dayInfo) => {
         const [usageResults, modelResults] = await Promise.all([
           getUsageDataByIndex(
-            `usage:daily:index:${dayInfo.dateStr}`,
+            RedisKeys.usage.dailyIndex(dayInfo.dateStr),
             `usage:daily:{id}:${dayInfo.dateStr}`,
             `usage:daily:*:${dayInfo.dateStr}`
           ),
           getUsageDataByIndex(
-            `usage:keymodel:daily:index:${dayInfo.dateStr}`,
+            RedisKeys.usage.keymodelDailyIndex(dayInfo.dateStr),
             `usage:{keyId}:model:daily:{model}:${dayInfo.dateStr}`,
             `usage:*:model:daily:*:${dayInfo.dateStr}`
           )
@@ -2327,7 +2342,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       // 使用索引获取数据
       const fetchPromises = dateStrs.map((dateStr) =>
         getUsageDataByIndex(
-          `usage:model:daily:index:${dateStr}`,
+          RedisKeys.usage.modelDailyIndex(dateStr),
           `usage:model:daily:{id}:${dateStr}`,
           `usage:model:daily:*:${dateStr}`
         )
@@ -2432,12 +2447,12 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       })
     } else {
       // 全部时间，使用月份索引
-      const months = await redis.client.smembers('usage:model:monthly:months')
+      const months = await redis.client.smembers(RedisKeys.usage.modelMonthlyMonths)
       const allData = []
       if (months && months.length > 0) {
         const fetchPromises = months.map((month) =>
           getUsageDataByIndex(
-            `usage:model:monthly:index:${month}`,
+            RedisKeys.usage.modelMonthlyIndex(month),
             `usage:model:monthly:{id}:${month}`,
             `usage:model:monthly:*:${month}`
           )
@@ -2586,7 +2601,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     let allData
     if (period === 'today') {
       const results = await getUsageDataByIndex(
-        `usage:model:daily:index:${today}`,
+        RedisKeys.usage.modelDailyIndex(today),
         `usage:model:daily:{id}:${today}`,
         `usage:model:daily:*:${today}`
       )
@@ -2594,7 +2609,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
     } else {
       // 本月 - 使用月度索引
       const results = await getUsageDataByIndex(
-        `usage:model:monthly:index:${currentMonth}`,
+        RedisKeys.usage.modelMonthlyIndex(currentMonth),
         `usage:model:monthly:{id}:${currentMonth}`,
         `usage:model:monthly:*:${currentMonth}`
       )
@@ -2697,8 +2712,8 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
     const pageSizeNumber = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200)
     const normalizedSortOrder = sortOrder === 'asc' ? 'asc' : 'desc'
 
-    const startTime = startDate ? new Date(startDate) : null
-    const endTime = endDate ? new Date(endDate) : null
+    const startTime = parseDateTimeQuery(startDate)
+    const endTime = parseDateTimeQuery(endDate)
 
     if (
       (startDate && Number.isNaN(startTime?.getTime())) ||
@@ -2728,6 +2743,20 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
       { type: 'openai-responses', getter: (id) => openaiResponsesAccountService.getAccount(id) },
       { type: 'gemini', getter: (id) => geminiAccountService.getAccount(id) },
       { type: 'gemini-api', getter: (id) => geminiApiAccountService.getAccount(id) },
+      {
+        type: 'azure-openai',
+        getter: async (id) => {
+          const r = await azureOpenaiAccountService.getAccount(id)
+          return r && 'success' in r ? (r.success ? r.data : null) : r
+        }
+      },
+      {
+        type: 'bedrock',
+        getter: async (id) => {
+          const r = await bedrockAccountService.getAccount(id)
+          return r && 'success' in r ? (r.success ? r.data : null) : r
+        }
+      },
       { type: 'droid', getter: (id) => droidAccountService.getAccount(id) }
     ]
 
@@ -3000,8 +3029,8 @@ router.get('/api-keys/:keyId/usage-records', authenticateAdmin, async (req, res)
           hasPreviousPage: totalPages > 0 && safePage > 1
         },
         filters: {
-          startDate: startTime ? startTime.toISOString() : null,
-          endDate: endTime ? endTime.toISOString() : null,
+          startDate: startDate || null,
+          endDate: endDate || null,
           model: model || null,
           accountId: accountId || null,
           sortOrder: normalizedSortOrder
@@ -3055,8 +3084,8 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
     const pageSizeNumber = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200)
     const normalizedSortOrder = sortOrder === 'asc' ? 'asc' : 'desc'
 
-    const startTime = startDate ? new Date(startDate) : null
-    const endTime = endDate ? new Date(endDate) : null
+    const startTime = parseDateTimeQuery(startDate)
+    const endTime = parseDateTimeQuery(endDate)
 
     if (
       (startDate && Number.isNaN(startTime?.getTime())) ||
@@ -3296,8 +3325,8 @@ router.get('/accounts/:accountId/usage-records', authenticateAdmin, async (req, 
           hasPreviousPage: totalPages > 0 && safePage > 1
         },
         filters: {
-          startDate: startTime ? startTime.toISOString() : null,
-          endDate: endTime ? endTime.toISOString() : null,
+          startDate: startDate || null,
+          endDate: endDate || null,
           model: model || null,
           apiKeyId: apiKeyId || null,
           platform: accountInfo.platform,

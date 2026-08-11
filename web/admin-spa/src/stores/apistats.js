@@ -411,6 +411,9 @@ export const useApiStatsStore = defineStore('apistats', () => {
   }
 
   // 保存 API Key 到 localStorage
+  // [人工决策-2026-06-03 14:36:59] 完整 apiKey 持久化在 localStorage 维持现状（统计页「记住我的 Key」特性）。
+  // 已知取舍：明文强凭证长期留浏览器（XSS 可窃取）。支付侧已用短期 token 把每次上送降到一次（规避问题1），
+  // 但未根治"长期持有"——用户主动接受。若改方向（只存 apiId / 开关 / sessionStorage），改这里及 loadApiKeyFromStorage。
   function saveApiKeyToStorage() {
     if (apiKey.value) {
       localStorage.setItem('lastApiKey', apiKey.value)

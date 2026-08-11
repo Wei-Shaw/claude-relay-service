@@ -9,7 +9,7 @@
         class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
       >
         <span
-          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
           >2</span
         >
         配置 Droid CLI
@@ -40,7 +40,7 @@
           将以下内容追加到配置文件中，并替换示例中的域名和 API 密钥：
         </p>
         <div
-          class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+          class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
         >
           <div
             v-for="(line, index) in droidCliConfigLines"
@@ -50,7 +50,7 @@
             {{ line }}
           </div>
         </div>
-        <p class="mt-3 text-xs text-blue-700 dark:text-blue-200 sm:text-sm">
+        <p class="mt-3 text-sm text-blue-700 dark:text-blue-200 sm:text-sm">
           💡 在 Droid CLI 中选择自定义模型即可使用新的 Droid 账号池；确保服务地址可被本地访问。
         </p>
       </div>

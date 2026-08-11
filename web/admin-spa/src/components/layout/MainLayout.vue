@@ -1,12 +1,12 @@
 <template>
-  <div class="min-h-screen p-3 sm:p-4 md:p-6">
+  <div class="flex min-h-screen flex-col p-3 sm:p-4 md:p-6">
     <!-- 顶部导航 -->
     <AppHeader />
 
-    <!-- 主内容区域 -->
+    <!-- 主内容区域：flex-1 自动填满 header 之外的剩余高度，避免魔数算高导致页面恒定溢出 -->
     <div
-      class="glass-strong rounded-xl p-3 shadow-xl sm:rounded-2xl sm:p-4 md:rounded-3xl md:p-6"
-      style="z-index: 1; min-height: calc(100vh - 120px)"
+      class="glass-strong flex-1 rounded-xl p-3 shadow-xl sm:rounded-2xl sm:p-4 md:rounded-3xl md:p-6"
+      style="z-index: 1"
     >
       <!-- 标签栏 -->
       <TabBar :active-tab="activeTab" @tab-change="handleTabChange" />
@@ -41,7 +41,9 @@ const tabRouteMap = computed(() => {
     accounts: '/accounts',
     requestDetails: '/request-details',
     quotaCards: '/quota-cards',
-    settings: '/settings'
+    paymentManage: '/payment-manage',
+    proxyPool: '/proxy-pool',
+    settings: '/settings/branding'
   }
 
   // 只有在 LDAP 启用时才包含用户管理路由
@@ -52,60 +54,49 @@ const tabRouteMap = computed(() => {
   return baseMap
 })
 
-// 初始化当前激活的标签
-const initActiveTab = () => {
-  const currentPath = route.path
-  const tabKey = Object.keys(tabRouteMap.value).find(
-    (key) => tabRouteMap.value[key] === currentPath
-  )
+// 路由名称 → 父标签（含使用记录等子路由，保证详情页也能高亮到对应栏目）
+const nameToTabMap = {
+  Dashboard: 'dashboard',
+  ApiKeys: 'apiKeys',
+  ApiKeyUsageRecords: 'apiKeys',
+  Accounts: 'accounts',
+  AccountUsageRecords: 'accounts',
+  RequestDetails: 'requestDetails',
+  QuotaCards: 'quotaCards',
+  PaymentManage: 'paymentManage',
+  ProxyPool: 'proxyPool',
+  UserManagement: 'userManagement',
+  Settings: 'settings'
+}
 
-  if (tabKey) {
-    activeTab.value = tabKey
-  } else {
-    // 如果路径不匹配任何标签，尝试从路由名称获取
-    const routeName = route.name
-    const nameToTabMap = {
-      Dashboard: 'dashboard',
-      ApiKeys: 'apiKeys',
-      Accounts: 'accounts',
-      RequestDetails: 'requestDetails',
-      QuotaCards: 'quotaCards',
-      Settings: 'settings'
-    }
-    if (routeName && nameToTabMap[routeName]) {
-      activeTab.value = nameToTabMap[routeName]
-    } else {
-      // 默认选中仪表板
-      activeTab.value = 'dashboard'
-    }
-  }
+// 解析当前路由所属标签：优先精确路径匹配，再前缀匹配，再回退到路由名映射
+const resolveTabKey = () => {
+  const byPath = Object.keys(tabRouteMap.value).find((key) => tabRouteMap.value[key] === route.path)
+  if (byPath) return byPath
+
+  // 子路由（如 /settings/branding、/api-keys/:id/usage-records）按路径前缀归属到父 tab
+  if (route.path.startsWith('/settings')) return 'settings'
+  if (route.path.startsWith('/api-keys')) return 'apiKeys'
+  if (route.path.startsWith('/accounts')) return 'accounts'
+
+  return route.name ? nameToTabMap[route.name] : undefined
+}
+
+// 初始化当前激活的标签（无法识别时默认仪表板）
+const initActiveTab = () => {
+  activeTab.value = resolveTabKey() ?? 'dashboard'
 }
 
 // 初始化
 initActiveTab()
 
-// 监听路由变化，更新激活的标签
+// 监听路由变化，更新激活的标签（无法识别时保持当前标签不变）
 watch(
   () => route.path,
-  (newPath) => {
-    const tabKey = Object.keys(tabRouteMap.value).find((key) => tabRouteMap.value[key] === newPath)
+  () => {
+    const tabKey = resolveTabKey()
     if (tabKey) {
       activeTab.value = tabKey
-    } else {
-      // 如果路径不匹配任何标签，尝试从路由名称获取
-      const routeName = route.name
-      const nameToTabMap = {
-        Dashboard: 'dashboard',
-        ApiKeys: 'apiKeys',
-        Accounts: 'accounts',
-        RequestDetails: 'requestDetails',
-        QuotaCards: 'quotaCards',
-        Tutorial: 'tutorial',
-        Settings: 'settings'
-      }
-      if (routeName && nameToTabMap[routeName]) {
-        activeTab.value = nameToTabMap[routeName]
-      }
     }
   }
 )

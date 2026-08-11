@@ -15,15 +15,11 @@ const {
 } = require('../../utils/tokenRefreshLogger')
 const tokenRefreshService = require('../tokenRefreshService')
 const { createEncryptor } = require('../../utils/commonHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 // 使用 commonHelper 的加密器
 const encryptor = createEncryptor('openai-account-salt')
 const { encrypt, decrypt } = encryptor
-
-// OpenAI 账户键前缀
-const OPENAI_ACCOUNT_KEY_PREFIX = 'openai:account:'
-const SHARED_OPENAI_ACCOUNTS_KEY = 'shared_openai_accounts'
-const ACCOUNT_SESSION_MAPPING_PREFIX = 'openai_session_account_mapping:'
 
 // 🧹 定期清理缓存（每10分钟）
 setInterval(
@@ -514,12 +510,12 @@ async function createAccount(accountData) {
   }
 
   const client = redisClient.getClientSafe()
-  await client.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, account)
-  await redisClient.addToIndex('openai:account:index', accountId)
+  await client.hset(RedisKeys.accounts.openai(accountId), account)
+  await redisClient.addToIndex(RedisKeys.accounts.openaiIndex, accountId)
 
   // 如果是共享账户，添加到共享账户集合
   if (account.accountType === 'shared') {
-    await client.sadd(SHARED_OPENAI_ACCOUNTS_KEY, accountId)
+    await client.sadd(RedisKeys.accounts.sharedOpenai, accountId)
   }
 
   logger.info(`Created OpenAI account: ${accountId}`)
@@ -529,7 +525,7 @@ async function createAccount(accountData) {
 // 获取账户
 async function getAccount(accountId) {
   const client = redisClient.getClientSafe()
-  const accountData = await client.hgetall(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
+  const accountData = await client.hgetall(RedisKeys.accounts.openai(accountId))
 
   if (!accountData || Object.keys(accountData).length === 0) {
     return null
@@ -619,17 +615,30 @@ async function updateAccount(accountId, updates) {
         : 'false'
   }
 
+  // 开启 disableAutoProtection 时立即清理已有自动停用状态并恢复调度（手动停用不受影响）
+  const enablingAutoProtection = updates.disableAutoProtection === 'true'
+  if (enablingAutoProtection) {
+    const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(existingAccount)
+    if (recoveryPatch) {
+      Object.assign(updates, recoveryPatch)
+    }
+  }
+
   // 更新账户类型时处理共享账户集合
   const client = redisClient.getClientSafe()
   if (updates.accountType && updates.accountType !== existingAccount.accountType) {
     if (updates.accountType === 'shared') {
-      await client.sadd(SHARED_OPENAI_ACCOUNTS_KEY, accountId)
+      await client.sadd(RedisKeys.accounts.sharedOpenai, accountId)
     } else {
-      await client.srem(SHARED_OPENAI_ACCOUNTS_KEY, accountId)
+      await client.srem(RedisKeys.accounts.sharedOpenai, accountId)
     }
   }
 
-  await client.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+  await client.hset(RedisKeys.accounts.openai(accountId), updates)
+
+  if (enablingAutoProtection) {
+    await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'openai')
+  }
 
   logger.info(`Updated OpenAI account: ${accountId}`)
 
@@ -657,20 +666,20 @@ async function deleteAccount(accountId) {
 
   // 从 Redis 删除
   const client = redisClient.getClientSafe()
-  await client.del(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
-  await redisClient.removeFromIndex('openai:account:index', accountId)
+  await client.del(RedisKeys.accounts.openai(accountId))
+  await redisClient.removeFromIndex(RedisKeys.accounts.openaiIndex, accountId)
 
   // 从共享账户集合中移除
   if (account.accountType === 'shared') {
-    await client.srem(SHARED_OPENAI_ACCOUNTS_KEY, accountId)
+    await client.srem(RedisKeys.accounts.sharedOpenai, accountId)
   }
 
   // 清理会话映射（使用反向索引）
-  const sessionHashes = await client.smembers(`openai_account_sessions:${accountId}`)
+  const sessionHashes = await client.smembers(RedisKeys.session.openaiAccountSessions(accountId))
   if (sessionHashes.length > 0) {
     const pipeline = client.pipeline()
-    sessionHashes.forEach((hash) => pipeline.del(`${ACCOUNT_SESSION_MAPPING_PREFIX}${hash}`))
-    pipeline.del(`openai_account_sessions:${accountId}`)
+    sessionHashes.forEach((hash) => pipeline.del(RedisKeys.session.openaiMapping(hash)))
+    pipeline.del(RedisKeys.session.openaiAccountSessions(accountId))
     await pipeline.exec()
   }
 
@@ -682,11 +691,11 @@ async function deleteAccount(accountId) {
 async function getAllAccounts() {
   const _client = redisClient.getClientSafe()
   const accountIds = await redisClient.getAllIdsByIndex(
-    'openai:account:index',
-    `${OPENAI_ACCOUNT_KEY_PREFIX}*`,
+    RedisKeys.accounts.openaiIndex,
+    RedisKeys.accounts.openaiPattern,
     /^openai:account:(.+)$/
   )
-  const keys = accountIds.map((id) => `${OPENAI_ACCOUNT_KEY_PREFIX}${id}`)
+  const keys = accountIds.map((id) => RedisKeys.accounts.openai(id))
   const accounts = []
   const dataList = await redisClient.batchHgetallChunked(keys)
 
@@ -787,7 +796,7 @@ async function getAllAccounts() {
 // 获取单个账户的概要信息（用于外部展示基本状态）
 async function getAccountOverview(accountId) {
   const client = redisClient.getClientSafe()
-  const accountData = await client.hgetall(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
+  const accountData = await client.hgetall(RedisKeys.accounts.openai(accountId))
 
   if (!accountData || Object.keys(accountData).length === 0) {
     return null
@@ -830,7 +839,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   // 首先检查是否有粘性会话
   const client = redisClient.getClientSafe()
   if (sessionHash) {
-    const mappedAccountId = await client.get(`${ACCOUNT_SESSION_MAPPING_PREFIX}${sessionHash}`)
+    const mappedAccountId = await client.get(RedisKeys.session.openaiMapping(sessionHash))
 
     if (mappedAccountId) {
       const account = await getAccount(mappedAccountId)
@@ -842,7 +851,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   }
 
   // 获取 API Key 信息
-  const apiKeyData = await client.hgetall(`api_key:${apiKeyId}`)
+  const apiKeyData = await client.hgetall(RedisKeys.apiKey.legacyData(apiKeyId))
 
   // 检查是否绑定了 OpenAI 账户
   if (apiKeyData.openaiAccountId) {
@@ -862,13 +871,13 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
       // 创建粘性会话映射
       if (sessionHash) {
         await client.setex(
-          `${ACCOUNT_SESSION_MAPPING_PREFIX}${sessionHash}`,
+          RedisKeys.session.openaiMapping(sessionHash),
           3600, // 1小时过期
           account.id
         )
         // 反向索引：accountId -> sessionHash（用于删除账户时快速清理）
-        await client.sadd(`openai_account_sessions:${account.id}`, sessionHash)
-        await client.expire(`openai_account_sessions:${account.id}`, 3600)
+        await client.sadd(RedisKeys.session.openaiAccountSessions(account.id), sessionHash)
+        await client.expire(RedisKeys.session.openaiAccountSessions(account.id), 3600)
       }
 
       return account
@@ -876,7 +885,7 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   }
 
   // 从共享账户池选择
-  const sharedAccountIds = await client.smembers(SHARED_OPENAI_ACCOUNTS_KEY)
+  const sharedAccountIds = await client.smembers(RedisKeys.accounts.sharedOpenai)
   const availableAccounts = []
 
   for (const accountId of sharedAccountIds) {
@@ -915,12 +924,12 @@ async function selectAvailableAccount(apiKeyId, sessionHash = null) {
   // 创建粘性会话映射
   if (sessionHash) {
     await client.setex(
-      `${ACCOUNT_SESSION_MAPPING_PREFIX}${sessionHash}`,
+      RedisKeys.session.openaiMapping(sessionHash),
       3600, // 1小时过期
       selectedAccount.id
     )
-    await client.sadd(`openai_account_sessions:${selectedAccount.id}`, sessionHash)
-    await client.expire(`openai_account_sessions:${selectedAccount.id}`, 3600)
+    await client.sadd(RedisKeys.session.openaiAccountSessions(selectedAccount.id), sessionHash)
+    await client.expire(RedisKeys.session.openaiAccountSessions(selectedAccount.id), 3600)
   }
 
   return selectedAccount
@@ -950,7 +959,17 @@ async function setAccountRateLimited(accountId, isLimited, resetsInSeconds = nul
       logger.info(
         `🛡️ Account ${accountId} has auto-protection disabled, skipping setAccountRateLimited`
       )
-      upstreamErrorHelper.recordErrorHistory(accountId, 'openai', 429, 'rate_limit').catch(() => {})
+      upstreamErrorHelper
+        .recordErrorHistory(
+          accountId,
+          'openai',
+          429,
+          'rate_limit',
+          upstreamErrorHelper.buildErrorContext({
+            reason: 'auto_protection_disabled_rate_limit'
+          })
+        )
+        .catch(() => {})
       return
     }
   }
@@ -1021,7 +1040,17 @@ async function markAccountUnauthorized(accountId, reason = 'OpenAI账号认证�
     logger.info(
       `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
     )
-    upstreamErrorHelper.recordErrorHistory(accountId, 'openai', 401, 'auth_error').catch(() => {})
+    upstreamErrorHelper
+      .recordErrorHistory(
+        accountId,
+        'openai',
+        401,
+        'auth_error',
+        upstreamErrorHelper.buildErrorContext({
+          reason: 'auto_protection_disabled_unauthorized'
+        })
+      )
+      .catch(() => {})
     return
   }
 
@@ -1227,7 +1256,7 @@ async function updateCodexUsageSnapshot(accountId, usageSnapshot) {
   updates.codexUsageUpdatedAt = new Date().toISOString()
 
   const client = redisClient.getClientSafe()
-  await client.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+  await client.hset(RedisKeys.accounts.openai(accountId), updates)
 }
 
 module.exports = {

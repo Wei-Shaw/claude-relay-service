@@ -4,6 +4,8 @@ const pricingService = require('./pricingService')
 const serviceRatesService = require('./serviceRatesService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
 
+const { RedisKeys } = require('../constants/redisKeys')
+
 function pad2(n) {
   return String(n).padStart(2, '0')
 }
@@ -53,7 +55,7 @@ class WeeklyClaudeCostInitService {
   }
 
   _buildWeeklyOpusKey(keyId, periodString) {
-    return `usage:opus:weekly:${keyId}:${periodString}`
+    return RedisKeys.usage.opusWeekly(keyId, periodString)
   }
 
   /**
@@ -79,7 +81,7 @@ class WeeklyClaudeCostInitService {
     }
 
     const todayStr = redis.getDateStringInTimezone()
-    const doneKey = `init:weekly_opus_cost:${todayStr}:done`
+    const doneKey = RedisKeys.system.weeklyOpusDone(todayStr)
 
     try {
       const alreadyDone = await client.get(doneKey)
@@ -91,7 +93,7 @@ class WeeklyClaudeCostInitService {
       // 尽力而为：读取失败不阻断启动回填流程。
     }
 
-    const lockKey = `lock:init:weekly_opus_cost:${todayStr}`
+    const lockKey = RedisKeys.lock.weeklyOpusInit(todayStr)
     const lockValue = `${process.pid}:${Date.now()}`
     const lockTtlMs = 15 * 60 * 1000
 
@@ -116,7 +118,7 @@ class WeeklyClaudeCostInitService {
         const batch = keyIds.slice(i, i + batchSize)
         const pipeline = client.pipeline()
         for (const keyId of batch) {
-          pipeline.hgetall(`apikey:${keyId}`)
+          pipeline.hgetall(RedisKeys.apiKey.byId(keyId))
         }
         const results = await pipeline.exec()
         for (let j = 0; j < batch.length; j++) {

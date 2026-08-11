@@ -5,6 +5,7 @@ const axios = require('axios')
 const claudeCodeHeadersService = require('../../services/claudeCodeHeadersService')
 const claudeAccountService = require('../../services/account/claudeAccountService')
 const redis = require('../../models/redis')
+const { RedisKeys } = require('../../constants/redisKeys')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
@@ -308,7 +309,10 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Site name is required' })
     }
 
-    if (siteName.length > 100) {
+    // 站点名会用于浏览器标题、页面头部和日志，收敛内部换行/连续空白为单个空格，避免多行注入日志与显示异常
+    const normalizedSiteName = siteName.replace(/\s+/g, ' ').trim()
+
+    if (normalizedSiteName.length > 100) {
       return res.status(400).json({ error: 'Site name must be less than 100 characters' })
     }
 
@@ -329,7 +333,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
     }
 
     const settings = {
-      siteName: siteName.trim(),
+      siteName: normalizedSiteName,
       siteIcon: (siteIcon || '').trim(),
       siteIconData: (siteIconData || '').trim(), // Base64数据
       showAdminButton: showAdminButton !== false, // 默认为true
@@ -344,7 +348,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
     const client = redis.getClient()
     await client.set('oem:settings', JSON.stringify(settings))
 
-    logger.info(`✅ OEM settings updated: ${siteName}`)
+    logger.info(`✅ OEM settings updated: ${normalizedSiteName}`)
 
     return res.json({
       success: true,
@@ -361,7 +365,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
 
 router.get('/claude-code-version', authenticateAdmin, async (req, res) => {
   try {
-    const CACHE_KEY = 'claude_code_user_agent:daily'
+    const CACHE_KEY = RedisKeys.claudeCode.userAgentDaily
 
     // 获取缓存的统一User-Agent
     const unifiedUserAgent = await redis.client.get(CACHE_KEY)
@@ -387,7 +391,7 @@ router.get('/claude-code-version', authenticateAdmin, async (req, res) => {
 // 🗑️ 清除统一Claude Code User-Agent缓存
 router.post('/claude-code-version/clear', authenticateAdmin, async (req, res) => {
   try {
-    const CACHE_KEY = 'claude_code_user_agent:daily'
+    const CACHE_KEY = RedisKeys.claudeCode.userAgentDaily
 
     // 删除缓存的统一User-Agent
     await redis.client.del(CACHE_KEY)

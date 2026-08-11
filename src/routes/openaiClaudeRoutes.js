@@ -19,6 +19,7 @@ const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const pricingService = require('../services/pricingService')
 const { getEffectiveModel } = require('../utils/modelHelper')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
+const { onClientDisconnect } = require('../utils/clientDisconnect')
 
 // 🔧 辅助函数：检查 API Key 权限
 function checkPermissions(apiKeyData, requiredPermission = 'claude') {
@@ -267,13 +268,17 @@ async function handleChatCompletion(req, res, apiKeyData) {
       // 创建中止控制器
       abortController = new AbortController()
 
-      // 处理客户端断开
-      req.on('close', () => {
-        if (abortController && !abortController.signal.aborted) {
-          logger.info('🔌 Client disconnected, aborting Claude request')
-          abortController.abort()
-        }
-      })
+      // 处理客户端断开（判据收口在 utils/clientDisconnect；此 abortController 未传入下方 relay 调用，
+      // 故 abort 目前只置信号位、不真正中止上游——留着是为了不把错判据留在原地被再次抄走）
+      onClientDisconnect(
+        res,
+        () => {
+          if (abortController && !abortController.signal.aborted) {
+            abortController.abort()
+          }
+        },
+        'Claude request'
+      )
 
       // 使用转换后的响应流 (根据账户类型选择转发服务)
       // 创建 usage 回调函数

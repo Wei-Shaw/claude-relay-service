@@ -1,11 +1,14 @@
 const express = require('express')
 const crypto = require('crypto')
 const droidAccountService = require('../../services/account/droidAccountService')
+const testModelConfigService = require('../../services/testModelConfigService')
 const accountGroupService = require('../../services/accountGroupService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
+const { RedisKeys } = require('../../constants/redisKeys')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
+const proxyResolver = require('../../utils/proxyResolver')
 const {
   startDeviceAuthorization,
   pollDeviceAuthorization,
@@ -13,6 +16,7 @@ const {
 } = require('../../utils/workosOAuthHelper')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { stripReadonlyAccountFields } = require('../../utils/commonHelper')
 const { extractErrorMessage } = require('../../utils/testPayloadHelper')
 
 const router = express.Router()
@@ -22,8 +26,14 @@ const router = express.Router()
 // 生成 Droid 设备码授权信息
 router.post('/droid-accounts/generate-auth-url', authenticateAdmin, async (req, res) => {
   try {
-    const { proxy } = req.body || {}
-    const deviceAuth = await startDeviceAuthorization(proxy || null)
+    const { proxy, proxyGroupId, proxyId } = req.body || {}
+    // 账户绑代理池时设备码授权也走池代理（未绑池回退静态 proxy）
+    const effectiveProxy = proxyResolver.resolveAuthProxy(
+      { proxyGroupId, proxyId, platform: 'droid' },
+      'droid',
+      proxy
+    )
+    const deviceAuth = await startDeviceAuthorization(effectiveProxy)
 
     const sessionId = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + deviceAuth.expiresIn * 1000).toISOString()
@@ -34,7 +44,8 @@ router.post('/droid-accounts/generate-auth-url', authenticateAdmin, async (req, 
       verificationUri: deviceAuth.verificationUri,
       verificationUriComplete: deviceAuth.verificationUriComplete,
       interval: deviceAuth.interval,
-      proxy: proxy || null,
+      proxy: effectiveProxy,
+      proxyBound: !!(proxyGroupId || proxyId), // 代理来源是否池绑定，供 exchange 一致性校验
       createdAt: new Date().toISOString(),
       expiresAt
     })
@@ -66,7 +77,7 @@ router.post('/droid-accounts/generate-auth-url', authenticateAdmin, async (req, 
 
 // 交换 Droid 授权码
 router.post('/droid-accounts/exchange-code', authenticateAdmin, async (req, res) => {
-  const { sessionId, proxy } = req.body || {}
+  const { sessionId } = req.body || {}
   try {
     if (!sessionId) {
       return res.status(400).json({ error: 'Session ID is required' })
@@ -89,7 +100,15 @@ router.post('/droid-accounts/exchange-code', authenticateAdmin, async (req, res)
       return res.status(400).json({ error: 'OAuth session missing device code, please retry' })
     }
 
-    const proxyConfig = proxy || oauthSession.proxy || null
+    // 一致性校验：会话来源为池绑定但无已解析代理，拒绝（不允许授权直连暴露真实出口）
+    if (oauthSession.proxyBound && !oauthSession.proxy) {
+      await redis.deleteOAuthSession(sessionId)
+      return res.status(409).json({
+        error: '账户绑定的代理池当前无可用代理，已阻止授权请求直连（避免暴露真实出口）'
+      })
+    }
+
+    const proxyConfig = oauthSession.proxy || null
     const tokens = await pollDeviceAuthorization(oauthSession.deviceCode, proxyConfig)
 
     await redis.deleteOAuthSession(sessionId)
@@ -189,9 +208,9 @@ router.get('/droid-accounts', authenticateAdmin, async (req, res) => {
 
     const statsPipeline = client.pipeline()
     for (const accountId of accountIds) {
-      statsPipeline.hgetall(`account_usage:${accountId}`)
-      statsPipeline.hgetall(`account_usage:daily:${accountId}:${today}`)
-      statsPipeline.hgetall(`account_usage:monthly:${accountId}:${currentMonth}`)
+      statsPipeline.hgetall(RedisKeys.accountUsage.total(accountId))
+      statsPipeline.hgetall(RedisKeys.accountUsage.daily(accountId, today))
+      statsPipeline.hgetall(RedisKeys.accountUsage.monthly(accountId, currentMonth))
     }
     const statsResults = await statsPipeline.exec()
 
@@ -354,7 +373,20 @@ router.put('/droid-accounts/:id', authenticateAdmin, async (req, res) => {
     const updates = { ...req.body }
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = mapExpiryField(updates, 'Droid', id)
+    // review#3：剥离外部传入的状态类字段，禁止伪造自动停用证据
+    const mappedUpdates = stripReadonlyAccountFields(mapExpiryField(updates, 'Droid', id))
+
+    // review#4：剥离 apiKeys 子项里的状态类字段（status/errorMessage），禁止外部伪造 key 级 error
+    // key 级 error 只能由自动流程(markApiKeyAsError)写入，手动停用走账户级 schedulable/isActive
+    if (Array.isArray(mappedUpdates.apiKeys)) {
+      mappedUpdates.apiKeys = mappedUpdates.apiKeys.map((entry) => {
+        if (entry && typeof entry === 'object') {
+          const { status: _status, errorMessage: _errorMessage, ...rest } = entry
+          return rest
+        }
+        return entry
+      })
+    }
 
     const { accountType: rawAccountType, groupId, groupIds } = mappedUpdates
 
@@ -605,10 +637,11 @@ router.post('/droid-accounts/:id/refresh-token', authenticateAdmin, async (req, 
 // 测试 Droid 账户连通性
 router.post('/droid-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
   const { accountId } = req.params
-  const { model = 'claude-sonnet-4-20250514' } = req.body
   const startTime = Date.now()
 
   try {
+    // 请求显式指定优先，否则用后台配置的默认测试模型（单一事实源）
+    const model = await testModelConfigService.resolveAccountModel('droid', req.body.model)
     // 获取账户信息
     const account = await droidAccountService.getAccount(accountId)
     if (!account) {

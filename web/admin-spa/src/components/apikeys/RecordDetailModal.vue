@@ -13,7 +13,7 @@
     <template #header>
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <p class="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
             请求详情
           </p>
           <p class="text-lg font-bold text-gray-900 dark:text-gray-100">
@@ -154,8 +154,8 @@
 
 <script setup>
 import { computed } from 'vue'
-import dayjs from 'dayjs'
 import { formatNumber } from '@/utils/tools'
+import { formatLocalDateTime } from '@/utils/time'
 
 const props = defineProps({
   show: {
@@ -173,7 +173,7 @@ const emitClose = () => emit('close')
 
 const formattedTime = computed(() => {
   if (!props.record?.timestamp) return '未知时间'
-  return dayjs(props.record.timestamp).format('YYYY-MM-DD HH:mm:ss')
+  return formatLocalDateTime(props.record.timestamp) || '未知时间'
 })
 
 const formattedCosts = computed(() => {

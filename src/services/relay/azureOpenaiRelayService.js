@@ -1,5 +1,6 @@
 const axios = require('axios')
 const ProxyHelper = require('../../utils/proxyHelper')
+const proxyResolver = require('../../utils/proxyResolver')
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
@@ -24,6 +25,7 @@ async function handleAzureOpenAIRequest({
   let requestUrl = ''
   let proxyAgent = null
   let deploymentName = ''
+  let proxyResolution = null
 
   try {
     // 构建 Azure OpenAI 请求 URL
@@ -63,8 +65,9 @@ async function handleAzureOpenAIRequest({
       processedBody.model = 'gpt-4'
     }
 
-    // 使用统一的代理创建工具
-    proxyAgent = ProxyHelper.createProxyAgent(account.proxy)
+    // 使用统一的代理解析（绑定 proxyGroupId 走代理池，否则用账户静态 proxy）
+    proxyResolution = proxyResolver.resolveAgent(account, 'azure_openai')
+    proxyAgent = proxyResolution.agent
 
     // 配置请求选项
     const axiosConfig = {
@@ -136,6 +139,9 @@ async function handleAzureOpenAIRequest({
     // 发送请求
     const response = await axios(axiosConfig)
 
+    // 被动健康检查：拿到 HTTP 响应即代理传输成功（含 4xx/5xx，不归咎代理），回写权重/成功率/慢启动
+    proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, null)
+
     const requestDuration = Date.now() - requestStartTime
     logger.debug(`✅ Azure OpenAI HTTP request completed at ${new Date().toISOString()}`)
 
@@ -150,6 +156,8 @@ async function handleAzureOpenAIRequest({
 
     return response
   } catch (error) {
+    // 被动健康检查：上报连接级故障（classifyBusinessTraffic 区分传输错误 vs 上游响应，不误熔断）
+    proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, error)
     const errorDetails = {
       message: error.message,
       code: error.code,
@@ -218,8 +226,17 @@ async function handleAzureOpenAIRequest({
       account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
     if (account?.id && !azureAutoProtectionDisabled) {
       const statusCode = error.response?.status || 503
+      // requestHeaders/processedBody 为 try 块内 const，catch 不可见，仅采集可见字段
+      const errorContext = upstreamErrorHelper.buildErrorContext({
+        url: requestUrl,
+        method: 'POST',
+        responseStatus: error.response?.status,
+        responseHeaders: error.response?.headers,
+        responseBody: error.response?.data,
+        message: error.message
+      })
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', statusCode)
+        .markTempUnavailable(account.id, 'azure-openai', statusCode, null, errorContext)
         .catch(() => {})
     }
 
