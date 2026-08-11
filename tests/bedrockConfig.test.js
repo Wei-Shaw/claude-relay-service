@@ -19,6 +19,7 @@ describe('Bedrock configuration', () => {
     expect(modelsConfig.BEDROCK_TEST_MODEL).toBe('us.anthropic.claude-haiku-4-5-20251001-v1:0')
     expect(modelsConfig.BEDROCK_MODELS[0].value).toBe(modelsConfig.BEDROCK_TEST_MODEL)
     expect(modelIds).toContain(modelsConfig.BEDROCK_TEST_MODEL)
+    expect(modelIds).toContain('global.anthropic.claude-opus-5')
     expect(modelIds).toContain('us.anthropic.claude-sonnet-4-6')
     expect(modelIds.some((model) => model.includes('claude-3-5-haiku-20241022'))).toBe(false)
     expect(modelsConfig.getModelsByService('bedrock')).toBe(modelsConfig.BEDROCK_MODELS)

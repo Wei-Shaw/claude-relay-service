@@ -6,6 +6,7 @@
 const CLAUDE_MODELS = [
   { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
   { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+  { value: 'claude-opus-5', label: 'Claude Opus 5' },
   { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5' },
   { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5' },
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
@@ -45,6 +46,7 @@ const BEDROCK_MODELS = [
     value: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
     label: 'Claude Haiku 4.5'
   },
+  { value: 'global.anthropic.claude-opus-5', label: 'Claude Opus 5' },
   { value: 'us.anthropic.claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
   { value: 'global.anthropic.claude-opus-4-6-v1', label: 'Claude Opus 4.6' },
   { value: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Claude Sonnet 4.5' },

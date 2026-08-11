@@ -230,7 +230,7 @@ class BedrockRelayService {
       const client = this._getBedrockClient(region, bedrockAccount)
 
       // 转换请求格式为Bedrock格式
-      const bedrockPayload = this._convertToBedrockFormat(requestBody)
+      const bedrockPayload = this._convertToBedrockFormat(requestBody, modelId)
 
       const command = new InvokeModelCommand({
         modelId,
@@ -372,7 +372,7 @@ class BedrockRelayService {
       const client = this._getBedrockClient(region, bedrockAccount)
 
       // 转换请求格式为Bedrock格式
-      const bedrockPayload = this._convertToBedrockFormat(requestBody)
+      const bedrockPayload = this._convertToBedrockFormat(requestBody, modelId)
 
       const command = new InvokeModelWithResponseStreamCommand({
         modelId,
@@ -591,6 +591,9 @@ class BedrockRelayService {
 
     // 标准Claude模型名到Bedrock模型名的映射表
     const modelMapping = {
+      // Claude Opus 5
+      'claude-opus-5': 'global.anthropic.claude-opus-5',
+
       // Claude Opus 4.6
       'claude-opus-4-6': 'global.anthropic.claude-opus-4-6-v1',
 
@@ -704,8 +707,19 @@ class BedrockRelayService {
     return obj
   }
 
+  _supportsAdaptiveThinking(modelId) {
+    const normalizedModel = (modelId || '').replace(/\[1m\]$/, '')
+    return ['claude-opus-5', 'claude-opus-4-6', 'claude-sonnet-4-6'].some((model) =>
+      normalizedModel.includes(model)
+    )
+  }
+
+  _requiresAdaptiveThinking(modelId) {
+    return (modelId || '').replace(/\[1m\]$/, '').includes('claude-opus-5')
+  }
+
   // 转换Claude格式请求到Bedrock格式
-  _convertToBedrockFormat(requestBody) {
+  _convertToBedrockFormat(requestBody, modelId = null) {
     // 透传客户端的 max_tokens，仅在未指定时使用默认值作为回退
     const maxTokens = requestBody.max_tokens || this.maxOutputTokens
 
@@ -747,17 +761,49 @@ class BedrockRelayService {
       bedrockPayload.tool_choice = requestBody.tool_choice
     }
 
-    // Extended thinking 支持
-    // Bedrock 只支持 "enabled" / "disabled"，不支持 "adaptive"
-    // adaptive 模式不要求 budget_tokens，但 Bedrock enabled 必须有
+    const anthropicBetas = Array.isArray(requestBody.anthropic_beta)
+      ? [...requestBody.anthropic_beta]
+      : []
+    if (requestBody.context_management) {
+      bedrockPayload.context_management = requestBody.context_management
+      if (!anthropicBetas.includes('context-management-2025-06-27')) {
+        anthropicBetas.push('context-management-2025-06-27')
+      }
+    }
+    if (anthropicBetas.length > 0) {
+      bedrockPayload.anthropic_beta = anthropicBetas
+    }
+
+    // Newer Claude models use adaptive thinking; older Bedrock models still need a token budget.
+    const supportsAdaptiveThinking = this._supportsAdaptiveThinking(modelId || requestBody.model)
+    const requiresAdaptiveThinking = this._requiresAdaptiveThinking(modelId || requestBody.model)
+
     if (requestBody.thinking) {
       bedrockPayload.thinking = { ...requestBody.thinking }
-      if (bedrockPayload.thinking.type === 'adaptive') {
+
+      if (requiresAdaptiveThinking && bedrockPayload.thinking.type === 'enabled') {
+        bedrockPayload.thinking.type = 'adaptive'
+      }
+
+      if (bedrockPayload.thinking.type === 'adaptive' && supportsAdaptiveThinking) {
+        delete bedrockPayload.thinking.budget_tokens
+      } else if (bedrockPayload.thinking.type === 'adaptive') {
         bedrockPayload.thinking.type = 'enabled'
         if (!bedrockPayload.thinking.budget_tokens) {
           bedrockPayload.thinking.budget_tokens = maxTokens - 1
         }
       }
+    }
+
+    if (
+      supportsAdaptiveThinking &&
+      requestBody.output_config &&
+      typeof requestBody.output_config === 'object' &&
+      !Array.isArray(requestBody.output_config)
+    ) {
+      bedrockPayload.output_config = { ...requestBody.output_config }
+    } else if (requiresAdaptiveThinking && requestBody.thinking?.type === 'enabled') {
+      bedrockPayload.output_config = { effort: 'high' }
     }
 
     // metadata 透传
@@ -774,6 +820,7 @@ class BedrockRelayService {
   // 转换Bedrock响应到Claude格式
   _convertFromBedrockFormat(bedrockResponse) {
     return {
+      ...bedrockResponse,
       id: bedrockResponse.id || `msg_${Date.now()}_bedrock`,
       type: 'message',
       role: bedrockResponse.role || 'assistant',
