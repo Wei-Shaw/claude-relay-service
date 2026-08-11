@@ -1,4 +1,5 @@
 const BEDROCK_REGION_PATTERN = /^[a-z]{2,8}(?:-[a-z0-9]+)+-\d+$/
+const BEDROCK_CREDENTIAL_TYPES = Object.freeze(['access_key', 'bearer_token', 'default'])
 
 const RETIRED_BEDROCK_MODEL_MARKERS = ['claude-3-5-haiku']
 
@@ -10,7 +11,7 @@ function createBedrockValidationError(message, code) {
 }
 
 function normalizeBedrockRegion(region, fallback = null) {
-  const value = region === undefined || region === null || region === '' ? fallback : region
+  const value = region === undefined || region === null ? fallback : region
   if (typeof value !== 'string' || value.trim() === '') {
     throw createBedrockValidationError('AWS Region is required', 'INVALID_BEDROCK_REGION')
   }
@@ -53,6 +54,7 @@ function assertSupportedBedrockModel(model) {
 
 module.exports = {
   BEDROCK_REGION_PATTERN,
+  BEDROCK_CREDENTIAL_TYPES,
   RETIRED_BEDROCK_MODEL_MARKERS,
   normalizeBedrockRegion,
   normalizeBedrockModel,

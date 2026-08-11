@@ -13,6 +13,11 @@ describe('Bedrock configuration', () => {
     expect(() => normalizeBedrockRegion('us-west-2.invalid')).toThrow('Invalid AWS Region')
   })
 
+  test('rejects an explicitly empty AWS region instead of applying a fallback', () => {
+    expect(() => normalizeBedrockRegion('', 'us-east-1')).toThrow('AWS Region is required')
+    expect(() => normalizeBedrockRegion('   ', 'us-east-1')).toThrow('AWS Region is required')
+  })
+
   test('publishes current Bedrock models and the Haiku 4.5 test default', () => {
     const modelIds = modelsConfig.BEDROCK_MODELS.map((model) => model.value)
 
@@ -22,6 +27,7 @@ describe('Bedrock configuration', () => {
     expect(modelIds).toContain('global.anthropic.claude-opus-5')
     expect(modelIds).toContain('us.anthropic.claude-sonnet-4-6')
     expect(modelIds.some((model) => model.includes('claude-3-5-haiku-20241022'))).toBe(false)
+    expect(modelsConfig.CLAUDE_MODELS.map((model) => model.value)).not.toContain('claude-opus-5')
     expect(modelsConfig.getModelsByService('bedrock')).toBe(modelsConfig.BEDROCK_MODELS)
   })
 

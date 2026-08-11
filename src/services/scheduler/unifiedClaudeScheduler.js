@@ -923,6 +923,7 @@ class UnifiedClaudeScheduler {
           account.isActive === true &&
           account.accountType === 'shared' &&
           !bedrockAccountService.isSubscriptionExpired(account) &&
+          account.hasCredentials !== false &&
           isSchedulable(account.schedulable)
         ) {
           // 检查是否临时不可用

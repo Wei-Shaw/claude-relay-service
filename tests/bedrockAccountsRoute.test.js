@@ -62,11 +62,18 @@ describe('Bedrock admin routes', () => {
   })
 
   test('maps create expiry and accepts the default credential chain', async () => {
+    const expiresAt = '2030-01-01T00:00:00.000Z'
     service.createAccount.mockResolvedValue({
       success: true,
-      data: { id: 'account-1', region: 'us-west-2', credentialType: 'default' }
+      data: {
+        id: 'account-1',
+        region: 'us-west-2',
+        credentialType: 'default',
+        subscriptionExpiresAt: expiresAt,
+        tokenExpiresAt: null,
+        expiresAt
+      }
     })
-    const expiresAt = '2030-01-01T00:00:00.000Z'
 
     const response = await request(app).post('/api/admin/bedrock-accounts').send({
       name: 'Role account',
@@ -79,17 +86,20 @@ describe('Bedrock admin routes', () => {
     expect(service.createAccount).toHaveBeenCalledWith(
       expect.objectContaining({
         credentialType: 'default',
-        region: ' us-west-2 ',
+        region: 'us-west-2',
         subscriptionExpiresAt: expiresAt
+      })
+    )
+    expect(response.body.data).toEqual(
+      expect.objectContaining({
+        subscriptionExpiresAt: expiresAt,
+        tokenExpiresAt: null,
+        expiresAt
       })
     )
   })
 
   test('propagates Bedrock validation failures as HTTP 400', async () => {
-    service.createAccount.mockRejectedValue(
-      Object.assign(new Error('Invalid AWS Region'), { statusCode: 400 })
-    )
-
     const response = await request(app).post('/api/admin/bedrock-accounts').send({
       name: 'Invalid account',
       region: 'not-a-region',
@@ -97,7 +107,20 @@ describe('Bedrock admin routes', () => {
     })
 
     expect(response.status).toBe(400)
-    expect(response.body.message).toBe('Invalid AWS Region')
+    expect(response.body.message).toMatch('Invalid AWS Region')
+    expect(service.createAccount).not.toHaveBeenCalled()
+  })
+
+  test('rejects an explicitly empty Region instead of applying the default', async () => {
+    const response = await request(app).post('/api/admin/bedrock-accounts').send({
+      name: 'Empty Region account',
+      region: '',
+      credentialType: 'default'
+    })
+
+    expect(response.status).toBe(400)
+    expect(response.body.message).toBe('AWS Region is required')
+    expect(service.createAccount).not.toHaveBeenCalled()
   })
 
   test('passes access key patches through without synthesizing omitted fields', async () => {
@@ -114,24 +137,39 @@ describe('Bedrock admin routes', () => {
   })
 
   test('returns HTTP 400 for invalid Region updates', async () => {
-    service.updateAccount.mockResolvedValue({
-      success: false,
-      error: 'Invalid AWS Region',
-      statusCode: 400
-    })
-
     const response = await request(app)
       .put('/api/admin/bedrock-accounts/account-1')
       .send({ region: 'invalid' })
 
     expect(response.status).toBe(400)
-    expect(response.body.message).toBe('Invalid AWS Region')
+    expect(response.body.message).toMatch('Invalid AWS Region')
+    expect(service.updateAccount).not.toHaveBeenCalled()
+  })
+
+  test('returns HTTP 400 for empty Region updates', async () => {
+    const response = await request(app)
+      .put('/api/admin/bedrock-accounts/account-1')
+      .send({ region: '' })
+
+    expect(response.status).toBe(400)
+    expect(response.body.message).toBe('AWS Region is required')
+    expect(service.updateAccount).not.toHaveBeenCalled()
   })
 
   test('queries usage statistics with the bedrock platform key', async () => {
+    const expiresAt = '2030-01-01T00:00:00.000Z'
     service.getAllAccounts.mockResolvedValue({
       success: true,
-      data: [{ id: 'account-1', name: 'Bedrock', platform: 'bedrock' }]
+      data: [
+        {
+          id: 'account-1',
+          name: 'Bedrock',
+          platform: 'bedrock',
+          subscriptionExpiresAt: expiresAt,
+          tokenExpiresAt: null,
+          expiresAt
+        }
+      ]
     })
     redis.getAccountUsageStats.mockResolvedValue({
       daily: { tokens: 1 },
@@ -143,5 +181,12 @@ describe('Bedrock admin routes', () => {
 
     expect(response.status).toBe(200)
     expect(redis.getAccountUsageStats).toHaveBeenCalledWith('account-1', 'bedrock')
+    expect(response.body.data[0]).toEqual(
+      expect.objectContaining({
+        subscriptionExpiresAt: expiresAt,
+        tokenExpiresAt: null,
+        expiresAt
+      })
+    )
   })
 })

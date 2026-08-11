@@ -8,7 +8,11 @@ const { BedrockClient, ListInferenceProfilesCommand } = require('@aws-sdk/client
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 const { BEDROCK_MODELS, BEDROCK_TEST_MODEL } = require('../../../config/models')
-const { normalizeBedrockRegion, assertSupportedBedrockModel } = require('../../utils/bedrockConfig')
+const {
+  BEDROCK_CREDENTIAL_TYPES,
+  normalizeBedrockRegion,
+  assertSupportedBedrockModel
+} = require('../../utils/bedrockConfig')
 const userMessageQueueService = require('../userMessageQueueService')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
@@ -37,7 +41,7 @@ class BedrockRelayService {
     if (!bedrockAccount) {
       return 'default'
     }
-    if (['access_key', 'bearer_token', 'default'].includes(bedrockAccount.credentialType)) {
+    if (BEDROCK_CREDENTIAL_TYPES.includes(bedrockAccount.credentialType)) {
       return bedrockAccount.credentialType
     }
     if (bedrockAccount.awsCredentials) {
@@ -988,33 +992,37 @@ class BedrockRelayService {
       const client = new BedrockClient(
         this._createAwsClientConfig(region, bedrockAccount, credentialType)
       )
-      const profiles = []
-      let nextToken
+      try {
+        const profiles = []
+        let nextToken
 
-      do {
-        const response = await client.send(
-          new ListInferenceProfilesCommand({
-            typeEquals: 'SYSTEM_DEFINED',
-            maxResults: 100,
-            nextToken
-          })
-        )
-        profiles.push(...(response.inferenceProfileSummaries || []))
-        const { nextToken: responseNextToken } = response
-        nextToken = responseNextToken
-      } while (nextToken)
+        do {
+          const response = await client.send(
+            new ListInferenceProfilesCommand({
+              typeEquals: 'SYSTEM_DEFINED',
+              maxResults: 100,
+              nextToken
+            })
+          )
+          profiles.push(...(response.inferenceProfileSummaries || []))
+          const { nextToken: responseNextToken } = response
+          nextToken = responseNextToken
+        } while (nextToken)
 
-      const models = profiles
-        .filter((profile) => profile.inferenceProfileId?.includes('.anthropic.claude-'))
-        .map((profile) => ({
-          id: profile.inferenceProfileId,
-          name: profile.inferenceProfileName || profile.inferenceProfileId,
-          provider: 'anthropic',
-          type: 'bedrock'
-        }))
+        const models = profiles
+          .filter((profile) => profile.inferenceProfileId?.includes('.anthropic.claude-'))
+          .map((profile) => ({
+            id: profile.inferenceProfileId,
+            name: profile.inferenceProfileName || profile.inferenceProfileId,
+            provider: 'anthropic',
+            type: 'bedrock'
+          }))
 
-      logger.debug(`📋 发现Bedrock推理配置 ${models.length} 个, 区域: ${region}`)
-      return models.length > 0 ? models : fallbackModels
+        logger.debug(`📋 发现Bedrock推理配置 ${models.length} 个, 区域: ${region}`)
+        return models.length > 0 ? models : fallbackModels
+      } finally {
+        client.destroy()
+      }
     } catch (error) {
       logger.warn(`⚠️ 无法列出Bedrock推理配置，使用官方模型目录: ${error.message}`)
       return fallbackModels

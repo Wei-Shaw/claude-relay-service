@@ -49,6 +49,8 @@ describe('bedrockRelayService', () => {
   let runtimeInstances
   let runtimeSend
   let middlewareAdd
+  let controlSend
+  let controlDestroy
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -56,6 +58,8 @@ describe('bedrockRelayService', () => {
     runtimeInstances = []
     runtimeSend = jest.fn().mockResolvedValue(streamResponse())
     middlewareAdd = jest.fn()
+    controlSend = jest.fn().mockResolvedValue({ inferenceProfileSummaries: [] })
+    controlDestroy = jest.fn()
     runtimeSdk.BedrockRuntimeClient.mockImplementation((clientConfig) => {
       const client = {
         clientConfig,
@@ -66,7 +70,8 @@ describe('bedrockRelayService', () => {
       return client
     })
     controlSdk.BedrockClient.mockImplementation(() => ({
-      send: jest.fn().mockResolvedValue({ inferenceProfileSummaries: [] })
+      send: controlSend,
+      destroy: controlDestroy
     }))
   })
 
@@ -151,6 +156,49 @@ describe('bedrockRelayService', () => {
     })
 
     expect(runtimeInstances[0].clientConfig).not.toHaveProperty('credentials')
+  })
+
+  test('destroys the control-plane client after paginated model discovery', async () => {
+    controlSend
+      .mockResolvedValueOnce({
+        inferenceProfileSummaries: [
+          {
+            inferenceProfileId: BEDROCK_TEST_MODEL,
+            inferenceProfileName: 'Claude Haiku 4.5'
+          }
+        ],
+        nextToken: 'next-page'
+      })
+      .mockResolvedValueOnce({ inferenceProfileSummaries: [] })
+
+    await expect(
+      relay.getAvailableModels({
+        id: 'account-1',
+        region: 'us-west-2',
+        credentialType: 'access_key',
+        awsCredentials: { accessKeyId: 'AKIA_TEST', secretAccessKey: 'secret' }
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({ id: BEDROCK_TEST_MODEL, name: 'Claude Haiku 4.5' })
+    ])
+    expect(controlSend).toHaveBeenCalledTimes(2)
+    expect(controlDestroy).toHaveBeenCalledTimes(1)
+  })
+
+  test('destroys the control-plane client when discovery falls back', async () => {
+    controlSend.mockRejectedValueOnce(new Error('Access denied'))
+
+    const models = await relay.getAvailableModels({
+      id: 'account-1',
+      region: 'us-west-2',
+      credentialType: 'access_key',
+      awsCredentials: { accessKeyId: 'AKIA_TEST', secretAccessKey: 'secret' }
+    })
+
+    expect(models).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: BEDROCK_TEST_MODEL })])
+    )
+    expect(controlDestroy).toHaveBeenCalledTimes(1)
   })
 
   test('honors the requested model before the account default', () => {

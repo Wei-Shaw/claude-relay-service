@@ -84,4 +84,20 @@ describe('UnifiedClaudeScheduler Bedrock expiry', () => {
     await expect(scheduler._getAllAvailableAccounts({})).resolves.toEqual([])
     expect(tempSpy).not.toHaveBeenCalledWith(expiredAccount.id, 'bedrock')
   })
+
+  test('excludes shared Bedrock accounts whose stored credentials were removed', async () => {
+    const accountWithoutCredentials = {
+      ...expiredAccount,
+      id: 'bedrock-no-credentials',
+      expiresAt: null,
+      hasCredentials: false
+    }
+    bedrockAccountService.getAllAccounts.mockResolvedValue({
+      success: true,
+      data: [accountWithoutCredentials]
+    })
+
+    await expect(scheduler._getAllAvailableAccounts({})).resolves.toEqual([])
+    expect(tempSpy).not.toHaveBeenCalledWith(accountWithoutCredentials.id, 'bedrock')
+  })
 })

@@ -13,6 +13,7 @@ const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { BEDROCK_CREDENTIAL_TYPES, normalizeBedrockRegion } = require('../../utils/bedrockConfig')
 
 // ☁️ Bedrock 账户管理
 
@@ -148,7 +149,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
     }
 
     // 验证credentialType的有效性
-    if (credentialType && !['access_key', 'bearer_token', 'default'].includes(credentialType)) {
+    if (credentialType && !BEDROCK_CREDENTIAL_TYPES.includes(credentialType)) {
       return res.status(400).json({
         error: 'Invalid credential type. Must be "access_key", "bearer_token", or "default"'
       })
@@ -157,7 +158,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
     const result = await bedrockAccountService.createAccount({
       name,
       description: description || '',
-      region: region || 'us-east-1',
+      region: normalizeBedrockRegion(region, 'us-east-1'),
       awsCredentials,
       bearerToken,
       defaultModel,
@@ -193,6 +194,10 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
     const mappedUpdates = mapExpiryField(updates, 'Bedrock', accountId)
 
+    if (mappedUpdates.region !== undefined) {
+      mappedUpdates.region = normalizeBedrockRegion(mappedUpdates.region)
+    }
+
     // 验证priority的有效性（1-100）
     if (
       mappedUpdates.priority !== undefined &&
@@ -211,7 +216,7 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
     // 验证credentialType的有效性
     if (
       mappedUpdates.credentialType &&
-      !['access_key', 'bearer_token', 'default'].includes(mappedUpdates.credentialType)
+      !BEDROCK_CREDENTIAL_TYPES.includes(mappedUpdates.credentialType)
     ) {
       return res.status(400).json({
         error: 'Invalid credential type. Must be "access_key", "bearer_token", or "default"'
@@ -231,7 +236,7 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to update Bedrock account:', error)
     return res
-      .status(500)
+      .status(error.statusCode || 500)
       .json({ error: 'Failed to update Bedrock account', message: error.message })
   }
 })

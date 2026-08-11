@@ -102,7 +102,7 @@ describe('bedrockAccountService', () => {
     expect(account.data.awsCredentials.accessKeyId).toBe('AKIA_ORIGINAL')
   })
 
-  test('removes the complete access key group only when null is explicit', async () => {
+  test('disables and remains deletable after the complete access key group is removed', async () => {
     const created = await createAccessKeyAccount()
 
     const updated = await service.updateAccount(created.data.id, { awsCredentials: null })
@@ -110,6 +110,17 @@ describe('bedrockAccountService', () => {
 
     expect(updated.success).toBe(true)
     expect(stored).not.toHaveProperty('awsCredentials')
+    expect(stored.isActive).toBe(false)
+    expect(stored.schedulable).toBe(false)
+    await expect(service.getAccount(created.data.id)).resolves.toEqual(
+      expect.objectContaining({ success: false })
+    )
+
+    relay.invalidateAccountClients.mockClear()
+    await expect(service.deleteAccount(created.data.id)).resolves.toEqual({ success: true })
+    expect(store.has(`bedrock_account:${created.data.id}`)).toBe(false)
+    expect(relay.invalidateAccountClients).toHaveBeenCalledTimes(1)
+    expect(relay.invalidateAccountClients).toHaveBeenCalledWith(created.data.id)
   })
 
   test('atomically clears stale access keys when switching to bearer token', async () => {
@@ -145,6 +156,23 @@ describe('bedrockAccountService', () => {
         data: expect.objectContaining({ credentialType: 'default' })
       })
     )
+  })
+
+  test('disables a bearer-token account when its token is explicitly removed', async () => {
+    const created = await service.createAccount({
+      name: 'Bearer account',
+      region: 'us-west-2',
+      credentialType: 'bearer_token',
+      bearerToken: 'bedrock-token'
+    })
+
+    const updated = await service.updateAccount(created.data.id, { bearerToken: null })
+    const stored = JSON.parse(store.get(`bedrock_account:${created.data.id}`))
+
+    expect(updated.success).toBe(true)
+    expect(stored).not.toHaveProperty('bearerToken')
+    expect(stored.isActive).toBe(false)
+    expect(stored.schedulable).toBe(false)
   })
 
   test('rejects non-string bearer tokens as validation errors', async () => {
@@ -220,5 +248,28 @@ describe('bedrockAccountService', () => {
     expect(service.isSubscriptionExpired({ subscriptionExpiresAt: past })).toBe(true)
     expect(service.isSubscriptionExpired({ expiresAt: past })).toBe(true)
     expect(service.isSubscriptionExpired({ expiresAt: future })).toBe(false)
+  })
+
+  test('preserves legacy expiresAt through the account-list DTO', async () => {
+    const created = await createAccessKeyAccount()
+    const key = `bedrock_account:${created.data.id}`
+    const legacy = JSON.parse(store.get(key))
+    const expiresAt = '2020-01-01T00:00:00.000Z'
+    delete legacy.subscriptionExpiresAt
+    legacy.expiresAt = expiresAt
+    store.set(key, JSON.stringify(legacy))
+    redis.getAllIdsByIndex.mockResolvedValue([created.data.id])
+    redis.batchGetChunked.mockImplementation(async (keys) => keys.map((item) => store.get(item)))
+
+    const result = await service.getAllAccounts()
+
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        subscriptionExpiresAt: expiresAt,
+        tokenExpiresAt: null,
+        expiresAt
+      })
+    )
+    expect(service.isSubscriptionExpired(result.data[0])).toBe(true)
   })
 })

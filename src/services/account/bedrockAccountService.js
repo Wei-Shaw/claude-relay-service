@@ -7,9 +7,11 @@ const { BEDROCK_TEST_MODEL } = require('../../../config/models')
 const bedrockRelayService = require('../relay/bedrockRelayService')
 const LRUCache = require('../../utils/lruCache')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
-const { normalizeBedrockRegion, assertSupportedBedrockModel } = require('../../utils/bedrockConfig')
-
-const BEDROCK_CREDENTIAL_TYPES = ['access_key', 'bearer_token', 'default']
+const {
+  BEDROCK_CREDENTIAL_TYPES,
+  normalizeBedrockRegion,
+  assertSupportedBedrockModel
+} = require('../../utils/bedrockConfig')
 
 class BedrockAccountService {
   constructor() {
@@ -60,6 +62,13 @@ class BedrockAccountService {
       )
     }
     return credentialType
+  }
+
+  _getSubscriptionExpiry(account = {}) {
+    if (Object.prototype.hasOwnProperty.call(account, 'subscriptionExpiresAt')) {
+      return account.subscriptionExpiresAt || null
+    }
+    return account.expiresAt || null
   }
 
   _normalizeAccessKeyCredentials(credentials) {
@@ -186,6 +195,8 @@ class BedrockAccountService {
         priority,
         schedulable,
         credentialType: normalizedCredentialType,
+        subscriptionExpiresAt: accountData.subscriptionExpiresAt,
+        tokenExpiresAt: null,
         expiresAt: accountData.subscriptionExpiresAt,
         createdAt: accountData.createdAt,
         type: 'bedrock'
@@ -205,6 +216,8 @@ class BedrockAccountService {
       const account = JSON.parse(accountData)
       account.region = normalizeBedrockRegion(account.region, 'us-east-1')
       account.credentialType = this._resolveCredentialType(account)
+      account.subscriptionExpiresAt = this._getSubscriptionExpiry(account)
+      account.expiresAt = account.subscriptionExpiresAt
 
       try {
         if (account.credentialType === 'access_key') {
@@ -270,6 +283,7 @@ class BedrockAccountService {
         if (accountData) {
           const account = JSON.parse(accountData)
           const credentialType = this._resolveCredentialType(account)
+          const subscriptionExpiresAt = this._getSubscriptionExpiry(account)
           let normalizedRegion
           try {
             normalizedRegion = normalizeBedrockRegion(account.region, 'us-east-1')
@@ -293,7 +307,9 @@ class BedrockAccountService {
             credentialType,
 
             // ✅ 前端显示订阅过期时间（业务字段）
-            expiresAt: account.subscriptionExpiresAt || null,
+            subscriptionExpiresAt,
+            tokenExpiresAt: null,
+            expiresAt: subscriptionExpiresAt,
 
             createdAt: account.createdAt,
             updatedAt: account.updatedAt,
@@ -354,7 +370,7 @@ class BedrockAccountService {
         account.description = updates.description
       }
       if (updates.region !== undefined) {
-        account.region = normalizeBedrockRegion(updates.region, account.region || 'us-east-1')
+        account.region = normalizeBedrockRegion(updates.region)
       } else {
         account.region = normalizeBedrockRegion(account.region, 'us-east-1')
       }
@@ -384,6 +400,8 @@ class BedrockAccountService {
 
         if (updates.awsCredentials === null) {
           delete account.awsCredentials
+          account.isActive = false
+          account.schedulable = false
         } else if (updates.awsCredentials !== undefined) {
           const existingCredentials =
             targetCredentialType === currentCredentialType && account.awsCredentials
@@ -429,6 +447,8 @@ class BedrockAccountService {
             })
           } else {
             delete account.bearerToken
+            account.isActive = false
+            account.schedulable = false
           }
         }
         delete account.awsCredentials
@@ -442,6 +462,7 @@ class BedrockAccountService {
       // Bedrock 没有 token 刷新逻辑，不会覆盖此字段
       if (updates.subscriptionExpiresAt !== undefined) {
         account.subscriptionExpiresAt = updates.subscriptionExpiresAt
+        delete account.expiresAt
       }
 
       // 自动防护开关
@@ -469,7 +490,9 @@ class BedrockAccountService {
           priority: account.priority,
           schedulable: account.schedulable,
           credentialType: account.credentialType,
-          expiresAt: account.subscriptionExpiresAt || null,
+          subscriptionExpiresAt: this._getSubscriptionExpiry(account),
+          tokenExpiresAt: null,
+          expiresAt: this._getSubscriptionExpiry(account),
           updatedAt: account.updatedAt,
           type: 'bedrock'
         }
@@ -483,12 +506,12 @@ class BedrockAccountService {
   // 🗑️ 删除账户
   async deleteAccount(accountId) {
     try {
-      const accountResult = await this.getAccount(accountId)
-      if (!accountResult.success) {
-        return accountResult
+      const client = redis.getClientSafe()
+      const accountData = await client.get(`bedrock_account:${accountId}`)
+      if (!accountData) {
+        return { success: false, error: 'Account not found' }
       }
 
-      const client = redis.getClientSafe()
       await client.del(`bedrock_account:${accountId}`)
       await redis.removeFromIndex('bedrock_account:index', accountId)
       bedrockRelayService.invalidateAccountClients(accountId)
@@ -519,7 +542,7 @@ class BedrockAccountService {
           return false
         }
 
-        return account.isActive && account.schedulable
+        return account.isActive && account.schedulable && account.hasCredentials !== false
       })
 
       if (availableAccounts.length === 0) {
@@ -659,7 +682,7 @@ class BedrockAccountService {
    * @returns {boolean} - true: 已过期, false: 未过期
    */
   isSubscriptionExpired(account) {
-    const expiresAt = account?.subscriptionExpiresAt || account?.expiresAt
+    const expiresAt = this._getSubscriptionExpiry(account)
     if (!expiresAt) {
       return false // 未设置视为永不过期
     }
