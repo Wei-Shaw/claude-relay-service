@@ -1,24 +1,30 @@
+const crypto = require('crypto')
 const {
   BedrockRuntimeClient,
   InvokeModelCommand,
   InvokeModelWithResponseStreamCommand
 } = require('@aws-sdk/client-bedrock-runtime')
-const { fromEnv } = require('@aws-sdk/credential-providers')
+const { BedrockClient, ListInferenceProfilesCommand } = require('@aws-sdk/client-bedrock')
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
+const { BEDROCK_MODELS, BEDROCK_TEST_MODEL } = require('../../../config/models')
+const { normalizeBedrockRegion, assertSupportedBedrockModel } = require('../../utils/bedrockConfig')
 const userMessageQueueService = require('../userMessageQueueService')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 
 class BedrockRelayService {
   constructor() {
-    this.defaultRegion = process.env.AWS_REGION || config.bedrock?.defaultRegion || 'us-east-1'
-    this.smallFastModelRegion =
-      process.env.ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION || this.defaultRegion
+    this.defaultRegion = normalizeBedrockRegion(
+      process.env.AWS_REGION || config.bedrock?.defaultRegion,
+      'us-east-1'
+    )
+    this.smallFastModelRegion = normalizeBedrockRegion(
+      process.env.ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION || config.bedrock?.smallFastModelRegion,
+      this.defaultRegion
+    )
 
     // 默认模型配置
     this.defaultModel = process.env.ANTHROPIC_MODEL || 'us.anthropic.claude-sonnet-4-20250514-v1:0'
-    this.defaultSmallModel =
-      process.env.ANTHROPIC_SMALL_FAST_MODEL || 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
 
     // Token配置 — 仅作为客户端未指定 max_tokens 时的回退默认值，不用于截断
     this.maxOutputTokens = parseInt(process.env.BEDROCK_MAX_OUTPUT_TOKENS) || 128000
@@ -27,72 +33,107 @@ class BedrockRelayService {
     this.clients = new Map() // 缓存不同区域的客户端
   }
 
-  // 获取或创建Bedrock客户端
-  _getBedrockClient(region = null, bedrockAccount = null) {
-    const targetRegion = region || this.defaultRegion
-    const clientKey = `${targetRegion}-${bedrockAccount?.id || 'default'}`
+  _getCredentialType(bedrockAccount) {
+    if (!bedrockAccount) {
+      return 'default'
+    }
+    if (['access_key', 'bearer_token', 'default'].includes(bedrockAccount.credentialType)) {
+      return bedrockAccount.credentialType
+    }
+    if (bedrockAccount.awsCredentials) {
+      return 'access_key'
+    }
+    if (bedrockAccount.bearerToken) {
+      return 'bearer_token'
+    }
+    return 'default'
+  }
 
-    if (this.clients.has(clientKey)) {
-      return this.clients.get(clientKey)
+  _getCredentialFingerprint(bedrockAccount, credentialType) {
+    let credentialMaterial = 'default-provider-chain'
+
+    if (credentialType === 'access_key') {
+      const credentials = bedrockAccount?.awsCredentials
+      if (!credentials?.accessKeyId || !credentials?.secretAccessKey) {
+        throw new Error('AWS access key credentials are incomplete')
+      }
+      credentialMaterial = JSON.stringify([
+        credentials.accessKeyId,
+        credentials.secretAccessKey,
+        credentials.sessionToken || ''
+      ])
+    } else if (credentialType === 'bearer_token') {
+      if (!bedrockAccount?.bearerToken) {
+        throw new Error('AWS Bedrock bearer token is missing')
+      }
+      credentialMaterial = bedrockAccount.bearerToken
     }
 
+    return crypto.createHash('sha256').update(credentialMaterial).digest('hex')
+  }
+
+  _createAwsClientConfig(region, bedrockAccount, credentialType) {
     const clientConfig = {
-      region: targetRegion,
+      region,
       requestHandler: {
-        requestTimeout: config.requestTimeout || 600000, // 与其他 relay 服务保持一致
+        requestTimeout: config.requestTimeout || 600000,
         connectionTimeout: 10000
       }
     }
 
-    // 如果账户配置了特定的AWS凭证，使用它们
-    if (bedrockAccount?.awsCredentials) {
+    if (credentialType === 'access_key') {
       clientConfig.credentials = {
         accessKeyId: bedrockAccount.awsCredentials.accessKeyId,
         secretAccessKey: bedrockAccount.awsCredentials.secretAccessKey,
         sessionToken: bedrockAccount.awsCredentials.sessionToken
       }
-    } else if (bedrockAccount?.bearerToken) {
-      // Bedrock API Key (ABSK) 模式：需要通过 middleware 注入 Bearer Token，
-      // 因为 BedrockRuntimeClient 默认使用 SigV4 签名，不支持 token 配置
-      // 使用占位凭证防止 "Could not load credentials" 错误
-      // SigV4 签名会生成 Authorization header，但随后被 middleware 替换为 Bearer Token
+    } else if (credentialType === 'bearer_token') {
+      // The runtime client still runs SigV4 middleware before the bearer token replaces it.
       clientConfig.credentials = {
         accessKeyId: 'BEDROCK_API_KEY_PLACEHOLDER',
         secretAccessKey: 'BEDROCK_API_KEY_PLACEHOLDER'
       }
-      logger.debug(`🔑 使用 Bearer Token 认证 - 账户: ${bedrockAccount.name || 'unknown'}`)
-    } else {
-      // 检查是否有环境变量凭证
-      if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-        clientConfig.credentials = fromEnv()
-      } else {
-        throw new Error(
-          'AWS凭证未配置。请在Bedrock账户中配置AWS访问密钥或Bearer Token，或设置环境变量AWS_ACCESS_KEY_ID、AWS_SECRET_ACCESS_KEY 或 AWS_BEARER_TOKEN_BEDROCK'
-        )
-      }
     }
+
+    return clientConfig
+  }
+
+  _addBearerTokenMiddleware(client, bearerToken) {
+    client.middlewareStack.add(
+      (next) => async (args) => {
+        for (const key of Object.keys(args.request.headers)) {
+          if (key.toLowerCase() === 'authorization') {
+            delete args.request.headers[key]
+          }
+        }
+        args.request.headers.Authorization = `Bearer ${bearerToken}`
+        delete args.request.headers['x-amz-date']
+        delete args.request.headers['x-amz-security-token']
+        delete args.request.headers['x-amz-content-sha256']
+        return next(args)
+      },
+      { step: 'finalizeRequest', name: 'bedrockBearerTokenAuth', override: true, priority: 'low' }
+    )
+  }
+
+  // 获取或创建Bedrock客户端
+  _getBedrockClient(region = null, bedrockAccount = null) {
+    const targetRegion = normalizeBedrockRegion(region, this.defaultRegion)
+    const credentialType = this._getCredentialType(bedrockAccount)
+    const credentialFingerprint = this._getCredentialFingerprint(bedrockAccount, credentialType)
+    const accountId = bedrockAccount?.id || 'default'
+    const clientKey = `${targetRegion}::${accountId}::${credentialType}::${credentialFingerprint}`
+
+    if (this.clients.has(clientKey)) {
+      return this.clients.get(clientKey)
+    }
+
+    const clientConfig = this._createAwsClientConfig(targetRegion, bedrockAccount, credentialType)
 
     const client = new BedrockRuntimeClient(clientConfig)
 
-    // Bedrock API Key (ABSK) 模式：注入 Bearer Token 到 Authorization header
-    if (bedrockAccount?.bearerToken) {
-      const { bearerToken } = bedrockAccount
-      client.middlewareStack.add(
-        (next) => async (args) => {
-          // 清除 SigV4 签名产生的所有 authorization header（大小写均删除）
-          for (const key of Object.keys(args.request.headers)) {
-            if (key.toLowerCase() === 'authorization') {
-              delete args.request.headers[key]
-            }
-          }
-          args.request.headers['Authorization'] = `Bearer ${bearerToken}`
-          delete args.request.headers['x-amz-date']
-          delete args.request.headers['x-amz-security-token']
-          delete args.request.headers['x-amz-content-sha256']
-          return next(args)
-        },
-        { step: 'finalizeRequest', name: 'bedrockBearerTokenAuth', override: true, priority: 'low' }
-      )
+    if (credentialType === 'bearer_token') {
+      this._addBearerTokenMiddleware(client, bedrockAccount.bearerToken)
       logger.debug(`🔑 Bearer Token middleware 已注入 - 账户: ${bedrockAccount.name || 'unknown'}`)
     }
 
@@ -102,6 +143,22 @@ class BedrockRelayService {
       `🔧 Created Bedrock client for region: ${targetRegion}, account: ${bedrockAccount?.name || 'default'}`
     )
     return client
+  }
+
+  invalidateAccountClients(accountId) {
+    if (!accountId) {
+      return 0
+    }
+
+    let removed = 0
+    for (const clientKey of this.clients.keys()) {
+      if (clientKey.split('::')[1] === accountId) {
+        this.clients.get(clientKey)?.destroy?.()
+        this.clients.delete(clientKey)
+        removed += 1
+      }
+    }
+    return removed
   }
 
   // 处理非流式请求
@@ -475,17 +532,15 @@ class BedrockRelayService {
   _selectModel(requestBody, bedrockAccount) {
     let selectedModel
 
-    // 优先使用账户配置的模型
-    if (bedrockAccount?.defaultModel) {
+    // The caller's explicit model must not be silently overridden by an account default.
+    if (requestBody?.model) {
+      selectedModel = requestBody.model
+      logger.info(`🎯 使用请求指定的模型: ${selectedModel}`, { metadata: { source: 'request' } })
+    } else if (bedrockAccount?.defaultModel) {
       selectedModel = bedrockAccount.defaultModel
       logger.info(`🎯 使用账户配置的模型: ${selectedModel}`, {
         metadata: { source: 'account', accountId: bedrockAccount.id }
       })
-    }
-    // 检查请求中指定的模型
-    else if (requestBody.model) {
-      selectedModel = requestBody.model
-      logger.info(`🎯 使用请求指定的模型: ${selectedModel}`, { metadata: { source: 'request' } })
     }
     // 使用默认模型
     else {
@@ -493,8 +548,8 @@ class BedrockRelayService {
       logger.info(`🎯 使用系统默认模型: ${selectedModel}`, { metadata: { source: 'default' } })
     }
 
-    // 如果是标准Claude模型名，需要映射为Bedrock格式
-    const bedrockModel = this._mapToBedrockModel(selectedModel)
+    const supportedModel = assertSupportedBedrockModel(selectedModel)
+    const bedrockModel = this._mapToBedrockModel(supportedModel)
     if (bedrockModel !== selectedModel) {
       logger.info(`🔄 模型映射: ${selectedModel} → ${bedrockModel}`, {
         metadata: { originalModel: selectedModel, bedrockModel }
@@ -539,8 +594,8 @@ class BedrockRelayService {
       // Claude Opus 4.6
       'claude-opus-4-6': 'global.anthropic.claude-opus-4-6-v1',
 
-      // Claude Sonnet 4.6 — Bedrock 暂未上线，回退到 Sonnet 4.5
-      'claude-sonnet-4-6': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+      // Claude Sonnet 4.6
+      'claude-sonnet-4-6': 'us.anthropic.claude-sonnet-4-6',
 
       // Claude 4.5 Opus
       'claude-opus-4-5': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
@@ -572,10 +627,6 @@ class BedrockRelayService {
       // Claude 3.5 Sonnet v2
       'claude-3-5-sonnet': 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
       'claude-3-5-sonnet-20241022': 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
-
-      // Claude 3.5 Haiku
-      'claude-3-5-haiku': 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
-      'claude-3-5-haiku-20241022': 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
 
       // Claude 3 Sonnet
       'claude-3-sonnet': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
@@ -613,15 +664,15 @@ class BedrockRelayService {
   _selectRegion(modelId, bedrockAccount) {
     // 优先使用账户配置的区域
     if (bedrockAccount?.region) {
-      return bedrockAccount.region
+      return normalizeBedrockRegion(bedrockAccount.region, this.defaultRegion)
     }
 
     // 对于小模型，使用专门的区域配置
     if (modelId.includes('haiku')) {
-      return this.smallFastModelRegion
+      return normalizeBedrockRegion(this.smallFastModelRegion, this.defaultRegion)
     }
 
-    return this.defaultRegion
+    return normalizeBedrockRegion(this.defaultRegion, 'us-east-1')
   }
 
   // Sanitize cache_control fields for Bedrock compatibility.
@@ -737,6 +788,76 @@ class BedrockRelayService {
     }
   }
 
+  async testConnection(bedrockAccount, model = BEDROCK_TEST_MODEL, onContent = null) {
+    const modelId = this._selectModel({ model }, bedrockAccount)
+    const region = this._selectRegion(modelId, bedrockAccount)
+    const client = this._getBedrockClient(region, bedrockAccount)
+    const command = new InvokeModelWithResponseStreamCommand({
+      modelId,
+      body: JSON.stringify({
+        anthropic_version: 'bedrock-2023-05-31',
+        max_tokens: 32,
+        messages: [{ role: 'user', content: 'Reply with OK.' }]
+      }),
+      contentType: 'application/json',
+      accept: 'application/json'
+    })
+
+    const startedAt = Date.now()
+    const response = await client.send(command)
+    if (!response?.body) {
+      throw new Error('Bedrock Runtime returned no response stream')
+    }
+
+    let responseText = ''
+    let eventCount = 0
+    let messageStopped = false
+
+    for await (const event of response.body) {
+      if (!event.chunk) {
+        const errorKey = [
+          'internalServerException',
+          'modelStreamErrorException',
+          'validationException',
+          'throttlingException',
+          'modelTimeoutException',
+          'serviceUnavailableException'
+        ].find((key) => event[key])
+        if (errorKey) {
+          throw new Error(event[errorKey].message || `Bedrock Runtime stream error: ${errorKey}`)
+        }
+        throw new Error('Bedrock Runtime returned an unknown stream event')
+      }
+      eventCount += 1
+      const chunkData = JSON.parse(new TextDecoder().decode(event.chunk.bytes))
+      if (chunkData.type === 'error') {
+        throw new Error(chunkData.error?.message || 'Bedrock API error')
+      }
+      if (chunkData.type === 'content_block_delta' && chunkData.delta?.text) {
+        responseText += chunkData.delta.text
+        if (onContent) {
+          onContent(chunkData.delta.text)
+        }
+      }
+      if (chunkData.type === 'message_stop') {
+        messageStopped = true
+      }
+    }
+
+    if (!messageStopped || !responseText.trim()) {
+      throw new Error('Bedrock Runtime returned an incomplete response stream')
+    }
+
+    return {
+      status: 'connected',
+      model: modelId,
+      region,
+      responseText,
+      eventCount,
+      duration: Date.now() - startedAt
+    }
+  }
+
   // 从 Bedrock 错误中提取 HTTP 状态码
   _getErrorStatusCode(error) {
     // AWS SDK v3 错误的 $metadata 包含 httpStatusCode
@@ -801,48 +922,55 @@ class BedrockRelayService {
 
   // 获取可用模型列表
   async getAvailableModels(bedrockAccount = null) {
+    const fallbackModels = BEDROCK_MODELS.map((model) => ({
+      id: model.value,
+      name: model.label,
+      provider: 'anthropic',
+      type: 'bedrock'
+    }))
+
     try {
-      const region = bedrockAccount?.region || this.defaultRegion
+      const region = normalizeBedrockRegion(bedrockAccount?.region, this.defaultRegion)
+      const credentialType = this._getCredentialType(bedrockAccount)
 
-      // Bedrock暂不支持列出推理配置文件的API，返回预定义的模型列表
-      const models = [
-        {
-          id: 'us.anthropic.claude-sonnet-4-20250514-v1:0',
-          name: 'Claude Sonnet 4',
-          provider: 'anthropic',
-          type: 'bedrock'
-        },
-        {
-          id: 'us.anthropic.claude-opus-4-1-20250805-v1:0',
-          name: 'Claude Opus 4.1',
-          provider: 'anthropic',
-          type: 'bedrock'
-        },
-        {
-          id: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0',
-          name: 'Claude 3.7 Sonnet',
-          provider: 'anthropic',
-          type: 'bedrock'
-        },
-        {
-          id: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
-          name: 'Claude 3.5 Sonnet v2',
-          provider: 'anthropic',
-          type: 'bedrock'
-        },
-        {
-          id: 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
-          name: 'Claude 3.5 Haiku',
-          provider: 'anthropic',
-          type: 'bedrock'
-        }
-      ]
+      // Bedrock API keys authenticate runtime requests, not control-plane discovery.
+      if (credentialType === 'bearer_token') {
+        return fallbackModels
+      }
 
-      logger.debug(`📋 返回Bedrock可用模型 ${models.length} 个, 区域: ${region}`)
-      return models
+      const client = new BedrockClient(
+        this._createAwsClientConfig(region, bedrockAccount, credentialType)
+      )
+      const profiles = []
+      let nextToken
+
+      do {
+        const response = await client.send(
+          new ListInferenceProfilesCommand({
+            typeEquals: 'SYSTEM_DEFINED',
+            maxResults: 100,
+            nextToken
+          })
+        )
+        profiles.push(...(response.inferenceProfileSummaries || []))
+        const { nextToken: responseNextToken } = response
+        nextToken = responseNextToken
+      } while (nextToken)
+
+      const models = profiles
+        .filter((profile) => profile.inferenceProfileId?.includes('.anthropic.claude-'))
+        .map((profile) => ({
+          id: profile.inferenceProfileId,
+          name: profile.inferenceProfileName || profile.inferenceProfileId,
+          provider: 'anthropic',
+          type: 'bedrock'
+        }))
+
+      logger.debug(`📋 发现Bedrock推理配置 ${models.length} 个, 区域: ${region}`)
+      return models.length > 0 ? models : fallbackModels
     } catch (error) {
-      logger.error('❌ 获取Bedrock模型列表失败:', error)
-      return []
+      logger.warn(`⚠️ 无法列出Bedrock推理配置，使用官方模型目录: ${error.message}`)
+      return fallbackModels
     }
   }
 }

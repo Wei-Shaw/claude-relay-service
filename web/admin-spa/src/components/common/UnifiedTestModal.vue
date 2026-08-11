@@ -347,9 +347,7 @@ const defaultModel = computed(() => {
     if (platform === 'bedrock') {
       const models = availableModels.value
       if (models.length > 0) return models[0].value
-      if (props.account?.credentialType === 'bearer_token')
-        return 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'
-      return 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
+      return 'us.anthropic.claude-haiku-4-5-20251001-v1:0'
     }
     const models = availableModels.value
     if (models.length > 0) return models[0].value

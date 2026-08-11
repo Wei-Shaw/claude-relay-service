@@ -2188,6 +2188,15 @@ class RedisClient {
       accountData = await this.client.hgetall(`openai:account:${accountId}`)
     } else if (accountType === 'openai-responses') {
       accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
+    } else if (accountType === 'bedrock') {
+      const bedrockAccount = await this.client.get(`bedrock_account:${accountId}`)
+      if (bedrockAccount) {
+        try {
+          accountData = JSON.parse(bedrockAccount)
+        } catch (error) {
+          logger.warn(`Failed to parse Bedrock account ${accountId} for usage stats:`, error)
+        }
+      }
     } else {
       // 尝试多个前缀（优先 claude:account:）
       accountData = await this.client.hgetall(`claude:account:${accountId}`)

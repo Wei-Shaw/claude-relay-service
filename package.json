@@ -49,6 +49,7 @@
     "test:pricing-fallback": "node scripts/test-pricing-fallback.js"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock": "^3.883.0",
     "@aws-sdk/client-bedrock-runtime": "^3.861.0",
     "@aws-sdk/credential-providers": "^3.859.0",
     "axios": "^1.6.0",
