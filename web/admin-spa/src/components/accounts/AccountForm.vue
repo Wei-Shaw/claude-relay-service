@@ -4504,7 +4504,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { showToast } from '@/utils/tools'
+import { formatDurationSeconds, showToast } from '@/utils/tools'
 
 import * as httpApis from '@/utils/http_apis'
 import { useAccountsStore } from '@/stores/accounts'
@@ -5425,7 +5425,7 @@ const testDraftAccountConnection = async () => {
       draftAccountTestResult.value = {
         success: true,
         latency: result.data?.latency,
-        message: `测试通过${result.data?.latency ? `，耗时 ${result.data.latency}ms` : ''}`
+        message: `测试通过${result.data?.latency ? `，耗时 ${formatDurationSeconds(result.data.latency)}` : ''}`
       }
       showToast('测试通过，可以创建账户', 'success')
     } else {

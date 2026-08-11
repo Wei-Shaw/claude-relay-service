@@ -55,6 +55,29 @@ describe('requestDetailService', () => {
     jest.useRealTimers()
   })
 
+  test('formats service-quality latency bucket labels in seconds', () => {
+    const accumulator = requestDetailService._createSlaAccumulator()
+
+    expect(accumulator.latencyBuckets.map((bucket) => bucket.label)).toEqual([
+      '<=0.5s',
+      '0.5-1s',
+      '1-2s',
+      '2-5s',
+      '5-10s',
+      '10-30s',
+      '>30s'
+    ])
+    expect(accumulator.latencyBuckets.map((bucket) => bucket.upperBoundMs)).toEqual([
+      500,
+      1000,
+      2000,
+      5000,
+      10000,
+      30000,
+      null
+    ])
+  })
+
   test('captureRequestDetail stores normalized request detail records when enabled', async () => {
     const exec = jest.fn().mockResolvedValue([])
     const multi = {

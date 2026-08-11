@@ -511,14 +511,14 @@ function createLatencyBuckets() {
         : `gt_${SLA_LATENCY_BUCKETS_MS[index - 1]}_le_${upperBoundMs}`,
     label:
       index === 0
-        ? `<=${upperBoundMs}ms`
-        : `${SLA_LATENCY_BUCKETS_MS[index - 1]}-${upperBoundMs}ms`,
+        ? `<=${upperBoundMs / 1000}s`
+        : `${SLA_LATENCY_BUCKETS_MS[index - 1] / 1000}-${upperBoundMs / 1000}s`,
     upperBoundMs,
     count: 0
   })).concat([
     {
       key: `gt_${SLA_LATENCY_BUCKETS_MS[SLA_LATENCY_BUCKETS_MS.length - 1]}`,
-      label: `>${SLA_LATENCY_BUCKETS_MS[SLA_LATENCY_BUCKETS_MS.length - 1]}ms`,
+      label: `>${SLA_LATENCY_BUCKETS_MS[SLA_LATENCY_BUCKETS_MS.length - 1] / 1000}s`,
       upperBoundMs: null,
       count: 0
     }

@@ -146,7 +146,7 @@
                     </span>
                   </div>
                   <span v-if="record.latencyMs" class="text-gray-500 dark:text-gray-500">
-                    {{ record.latencyMs }}ms
+                    {{ formatDurationSeconds(record.latencyMs) }}
                   </span>
                   <span
                     v-else-if="record.error"
@@ -202,8 +202,7 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { APP_CONFIG } from '@/utils/tools'
-import { showToast } from '@/utils/tools'
+import { APP_CONFIG, formatDurationSeconds, showToast } from '@/utils/tools'
 import { getConnectivityTestModelsApi } from '@/utils/http_apis'
 import ModelSelector from '@/components/common/ModelSelector.vue'
 
