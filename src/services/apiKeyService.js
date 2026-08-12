@@ -6,7 +6,7 @@ const logger = require('../utils/logger')
 const serviceRatesService = require('./serviceRatesService')
 const requestDetailService = require('./requestDetailService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
-const { finalizeRequestDetailMeta } = require('../utils/requestDetailHelper')
+const { finalizeRequestDetailMeta, normalizeUnitPricing } = require('../utils/requestDetailHelper')
 const { normalizeDisplayModel } = require('../utils/modelDisplayHelper')
 const { shouldSkipApiKeyUsage } = require('../utils/apiKeyUsageContext')
 const requestBodyRuleService = require('./requestBodyRuleService')
@@ -2006,6 +2006,7 @@ class ApiKeyService {
         realCost: Number(realCost.toFixed(6)),
         costBreakdown: costInfo?.costs || undefined,
         realCostBreakdown: costInfo?.costs || undefined,
+        unitPricing: normalizeUnitPricing(costInfo?.pricing),
         pricingTier: costInfo?.pricingTier || null,
         isLongContext: isLongContextRequest,
         usageStatus: 'completed',
@@ -2110,7 +2111,8 @@ class ApiKeyService {
         isLongContextRequest: false,
         usedFallbackPricing: false,
         pricingSource: null,
-        pricingTier: null
+        pricingTier: null,
+        unitPricing: null
       }
       try {
         const CostCalculator = require('../utils/costCalculator')
@@ -2141,7 +2143,8 @@ class ApiKeyService {
           pricingSource:
             calculatedCost?.debug?.pricingSource ||
             (calculatedCost?.usingDynamicPricing ? 'dynamic' : 'unknown-fallback'),
-          pricingTier: calculatedCost?.pricingTier || null
+          pricingTier: calculatedCost?.pricingTier || null,
+          unitPricing: normalizeUnitPricing(calculatedCost?.pricing)
         }
       } catch (pricingError) {
         logger.error(`❌ Failed to calculate cost for model ${actualModel}:`, pricingError)
@@ -2330,6 +2333,7 @@ class ApiKeyService {
         pricingSource: costInfo.pricingSource || null,
         usedFallbackPricing: costInfo.usedFallbackPricing === true,
         pricingTier: costInfo.pricingTier,
+        unitPricing: costInfo.unitPricing,
         isLongContext: costInfo.isLongContextRequest || false,
         usageStatus: 'completed',
         lifecycleStatus: 'completed',
@@ -2451,6 +2455,7 @@ class ApiKeyService {
       realCost: usageRecord.realCost || usageRecord.cost || 0,
       costBreakdown: usageRecord.costBreakdown || null,
       realCostBreakdown: usageRecord.realCostBreakdown || usageRecord.costBreakdown || null,
+      unitPricing: usageRecord.unitPricing || null,
       pricingSource: usageRecord.pricingSource || null,
       usedFallbackPricing: usageRecord.usedFallbackPricing === true,
       pricingTier: usageRecord.pricingTier || null,

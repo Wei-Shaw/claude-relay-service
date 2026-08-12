@@ -21,6 +21,7 @@ const {
   getRequestDetailCacheMetrics,
   extractRequestReasoningInfo,
   resolveRequestDetailReasoning,
+  normalizeUnitPricing,
   CACHE_HIT_FORMULA
 } = require('../utils/requestDetailHelper')
 
@@ -639,7 +640,7 @@ function mergeRequestDetailRecords(existing = null, incoming = {}) {
     }
   }
 
-  const objectFields = ['costBreakdown', 'realCostBreakdown', 'pricingTier']
+  const objectFields = ['costBreakdown', 'realCostBreakdown', 'pricingTier', 'unitPricing']
   for (const field of objectFields) {
     if (!incoming[field] && existing[field]) {
       merged[field] = existing[field]
@@ -837,6 +838,7 @@ function createCostRecomputePatch(record = {}) {
       realCost: totalCost,
       costBreakdown: breakdown,
       realCostBreakdown: breakdown,
+      unitPricing: normalizeUnitPricing(costResult?.pricing),
       costRecomputed: true,
       usedFallbackPricing: costResult?.debug?.usedFallbackPricing === true,
       pricingSource,
@@ -1576,6 +1578,7 @@ class RequestDetailService {
       realCost,
       costBreakdown: detail.costBreakdown || null,
       realCostBreakdown: detail.realCostBreakdown || null,
+      unitPricing: normalizeUnitPricing(detail.unitPricing),
       pricingTier: detail.pricingTier || null,
       pricingSource: detail.pricingSource || null,
       usedFallbackPricing: detail.usedFallbackPricing === true,

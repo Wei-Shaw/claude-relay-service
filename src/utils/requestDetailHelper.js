@@ -23,6 +23,21 @@ function toFiniteNumber(value) {
   return num
 }
 
+function normalizeUnitPricing(pricing) {
+  if (!pricing || typeof pricing !== 'object' || Array.isArray(pricing)) {
+    return null
+  }
+
+  const normalized = {
+    input: toFiniteNumber(pricing.input),
+    output: toFiniteNumber(pricing.output),
+    cacheCreate: toFiniteNumber(pricing.cacheCreate ?? pricing.cacheWrite),
+    cacheRead: toFiniteNumber(pricing.cacheRead)
+  }
+
+  return Object.values(normalized).some((value) => value !== null) ? normalized : null
+}
+
 function maskSensitiveValue(value) {
   if (value === null || value === undefined) {
     return value
@@ -723,6 +738,7 @@ module.exports = {
   finalizeRequestDetailMeta,
   extractOpenAICacheReadTokens,
   isOpenAIRelatedEndpoint,
+  normalizeUnitPricing,
   CACHE_HIT_FORMULA,
   getRequestDetailCacheMetrics,
   calculateCacheHitRate
