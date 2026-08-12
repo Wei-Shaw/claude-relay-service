@@ -3,10 +3,9 @@
 const crypto = require('crypto')
 const path = require('path')
 
-const codexClientModelsTemplate = require(path.join(
-  __dirname,
-  '../constants/codex_client_models.json'
-))
+const codexClientModelsTemplate = require(
+  path.join(__dirname, '../constants/codex_client_models.json')
+)
 
 const templateBySlug = new Map()
 let defaultTemplate = null
@@ -29,8 +28,7 @@ if (!defaultTemplate) {
 
 const cloneEntry = (entry) => JSON.parse(JSON.stringify(entry))
 
-const codexEntryPriority = (entry) =>
-  typeof entry?.priority === 'number' ? entry.priority : 100
+const codexEntryPriority = (entry) => (typeof entry?.priority === 'number' ? entry.priority : 100)
 
 // 未命中官方模板时克隆 gpt-5.5 兜底，覆盖 slug/display_name
 const buildFallbackEntry = (id) => {
@@ -50,7 +48,7 @@ const buildFallbackEntry = (id) => {
 // 数组（含空数组）原样归一；null/undefined 才回退默认
 // 空数组是合法结果（例如黑名单清空后），禁止当成“未传”还原全量
 const normalizeModelIds = (modelIds, defaultIds) => {
-  if (modelIds == null) {
+  if (modelIds === null || modelIds === undefined) {
     return [...defaultIds]
   }
   if (!Array.isArray(modelIds)) {
