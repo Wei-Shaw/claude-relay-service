@@ -52,8 +52,15 @@ const CLIENT_DEFINITIONS = {
     displayName: 'Codex Command Line Tool',
     description: 'Cursor/Codex command-line interface',
     icon: '🔷',
-    // Codex CLI 仅允许访问 OpenAI Responses 和 Azure 端点
-    allowedPathPrefixes: ['/openai/responses', '/openai/v1/responses', '/azure/']
+    // Codex CLI / VS Code 插件：Responses + 模型列表 + Azure
+    // /openai/responses 前缀同时覆盖 /openai/responses/compact
+    allowedPathPrefixes: [
+      '/openai/responses',
+      '/openai/v1/responses',
+      '/openai/models',
+      '/openai/v1/models',
+      '/azure/'
+    ]
   },
 
   DROID_CLI: {

@@ -3,7 +3,10 @@ const { CLIENT_DEFINITIONS } = require('../clientDefinitions')
 
 /**
  * Codex CLI 验证器
- * 验证请求是否来自 Codex CLI
+ * 验证请求是否来自 Codex CLI / VS Code / TUI 等官方客户端
+ *
+ * 身份特征只用协议头（UA / originator / session-id），
+ * 不用 body.instructions 文案——官方远端模型模板可换成任意 system prompt
  */
 class CodexCliValidator {
   /**
@@ -28,88 +31,181 @@ class CodexCliValidator {
   }
 
   /**
-   * 验证请求是否来自 Codex CLI
+   * 获取客户端信息
+   */
+  static getInfo() {
+    return {
+      id: this.getId(),
+      name: this.getName(),
+      description: this.getDescription(),
+      icon: CLIENT_DEFINITIONS.CODEX_CLI.icon
+    }
+  }
+
+  // 子路由挂载后 req.path 是相对路径（如 /models、/responses），
+  // 必须拼 baseUrl 或回退 originalUrl，才能匹配 /openai、/azure 前缀
+  static getFullRequestPath(req) {
+    const mountedPath = `${req?.baseUrl || ''}${req?.path || ''}`
+    if (mountedPath) {
+      return mountedPath
+    }
+    const originalUrl = typeof req?.originalUrl === 'string' ? req.originalUrl : ''
+    return originalUrl.split('?')[0] || ''
+  }
+
+  static isResponsesPath(fullPath) {
+    const path = (fullPath || '').toLowerCase()
+    return path.includes('/responses') || path.includes('/azure/response')
+  }
+
+  // 对齐官方 is_first_party_originator + 已知客户端 + 常见 env override（codex_*）
+  static isAllowedCodexOriginator(originatorValue) {
+    if (!originatorValue || typeof originatorValue !== 'string') {
+      return false
+    }
+    if (
+      originatorValue === 'codex_cli_rs' ||
+      originatorValue === 'codex-tui' ||
+      originatorValue === 'codex_vscode' ||
+      originatorValue === 'codex_exec'
+    ) {
+      return true
+    }
+    // 官方：originator.starts_with("Codex ")
+    if (originatorValue.startsWith('Codex ')) {
+      return true
+    }
+    // CODEX_INTERNAL_ORIGINATOR_OVERRIDE 常见形态：codex_* / codex-*
+    if (/^codex[_-]/i.test(originatorValue)) {
+      return true
+    }
+    return false
+  }
+
+  // 官方 UA：`${originator}/${version} (...)`；env override 时前缀随 originator 变化
+  static userAgentMatchesOriginator(userAgent, originatorValue) {
+    if (!userAgent || !originatorValue) {
+      return false
+    }
+    const escaped = originatorValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = new RegExp(`^${escaped}\\/[\\d.]+`, 'i')
+    return pattern.test(userAgent)
+  }
+
+  // 仅看 UA 是否像 Codex 客户端（无 originator 时的宽松探测）
+  static looksLikeCodexUserAgent(userAgent) {
+    if (!userAgent || typeof userAgent !== 'string') {
+      return false
+    }
+    return (
+      /^(codex_vscode|codex_cli_rs|codex_exec|codex-tui)\//i.test(userAgent) ||
+      /^Codex [^/]+\//.test(userAgent) ||
+      /^codex[_-][^/\s]+\//i.test(userAgent)
+    )
+  }
+
+  // 官方会话头是 session-id / thread-id；兼容历史 session_id / x-session-id
+  static extractSessionId(req) {
+    const headers = req?.headers || {}
+    const candidates = [
+      headers['session-id'],
+      headers.session_id,
+      headers['x-session-id'],
+      headers['thread-id'],
+      req?.body?.session_id,
+      req?.body?.conversation_id,
+      req?.body?.prompt_cache_key
+    ]
+    for (const value of candidates) {
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim()
+      }
+    }
+    return null
+  }
+
+  // Codex 客户端完整判定（单一契约）：
+  // - /openai、/azure、responses：必须 originator 合法且 UA 前缀一致（禁止仅 UA 退化）
+  // - 其他路径：无 originator 时可仅看 UA
+  // - responses 路径：额外要求 session-id
+  // 用于：客户端限制硬门 + 路由层是否跳过适配改包
+  static isCodexClientRequest(req) {
+    const userAgent = req?.headers?.['user-agent'] || ''
+    const originator = req?.headers?.originator || ''
+    const fullPath = CodexCliValidator.getFullRequestPath(req)
+    const lowerPath = fullPath.toLowerCase()
+    const requireOriginator =
+      lowerPath.startsWith('/openai') ||
+      lowerPath.startsWith('/azure') ||
+      CodexCliValidator.isResponsesPath(fullPath)
+
+    if (requireOriginator) {
+      // 严格：伪造 UA + session 但无 originator 不得过
+      if (
+        !CodexCliValidator.isAllowedCodexOriginator(originator) ||
+        !CodexCliValidator.userAgentMatchesOriginator(userAgent, originator)
+      ) {
+        return false
+      }
+    } else if (originator) {
+      if (
+        !CodexCliValidator.isAllowedCodexOriginator(originator) ||
+        !CodexCliValidator.userAgentMatchesOriginator(userAgent, originator)
+      ) {
+        return false
+      }
+    } else if (!CodexCliValidator.looksLikeCodexUserAgent(userAgent)) {
+      return false
+    }
+
+    // responses 写路径：缺 session-id 不视为完整 Codex 请求
+    // /models 只带 UA+originator，不要求 session-id
+    if (CodexCliValidator.isResponsesPath(fullPath)) {
+      const sessionId = CodexCliValidator.extractSessionId(req)
+      if (!sessionId || sessionId.length <= 20) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  /**
+   * 验证请求是否来自 Codex CLI（客户端限制硬门）
    * @param {Object} req - Express 请求对象
    * @returns {boolean} 验证结果
    */
   static validate(req) {
     try {
       const userAgent = req.headers['user-agent'] || ''
-      const originator = req.headers['originator'] || ''
-      const sessionId = req.headers['session_id']
+      const fullPath = CodexCliValidator.getFullRequestPath(req)
 
-      // 1. 基础 User-Agent 检查
-      // Codex CLI 的 UA 格式:
-      // - codex_vscode/0.35.0 (Windows 10.0.26100; x86_64) unknown (Cursor; 0.4.10)
-      // - codex_cli_rs/0.38.0 (Ubuntu 22.4.0; x86_64) WindowsTerminal
-      // - codex_exec/0.89.0 (Mac OS 26.2.0; arm64) xterm-256color (非交互式/脚本模式)
-      const codexCliPattern = /^(codex_vscode|codex_cli_rs|codex_exec)\/[\d.]+/i
-      const uaMatch = userAgent.match(codexCliPattern)
-
-      if (!uaMatch) {
-        logger.debug(`Codex CLI validation failed - UA mismatch: ${userAgent}`)
-        return false
-      }
-
-      // 2. 对于特定路径，进行额外的严格验证
-      // 对于 /openai 和 /azure 路径需要完整验证
       const strictValidationPaths = ['/openai', '/azure']
-      const needsStrictValidation =
-        req.path && strictValidationPaths.some((path) => req.path.startsWith(path))
+      const needsStrictValidation = strictValidationPaths.some((prefix) =>
+        fullPath.toLowerCase().startsWith(prefix)
+      )
 
       if (!needsStrictValidation) {
-        // 其他路径，只要 User-Agent 匹配就认为是 Codex CLI
-        logger.debug(`Codex CLI detected for path: ${req.path}, allowing access`)
+        if (!CodexCliValidator.looksLikeCodexUserAgent(userAgent)) {
+          logger.debug(`Codex CLI validation failed - UA mismatch: ${userAgent}`)
+          return false
+        }
+        logger.debug(`Codex CLI detected for path: ${fullPath}, allowing access`)
         return true
       }
 
-      // 3. 验证 originator 头必须与 UA 中的客户端类型匹配
-      const clientType = uaMatch[1].toLowerCase()
-      if (originator.toLowerCase() !== clientType) {
+      // /openai、/azure：与 isCodexClientRequest 完全同源，禁止再分叉
+      if (!CodexCliValidator.isCodexClientRequest(req)) {
         logger.debug(
-          `Codex CLI validation failed - originator mismatch. UA: ${clientType}, originator: ${originator}`
+          `Codex CLI validation failed - isCodexClientRequest=false path=${fullPath} UA=${userAgent}`
         )
         return false
       }
 
-      // 4. 检查 session_id - 必须存在且长度大于20
-      if (!sessionId || sessionId.length <= 20) {
-        logger.debug(`Codex CLI validation failed - session_id missing or too short: ${sessionId}`)
-        return false
-      }
-
-      // 5. 对于 /openai/responses 和 /azure/response 路径，额外检查 body 中的 instructions 字段
-      if (
-        req.path &&
-        (req.path.includes('/openai/responses') || req.path.includes('/azure/response'))
-      ) {
-        if (!req.body || !req.body.instructions) {
-          logger.debug(`Codex CLI validation failed - missing instructions in body for ${req.path}`)
-          return false
-        }
-
-        const expectedPrefix =
-          'You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI'
-        if (!req.body.instructions.startsWith(expectedPrefix)) {
-          logger.debug(`Codex CLI validation failed - invalid instructions prefix for ${req.path}`)
-          logger.debug(`Expected: "${expectedPrefix}..."`)
-          logger.debug(`Received: "${req.body.instructions.substring(0, 100)}..."`)
-          return false
-        }
-
-        // 额外检查 model 字段应该是 gpt-5.5
-        if (req.body.model && req.body.model !== 'gpt-5.5') {
-          logger.debug(`Codex CLI validation warning - unexpected model: ${req.body.model}`)
-          // 只记录警告，不拒绝请求
-        }
-      }
-
-      // 所有必要检查通过
-      logger.debug(`Codex CLI validation passed for UA: ${userAgent}`)
+      logger.debug(`Codex CLI validation passed for UA: ${userAgent}, path: ${fullPath}`)
       return true
     } catch (error) {
       logger.error('Error in CodexCliValidator:', error)
-      // 验证出错时默认拒绝
       return false
     }
   }
@@ -135,18 +231,6 @@ class CodexCliValidator {
     }
 
     return 0
-  }
-
-  /**
-   * 获取验证器信息
-   */
-  static getInfo() {
-    return {
-      id: this.getId(),
-      name: this.getName(),
-      description: this.getDescription(),
-      icon: CLIENT_DEFINITIONS.CODEX_CLI.icon
-    }
   }
 }
 

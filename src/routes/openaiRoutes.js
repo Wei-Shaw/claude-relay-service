@@ -21,6 +21,15 @@ const {
   extractOpenAICacheReadTokens
 } = require('../utils/requestDetailHelper')
 const requestBodyRuleService = require('../services/requestBodyRuleService')
+const modelService = require('../services/modelService')
+const CodexCliValidator = require('../validators/clients/codexCliValidator')
+const {
+  buildCodexModelsManifest,
+  buildOpenAIModelsList,
+  codexManifestEtag,
+  codexManifestETagMatches,
+  getDefaultCodexModelIds
+} = require('../utils/codexModelsManifest')
 
 // Codex CLI 系统提示词（非 Codex CLI 客户端请求时注入，统一端点也使用）
 const CODEX_CLI_INSTRUCTIONS =
@@ -314,11 +323,10 @@ const handleResponses = async (req, res) => {
       })
     }
 
-    // 判断是否为 Codex CLI 的请求（基于 User-Agent）
-    // 支持: codex_vscode, codex_cli_rs, codex_exec (非交互式/脚本模式)
-    const userAgent = req.headers['user-agent'] || ''
-    const codexCliPattern = /^(codex_vscode|codex_cli_rs|codex_exec)\/[\d.]+/i
-    const isCodexCLI = codexCliPattern.test(userAgent)
+    // 是否为 Codex 客户端：与 CodexCliValidator 单一契约同源
+    // （UA+originator；responses 路径还要求 session-id）
+    // 识别为 Codex 时跳过适配改包，原样转发
+    const isCodexCLI = CodexCliValidator.isCodexClientRequest(req)
 
     const standardResponsesRoute = isStandardResponsesRoute(req)
     const compactRoute = isCompactResponsesRoute(req)
@@ -361,10 +369,13 @@ const handleResponses = async (req, res) => {
     req._serviceTier = req.body?.service_tier || null
 
     // 从最终请求体中提取模型、会话 ID 和流式标志
+    // 官方 Codex 头是 session-id / thread-id；兼容历史 session_id / x-session-id
     // NOTE: For some clients, prompt_cache_key is the only stable per-session key.
     const sessionId =
+      req.headers['session-id'] ||
       req.headers['session_id'] ||
       req.headers['x-session-id'] ||
+      req.headers['thread-id'] ||
       req.body?.session_id ||
       req.body?.conversation_id ||
       req.body?.prompt_cache_key ||
@@ -407,12 +418,29 @@ const handleResponses = async (req, res) => {
     // 基于白名单构造上游所需的请求头，确保键为小写且值受控
     const incoming = req.headers || {}
 
-    const allowedKeys = ['version', 'openai-beta', 'session_id']
+    // 官方 Codex：session-id / thread-id；兼容历史 session_id / x-session-id
+    const allowedKeys = [
+      'version',
+      'openai-beta',
+      'session_id',
+      'session-id',
+      'thread-id',
+      'originator'
+    ]
 
     const headers = {}
     for (const key of allowedKeys) {
       if (incoming[key] !== undefined) {
         headers[key] = incoming[key]
+      }
+    }
+
+    // 统一补官方 session-id：历史 session_id / x-session-id 只影响本地下游选号还不够，必须透传到上游
+    if (headers['session-id'] === undefined) {
+      if (headers.session_id !== undefined) {
+        headers['session-id'] = headers.session_id
+      } else if (incoming['x-session-id'] !== undefined) {
+        headers['session-id'] = incoming['x-session-id']
       }
     }
 
@@ -1046,7 +1074,12 @@ async function handleImages(req, res) {
       })
     }
     const n = body.n || 1
-    const sessionId = req.headers['session_id'] || req.body?.session_id || null
+    const sessionId =
+      req.headers['session-id'] ||
+      req.headers['session_id'] ||
+      req.headers['thread-id'] ||
+      req.body?.session_id ||
+      null
     sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
 
     const authResult = await getOpenAIAuthToken(apiKeyData, sessionId, 'gpt-5.4-mini')
@@ -1383,6 +1416,76 @@ router.post('/responses', authenticateApiKey, handleResponses)
 router.post('/v1/responses', authenticateApiKey, handleResponses)
 router.post('/responses/compact', authenticateApiKey, handleResponses)
 router.post('/v1/responses/compact', authenticateApiKey, handleResponses)
+
+// Codex CLI / VS Code 插件会请求 GET /models?client_version=...
+// 带 client_version 时返回 Codex ModelsResponse（{ models: ModelInfo[] }）
+// 不带时返回 OpenAI 兼容列表，数据源走 modelService 权威 OpenAI 支持集
+const applyModelBlacklist = (modelIds, apiKeyData) => {
+  if (!apiKeyData?.enableModelRestriction || !Array.isArray(apiKeyData.restrictedModels)) {
+    return modelIds
+  }
+  const restricted = new Set(
+    apiKeyData.restrictedModels
+      .filter((model) => typeof model === 'string')
+      .map((model) => model.trim())
+      .filter(Boolean)
+  )
+  if (restricted.size === 0) {
+    return modelIds
+  }
+  // 空数组是合法结果（黑名单清空），禁止回退全量
+  return modelIds.filter((id) => !restricted.has(id))
+}
+
+const handleModels = async (req, res) => {
+  try {
+    const apiKeyData = req.apiKey
+    if (!checkOpenAIPermissions(apiKeyData)) {
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access OpenAI',
+          type: 'permission_denied'
+        }
+      })
+    }
+
+    const clientVersion =
+      typeof req.query?.client_version === 'string' ? req.query.client_version.trim() : ''
+
+    if (clientVersion) {
+      const codexModelIds = applyModelBlacklist(getDefaultCodexModelIds(), apiKeyData)
+      const manifest = buildCodexModelsManifest(codexModelIds)
+      const etag = codexManifestEtag(manifest)
+      res.setHeader('ETag', etag)
+      logger.debug(
+        `[openai/models] client_version=${clientVersion} models=${manifest.models.length} etag=${etag}`
+      )
+      if (codexManifestETagMatches(req.headers['if-none-match'], etag)) {
+        return res.status(304).end()
+      }
+      return res.json(manifest)
+    }
+
+    // 无 client_version：OpenAI 兼容列表，用 modelService 权威目录
+    const openAIModelIds = applyModelBlacklist(
+      modelService.getModelsByProvider('openai').map((model) => model.id),
+      apiKeyData
+    )
+    return res.json(buildOpenAIModelsList(openAIModelIds))
+  } catch (error) {
+    logger.error('Failed to get OpenAI/Codex models:', error)
+    console.error(error)
+    return res.status(500).json({
+      error: {
+        message: 'Failed to retrieve models',
+        type: 'api_error'
+      }
+    })
+  }
+}
+
+router.get('/models', authenticateApiKey, handleModels)
+router.get('/v1/models', authenticateApiKey, handleModels)
 
 // 使用情况统计端点
 router.get('/usage', authenticateApiKey, async (req, res) => {
