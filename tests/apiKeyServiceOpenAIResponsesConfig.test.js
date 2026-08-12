@@ -51,6 +51,7 @@ jest.mock('../src/utils/modelHelper', () => ({
   isClaudeFamilyModel: jest.fn(() => false)
 }))
 jest.mock('../src/utils/requestDetailHelper', () => ({
+  ...jest.requireActual('../src/utils/requestDetailHelper'),
   finalizeRequestDetailMeta: jest.fn((value) => value)
 }))
 
@@ -213,6 +214,12 @@ describe('apiKeyService openai responses config', () => {
         pricingSource: 'unknown-fallback',
         isLongContextRequest: false
       },
+      pricing: {
+        input: 3,
+        output: 15,
+        cacheWrite: 3.75,
+        cacheRead: 0.3
+      },
       usingDynamicPricing: false
     })
 
@@ -259,6 +266,12 @@ describe('apiKeyService openai responses config', () => {
         realCost: 0.052997,
         usedFallbackPricing: true,
         pricingSource: 'unknown-fallback',
+        unitPricing: {
+          input: 3,
+          output: 15,
+          cacheCreate: 3.75,
+          cacheRead: 0.3
+        },
         costBreakdown: expect.objectContaining({
           input: 0.051618,
           output: 0.000765,
@@ -274,7 +287,13 @@ describe('apiKeyService openai responses config', () => {
         cost: 0.052997,
         realCost: 0.052997,
         usedFallbackPricing: true,
-        pricingSource: 'unknown-fallback'
+        pricingSource: 'unknown-fallback',
+        unitPricing: {
+          input: 3,
+          output: 15,
+          cacheCreate: 3.75,
+          cacheRead: 0.3
+        }
       })
     )
   })

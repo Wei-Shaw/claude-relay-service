@@ -113,6 +113,12 @@ describe('requestDetailService', () => {
       cacheReadTokens: 3,
       cacheCreateTokens: 2,
       cost: 0.123456,
+      unitPricing: {
+        input: 5,
+        output: 30,
+        cacheWrite: 6.25,
+        cacheRead: 0.5
+      },
       requestBody: {
         apiKey: 'super-secret',
         model: 'gpt-5.4',
@@ -138,6 +144,12 @@ describe('requestDetailService', () => {
     expect(storedPayload.mappedModel).toBe('codex-auto-review')
     expect(storedPayload.outboundModel).toBe('codex-auto-review')
     expect(storedPayload.responseModel).toBe('gpt-5.6-luna')
+    expect(storedPayload.unitPricing).toEqual({
+      input: 5,
+      output: 30,
+      cacheCreate: 6.25,
+      cacheRead: 0.5
+    })
     expect(storedPayload.reasoningDisplay).toBe('medium')
     expect(storedPayload.reasoningSource).toBe('reasoning.effort')
     expect(multi.zadd).toHaveBeenCalled()
@@ -161,7 +173,13 @@ describe('requestDetailService', () => {
       requestedModel: 'codex-auto-review',
       mappedModel: 'codex-auto-review',
       outboundModel: 'codex-auto-review',
-      responseModel: 'gpt-5.6-luna'
+      responseModel: 'gpt-5.6-luna',
+      unitPricing: {
+        input: 5,
+        output: 30,
+        cacheCreate: 5,
+        cacheRead: 0.5
+      }
     }
 
     claudeRelayConfigService.getConfig.mockResolvedValue({
@@ -187,6 +205,7 @@ describe('requestDetailService', () => {
     expect(storedPayload.mappedModel).toBe('codex-auto-review')
     expect(storedPayload.outboundModel).toBe('codex-auto-review')
     expect(storedPayload.responseModel).toBe('gpt-5.6-luna')
+    expect(storedPayload.unitPricing).toEqual(existing.unitPricing)
   })
 
   test('stores full request and upstream response only for errors when enabled', async () => {
@@ -543,6 +562,12 @@ describe('requestDetailService', () => {
         usedFallbackPricing: true,
         pricingSource: 'unknown-fallback'
       },
+      pricing: {
+        input: 3,
+        output: 15,
+        cacheWrite: 3.75,
+        cacheRead: 0.3
+      },
       usingDynamicPricing: false
     })
 
@@ -593,6 +618,12 @@ describe('requestDetailService', () => {
     expect(result.records[0].costRecomputed).toBe(true)
     expect(result.records[0].usedFallbackPricing).toBe(true)
     expect(result.records[0].pricingSource).toBe('unknown-fallback')
+    expect(result.records[0].unitPricing).toEqual({
+      input: 3,
+      output: 15,
+      cacheCreate: 3.75,
+      cacheRead: 0.3
+    })
     expect(result.records[0].realCostBreakdown).toEqual(
       expect.objectContaining({
         input: 0.051618,
