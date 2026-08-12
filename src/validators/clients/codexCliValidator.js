@@ -104,14 +104,14 @@ class CodexCliValidator {
     )
   }
 
-  // 官方会话头是 session-id / thread-id；兼容历史 session_id / x-session-id
+  // 只取 session 系头（官方 session-id + 历史 session_id / x-session-id）
+  // 不含 thread-id：官方 build_session_headers 把二者并列写入，不能互相顶替
   static extractSessionId(req) {
     const headers = req?.headers || {}
     const candidates = [
       headers['session-id'],
       headers.session_id,
       headers['x-session-id'],
-      headers['thread-id'],
       req?.body?.session_id,
       req?.body?.conversation_id,
       req?.body?.prompt_cache_key

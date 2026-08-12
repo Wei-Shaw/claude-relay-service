@@ -1074,9 +1074,11 @@ async function handleImages(req, res) {
       })
     }
     const n = body.n || 1
+    // 与 handleResponses 同源：官方 session-id + 历史 session_id / x-session-id；thread-id 仅作粘性 fallback
     const sessionId =
       req.headers['session-id'] ||
       req.headers['session_id'] ||
+      req.headers['x-session-id'] ||
       req.headers['thread-id'] ||
       req.body?.session_id ||
       null
