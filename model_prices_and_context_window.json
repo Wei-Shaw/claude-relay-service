@@ -165,6 +165,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_xhigh_reasoning_effort": true,
+    "thinking_always_on": true,
     "tool_use_system_prompt_tokens": 346
   },
   "claude-haiku-4-5": {
@@ -254,6 +255,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_xhigh_reasoning_effort": true,
+    "thinking_always_on": true,
     "tool_use_system_prompt_tokens": 346
   },
   "claude-mythos-preview": {
@@ -288,7 +290,8 @@
     "supports_sampling_params": false,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_xhigh_reasoning_effort": true
+    "supports_xhigh_reasoning_effort": true,
+    "thinking_always_on": true
   },
   "claude-opus-4-1": {
     "cache_creation_input_token_cost": 1.875e-05,
@@ -2079,8 +2082,10 @@
     "web_search_billing_unit": "per_query"
   },
   "gemini-3.1-flash-lite-image": {
+    "cache_read_input_token_cost": 2.5e-08,
     "input_cost_per_image": 0.00028,
     "input_cost_per_token": 2.5e-07,
+    "input_cost_per_token_batches": 1.25e-07,
     "litellm_provider": "vertex_ai-language-models",
     "max_input_tokens": 65536,
     "max_output_tokens": 4096,
@@ -2089,6 +2094,7 @@
     "output_cost_per_image": 0.0336,
     "output_cost_per_image_token": 3e-05,
     "output_cost_per_token": 1.5e-06,
+    "output_cost_per_token_batches": 7.5e-07,
     "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing#gemini-models",
     "supported_endpoints": [
       "/v1/chat/completions",
@@ -2104,10 +2110,12 @@
       "image"
     ],
     "supports_function_calling": false,
+    "supports_pdf_input": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": false,
     "supports_system_messages": true,
+    "supports_video_input": true,
     "supports_vision": true
   },
   "gemini-3.1-flash-lite-preview": {
