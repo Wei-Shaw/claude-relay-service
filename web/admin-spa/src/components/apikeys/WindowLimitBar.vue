@@ -13,13 +13,13 @@
       <!-- 文字层 -->
       <div class="relative z-10 flex h-full items-center justify-between px-2">
         <div class="flex items-center gap-1.5">
-          <i class="fas fa-clock text-xs text-blue-600 dark:text-blue-400" />
-          <span class="text-xs font-medium text-gray-700 dark:text-gray-200">
+          <i class="fas fa-clock text-sm text-blue-600 dark:text-blue-400" />
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
             {{ rateLimitWindow }}分钟窗口
           </span>
         </div>
         <span
-          class="text-xs font-bold"
+          class="text-sm font-bold"
           :class="
             remainingSeconds > 0
               ? 'text-blue-700 dark:text-blue-300'
@@ -48,8 +48,8 @@
 
         <!-- 文字 -->
         <div class="relative z-10 flex h-full items-center justify-between px-2">
-          <span class="text-[10px] font-medium" :class="getCostTextClass()">费用</span>
-          <span class="text-[10px] font-bold" :class="getCostValueTextClass()">
+          <span class="text-sm font-medium" :class="getCostTextClass()">费用</span>
+          <span class="text-sm font-bold" :class="getCostValueTextClass()">
             ${{ currentCost.toFixed(1) }}/${{ costLimit.toFixed(0) }}
           </span>
         </div>
@@ -70,8 +70,8 @@
 
         <!-- 文字 -->
         <div class="relative z-10 flex h-full items-center justify-between px-2">
-          <span class="text-[10px] font-medium" :class="getRequestTextClass()">请求</span>
-          <span class="text-[10px] font-bold" :class="getRequestValueTextClass()">
+          <span class="text-sm font-medium" :class="getRequestTextClass()">请求</span>
+          <span class="text-sm font-bold" :class="getRequestValueTextClass()">
             {{ currentRequests }}/{{ requestLimit }}
           </span>
         </div>

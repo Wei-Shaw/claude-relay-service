@@ -62,16 +62,25 @@
             for="password"
             >密码</label
           >
-          <input
-            id="password"
-            v-model="loginForm.password"
-            autocomplete="current-password"
-            class="form-input w-full"
-            name="password"
-            placeholder="请输入密码"
-            required
-            type="password"
-          />
+          <div class="relative">
+            <input
+              id="password"
+              v-model="loginForm.password"
+              autocomplete="current-password"
+              class="form-input w-full pr-10"
+              name="password"
+              placeholder="请输入密码"
+              required
+              :type="showPassword ? 'text' : 'password'"
+            />
+            <button
+              class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400"
+              type="button"
+              @click="showPassword = !showPassword"
+            >
+              <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" />
+            </button>
+          </div>
         </div>
 
         <button
@@ -87,7 +96,7 @@
 
       <div
         v-if="authStore.loginError"
-        class="mt-4 rounded-lg border border-red-500/30 bg-red-500/20 p-3 text-center text-xs text-red-800 backdrop-blur-sm dark:text-red-400 sm:mt-6 sm:rounded-xl sm:p-4 sm:text-sm"
+        class="mt-4 rounded-lg border border-red-500/30 bg-red-500/20 p-3 text-center text-sm text-red-800 backdrop-blur-sm dark:text-red-400 sm:mt-6 sm:rounded-xl sm:p-4 sm:text-sm"
       >
         <i class="fas fa-exclamation-triangle mr-2" />{{ authStore.loginError }}
       </div>
@@ -109,6 +118,7 @@ const loginForm = ref({
   username: '',
   password: ''
 })
+const showPassword = ref(false)
 
 onMounted(() => {
   // 初始化主题

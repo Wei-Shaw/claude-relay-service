@@ -2,6 +2,8 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const { v4: uuidv4 } = require('uuid')
 
+const { RedisKeys } = require('../constants/redisKeys')
+
 /**
  * Token 刷新锁服务
  * 提供分布式锁机制，避免并发刷新问题
@@ -77,7 +79,7 @@ class TokenRefreshService {
    * @returns {Promise<boolean>} 是否成功获取锁
    */
   async acquireRefreshLock(accountId, platform = 'claude') {
-    const lockKey = `token_refresh_lock:${platform}:${accountId}`
+    const lockKey = RedisKeys.lock.tokenRefresh(platform, accountId)
     return await this.acquireLock(lockKey)
   }
 
@@ -87,7 +89,7 @@ class TokenRefreshService {
    * @param {string} platform - 平台类型 (claude/gemini)
    */
   async releaseRefreshLock(accountId, platform = 'claude') {
-    const lockKey = `token_refresh_lock:${platform}:${accountId}`
+    const lockKey = RedisKeys.lock.tokenRefresh(platform, accountId)
     await this.releaseLock(lockKey)
   }
 
@@ -98,7 +100,7 @@ class TokenRefreshService {
    * @returns {Promise<boolean>} 锁是否存在
    */
   async isRefreshLocked(accountId, platform = 'claude') {
-    const lockKey = `token_refresh_lock:${platform}:${accountId}`
+    const lockKey = RedisKeys.lock.tokenRefresh(platform, accountId)
     try {
       const client = redis.getClientSafe()
       const exists = await client.exists(lockKey)
@@ -116,7 +118,7 @@ class TokenRefreshService {
    * @returns {Promise<number>} 剩余秒数，-1表示锁不存在
    */
   async getLockTTL(accountId, platform = 'claude') {
-    const lockKey = `token_refresh_lock:${platform}:${accountId}`
+    const lockKey = RedisKeys.lock.tokenRefresh(platform, accountId)
     try {
       const client = redis.getClientSafe()
       const ttl = await client.ttl(lockKey)

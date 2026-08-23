@@ -19,6 +19,7 @@ function registerAllProviders(balanceService) {
   balanceService.registerProvider('gemini-api', new GenericBalanceProvider('gemini-api'))
   balanceService.registerProvider('bedrock', new GenericBalanceProvider('bedrock'))
   balanceService.registerProvider('droid', new GenericBalanceProvider('droid'))
+  balanceService.registerProvider('grok', new GenericBalanceProvider('grok'))
   balanceService.registerProvider('ccr', new GenericBalanceProvider('ccr'))
 }
 

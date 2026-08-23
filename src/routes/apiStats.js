@@ -1,5 +1,6 @@
 const express = require('express')
 const redis = require('../models/redis')
+const { RedisKeys, TTL } = require('../constants/redisKeys')
 const logger = require('../utils/logger')
 const apiKeyService = require('../services/apiKeyService')
 const CostCalculator = require('../utils/costCalculator')
@@ -12,12 +13,31 @@ const {
   sanitizeErrorMsg
 } = require('../utils/testPayloadHelper')
 const modelsConfig = require('../../config/models')
+const testModelConfigService = require('../services/testModelConfigService')
 const { getSafeMessage } = require('../utils/errorSanitizer')
+const { parseDateTimeQuery } = require('../utils/dateTime')
 
 const router = express.Router()
 
+const accountTypeNames = {
+  claude: 'Claude官方',
+  'claude-official': 'Claude官方',
+  'claude-console': 'Claude Console',
+  ccr: 'Claude Console Relay',
+  openai: 'OpenAI',
+  'openai-responses': 'OpenAI Responses',
+  gemini: 'Gemini',
+  'gemini-api': 'Gemini API',
+  'azure-openai': 'Azure OpenAI',
+  azure_openai: 'Azure OpenAI',
+  droid: 'Droid',
+  grok: 'Grok',
+  bedrock: 'AWS Bedrock',
+  unknown: '未知渠道'
+}
+
 // 📋 获取可用模型列表（公开接口）
-router.get('/models', (req, res) => {
+router.get('/models', async (req, res) => {
   const { service } = req.query
 
   if (service) {
@@ -29,6 +49,10 @@ router.get('/models', (req, res) => {
     })
   }
 
+  // 测试默认模型配置（后台可配置，连通性测试弹窗读取）
+  // 仅取模型映射，剥离 updatedAt/updatedBy 等管理元数据，避免公开接口泄露管理员信息
+  const defaultModels = await testModelConfigService.getModelDefaults()
+
   // 返回所有模型（按服务分组 + 平台维度）
   res.json({
     success: true,
@@ -36,9 +60,11 @@ router.get('/models', (req, res) => {
       claude: modelsConfig.CLAUDE_MODELS,
       gemini: modelsConfig.GEMINI_MODELS,
       openai: modelsConfig.OPENAI_MODELS,
+      grok: modelsConfig.GROK_MODELS,
       other: modelsConfig.OTHER_MODELS,
       all: modelsConfig.getAllModels(),
-      platforms: modelsConfig.PLATFORM_TEST_MODELS
+      platforms: modelsConfig.PLATFORM_TEST_MODELS,
+      defaultModels
     }
   })
 })
@@ -249,7 +275,7 @@ router.post('/api/user-stats', async (req, res) => {
       const client = redis.getClientSafe()
 
       // 读取累积的总费用（没有 TTL 的持久键）
-      const totalCostKey = `usage:cost:total:${keyId}`
+      const totalCostKey = RedisKeys.usage.costTotal(keyId)
       const allTimeCost = parseFloat((await client.get(totalCostKey)) || '0')
 
       if (allTimeCost > 0) {
@@ -389,10 +415,10 @@ router.post('/api/user-stats', async (req, res) => {
       // 获取当前时间窗口的请求次数、Token使用量和费用
       if (fullKeyData.rateLimitWindow > 0) {
         const client = redis.getClientSafe()
-        const requestCountKey = `rate_limit:requests:${keyId}`
-        const tokenCountKey = `rate_limit:tokens:${keyId}`
-        const costCountKey = `rate_limit:cost:${keyId}` // 新增：费用计数key
-        const windowStartKey = `rate_limit:window_start:${keyId}`
+        const requestCountKey = RedisKeys.rateLimit.requests(keyId)
+        const tokenCountKey = RedisKeys.rateLimit.tokens(keyId)
+        const costCountKey = RedisKeys.rateLimit.cost(keyId) // 新增：费用计数key
+        const windowStartKey = RedisKeys.rateLimit.windowStart(keyId)
 
         currentWindowRequests = parseInt((await client.get(requestCountKey)) || '0')
         currentWindowTokens = parseInt((await client.get(tokenCountKey)) || '0')
@@ -403,7 +429,7 @@ router.post('/api/user-stats', async (req, res) => {
         if (windowStart) {
           const now = Date.now()
           windowStartTime = parseInt(windowStart)
-          const windowDuration = fullKeyData.rateLimitWindow * 60 * 1000 // 转换为毫秒
+          const windowDuration = TTL.rateLimitWindowMs(fullKeyData.rateLimitWindow) // 转换为毫秒
           windowEndTime = windowStartTime + windowDuration
 
           // 如果窗口还有效
@@ -582,6 +608,290 @@ router.post('/api/user-stats', async (req, res) => {
     return res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to retrieve API key statistics'
+    })
+  }
+})
+
+router.get('/api/user-usage-records', async (req, res) => {
+  try {
+    const {
+      apiId,
+      page = 1,
+      pageSize = 50,
+      startDate,
+      endDate,
+      model,
+      sortOrder = 'desc'
+    } = req.query
+
+    if (
+      typeof apiId !== 'string' ||
+      !apiId.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid API ID format',
+        message: 'API ID must be a valid UUID'
+      })
+    }
+
+    const pageNumber = Math.max(parseInt(page, 10) || 1, 1)
+    const pageSizeNumber = Math.min(Math.max(parseInt(pageSize, 10) || 50, 1), 200)
+    const normalizedSortOrder = sortOrder === 'asc' ? 'asc' : 'desc'
+
+    const startTime = parseDateTimeQuery(startDate)
+    const endTime = parseDateTimeQuery(endDate)
+
+    if (
+      (startDate && Number.isNaN(startTime?.getTime())) ||
+      (endDate && Number.isNaN(endTime?.getTime()))
+    ) {
+      return res.status(400).json({ success: false, error: 'Invalid date range' })
+    }
+
+    if (startTime && endTime && startTime > endTime) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Start date must be before or equal to end date' })
+    }
+
+    const keyData = await redis.getApiKey(apiId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'API key not found',
+        message: 'The specified API key does not exist'
+      })
+    }
+
+    if (keyData.isActive !== 'true') {
+      return res.status(403).json({
+        success: false,
+        error: 'API key is disabled',
+        message: `API Key "${keyData.name || 'Unknown'}" 已被禁用`
+      })
+    }
+
+    if (keyData.expiresAt && new Date() > new Date(keyData.expiresAt)) {
+      return res.status(403).json({
+        success: false,
+        error: 'API key has expired',
+        message: `API Key "${keyData.name || 'Unknown'}" 已过期`
+      })
+    }
+
+    const rawRecords = await redis.getUsageRecords(apiId, 5000)
+
+    const toUsageObject = (record) => {
+      const usage = {
+        input_tokens: record.inputTokens || 0,
+        output_tokens: record.outputTokens || 0,
+        cache_creation_input_tokens: record.cacheCreateTokens || 0,
+        cache_read_input_tokens: record.cacheReadTokens || 0,
+        cache_creation: record.cacheCreation || record.cache_creation || null
+      }
+
+      if (!usage.cache_creation) {
+        const eph5m = parseInt(record.ephemeral5mTokens) || 0
+        const eph1h = parseInt(record.ephemeral1hTokens) || 0
+        if (eph5m > 0 || eph1h > 0) {
+          usage.cache_creation = {
+            ephemeral_5m_input_tokens: eph5m,
+            ephemeral_1h_input_tokens: eph1h
+          }
+        }
+      }
+
+      return usage
+    }
+
+    const withinRange = (record) => {
+      if (!record.timestamp) {
+        return false
+      }
+
+      const ts = new Date(record.timestamp)
+      if (Number.isNaN(ts.getTime())) {
+        return false
+      }
+
+      if (startTime && ts < startTime) {
+        return false
+      }
+      if (endTime && ts > endTime) {
+        return false
+      }
+
+      return true
+    }
+
+    const filteredRecords = rawRecords.filter((record) => {
+      if (!withinRange(record)) {
+        return false
+      }
+      if (model && record.model !== model) {
+        return false
+      }
+      return true
+    })
+
+    filteredRecords.sort((a, b) => {
+      const aTime = new Date(a.timestamp).getTime()
+      const bTime = new Date(b.timestamp).getTime()
+      if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+        return 0
+      }
+      return normalizedSortOrder === 'asc' ? aTime - bTime : bTime - aTime
+    })
+
+    const summary = {
+      totalRequests: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreateTokens: 0,
+      cacheReadTokens: 0,
+      totalTokens: 0,
+      totalCost: 0
+    }
+
+    const modelSet = new Set()
+    let earliestTimestamp = null
+    let latestTimestamp = null
+
+    for (const record of filteredRecords) {
+      const usage = toUsageObject(record)
+      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const computedCost =
+        typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const totalTokens =
+        record.totalTokens ||
+        usage.input_tokens +
+          usage.output_tokens +
+          usage.cache_creation_input_tokens +
+          usage.cache_read_input_tokens
+
+      summary.totalRequests += 1
+      summary.inputTokens += usage.input_tokens
+      summary.outputTokens += usage.output_tokens
+      summary.cacheCreateTokens += usage.cache_creation_input_tokens
+      summary.cacheReadTokens += usage.cache_read_input_tokens
+      summary.totalTokens += totalTokens
+      summary.totalCost += computedCost
+
+      if (record.model) {
+        modelSet.add(record.model)
+      }
+
+      if (record.timestamp) {
+        const ts = new Date(record.timestamp)
+        if (!Number.isNaN(ts.getTime())) {
+          if (!earliestTimestamp || ts < earliestTimestamp) {
+            earliestTimestamp = ts
+          }
+          if (!latestTimestamp || ts > latestTimestamp) {
+            latestTimestamp = ts
+          }
+        }
+      }
+    }
+
+    const totalRecords = filteredRecords.length
+    const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / pageSizeNumber) : 0
+    const safePage = totalPages > 0 ? Math.min(pageNumber, totalPages) : 1
+    const startIndex = (safePage - 1) * pageSizeNumber
+    const pageRecords =
+      totalRecords === 0 ? [] : filteredRecords.slice(startIndex, startIndex + pageSizeNumber)
+
+    const records = pageRecords.map((record) => {
+      const usage = toUsageObject(record)
+      const costData = CostCalculator.calculateCost(usage, record.model || 'unknown')
+      const computedCost =
+        typeof record.cost === 'number' ? record.cost : costData?.costs?.total || 0
+      const realCost =
+        typeof record.realCost === 'number' ? record.realCost : costData?.costs?.total || 0
+      const totalTokens =
+        record.totalTokens ||
+        usage.input_tokens +
+          usage.output_tokens +
+          usage.cache_creation_input_tokens +
+          usage.cache_read_input_tokens
+      const accountType = record.accountType || 'unknown'
+
+      return {
+        timestamp: record.timestamp,
+        model: record.model || 'unknown',
+        accountType,
+        accountTypeName: accountTypeNames[accountType] || '未知渠道',
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cacheCreateTokens: usage.cache_creation_input_tokens,
+        cacheReadTokens: usage.cache_read_input_tokens,
+        ephemeral5mTokens: record.ephemeral5mTokens || 0,
+        ephemeral1hTokens: record.ephemeral1hTokens || 0,
+        totalTokens,
+        isLongContextRequest: record.isLongContext || record.isLongContextRequest || false,
+        cost: Number(computedCost.toFixed(6)),
+        costFormatted: CostCalculator.formatCost(computedCost),
+        realCost: Number(realCost.toFixed(6)),
+        realCostFormatted: CostCalculator.formatCost(realCost),
+        costBreakdown: record.realCostBreakdown ||
+          record.costBreakdown || {
+            input: costData?.costs?.input || 0,
+            output: costData?.costs?.output || 0,
+            cacheCreate: costData?.costs?.cacheWrite || 0,
+            cacheRead: costData?.costs?.cacheRead || 0,
+            total: costData?.costs?.total || computedCost
+          },
+        responseTime: record.responseTime || null
+      }
+    })
+
+    return res.json({
+      success: true,
+      data: {
+        records,
+        pagination: {
+          currentPage: safePage,
+          pageSize: pageSizeNumber,
+          totalRecords,
+          totalPages,
+          hasNextPage: totalPages > 0 && safePage < totalPages,
+          hasPreviousPage: totalPages > 0 && safePage > 1
+        },
+        filters: {
+          startDate: startDate || null,
+          endDate: endDate || null,
+          model: model || null,
+          accountId: null,
+          sortOrder: normalizedSortOrder
+        },
+        apiKeyInfo: {
+          id: apiId,
+          name: keyData.name || keyData.label || apiId
+        },
+        summary: {
+          ...summary,
+          totalCost: Number(summary.totalCost.toFixed(6)),
+          avgCost:
+            summary.totalRequests > 0
+              ? Number((summary.totalCost / summary.totalRequests).toFixed(6))
+              : 0
+        },
+        availableFilters: {
+          models: Array.from(modelSet),
+          accounts: [],
+          dateRange: {
+            earliest: earliestTimestamp ? earliestTimestamp.toISOString() : null,
+            latest: latestTimestamp ? latestTimestamp.toISOString() : null
+          }
+        }
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get public API key usage records:', error)
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to retrieve API key usage records'
     })
   }
 })
@@ -950,7 +1260,8 @@ router.post('/api-key/test', async (req, res) => {
   const { sendStreamTestRequest } = require('../utils/testPayloadHelper')
 
   try {
-    const { apiKey, model = 'claude-sonnet-4-5-20250929', prompt = 'hi' } = req.body
+    const { apiKey, prompt = 'hi' } = req.body
+    const model = await testModelConfigService.resolveApikeyModel('claude', req.body.model)
     const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
 
     if (!apiKey) {
@@ -1015,7 +1326,8 @@ router.post('/api-key/test-gemini', async (req, res) => {
   const { createGeminiTestPayload } = require('../utils/testPayloadHelper')
 
   try {
-    const { apiKey, model = 'gemini-2.5-pro', prompt = 'hi' } = req.body
+    const { apiKey, prompt = 'hi' } = req.body
+    const model = await testModelConfigService.resolveApikeyModel('gemini', req.body.model)
     const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
 
     if (!apiKey) {
@@ -1167,7 +1479,8 @@ router.post('/api-key/test-openai', async (req, res) => {
   const { createOpenAITestPayload } = require('../utils/testPayloadHelper')
 
   try {
-    const { apiKey, model = 'gpt-5', prompt = 'hi' } = req.body
+    const { apiKey, prompt = 'hi' } = req.body
+    const model = await testModelConfigService.resolveApikeyModel('openai', req.body.model)
     const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
 
     if (!apiKey) {
@@ -1363,8 +1676,8 @@ router.post('/api/user-model-stats', async (req, res) => {
       keyData.usage = { total: usage.total }
     } else if (apiKey) {
       // 通过 apiKey 查询（保持向后兼容）
-      // 验证API Key
-      const validation = await apiKeyService.validateApiKey(apiKey)
+      // 验证API Key（使用不触发激活的验证方法，与其它统计接口一致）
+      const validation = await apiKeyService.validateApiKeyForStats(apiKey)
 
       if (!validation.valid) {
         const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
@@ -1407,7 +1720,7 @@ router.post('/api/user-model-stats', async (req, res) => {
       pattern = `usage:${keyId}:model:daily:*:${today}`
       matchRegex = /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
     } else if (period === 'alltime') {
-      pattern = `usage:${keyId}:model:alltime:*`
+      pattern = RedisKeys.usage.keyAlltimePattern(keyId)
       matchRegex = /usage:.+:model:alltime:(.+)$/
     } else {
       // monthly
@@ -1525,6 +1838,33 @@ router.get('/service-rates', async (req, res) => {
   }
 })
 
+// 💰 获取模型价格列表（公开只读，用户统计页展示用）
+router.get('/model-pricing', async (req, res) => {
+  const pricingService = require('../services/pricingService')
+  try {
+    if (!pricingService.pricingData || Object.keys(pricingService.pricingData).length === 0) {
+      await pricingService.loadPricingData()
+    }
+    const status = pricingService.getStatus()
+    res.json({
+      success: true,
+      data: {
+        pricing: pricingService.pricingData || {},
+        status: {
+          lastUpdated: status.lastUpdated,
+          modelCount: status.modelCount
+        }
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get public model pricing:', error)
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to retrieve model pricing'
+    })
+  }
+})
+
 // 🎫 公开的额度卡兑换接口（通过 apiId 验证身份）
 router.post('/api/redeem-card', async (req, res) => {
   const quotaCardService = require('../services/quotaCardService')
@@ -1535,7 +1875,7 @@ router.post('/api/redeem-card', async (req, res) => {
     const hour = new Date().toISOString().slice(0, 13)
 
     // 防暴力破解：检查失败锁定
-    const failKey = `redeem_card:fail:${clientIP}`
+    const failKey = RedisKeys.redeemCard.fail(clientIP)
     const failCount = parseInt((await redis.client.get(failKey)) || '0')
     if (failCount >= 5) {
       logger.security(`🔒 Card redemption locked for IP: ${clientIP}`)
@@ -1546,9 +1886,9 @@ router.post('/api/redeem-card', async (req, res) => {
     }
 
     // 防暴力破解：检查 IP 速率限制
-    const ipKey = `redeem_card:ip:${clientIP}:${hour}`
+    const ipKey = RedisKeys.redeemCard.ip(clientIP, hour)
     const ipCount = await redis.client.incr(ipKey)
-    await redis.client.expire(ipKey, 3600)
+    await redis.client.expire(ipKey, TTL.redeemCardWindow)
     if (ipCount > 10) {
       logger.security(`🚨 Card redemption rate limit for IP: ${clientIP}`)
       return res.status(429).json({
@@ -1606,10 +1946,10 @@ router.post('/api/redeem-card', async (req, res) => {
   } catch (error) {
     // 失败时增加失败计数（静默处理，不影响错误响应）
     const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
-    const failKey = `redeem_card:fail:${clientIP}`
+    const failKey = RedisKeys.redeemCard.fail(clientIP)
     redis.client
       .incr(failKey)
-      .then(() => redis.client.expire(failKey, 3600))
+      .then(() => redis.client.expire(failKey, TTL.redeemCardWindow))
       .catch(() => {})
 
     logger.error('❌ Failed to redeem card:', error)

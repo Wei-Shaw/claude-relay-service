@@ -6,16 +6,13 @@ const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 const LRUCache = require('../../utils/lruCache')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 class ClaudeConsoleAccountService {
   constructor() {
     // 加密相关常量
     this.ENCRYPTION_ALGORITHM = 'aes-256-cbc'
     this.ENCRYPTION_SALT = 'claude-console-salt'
-
-    // Redis键前缀
-    this.ACCOUNT_KEY_PREFIX = 'claude_console_account:'
-    this.SHARED_ACCOUNTS_KEY = 'shared_claude_console_accounts'
 
     // 🚀 性能优化：缓存派生的加密密钥，避免每次重复计算
     // scryptSync 是 CPU 密集型操作，缓存可以减少 95%+ 的 CPU 密集型操作
@@ -125,16 +122,16 @@ class ClaudeConsoleAccountService {
 
     const client = redis.getClientSafe()
     logger.debug(
-      `[DEBUG] Saving account data to Redis with key: ${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      `[DEBUG] Saving account data to Redis with key: ${RedisKeys.accounts.claudeConsole(accountId)}`
     )
     logger.debug(`[DEBUG] Account data to save: ${JSON.stringify(accountData, null, 2)}`)
 
-    await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, accountData)
-    await redis.addToIndex('claude_console_account:index', accountId)
+    await client.hset(RedisKeys.accounts.claudeConsole(accountId), accountData)
+    await redis.addToIndex(RedisKeys.accounts.claudeConsoleIndex, accountId)
 
     // 如果是共享账户，添加到共享账户集合
     if (accountType === 'shared') {
-      await client.sadd(this.SHARED_ACCOUNTS_KEY, accountId)
+      await client.sadd(RedisKeys.accounts.sharedClaudeConsole, accountId)
     }
 
     logger.success(`🏢 Created Claude Console account: ${name} (${accountId})`)
@@ -170,11 +167,11 @@ class ClaudeConsoleAccountService {
     try {
       const client = redis.getClientSafe()
       const accountIds = await redis.getAllIdsByIndex(
-        'claude_console_account:index',
-        `${this.ACCOUNT_KEY_PREFIX}*`,
+        RedisKeys.accounts.claudeConsoleIndex,
+        RedisKeys.accounts.claudeConsolePattern,
         /^claude_console_account:(.+)$/
       )
-      const keys = accountIds.map((id) => `${this.ACCOUNT_KEY_PREFIX}${id}`)
+      const keys = accountIds.map((id) => RedisKeys.accounts.claudeConsole(id))
       const accounts = []
       const dataList = await redis.batchHgetallChunked(keys)
 
@@ -208,6 +205,8 @@ class ClaudeConsoleAccountService {
               : parseInt(accountData.rateLimitDuration),
             isActive: accountData.isActive === 'true',
             proxy: accountData.proxy ? JSON.parse(accountData.proxy) : null,
+            proxyGroupId: accountData.proxyGroupId || null,
+            proxyId: accountData.proxyId || null,
             accountType: accountData.accountType || 'shared',
             createdAt: accountData.createdAt,
             lastUsedAt: accountData.lastUsedAt,
@@ -247,7 +246,7 @@ class ClaudeConsoleAccountService {
   async getAccount(accountId) {
     const client = redis.getClientSafe()
     logger.debug(`[DEBUG] Getting account data for ID: ${accountId}`)
-    const accountData = await client.hgetall(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
+    const accountData = await client.hgetall(RedisKeys.accounts.claudeConsole(accountId))
 
     if (!accountData || Object.keys(accountData).length === 0) {
       logger.debug(`[DEBUG] No account data found for ID: ${accountId}`)
@@ -344,6 +343,14 @@ class ClaudeConsoleAccountService {
       if (updates.proxy !== undefined) {
         updatedData.proxy = updates.proxy ? JSON.stringify(updates.proxy) : ''
       }
+      // 代理池分组绑定（普通字符串，空字符串表示未绑定）
+      if (updates.proxyGroupId !== undefined) {
+        updatedData.proxyGroupId = updates.proxyGroupId
+      }
+      // 代理池单代理绑定（普通字符串，空字符串表示未绑定）
+      if (updates.proxyId !== undefined) {
+        updatedData.proxyId = updates.proxyId
+      }
       if (updates.isActive !== undefined) {
         updatedData.isActive = updates.isActive.toString()
       }
@@ -404,9 +411,19 @@ class ClaudeConsoleAccountService {
         updatedData.accountType = updates.accountType
 
         if (updates.accountType === 'shared') {
-          await client.sadd(this.SHARED_ACCOUNTS_KEY, accountId)
+          await client.sadd(RedisKeys.accounts.sharedClaudeConsole, accountId)
         } else {
-          await client.srem(this.SHARED_ACCOUNTS_KEY, accountId)
+          await client.srem(RedisKeys.accounts.sharedClaudeConsole, accountId)
+        }
+      }
+
+      // 开启 disableAutoProtection 时立即清理已有自动停用状态并恢复调度（手动停用不受影响）
+      const enablingAutoProtection =
+        updates.disableAutoProtection === true || updates.disableAutoProtection === 'true'
+      if (enablingAutoProtection) {
+        const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(existingAccount)
+        if (recoveryPatch) {
+          Object.assign(updatedData, recoveryPatch)
         }
       }
 
@@ -433,9 +450,13 @@ class ClaudeConsoleAccountService {
       }
 
       logger.debug(`[DEBUG] Final updatedData to save: ${JSON.stringify(updatedData, null, 2)}`)
-      logger.debug(`[DEBUG] Updating Redis key: ${this.ACCOUNT_KEY_PREFIX}${accountId}`)
+      logger.debug(`[DEBUG] Updating Redis key: ${RedisKeys.accounts.claudeConsole(accountId)}`)
 
-      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updatedData)
+      await client.hset(RedisKeys.accounts.claudeConsole(accountId), updatedData)
+
+      if (enablingAutoProtection) {
+        await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'claude-console')
+      }
 
       logger.success(`📝 Updated Claude Console account: ${accountId}`)
 
@@ -457,12 +478,12 @@ class ClaudeConsoleAccountService {
       }
 
       // 从Redis删除
-      await client.del(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
-      await redis.removeFromIndex('claude_console_account:index', accountId)
+      await client.del(RedisKeys.accounts.claudeConsole(accountId))
+      await redis.removeFromIndex(RedisKeys.accounts.claudeConsoleIndex, accountId)
 
       // 从共享账户集合中移除
       if (account.accountType === 'shared') {
-        await client.srem(this.SHARED_ACCOUNTS_KEY, accountId)
+        await client.srem(RedisKeys.accounts.sharedClaudeConsole, accountId)
       }
 
       logger.success(`🗑️ Deleted Claude Console account: ${accountId}`)
@@ -490,7 +511,15 @@ class ClaudeConsoleAccountService {
           `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountRateLimited`
         )
         upstreamErrorHelper
-          .recordErrorHistory(accountId, 'claude-console', 429, 'rate_limit')
+          .recordErrorHistory(
+            accountId,
+            'claude-console',
+            429,
+            'rate_limit',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_rate_limit'
+            })
+          )
           .catch(() => {})
         return { success: true, skipped: true }
       }
@@ -515,12 +544,12 @@ class ClaudeConsoleAccountService {
 
       // 只有当前状态不是quota_exceeded时才设置为rate_limited
       // 避免覆盖更重要的配额超限状态
-      const currentStatus = await client.hget(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, 'status')
+      const currentStatus = await client.hget(RedisKeys.accounts.claudeConsole(accountId), 'status')
       if (currentStatus !== 'quota_exceeded') {
         updates.status = 'rate_limited'
       }
 
-      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+      await client.hset(RedisKeys.accounts.claudeConsole(accountId), updates)
 
       // 发送Webhook通知
       try {
@@ -553,7 +582,7 @@ class ClaudeConsoleAccountService {
   async removeAccountRateLimit(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.claudeConsole(accountId)
 
       // 获取账户当前状态和额度信息
       const [currentStatus, quotaStoppedAt] = await client.hmget(
@@ -666,6 +695,7 @@ class ClaudeConsoleAccountService {
         return false
       }
 
+      // [人工决策-2026-06-02 23:30:05] 方案甲：每日预算(dailyQuota)是独立轴，disableAutoProtection 不覆盖预算，配额始终生效
       // 如果没有设置额度限制，不会超额
       const dailyQuota = parseFloat(account.dailyQuota || '0')
       if (isNaN(dailyQuota) || dailyQuota <= 0) {
@@ -732,7 +762,15 @@ class ClaudeConsoleAccountService {
           `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountUnauthorized`
         )
         upstreamErrorHelper
-          .recordErrorHistory(accountId, 'claude-console', 401, 'auth_error')
+          .recordErrorHistory(
+            accountId,
+            'claude-console',
+            401,
+            'auth_error',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_unauthorized'
+            })
+          )
           .catch(() => {})
         return { success: true, skipped: true }
       }
@@ -745,7 +783,7 @@ class ClaudeConsoleAccountService {
         unauthorizedCount: String((parseInt(account.unauthorizedCount || '0') || 0) + 1)
       }
 
-      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+      await client.hset(RedisKeys.accounts.claudeConsole(accountId), updates)
 
       // 发送Webhook通知
       try {
@@ -789,7 +827,15 @@ class ClaudeConsoleAccountService {
           `🛡️ Account ${accountId} has auto-protection disabled, skipping markConsoleAccountBlocked`
         )
         upstreamErrorHelper
-          .recordErrorHistory(accountId, 'claude-console', 403, 'server_error')
+          .recordErrorHistory(
+            accountId,
+            'claude-console',
+            403,
+            'server_error',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_server_error'
+            })
+          )
           .catch(() => {})
         return { success: true, skipped: true }
       }
@@ -823,7 +869,7 @@ class ClaudeConsoleAccountService {
         blockedAutoStopped: 'true'
       }
 
-      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+      await client.hset(RedisKeys.accounts.claudeConsole(accountId), updates)
 
       // 发送Webhook通知，包含完整错误详情
       try {
@@ -854,7 +900,7 @@ class ClaudeConsoleAccountService {
   async removeAccountBlocked(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.claudeConsole(accountId)
 
       // 获取账户当前状态和额度信息
       const [currentStatus, quotaStoppedAt] = await client.hmget(
@@ -977,7 +1023,15 @@ class ClaudeConsoleAccountService {
           `🛡️ Account ${accountId} has auto-protection disabled, skipping markAccountOverloaded`
         )
         upstreamErrorHelper
-          .recordErrorHistory(accountId, 'claude-console', 529, 'overload')
+          .recordErrorHistory(
+            accountId,
+            'claude-console',
+            529,
+            'overload',
+            upstreamErrorHelper.buildErrorContext({
+              reason: 'auto_protection_disabled_overload'
+            })
+          )
           .catch(() => {})
         return { success: true, skipped: true }
       }
@@ -988,7 +1042,7 @@ class ClaudeConsoleAccountService {
         errorMessage: '服务过载（529错误）'
       }
 
-      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+      await client.hset(RedisKeys.accounts.claudeConsole(accountId), updates)
 
       // 发送Webhook通知
       try {
@@ -1019,7 +1073,11 @@ class ClaudeConsoleAccountService {
     try {
       const client = redis.getClientSafe()
 
-      await client.hdel(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, 'overloadedAt', 'overloadStatus')
+      await client.hdel(
+        RedisKeys.accounts.claudeConsole(accountId),
+        'overloadedAt',
+        'overloadStatus'
+      )
 
       logger.success(`Overload status removed for Claude Console account: ${accountId}`)
       return { success: true }
@@ -1070,7 +1128,7 @@ class ClaudeConsoleAccountService {
       const client = redis.getClientSafe()
 
       // 获取账户信息用于webhook通知
-      const accountData = await client.hgetall(`${this.ACCOUNT_KEY_PREFIX}${accountId}`)
+      const accountData = await client.hgetall(RedisKeys.accounts.claudeConsole(accountId))
 
       const updates = {
         status: 'blocked',
@@ -1078,7 +1136,7 @@ class ClaudeConsoleAccountService {
         blockedAt: new Date().toISOString()
       }
 
-      await client.hset(`${this.ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+      await client.hset(RedisKeys.accounts.claudeConsole(accountId), updates)
 
       logger.warn(`🚫 Claude Console account blocked: ${accountId} - ${reason}`)
 
@@ -1332,6 +1390,7 @@ class ClaudeConsoleAccountService {
         return
       }
 
+      // [人工决策-2026-06-02 23:30:05] 方案甲：预算独立轴，disableAutoProtection 不覆盖预算，配额始终标记
       // 解析额度配置，确保数值有效
       const dailyQuota = parseFloat(accountData.dailyQuota || '0')
       if (isNaN(dailyQuota) || dailyQuota <= 0) {
@@ -1348,7 +1407,7 @@ class ClaudeConsoleAccountService {
       if (currentDailyCost >= dailyQuota) {
         // 使用原子操作避免竞态条件 - 再次检查是否已设置quotaStoppedAt
         const client = redis.getClientSafe()
-        const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+        const accountKey = RedisKeys.accounts.claudeConsole(accountId)
 
         // double-check locking pattern - 检查quotaStoppedAt而不是status
         const existingQuotaStop = await client.hget(accountKey, 'quotaStoppedAt')
@@ -1496,7 +1555,7 @@ class ClaudeConsoleAccountService {
       }
 
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.claudeConsole(accountId)
 
       // 准备要更新的字段
       const updates = {
@@ -1567,7 +1626,7 @@ class ClaudeConsoleAccountService {
   async markCountTokensUnavailable(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.claudeConsole(accountId)
 
       // 检查账户是否存在
       const exists = await client.exists(accountKey)
@@ -1597,7 +1656,7 @@ class ClaudeConsoleAccountService {
   async removeCountTokensUnavailable(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.claudeConsole(accountId)
 
       await client.hdel(accountKey, 'countTokensUnavailable', 'countTokensUnavailableAt')
 
@@ -1618,7 +1677,7 @@ class ClaudeConsoleAccountService {
   async isCountTokensUnavailable(accountId) {
     try {
       const client = redis.getClientSafe()
-      const accountKey = `${this.ACCOUNT_KEY_PREFIX}${accountId}`
+      const accountKey = RedisKeys.accounts.claudeConsole(accountId)
 
       const value = await client.hget(accountKey, 'countTokensUnavailable')
       return value === 'true'

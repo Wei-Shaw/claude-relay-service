@@ -3,14 +3,15 @@ const openaiResponsesAccountService = require('../account/openaiResponsesAccount
 const accountGroupService = require('../accountGroupService')
 const redis = require('../../models/redis')
 const logger = require('../../utils/logger')
-const { isSchedulable, sortAccountsByPriority } = require('../../utils/commonHelper')
+const {
+  isSchedulable,
+  isAutoProtectionDisabled,
+  sortAccountsByPriority
+} = require('../../utils/commonHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { RedisKeys, TTL } = require('../../constants/redisKeys')
 
 class UnifiedOpenAIScheduler {
-  constructor() {
-    this.SESSION_MAPPING_PREFIX = 'unified_openai_session_mapping:'
-  }
-
   // 🔧 辅助方法：检查账户是否被限流（兼容字符串和对象格式）
   _isRateLimited(rateLimitStatus) {
     if (!rateLimitStatus) {
@@ -118,6 +119,52 @@ class UnifiedOpenAIScheduler {
     return { canUse: true }
   }
 
+  // OpenAI-Responses 订阅/预算硬门单一判定（开关不豁免，无自愈语义）：订阅过期 + 每日预算(方案甲)
+  // 所有 openai-responses 选号/复检/分组路径统一调用此处，避免漏检漂移；
+  // schedulable 含限流自愈语义，由各路径单独处理，不并入此处
+  _openaiResponsesBudgetBlocked(account) {
+    if (openaiResponsesAccountService.isSubscriptionExpired(account)) {
+      return 'subscription_expired'
+    }
+    if (openaiResponsesAccountService.isAccountQuotaExceeded(account)) {
+      return 'quota_exceeded'
+    }
+    return null
+  }
+
+  // 模型支持检查：openai-responses 默认支持所有模型；openai 按 supportedModels 白名单(未配置/空=全支持)
+  _isOpenAIModelSupported(account, accountType, requestedModel) {
+    if (accountType !== 'openai') {
+      return true
+    }
+    if (!requestedModel || !account.supportedModels || account.supportedModels.length === 0) {
+      return true
+    }
+    return account.supportedModels.includes(requestedModel)
+  }
+
+  // [人工决策-2026-06-03 14:51:27] OpenAI OAuth token 失效统一处理(单一实现：共享池/dedicated/_isAccountAvailable 都调它,
+  //   避免两套实现漂移)。返回有效 token 的账户(过期可刷新者返回刷新后的最新账户);死号或刷新失败返回 null。
+  async _ensureOpenAITokenValid(account, accountId) {
+    if (!openaiAccountService.isTokenExpired(account)) {
+      return account
+    }
+    if (!account.refreshToken) {
+      logger.warn(`⚠️ OpenAI account ${accountId} token expired and no refresh token available`)
+      return null
+    }
+    try {
+      await openaiAccountService.refreshAccountToken(accountId)
+      return await openaiAccountService.getAccount(accountId)
+    } catch (refreshError) {
+      logger.error(
+        `❌ Failed to refresh token for OpenAI account ${accountId}:`,
+        refreshError.message
+      )
+      return null
+    }
+  }
+
   // 🎯 统一调度OpenAI账号
   async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
     try {
@@ -147,18 +194,19 @@ class UnifiedOpenAIScheduler {
           accountType = 'openai'
         }
 
+        const autoOff = isAutoProtectionDisabled(boundAccount)
         const isActiveBoundAccount =
           boundAccount &&
           (boundAccount.isActive === true || boundAccount.isActive === 'true') &&
-          boundAccount.status !== 'error' &&
-          boundAccount.status !== 'unauthorized'
+          (autoOff || (boundAccount.status !== 'error' && boundAccount.status !== 'unauthorized'))
 
         if (isActiveBoundAccount) {
+          // [人工决策-2026-06-02 23:30:05] 专属绑定开关 ON：暴力打，跳过 temp/限流/schedulable 自动暂停；
+          //   订阅过期/模型支持为硬约束仍校验
           // 检查是否临时不可用
-          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
-            boundAccount.id,
-            accountType
-          )
+          const isTempUnavailable = autoOff
+            ? false
+            : await upstreamErrorHelper.isTempUnavailable(boundAccount.id, accountType)
           if (isTempUnavailable) {
             logger.warn(
               `⏱️ Bound ${accountType} account ${boundAccount.name} temporarily unavailable, falling back to pool`
@@ -166,45 +214,68 @@ class UnifiedOpenAIScheduler {
             // 不 throw，让代码继续走到共享池选择
           } else {
             if (accountType === 'openai') {
-              const readiness = await this._ensureAccountReadyForScheduling(
-                boundAccount,
-                boundAccount.id,
-                { sanitized: false }
-              )
-
-              if (!readiness.canUse) {
-                const isRateLimited = readiness.reason === 'rate_limited'
-                const errorMsg = isRateLimited
-                  ? `Dedicated account ${boundAccount.name} is currently rate limited`
-                  : `Dedicated account ${boundAccount.name} is not schedulable`
+              // schedulable 硬门：手动停用始终生效（开关不豁免）
+              if (!isSchedulable(boundAccount.schedulable)) {
+                const errorMsg = `Dedicated account ${boundAccount.name} is not schedulable`
                 logger.warn(`⚠️ ${errorMsg}`)
                 const error = new Error(errorMsg)
-                error.statusCode = isRateLimited ? 429 : 403
+                error.statusCode = 403
                 throw error
               }
-            } else {
-              const hasRateLimitFlag = this._isRateLimited(boundAccount.rateLimitStatus)
-              if (hasRateLimitFlag) {
-                const isRateLimitCleared =
-                  await openaiResponsesAccountService.checkAndClearRateLimit(boundAccount.id)
-                if (!isRateLimitCleared) {
-                  const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
+              // [人工决策-2026-06-03 14:51:27] token 失效：统一走 _ensureOpenAITokenValid(单一实现);死号/刷新失败抛 401
+              const freshBound = await this._ensureOpenAITokenValid(boundAccount, boundAccount.id)
+              if (!freshBound) {
+                const errorMsg = `Dedicated account ${boundAccount.name} token expired or refresh failed`
+                logger.warn(`⚠️ ${errorMsg}`)
+                const error = new Error(errorMsg)
+                error.statusCode = 401
+                throw error
+              }
+              boundAccount = freshBound
+              if (!autoOff) {
+                const readiness = await this._ensureAccountReadyForScheduling(
+                  boundAccount,
+                  boundAccount.id,
+                  { sanitized: false }
+                )
+
+                if (!readiness.canUse) {
+                  const isRateLimited = readiness.reason === 'rate_limited'
+                  const errorMsg = isRateLimited
+                    ? `Dedicated account ${boundAccount.name} is currently rate limited`
+                    : `Dedicated account ${boundAccount.name} is not schedulable`
                   logger.warn(`⚠️ ${errorMsg}`)
                   const error = new Error(errorMsg)
-                  error.statusCode = 429 // Too Many Requests - 限流
+                  error.statusCode = isRateLimited ? 429 : 403
                   throw error
                 }
-                // 限流已解除，刷新账户最新状态，确保后续调度信息准确
-                boundAccount = await openaiResponsesAccountService.getAccount(boundAccount.id)
-                if (!boundAccount) {
-                  const errorMsg = `Dedicated account ${apiKeyData.openaiAccountId} not found after rate limit reset`
-                  logger.warn(`⚠️ ${errorMsg}`)
-                  const error = new Error(errorMsg)
-                  error.statusCode = 404
-                  throw error
+              }
+            } else {
+              if (!autoOff) {
+                const hasRateLimitFlag = this._isRateLimited(boundAccount.rateLimitStatus)
+                if (hasRateLimitFlag) {
+                  const isRateLimitCleared =
+                    await openaiResponsesAccountService.checkAndClearRateLimit(boundAccount.id)
+                  if (!isRateLimitCleared) {
+                    const errorMsg = `Dedicated account ${boundAccount.name} is currently rate limited`
+                    logger.warn(`⚠️ ${errorMsg}`)
+                    const error = new Error(errorMsg)
+                    error.statusCode = 429 // Too Many Requests - 限流
+                    throw error
+                  }
+                  // 限流已解除，刷新账户最新状态，确保后续调度信息准确
+                  boundAccount = await openaiResponsesAccountService.getAccount(boundAccount.id)
+                  if (!boundAccount) {
+                    const errorMsg = `Dedicated account ${apiKeyData.openaiAccountId} not found after rate limit reset`
+                    logger.warn(`⚠️ ${errorMsg}`)
+                    const error = new Error(errorMsg)
+                    error.statusCode = 404
+                    throw error
+                  }
                 }
               }
 
+              // schedulable 硬门：手动停用始终生效（开关不豁免）
               if (!isSchedulable(boundAccount.schedulable)) {
                 const errorMsg = `Dedicated account ${boundAccount.name} is not schedulable`
                 logger.warn(`⚠️ ${errorMsg}`)
@@ -213,12 +284,16 @@ class UnifiedOpenAIScheduler {
                 throw error
               }
 
-              // ⏰ 检查 OpenAI-Responses 专属账户订阅是否过期
-              if (openaiResponsesAccountService.isSubscriptionExpired(boundAccount)) {
-                const errorMsg = `Dedicated account ${boundAccount.name} subscription has expired`
+              // 订阅/预算硬门走同一单一判定 _openaiResponsesBudgetBlocked；dedicated 仅附加专属错误码(403订阅/402预算)
+              const budgetBlock = this._openaiResponsesBudgetBlocked(boundAccount)
+              if (budgetBlock) {
+                const isQuota = budgetBlock === 'quota_exceeded'
+                const errorMsg = isQuota
+                  ? `Dedicated account ${boundAccount.name} daily quota exceeded`
+                  : `Dedicated account ${boundAccount.name} subscription has expired`
                 logger.warn(`⚠️ ${errorMsg}`)
                 const error = new Error(errorMsg)
-                error.statusCode = 403 // Forbidden - 订阅已过期
+                error.statusCode = isQuota ? 402 : 403
                 throw error
               }
             }
@@ -362,53 +437,46 @@ class UnifiedOpenAIScheduler {
     // 获取所有OpenAI账户（共享池）
     const openaiAccounts = await openaiAccountService.getAllAccounts()
     for (let account of openaiAccounts) {
+      const autoOff = isAutoProtectionDisabled(account)
       if (
         account.isActive &&
-        account.status !== 'error' &&
+        isSchedulable(account.schedulable) &&
         (account.accountType === 'shared' || !account.accountType) // 兼容旧数据
       ) {
         const accountId = account.id || account.accountId
 
-        const readiness = await this._ensureAccountReadyForScheduling(account, accountId, {
-          sanitized: true
-        })
-
-        if (!readiness.canUse) {
-          if (readiness.reason === 'rate_limited') {
-            logger.debug(`⏭️ 跳过 OpenAI 账号 ${account.name} - 仍处于限流状态`)
-          } else {
-            logger.debug(`⏭️ 跳过 OpenAI 账号 ${account.name} - 已被管理员禁用调度`)
-          }
+        // token 自愈优先于旧状态过滤：避免历史 status=error 把可刷新账户挡在 helper 之前
+        const freshAccount = await this._ensureOpenAITokenValid(account, accountId)
+        if (!freshAccount) {
           continue
         }
+        account = freshAccount
 
-        const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(accountId, 'openai')
-        if (isTempUnavailable) {
-          logger.debug(`⏭️ Skipping openai account ${account.name} - temporarily unavailable`)
-          continue
-        }
+        // [人工决策-2026-06-02 23:30:05] 开关 ON：跳过上游错误类自动暂停（限流/temp）；
+        //   schedulable(手动停用) 已在上方硬校验；token 刷新与模型校验保留（oauth 仍需有效 token）
+        if (!autoOff) {
+          const readiness = await this._ensureAccountReadyForScheduling(account, accountId, {
+            sanitized: true
+          })
 
-        // 检查token是否过期并自动刷新
-        const isExpired = openaiAccountService.isTokenExpired(account)
-        if (isExpired) {
-          if (!account.refreshToken) {
-            logger.warn(
-              `⚠️ OpenAI account ${account.name} token expired and no refresh token available`
-            )
+          if (!readiness.canUse) {
+            if (readiness.reason === 'rate_limited') {
+              logger.debug(`⏭️ 跳过 OpenAI 账号 ${account.name} - 仍处于限流状态`)
+            } else {
+              logger.debug(`⏭️ 跳过 OpenAI 账号 ${account.name} - 已被管理员禁用调度`)
+            }
             continue
           }
 
-          // 自动刷新过期的 token
-          try {
-            logger.info(`🔄 Auto-refreshing expired token for OpenAI account ${account.name}`)
-            await openaiAccountService.refreshAccountToken(account.id)
-            // 重新获取更新后的账户信息
-            account = await openaiAccountService.getAccount(account.id)
-            logger.info(`✅ Token refreshed successfully for ${account.name}`)
-          } catch (refreshError) {
-            logger.error(`❌ Failed to refresh token for ${account.name}:`, refreshError.message)
-            continue // 刷新失败，跳过此账户
+          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(accountId, 'openai')
+          if (isTempUnavailable) {
+            logger.debug(`⏭️ Skipping openai account ${account.name} - temporarily unavailable`)
+            continue
           }
+        }
+
+        if (!autoOff && (account.status === 'error' || account.status === 'unauthorized')) {
+          continue
         }
 
         // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
@@ -436,6 +504,29 @@ class UnifiedOpenAIScheduler {
     // 获取所有 OpenAI-Responses 账户（共享池）
     const openaiResponsesAccounts = await openaiResponsesAccountService.getAllAccounts()
     for (const account of openaiResponsesAccounts) {
+      // [人工决策-2026-06-02 23:30:05] apikey 开关 ON：暴力打，跳过上游错误类自动暂停（status error/限流/temp）；
+      //   手动停用(isActive/schedulable)、订阅过期、预算(方案甲)为硬约束仍校验；默认支持所有模型
+      if (
+        isAutoProtectionDisabled(account) &&
+        (account.isActive === true || account.isActive === 'true') &&
+        isSchedulable(account.schedulable) &&
+        (account.accountType === 'shared' || !account.accountType)
+      ) {
+        // 订阅/预算硬门（单一判定，开关不豁免）
+        const budgetBlock = this._openaiResponsesBudgetBlocked(account)
+        if (budgetBlock) {
+          logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - ${budgetBlock}`)
+          continue
+        }
+        availableAccounts.push({
+          ...account,
+          accountId: account.id,
+          accountType: 'openai-responses',
+          priority: parseInt(account.priority) || 50,
+          lastUsedAt: account.lastUsedAt || '0'
+        })
+        continue
+      }
       if (
         (account.isActive === true || account.isActive === 'true') &&
         account.status !== 'error' &&
@@ -494,11 +585,10 @@ class UnifiedOpenAIScheduler {
           continue
         }
 
-        // ⏰ 检查订阅是否过期
-        if (openaiResponsesAccountService.isSubscriptionExpired(account)) {
-          logger.debug(
-            `⏭️ Skipping OpenAI-Responses account ${account.name} - subscription expired`
-          )
+        // 订阅/预算硬门（单一判定，开关不豁免）
+        const budgetBlock = this._openaiResponsesBudgetBlocked(account)
+        if (budgetBlock) {
+          logger.debug(`⏭️ Skipping OpenAI-Responses account ${account.name} - ${budgetBlock}`)
           continue
         }
 
@@ -523,15 +613,28 @@ class UnifiedOpenAIScheduler {
     try {
       if (accountType === 'openai') {
         const account = await openaiAccountService.getAccount(accountId)
-        if (
-          !account ||
-          !account.isActive ||
-          account.status === 'error' ||
-          account.status === 'unauthorized'
-        ) {
+        if (!account || !account.isActive) {
           return false
         }
-        const readiness = await this._ensureAccountReadyForScheduling(account, accountId, {
+        // [人工决策-2026-06-02 23:30:05] 开 disableAutoProtection = 暴力打上游：忽略上游错误类自动暂停
+        //   (status error/unauthorized、限流、temp_unavailable)；手动停用(isActive/schedulable)始终生效。
+        if (!isSchedulable(account.schedulable)) {
+          logger.info(`🚫 OpenAI account ${accountId} is not schedulable`)
+          return false
+        }
+        // [人工决策-2026-06-03 14:51:27] token 失效：统一走 _ensureOpenAITokenValid(单一实现);死号/刷新失败=不可用
+        const validatedAccount = await this._ensureOpenAITokenValid(account, accountId)
+        if (!validatedAccount) {
+          return false
+        }
+        const currentAccount = validatedAccount
+        if (isAutoProtectionDisabled(currentAccount)) {
+          return true
+        }
+        if (currentAccount.status === 'error' || currentAccount.status === 'unauthorized') {
+          return false
+        }
+        const readiness = await this._ensureAccountReadyForScheduling(currentAccount, accountId, {
           sanitized: false
         })
 
@@ -558,22 +661,26 @@ class UnifiedOpenAIScheduler {
         return true
       } else if (accountType === 'openai-responses') {
         const account = await openaiResponsesAccountService.getAccount(accountId)
-        if (
-          !account ||
-          (account.isActive !== true && account.isActive !== 'true') ||
-          account.status === 'error' ||
-          account.status === 'unauthorized'
-        ) {
+        if (!account || (account.isActive !== true && account.isActive !== 'true')) {
           return false
         }
-        // 检查是否可调度
+        // [人工决策-2026-06-02 23:30:05] apikey 类开 disableAutoProtection = 暴力打：忽略上游错误类自动暂停
+        //   (status error/unauthorized、限流、temp_unavailable)；手动停用(isActive/schedulable)、订阅、预算(方案甲)始终生效。
+        // 硬约束（始终校验，开关不豁免）
         if (!isSchedulable(account.schedulable)) {
           logger.info(`🚫 OpenAI-Responses account ${accountId} is not schedulable`)
           return false
         }
-        // ⏰ 检查订阅是否过期
-        if (openaiResponsesAccountService.isSubscriptionExpired(account)) {
-          logger.info(`🚫 OpenAI-Responses account ${accountId} subscription expired`)
+        const budgetBlock = this._openaiResponsesBudgetBlocked(account)
+        if (budgetBlock) {
+          logger.info(`🚫 OpenAI-Responses account ${accountId} ${budgetBlock}`)
+          return false
+        }
+        // 开关 ON：忽略上游错误类
+        if (isAutoProtectionDisabled(account)) {
+          return true
+        }
+        if (account.status === 'error' || account.status === 'unauthorized') {
           return false
         }
         // 检查并清除过期的限流状态
@@ -604,7 +711,7 @@ class UnifiedOpenAIScheduler {
   // 🔗 获取会话映射
   async _getSessionMapping(sessionHash) {
     const client = redis.getClientSafe()
-    const mappingData = await client.get(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`)
+    const mappingData = await client.get(RedisKeys.session.unifiedOpenaiMapping(sessionHash))
 
     if (mappingData) {
       try {
@@ -623,23 +730,21 @@ class UnifiedOpenAIScheduler {
     const client = redis.getClientSafe()
     const mappingData = JSON.stringify({ accountId, accountType })
     // 依据配置设置TTL（小时）
-    const appConfig = require('../../../config/config')
-    const ttlHours = appConfig.session?.stickyTtlHours || 1
-    const ttlSeconds = Math.max(1, Math.floor(ttlHours * 60 * 60))
-    await client.setex(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`, ttlSeconds, mappingData)
+    const ttlSeconds = Math.max(1, Math.floor(TTL.stickySession()))
+    await client.setex(RedisKeys.session.unifiedOpenaiMapping(sessionHash), ttlSeconds, mappingData)
   }
 
   // 🗑️ 删除会话映射
   async _deleteSessionMapping(sessionHash) {
     const client = redis.getClientSafe()
-    await client.del(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`)
+    await client.del(RedisKeys.session.unifiedOpenaiMapping(sessionHash))
   }
 
   // 🔁 续期统一调度会话映射TTL（针对 unified_openai_session_mapping:* 键），遵循会话配置
   async _extendSessionMappingTTL(sessionHash) {
     try {
       const client = redis.getClientSafe()
-      const key = `${this.SESSION_MAPPING_PREFIX}${sessionHash}`
+      const key = RedisKeys.session.unifiedOpenaiMapping(sessionHash)
       const remainingTTL = await client.ttl(key)
 
       if (remainingTTL === -2) {
@@ -650,13 +755,13 @@ class UnifiedOpenAIScheduler {
       }
 
       const appConfig = require('../../../config/config')
-      const ttlHours = appConfig.session?.stickyTtlHours || 1
-      const renewalThresholdMinutes = appConfig.session?.renewalThresholdMinutes || 0
+      const ttlHours = appConfig.session.stickyTtlHours
+      const { renewalThresholdMinutes } = appConfig.session
       if (!renewalThresholdMinutes) {
         return true
       }
 
-      const fullTTL = Math.max(1, Math.floor(ttlHours * 60 * 60))
+      const fullTTL = Math.max(1, Math.floor(TTL.stickySession()))
       const threshold = Math.max(0, Math.floor(renewalThresholdMinutes * 60))
 
       if (remainingTTL < threshold) {
@@ -881,63 +986,13 @@ class UnifiedOpenAIScheduler {
           accountType = 'openai-responses'
         }
 
-        if (
-          account &&
-          (account.isActive === true || account.isActive === 'true') &&
-          account.status !== 'error'
-        ) {
-          const readiness = await this._ensureAccountReadyForScheduling(account, account.id, {
-            sanitized: false
-          })
-
-          if (!readiness.canUse) {
-            if (readiness.reason === 'rate_limited') {
-              logger.debug(
-                `⏭️ Skipping group member ${accountType} account ${account.name} - still rate limited`
-              )
-            } else {
-              logger.debug(
-                `⏭️ Skipping group member ${accountType} account ${account.name} - not schedulable`
-              )
-            }
-            continue
-          }
-
-          const isTempUnavailable = await upstreamErrorHelper.isTempUnavailable(
-            account.id,
-            accountType
-          )
-          if (isTempUnavailable) {
-            logger.debug(
-              `⏭️ Skipping group member ${accountType} account ${account.name} - temporarily unavailable`
-            )
-            continue
-          }
-
-          // 检查token是否过期（仅对 OpenAI OAuth 账户检查）
-          if (accountType === 'openai') {
-            const isExpired = openaiAccountService.isTokenExpired(account)
-            if (isExpired && !account.refreshToken) {
-              logger.warn(
-                `⚠️ Group member OpenAI account ${account.name} token expired and no refresh token available`
-              )
-              continue
-            }
-          }
-
-          // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
-          // 如果没有设置supportedModels或为空数组，则支持所有模型
-          if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
-            const modelSupported = account.supportedModels.includes(requestedModel)
-            if (!modelSupported) {
-              logger.debug(
-                `⏭️ Skipping group member ${accountType} account ${account.name} - doesn't support model ${requestedModel}`
-              )
-              continue
-            }
-          }
-
-          // 添加到可用账户列表
+        // [人工决策-2026-06-03 14:51:27] 分组成员统一委托 _isAccountAvailable(硬门+开关绕过上游错误,含 token/预算硬门) + 模型,
+        //   与共享/复检同一判定,不再内联手抄
+        const usable =
+          !!account &&
+          (await this._isAccountAvailable(account.id, accountType)) &&
+          this._isOpenAIModelSupported(account, accountType, requestedModel)
+        if (usable) {
           availableAccounts.push({
             ...account,
             accountId: account.id,

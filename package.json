@@ -45,12 +45,14 @@
     "data:export:enhanced": "node scripts/data-transfer-enhanced.js export",
     "data:export:encrypted": "node scripts/data-transfer-enhanced.js export --decrypt=false",
     "data:import:enhanced": "node scripts/data-transfer-enhanced.js import",
+    "data:export:payment": "node scripts/export-payment.js",
     "data:debug": "node scripts/debug-redis-keys.js",
     "test:pricing-fallback": "node scripts/test-pricing-fallback.js"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.861.0",
     "@aws-sdk/credential-providers": "^3.859.0",
+    "adm-zip": "^0.5.17",
     "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
     "chalk": "^4.1.2",

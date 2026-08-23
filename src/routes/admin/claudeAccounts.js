@@ -10,11 +10,13 @@ const claudeAccountService = require('../../services/account/claudeAccountServic
 const claudeRelayService = require('../../services/relay/claudeRelayService')
 const accountGroupService = require('../../services/accountGroupService')
 const accountTestSchedulerService = require('../../services/accountTestSchedulerService')
+const testModelConfigService = require('../../services/testModelConfigService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const oauthHelper = require('../../utils/oauthHelper')
+const proxyResolver = require('../../utils/proxyResolver')
 const CostCalculator = require('../../utils/costCalculator')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const {
@@ -23,6 +25,7 @@ const {
   normalizeOptionalNonNegativeInteger
 } = require('../../utils/tempUnavailablePolicy')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { stripReadonlyAccountFields } = require('../../utils/commonHelper')
 
 const TEMP_UNAVAILABLE_TTL_FIELDS = ['tempUnavailable503TtlSeconds', 'tempUnavailable5xxTtlSeconds']
 
@@ -53,7 +56,13 @@ const normalizeTempUnavailablePolicyPayload = (payload, options = {}) => {
 // 生成OAuth授权URL
 router.post('/claude-accounts/generate-auth-url', authenticateAdmin, async (req, res) => {
   try {
-    const { proxy } = req.body // 接收代理配置
+    const { proxy, proxyGroupId, proxyId } = req.body
+    // 账户绑代理池时授权请求也走池代理（未绑池回退静态 proxy）
+    const effectiveProxy = proxyResolver.resolveAuthProxy(
+      { proxyGroupId, proxyId, platform: 'claude' },
+      'claude',
+      proxy
+    )
     const oauthParams = await oauthHelper.generateOAuthParams()
 
     // 将codeVerifier和state临时存储到Redis，用于后续验证
@@ -62,7 +71,8 @@ router.post('/claude-accounts/generate-auth-url', authenticateAdmin, async (req,
       codeVerifier: oauthParams.codeVerifier,
       state: oauthParams.state,
       codeChallenge: oauthParams.codeChallenge,
-      proxy: proxy || null, // 存储代理配置
+      proxy: effectiveProxy, // 存储已解析代理（池或静态）
+      proxyBound: !!(proxyGroupId || proxyId), // 代理来源是否池绑定，供 exchange 一致性校验
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10分钟过期
     })
@@ -111,6 +121,14 @@ router.post('/claude-accounts/exchange-code', authenticateAdmin, async (req, res
       return res
         .status(400)
         .json({ error: 'OAuth session has expired, please generate a new authorization URL' })
+    }
+
+    // 一致性校验：会话来源为池绑定但无已解析代理，拒绝（不允许授权直连暴露真实出口）
+    if (oauthSession.proxyBound && !oauthSession.proxy) {
+      await redis.deleteOAuthSession(sessionId)
+      return res.status(409).json({
+        error: '账户绑定的代理池当前无可用代理，已阻止授权请求直连（避免暴露真实出口）'
+      })
     }
 
     // 统一处理授权码输入（可能是直接的code或完整的回调URL）
@@ -168,7 +186,13 @@ router.post('/claude-accounts/exchange-code', authenticateAdmin, async (req, res
 // 生成Claude setup-token授权URL
 router.post('/claude-accounts/generate-setup-token-url', authenticateAdmin, async (req, res) => {
   try {
-    const { proxy } = req.body // 接收代理配置
+    const { proxy, proxyGroupId, proxyId } = req.body
+    // 账户绑代理池时授权请求也走池代理（未绑池回退静态 proxy）
+    const effectiveProxy = proxyResolver.resolveAuthProxy(
+      { proxyGroupId, proxyId, platform: 'claude' },
+      'claude',
+      proxy
+    )
     const setupTokenParams = await oauthHelper.generateSetupTokenParams()
 
     // 将codeVerifier和state临时存储到Redis，用于后续验证
@@ -178,7 +202,8 @@ router.post('/claude-accounts/generate-setup-token-url', authenticateAdmin, asyn
       codeVerifier: setupTokenParams.codeVerifier,
       state: setupTokenParams.state,
       codeChallenge: setupTokenParams.codeChallenge,
-      proxy: proxy || null, // 存储代理配置
+      proxy: effectiveProxy, // 存储已解析代理（池或静态）
+      proxyBound: !!(proxyGroupId || proxyId), // 代理来源是否池绑定，供 exchange 一致性校验
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10分钟过期
     })
@@ -233,6 +258,14 @@ router.post('/claude-accounts/exchange-setup-token-code', authenticateAdmin, asy
       return res
         .status(400)
         .json({ error: 'OAuth session has expired, please generate a new authorization URL' })
+    }
+
+    // 一致性校验：会话来源为池绑定但无已解析代理，拒绝（不允许授权直连暴露真实出口）
+    if (oauthSession.proxyBound && !oauthSession.proxy) {
+      await redis.deleteOAuthSession(sessionId)
+      return res.status(409).json({
+        error: '账户绑定的代理池当前无可用代理，已阻止授权请求直连（避免暴露真实出口）'
+      })
     }
 
     // 统一处理授权码输入（可能是直接的code或完整的回调URL）
@@ -294,7 +327,7 @@ router.post('/claude-accounts/exchange-setup-token-code', authenticateAdmin, asy
 // 普通OAuth的Cookie自动授权
 router.post('/claude-accounts/oauth-with-cookie', authenticateAdmin, async (req, res) => {
   try {
-    const { sessionKey, proxy } = req.body
+    const { sessionKey, proxy, proxyGroupId, proxyId } = req.body
 
     // 验证sessionKey参数
     if (!sessionKey || typeof sessionKey !== 'string' || sessionKey.trim().length === 0) {
@@ -306,15 +339,21 @@ router.post('/claude-accounts/oauth-with-cookie', authenticateAdmin, async (req,
     }
 
     const trimmedSessionKey = sessionKey.trim()
+    // 账户绑代理池时授权也走池代理（未绑池回退静态 proxy）
+    const effectiveProxy = proxyResolver.resolveAuthProxy(
+      { proxyGroupId, proxyId, platform: 'claude' },
+      'claude',
+      proxy
+    )
 
     logger.info('🍪 Starting Cookie-based OAuth authorization', {
       sessionKeyLength: trimmedSessionKey.length,
       sessionKeyPrefix: `${trimmedSessionKey.substring(0, 10)}...`,
-      hasProxy: !!proxy
+      hasProxy: !!effectiveProxy
     })
 
     // 执行Cookie自动授权流程
-    const result = await oauthHelper.oauthWithCookie(trimmedSessionKey, proxy, false)
+    const result = await oauthHelper.oauthWithCookie(trimmedSessionKey, effectiveProxy, false)
 
     logger.success('🎉 Cookie-based OAuth authorization completed successfully')
 
@@ -343,7 +382,7 @@ router.post('/claude-accounts/oauth-with-cookie', authenticateAdmin, async (req,
 // Setup Token的Cookie自动授权
 router.post('/claude-accounts/setup-token-with-cookie', authenticateAdmin, async (req, res) => {
   try {
-    const { sessionKey, proxy } = req.body
+    const { sessionKey, proxy, proxyGroupId, proxyId } = req.body
 
     // 验证sessionKey参数
     if (!sessionKey || typeof sessionKey !== 'string' || sessionKey.trim().length === 0) {
@@ -355,15 +394,21 @@ router.post('/claude-accounts/setup-token-with-cookie', authenticateAdmin, async
     }
 
     const trimmedSessionKey = sessionKey.trim()
+    // 账户绑代理池时授权也走池代理（未绑池回退静态 proxy）
+    const effectiveProxy = proxyResolver.resolveAuthProxy(
+      { proxyGroupId, proxyId, platform: 'claude' },
+      'claude',
+      proxy
+    )
 
     logger.info('🍪 Starting Cookie-based Setup Token authorization', {
       sessionKeyLength: trimmedSessionKey.length,
       sessionKeyPrefix: `${trimmedSessionKey.substring(0, 10)}...`,
-      hasProxy: !!proxy
+      hasProxy: !!effectiveProxy
     })
 
     // 执行Cookie自动授权流程（Setup Token模式）
-    const result = await oauthHelper.oauthWithCookie(trimmedSessionKey, proxy, true)
+    const result = await oauthHelper.oauthWithCookie(trimmedSessionKey, effectiveProxy, true)
 
     logger.success('🎉 Cookie-based Setup Token authorization completed successfully')
 
@@ -619,6 +664,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       groupId,
       groupIds,
       autoStopOnWarning,
+      disableAutoProtection,
       useUnifiedUserAgent,
       useUnifiedClientId,
       unifiedClientId,
@@ -679,6 +725,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       platform,
       priority: priority || 50, // 默认优先级为50
       autoStopOnWarning: autoStopOnWarning === true, // 默认为false
+      disableAutoProtection: disableAutoProtection === true, // 关闭自动防护：默认为false
       useUnifiedUserAgent: useUnifiedUserAgent === true, // 默认为false
       useUnifiedClientId: useUnifiedClientId === true, // 默认为false
       unifiedClientId: unifiedClientId || '', // 统一的客户端标识
@@ -720,7 +767,8 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     const updates = req.body
 
     // ✅ 【修改】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt（提前到参数验证之前）
-    const mappedUpdates = mapExpiryField(updates, 'Claude', accountId)
+    // review#3：剥离外部传入的状态类字段，禁止伪造自动停用证据
+    const mappedUpdates = stripReadonlyAccountFields(mapExpiryField(updates, 'Claude', accountId))
 
     // 验证priority的有效性
     if (
@@ -962,8 +1010,9 @@ router.post('/claude-accounts/:accountId/test', authenticateAdmin, async (req, r
   const { accountId } = req.params
 
   try {
-    // 直接调用服务层的测试方法
-    await claudeRelayService.testAccountConnection(accountId, res)
+    // 请求显式指定优先，否则用后台配置的默认测试模型（单一事实源）
+    const model = await testModelConfigService.resolveAccountModel('claude', req.body.model)
+    await claudeRelayService.testAccountConnection(accountId, res, model)
   } catch (error) {
     logger.error(`❌ Failed to test Claude OAuth account:`, error)
     // 错误已在服务层处理，这里仅做日志记录
@@ -1003,16 +1052,15 @@ router.get('/claude-accounts/:accountId/test-config', authenticateAdmin, async (
 
   try {
     const testConfig = await redis.getAccountTestConfig(accountId, 'claude')
+    const config = testConfig || { enabled: false, cronExpression: '0 8 * * *' }
+    // 模型缺省时回退后台"测试模型"全局配置（单一事实源），兼容历史无 model 记录
+    config.model = await testModelConfigService.resolveAccountModel('claude', config.model)
     return res.json({
       success: true,
       data: {
         accountId,
         platform: 'claude',
-        config: testConfig || {
-          enabled: false,
-          cronExpression: '0 8 * * *',
-          model: 'claude-sonnet-4-5-20250929'
-        }
+        config
       }
     })
   } catch (error) {
@@ -1063,8 +1111,8 @@ router.put('/claude-accounts/:accountId/test-config', authenticateAdmin, async (
       })
     }
 
-    // 验证模型参数
-    const testModel = model || 'claude-sonnet-4-5-20250929'
+    // 验证模型参数（未传时回退后台"测试模型"全局配置，单一事实源）
+    const testModel = await testModelConfigService.resolveAccountModel('claude', model)
     if (typeof testModel !== 'string' || testModel.length > 256) {
       return res.status(400).json({
         error: 'Invalid parameter',
@@ -1126,8 +1174,9 @@ router.post('/claude-accounts/:accountId/test-sync', authenticateAdmin, async (r
 
     logger.info(`🧪 Manual sync test triggered for Claude account: ${accountId}`)
 
-    // 执行测试
-    const testResult = await claudeRelayService.testAccountConnectionSync(accountId)
+    // 执行测试（请求显式指定优先，否则用后台配置默认）
+    const model = await testModelConfigService.resolveAccountModel('claude', req.body.model)
+    const testResult = await claudeRelayService.testAccountConnectionSync(accountId, model)
 
     // 保存测试结果到历史
     await redis.saveAccountTestResult(accountId, 'claude', testResult)

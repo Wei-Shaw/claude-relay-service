@@ -2,6 +2,8 @@ const redis = require('../models/redis')
 const CostCalculator = require('../utils/costCalculator')
 const logger = require('../utils/logger')
 
+const { RedisKeys, TTL } = require('../constants/redisKeys')
+
 // HMGET 需要的字段
 const USAGE_FIELDS = [
   'totalInputTokens',
@@ -71,6 +73,10 @@ class CostInitService {
   async initializeAllCosts() {
     try {
       logger.info('💰 Starting cost initialization for all API Keys...')
+      // [audit] concern 2：重建缺失费用用的是当前价格，可能与请求发生时的价格有出入（仅补缺失不覆盖）
+      logger.warn(
+        '💰 [audit] 费用初始化将按【当前价格】重建缺失的历史费用，重建值可能与请求当时价格有出入'
+      )
 
       // 用 scanApiKeyIds 获取 ID，然后过滤已删除的
       const allKeyIds = await redis.scanApiKeyIds()
@@ -85,7 +91,7 @@ class CostInitService {
         const pipeline = client.pipeline()
 
         for (const keyId of batch) {
-          pipeline.hget(`apikey:${keyId}`, 'isDeleted')
+          pipeline.hget(RedisKeys.apiKey.byId(keyId), 'isDeleted')
         }
 
         const results = await pipeline.exec()
@@ -104,13 +110,18 @@ class CostInitService {
 
       let processedCount = 0
       let errorCount = 0
+      let reconstructedCount = 0
 
       // 优化6: 并行处理 + 并发限制
       await this.parallelLimit(
         apiKeyIds,
         async (apiKeyId) => {
           try {
-            await this.initializeApiKeyCosts(apiKeyId, client)
+            // 必须先把 await 结果落到局部变量再累加：a += await f() 会在 await 之前
+            // 就读取 a 的当前值，20 并发下各 worker 的累加会互相覆盖（lost update），
+            // 导致汇总数严重少算（逐条日志准确、汇总偏小就是这个坑）
+            const reconstructed = (await this.initializeApiKeyCosts(apiKeyId, client)) || 0
+            reconstructedCount += reconstructed
             processedCount++
 
             if (processedCount % 100 === 0) {
@@ -125,9 +136,14 @@ class CostInitService {
       )
 
       logger.success(
-        `💰 Cost initialization completed! Processed: ${processedCount}, Errors: ${errorCount}`
+        `💰 Cost initialization completed! Processed: ${processedCount}, Errors: ${errorCount}, Reconstructed@currentPrice: ${reconstructedCount}`
       )
-      return { processed: processedCount, errors: errorCount }
+      if (reconstructedCount > 0) {
+        logger.warn(
+          `💰 [audit] 本次按当前价格重建了 ${reconstructedCount} 条缺失费用，如对历史价格敏感请核对`
+        )
+      }
+      return { processed: processedCount, errors: errorCount, reconstructed: reconstructedCount }
     } catch (error) {
       logger.error('❌ Failed to initialize costs:', error)
       throw error
@@ -142,7 +158,7 @@ class CostInitService {
     const modelKeys = await this.scanKeysWithDedup(client, `usage:${apiKeyId}:model:*:*:*`)
 
     if (modelKeys.length === 0) {
-      return
+      return 0
     }
 
     // 优化5: 使用 Pipeline + HMGET 批量获取数据
@@ -231,21 +247,23 @@ class CostInitService {
     const pipeline = client.pipeline()
 
     // 写入每日费用（只补缺失）
+    // TTL 必须与 redis.js incrementDailyCost 保持一致，且 ≥ 用量日 TTL（32 天），否则启动会反复全量重算
     for (const [date, cost] of dailyCosts) {
-      const key = `usage:cost:daily:${apiKeyId}:${date}`
-      pipeline.set(key, cost.toString(), 'EX', 86400 * 30, 'NX')
+      const key = RedisKeys.usage.costDaily(apiKeyId, date)
+      pipeline.set(key, cost.toString(), 'EX', TTL.costDaily, 'NX')
     }
 
     // 写入每月费用（只补缺失）
+    // TTL 必须 ≥ 用量月 TTL（365 天），与 redis.js incrementDailyCost 保持一致
     for (const [month, cost] of monthlyCosts) {
-      const key = `usage:cost:monthly:${apiKeyId}:${month}`
-      pipeline.set(key, cost.toString(), 'EX', 86400 * 90, 'NX')
+      const key = RedisKeys.usage.costMonthly(apiKeyId, month)
+      pipeline.set(key, cost.toString(), 'EX', TTL.costMonthly, 'NX')
     }
 
     // 写入每小时费用（只补缺失）
     for (const [hour, cost] of hourlyCosts) {
-      const key = `usage:cost:hourly:${apiKeyId}:${hour}`
-      pipeline.set(key, cost.toString(), 'EX', 86400 * 7, 'NX')
+      const key = RedisKeys.usage.costHourly(apiKeyId, hour)
+      pipeline.set(key, cost.toString(), 'EX', TTL.costHourly, 'NX')
     }
 
     // 计算总费用
@@ -256,7 +274,7 @@ class CostInitService {
 
     // 写入总费用（只补缺失）
     if (totalCost > 0) {
-      const totalKey = `usage:cost:total:${apiKeyId}`
+      const totalKey = RedisKeys.usage.costTotal(apiKeyId)
       const existingTotal = await client.get(totalKey)
 
       if (!existingTotal || parseFloat(existingTotal) === 0) {
@@ -272,11 +290,28 @@ class CostInitService {
       }
     }
 
-    await pipeline.exec()
+    // NX set 按入队顺序排在最前（日→月→时），统计实际命中（即真正按当前价格重建）的条目数
+    const nxSetCount = dailyCosts.size + monthlyCosts.size + hourlyCosts.size
+    const results = await pipeline.exec()
+
+    let reconstructed = 0
+    for (let i = 0; i < nxSetCount && i < results.length; i++) {
+      // ioredis：NX 命中返回 'OK'，键已存在返回 null
+      if (results[i] && results[i][1] === 'OK') {
+        reconstructed++
+      }
+    }
+
+    if (reconstructed > 0) {
+      logger.warn(
+        `💰 [audit] 按当前价格为 API Key ${apiKeyId} 重建了 ${reconstructed} 条缺失费用（可能与请求当时价格有出入）`
+      )
+    }
 
     logger.debug(
-      `💰 Initialized costs for API Key ${apiKeyId}: Daily entries: ${dailyCosts.size}, Total cost: $${totalCost.toFixed(2)}`
+      `💰 Initialized costs for API Key ${apiKeyId}: Daily entries: ${dailyCosts.size}, Total cost: $${totalCost.toFixed(2)}, reconstructed: ${reconstructed}`
     )
+    return reconstructed
   }
 
   /**
@@ -292,7 +327,13 @@ class CostInitService {
       let hasCostData = false
 
       do {
-        const [newCursor, keys] = await client.scan(cursor, 'MATCH', 'usage:cost:*', 'COUNT', 100)
+        const [newCursor, keys] = await client.scan(
+          cursor,
+          'MATCH',
+          RedisKeys.usage.costPattern,
+          'COUNT',
+          100
+        )
         cursor = newCursor
         if (keys.length > 0) {
           hasCostData = true
@@ -328,7 +369,19 @@ class CostInitService {
           const match = usageKey.match(/usage:(.+):model:daily:(.+):(\d{4}-\d{2}-\d{2})$/)
           if (match) {
             const [, keyId, , date] = match
-            const costKey = `usage:cost:daily:${keyId}:${date}`
+
+            // 与 initializeAllCosts 保持同一口径：只检查"存在且未软删除"的 Key。
+            // 否则永久删除残留的 usage 孤儿键（permanentDeleteApiKey 漏删 usage:${keyId}:model:*）
+            // 会把检测打成"缺费用"，而修复路径又永远不补这些 Key，导致启动反复全量重算。
+            const [keyExists, isDeleted] = await Promise.all([
+              client.exists(RedisKeys.apiKey.byId(keyId)),
+              client.hget(RedisKeys.apiKey.byId(keyId), 'isDeleted')
+            ])
+            if (!keyExists || isDeleted === 'true') {
+              continue
+            }
+
+            const costKey = RedisKeys.usage.costDaily(keyId, date)
             const hasCost = await client.exists(costKey)
 
             if (!hasCost) {

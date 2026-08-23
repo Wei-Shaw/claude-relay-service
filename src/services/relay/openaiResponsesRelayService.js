@@ -1,5 +1,5 @@
 const axios = require('axios')
-const ProxyHelper = require('../../utils/proxyHelper')
+const proxyResolver = require('../../utils/proxyResolver')
 const logger = require('../../utils/logger')
 const { filterForOpenAI } = require('../../utils/headerFilter')
 const openaiResponsesAccountService = require('../account/openaiResponsesAccountService')
@@ -9,6 +9,8 @@ const config = require('../../../config/config')
 const crypto = require('crypto')
 const LRUCache = require('../../utils/lruCache')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { buildClientError } = require('../../utils/clientErrorBuilder')
+const { onClientDisconnect } = require('../../utils/clientDisconnect')
 const {
   createRequestDetailMeta,
   extractOpenAICacheReadTokens
@@ -67,6 +69,8 @@ class OpenAIResponsesRelayService {
   // 处理请求转发
   async handleRequest(req, res, account, apiKeyData) {
     let abortController = null
+    let detachClientDisconnect = () => {}
+    let proxyResolution = null
     // 获取会话哈希（如果有的话）
     const sessionId = req.headers['session_id'] || req.body?.session_id
     const sessionHash = sessionId
@@ -83,17 +87,16 @@ class OpenAIResponsesRelayService {
       // 创建 AbortController 用于取消请求
       abortController = new AbortController()
 
-      // 设置客户端断开监听器
-      const handleClientDisconnect = () => {
-        logger.info('🔌 Client disconnected, aborting OpenAI-Responses request')
-        if (abortController && !abortController.signal.aborted) {
-          abortController.abort()
-        }
-      }
-
-      // 监听客户端断开事件
-      req.once('close', handleClientDisconnect)
-      res.once('close', handleClientDisconnect)
+      // 监听客户端断开：判据收口在 utils/clientDisconnect（禁用 req 'close'，它在请求体读完时即触发）
+      detachClientDisconnect = onClientDisconnect(
+        res,
+        () => {
+          if (abortController && !abortController.signal.aborted) {
+            abortController.abort()
+          }
+        },
+        'OpenAI-Responses request'
+      )
 
       // 构建目标 URL（根据 providerEndpoint 配置决定端点路径）
       const providerEndpoint = fullAccount.providerEndpoint || 'responses'
@@ -151,17 +154,14 @@ class OpenAIResponsesRelayService {
         signal: abortController.signal
       }
 
-      // 配置代理（如果有）
-      if (fullAccount.proxy) {
-        const proxyAgent = ProxyHelper.createProxyAgent(fullAccount.proxy)
-        if (proxyAgent) {
-          requestOptions.httpAgent = proxyAgent
-          requestOptions.httpsAgent = proxyAgent
-          requestOptions.proxy = false
-          logger.info(
-            `🌐 Using proxy for OpenAI-Responses: ${ProxyHelper.getProxyDescription(fullAccount.proxy)}`
-          )
-        }
+      // 配置代理（绑定 proxyGroupId 走代理池，否则用账户静态 proxy）
+      proxyResolution = proxyResolver.resolveAgent(fullAccount, 'openai_responses')
+      const proxyAgent = proxyResolution.agent
+      if (proxyAgent) {
+        requestOptions.httpAgent = proxyAgent
+        requestOptions.httpsAgent = proxyAgent
+        requestOptions.proxy = false
+        logger.info('🌐 Using proxy for OpenAI-Responses request')
       }
 
       // 记录请求信息
@@ -178,6 +178,9 @@ class OpenAIResponsesRelayService {
       // 发送请求
       const response = await axios(requestOptions)
 
+      // 被动健康检查：拿到 HTTP 响应即代理传输成功（含 429/4xx/5xx，不归咎代理）
+      proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, null)
+
       // 处理 429 限流错误
       if (response.status === 429) {
         const { resetsInSeconds, errorData } = await this._handle429Error(
@@ -190,26 +193,36 @@ class OpenAIResponsesRelayService {
         const oaiAutoProtectionDisabled =
           account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
         if (!oaiAutoProtectionDisabled) {
+          const errorContext = upstreamErrorHelper.buildErrorContext({
+            url: requestOptions.url,
+            method: requestOptions.method,
+            requestHeaders: requestOptions.headers,
+            requestBody: requestOptions.data,
+            model: req.body?.model,
+            sessionId: sessionHash,
+            responseStatus: 429,
+            responseHeaders: response.headers,
+            responseBody: errorData
+          })
           await upstreamErrorHelper
             .markTempUnavailable(
               account.id,
               'openai-responses',
               429,
-              resetsInSeconds || upstreamErrorHelper.parseRetryAfter(response.headers)
+              resetsInSeconds || upstreamErrorHelper.parseRetryAfter(response.headers),
+              errorContext
             )
             .catch(() => {})
         }
 
-        // 返回错误响应（使用处理后的数据，避免循环引用）
-        const errorResponse = errorData || {
-          error: {
-            message: 'Rate limit exceeded',
-            type: 'rate_limit_error',
-            code: 'rate_limit_exceeded',
-            resets_in_seconds: resetsInSeconds
-          }
-        }
-        return res.status(429).json(errorResponse)
+        // 返回包装后的限流错误（脱敏 + 协议化，不裸透传上游 body）
+        const clientError = buildClientError({
+          statusCode: 429,
+          protocol: 'openai',
+          upstreamBody: errorData,
+          retryAfterSeconds: resetsInSeconds
+        })
+        return res.status(clientError.statusCode).json(clientError.body)
       }
 
       // 处理其他错误状态码
@@ -265,8 +278,19 @@ class OpenAIResponsesRelayService {
             const oaiAutoProtectionDisabled =
               account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
             if (!oaiAutoProtectionDisabled) {
+              const errorContext = upstreamErrorHelper.buildErrorContext({
+                url: requestOptions.url,
+                method: requestOptions.method,
+                requestHeaders: requestOptions.headers,
+                requestBody: requestOptions.data,
+                model: req.body?.model,
+                sessionId: sessionHash,
+                responseStatus: 401,
+                responseHeaders: response.headers,
+                responseBody: errorData
+              })
               await upstreamErrorHelper
-                .markTempUnavailable(account.id, 'openai-responses', 401)
+                .markTempUnavailable(account.id, 'openai-responses', 401, null, errorContext)
                 .catch(() => {})
             }
             if (sessionHash) {
@@ -298,8 +322,7 @@ class OpenAIResponsesRelayService {
           }
 
           // 清理监听器
-          req.removeListener('close', handleClientDisconnect)
-          res.removeListener('close', handleClientDisconnect)
+          detachClientDisconnect()
 
           return res.status(401).json(unauthorizedResponse)
         }
@@ -310,10 +333,23 @@ class OpenAIResponsesRelayService {
             const oaiAutoProtectionDisabled =
               account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
             if (!oaiAutoProtectionDisabled) {
+              const errorContext = upstreamErrorHelper.buildErrorContext({
+                url: requestOptions.url,
+                method: requestOptions.method,
+                requestHeaders: requestOptions.headers,
+                requestBody: requestOptions.data,
+                model: req.body?.model,
+                sessionId: sessionHash,
+                responseStatus: response.status,
+                responseHeaders: response.headers,
+                responseBody: errorData
+              })
               await upstreamErrorHelper.markTempUnavailable(
                 account.id,
                 'openai-responses',
-                response.status
+                response.status,
+                null,
+                errorContext
               )
             }
             if (sessionHash) {
@@ -328,12 +364,14 @@ class OpenAIResponsesRelayService {
         }
 
         // 清理监听器
-        req.removeListener('close', handleClientDisconnect)
-        res.removeListener('close', handleClientDisconnect)
+        detachClientDisconnect()
 
-        return res
-          .status(response.status)
-          .json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        const clientError = buildClientError({
+          statusCode: response.status,
+          protocol: 'openai',
+          upstreamBody: errorData
+        })
+        return res.status(clientError.statusCode).json(clientError.body)
       }
 
       // 更新最后使用时间（节流）
@@ -347,7 +385,7 @@ class OpenAIResponsesRelayService {
           account,
           apiKeyData,
           req.body?.model,
-          handleClientDisconnect,
+          detachClientDisconnect,
           req
         )
       }
@@ -355,6 +393,21 @@ class OpenAIResponsesRelayService {
       // 处理非流式响应
       return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model, req)
     } catch (error) {
+      detachClientDisconnect()
+      // 客户端断开导致的主动 abort 不是代理/上游故障，先拦截再 report，否则会污染代理健康与错误日志
+      if (
+        error.name === 'AbortError' ||
+        error.name === 'CanceledError' ||
+        error.code === 'ERR_CANCELED'
+      ) {
+        logger.info('OpenAI-Responses request aborted due to client disconnect')
+        if (!res.headersSent && !res.destroyed) {
+          res.status(499).end()
+        }
+        return
+      }
+      // 被动健康检查：上报连接级故障（classifyBusinessTraffic 区分传输错误 vs 上游响应，不误熔断）
+      proxyResolver.report(proxyResolution?.proxyId, proxyResolution?.contextKey, error)
       // 清理 AbortController
       if (abortController && !abortController.signal.aborted) {
         abortController.abort()
@@ -369,14 +422,28 @@ class OpenAIResponsesRelayService {
       }
       logger.error('OpenAI-Responses relay error:', errorInfo)
 
-      // 检查是否是网络错误
-      if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      // 检查是否是网络错误（含 axios 请求超时 ECONNABORTED）
+      if (
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNABORTED'
+      ) {
         if (account?.id) {
           const oaiAutoProtectionDisabled =
             account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
           if (!oaiAutoProtectionDisabled) {
+            const errorContext = upstreamErrorHelper.buildErrorContext({
+              url: error.config?.url,
+              method: error.config?.method,
+              requestHeaders: error.config?.headers,
+              requestBody: error.config?.data,
+              model: req.body?.model,
+              sessionId: sessionHash,
+              responseStatus: 503,
+              message: error.message
+            })
             await upstreamErrorHelper
-              .markTempUnavailable(account.id, 'openai-responses', 503)
+              .markTempUnavailable(account.id, 'openai-responses', 503, null, errorContext)
               .catch(() => {})
           }
         }
@@ -423,8 +490,19 @@ class OpenAIResponsesRelayService {
             const oaiAutoProtectionDisabled =
               account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
             if (!oaiAutoProtectionDisabled) {
+              const errorContext = upstreamErrorHelper.buildErrorContext({
+                url: error.config?.url,
+                method: error.config?.method,
+                requestHeaders: error.config?.headers,
+                requestBody: error.config?.data,
+                model: req.body?.model,
+                sessionId: sessionHash,
+                responseStatus: 401,
+                responseHeaders: error.response?.headers,
+                responseBody: errorData
+              })
               await upstreamErrorHelper
-                .markTempUnavailable(account.id, 'openai-responses', 401)
+                .markTempUnavailable(account.id, 'openai-responses', 401, null, errorContext)
                 .catch(() => {})
             }
             if (sessionHash) {
@@ -458,7 +536,12 @@ class OpenAIResponsesRelayService {
           return res.status(401).json(unauthorizedResponse)
         }
 
-        return res.status(status).json(upstreamErrorHelper.sanitizeErrorForClient(errorData))
+        const clientError = buildClientError({
+          statusCode: status,
+          protocol: 'openai',
+          upstreamBody: errorData
+        })
+        return res.status(clientError.statusCode).json(clientError.body)
       }
 
       // 其他错误
@@ -479,7 +562,7 @@ class OpenAIResponsesRelayService {
     account,
     apiKeyData,
     requestedModel,
-    handleClientDisconnect,
+    detachClientDisconnect,
     req
   ) {
     // 设置 SSE 响应头
@@ -673,8 +756,7 @@ class OpenAIResponsesRelayService {
       }
 
       // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', handleClientDisconnect)
+      detachClientDisconnect()
 
       if (!res.destroyed) {
         res.end()
@@ -692,11 +774,11 @@ class OpenAIResponsesRelayService {
       logger.error('Stream error:', error)
 
       // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', handleClientDisconnect)
+      detachClientDisconnect()
 
       if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
+        const clientError = buildClientError({ statusCode: 502, protocol: 'openai' })
+        res.status(clientError.statusCode).json(clientError.body)
       } else if (!res.destroyed) {
         res.end()
       }
@@ -713,8 +795,8 @@ class OpenAIResponsesRelayService {
       }
     }
 
-    req.on('close', cleanup)
-    req.on('aborted', cleanup)
+    // 上游流回收同样走统一判据：req 'close' 在请求体读完时即触发，挂它等于「正常请求就销毁上游流」
+    onClientDisconnect(res, cleanup, 'OpenAI-Responses stream')
   }
 
   // 处理非流式响应

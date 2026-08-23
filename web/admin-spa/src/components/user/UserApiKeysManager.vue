@@ -98,20 +98,20 @@
                   <p class="text-sm font-medium text-gray-900">{{ apiKey.name }}</p>
                   <span
                     v-if="apiKey.isDeleted === true || apiKey.deletedAt"
-                    class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800"
+                    class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-sm font-medium text-gray-800"
                   >
                     Deleted
                   </span>
                   <span
                     v-else-if="!apiKey.isActive"
-                    class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800"
+                    class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-sm font-medium text-red-800"
                   >
                     Deleted
                   </span>
                 </div>
                 <div class="mt-1">
                   <p class="text-sm text-gray-500">{{ apiKey.description || 'No description' }}</p>
-                  <div class="mt-1 flex items-center space-x-4 text-xs text-gray-400">
+                  <div class="mt-1 flex items-center space-x-4 text-sm text-gray-400">
                     <span>Created: {{ formatDate(apiKey.createdAt) }}</span>
                     <span v-if="apiKey.isDeleted === 'true' || apiKey.deletedAt"
                       >Deleted: {{ formatDate(apiKey.deletedAt) }}</span
@@ -130,7 +130,7 @@
             </div>
             <div class="flex items-center space-x-2">
               <!-- Usage Stats -->
-              <div class="text-right text-xs text-gray-500">
+              <div class="text-right text-sm text-gray-500">
                 <div>{{ formatNumber(apiKey.usage?.requests || 0) }} requests</div>
                 <div v-if="apiKey.usage?.totalCost">${{ apiKey.usage.totalCost.toFixed(4) }}</div>
               </div>

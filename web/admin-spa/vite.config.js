@@ -51,6 +51,8 @@ export default defineConfig(({ mode }) => {
         imports: ['vue', 'vue-router', 'pinia']
       }),
       Components({
+        // common 下全局组件自动注册（CustomDropdown 等），业务页无需手动 import
+        dirs: ['src/components/common'],
         resolvers: [ElementPlusResolver()]
       })
     ],
@@ -62,7 +64,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3001,
       host: true,
-      open: true,
+      open: false,
       proxy: {
         // 统一的 API 代理规则 - 开发环境所有 API 请求都加 /webapi 前缀
         '/webapi': {

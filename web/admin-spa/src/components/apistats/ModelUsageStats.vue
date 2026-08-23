@@ -8,7 +8,7 @@
           <i class="fas fa-robot mr-2 text-sm text-indigo-500 md:mr-3 md:text-base" />
           模型使用统计
         </span>
-        <span class="text-xs font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
+        <span class="text-sm font-normal text-gray-600 dark:text-gray-400 sm:ml-2 md:text-sm"
           >({{ periodLabel }})</span
         >
       </h3>
@@ -33,9 +33,9 @@
               @click="copyModelName(model.model)"
             >
               {{ model.model }}
-              <i class="fas fa-copy ml-1 text-xs text-gray-400" />
+              <i class="fas fa-copy ml-1 text-sm text-gray-400" />
             </h4>
-            <div class="flex flex-wrap gap-x-2 text-xs text-gray-500 dark:text-gray-400">
+            <div class="flex flex-wrap gap-x-2 text-sm text-gray-500 dark:text-gray-400">
               <span>{{ model.requests }}次</span>
               <span>输入:{{ formatNumber(model.inputTokens) }}</span>
               <span>输出:{{ formatNumber(model.outputTokens) }}</span>
@@ -47,7 +47,7 @@
               >
             </div>
           </div>
-          <div class="flex-shrink-0 text-xs sm:text-sm">
+          <div class="flex-shrink-0 text-sm">
             <span class="text-gray-500">官方API</span>
             <span class="ml-1 font-semibold text-green-600">
               {{ model.formatted?.total || '$0.00' }}
@@ -89,7 +89,7 @@ const apiStatsStore = useApiStatsStore()
 const { dailyModelStats, monthlyModelStats, alltimeModelStats, modelStatsLoading, serviceRates } =
   storeToRefs(apiStatsStore)
 
-// 根据 period 选择对应的数据
+// 根据 period prop 选择对应数据，不读写全局 statsPeriod
 const stats = computed(() => {
   if (props.period === 'daily') return dailyModelStats.value
   if (props.period === 'monthly') return monthlyModelStats.value
@@ -106,20 +106,31 @@ const periodLabel = computed(() => {
   return ''
 })
 
-// 复制模型名称
 const copyModelName = (name) => copyText(name, '模型名称已复制')
 
-// 根据模型名称判断服务类型
 const getServiceFromModel = (model) => {
   if (!model) return 'claude'
-  const m = model.toLowerCase()
-  if (m.includes('claude') || m.includes('sonnet') || m.includes('opus') || m.includes('haiku'))
+  const lowerName = model.toLowerCase()
+  if (
+    lowerName.includes('claude') ||
+    lowerName.includes('sonnet') ||
+    lowerName.includes('opus') ||
+    lowerName.includes('haiku')
+  ) {
     return 'claude'
-  if (m.includes('gpt') || m.includes('o1') || m.includes('o3') || m.includes('o4')) return 'codex'
-  if (m.includes('gemini')) return 'gemini'
-  if (m.includes('droid') || m.includes('factory')) return 'droid'
-  if (m.includes('bedrock') || m.includes('amazon')) return 'bedrock'
-  if (m.includes('azure')) return 'azure'
+  }
+  if (
+    lowerName.includes('gpt') ||
+    lowerName.includes('o1') ||
+    lowerName.includes('o3') ||
+    lowerName.includes('o4')
+  ) {
+    return 'codex'
+  }
+  if (lowerName.includes('gemini')) return 'gemini'
+  if (lowerName.includes('droid') || lowerName.includes('factory')) return 'droid'
+  if (lowerName.includes('bedrock') || lowerName.includes('amazon')) return 'bedrock'
+  if (lowerName.includes('azure')) return 'azure'
   return 'claude'
 }
 
@@ -142,12 +153,9 @@ const calculateCcCost = (model) => {
   if (ccCost >= 0.01) return '$' + ccCost.toFixed(4)
   return '$' + ccCost.toFixed(6)
 }
-
-// 格式化数字
 </script>
 
 <style scoped>
-/* 卡片样式 - 使用CSS变量 */
 .card {
   background: var(--surface-color);
   border-radius: 16px;
@@ -183,7 +191,6 @@ const calculateCcCost = (model) => {
     0 10px 10px -5px rgba(0, 0, 0, 0.35);
 }
 
-/* 模型使用项样式 - 使用CSS变量 */
 .model-usage-item {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
@@ -225,7 +232,6 @@ const calculateCcCost = (model) => {
   border-color: rgba(75, 85, 99, 0.6);
 }
 
-/* 加载动画 */
 .loading-spinner {
   animation: spin 1s linear infinite;
   filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
@@ -240,7 +246,6 @@ const calculateCcCost = (model) => {
   }
 }
 
-/* 响应式优化 */
 @media (max-width: 768px) {
   .model-usage-item .grid {
     grid-template-columns: 1fr 1fr;

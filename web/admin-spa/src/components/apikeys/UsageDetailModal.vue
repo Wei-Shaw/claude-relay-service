@@ -1,160 +1,112 @@
 <template>
-  <Teleport to="body">
+  <ModalTransition>
     <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <!-- 背景遮罩 -->
       <div class="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm" @click="close" />
 
       <!-- 模态框 -->
       <div
-        class="modal-content relative mx-auto flex max-h-[90vh] w-[95%] max-w-5xl flex-col p-4 sm:w-full sm:p-6 md:p-8"
+        class="modal-content relative mx-auto flex max-h-[90vh] w-[95%] max-w-2xl flex-col p-4 sm:w-full sm:p-5"
       >
         <!-- 标题栏 -->
-        <div class="mb-4 flex items-center justify-between sm:mb-6">
-          <div class="flex items-center gap-2 sm:gap-3">
+        <div class="mb-3 flex items-center justify-between">
+          <div class="flex min-w-0 items-center gap-2">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 sm:h-10 sm:w-10 sm:rounded-xl"
+              class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600"
             >
-              <i class="fas fa-chart-line text-sm text-white sm:text-base" />
+              <i class="fas fa-chart-line text-sm text-white" />
             </div>
-            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
+            <h3 class="truncate text-base font-bold text-gray-900 dark:text-gray-100 sm:text-lg">
               使用统计详情 - {{ apiKey.name }}
             </h3>
           </div>
           <button class="p-1 text-gray-400 transition-colors hover:text-gray-600" @click="close">
-            <i class="fas fa-times text-lg sm:text-xl" />
+            <i class="fas fa-times text-lg" />
           </button>
         </div>
 
         <!-- 内容区 -->
         <div class="modal-scroll-content custom-scrollbar flex-1 overflow-y-auto">
-          <!-- 总体统计卡片 -->
-          <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <!-- 请求统计卡片 -->
-            <div
-              class="rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 p-4 dark:border-blue-700 dark:from-blue-900/20 dark:to-blue-800/20"
-            >
-              <div class="mb-3 flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">总请求数</span>
-                <i class="fas fa-paper-plane text-blue-500" />
+          <!-- 紧凑用量统计 -->
+          <div
+            class="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-600 dark:bg-gray-700/50"
+          >
+            <div class="grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-gray-500 dark:text-gray-400">请求</span>
+                <span class="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                  {{ formatNumber(totalRequests) }}
+                </span>
               </div>
-              <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {{ formatNumber(totalRequests) }}
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-gray-500 dark:text-gray-400">总Token</span>
+                <span class="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                  {{ formatTokenCount(totalTokens) }}
+                </span>
               </div>
-              <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                今日: {{ formatNumber(dailyRequests) }} 次
-              </div>
-            </div>
-
-            <!-- Token统计卡片 -->
-            <div
-              class="rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-green-100 p-4 dark:border-green-700 dark:from-green-900/20 dark:to-green-800/20"
-            >
-              <div class="mb-3 flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">总Token数</span>
-                <i class="fas fa-coins text-green-500" />
-              </div>
-              <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {{ formatTokenCount(totalTokens) }}
-              </div>
-              <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                今日: {{ formatTokenCount(dailyTokens) }}
-              </div>
-            </div>
-
-            <!-- 费用统计卡片 -->
-            <div
-              class="rounded-lg border border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 dark:border-yellow-700 dark:from-yellow-900/20 dark:to-yellow-800/20"
-            >
-              <div class="mb-3 flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">总费用</span>
-                <i class="fas fa-dollar-sign text-yellow-600" />
-              </div>
-              <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                ${{ totalCost.toFixed(4) }}
-              </div>
-              <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                今日: ${{ dailyCost.toFixed(4) }}
-              </div>
-            </div>
-
-            <!-- 平均统计卡片 -->
-            <div
-              class="rounded-lg border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 p-4 dark:border-purple-700 dark:from-purple-900/20 dark:to-purple-800/20"
-            >
-              <div class="mb-3 flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">平均速率</span>
-                <i class="fas fa-tachometer-alt text-purple-500" />
-              </div>
-              <div class="space-y-1 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">RPM:</span>
-                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{ rpm }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">TPM:</span>
-                  <span class="font-semibold text-gray-900 dark:text-gray-100">{{ tpm }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Token详细分布 -->
-          <div class="mb-6">
-            <h4
-              class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
-            >
-              <i class="fas fa-chart-pie mr-2 text-indigo-500" />
-              Token 使用分布
-            </h4>
-            <div class="space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-700/50">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <i class="fas fa-arrow-down mr-2 text-green-500" />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">输入 Token</span>
-                </div>
-                <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-gray-500 dark:text-gray-400">输入</span>
+                <span class="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                   {{ formatTokenCount(inputTokens) }}
                 </span>
               </div>
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <i class="fas fa-arrow-up mr-2 text-blue-500" />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">输出 Token</span>
-                </div>
-                <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-gray-500 dark:text-gray-400">输出</span>
+                <span class="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                   {{ formatTokenCount(outputTokens) }}
                 </span>
               </div>
-              <div v-if="cacheCreateTokens > 0" class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <i class="fas fa-save mr-2 text-purple-500" />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">缓存创建 Token</span>
-                </div>
-                <span class="text-sm font-semibold text-purple-600">
-                  {{ formatTokenCount(cacheCreateTokens) }}
+              <div class="flex items-center justify-between gap-3 sm:col-span-2">
+                <span class="text-gray-500 dark:text-gray-400">缓存写</span>
+                <span
+                  class="text-right font-semibold tabular-nums text-purple-600 dark:text-purple-400"
+                >
+                  {{ formatTokenCount(cacheCreateTokens)
+                  }}<span
+                    v-if="ephemeral5mTokens > 0 || ephemeral1hTokens > 0"
+                    class="ml-1 font-normal text-gray-500 dark:text-gray-400"
+                  >
+                    (5m: {{ formatTokenCount(ephemeral5mTokens) }} / 1h:
+                    {{ formatTokenCount(ephemeral1hTokens) }})
+                  </span>
                 </span>
               </div>
-              <div v-if="cacheReadTokens > 0" class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <i class="fas fa-download mr-2 text-purple-500" />
-                  <span class="text-sm text-gray-600 dark:text-gray-400">缓存读取 Token</span>
-                </div>
-                <span class="text-sm font-semibold text-purple-600">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-gray-500 dark:text-gray-400">缓存读</span>
+                <span class="font-semibold tabular-nums text-purple-600 dark:text-purple-400">
                   {{ formatTokenCount(cacheReadTokens) }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-gray-500 dark:text-gray-400">命中率</span>
+                <span class="font-semibold tabular-nums text-cyan-600 dark:text-cyan-400">
+                  {{ formatPercent(cacheHitRate) }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-gray-500 dark:text-gray-400">原始</span>
+                <span class="font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                  {{ formatCost(realCost) }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-gray-500 dark:text-gray-400">扣费</span>
+                <span class="font-semibold tabular-nums text-green-600 dark:text-green-400">
+                  {{ formatCost(totalCost) }}
                 </span>
               </div>
             </div>
           </div>
 
           <!-- 限制信息 -->
-          <div v-if="hasLimits" class="mb-6">
+          <div v-if="hasLimits" class="mb-4">
             <h4
-              class="mb-3 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
+              class="mb-2 flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300"
             >
               <i class="fas fa-shield-alt mr-2 text-red-500" />
               限制设置
             </h4>
-            <div class="space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-700/50">
+            <div class="space-y-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
               <div v-if="Number(apiKey.dailyCostLimit) > 0" class="space-y-1.5">
                 <LimitProgressBar
                   :current="Number(dailyCost) || 0"
@@ -163,7 +115,7 @@
                   :show-shine="true"
                   type="daily"
                 />
-                <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+                <div class="text-right text-sm text-gray-500 dark:text-gray-400">
                   已使用 {{ Math.min(dailyCostPercentage, 100).toFixed(1) }}%
                 </div>
               </div>
@@ -176,7 +128,7 @@
                   :show-shine="true"
                   type="opus"
                 />
-                <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+                <div class="text-right text-sm text-gray-500 dark:text-gray-400">
                   已使用 {{ Math.min(opusUsagePercentage, 100).toFixed(1) }}%
                 </div>
               </div>
@@ -189,7 +141,7 @@
                   :show-shine="true"
                   type="total"
                 />
-                <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+                <div class="text-right text-sm text-gray-500 dark:text-gray-400">
                   已使用 {{ Math.min(totalUsagePercentage, 100).toFixed(1) }}%
                 </div>
               </div>
@@ -219,7 +171,7 @@
                 </h5>
                 <div
                   v-if="apiKey.rateLimitWindow <= 0"
-                  class="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:border-yellow-700/50 dark:bg-yellow-900/20 dark:text-yellow-200"
+                  class="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:border-yellow-700/50 dark:bg-yellow-900/20 dark:text-yellow-200"
                 >
                   未设置窗口时长（rateLimitWindow=0），窗口限制不会生效。
                 </div>
@@ -272,12 +224,12 @@
                     <span
                       v-for="model in restrictedModels"
                       :key="model"
-                      class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                      class="rounded bg-gray-100 px-2 py-0.5 text-sm text-gray-700 dark:bg-gray-700 dark:text-gray-200"
                     >
                       {{ model }}
                     </span>
                   </div>
-                  <div v-else class="text-xs text-gray-500 dark:text-gray-400">未配置具体模型</div>
+                  <div v-else class="text-sm text-gray-500 dark:text-gray-400">未配置具体模型</div>
                 </div>
 
                 <div
@@ -294,12 +246,12 @@
                     <span
                       v-for="client in allowedClients"
                       :key="client"
-                      class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                      class="rounded bg-gray-100 px-2 py-0.5 text-sm text-gray-700 dark:bg-gray-700 dark:text-gray-200"
                     >
                       {{ client }}
                     </span>
                   </div>
-                  <div v-else class="text-xs text-gray-500 dark:text-gray-400">未配置客户端</div>
+                  <div v-else class="text-sm text-gray-500 dark:text-gray-400">未配置客户端</div>
                 </div>
               </div>
             </div>
@@ -307,25 +259,23 @@
         </div>
 
         <!-- 底部按钮 -->
-        <div class="mt-4 flex justify-end gap-2 sm:mt-6 sm:gap-3">
-          <button class="btn btn-primary px-4 py-2 text-sm" type="button" @click="openTimeline">
-            查看请求时间线
-          </button>
+        <div class="mt-3 flex justify-end">
           <button class="btn btn-secondary px-4 py-2 text-sm" type="button" @click="close">
             关闭
           </button>
         </div>
       </div>
     </div>
-  </Teleport>
+  </ModalTransition>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import LimitProgressBar from './LimitProgressBar.vue'
 import WindowCountdown from './WindowCountdown.vue'
 
-import { formatNumber } from '@/utils/tools'
+import { formatCost, formatNumber } from '@/utils/tools'
 
 const props = defineProps({
   show: {
@@ -338,14 +288,17 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'open-timeline'])
+const emit = defineEmits(['close'])
 
 // 计算属性
 const totalRequests = computed(() => props.apiKey.usage?.total?.requests || 0)
-const dailyRequests = computed(() => props.apiKey.usage?.daily?.requests || 0)
 const totalTokens = computed(() => props.apiKey.usage?.total?.tokens || 0)
-const dailyTokens = computed(() => props.apiKey.usage?.daily?.tokens || 0)
 const totalCost = computed(() => props.apiKey.usage?.total?.cost || 0)
+const realCost = computed(() => {
+  const value = props.apiKey.usage?.total?.realCost
+  // 旧数据没有 realCost 时，回退到扣费金额
+  return value > 0 ? value : totalCost.value
+})
 const dailyCost = computed(() => props.apiKey.dailyCost || 0)
 const totalCostLimit = computed(() => props.apiKey.totalCostLimit || 0)
 const weeklyOpusCost = computed(() => props.apiKey.weeklyOpusCost || 0)
@@ -354,8 +307,15 @@ const inputTokens = computed(() => props.apiKey.usage?.total?.inputTokens || 0)
 const outputTokens = computed(() => props.apiKey.usage?.total?.outputTokens || 0)
 const cacheCreateTokens = computed(() => props.apiKey.usage?.total?.cacheCreateTokens || 0)
 const cacheReadTokens = computed(() => props.apiKey.usage?.total?.cacheReadTokens || 0)
-const rpm = computed(() => props.apiKey.usage?.averages?.rpm || 0)
-const tpm = computed(() => props.apiKey.usage?.averages?.tpm || 0)
+const ephemeral5mTokens = computed(() => props.apiKey.usage?.total?.ephemeral5mTokens || 0)
+const ephemeral1hTokens = computed(() => props.apiKey.usage?.total?.ephemeral1hTokens || 0)
+
+// 命中率：读 / (输入 + 读 + 写)
+const cacheHitRate = computed(() => {
+  const denominator = inputTokens.value + cacheReadTokens.value + cacheCreateTokens.value
+  if (denominator <= 0) return 0
+  return cacheReadTokens.value / denominator
+})
 
 const enableModelRestriction = computed(
   () =>
@@ -417,8 +377,6 @@ const opusUsagePercentage = computed(() => {
   return (weeklyOpusCost.value / weeklyOpusCostLimit.value) * 100
 })
 
-// 方法
-
 // 格式化Token数量（使用K/M单位）
 const formatTokenCount = (count) => {
   if (count >= 1000000) {
@@ -426,14 +384,16 @@ const formatTokenCount = (count) => {
   } else if (count >= 1000) {
     return (count / 1000).toFixed(1) + 'K'
   }
-  return count.toString()
+  return String(count || 0)
+}
+
+const formatPercent = (value) => {
+  const num = Number(value || 0)
+  if (!Number.isFinite(num) || num <= 0) return '0%'
+  return `${(num * 100).toFixed(1)}%`
 }
 
 const close = () => {
   emit('close')
-}
-
-const openTimeline = () => {
-  emit('open-timeline', props.apiKey?.id)
 }
 </script>

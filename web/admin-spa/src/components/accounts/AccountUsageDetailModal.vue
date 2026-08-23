@@ -1,12 +1,12 @@
 <template>
-  <Teleport to="body">
+  <ModalTransition>
     <div
       v-if="show"
       class="fixed inset-0 z-[1050] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm"
     >
       <div class="absolute inset-0" @click="handleClose" />
       <div
-        class="relative z-10 mx-3 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4 sm:p-1"
+        class="modal-panel relative z-10 mx-3 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95 shadow-2xl ring-1 ring-black/5 transition-all dark:border-gray-700/60 dark:bg-gray-900/95 dark:ring-white/10 sm:mx-4 sm:p-1"
       >
         <!-- 顶部栏 -->
         <div
@@ -25,18 +25,18 @@
                 </h3>
                 <span
                   v-if="account?.platform"
-                  class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                  class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
                 >
                   <i class="fas fa-layer-group mr-1" />{{ platformLabel }}
                 </span>
                 <span
                   v-if="account?.accountType"
-                  class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-500/10 dark:text-purple-300"
+                  class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-sm font-medium text-purple-700 dark:bg-purple-500/10 dark:text-purple-300"
                 >
                   <i class="fas fa-user-tag mr-1" />{{ accountTypeLabel }}
                 </span>
               </div>
-              <p class="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+              <p class="text-sm text-gray-500 dark:text-gray-400 sm:text-sm">
                 近 {{ summary?.days || 30 }} 天内的费用与请求趋势
                 <span v-if="summary?.actualDaysUsed && summary?.actualDaysUsed < summary?.days">
                   (日均基于实际使用 {{ summary.actualDaysUsed }} 天)
@@ -46,7 +46,7 @@
           </div>
           <div class="flex items-center gap-2">
             <button
-              class="flex items-center gap-2 rounded-full bg-purple-100 px-3 py-2 text-xs font-semibold text-purple-700 transition hover:bg-purple-200 dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
+              class="flex items-center gap-2 rounded-full bg-purple-100 px-3 py-2 text-sm font-semibold text-purple-700 transition hover:bg-purple-200 dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
               @click="goTimeline"
             >
               <i class="fas fa-clock" /> 请求时间线
@@ -76,14 +76,14 @@
                 <div class="flex items-start justify-between">
                   <div>
                     <p
-                      class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                      class="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
                     >
                       {{ metric.label }}
                     </p>
                     <p class="mt-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
                       {{ metric.value }}
                     </p>
-                    <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                    <p class="mt-1 text-sm text-gray-400 dark:text-gray-500">
                       {{ metric.subtitle }}
                     </p>
                   </div>
@@ -123,7 +123,7 @@
                     }}</span>
                   </div>
                   <div
-                    class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                    class="mt-2 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400"
                   >
                     <span>Tokens</span>
                     <span>{{ formatNumber(summary?.today?.tokens || 0) }}</span>
@@ -156,7 +156,7 @@
                     }}</span>
                   </div>
                   <div
-                    class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                    class="mt-2 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400"
                   >
                     <span>请求</span>
                     <span>{{
@@ -191,7 +191,7 @@
                     }}</span>
                   </div>
                   <div
-                    class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                    class="mt-2 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400"
                   >
                     <span>费用</span>
                     <span>{{
@@ -226,7 +226,7 @@
                     }}</span>
                   </div>
                   <div
-                    class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                    class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400"
                   >
                     <span>输入 / 输出</span>
                     <span
@@ -258,7 +258,7 @@
                     }}</span>
                   </div>
                   <div
-                    class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                    class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400"
                   >
                     <span>日均请求 / Token</span>
                     <span
@@ -297,7 +297,7 @@
                     }}</span>
                   </div>
                   <div
-                    class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                    class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400"
                   >
                     <span>今日费用</span>
                     <span>{{ formatCost(overview?.daily?.cost || 0) }}</span>
@@ -316,7 +316,7 @@
                 >
                   <i class="fas fa-chart-line mr-2 text-blue-500" /> 30天费用与请求趋势
                 </h4>
-                <span class="text-xs text-gray-400 dark:text-gray-500">
+                <span class="text-sm text-gray-400 dark:text-gray-500">
                   最新更新时间：{{ formatDateTime(generatedAtDisplay) }}
                 </span>
               </div>
@@ -328,17 +328,19 @@
         </div>
       </div>
     </div>
-  </Teleport>
+  </ModalTransition>
 </template>
 
 <script setup>
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useThemeStore } from '@/stores/theme'
 
 import { formatNumber } from '@/utils/tools'
+import { formatLocalDate, formatLocalDateTime } from '@/utils/time'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -409,16 +411,12 @@ const formatDate = (value) => {
     if (parts.length === 3) return `${parts[1]}-${parts[2]}`
     return value
   }
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${month}-${day}`
+  return formatLocalDate(value, 'MM-DD') || value
 }
 
 const formatDateTime = (value) => {
   if (!value) return '暂无'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return formatLocalDateTime(value, 'YYYY-MM-DD HH:mm') || value
 }
 
 const findHistoryValue = (date, field) => {

@@ -6,13 +6,16 @@
 const express = require('express')
 const axios = require('axios')
 const openaiResponsesAccountService = require('../../services/account/openaiResponsesAccountService')
+const testModelConfigService = require('../../services/testModelConfigService')
 const apiKeyService = require('../../services/apiKeyService')
 const accountGroupService = require('../../services/accountGroupService')
 const redis = require('../../models/redis')
+const { RedisKeys } = require('../../constants/redisKeys')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { stripReadonlyAccountFields } = require('../../utils/commonHelper')
 const { createOpenAITestPayload, extractErrorMessage } = require('../../utils/testPayloadHelper')
 const { getProxyAgent } = require('../../utils/proxyHelper')
 
@@ -73,9 +76,9 @@ router.get('/openai-responses-accounts', authenticateAdmin, async (req, res) => 
 
     const statsPipeline = client.pipeline()
     for (const accountId of accountIds) {
-      statsPipeline.hgetall(`account_usage:${accountId}`)
-      statsPipeline.hgetall(`account_usage:daily:${accountId}:${today}`)
-      statsPipeline.hgetall(`account_usage:monthly:${accountId}:${currentMonth}`)
+      statsPipeline.hgetall(RedisKeys.accountUsage.total(accountId))
+      statsPipeline.hgetall(RedisKeys.accountUsage.daily(accountId, today))
+      statsPipeline.hgetall(RedisKeys.accountUsage.monthly(accountId, currentMonth))
     }
     const statsResults = await statsPipeline.exec()
 
@@ -204,7 +207,10 @@ router.put('/openai-responses-accounts/:id', authenticateAdmin, async (req, res)
     }
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = mapExpiryField(updates, 'OpenAI-Responses', id)
+    // review#3：剥离外部传入的状态类字段，禁止伪造自动停用证据
+    const mappedUpdates = stripReadonlyAccountFields(
+      mapExpiryField(updates, 'OpenAI-Responses', id)
+    )
 
     // 验证priority的有效性（1-100）
     if (mappedUpdates.priority !== undefined) {
@@ -458,10 +464,14 @@ router.post('/openai-responses-accounts/:id/reset-usage', authenticateAdmin, asy
 // 测试 OpenAI-Responses 账户连通性
 router.post('/openai-responses-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
   const { accountId } = req.params
-  const { model = 'gpt-4o-mini' } = req.body
   const startTime = Date.now()
 
   try {
+    // 请求显式指定优先，否则用后台配置的默认测试模型（单一事实源）
+    const model = await testModelConfigService.resolveAccountModel(
+      'openai-responses',
+      req.body.model
+    )
     // 获取账户信息（apiKey 已自动解密）
     const account = await openaiResponsesAccountService.getAccount(accountId)
     if (!account) {

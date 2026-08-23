@@ -1,14 +1,8 @@
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <div class="sm:flex sm:items-center">
-      <div class="sm:flex-auto">
-        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">User Management</h1>
-        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
-          Manage users, their API keys, and view usage statistics
-        </p>
-      </div>
-      <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+    <!-- 页面标题「User Management」与主 Tab「用户管理」重复，已移除；保留刷新按钮（左对齐） -->
+    <div class="flex items-center">
+      <div class="sm:flex-none">
         <button
           class="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 sm:w-auto"
           :disabled="loading"
@@ -29,7 +23,7 @@
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+      <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -61,7 +55,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+      <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -93,7 +87,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+      <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -125,7 +119,7 @@
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+      <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
         <div class="p-5">
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -159,7 +153,7 @@
     </div>
 
     <!-- Search and Filters -->
-    <div class="rounded-lg bg-white shadow dark:bg-gray-800">
+    <div class="rounded-lg border border-gray-200 dark:border-gray-700">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div class="space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
@@ -192,29 +186,29 @@
             </div>
 
             <!-- Role Filter -->
-            <div>
-              <select
+            <div class="min-w-[140px]">
+              <CustomDropdown
                 v-model="selectedRole"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                accent="indigo"
+                icon="fa-user-tag"
+                :options="roleFilterOptions"
+                placeholder="All Roles"
+                size="sm"
                 @change="loadUsers"
-              >
-                <option value="">All Roles</option>
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
+              />
             </div>
 
             <!-- Status Filter -->
-            <div>
-              <select
+            <div class="min-w-[140px]">
+              <CustomDropdown
                 v-model="selectedStatus"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+                accent="green"
+                icon="fa-toggle-on"
+                :options="statusFilterOptions"
+                placeholder="All Status"
+                size="sm"
                 @change="loadUsers"
-              >
-                <option value="">All Status</option>
-                <option value="true">Active</option>
-                <option value="false">Disabled</option>
-              </select>
+              />
             </div>
           </div>
         </div>
@@ -222,7 +216,7 @@
     </div>
 
     <!-- Users Table -->
-    <div class="overflow-hidden bg-white shadow dark:bg-gray-800 sm:rounded-md">
+    <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
       <div class="border-b border-gray-200 px-4 py-5 dark:border-gray-700 sm:px-6">
         <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
           Users
@@ -293,7 +287,7 @@
                   <div class="ml-2 flex items-center space-x-2">
                     <span
                       :class="[
-                        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        'inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium',
                         user.isActive
                           ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                           : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
@@ -303,7 +297,7 @@
                     </span>
                     <span
                       :class="[
-                        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        'inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium',
                         user.role === 'admin'
                           ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
                           : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
@@ -326,7 +320,7 @@
                 </div>
                 <div
                   v-if="user.totalUsage"
-                  class="mt-1 flex items-center space-x-4 text-xs text-gray-400 dark:text-gray-500"
+                  class="mt-1 flex items-center space-x-4 text-sm text-gray-400 dark:text-gray-500"
                 >
                   <span>{{ formatNumber(user.totalUsage.requests || 0) }} requests</span>
                   <span>${{ (user.totalUsage.totalCost || 0).toFixed(4) }} total cost</span>
@@ -478,8 +472,7 @@
 import { ref, computed, onMounted } from 'vue'
 
 import * as httpApis from '@/utils/http_apis'
-import { showToast, formatNumber, formatDate } from '@/utils/tools'
-import { debounce } from 'lodash-es'
+import { showToast, formatNumber, formatDate, debounce } from '@/utils/tools'
 import UserUsageStatsModal from '@/components/admin/UserUsageStatsModal.vue'
 import ChangeRoleModal from '@/components/admin/ChangeRoleModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -490,6 +483,16 @@ const userStats = ref(null)
 const searchQuery = ref('')
 const selectedRole = ref('')
 const selectedStatus = ref('')
+const roleFilterOptions = [
+  { value: '', label: 'All Roles' },
+  { value: 'user', label: 'User' },
+  { value: 'admin', label: 'Admin' }
+]
+const statusFilterOptions = [
+  { value: '', label: 'All Status' },
+  { value: 'true', label: 'Active' },
+  { value: 'false', label: 'Disabled' }
+]
 
 const showStatsModal = ref(false)
 const showConfirmModal = ref(false)
@@ -551,10 +554,14 @@ const loadUsers = async () => {
 
     if (usersResponse.success) {
       users.value = usersResponse.users
+    } else {
+      showToast(usersResponse.message || 'Failed to load users', 'error')
     }
 
     if (statsResponse.success) {
       userStats.value = statsResponse.stats
+    } else {
+      showToast(statsResponse.message || 'Failed to load user stats', 'error')
     }
   } catch (error) {
     console.error('Failed to load users:', error)
@@ -622,6 +629,8 @@ const handleConfirmAction = async () => {
           users.value[userIndex].isActive = !user.isActive
         }
         showToast(`User ${user.isActive ? 'disabled' : 'enabled'} successfully`, 'success')
+      } else {
+        showToast(response.message || `Failed to ${action}`, 'error')
       }
     } else if (action === 'disableKeys') {
       const response = await httpApis.disableFrontUserKeysApi(user.id)
@@ -629,6 +638,8 @@ const handleConfirmAction = async () => {
       if (response.success) {
         showToast(`Disabled ${response.disabledCount} API keys`, 'success')
         await loadUsers() // Refresh to get updated counts
+      } else {
+        showToast(response.message || `Failed to ${action}`, 'error')
       }
     }
   } catch (error) {

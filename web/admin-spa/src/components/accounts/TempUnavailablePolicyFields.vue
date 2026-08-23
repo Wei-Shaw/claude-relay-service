@@ -16,7 +16,7 @@
     </label>
     <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
       <div>
-        <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+        <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">
           503 冷却秒数（留空=全局，0=关闭）
         </label>
         <input
@@ -29,7 +29,7 @@
         />
       </div>
       <div>
-        <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+        <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400">
           5xx 冷却秒数（留空=全局，0=关闭）
         </label>
         <input

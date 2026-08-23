@@ -37,7 +37,7 @@
             :class="getActionClass(action)"
             @click.stop="handleAction(action)"
           >
-            <i :class="['fas', action.icon, 'w-4 text-center text-xs']"></i>
+            <i :class="['fas', action.icon, 'w-4 text-center text-sm']"></i>
             <span>{{ action.label }}</span>
           </button>
         </div>

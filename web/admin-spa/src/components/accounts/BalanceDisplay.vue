@@ -2,14 +2,14 @@
   <div class="min-w-[200px] space-y-1">
     <div v-if="loading" class="flex items-center gap-2">
       <i class="fas fa-spinner fa-spin text-gray-400 dark:text-gray-500"></i>
-      <span class="text-xs text-gray-500 dark:text-gray-400">加载中...</span>
+      <span class="text-sm text-gray-500 dark:text-gray-400">加载中...</span>
     </div>
 
     <div v-else-if="requestError" class="flex items-center gap-2">
       <i class="fas fa-exclamation-circle text-red-500"></i>
-      <span class="text-xs text-red-600 dark:text-red-400">{{ requestError }}</span>
+      <span class="text-sm text-red-600 dark:text-red-400">{{ requestError }}</span>
       <button
-        class="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400"
+        class="text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400"
         :disabled="refreshing"
         @click="reload"
       >
@@ -18,7 +18,7 @@
     </div>
 
     <div v-else-if="balanceData" class="space-y-1">
-      <div v-if="balanceData.status === 'error' && balanceData.error" class="text-xs text-red-500">
+      <div v-if="balanceData.status === 'error' && balanceData.error" class="text-sm text-red-500">
         {{ balanceData.error }}
       </div>
 
@@ -35,14 +35,14 @@
           <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {{ primaryText }}
           </span>
-          <span class="rounded px-1.5 py-0.5 text-xs" :class="sourceClass">
+          <span class="rounded px-1.5 py-0.5 text-sm" :class="sourceClass">
             {{ sourceLabel }}
           </span>
         </div>
 
         <button
           v-if="!hideRefresh"
-          class="text-xs text-gray-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:text-blue-400"
+          class="text-sm text-gray-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:text-blue-400"
           :disabled="refreshing || !canRefresh"
           :title="refreshTitle"
           @click="refresh"
@@ -53,7 +53,7 @@
 
       <!-- 配额（如适用） -->
       <div v-if="quotaInfo && isAntigravityQuota" class="space-y-2">
-        <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+        <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
           <span>剩余</span>
           <span>{{ formatQuotaNumber(quotaInfo.remaining) }}</span>
         </div>
@@ -66,7 +66,7 @@
           >
             <span class="h-2 w-2 shrink-0 rounded-full" :class="row.dotClass"></span>
             <span
-              class="min-w-0 flex-1 truncate text-xs font-medium text-gray-800 dark:text-gray-100"
+              class="min-w-0 flex-1 truncate text-sm font-medium text-gray-800 dark:text-gray-100"
               :title="row.category"
             >
               {{ row.category }}
@@ -81,7 +81,7 @@
                 ></div>
               </div>
               <div
-                class="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-300"
+                class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-300"
               >
                 <span>{{ row.remainingText }}</span>
                 <span v-if="row.resetAt" class="text-gray-400 dark:text-gray-400">{{
@@ -94,7 +94,7 @@
       </div>
 
       <div v-else-if="quotaInfo" class="space-y-1">
-        <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+        <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
           <span>已用: {{ formatQuotaNumber(quotaInfo.used) }}</span>
           <span>剩余: {{ formatQuotaNumber(quotaInfo.remaining) }}</span>
         </div>
@@ -105,7 +105,7 @@
             :style="{ width: `${Math.min(100, quotaInfo.percentage)}%` }"
           ></div>
         </div>
-        <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center justify-between text-sm">
           <span class="text-gray-500 dark:text-gray-400">
             {{ quotaInfo.percentage.toFixed(1) }}% 已使用
           </span>
@@ -117,18 +117,18 @@
 
       <div v-else-if="balanceData.quota?.unlimited" class="flex items-center gap-2">
         <i class="fas fa-infinity text-blue-500 dark:text-blue-400"></i>
-        <span class="text-xs text-gray-600 dark:text-gray-400">无限制</span>
+        <span class="text-sm text-gray-600 dark:text-gray-400">无限制</span>
       </div>
 
       <div
         v-if="balanceData.cacheExpiresAt && balanceData.source === 'cache'"
-        class="text-xs text-gray-400 dark:text-gray-500"
+        class="text-sm text-gray-400 dark:text-gray-500"
       >
         缓存至: {{ formatCacheExpiry(balanceData.cacheExpiresAt) }}
       </div>
     </div>
 
-    <div v-else class="text-xs text-gray-400 dark:text-gray-500">暂无余额数据</div>
+    <div v-else class="text-sm text-gray-400 dark:text-gray-500">暂无余额数据</div>
   </div>
 </template>
 

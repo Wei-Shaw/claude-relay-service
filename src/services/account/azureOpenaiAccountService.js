@@ -4,6 +4,7 @@ const crypto = require('crypto')
 const config = require('../../../config/config')
 const logger = require('../../utils/logger')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 // 加密相关常量
 const ALGORITHM = 'aes-256-cbc'
@@ -60,11 +61,6 @@ setInterval(
 function generateEncryptionKey() {
   return encryptionKeyManager.getKey()
 }
-
-// Azure OpenAI 账户键前缀
-const AZURE_OPENAI_ACCOUNT_KEY_PREFIX = 'azure_openai:account:'
-const SHARED_AZURE_OPENAI_ACCOUNTS_KEY = 'shared_azure_openai_accounts'
-const ACCOUNT_SESSION_MAPPING_PREFIX = 'azure_openai_session_account_mapping:'
 
 // 加密函数
 function encrypt(text) {
@@ -154,12 +150,12 @@ async function createAccount(accountData) {
   }
 
   const client = redisClient.getClientSafe()
-  await client.hset(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, account)
-  await redisClient.addToIndex('azure_openai:account:index', accountId)
+  await client.hset(RedisKeys.accounts.azureOpenai(accountId), account)
+  await redisClient.addToIndex(RedisKeys.accounts.azureOpenaiIndex, accountId)
 
   // 如果是共享账户，添加到共享账户集合
   if (account.accountType === 'shared') {
-    await client.sadd(SHARED_AZURE_OPENAI_ACCOUNTS_KEY, accountId)
+    await client.sadd(RedisKeys.accounts.sharedAzureOpenai, accountId)
   }
 
   logger.info(`Created Azure OpenAI account: ${accountId}`)
@@ -169,7 +165,7 @@ async function createAccount(accountData) {
 // 获取账户
 async function getAccount(accountId) {
   const client = redisClient.getClientSafe()
-  const accountData = await client.hgetall(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`)
+  const accountData = await client.hgetall(RedisKeys.accounts.azureOpenai(accountId))
 
   if (!accountData || Object.keys(accountData).length === 0) {
     return null
@@ -243,17 +239,30 @@ async function updateAccount(accountId, updates) {
         : 'false'
   }
 
+  // 开启 disableAutoProtection 时立即清理已有自动停用状态并恢复调度（手动停用不受影响）
+  const enablingAutoProtection = updates.disableAutoProtection === 'true'
+  if (enablingAutoProtection) {
+    const recoveryPatch = upstreamErrorHelper.buildAutoProtectionRecoveryPatch(existingAccount)
+    if (recoveryPatch) {
+      Object.assign(updates, recoveryPatch)
+    }
+  }
+
   // 更新账户类型时处理共享账户集合
   const client = redisClient.getClientSafe()
   if (updates.accountType && updates.accountType !== existingAccount.accountType) {
     if (updates.accountType === 'shared') {
-      await client.sadd(SHARED_AZURE_OPENAI_ACCOUNTS_KEY, accountId)
+      await client.sadd(RedisKeys.accounts.sharedAzureOpenai, accountId)
     } else {
-      await client.srem(SHARED_AZURE_OPENAI_ACCOUNTS_KEY, accountId)
+      await client.srem(RedisKeys.accounts.sharedAzureOpenai, accountId)
     }
   }
 
-  await client.hset(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+  await client.hset(RedisKeys.accounts.azureOpenai(accountId), updates)
+
+  if (enablingAutoProtection) {
+    await upstreamErrorHelper.clearAutoProtectionCooldowns(accountId, 'azure-openai')
+  }
 
   logger.info(`Updated Azure OpenAI account: ${accountId}`)
 
@@ -279,16 +288,16 @@ async function deleteAccount(accountId) {
   await accountGroupService.removeAccountFromAllGroups(accountId)
 
   const client = redisClient.getClientSafe()
-  const accountKey = `${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`
+  const accountKey = RedisKeys.accounts.azureOpenai(accountId)
 
   // 从Redis中删除账户数据
   await client.del(accountKey)
 
   // 从索引中移除
-  await redisClient.removeFromIndex('azure_openai:account:index', accountId)
+  await redisClient.removeFromIndex(RedisKeys.accounts.azureOpenaiIndex, accountId)
 
   // 从共享账户集合中移除
-  await client.srem(SHARED_AZURE_OPENAI_ACCOUNTS_KEY, accountId)
+  await client.srem(RedisKeys.accounts.sharedAzureOpenai, accountId)
 
   logger.info(`Deleted Azure OpenAI account: ${accountId}`)
   return true
@@ -297,8 +306,8 @@ async function deleteAccount(accountId) {
 // 获取所有账户
 async function getAllAccounts() {
   const accountIds = await redisClient.getAllIdsByIndex(
-    'azure_openai:account:index',
-    `${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}*`,
+    RedisKeys.accounts.azureOpenaiIndex,
+    RedisKeys.accounts.azureOpenaiPattern,
     /^azure_openai:account:(.+)$/
   )
 
@@ -306,7 +315,7 @@ async function getAllAccounts() {
     return []
   }
 
-  const keys = accountIds.map((id) => `${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${id}`)
+  const keys = accountIds.map((id) => RedisKeys.accounts.azureOpenai(id))
   const accounts = []
   const dataList = await redisClient.batchHgetallChunked(keys)
 
@@ -352,7 +361,7 @@ async function getAllAccounts() {
 // 获取共享账户
 async function getSharedAccounts() {
   const client = redisClient.getClientSafe()
-  const accountIds = await client.smembers(SHARED_AZURE_OPENAI_ACCOUNTS_KEY)
+  const accountIds = await client.smembers(RedisKeys.accounts.sharedAzureOpenai)
 
   if (!accountIds || accountIds.length === 0) {
     return []
@@ -387,7 +396,7 @@ async function selectAvailableAccount(sessionId = null) {
   // 如果有会话ID，尝试获取之前分配的账户
   if (sessionId) {
     const client = redisClient.getClientSafe()
-    const mappingKey = `${ACCOUNT_SESSION_MAPPING_PREFIX}${sessionId}`
+    const mappingKey = RedisKeys.session.azureOpenaiMapping(sessionId)
     const accountId = await client.get(mappingKey)
 
     if (accountId) {
@@ -444,7 +453,7 @@ async function selectAvailableAccount(sessionId = null) {
   // 如果有会话ID，保存映射关系
   if (sessionId && selectedAccount) {
     const client = redisClient.getClientSafe()
-    const mappingKey = `${ACCOUNT_SESSION_MAPPING_PREFIX}${sessionId}`
+    const mappingKey = RedisKeys.session.azureOpenaiMapping(sessionId)
     await client.setex(mappingKey, 3600, selectedAccount.id) // 1小时过期
   }
 
@@ -458,8 +467,8 @@ async function updateAccountUsage(accountId, tokens) {
   const now = new Date().toISOString()
 
   // 使用 HINCRBY 原子操作更新使用量
-  await client.hincrby(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, 'totalTokensUsed', tokens)
-  await client.hset(`${AZURE_OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, 'lastUsedAt', now)
+  await client.hincrby(RedisKeys.accounts.azureOpenai(accountId), 'totalTokensUsed', tokens)
+  await client.hset(RedisKeys.accounts.azureOpenai(accountId), 'lastUsedAt', now)
 
   logger.debug(`Updated Azure OpenAI account ${accountId} usage: ${tokens} tokens`)
 }
@@ -530,14 +539,14 @@ async function toggleSchedulable(accountId) {
 // 迁移 API Keys 以支持 Azure OpenAI
 async function migrateApiKeysForAzureSupport() {
   const client = redisClient.getClientSafe()
-  const apiKeyIds = await client.smembers('api_keys')
+  const apiKeyIds = await client.smembers(RedisKeys.apiKey.legacyAll)
 
   let migratedCount = 0
   for (const keyId of apiKeyIds) {
-    const keyData = await client.hgetall(`api_key:${keyId}`)
+    const keyData = await client.hgetall(RedisKeys.apiKey.legacyData(keyId))
     if (keyData && !keyData.azureOpenaiAccountId) {
       // 添加 Azure OpenAI 账户ID字段（初始为空）
-      await client.hset(`api_key:${keyId}`, 'azureOpenaiAccountId', '')
+      await client.hset(RedisKeys.apiKey.legacyData(keyId), 'azureOpenaiAccountId', '')
       migratedCount++
     }
   }
@@ -555,7 +564,7 @@ async function resetAccountStatus(accountId) {
     }
 
     const client = redisClient.getClientSafe()
-    const accountKey = `azure_openai:account:${accountId}`
+    const accountKey = RedisKeys.accounts.azureOpenai(accountId)
 
     const updates = {
       status: 'active',

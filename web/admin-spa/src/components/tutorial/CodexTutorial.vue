@@ -9,7 +9,7 @@
         class="mb-3 flex items-center text-lg font-semibold text-gray-800 dark:text-gray-300 sm:mb-4 sm:text-xl"
       >
         <span
-          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+          class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-sm font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
           >2</span
         >
         配置 Codex
@@ -32,7 +32,7 @@
             文件开头添加以下配置：
           </p>
           <div
-            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
           >
             <div
               v-for="line in configTomlLines"
@@ -45,7 +45,7 @@
           </div>
           <p class="mt-3 text-sm text-yellow-600 dark:text-yellow-400">一键写入命令：</p>
           <div
-            class="mt-2 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+            class="mt-2 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
           >
             <div class="whitespace-nowrap text-gray-300">{{ configTomlWriteCmd }}</div>
           </div>
@@ -64,7 +64,7 @@
             文件中配置：
           </p>
           <div
-            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+            class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
           >
             <div class="whitespace-nowrap text-gray-300">{</div>
             <div class="whitespace-nowrap text-gray-300">
@@ -77,7 +77,7 @@
           ></div>
           <p class="mt-3 text-sm text-orange-600 dark:text-orange-400">一键写入命令：</p>
           <div
-            class="mt-2 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+            class="mt-2 overflow-x-auto rounded bg-gray-900 p-2 font-mono text-sm text-green-400 sm:p-3 sm:text-sm"
           >
             <div class="whitespace-nowrap text-gray-300">{{ authJsonWriteCmd }}</div>
           </div>

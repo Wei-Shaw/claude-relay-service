@@ -1,6 +1,6 @@
 <template>
-  <Teleport to="body">
-    <div class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
+  <ModalTransition @after-leave="onClosed">
+    <div v-if="visible" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
       <div class="modal-content mx-auto flex max-h-[90vh] w-full max-w-md flex-col p-8">
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -11,10 +11,7 @@
             </div>
             <h3 class="text-xl font-bold text-gray-900">续期 API Key</h3>
           </div>
-          <button
-            class="text-gray-400 transition-colors hover:text-gray-600"
-            @click="$emit('close')"
-          >
+          <button class="text-gray-400 transition-colors hover:text-gray-600" @click="requestClose">
             <i class="fas fa-times text-xl" />
           </button>
         </div>
@@ -32,7 +29,7 @@
                 <p class="text-sm text-gray-700">
                   {{ apiKey.name }}
                 </p>
-                <p class="mt-1 text-xs text-gray-600">
+                <p class="mt-1 text-sm text-gray-600">
                   当前过期时间：{{
                     apiKey.expiresAt ? formatExpireDate(apiKey.expiresAt) : '永不过期'
                   }}
@@ -43,19 +40,14 @@
 
           <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700">续期时长</label>
-            <select
+            <CustomDropdown
               v-model="form.renewDuration"
-              class="form-input w-full"
+              accent="green"
+              icon="fa-clock"
+              :options="renewDurationOptions"
+              placeholder="续期时长"
               @change="updateRenewExpireAt"
-            >
-              <option value="7d">延长 7 天</option>
-              <option value="30d">延长 30 天</option>
-              <option value="90d">延长 90 天</option>
-              <option value="180d">延长 180 天</option>
-              <option value="365d">延长 365 天</option>
-              <option value="custom">自定义日期</option>
-              <option value="permanent">设为永不过期</option>
-            </select>
+            />
             <div v-if="form.renewDuration === 'custom'" class="mt-3">
               <input
                 v-model="form.customExpireDate"
@@ -65,7 +57,7 @@
                 @change="updateCustomRenewExpireAt"
               />
             </div>
-            <p v-if="form.newExpiresAt" class="mt-2 text-xs text-gray-500">
+            <p v-if="form.newExpiresAt" class="mt-2 text-sm text-gray-500">
               新的过期时间：{{ formatExpireDate(form.newExpiresAt) }}
             </p>
           </div>
@@ -75,7 +67,7 @@
           <button
             class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200"
             type="button"
-            @click="$emit('close')"
+            @click="requestClose"
           >
             取消
           </button>
@@ -92,12 +84,19 @@
         </div>
       </div>
     </div>
-  </Teleport>
+  </ModalTransition>
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { showToast } from '@/utils/tools'
+import {
+  formatDateTimeLocalValue,
+  getDateTimeLocalMinValue,
+  localDateTimeInputToISOString
+} from '@/utils/time'
 import * as httpApis from '@/utils/http_apis'
 
 const props = defineProps({
@@ -109,7 +108,27 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success'])
 
+// 弹窗进入/退出动画：挂载后置 visible 触发进入，关闭时先播退出动画再通知父级卸载
+const visible = ref(false)
+onMounted(() => {
+  visible.value = true
+})
+const requestClose = () => {
+  visible.value = false
+}
+const onClosed = () => emit('close')
+
 const loading = ref(false)
+
+const renewDurationOptions = [
+  { value: '7d', label: '延长 7 天' },
+  { value: '30d', label: '延长 30 天' },
+  { value: '90d', label: '延长 90 天' },
+  { value: '180d', label: '延长 180 天' },
+  { value: '365d', label: '延长 365 天' },
+  { value: 'custom', label: '自定义日期' },
+  { value: 'permanent', label: '设为永不过期' }
+]
 
 // 表单数据
 const form = reactive({
@@ -120,14 +139,12 @@ const form = reactive({
 
 // 计算最小日期时间
 const minDateTime = computed(() => {
-  const now = new Date()
   // 如果有当前过期时间且未过期，从当前过期时间开始
-  if (props.apiKey.expiresAt && new Date(props.apiKey.expiresAt) > now) {
-    return new Date(props.apiKey.expiresAt).toISOString().slice(0, 16)
+  if (props.apiKey.expiresAt && new Date(props.apiKey.expiresAt) > new Date()) {
+    return formatDateTimeLocalValue(props.apiKey.expiresAt)
   }
   // 否则从现在开始
-  now.setMinutes(now.getMinutes() + 1)
-  return now.toISOString().slice(0, 16)
+  return getDateTimeLocalMinValue(1)
 })
 
 // 格式化过期日期
@@ -193,7 +210,7 @@ const updateRenewExpireAt = () => {
 // 更新自定义续期时间
 const updateCustomRenewExpireAt = () => {
   if (form.customExpireDate) {
-    form.newExpiresAt = new Date(form.customExpireDate).toISOString()
+    form.newExpiresAt = localDateTimeInputToISOString(form.customExpireDate)
   }
 }
 
@@ -211,7 +228,7 @@ const renewApiKey = async () => {
     if (result.success) {
       showToast('API Key 续期成功', 'success')
       emit('success')
-      emit('close')
+      requestClose()
     } else {
       showToast(result.message || '续期失败', 'error')
     }

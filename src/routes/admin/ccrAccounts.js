@@ -1,5 +1,6 @@
 const express = require('express')
 const ccrAccountService = require('../../services/account/ccrAccountService')
+const testModelConfigService = require('../../services/testModelConfigService')
 const accountGroupService = require('../../services/accountGroupService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
@@ -7,6 +8,7 @@ const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { stripReadonlyAccountFields } = require('../../utils/commonHelper')
 const { extractErrorMessage } = require('../../utils/testPayloadHelper')
 
 const router = express.Router()
@@ -185,7 +187,8 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
     const updates = req.body
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
-    const mappedUpdates = mapExpiryField(updates, 'CCR', accountId)
+    // review#3：剥离外部传入的状态类字段，禁止伪造自动停用证据
+    const mappedUpdates = stripReadonlyAccountFields(mapExpiryField(updates, 'CCR', accountId))
 
     // 验证priority的有效性（1-100）
     if (
@@ -417,10 +420,11 @@ router.post('/reset-all-usage', authenticateAdmin, async (req, res) => {
 // 测试 CCR 账户连通性
 router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
   const { accountId } = req.params
-  const { model = 'claude-sonnet-4-20250514' } = req.body
   const startTime = Date.now()
 
   try {
+    // 请求显式指定优先，否则用后台配置的默认测试模型（单一事实源）
+    const model = await testModelConfigService.resolveAccountModel('ccr', req.body.model)
     // 获取账户信息
     const account = await ccrAccountService.getAccount(accountId)
     if (!account) {

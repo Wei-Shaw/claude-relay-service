@@ -38,6 +38,11 @@ function detectBackendFromModel(modelName) {
     return 'openai'
   }
 
+  // Grok / xAI 模型
+  if (model.startsWith('grok') || model.startsWith('composer') || model.includes('imagine')) {
+    return 'grok'
+  }
+
   // 默认使用 Claude
   return 'claude'
 }
@@ -216,6 +221,29 @@ async function routeToBackend(req, res, requestedModel) {
     req.url = '/v1/responses'
 
     return await openaiRoutes.handleResponses(req, res)
+  } else if (backend === 'grok') {
+    if (!apiKeyService.hasPermission(permissions, 'grok')) {
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access Grok',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
+    const grokRelayService = require('../services/relay/grokRelayService')
+    const crypto = require('crypto')
+    const sessionId =
+      req.headers['session_id'] ||
+      req.headers['x-session-id'] ||
+      req.body?.session_id ||
+      req.body?.conversation_id ||
+      null
+    const sessionHash = sessionId
+      ? crypto.createHash('sha256').update(String(sessionId)).digest('hex')
+      : null
+    // 统一入口按 chat completions 转发；Grok 上游原生支持 chat/completions
+    return await grokRelayService.relayChatCompletions(req, res, req.apiKey, sessionHash)
   } else if (backend === 'gemini') {
     // Gemini 后端
     if (!apiKeyService.hasPermission(permissions, 'gemini')) {

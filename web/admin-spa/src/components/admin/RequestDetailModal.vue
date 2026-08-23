@@ -17,7 +17,7 @@
           <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
             {{ detail?.model || '加载中...' }}
           </h3>
-          <p class="mt-1 break-all text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+          <p class="mt-1 break-all text-sm text-gray-500 dark:text-gray-400 sm:text-sm">
             Request ID: {{ requestId || '未知' }}
           </p>
         </div>
@@ -212,9 +212,9 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import dayjs from 'dayjs'
 import { getRequestDetailApi } from '@/utils/http_apis'
 import { showToast, formatNumber } from '@/utils/tools'
+import { formatLocalDateTime } from '@/utils/time'
 
 const props = defineProps({
   show: {
@@ -417,7 +417,7 @@ const copySnapshot = async () => {
   }
 }
 
-const formatDate = (value) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-')
+const formatDate = (value) => formatLocalDateTime(value) || '-'
 const formatDuration = (value) => `${Number(value || 0)}ms`
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
 const formatCacheCreate = (value, notApplicable = false) =>
@@ -559,7 +559,7 @@ onBeforeUnmount(() => {
 
 .info-label,
 .field-label {
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgb(100 116 139);
@@ -581,7 +581,7 @@ onBeforeUnmount(() => {
 .info-sub,
 .field-sub {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 14px;
   color: rgb(100 116 139);
 }
 
@@ -609,7 +609,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .dark .cost-chip {
@@ -628,7 +628,7 @@ onBeforeUnmount(() => {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.55;
   color: rgb(226 232 240);
 }
@@ -662,7 +662,7 @@ onBeforeUnmount(() => {
   }
 
   .snapshot-panel pre {
-    font-size: 11px;
+    font-size: 14px;
     line-height: 1.5;
   }
 }

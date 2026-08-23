@@ -5,17 +5,16 @@
         <h1 class="text-2xl font-semibold text-gray-900">Usage Statistics</h1>
         <p class="mt-2 text-sm text-gray-700">View your API usage statistics and costs</p>
       </div>
-      <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-        <select
+      <div class="mt-4 w-44 sm:ml-16 sm:mt-0 sm:flex-none">
+        <CustomDropdown
           v-model="selectedPeriod"
-          class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+          accent="blue"
+          icon="fa-calendar-alt"
+          :options="periodOptions"
+          placeholder="Select period"
+          size="sm"
           @change="loadUsageStats"
-        >
-          <option value="day">Last 24 Hours</option>
-          <option value="week">Last 7 Days</option>
-          <option value="month">Last 30 Days</option>
-          <option value="quarter">Last 90 Days</option>
-        </select>
+        />
       </div>
     </div>
 
@@ -192,7 +191,7 @@
             </svg>
             <h3 class="mt-2 text-sm font-medium text-gray-900">Usage Chart</h3>
             <p class="mt-1 text-sm text-gray-500">Daily usage trends would be displayed here</p>
-            <p class="mt-2 text-xs text-gray-400">
+            <p class="mt-2 text-sm text-gray-400">
               (Chart integration can be added with Chart.js, D3.js, or similar library)
             </p>
           </div>
@@ -223,7 +222,7 @@
             </div>
             <div class="text-right">
               <p class="text-sm text-gray-900">{{ formatNumber(model.requests) }} requests</p>
-              <p class="text-xs text-gray-500">${{ model.cost.toFixed(4) }}</p>
+              <p class="text-sm text-gray-500">${{ model.cost.toFixed(4) }}</p>
             </div>
           </div>
         </div>
@@ -239,37 +238,37 @@
             <thead class="bg-gray-50">
               <tr>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500"
                   scope="col"
                 >
                   API Key
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500"
                   scope="col"
                 >
                   Requests
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500"
                   scope="col"
                 >
                   Input Tokens
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500"
                   scope="col"
                 >
                   Output Tokens
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500"
                   scope="col"
                 >
                   Cost
                 </th>
                 <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider text-gray-500"
                   scope="col"
                 >
                   Status
@@ -297,7 +296,7 @@
                 <td class="whitespace-nowrap px-6 py-4">
                   <span
                     :class="[
-                      'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                      'inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium',
                       apiKey.isDeleted === 'true' || apiKey.deletedAt
                         ? 'bg-gray-100 text-gray-800'
                         : apiKey.isActive
@@ -357,6 +356,12 @@ const userStore = useUserStore()
 
 const loading = ref(true)
 const selectedPeriod = ref('week')
+const periodOptions = [
+  { value: 'day', label: 'Last 24 Hours' },
+  { value: 'week', label: 'Last 7 Days' },
+  { value: 'month', label: 'Last 30 Days' },
+  { value: 'quarter', label: 'Last 90 Days' }
+]
 const usageStats = ref(null)
 const userApiKeys = ref([])
 

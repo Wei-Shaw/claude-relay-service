@@ -1,6 +1,9 @@
 <template>
-  <Teleport to="body">
-    <div class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+  <ModalTransition @after-leave="onClosed">
+    <div
+      v-if="visible"
+      class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+    >
       <div
         class="modal-content mx-auto flex max-h-[90vh] w-full max-w-4xl flex-col p-4 sm:p-6 md:p-8"
       >
@@ -17,7 +20,7 @@
           </div>
           <button
             class="p-1 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-            @click="$emit('close')"
+            @click="requestClose"
           >
             <i class="fas fa-times text-lg sm:text-xl" />
           </button>
@@ -29,7 +32,7 @@
         >
           <div>
             <label
-              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
+              class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
               >名称</label
             >
             <div>
@@ -42,7 +45,7 @@
                 type="text"
               />
             </div>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400 sm:mt-2">
               用于识别此 API Key 的用途
             </p>
           </div>
@@ -66,7 +69,7 @@
                   自定义服务倍率
                 </label>
               </div>
-              <span class="text-xs text-gray-500 dark:text-gray-400">
+              <span class="text-sm text-gray-500 dark:text-gray-400">
                 与全局倍率相乘，用于 VIP 折扣等（如全局1.5 × Key倍率0.8 = 1.2）
               </span>
             </div>
@@ -76,7 +79,7 @@
                 :key="service.key"
                 class="flex items-center gap-2"
               >
-                <span class="w-20 text-xs text-gray-600 dark:text-gray-400">{{
+                <span class="w-20 text-sm text-gray-600 dark:text-gray-400">{{
                   service.label
                 }}</span>
                 <input
@@ -87,7 +90,7 @@
                   step="0.1"
                   type="number"
                 />
-                <span class="text-xs text-gray-400">默认 1.0</span>
+                <span class="text-sm text-gray-400">默认 1.0</span>
               </div>
             </div>
           </div>
@@ -95,19 +98,18 @@
           <!-- 所有者选择 -->
           <div>
             <label
-              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
+              class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
               >所有者</label
             >
-            <select
+            <CustomDropdown
               v-model="form.ownerId"
-              class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-            >
-              <option v-for="user in availableUsers" :key="user.id" :value="user.id">
-                {{ user.displayName }} ({{ user.username }})
-                <span v-if="user.role === 'admin'" class="text-gray-500">- 管理员</span>
-              </option>
-            </select>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:mt-2">
+              accent="blue"
+              icon="fa-user"
+              :options="ownerDropdownOptions"
+              placeholder="选择所有者"
+              searchable
+            />
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400 sm:mt-2">
               分配此 API Key 给指定用户或管理员，管理员分配时不受用户 API Key 数量限制
             </p>
           </div>
@@ -115,13 +117,13 @@
           <!-- 标签 -->
           <div>
             <label
-              class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
+              class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300 sm:mb-3 sm:text-sm"
               >标签</label
             >
             <div class="space-y-4">
               <!-- 已选择的标签 -->
               <div v-if="form.tags.length > 0">
-                <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                <div class="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                   已选择的标签:
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -136,7 +138,7 @@
                       type="button"
                       @click="removeTag(index)"
                     >
-                      <i class="fas fa-times text-xs" />
+                      <i class="fas fa-times text-sm" />
                     </button>
                   </span>
                 </div>
@@ -144,7 +146,7 @@
 
               <!-- 可选择的已有标签 -->
               <div v-if="unselectedTags.length > 0">
-                <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                <div class="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                   点击选择已有标签:
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -155,7 +157,7 @@
                     type="button"
                     @click="selectTag(tag)"
                   >
-                    <i class="fas fa-tag text-xs text-gray-500 dark:text-gray-400" />
+                    <i class="fas fa-tag text-sm text-gray-500 dark:text-gray-400" />
                     {{ tag }}
                   </button>
                 </div>
@@ -163,7 +165,7 @@
 
               <!-- 创建新标签 -->
               <div>
-                <div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                <div class="mb-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                   创建新标签:
                 </div>
                 <div class="flex gap-2">
@@ -184,7 +186,7 @@
                 </div>
               </div>
 
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
                 用于标记不同团队或用途，方便筛选管理
               </p>
             </div>
@@ -198,7 +200,7 @@
               <div
                 class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-blue-500"
               >
-                <i class="fas fa-tachometer-alt text-xs text-white" />
+                <i class="fas fa-tachometer-alt text-sm text-white" />
               </div>
               <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
                 速率限制设置 (可选)
@@ -208,7 +210,7 @@
             <div class="space-y-2">
               <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >时间窗口 (分钟)</label
                   >
                   <input
@@ -218,11 +220,11 @@
                     placeholder="无限制"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">时间段单位</p>
+                  <p class="ml-2 mt-0.5 text-sm text-gray-500 dark:text-gray-400">时间段单位</p>
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >请求次数限制</label
                   >
                   <input
@@ -232,11 +234,11 @@
                     placeholder="无限制"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">窗口内最大请求</p>
+                  <p class="ml-2 mt-0.5 text-sm text-gray-500 dark:text-gray-400">窗口内最大请求</p>
                 </div>
 
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300"
+                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >费用限制 (美元)</label
                   >
                   <input
@@ -247,16 +249,16 @@
                     step="0.01"
                     type="number"
                   />
-                  <p class="ml-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">窗口内最大费用</p>
+                  <p class="ml-2 mt-0.5 text-sm text-gray-500 dark:text-gray-400">窗口内最大费用</p>
                 </div>
               </div>
 
               <!-- 示例说明 -->
               <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                <h5 class="mb-1 text-xs font-semibold text-blue-800 dark:text-blue-400">
+                <h5 class="mb-1 text-sm font-semibold text-blue-800 dark:text-blue-400">
                   💡 使用示例
                 </h5>
-                <div class="space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
+                <div class="space-y-0.5 text-sm text-blue-700 dark:text-blue-300">
                   <div>
                     <strong>示例1:</strong> 时间窗口=60，请求次数=1000 → 每60分钟最多1000次请求
                   </div>
@@ -312,7 +314,7 @@
                 step="0.01"
                 type="number"
               />
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
                 设置此 API Key 每日的费用限制，超过限制将拒绝请求，0 或留空表示无限制
               </p>
             </div>
@@ -361,7 +363,7 @@
                 step="0.01"
                 type="number"
               />
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
                 设置此 API Key 的累计总费用限制，达到限制后将拒绝所有后续请求，0 或留空表示无限制
               </p>
             </div>
@@ -410,7 +412,7 @@
                 step="0.01"
                 type="number"
               />
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
                 设置 Claude 模型的周费用限制，仅对 Claude 模型请求生效，0 或留空表示无限制
               </p>
               <div
@@ -418,34 +420,26 @@
                 class="mt-3 flex gap-3"
               >
                 <div class="flex-1">
-                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                  <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                     >重置日</label
                   >
-                  <select
+                  <CustomDropdown
                     v-model="form.weeklyResetDay"
-                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  >
-                    <option :value="1">周一</option>
-                    <option :value="2">周二</option>
-                    <option :value="3">周三</option>
-                    <option :value="4">周四</option>
-                    <option :value="5">周五</option>
-                    <option :value="6">周六</option>
-                    <option :value="7">周日</option>
-                  </select>
+                    accent="blue"
+                    :options="weeklyResetDayOptions"
+                    placeholder="重置日"
+                  />
                 </div>
                 <div class="flex-1">
-                  <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                  <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                     >重置时间 (UTC+8)</label
                   >
-                  <select
+                  <CustomDropdown
                     v-model="form.weeklyResetHour"
-                    class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                  >
-                    <option v-for="h in 24" :key="h - 1" :value="h - 1">
-                      {{ String(h - 1).padStart(2, '0') }}:00
-                    </option>
-                  </select>
+                    accent="blue"
+                    :options="weeklyResetHourOptions"
+                    placeholder="重置时间"
+                  />
                 </div>
               </div>
             </div>
@@ -462,7 +456,7 @@
               placeholder="0 表示无限制"
               type="number"
             />
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               设置此 API Key 可同时处理的最大请求数
             </p>
           </div>
@@ -483,7 +477,7 @@
                 激活账号
               </label>
             </div>
-            <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
               取消勾选将禁用此 API Key，暂停所有请求，客户端返回 401 错误
             </p>
           </div>
@@ -533,8 +527,18 @@
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">Droid</span>
               </label>
+              <label class="flex cursor-pointer items-center">
+                <input
+                  v-model="form.permissions"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                  value="grok"
+                  @change="updatePermissions"
+                />
+                <span class="text-sm text-gray-700 dark:text-gray-300">Grok</span>
+              </label>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               不选择任何服务表示允许访问全部服务
             </p>
           </div>
@@ -546,7 +550,7 @@
               <div
                 class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-emerald-500"
               >
-                <i class="fas fa-sliders-h text-xs text-white" />
+                <i class="fas fa-sliders-h text-sm text-white" />
               </div>
               <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
                 OpenAI Responses 请求处理
@@ -566,7 +570,7 @@
                       <span>非 Codex 请求兼容为 Codex 风格</span>
                       <el-tooltip placement="top">
                         <template #content>
-                          <div class="w-[250px] space-y-2 text-xs leading-relaxed">
+                          <div class="w-[250px] space-y-2 text-sm leading-relaxed">
                             <div>只对 `/openai/responses` 和 `/openai/v1/responses` 生效。</div>
                             <div>
                               关闭后不再做 Codex 风格字段改写，会保留原始 `text`、`service_tier`
@@ -580,7 +584,7 @@
                         </template>
                         <span class="inline-flex" @click.stop.prevent>
                           <i
-                            class="fas fa-question-circle cursor-help text-xs text-gray-400 hover:text-gray-600"
+                            class="fas fa-question-circle cursor-help text-sm text-gray-400 hover:text-gray-600"
                           />
                         </span>
                       </el-tooltip>
@@ -601,14 +605,14 @@
                       <span>启用 Payload 规则</span>
                       <el-tooltip placement="top">
                         <template #content>
-                          <div class="w-[240px] space-y-2 text-xs leading-relaxed">
+                          <div class="w-[240px] space-y-2 text-sm leading-relaxed">
                             <div>开启后会按顺序写入字段。</div>
                             <div>只填字段不填值时，会把该字段写成空字符串。</div>
                           </div>
                         </template>
                         <span class="inline-flex" @click.stop.prevent>
                           <i
-                            class="fas fa-question-circle cursor-help text-xs text-gray-400 hover:text-gray-600"
+                            class="fas fa-question-circle cursor-help text-sm text-gray-400 hover:text-gray-600"
                           />
                         </span>
                       </el-tooltip>
@@ -628,20 +632,20 @@
                     <span>Payload 规则</span>
                     <el-tooltip placement="top">
                       <template #content>
-                        <div class="w-[240px] space-y-2 text-xs leading-relaxed">
+                        <div class="w-[240px] space-y-2 text-sm leading-relaxed">
                           <div>规则会按列表顺序依次执行，后面的规则可以覆盖前面的结果。</div>
                           <div>两个开关都开启时，先做 Codex 风格兼容，再应用这里的规则。</div>
                         </div>
                       </template>
                       <span class="inline-flex" @click.stop.prevent>
                         <i
-                          class="fas fa-question-circle cursor-help text-xs text-gray-400 hover:text-gray-600"
+                          class="fas fa-question-circle cursor-help text-sm text-gray-400 hover:text-gray-600"
                         />
                       </span>
                     </el-tooltip>
                   </div>
                   <button
-                    class="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
+                    class="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
                     type="button"
                     @click="addPayloadRule"
                   >
@@ -657,7 +661,7 @@
                     class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/70"
                   >
                     <div class="mb-3 flex items-center justify-between">
-                      <span class="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      <span class="text-sm font-medium uppercase tracking-wide text-gray-500">
                         规则 {{ index + 1 }}
                       </span>
                       <button
@@ -672,7 +676,7 @@
                     <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
                       <div>
                         <label
-                          class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                          class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                         >
                           字段路径
                         </label>
@@ -686,28 +690,22 @@
 
                       <div>
                         <label
-                          class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                          class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                         >
                           值类型
                         </label>
-                        <select
+                        <CustomDropdown
                           v-model="rule.valueType"
-                          class="form-input w-full border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                        >
-                          <option
-                            v-for="option in payloadRuleValueTypeOptions"
-                            :key="option.value"
-                            :value="option.value"
-                          >
-                            {{ option.label }}
-                          </option>
-                        </select>
+                          accent="blue"
+                          :options="payloadRuleValueTypeOptions"
+                          placeholder="值类型"
+                        />
                       </div>
                     </div>
 
                     <div class="mt-3">
                       <label
-                        class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                        class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
                       >
                         值
                       </label>
@@ -761,7 +759,7 @@
                   :class="[
                     'fas',
                     accountsLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt',
-                    'text-xs'
+                    'text-sm'
                   ]"
                 />
                 <span>{{ accountsLoading ? '刷新中...' : '刷新账号' }}</span>
@@ -838,8 +836,22 @@
                   platform="droid"
                 />
               </div>
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >Grok 专属账号</label
+                >
+                <AccountSelector
+                  v-model="form.grokAccountId"
+                  :accounts="localAccounts.grok"
+                  default-option-text="使用共享账号池"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('grok')"
+                  :groups="localAccounts.grokGroups"
+                  placeholder="请选择Grok账号"
+                  platform="grok"
+                />
+              </div>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               修改绑定账号将影响此API Key的请求路由
             </p>
           </div>
@@ -879,7 +891,7 @@
                       type="button"
                       @click="removeRestrictedModel(index)"
                     >
-                      <i class="fas fa-times text-xs" />
+                      <i class="fas fa-times text-sm" />
                     </button>
                   </span>
                   <span
@@ -895,7 +907,7 @@
                     <button
                       v-for="model in availableQuickModels"
                       :key="model"
-                      class="flex-shrink-0 rounded-lg bg-gray-100 px-3 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 sm:text-sm"
+                      class="flex-shrink-0 rounded-lg bg-gray-100 px-3 py-1 text-sm text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 sm:text-sm"
                       type="button"
                       @click="quickAddRestrictedModel(model)"
                     >
@@ -927,7 +939,7 @@
                     </button>
                   </div>
                 </div>
-                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                   设置此API Key无法访问的模型，例如：claude-opus-4-20250514
                 </p>
               </div>
@@ -956,7 +968,7 @@
                 <label class="mb-2 block text-sm font-medium text-gray-600 dark:text-gray-400"
                   >允许的客户端</label
                 >
-                <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
                   勾选允许使用此API Key的客户端
                 </p>
                 <div class="space-y-2">
@@ -972,7 +984,7 @@
                       <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{
                         client.name
                       }}</span>
-                      <span class="block text-xs text-gray-500 dark:text-gray-400">{{
+                      <span class="block text-sm text-gray-500 dark:text-gray-400">{{
                         client.description
                       }}</span>
                     </label>
@@ -986,7 +998,7 @@
             <button
               class="flex-1 rounded-xl bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               type="button"
-              @click="$emit('close')"
+              @click="requestClose"
             >
               取消
             </button>
@@ -1003,23 +1015,25 @@
         </form>
       </div>
     </div>
+  </ModalTransition>
 
-    <!-- ConfirmModal -->
-    <ConfirmModal
-      :cancel-text="confirmModalConfig.cancelText"
-      :confirm-text="confirmModalConfig.confirmText"
-      :message="confirmModalConfig.message"
-      :show="showConfirmModal"
-      :title="confirmModalConfig.title"
-      :type="confirmModalConfig.type"
-      @cancel="handleCancelModal"
-      @confirm="handleConfirmModal"
-    />
-  </Teleport>
+  <!-- ConfirmModal -->
+  <ConfirmModal
+    :cancel-text="confirmModalConfig.cancelText"
+    :confirm-text="confirmModalConfig.confirmText"
+    :message="confirmModalConfig.message"
+    :show="showConfirmModal"
+    :title="confirmModalConfig.title"
+    :type="confirmModalConfig.type"
+    @cancel="handleCancelModal"
+    @confirm="handleConfirmModal"
+  />
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { showToast } from '@/utils/tools'
 import { useClientsStore } from '@/stores/clients'
 import { useApiKeysStore } from '@/stores/apiKeys'
@@ -1050,6 +1064,16 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'success'])
+
+// 弹窗进入/退出动画：挂载后置 visible 触发进入，关闭时先播退出动画再通知父级卸载
+const visible = ref(false)
+onMounted(() => {
+  visible.value = true
+})
+const requestClose = () => {
+  visible.value = false
+}
+const onClosed = () => emit('close')
 
 // const authStore = useAuthStore()
 const clientsStore = useClientsStore()
@@ -1096,10 +1120,12 @@ const localAccounts = ref({
   openai: [],
   bedrock: [],
   droid: [],
+  grok: [],
   claudeGroups: [],
   geminiGroups: [],
   openaiGroups: [],
-  droidGroups: []
+  droidGroups: [],
+  grokGroups: []
 })
 
 // 支持的客户端列表
@@ -1107,6 +1133,31 @@ const supportedClients = ref([])
 
 // 可用用户列表
 const availableUsers = ref([])
+
+const ownerDropdownOptions = computed(() =>
+  availableUsers.value.map((user) => ({
+    value: user.id,
+    label:
+      user.role === 'admin'
+        ? `${user.displayName} (${user.username}) - 管理员`
+        : `${user.displayName} (${user.username})`
+  }))
+)
+
+const weeklyResetDayOptions = [
+  { value: 1, label: '周一' },
+  { value: 2, label: '周二' },
+  { value: 3, label: '周三' },
+  { value: 4, label: '周四' },
+  { value: 5, label: '周五' },
+  { value: 6, label: '周六' },
+  { value: 7, label: '周日' }
+]
+
+const weeklyResetHourOptions = Array.from({ length: 24 }, (_, hour) => ({
+  value: hour,
+  label: `${String(hour).padStart(2, '0')}:00`
+}))
 
 // 标签相关
 const newTag = ref('')
@@ -1162,6 +1213,7 @@ const form = reactive({
   openaiAccountId: '',
   bedrockAccountId: '',
   droidAccountId: '',
+  grokAccountId: '',
   enableModelRestriction: false,
   restrictedModels: [],
   modelInput: '',
@@ -1421,6 +1473,11 @@ const updateApiKey = async () => {
     } else {
       data.droidAccountId = null
     }
+    if (form.grokAccountId) {
+      data.grokAccountId = form.grokAccountId
+    } else {
+      data.grokAccountId = null
+    }
 
     // 模型限制 - 始终提交这些字段
     data.enableModelRestriction = form.enableModelRestriction
@@ -1442,7 +1499,7 @@ const updateApiKey = async () => {
 
     if (result.success) {
       emit('success')
-      emit('close')
+      requestClose()
     } else {
       showToast(result.message || '更新失败', 'error')
     }
@@ -1466,6 +1523,7 @@ const refreshAccounts = async () => {
       openaiResponsesData,
       bedrockData,
       droidData,
+      grokData,
       groupsData
     ] = await Promise.all([
       httpApis.getClaudeAccountsApi(),
@@ -1476,6 +1534,7 @@ const refreshAccounts = async () => {
       httpApis.getOpenAIResponsesAccountsApi(),
       httpApis.getBedrockAccountsApi(),
       httpApis.getDroidAccountsApi(),
+      httpApis.getGrokAccountsApi(),
       httpApis.getAccountGroupsApi()
     ])
 
@@ -1569,6 +1628,14 @@ const refreshAccounts = async () => {
       }))
     }
 
+    if (grokData.success) {
+      localAccounts.value.grok = (grokData.data || []).map((account) => ({
+        ...account,
+        platform: 'grok',
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+
     // 处理分组数据
     if (groupsData.success) {
       const allGroups = groupsData.data || []
@@ -1576,6 +1643,7 @@ const refreshAccounts = async () => {
       localAccounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
       localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
       localAccounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
+      localAccounts.value.grokGroups = allGroups.filter((g) => g.platform === 'grok')
     }
 
     showToast('账号列表已刷新', 'success')
@@ -1696,7 +1764,7 @@ onMounted(async () => {
   form.weeklyResetHour = props.apiKey.weeklyResetHour || 0
   // 处理权限数据，兼容旧格式（字符串）和新格式（数组）
   // 有效的权限值
-  const VALID_PERMS = ['claude', 'gemini', 'openai', 'droid']
+  const VALID_PERMS = ['claude', 'gemini', 'openai', 'droid', 'grok']
   let perms = props.apiKey.permissions
   // 如果是字符串，尝试 JSON.parse（Redis 可能返回 "[]" 或 "[\"gemini\"]"）
   if (typeof perms === 'string') {
@@ -1739,6 +1807,7 @@ onMounted(async () => {
 
   form.bedrockAccountId = props.apiKey.bedrockAccountId || ''
   form.droidAccountId = props.apiKey.droidAccountId || ''
+  form.grokAccountId = props.apiKey.grokAccountId || ''
   form.restrictedModels = props.apiKey.restrictedModels || []
   form.allowedClients = props.apiKey.allowedClients || []
   form.tags = props.apiKey.tags || []

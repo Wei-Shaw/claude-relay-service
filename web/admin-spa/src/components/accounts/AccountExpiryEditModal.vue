@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <ModalTransition>
     <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
       <!-- 背景遮罩 -->
       <div
@@ -39,14 +39,14 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">当前状态</p>
+                <p class="mb-1 text-sm font-medium text-gray-600 dark:text-gray-400">当前状态</p>
                 <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
                   <!-- 已设置过期时间 -->
                   <template v-if="account.expiresAt">
                     {{ formatFullExpireDate(account.expiresAt) }}
                     <span
                       v-if="getExpiryStatus(account.expiresAt)"
-                      class="ml-2 text-xs font-normal"
+                      class="ml-2 text-sm font-normal"
                       :class="getExpiryStatus(account.expiresAt).class"
                     >
                       ({{ getExpiryStatus(account.expiresAt).text }})
@@ -120,7 +120,7 @@
               type="datetime-local"
               @change="updateCustomExpiryPreview"
             />
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               选择一个未来的日期和时间作为到期时间
             </p>
           </div>
@@ -132,7 +132,7 @@
           >
             <div class="flex items-center justify-between">
               <div>
-                <p class="mb-1 text-xs font-medium text-blue-700 dark:text-blue-400">
+                <p class="mb-1 text-sm font-medium text-blue-700 dark:text-blue-400">
                   <i class="fas fa-arrow-right mr-1" />
                   新的到期时间
                 </p>
@@ -141,7 +141,7 @@
                     {{ formatFullExpireDate(localForm.expiresAt) }}
                     <span
                       v-if="getExpiryStatus(localForm.expiresAt)"
-                      class="ml-2 text-xs font-normal"
+                      class="ml-2 text-sm font-normal"
                       :class="getExpiryStatus(localForm.expiresAt).class"
                     >
                       ({{ getExpiryStatus(localForm.expiresAt).text }})
@@ -182,11 +182,17 @@
         </div>
       </div>
     </div>
-  </Teleport>
+  </ModalTransition>
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import ModalTransition from '@/components/common/ModalTransition.vue'
+import {
+  formatDateTimeLocalValue,
+  getDateTimeLocalMinValue,
+  localDateTimeInputToISOString
+} from '@/utils/time'
 
 const props = defineProps({
   show: {
@@ -222,9 +228,7 @@ const quickOptions = [
 
 // 计算最小日期时间
 const minDateTime = computed(() => {
-  const now = new Date()
-  now.setMinutes(now.getMinutes() + 1)
-  return now.toISOString().slice(0, 16)
+  return getDateTimeLocalMinValue(1)
 })
 
 // 监听显示状态，初始化表单
@@ -253,7 +257,7 @@ const initializeForm = () => {
 
   if (props.account.expiresAt) {
     localForm.expireDuration = 'custom'
-    localForm.customExpireDate = new Date(props.account.expiresAt).toISOString().slice(0, 16)
+    localForm.customExpireDate = formatDateTimeLocalValue(props.account.expiresAt)
     localForm.expiresAt = props.account.expiresAt
   } else {
     localForm.expireDuration = ''
@@ -304,25 +308,7 @@ const selectQuickOption = (value) => {
 // 更新自定义过期时间
 const updateCustomExpiryPreview = () => {
   if (localForm.customExpireDate) {
-    try {
-      // 手动解析日期时间字符串，确保它被正确解释为本地时间
-      const [datePart, timePart] = localForm.customExpireDate.split('T')
-      const [year, month, day] = datePart.split('-').map(Number)
-      const [hours, minutes] = timePart.split(':').map(Number)
-
-      // 使用构造函数创建本地时间的 Date 对象，然后转换为 UTC ISO 字符串
-      const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0)
-
-      // 验证日期有效性
-      if (isNaN(localDate.getTime())) {
-        console.error('Invalid date:', localForm.customExpireDate)
-        return
-      }
-
-      localForm.expiresAt = localDate.toISOString()
-    } catch (error) {
-      console.error('Failed to parse custom expire date:', error)
-    }
+    localForm.expiresAt = localDateTimeInputToISOString(localForm.customExpireDate)
   }
 }
 

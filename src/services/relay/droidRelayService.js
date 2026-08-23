@@ -1,6 +1,6 @@
 const https = require('https')
 const axios = require('axios')
-const ProxyHelper = require('../../utils/proxyHelper')
+const proxyResolver = require('../../utils/proxyResolver')
 const droidScheduler = require('../scheduler/droidScheduler')
 const droidAccountService = require('../account/droidAccountService')
 const apiKeyService = require('../apiKeyService')
@@ -10,6 +10,7 @@ const logger = require('../../utils/logger')
 const runtimeAddon = require('../../utils/runtimeAddon')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const { createRequestDetailMeta } = require('../../utils/requestDetailHelper')
+const { RedisKeys } = require('../../constants/redisKeys')
 
 const SYSTEM_PROMPT = 'You are Droid, an AI software engineering agent built by Factory.'
 const RUNTIME_EVENT_FMT_PAYLOAD = 'fmtPayload'
@@ -30,7 +31,6 @@ class DroidRelayService {
 
     this.userAgent = 'factory-cli/0.32.1'
     this.systemPrompt = SYSTEM_PROMPT
-    this.API_KEY_STICKY_PREFIX = 'droid_api_key'
   }
 
   _normalizeEndpointType(endpointType) {
@@ -131,7 +131,7 @@ class DroidRelayService {
     }
 
     const normalizedEndpoint = this._normalizeEndpointType(endpointType)
-    return `${this.API_KEY_STICKY_PREFIX}:${accountId}:${normalizedEndpoint}:${sessionHash}`
+    return RedisKeys.accounts.droidApiKey(accountId, normalizedEndpoint, sessionHash)
   }
 
   async _selectApiKey(account, endpointType, sessionHash) {
@@ -203,6 +203,10 @@ class DroidRelayService {
     let account = null
     let selectedApiKey = null
     let accessToken = null
+    // 提到 try 外，使 catch 的 buildErrorContext 能拿到请求 url/headers
+    let apiUrl = null
+    let headers = null
+    let proxyResolution = null
 
     try {
       logger.info(
@@ -236,20 +240,20 @@ class DroidRelayService {
         endpointPath = customPath.startsWith('/') ? customPath : `/${customPath}`
       }
 
-      const apiUrl = `${this.factoryApiBaseUrl}${endpointPath}`
+      apiUrl = `${this.factoryApiBaseUrl}${endpointPath}`
 
       logger.info(`🌐 Forwarding to Factory.ai: ${apiUrl}`)
 
-      // 获取代理配置
-      const proxyConfig = account.proxy ? JSON.parse(account.proxy) : null
-      const proxyAgent = proxyConfig ? ProxyHelper.createProxyAgent(proxyConfig) : null
+      // 获取代理（保留 proxyId/contextKey 供被动健康检查上报）
+      proxyResolution = proxyResolver.resolveAgent(account, 'droid')
+      const proxyAgent = proxyResolution.agent
 
       if (proxyAgent) {
-        logger.info(`🌐 Using proxy: ${ProxyHelper.getProxyDescription(proxyConfig)}`)
+        logger.info(`🌐 Using proxy for Droid request`)
       }
 
       // 构建请求头
-      const headers = this._buildHeaders(
+      headers = this._buildHeaders(
         accessToken,
         normalizedRequestBody,
         normalizedEndpoint,
@@ -299,6 +303,8 @@ class DroidRelayService {
 
       // 根据是否流式选择不同的处理方式
       if (isStreaming) {
+        // 被动健康检查：流式建连成功（进入流处理）= 代理传输成功
+        proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, null)
         // 流式响应：使用原生 https 模块以更好地控制流
         return await this._handleStreamRequest(
           apiUrl,
@@ -336,6 +342,9 @@ class DroidRelayService {
 
         logger.info(`✅ Factory.ai response status: ${response.status}`)
 
+        // 被动健康检查：拿到 HTTP 响应即代理传输成功（含 4xx/5xx，不归咎代理）
+        proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, null)
+
         // 处理非流式响应
         return this._handleNonStreamResponse(
           response,
@@ -348,6 +357,8 @@ class DroidRelayService {
         )
       }
     } catch (error) {
+      // 被动健康检查：上报连接级故障（classifyBusinessTraffic 区分传输错误 vs 上游响应，不误熔断）
+      proxyResolver.report(proxyResolution.proxyId, proxyResolution.contextKey, error)
       // 客户端主动断开连接是正常情况，使用 INFO 级别
       if (error.message === 'Client disconnected') {
         logger.info(`🔌 Droid relay ended: Client disconnected`)
@@ -358,9 +369,22 @@ class DroidRelayService {
       const status = error?.response?.status
       const droidAutoProtectionDisabled =
         account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
+      const errorContext = upstreamErrorHelper.buildErrorContext({
+        url: apiUrl,
+        method: 'POST',
+        requestHeaders: headers,
+        requestBody: normalizedRequestBody,
+        model: normalizedRequestBody?.model,
+        responseStatus: error?.response?.status,
+        responseHeaders: error?.response?.headers,
+        responseBody: error?.response?.data,
+        message: error?.message
+      })
       // 5xx 错误
       if (status >= 500 && account?.id && !droidAutoProtectionDisabled) {
-        await upstreamErrorHelper.markTempUnavailable(account.id, 'droid', status).catch(() => {})
+        await upstreamErrorHelper
+          .markTempUnavailable(account.id, 'droid', status, null, errorContext)
+          .catch(() => {})
       } else if (
         !status &&
         account?.id &&
@@ -368,7 +392,9 @@ class DroidRelayService {
         !droidAutoProtectionDisabled
       ) {
         // 网络错误（非客户端断开），临时不可用
-        await upstreamErrorHelper.markTempUnavailable(account.id, 'droid', 503).catch(() => {})
+        await upstreamErrorHelper
+          .markTempUnavailable(account.id, 'droid', 503, null, errorContext)
+          .catch(() => {})
       }
 
       if (status >= 400 && status < 500) {
@@ -543,12 +569,22 @@ class DroidRelayService {
             logger.info('✅ res.end() reached')
             const body = Buffer.concat(chunks).toString()
             logger.error(`❌ Factory.ai error response body: ${body || '(empty)'}`)
+            const errorContext = upstreamErrorHelper.buildErrorContext({
+              url: apiUrl,
+              method: 'POST',
+              requestHeaders,
+              requestBody: processedBody,
+              model: requestBody?.model,
+              responseStatus: res.statusCode,
+              responseHeaders: res.headers,
+              responseBody: body
+            })
             if (res.statusCode >= 500) {
               const streamAutoProtectionDisabled =
                 account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
               if (!streamAutoProtectionDisabled) {
                 upstreamErrorHelper
-                  .markTempUnavailable(account.id, 'droid', res.statusCode)
+                  .markTempUnavailable(account.id, 'droid', res.statusCode, null, errorContext)
                   .catch(() => {})
               }
             }
@@ -1447,7 +1483,19 @@ class DroidRelayService {
     const clientErrorAutoProtectionDisabled =
       account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
     if (!clientErrorAutoProtectionDisabled) {
-      await upstreamErrorHelper.markTempUnavailable(accountId, 'droid', statusCode)
+      const errorContext = upstreamErrorHelper.buildErrorContext({
+        method: 'POST',
+        sessionId: sessionHash,
+        responseStatus: statusCode,
+        reason: `droid_upstream_4xx_${normalizedEndpoint}`
+      })
+      await upstreamErrorHelper.markTempUnavailable(
+        accountId,
+        'droid',
+        statusCode,
+        null,
+        errorContext
+      )
     }
     await this._clearAccountStickyMapping(normalizedEndpoint, sessionHash, clientApiKeyId)
   }
@@ -1460,12 +1508,27 @@ class DroidRelayService {
       return
     }
 
+    // disableAutoProtection 检查：关闭自动防护时不自动停止调度，仅记录日志
+    try {
+      const account = await droidAccountService.getAccount(accountId)
+      if (account?.disableAutoProtection === true || account?.disableAutoProtection === 'true') {
+        logger.info(
+          `🛡️ Droid 账号 ${accountId} 已关闭自动防护，跳过自动停止调度（状态码 ${statusCode}，原因：${reason || '4xx'}）`
+        )
+        return
+      }
+    } catch (error) {
+      logger.warn(`⚠️ 读取 Droid 账号自动防护配置失败：${accountId}`, error)
+    }
+
     const message = reason ? `${reason}` : '上游返回 4xx 错误'
 
     try {
       await droidAccountService.updateAccount(accountId, {
         schedulable: 'false',
         status: 'error',
+        // 自动停用标记：用于区分"自动停用"与手动/运行时 error，开启 disableAutoProtection 时据此恢复
+        autoStoppedAt: new Date().toISOString(),
         errorMessage: `上游返回 ${statusCode}：${message}`
       })
       logger.warn(`🚫 已停止调度 Droid 账号 ${accountId}（状态码 ${statusCode}，原因：${message}）`)

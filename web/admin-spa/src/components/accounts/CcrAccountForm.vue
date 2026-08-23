@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <ModalTransition>
     <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div
         class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white/90 p-4 shadow-xl backdrop-blur-xl dark:bg-gray-800/95 dark:shadow-2xl sm:p-6 md:p-8"
@@ -37,7 +37,7 @@
               required
               type="text"
             />
-            <p v-if="errors.name" class="mt-1 text-xs text-red-500">{{ errors.name }}</p>
+            <p v-if="errors.name" class="mt-1 text-sm text-red-500">{{ errors.name }}</p>
           </div>
 
           <div>
@@ -65,7 +65,7 @@
                 required
                 type="text"
               />
-              <p v-if="errors.apiUrl" class="mt-1 text-xs text-red-500">{{ errors.apiUrl }}</p>
+              <p v-if="errors.apiUrl" class="mt-1 text-sm text-red-500">{{ errors.apiUrl }}</p>
             </div>
             <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
@@ -79,7 +79,7 @@
                 :required="!isEdit"
                 type="password"
               />
-              <p v-if="errors.apiKey" class="mt-1 text-xs text-red-500">{{ errors.apiKey }}</p>
+              <p v-if="errors.apiKey" class="mt-1 text-sm text-red-500">{{ errors.apiKey }}</p>
             </div>
           </div>
 
@@ -96,7 +96,7 @@
                 placeholder="默认50，数字越小优先级越高"
                 type="number"
               />
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 建议范围：1-100，数字越小优先级越高
               </p>
             </div>
@@ -141,7 +141,7 @@
                 placeholder="默认60分钟"
                 type="number"
               />
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 账号被限流后暂停调度的时间（分钟）
               </p>
             </div>
@@ -161,7 +161,7 @@
                 step="0.01"
                 type="number"
               />
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 设置每日使用额度，0 表示不限制
               </p>
             </div>
@@ -175,7 +175,7 @@
                 placeholder="00:00"
                 type="time"
               />
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">每日自动重置额度的时间</p>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">每日自动重置额度的时间</p>
             </div>
           </div>
 
@@ -185,7 +185,7 @@
               >模型映射表 (可选)</label
             >
             <div class="mb-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/30">
-              <p class="text-xs text-blue-700 dark:text-blue-400">
+              <p class="text-sm text-blue-700 dark:text-blue-400">
                 <i class="fas fa-info-circle mr-1" />
                 留空表示支持所有模型且不修改请求。配置映射后，左侧模型会被识别为支持的模型，右侧是实际发送的模型。
               </p>
@@ -227,10 +227,15 @@
             </button>
           </div>
 
-          <!-- 代理配置 -->
-          <div>
-            <ProxyConfig v-model="form.proxy" />
-          </div>
+          <!-- 代理设置 -->
+          <ProxyBinding
+            v-model="form.proxy"
+            v-model:mode="proxyMode"
+            v-model:proxy-group-id="form.proxyGroupId"
+            v-model:proxy-id="form.proxyId"
+            :account-id="props.account?.id || ''"
+            platform="ccr"
+          />
 
           <!-- 操作区 -->
           <div class="mt-2 flex gap-3">
@@ -254,14 +259,15 @@
         </div>
       </div>
     </div>
-  </Teleport>
+  </ModalTransition>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { updateCcrAccountApi, createCcrAccountApi } from '@/utils/http_apis'
 import { showToast } from '@/utils/tools'
-import ProxyConfig from '@/components/accounts/ProxyConfig.vue'
+import ProxyBinding from '@/components/accounts/ProxyBinding.vue'
 
 const props = defineProps({
   account: {
@@ -287,6 +293,8 @@ const form = ref({
   dailyQuota: 0,
   quotaResetTime: '00:00',
   proxy: null,
+  proxyGroupId: '',
+  proxyId: '',
   supportedModels: {}
 })
 
@@ -294,6 +302,34 @@ const enableRateLimit = ref(true)
 const errors = ref({})
 
 const modelMappings = ref([]) // [{from,to}]
+
+// 由账户绑定字段派生 ProxyBinding 初始模式（mode 受控、由 form 持有）：分组 > 指定 > 自定义 > 不使用
+const deriveProxyMode = (account) => {
+  if (account?.proxyGroupId) {
+    return 'group'
+  }
+  if (account?.proxyId) {
+    return 'proxy'
+  }
+  const p = account?.proxy
+  if (p && (p.host || p.enabled)) {
+    return 'custom'
+  }
+  return 'none'
+}
+
+// proxyMode 由绑定字段派生（代码级保证：proxyGroupId/proxyId/proxy 任一变化，mode 立即跟上）。
+// explicitProxyMode 仅在绑定全空(派生 none)时作回退——承载"已选池/指定模式但尚未选具体值"的过渡态
+const explicitProxyMode = ref(deriveProxyMode(props.account))
+const proxyMode = computed({
+  get() {
+    const derived = deriveProxyMode(form.value)
+    return derived === 'none' ? explicitProxyMode.value : derived
+  },
+  set(mode) {
+    explicitProxyMode.value = mode
+  }
+})
 
 const buildSupportedModels = () => {
   const map = {}
@@ -339,6 +375,8 @@ const submit = async () => {
         dailyQuota: Number(form.value.dailyQuota || 0),
         quotaResetTime: form.value.quotaResetTime || '00:00',
         proxy: form.value.proxy || null,
+        proxyGroupId: form.value.proxyGroupId || '',
+        proxyId: form.value.proxyId || '',
         supportedModels: buildSupportedModels()
       }
       if (form.value.apiKey && form.value.apiKey.trim().length > 0) {
@@ -394,6 +432,9 @@ const populateFromAccount = () => {
   form.value.dailyQuota = Number(a.dailyQuota || 0)
   form.value.quotaResetTime = a.quotaResetTime || '00:00'
   form.value.proxy = a.proxy || null
+  form.value.proxyGroupId = a.proxyGroupId || ''
+  form.value.proxyId = a.proxyId || ''
+  explicitProxyMode.value = deriveProxyMode(a)
   enableRateLimit.value = form.value.rateLimitDuration > 0
 
   // supportedModels 对象转为数组
@@ -406,9 +447,10 @@ const populateFromAccount = () => {
   }
 }
 
-onMounted(() => {
-  if (isEdit.value) populateFromAccount()
-})
+// 编辑态：setup 期间同步填充，确保 ProxyBinding 挂载时已拿到绑定值（mode 推导正确）
+if (isEdit.value) {
+  populateFromAccount()
+}
 
 watch(
   () => props.account,

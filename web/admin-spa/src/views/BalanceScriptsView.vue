@@ -5,7 +5,7 @@
         <div class="mb-3 flex items-center justify-between">
           <div>
             <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">脚本余额配置</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
               使用自定义脚本 + 模板变量适配任意余额接口
             </div>
           </div>
@@ -75,7 +75,7 @@
           </div>
           <div class="md:col-span-2">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-200">模板变量</label>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
               可用变量：{{ '{' }}{{ '{' }}baseUrl{{ '}' }}{{ '}' }}、{{ '{' }}{{ '{' }}apiKey{{ '}'
               }}{{ '}' }}、{{ '{' }}{{ '{' }}token{{ '}' }}{{ '}' }}、{{ '{' }}{{ '{' }}accountId{{
                 '}'
@@ -91,7 +91,7 @@
         <div class="mb-3 flex items-center justify-between">
           <div>
             <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">测试脚本</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
               填入账号上下文（可选），调试 extractor 输出
             </div>
           </div>
@@ -126,7 +126,7 @@
             <span class="font-semibold text-gray-800 dark:text-gray-100">测试结果</span>
             <span
               :class="[
-                'rounded px-2 py-0.5 text-xs',
+                'rounded px-2 py-0.5 text-sm',
                 testResult.mapped?.status === 'success'
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200'
                   : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200'
@@ -135,7 +135,7 @@
               {{ testResult.mapped?.status || 'unknown' }}
             </span>
           </div>
-          <div class="text-xs text-gray-600 dark:text-gray-300">
+          <div class="text-sm text-gray-600 dark:text-gray-300">
             <div>余额: {{ displayAmount(testResult.mapped?.balance) }}</div>
             <div>单位: {{ testResult.mapped?.currency || '—' }}</div>
             <div v-if="testResult.mapped?.planName">套餐: {{ testResult.mapped.planName }}</div>
@@ -146,16 +146,16 @@
               配额: {{ JSON.stringify(testResult.mapped.quota) }}
             </div>
           </div>
-          <details class="text-xs text-gray-500 dark:text-gray-400">
+          <details class="text-sm text-gray-500 dark:text-gray-400">
             <summary class="cursor-pointer">查看 extractor 输出</summary>
-            <pre class="mt-2 overflow-auto rounded bg-black/70 p-2 text-[11px] text-gray-100"
+            <pre class="mt-2 overflow-auto rounded bg-black/70 p-2 text-sm text-gray-100"
               >{{ formatJson(testResult.extracted) }}
 </pre
             >
           </details>
-          <details class="text-xs text-gray-500 dark:text-gray-400">
+          <details class="text-sm text-gray-500 dark:text-gray-400">
             <summary class="cursor-pointer">查看原始响应</summary>
-            <pre class="mt-2 overflow-auto rounded bg-black/70 p-2 text-[11px] text-gray-100"
+            <pre class="mt-2 overflow-auto rounded bg-black/70 p-2 text-sm text-gray-100"
               >{{ formatJson(testResult.response) }}
 </pre
             >
@@ -168,7 +168,7 @@
       <div class="mb-2 flex items-center justify-between">
         <div>
           <div class="text-lg font-semibold text-gray-900 dark:text-gray-100">提取器代码</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400">
+          <div class="text-sm text-gray-500 dark:text-gray-400">
             返回对象需包含 request、extractor；支持模板变量替换
           </div>
         </div>
@@ -184,7 +184,7 @@
         class="min-h-[320px] w-full rounded-xl bg-gray-900 font-mono text-sm text-gray-100 shadow-inner focus:outline-none focus:ring-2 focus:ring-indigo-500"
         spellcheck="false"
       ></textarea>
-      <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+      <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
         extractor
         返回字段（可选）：isValid、invalidMessage、remaining、unit、planName、total、used、extra
       </div>

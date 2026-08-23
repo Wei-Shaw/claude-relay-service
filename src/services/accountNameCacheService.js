@@ -56,6 +56,7 @@ class AccountNameCacheService {
       const azureOpenaiAccountService = require('./account/azureOpenaiAccountService')
       const bedrockAccountService = require('./account/bedrockAccountService')
       const droidAccountService = require('./account/droidAccountService')
+      const grokAccountService = require('./account/grokAccountService')
       const ccrAccountService = require('./account/ccrAccountService')
       const accountGroupService = require('./accountGroupService')
 
@@ -84,6 +85,7 @@ class AccountNameCacheService {
         azureOpenaiAccountService.getAllAccounts(),
         bedrockAccountService.getAllAccounts(),
         droidAccountService.getAllAccounts(),
+        grokAccountService.getAllAccounts(),
         ccrAccountService.getAllAccounts(),
         accountGroupService.getAllGroups()
       ])
@@ -96,15 +98,19 @@ class AccountNameCacheService {
       const openaiAccounts = results[4].status === 'fulfilled' ? results[4].value : []
       const openaiResponsesAccounts = results[5].status === 'fulfilled' ? results[5].value : []
       const azureOpenaiAccounts = results[6].status === 'fulfilled' ? results[6].value : []
-      const bedrockResult = results[7].status === 'fulfilled' ? results[7].value : { accounts: [] }
+      const bedrockResult =
+        results[7].status === 'fulfilled' ? results[7].value : { success: false, data: [] }
       const droidAccounts = results[8].status === 'fulfilled' ? results[8].value : []
-      const ccrAccounts = results[9].status === 'fulfilled' ? results[9].value : []
-      const groups = results[10].status === 'fulfilled' ? results[10].value : []
+      const grokAccounts = results[9].status === 'fulfilled' ? results[9].value : []
+      const ccrAccounts = results[10].status === 'fulfilled' ? results[10].value : []
+      const groups = results[11].status === 'fulfilled' ? results[11].value : []
 
-      // Bedrock 返回格式特殊处理
+      // Bedrock 返回 { success, data } 包装，需解包；其余服务返回裸数组
       const bedrockAccounts = Array.isArray(bedrockResult)
         ? bedrockResult
-        : bedrockResult.accounts || []
+        : bedrockResult.success
+          ? bedrockResult.data || []
+          : []
 
       // 填充账户缓存的辅助函数
       const addAccounts = (accounts, platform, prefix = '') => {
@@ -132,6 +138,7 @@ class AccountNameCacheService {
       addAccounts(azureOpenaiAccounts, 'azure-openai')
       addAccounts(bedrockAccounts, 'bedrock')
       addAccounts(droidAccounts, 'droid')
+      addAccounts(grokAccounts, 'grok')
       addAccounts(ccrAccounts, 'ccr')
 
       // 填充账户组缓存
@@ -219,6 +226,7 @@ class AccountNameCacheService {
       { field: 'azureOpenaiAccountId', platform: 'Azure OpenAI' },
       { field: 'bedrockAccountId', platform: 'Bedrock' },
       { field: 'droidAccountId', platform: 'Droid' },
+      { field: 'grokAccountId', platform: 'Grok' },
       { field: 'ccrAccountId', platform: 'CCR' }
     ]
 

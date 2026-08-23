@@ -10,17 +10,59 @@ permissions:
   contents: write
   packages: write
 
+# 串行发布。两个相近的 push 会各自基于同一 tag/VERSION 算出【同一个版本号】，
+# 先完成者拿到它，后完成者在推 tag 时失败 —— 而那时 push_tag 不算 success、清理步骤不触发，
+# 那次提交就静默地没发版，要人工重跑。串行执行让后一个跑在前一个之后，
+# 重新读到已更新的 VERSION、算出正确的下一个号。
+#
+# cancel-in-progress 必须为 false：发布中途被取消会留下推了一半的 tag/Release/镜像，
+# 而取消不触发 failure()、清理步骤不会执行。宁可排队等待。
+#
+# group 是固定字符串、不含 ${{ github.ref }}：本工作流只发布 main，所有运行都在争同一份
+# tag/VERSION/latest，必须全局串行。按 ref 分组会让手动触发的其它分支自成一组、与 main 并行跑。
+#
+# queue: max 不可省。默认是 queue: single —— 组内只允许一个 pending，新来的 run 会
+# 【取消并替换】那个 pending（cancel-in-progress: false 只保护正在跑的，管不到 pending）。
+# 后果：A 在发布、含代码的 B 在排队、只改文档的 C 到来 → C 顶掉 B → C 判定无实质改动而跳过
+# → B 的代码进了 main 却永远不会发版。queue: max 允许最多 100 个 pending 按顺序处理。
+# 该选项只能与 cancel-in-progress: false/未设置 同用（与 true 组合会校验失败）。
+concurrency:
+  group: auto-release-main
+  cancel-in-progress: false
+  queue: max
+
 jobs:
   release-pipeline:
     runs-on: ubuntu-latest
-    # 跳过由GitHub Actions创建的提交，避免死循环
-    if: github.event.pusher.name != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip ci]')
+    # 两道门：
+    # 1) 只在 main 上运行。本工作流会 `git push origin HEAD:main` —— 手动触发（workflow_dispatch）
+    #    可以选任意分支，若不限制，在功能分支点 Run workflow 就会把未合并代码连同版本提交
+    #    推进 main 并发布镜像。push 触发已由 on.push.branches 限定，这里管住 workflow_dispatch。
+    # 2) 跳过 GitHub Actions 自己产生的提交，避免死循环。
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event.pusher.name != 'github-actions[bot]' &&
+      !contains(github.event.head_commit.message, '[skip ci]')
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
+
+    # 运行时断言，防御 job 级 if 被改动或写错。
+    # workflow_dispatch 的分支选择器无法在 workflow 文件里限制（GitHub UI 总是允许选任意分支），
+    # 而本工作流会 `git push origin HEAD:main`，在功能分支跑就等于把未合并代码发布出去。
+    # 这一步在任何写操作之前失败，代价只是一次白跑。
+    - name: Assert running on main
+      env:
+        REF: ${{ github.ref }}
+      run: |
+        if [ "${REF}" != "refs/heads/main" ]; then
+          echo "::error::本工作流只能在 main 上运行（当前 ${REF}）。它会把 HEAD 推送到 main，在其它分支运行会发布未合并的代码。"
+          exit 1
+        fi
+        echo "分支检查通过：${REF}"
 
     - name: Check if version bump is needed
       id: check
@@ -36,26 +78,26 @@ jobs:
           FORCE_RELEASE=true
         fi
 
-        # 检测是否是合并提交
-        PARENT_COUNT=$(git rev-list --parents -n 1 HEAD | wc -w)
-        PARENT_COUNT=$((PARENT_COUNT - 1))
-        echo "Parent count: $PARENT_COUNT"
-        
-        if [ "$PARENT_COUNT" -gt 1 ]; then
-          # 合并提交：获取合并进来的所有文件变更
-          echo "Detected merge commit, getting all merged changes"
-          # 获取合并基准点
-          MERGE_BASE=$(git merge-base HEAD^1 HEAD^2 2>/dev/null || echo "")
-          if [ -n "$MERGE_BASE" ]; then
-            # 获取从合并基准到 HEAD 的所有变更
-            CHANGED_FILES=$(git diff --name-only $MERGE_BASE..HEAD)
-          else
-            # 如果无法获取合并基准，使用第二个父提交
-            CHANGED_FILES=$(git diff --name-only HEAD^2..HEAD)
-          fi
+        # 【变更基线取"上一次成功发布的 tag"，不是"上一个提交"】
+        #
+        # 用 HEAD~1 作基线会漏发版：提交 A（含代码）的运行因 main 前进而作废后，
+        # 紧随的提交 B（仅文档）的运行只看 B 相对 A 的差异 → 判定无实质改动 → 跳过，
+        # 于是 A 的代码进了 main 却永远没有 tag/Release/镜像。
+        #
+        # 以最后一个发布 tag 为基线，"自上次发布以来是否有实质改动"才是这个判断真正要问的问题：
+        # 上一次作废的内容会被下一次运行自然纳入，不会漏。
+        git fetch origin --tags --force
+        LAST_RELEASE_TAG=$(git ls-remote --tags origin \
+          | grep -oE 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+          | sed 's|refs/tags/||' | sort -V | tail -n1)
+
+        if [ -n "$LAST_RELEASE_TAG" ] && git rev-parse -q --verify "refs/tags/${LAST_RELEASE_TAG}" >/dev/null; then
+          echo "变更基线：上次发布 ${LAST_RELEASE_TAG}"
+          CHANGED_FILES=$(git diff --name-only "refs/tags/${LAST_RELEASE_TAG}..HEAD")
         else
-          # 普通提交：获取相对于上一个提交的变更
-          CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || git diff --name-only $(git rev-list --max-parents=0 HEAD)..HEAD)
+          # 尚无任何发布 tag（首次发布），或本地取不到该 tag 对象：退回全量
+          echo "变更基线：无发布 tag，视为首次发布（全量）"
+          CHANGED_FILES=$(git ls-files)
         fi
         
         echo "Changed files:"
@@ -95,22 +137,31 @@ jobs:
           echo "needs_bump=false" >> $GITHUB_OUTPUT
         fi
 
+    # 版本基线一律取【远端当前状态】，不用 checkout 时的本地快照。
+    # 原因：concurrency 串行会让本 run 排队，期间前一个 run 已经推了新 tag 和新 VERSION；
+    # 本地的 git describe / cat VERSION 仍是排队前的旧值，据此计算会撞上已发布的号。
     - name: Get current version
       if: steps.check.outputs.needs_bump == 'true'
       id: get_version
       run: |
-        # 获取最新的tag版本
-        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-        echo "Latest tag: $LATEST_TAG"
+        # 远端最新版本 tag（排序取最大，不用 git describe —— 它只看当前提交的祖先）
+        git fetch origin --tags --force
+        LATEST_TAG=$(git ls-remote --tags origin \
+          | grep -oE 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+          | sed 's|refs/tags/||' | sort -V | tail -n1)
+        LATEST_TAG=${LATEST_TAG:-v0.0.0}
+        echo "Latest remote tag: $LATEST_TAG"
         TAG_VERSION=${LATEST_TAG#v}
-        
-        # 获取VERSION文件中的版本
-        FILE_VERSION=$(cat VERSION | tr -d '[:space:]')
-        echo "VERSION file: $FILE_VERSION"
-        
+
+        # 远端 main 上的 VERSION（不是工作区里那份）
+        git fetch origin main
+        FILE_VERSION=$(git show origin/main:VERSION 2>/dev/null | tr -d '[:space:]')
+        FILE_VERSION=${FILE_VERSION:-0.0.0}
+        echo "VERSION on origin/main: $FILE_VERSION"
+
         # 比较tag版本和文件版本，取较大值
         function version_gt() { test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"; }
-        
+
         if version_gt "$FILE_VERSION" "$TAG_VERSION"; then
           VERSION="$FILE_VERSION"
           echo "Using VERSION file: $VERSION (newer than tag)"
@@ -118,7 +169,7 @@ jobs:
           VERSION="$TAG_VERSION"
           echo "Using tag version: $VERSION (newer or equal to file)"
         fi
-        
+
         echo "Current version: $VERSION"
         echo "current_version=$VERSION" >> $GITHUB_OUTPUT
 
@@ -173,66 +224,19 @@ jobs:
         npm run build
         echo "Frontend build completed"
 
-    - name: Push Frontend Build to web-dist Branch
+    # 前端产物先暂存到工作区外，【不推送】。
+    # 推送 web-dist 挪到发布成功之后（见 Push Frontend Build to web-dist Branch）：
+    # 本次发布可能因 main 前进而作废，若此处已推 web-dist，就会出现
+    # "源码部署拿到了新前端、镜像部署还是旧版本" 的不一致。
+    - name: Stash frontend build
       if: steps.check.outputs.needs_bump == 'true'
       run: |
-        # 创建临时目录
-        TEMP_DIR=$(mktemp -d)
-        echo "Using temp directory: $TEMP_DIR"
-        
-        # 复制构建产物到临时目录
-        cp -r web/admin-spa/dist/* "$TEMP_DIR/"
-        
-        # 检查 web-dist 分支是否存在
-        if git ls-remote --heads origin web-dist | grep -q web-dist; then
-          echo "Checking out existing web-dist branch"
-          git fetch origin web-dist:web-dist
-          git checkout web-dist
-        else
-          echo "Creating new web-dist branch"
-          git checkout --orphan web-dist
-        fi
-        
-        # 清空当前目录（保留 .git）
-        git rm -rf . 2>/dev/null || true
-        
-        # 复制构建产物
-        cp -r "$TEMP_DIR"/* .
-        
-        # 添加 README
-        cat > README.md << EOF
-        # Claude Relay Service - Web Frontend Build
-        
-        This branch contains the pre-built frontend assets for Claude Relay Service.
-        
-        **DO NOT EDIT FILES IN THIS BRANCH DIRECTLY**
-        
-        These files are automatically generated by the CI/CD pipeline.
-        
-        Version: ${{ steps.next_version.outputs.new_version }}
-        Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        EOF
-        
-        # 创建 .gitignore 文件以排除 node_modules
-        cat > .gitignore << EOF
-        node_modules/
-        *.log
-        .DS_Store
-        .env
-        EOF
-        
-        # 只添加必要的文件，排除 node_modules
-        git add --all -- ':!node_modules'
-        git commit -m "chore: update frontend build for v${{ steps.next_version.outputs.new_version }} [skip ci]"
-        git push origin web-dist --force
-        
-        # 切换回主分支
-        git checkout main
-        
-        # 清理临时目录
-        rm -rf "$TEMP_DIR"
-        
-        echo "Frontend build pushed to web-dist branch successfully"
+        set -euo pipefail
+        DIST_STASH="${RUNNER_TEMP}/web-dist-stash"
+        rm -rf "$DIST_STASH"
+        mkdir -p "$DIST_STASH"
+        cp -r web/admin-spa/dist/* "$DIST_STASH/"
+        echo "前端产物已暂存到 $DIST_STASH"
 
     - name: Install git-cliff
       if: steps.check.outputs.needs_bump == 'true'
@@ -258,29 +262,65 @@ jobs:
         echo "$CHANGELOG" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
-    - name: Create and push tag
-      if: steps.check.outputs.needs_bump == 'true'
-      run: |
-        NEW_TAG="${{ steps.next_version.outputs.new_tag }}"
-        git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
-        git push origin HEAD:main "$NEW_TAG"
-
     - name: Prepare image names
       id: image_names
       if: steps.check.outputs.needs_bump == 'true'
       run: |
-        DOCKER_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
-        if [ -z "$DOCKER_USERNAME" ]; then
-          DOCKER_USERNAME="weishaw"
-        fi
-
-        DOCKER_IMAGE=$(echo "${DOCKER_USERNAME}/claude-relay-service" | tr '[:upper:]' '[:lower:]')
+        # 仅发布到 GHCR：用内置 GITHUB_TOKEN 推送，无需额外 secrets
         GHCR_IMAGE=$(echo "ghcr.io/${{ github.repository_owner }}/claude-relay-service" | tr '[:upper:]' '[:lower:]')
 
-        {
-          echo "docker_image=${DOCKER_IMAGE}"
-          echo "ghcr_image=${GHCR_IMAGE}"
-        } >> "$GITHUB_OUTPUT"
+        echo "ghcr_image=${GHCR_IMAGE}" >> "$GITHUB_OUTPUT"
+
+    # Docker构建步骤
+    - name: Set up QEMU
+      if: steps.check.outputs.needs_bump == 'true'
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      if: steps.check.outputs.needs_bump == 'true'
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      if: steps.check.outputs.needs_bump == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # 发布顺序的关键约束：VERSION 提交与 tag 一起推，这是本次运行第一次写 origin。
+    # 排在镜像构建之前是有意的：Git 侧可撤回（删 tag/Release），GHCR 的 latest 不可撤回，
+    # 所以先做可撤回的、最后做不可撤回的（见 Point latest 与 Clean up 两步的注释）。
+    #
+    # 【禁止 rebase 到 origin/main】。曾经为了解决"非快进被拒"在这里 rebase，那是错的：
+    # 前端产物(web-dist)、changelog、镜像 label 里的 image.revision 全部基于触发时的 HEAD 生成，
+    # 而 rebase 会把 VERSION 提交重放到期间新进 main 的代码之上 —— tag 和镜像内容变成新代码，
+    # 产物与元数据却还是旧快照，一个发布版本对不上自己的构建产物。
+    #
+    # 正确做法：这次发布只发布触发时的那个提交。若期间 main 前进了，推送会因非快进失败，
+    # 本次发布作废（清理步骤撤掉 tag/Release），由那个新提交自己的 run 去发布它自己的内容。
+    # concurrency 串行已让这种情况变少；真发生时"作废重来"比"发布拼接内容"正确。
+    - name: Create and push tag
+      id: push_tag
+      if: steps.check.outputs.needs_bump == 'true'
+      env:
+        NEW_TAG: ${{ steps.next_version.outputs.new_tag }}
+        TRIGGER_SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        # 确认 main 仍停在触发本次运行的提交上。前进了就说明这次发布的产物已经过时。
+        git fetch origin main
+        REMOTE_SHA=$(git rev-parse origin/main)
+        if [ "${REMOTE_SHA}" != "${TRIGGER_SHA}" ]; then
+          echo "::error::main 已从 ${TRIGGER_SHA} 前进到 ${REMOTE_SHA}，本次发布的前端产物与 changelog 已过时。"
+          echo "::error::本次发布作废；新提交会由它自己的运行发布。"
+          exit 1
+        fi
+
+        git tag -a "${NEW_TAG}" -m "Release ${NEW_TAG}"
+        # 非快进不重试、不 rebase：失败即作废（理由见上方注释）
+        git push origin HEAD:main "${NEW_TAG}"
 
     - name: Create GitHub Release
       if: steps.check.outputs.needs_bump == 'true'
@@ -292,9 +332,9 @@ jobs:
           ## 🐳 Docker 镜像
           
           ```bash
-          docker pull ${{ steps.image_names.outputs.docker_image }}:${{ steps.next_version.outputs.new_tag }}
-          docker pull ${{ steps.image_names.outputs.docker_image }}:latest
+          # 固定版本
           docker pull ${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_tag }}
+          # 跟随最新（发布流程全部成功后才指向本版本）
           docker pull ${{ steps.image_names.outputs.ghcr_image }}:latest
           ```
           
@@ -309,12 +349,186 @@ jobs:
         prerelease: false
         generate_release_notes: true
 
+    - name: Build and push Docker image
+      if: steps.check.outputs.needs_bump == 'true'
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_tag }}
+          ${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_version }}
+        labels: |
+          org.opencontainers.image.version=${{ steps.next_version.outputs.new_version }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # 【不能 continue-on-error】。web-dist 不是次要路径：scripts/manage.sh 的安装、更新、
+    # 切分支三条流程都从这个分支取预构建前端（见 manage.sh 中 --branch web-dist 的 clone）。
+    # 推送失败却把发布标记为成功，会让源码部署的用户一直停在上一版前端，
+    # 而流水线显示绿色、没人知道要补，直到下一次真正发版才会被动修复。
+    #
+    # 所以失败必须让 workflow 红掉。带重试（网络抖动是最常见的失败原因），
+    # 重试仍失败就 exit 1 —— 此时 tag/Release/镜像已成功，清理步骤会撤掉它们，
+    # 整个版本作废重来，而不是留下一个"镜像新、源码部署旧"的半成品发布。
+    - name: Push Frontend Build to web-dist Branch
+      if: steps.check.outputs.needs_bump == 'true'
+      env:
+        NEW_VERSION: ${{ steps.next_version.outputs.new_version }}
+      run: |
+        set -euo pipefail
+        DIST_STASH="${RUNNER_TEMP}/web-dist-stash"
+
+        if git ls-remote --heads origin web-dist | grep -q web-dist; then
+          echo "Checking out existing web-dist branch"
+          git fetch origin web-dist:web-dist
+          git checkout web-dist
+        else
+          echo "Creating new web-dist branch"
+          git checkout --orphan web-dist
+        fi
+
+        # 清空当前目录（保留 .git）
+        git rm -rf . 2>/dev/null || true
+
+        cp -r "$DIST_STASH"/* .
+
+        cat > README.md << EOF
+        # Claude Relay Service - Web Frontend Build
+
+        This branch contains the pre-built frontend assets for Claude Relay Service.
+
+        **DO NOT EDIT FILES IN THIS BRANCH DIRECTLY**
+
+        These files are automatically generated by the CI/CD pipeline.
+
+        Version: ${NEW_VERSION}
+        Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        EOF
+
+        cat > .gitignore << EOF
+        node_modules/
+        *.log
+        .DS_Store
+        .env
+        EOF
+
+        git add --all -- ':!node_modules'
+        git commit -m "chore: update frontend build for v${NEW_VERSION} [skip ci]"
+
+        # 重试三次：--force 推送是幂等的（每次都把分支指向同一个本地提交），重试无副作用
+        PUSHED=0
+        for attempt in 1 2 3; do
+          if git push origin web-dist --force; then
+            PUSHED=1
+            break
+          fi
+          echo "::warning::web-dist 推送失败（第 ${attempt} 次），5 秒后重试"
+          sleep 5
+        done
+
+        if [ "$PUSHED" -ne 1 ]; then
+          echo "::error::web-dist 推送三次均失败。源码部署（scripts/manage.sh）依赖该分支取前端，"
+          echo "::error::留着会让源码部署用户停在旧前端且无人知晓，故本次发布整体作废（清理步骤会撤掉 tag/Release）。"
+          exit 1
+        fi
+
+        # 切回 main，后续步骤（清理旧版本等）在 main 上操作
+        git checkout main
+        rm -rf "$DIST_STASH"
+
+    # latest 是【整条流水线最后一个写操作】，也是唯一不可撤回的那个
+    # （GHCR 不保留 latest 的历史指向，一旦覆盖就还原不了）。
+    # 所以它必须等 Git tag、VERSION、Release、版本镜像、web-dist 全部落地之后才移动：
+    # 前面任何一步失败，latest 仍指向上一个完整发布的版本，用户拉不到半成品。
+    # 新增发布动作时一律排在本步之前，不要排在后面。
+    #
+    # 用 buildx imagetools create 从已推送的版本 tag 复制 manifest，不重新构建：
+    # 既省一次多架构构建，也保证 latest 与版本 tag 指向完全相同的镜像。
+    - name: Point latest at the new release
+      if: steps.check.outputs.needs_bump == 'true'
+      env:
+        IMAGE: ${{ steps.image_names.outputs.ghcr_image }}
+        NEW_TAG: ${{ steps.next_version.outputs.new_tag }}
+      run: |
+        docker buildx imagetools create -t "${IMAGE}:latest" "${IMAGE}:${NEW_TAG}"
+        echo "latest -> ${NEW_TAG}"
+
+    # web-dist 推送放在发布链路全部成功之后：它服务的是"源码部署"路径
+    # （scripts/manage.sh 从这个分支取预构建前端），必须与已发布的镜像版本对应。
+    # 放在前面的话，发布中途失败会留下一个没有对应镜像版本的前端产物。
+    # 失败清理。必须放在【所有被监控步骤之后】——failure() 判的是"到本步为止已发生失败",
+    # 放在被监控步骤之前它永远是 false、永远跳过（本文件曾犯过这个错）。
+    #
+    # 【版本号只进不退】这是本步骤最重要的设计决定,不要改成"把 VERSION 退回旧值":
+    # 版本镜像在本步之前已推到 GHCR,而 GHCR 不允许删除 tag 内的 manifest。若把版本号退回,
+    # 下次发布会算出同一个号,但此时 main 可能已有新提交 —— 于是【同一个版本 tag 被换成不同内容】,
+    # 已经 pin 住该 tag 的用户会在无感知的情况下拿到不同镜像。固定版本必须不可变,
+    # 所以宁可跳一个号(纯粹是数字上的浪费),也不能让 v2.0.7 今天和明天指向不同东西。
+    #
+    # 因此本步只做两件事:删掉这个不完整发布的 Release 与 Git tag,让该版本号成为"作废号"。
+    # main 上递增后的 VERSION 保留 —— 下次发布从它继续 +1,拿到一个全新的、没被占用过的号。
+    #
+    # web-dist 分支不回滚:它总是被 --force 覆盖成"最后一次成功构建的前端",
+    # 没有版本语义、也不影响镜像部署。若它推成功而后续失败,下次发布会再覆盖一次。
+    #
+    # 删除失败一律 fail,不吞错(曾用 `|| echo` 吞掉,会在权限/保护规则/网络问题时
+    # 谎报"已回滚",而残留 tag 会让下次版本计算取到它、造成真正的跳号与状态不一致)。
+    - name: Clean up incomplete release
+      if: failure() && steps.push_tag.outcome == 'success'
+      env:
+        NEW_TAG: ${{ steps.next_version.outputs.new_tag }}
+        NEW_VERSION: ${{ steps.next_version.outputs.new_version }}
+        IMAGE: ${{ steps.image_names.outputs.ghcr_image }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -euo pipefail
+        echo "::warning::发布未完成，清理 ${NEW_TAG}（VERSION 保留在 ${NEW_VERSION}，该号作废不再复用）"
+
+        FAILED=0
+
+        # 删 Release（可能还没建，用 view 区分"不存在"与"删不掉"）
+        if gh release view "${NEW_TAG}" >/dev/null 2>&1; then
+          if gh release delete "${NEW_TAG}" --yes; then
+            echo "已删除 Release ${NEW_TAG}"
+          else
+            echo "::error::删除 Release ${NEW_TAG} 失败，请手动删除"
+            FAILED=1
+          fi
+        else
+          echo "Release ${NEW_TAG} 不存在，跳过"
+        fi
+
+        # 删远端 tag（用 ls-remote 区分"不存在"与"删不掉"）
+        if [ -n "$(git ls-remote --tags origin "refs/tags/${NEW_TAG}")" ]; then
+          if git push origin ":refs/tags/${NEW_TAG}"; then
+            echo "已删除 tag ${NEW_TAG}"
+          else
+            echo "::error::删除 tag ${NEW_TAG} 失败（可能有 tag 保护规则），请手动删除"
+            FAILED=1
+          fi
+        else
+          echo "tag ${NEW_TAG} 不存在，跳过"
+        fi
+
+        if [ "$FAILED" -ne 0 ]; then
+          echo "::error::清理未完全成功，需人工介入：确认 ${NEW_TAG} 的 tag/Release 已删除"
+          exit 1
+        fi
+
+        echo "::notice::清理完成。GHCR 上的 ${IMAGE}:${NEW_TAG} 无法删除但已作废（latest 未移动，不影响用户）；下次发布将使用新版本号。"
+
     # 自动清理旧的tags和releases（保持最近50个）
     - name: Cleanup old tags and releases
       if: steps.check.outputs.needs_bump == 'true'
       continue-on-error: true
       env:
         TAGS_TO_KEEP: 50
+        # gh release delete/view 需要 token,缺失会静默失败(被 continue-on-error 吞掉)
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "🧹 自动清理旧版本，保持最近 $TAGS_TO_KEEP 个tag..."
         
@@ -409,58 +623,13 @@ jobs:
           echo "✅ 当前tag数量（$TOTAL_COUNT）未超过限制（$TAGS_TO_KEEP），无需清理"
         fi
 
-    # Docker构建步骤
-    - name: Set up QEMU
-      if: steps.check.outputs.needs_bump == 'true'
-      uses: docker/setup-qemu-action@v3
-
-    - name: Set up Docker Buildx
-      if: steps.check.outputs.needs_bump == 'true'
-      uses: docker/setup-buildx-action@v3
-
-    - name: Log in to Docker Hub
-      if: steps.check.outputs.needs_bump == 'true'
-      uses: docker/login-action@v3
-      with:
-        registry: docker.io
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Log in to GitHub Container Registry
-      if: steps.check.outputs.needs_bump == 'true'
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Build and push Docker image
-      if: steps.check.outputs.needs_bump == 'true'
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: |
-          ${{ steps.image_names.outputs.docker_image }}:${{ steps.next_version.outputs.new_tag }}
-          ${{ steps.image_names.outputs.docker_image }}:latest
-          ${{ steps.image_names.outputs.docker_image }}:${{ steps.next_version.outputs.new_version }}
-          ${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_tag }}
-          ${{ steps.image_names.outputs.ghcr_image }}:latest
-          ${{ steps.image_names.outputs.ghcr_image }}:${{ steps.next_version.outputs.new_version }}
-        labels: |
-          org.opencontainers.image.version=${{ steps.next_version.outputs.new_version }}
-          org.opencontainers.image.revision=${{ github.sha }}
-          org.opencontainers.image.source=https://github.com/${{ github.repository }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
+    # success() 不可省：默认条件只排除"前序失败"，而 Cleanup 带 continue-on-error，
+    # 它吞掉的失败会让本步以为一切正常。加 success() 才保证回滚发生时不发"发布成功"通知。
     - name: Send Telegram Notification
-      if: steps.check.outputs.needs_bump == 'true' && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
+      if: success() && steps.check.outputs.needs_bump == 'true' && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        DOCKER_IMAGE: ${{ steps.image_names.outputs.docker_image }}
         GHCR_IMAGE: ${{ steps.image_names.outputs.ghcr_image }}
       continue-on-error: true
       run: |
@@ -482,15 +651,12 @@ jobs:
         MESSAGE+="${CHANGELOG_TRUNCATED}"$'\n'$'\n'
         MESSAGE+="🐳 *Docker 部署:*"$'\n'
         MESSAGE+="\`\`\`bash"$'\n'
-        MESSAGE+="docker pull ${DOCKER_IMAGE}:${TAG}"$'\n'
-        MESSAGE+="docker pull ${DOCKER_IMAGE}:latest"$'\n'
         MESSAGE+="docker pull ${GHCR_IMAGE}:${TAG}"$'\n'
         MESSAGE+="docker pull ${GHCR_IMAGE}:latest"$'\n'
         MESSAGE+="\`\`\`"$'\n'$'\n'
         MESSAGE+="🔗 *相关链接:*"$'\n'
         MESSAGE+="• [GitHub Release](https://github.com/${REPO}/releases/tag/${TAG})"$'\n'
         MESSAGE+="• [完整更新日志](https://github.com/${REPO}/releases)"$'\n'
-        MESSAGE+="• [Docker Hub](https://hub.docker.com/r/${DOCKER_IMAGE%/*}/claude-relay-service)"$'\n'
         MESSAGE+="• [GHCR](https://ghcr.io/${GHCR_IMAGE#ghcr.io/})"$'\n'$'\n'
         MESSAGE+="#ClaudeRelay #Update #v${VERSION//./_}"
         

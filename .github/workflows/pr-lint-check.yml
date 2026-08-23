@@ -22,6 +22,13 @@ permissions:
   pull-requests: write
   issues: write
 
+# 同一 PR 连续推送时取消上一次检查：只有最新提交的结果有意义，旧 run 白占 runner。
+# 这里 cancel-in-progress 用 true（与发布流水线相反）——本工作流只读代码 + 写 PR 评论，
+# 中途取消不会留下不一致状态。
+concurrency:
+  group: pr-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-format:
     runs-on: ubuntu-latest

@@ -1,10 +1,19 @@
 <template>
-  <Teleport to="body">
-    <div v-if="show" class="modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+  <!-- 账户分组管理：默认弹窗形态（AccountForm 调用）；inline=true 时为账户管理子 tab 的内联面板 -->
+  <ModalTransition :teleport="!inline" @after-leave="onClosed">
+    <div
+      v-if="inline || visible"
+      :class="inline ? '' : 'modal fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4'"
+    >
       <div
-        class="modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-4xl overflow-y-auto p-4 sm:p-6 md:p-8"
+        :class="
+          inline
+            ? ''
+            : 'modal-content custom-scrollbar mx-auto max-h-[90vh] w-full max-w-4xl overflow-y-auto p-4 sm:p-6 md:p-8'
+        "
       >
-        <div class="mb-4 flex items-center justify-between sm:mb-6">
+        <!-- 标题栏：仅弹窗模式显示（内联模式由子 tab 标签表达） -->
+        <div v-if="!inline" class="mb-4 flex items-center justify-between sm:mb-6">
           <div class="flex items-center gap-2 sm:gap-3">
             <div
               class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 sm:h-10 sm:w-10 sm:rounded-xl"
@@ -17,7 +26,7 @@
           </div>
           <button
             class="p-1 text-gray-400 transition-colors hover:text-gray-600"
-            @click="$emit('close')"
+            @click="requestClose"
           >
             <i class="fas fa-times text-lg sm:text-xl" />
           </button>
@@ -43,7 +52,7 @@
             @click="activeTab = tab.key"
           >
             {{ tab.label }}
-            <span class="ml-1 text-xs opacity-70">({{ platformCounts[tab.key] }})</span>
+            <span class="ml-1 text-sm opacity-70">({{ platformCounts[tab.key] }})</span>
           </button>
         </div>
 
@@ -74,28 +83,28 @@
             <div
               v-for="group in filteredGroups"
               :key="group.id"
-              class="rounded-lg border bg-white p-4 transition-shadow hover:shadow-md"
+              class="rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
             >
               <div class="mb-3 flex items-start justify-between">
                 <div class="flex-1">
-                  <h4 class="font-semibold text-gray-900">
+                  <h4 class="font-semibold text-gray-900 dark:text-gray-100">
                     {{ group.name }}
                   </h4>
-                  <p class="mt-1 text-sm text-gray-500">
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ group.description || '暂无描述' }}
                   </p>
                 </div>
                 <div class="ml-4 flex items-center gap-2">
                   <span
                     :class="[
-                      'rounded-full px-2 py-1 text-xs font-medium',
+                      'rounded-full px-2 py-1 text-sm font-medium',
                       group.platform === 'claude'
-                        ? 'bg-purple-100 text-purple-700'
+                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
                         : group.platform === 'gemini'
-                          ? 'bg-blue-100 text-blue-700'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                           : group.platform === 'openai'
-                            ? 'bg-gray-100 text-gray-700'
-                            : 'bg-cyan-100 text-cyan-700'
+                            ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+                            : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
                     ]"
                   >
                     {{
@@ -111,41 +120,43 @@
                 </div>
               </div>
 
-              <div class="flex items-center justify-between text-sm text-gray-600">
-                <div class="flex items-center gap-4">
-                  <span>
-                    <i class="fas fa-users mr-1" />
-                    {{ group.memberCount || 0 }} 个成员
-                  </span>
-                  <span>
-                    <i class="fas fa-clock mr-1" />
-                    {{ formatDate(group.createdAt) }}
-                  </span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <button
-                    class="text-blue-600 transition-colors hover:text-blue-800"
-                    title="编辑"
-                    @click="editGroup(group)"
-                  >
-                    <i class="fas fa-edit" />
-                  </button>
-                  <button
-                    class="text-red-600 transition-colors hover:text-red-800"
-                    :disabled="group.memberCount > 0"
-                    title="删除"
-                    @click="deleteGroup(group)"
-                  >
-                    <i class="fas fa-trash" />
-                  </button>
-                </div>
+              <div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                <span>
+                  <i class="fas fa-users mr-1" />
+                  {{ group.memberCount || 0 }} 个成员
+                </span>
+                <span>
+                  <i class="fas fa-clock mr-1" />
+                  {{ formatDate(group.createdAt) }}
+                </span>
+              </div>
+              <div
+                class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-700"
+              >
+                <button
+                  class="flex items-center justify-center gap-1 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  @click="editGroup(group)"
+                >
+                  <i class="fas fa-edit" />
+                  编辑
+                </button>
+                <button
+                  class="flex items-center justify-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-800/50"
+                  :disabled="group.memberCount > 0"
+                  @click="deleteGroup(group)"
+                >
+                  <i class="fas fa-trash" />
+                  删除
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  </ModalTransition>
 
+  <ModalTransition>
     <!-- 编辑分组模态框 -->
     <div
       v-if="showEditForm"
@@ -161,7 +172,9 @@
 
         <div class="space-y-4">
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700">分组名称 *</label>
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >分组名称 *</label
+            >
             <input
               v-model="editForm.name"
               class="form-input w-full"
@@ -171,8 +184,12 @@
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700">平台类型</label>
-            <div class="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600">
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >平台类型</label
+            >
+            <div
+              class="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+            >
               {{
                 editForm.platform === 'claude'
                   ? 'Claude'
@@ -180,12 +197,14 @@
                     ? 'Gemini'
                     : 'OpenAI'
               }}
-              <span class="ml-2 text-xs text-gray-500">(不可修改)</span>
+              <span class="ml-2 text-sm text-gray-500">(不可修改)</span>
             </div>
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-semibold text-gray-700">描述 (可选)</label>
+            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >描述 (可选)</label
+            >
             <textarea
               v-model="editForm.description"
               class="form-input w-full resize-none"
@@ -208,7 +227,9 @@
         </div>
       </div>
     </div>
+  </ModalTransition>
 
+  <ModalTransition>
     <!-- 创建分组模态框 -->
     <div
       v-if="showCreateForm"
@@ -288,31 +309,48 @@
         </div>
       </div>
     </div>
+  </ModalTransition>
 
-    <!-- 删除确认对话框 -->
-    <ConfirmModal
-      cancel-text="取消"
-      confirm-text="确认删除"
-      :message="`确定要删除分组 &quot;${deletingGroup?.name}&quot; 吗？此操作不可撤销。`"
-      :show="showDeleteConfirm"
-      title="确认删除"
-      type="danger"
-      @cancel="cancelDelete"
-      @confirm="confirmDelete"
-    />
-  </Teleport>
+  <!-- 删除确认对话框 -->
+  <ConfirmModal
+    cancel-text="取消"
+    confirm-text="确认删除"
+    :message="`确定要删除分组 &quot;${deletingGroup?.name}&quot; 吗？此操作不可撤销。`"
+    :show="showDeleteConfirm"
+    title="确认删除"
+    type="danger"
+    @cancel="cancelDelete"
+    @confirm="confirmDelete"
+  />
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+
+import ModalTransition from '@/components/common/ModalTransition.vue'
 import { showToast, formatDate } from '@/utils/tools'
 
 import * as httpApis from '@/utils/http_apis'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
+defineProps({
+  // 默认弹窗形态；inline=true 时渲染为账户管理子 tab 的内联面板
+  inline: {
+    type: Boolean,
+    default: false
+  }
+})
+
 const emit = defineEmits(['close', 'refresh'])
 
-const show = ref(true)
+// 弹窗模式退出动画：visible 控制遮罩 v-if；关闭先播退出动画，after-leave 再 emit('close') 由父级卸载
+// 内联模式 v-if 恒为真（inline || visible），不受影响
+const visible = ref(false)
+const requestClose = () => {
+  visible.value = false
+}
+const onClosed = () => emit('close')
+
 const loading = ref(false)
 const groups = ref([])
 
@@ -369,14 +407,13 @@ const editForm = ref({
 // 加载分组列表
 const loadGroups = async () => {
   loading.value = true
-  try {
-    const response = await httpApis.getAccountGroupsApi()
+  const response = await httpApis.getAccountGroupsApi()
+  if (response.success) {
     groups.value = response.data || []
-  } catch (error) {
-    showToast('加载分组列表失败', 'error')
-  } finally {
-    loading.value = false
+  } else {
+    showToast(response.message || '加载分组列表失败', 'error')
   }
+  loading.value = false
 }
 
 // 创建分组
@@ -387,22 +424,21 @@ const createGroup = async () => {
   }
 
   creating.value = true
-  try {
-    await httpApis.createAccountGroupApi({
-      name: createForm.value.name,
-      platform: createForm.value.platform,
-      description: createForm.value.description
-    })
-
-    showToast('分组创建成功', 'success')
-    cancelCreate()
-    await loadGroups()
-    emit('refresh')
-  } catch (error) {
-    showToast(error.response?.data?.error || '创建分组失败', 'error')
-  } finally {
-    creating.value = false
+  const response = await httpApis.createAccountGroupApi({
+    name: createForm.value.name,
+    platform: createForm.value.platform,
+    description: createForm.value.description
+  })
+  creating.value = false
+  if (!response.success) {
+    showToast(response.message || '创建分组失败', 'error')
+    return
   }
+
+  showToast('分组创建成功', 'success')
+  cancelCreate()
+  await loadGroups()
+  emit('refresh')
 }
 
 // 打开创建表单（根据当前 Tab 预选平台）
@@ -440,21 +476,20 @@ const updateGroup = async () => {
   }
 
   updating.value = true
-  try {
-    await httpApis.updateAccountGroupApi(editingGroup.value.id, {
-      name: editForm.value.name,
-      description: editForm.value.description
-    })
-
-    showToast('分组更新成功', 'success')
-    cancelEdit()
-    await loadGroups()
-    emit('refresh')
-  } catch (error) {
-    showToast(error.response?.data?.error || '更新分组失败', 'error')
-  } finally {
-    updating.value = false
+  const response = await httpApis.updateAccountGroupApi(editingGroup.value.id, {
+    name: editForm.value.name,
+    description: editForm.value.description
+  })
+  updating.value = false
+  if (!response.success) {
+    showToast(response.message || '更新分组失败', 'error')
+    return
   }
+
+  showToast('分组更新成功', 'success')
+  cancelEdit()
+  await loadGroups()
+  emit('refresh')
 }
 
 // 取消编辑
@@ -481,15 +516,15 @@ const deleteGroup = (group) => {
 // 确认删除
 const confirmDelete = async () => {
   if (!deletingGroup.value) return
-  try {
-    await httpApis.deleteAccountGroupApi(deletingGroup.value.id)
-    showToast('分组删除成功', 'success')
-    cancelDelete()
-    await loadGroups()
-    emit('refresh')
-  } catch (error) {
-    showToast(error.response?.data?.error || '删除分组失败', 'error')
+  const response = await httpApis.deleteAccountGroupApi(deletingGroup.value.id)
+  if (!response.success) {
+    showToast(response.message || '删除分组失败', 'error')
+    return
   }
+  showToast('分组删除成功', 'success')
+  cancelDelete()
+  await loadGroups()
+  emit('refresh')
 }
 
 // 取消删除
@@ -500,6 +535,7 @@ const cancelDelete = () => {
 
 // 组件挂载时加载数据
 onMounted(() => {
+  visible.value = true
   loadGroups()
 })
 </script>

@@ -6,6 +6,7 @@
 const cron = require('node-cron')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const testModelConfigService = require('./testModelConfigService')
 
 class AccountTestSchedulerService {
   constructor() {
@@ -103,13 +104,16 @@ class AccountTestSchedulerService {
       // 展平平台数据
       const flatAccounts = allEnabledAccounts.flat()
 
-      for (const { accountId, cronExpression, model, platform } of flatAccounts) {
+      for (const { accountId, cronExpression, model: rawModel, platform } of flatAccounts) {
         if (!cronExpression) {
           logger.warn(
             `⚠️ Account ${accountId} (${platform}) has no valid cron expression, skipping`
           )
           continue
         }
+
+        // 缺省模型回退到后台"测试模型"全局配置（单一事实源）；在变更检测前解析，避免误判任务变化
+        const model = rawModel || (await testModelConfigService.resolveAccountModel(platform, null))
 
         const accountKey = `${platform}:${accountId}`
         activeAccountKeys.add(accountKey)
@@ -381,9 +385,12 @@ class AccountTestSchedulerService {
 
     // 如果启用且有有效的 cron 表达式，创建新任务
     if (testConfig?.enabled && testConfig?.cronExpression) {
-      this._createCronTask(accountId, platform, testConfig.cronExpression, testConfig.model)
+      // 缺省模型回退到后台"测试模型"全局配置（单一事实源）
+      const model =
+        testConfig.model || (await testModelConfigService.resolveAccountModel(platform, null))
+      this._createCronTask(accountId, platform, testConfig.cronExpression, model)
       logger.info(
-        `🔄 Refreshed cron task for ${accountKey}: ${testConfig.cronExpression}, model: ${testConfig.model}`
+        `🔄 Refreshed cron task for ${accountKey}: ${testConfig.cronExpression}, model: ${model}`
       )
     }
   }

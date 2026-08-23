@@ -19,7 +19,7 @@
           v-for="system in tutorialSystems"
           :key="system.key"
           :class="[
-            'flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-300 sm:gap-2 sm:px-6 sm:py-3 sm:text-sm',
+            'flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-300 sm:gap-2 sm:px-6 sm:py-3 sm:text-sm',
             activeTutorialSystem === system.key
               ? 'bg-white text-blue-600 shadow-sm dark:bg-blue-600 dark:text-white dark:shadow-blue-500/40'
               : 'text-gray-600 hover:bg-white/50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
@@ -39,7 +39,7 @@
           v-for="tool in cliTools"
           :key="tool.key"
           :class="[
-            'flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-300 sm:gap-2 sm:px-4 sm:py-3 sm:text-sm',
+            'flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-300 sm:gap-2 sm:px-4 sm:py-3 sm:text-sm',
             activeCliTool === tool.key
               ? 'bg-white text-blue-600 shadow-sm dark:bg-blue-600 dark:text-white dark:shadow-blue-500/40'
               : 'text-gray-600 hover:bg-white/50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
@@ -63,6 +63,7 @@ import ClaudeCodeTutorial from '@/components/tutorial/ClaudeCodeTutorial.vue'
 import GeminiCliTutorial from '@/components/tutorial/GeminiCliTutorial.vue'
 import CodexTutorial from '@/components/tutorial/CodexTutorial.vue'
 import DroidCliTutorial from '@/components/tutorial/DroidCliTutorial.vue'
+import GrokCliTutorial from '@/components/tutorial/GrokCliTutorial.vue'
 
 // 当前系统选择
 const activeTutorialSystem = ref('windows')
@@ -82,7 +83,8 @@ const cliTools = [
   { key: 'claude-code', name: 'Claude Code', icon: 'fas fa-robot', component: ClaudeCodeTutorial },
   { key: 'codex', name: 'Codex', icon: 'fas fa-code', component: CodexTutorial },
   { key: 'gemini-cli', name: 'Gemini CLI', icon: 'fab fa-google', component: GeminiCliTutorial },
-  { key: 'droid-cli', name: 'Droid CLI', icon: 'fas fa-terminal', component: DroidCliTutorial }
+  { key: 'droid-cli', name: 'Droid CLI', icon: 'fas fa-terminal', component: DroidCliTutorial },
+  { key: 'grok-cli', name: 'Grok / Codex', icon: 'fas fa-bolt', component: GrokCliTutorial }
 ]
 
 // 当前工具标题
@@ -97,9 +99,3 @@ const currentTutorialComponent = computed(() => {
   return tool ? tool.component : null
 })
 </script>
-
-<style scoped>
-.tutorial-container {
-  min-height: calc(100vh - 300px);
-}
-</style>

@@ -6,9 +6,9 @@
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const metadataUserIdHelper = require('../utils/metadataUserIdHelper')
+const { RedisKeys } = require('../constants/redisKeys')
 
-const CONFIG_KEY = 'claude_relay_config'
-const SESSION_BINDING_PREFIX = 'original_session_binding:'
+const CONFIG_KEY = RedisKeys.relayConfig
 
 // 默认配置
 const DEFAULT_CONFIG = {
@@ -30,6 +30,7 @@ const DEFAULT_CONFIG = {
   requestDetailCaptureEnabled: false, // 是否启用请求明细采集
   requestDetailRetentionHours: 6, // 请求明细保留时间（小时）
   requestDetailBodyPreviewEnabled: false, // 是否保存请求体预览快照
+  errorHistoryCollectionEnabled: true, // 账号错误收集（错误历史记录），默认开启
   // 排队健康检查配置
   concurrentRequestQueueHealthCheckEnabled: true, // 是否启用排队健康检查（默认开启）
   concurrentRequestQueueHealthThreshold: 0.8, // 健康检查阈值（P90 >= 超时 × 阈值时拒绝新请求）
@@ -144,6 +145,15 @@ class ClaudeRelayConfigService {
   }
 
   /**
+   * 检查是否启用账号错误收集（错误历史记录），默认开启
+   * @returns {Promise<boolean>}
+   */
+  async isErrorHistoryCollectionEnabled() {
+    const cfg = await this.getConfig()
+    return cfg.errorHistoryCollectionEnabled !== false
+  }
+
+  /**
    * 获取会话绑定错误信息
    * @returns {Promise<string>}
    */
@@ -168,7 +178,7 @@ class ClaudeRelayConfigService {
         return null
       }
 
-      const key = `${SESSION_BINDING_PREFIX}${originalSessionId}`
+      const key = RedisKeys.session.originalBinding(originalSessionId)
       const data = await client.get(key)
 
       if (data) {
@@ -195,7 +205,7 @@ class ClaudeRelayConfigService {
 
     try {
       const client = redis.getClientSafe()
-      const key = `${SESSION_BINDING_PREFIX}${originalSessionId}`
+      const key = RedisKeys.session.originalBinding(originalSessionId)
 
       const binding = {
         accountId,
@@ -240,7 +250,7 @@ class ClaudeRelayConfigService {
       binding.lastUsedAt = new Date().toISOString()
 
       const client = redis.getClientSafe()
-      const key = `${SESSION_BINDING_PREFIX}${originalSessionId}`
+      const key = RedisKeys.session.originalBinding(originalSessionId)
 
       // 使用配置的 TTL（默认30天）
       const cfg = await this.getConfig()
@@ -314,8 +324,10 @@ class ClaudeRelayConfigService {
         return false
       }
 
-      // 检查账户状态（如果存在）
-      if (accountData.status && accountData.status === 'error') {
+      // 检查账户状态（开 disableAutoProtection 时忽略 status=error 自动暂停，暴力打上游）
+      const autoOff =
+        accountData.disableAutoProtection === true || accountData.disableAutoProtection === 'true'
+      if (accountData.status === 'error' && !autoOff) {
         logger.warn(
           `Session binding account has error status: ${accountId} (${accountType}), status: ${accountData.status}`
         )
@@ -398,7 +410,7 @@ class ClaudeRelayConfigService {
         return
       }
 
-      const key = `${SESSION_BINDING_PREFIX}${originalSessionId}`
+      const key = RedisKeys.session.originalBinding(originalSessionId)
       await client.del(key)
       logger.info(`🗑️ Session binding deleted: ${originalSessionId}`)
     } catch (error) {
@@ -424,7 +436,7 @@ class ClaudeRelayConfigService {
         const [newCursor, keys] = await client.scan(
           cursor,
           'MATCH',
-          `${SESSION_BINDING_PREFIX}*`,
+          `${RedisKeys.session.originalBinding('')}*`,
           'COUNT',
           100
         )

@@ -1,9 +1,47 @@
 import { defineStore } from 'pinia'
-import axios from 'axios'
-import { showToast } from '@/utils/tools'
-import { APP_CONFIG } from '@/utils/tools'
 
-const API_BASE = `${APP_CONFIG.apiPrefix}/users`
+import { createHttp } from '@/utils/http'
+import { showToast, APP_CONFIG } from '@/utils/tools'
+
+// 清除前台用户的本地存储
+const clearUserStorage = () => {
+  localStorage.removeItem('userToken')
+  localStorage.removeItem('userData')
+  localStorage.removeItem('userConfig')
+}
+
+// 前台用户专用 fetch 客户端: 注入 x-user-token，非 2xx 抛错（携带 status/data）
+const userHttp = createHttp({
+  baseURL: `${APP_CONFIG.apiPrefix}/users`,
+  onRequest: (_config, init) => {
+    const token = localStorage.getItem('userToken')
+    if (token) init.headers['x-user-token'] = token
+  },
+  onResponse: (res, json) => {
+    // 网络异常 / 超时 / 取消
+    if (!res) throw Object.assign(new Error(json.message || '请求失败'), { status: json.status })
+    // 全局: 账户被禁用时清理并跳转登录页
+    if (res.status === 403) {
+      const message = json?.message
+      if (message && (message.includes('disabled') || message.includes('Account disabled'))) {
+        clearUserStorage()
+        showToast(message, 'error')
+        // 跳转地址需带上 SPA 的 basePath（生产为 /web/admin/），否则会打到站点根
+        const userLoginPath = APP_CONFIG.basePath.replace(/\/$/, '') + '/user-login'
+        if (window.location.pathname !== userLoginPath) {
+          window.location.href = userLoginPath
+        }
+      }
+    }
+    if (!res.ok) {
+      throw Object.assign(new Error(json?.message || `HTTP ${res.status}`), {
+        status: res.status,
+        data: json
+      })
+    }
+    return json
+  }
+})
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -25,23 +63,20 @@ export const useUserStore = defineStore('user', {
     async login(credentials) {
       this.loading = true
       try {
-        const response = await axios.post(`${API_BASE}/login`, credentials)
+        const body = await userHttp({ url: '/login', method: 'POST', data: credentials })
 
-        if (response.data.success) {
-          this.user = response.data.user
-          this.sessionToken = response.data.sessionToken
+        if (body.success) {
+          this.user = body.user
+          this.sessionToken = body.sessionToken
           this.isAuthenticated = true
 
-          // 保存到 localStorage
+          // 保存到 localStorage（后续请求由 userHttp 自动注入 token）
           localStorage.setItem('userToken', this.sessionToken)
           localStorage.setItem('userData', JSON.stringify(this.user))
 
-          // 设置 axios 默认头部
-          this.setAuthHeader()
-
-          return response.data
+          return body
         } else {
-          throw new Error(response.data.message || 'Login failed')
+          throw new Error(body.message || 'Login failed')
         }
       } catch (error) {
         this.clearAuth()
@@ -55,13 +90,7 @@ export const useUserStore = defineStore('user', {
     async logout() {
       try {
         if (this.sessionToken) {
-          await axios.post(
-            `${API_BASE}/logout`,
-            {},
-            {
-              headers: { 'x-user-token': this.sessionToken }
-            }
-          )
+          await userHttp({ url: '/logout', method: 'POST', data: {} })
         }
       } catch (error) {
         console.error('Logout request failed:', error)
@@ -86,7 +115,6 @@ export const useUserStore = defineStore('user', {
         this.user = JSON.parse(userData)
         this.config = userConfig ? JSON.parse(userConfig) : null
         this.isAuthenticated = true
-        this.setAuthHeader()
 
         // 验证 token 是否仍然有效
         await this.getUserProfile()
@@ -101,22 +129,21 @@ export const useUserStore = defineStore('user', {
     // 👤 获取用户资料
     async getUserProfile() {
       try {
-        const response = await axios.get(`${API_BASE}/profile`)
+        const body = await userHttp({ url: '/profile', method: 'GET' })
 
-        if (response.data.success) {
-          this.user = response.data.user
-          this.config = response.data.config
+        if (body.success) {
+          this.user = body.user
+          this.config = body.config
           localStorage.setItem('userData', JSON.stringify(this.user))
           localStorage.setItem('userConfig', JSON.stringify(this.config))
-          return response.data.user
+          return body.user
         }
       } catch (error) {
-        if (error.response?.status === 401 || error.response?.status === 403) {
-          // 401: Invalid/expired session, 403: Account disabled
+        if (error.status === 401 || error.status === 403) {
+          // 401: 会话无效/过期, 403: 账户被禁用
           this.clearAuth()
-          // If it's a disabled account error, throw a specific error
-          if (error.response?.status === 403) {
-            throw new Error(error.response.data?.message || 'Your account has been disabled')
+          if (error.status === 403) {
+            throw new Error(error.data?.message || 'Your account has been disabled')
           }
         }
         throw error
@@ -126,12 +153,9 @@ export const useUserStore = defineStore('user', {
     // 🔑 获取用户API Keys
     async getUserApiKeys(includeDeleted = false) {
       try {
-        const params = {}
-        if (includeDeleted) {
-          params.includeDeleted = 'true'
-        }
-        const response = await axios.get(`${API_BASE}/api-keys`, { params })
-        return response.data.success ? response.data.apiKeys : []
+        const params = includeDeleted ? { includeDeleted: 'true' } : undefined
+        const body = await userHttp({ url: '/api-keys', method: 'GET', params })
+        return body.success ? body.apiKeys : []
       } catch (error) {
         console.error('Failed to fetch API keys:', error)
         throw error
@@ -141,8 +165,7 @@ export const useUserStore = defineStore('user', {
     // 🔑 创建API Key
     async createApiKey(keyData) {
       try {
-        const response = await axios.post(`${API_BASE}/api-keys`, keyData)
-        return response.data
+        return await userHttp({ url: '/api-keys', method: 'POST', data: keyData })
       } catch (error) {
         console.error('Failed to create API key:', error)
         throw error
@@ -152,8 +175,7 @@ export const useUserStore = defineStore('user', {
     // 🗑️ 删除API Key
     async deleteApiKey(keyId) {
       try {
-        const response = await axios.delete(`${API_BASE}/api-keys/${keyId}`)
-        return response.data
+        return await userHttp({ url: `/api-keys/${keyId}`, method: 'DELETE' })
       } catch (error) {
         console.error('Failed to delete API key:', error)
         throw error
@@ -163,8 +185,8 @@ export const useUserStore = defineStore('user', {
     // 📊 获取使用统计
     async getUserUsageStats(params = {}) {
       try {
-        const response = await axios.get(`${API_BASE}/usage-stats`, { params })
-        return response.data.success ? response.data.stats : null
+        const body = await userHttp({ url: '/usage-stats', method: 'GET', params })
+        return body.success ? body.stats : null
       } catch (error) {
         console.error('Failed to fetch usage stats:', error)
         throw error
@@ -178,41 +200,7 @@ export const useUserStore = defineStore('user', {
       this.isAuthenticated = false
       this.config = null
 
-      localStorage.removeItem('userToken')
-      localStorage.removeItem('userData')
-      localStorage.removeItem('userConfig')
-
-      // 清除 axios 默认头部
-      delete axios.defaults.headers.common['x-user-token']
-    },
-
-    // 🔧 设置认证头部
-    setAuthHeader() {
-      if (this.sessionToken) {
-        axios.defaults.headers.common['x-user-token'] = this.sessionToken
-      }
-    },
-
-    // 🔧 设置axios拦截器
-    setupAxiosInterceptors() {
-      // Response interceptor to handle disabled user responses globally
-      axios.interceptors.response.use(
-        (response) => response,
-        (error) => {
-          if (error.response?.status === 403) {
-            const message = error.response.data?.message
-            if (message && (message.includes('disabled') || message.includes('Account disabled'))) {
-              this.clearAuth()
-              showToast(message, 'error')
-              // Redirect to login page
-              if (window.location.pathname !== '/user-login') {
-                window.location.href = '/user-login'
-              }
-            }
-          }
-          return Promise.reject(error)
-        }
-      )
+      clearUserStorage()
     }
   }
 })

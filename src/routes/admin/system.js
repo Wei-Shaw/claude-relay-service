@@ -5,6 +5,7 @@ const axios = require('axios')
 const claudeCodeHeadersService = require('../../services/claudeCodeHeadersService')
 const claudeAccountService = require('../../services/account/claudeAccountService')
 const redis = require('../../models/redis')
+const { RedisKeys } = require('../../constants/redisKeys')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
@@ -128,7 +129,8 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
     }
 
     // 请求 GitHub API
-    const githubRepo = 'wei-shaw/claude-relay-service'
+    // 自维护 fork:更新检查指向本仓库 release,避免升级到本版本后被上游版本号误报"有更新"
+    const githubRepo = 'SunSeekerX/claude-relay-service'
     const response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, {
       headers: {
         Accept: 'application/vnd.github.v3+json',
@@ -308,7 +310,10 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Site name is required' })
     }
 
-    if (siteName.length > 100) {
+    // 站点名会用于浏览器标题、页面头部和日志，收敛内部换行/连续空白为单个空格，避免多行注入日志与显示异常
+    const normalizedSiteName = siteName.replace(/\s+/g, ' ').trim()
+
+    if (normalizedSiteName.length > 100) {
       return res.status(400).json({ error: 'Site name must be less than 100 characters' })
     }
 
@@ -329,7 +334,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
     }
 
     const settings = {
-      siteName: siteName.trim(),
+      siteName: normalizedSiteName,
       siteIcon: (siteIcon || '').trim(),
       siteIconData: (siteIconData || '').trim(), // Base64数据
       showAdminButton: showAdminButton !== false, // 默认为true
@@ -344,7 +349,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
     const client = redis.getClient()
     await client.set('oem:settings', JSON.stringify(settings))
 
-    logger.info(`✅ OEM settings updated: ${siteName}`)
+    logger.info(`✅ OEM settings updated: ${normalizedSiteName}`)
 
     return res.json({
       success: true,
@@ -361,7 +366,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
 
 router.get('/claude-code-version', authenticateAdmin, async (req, res) => {
   try {
-    const CACHE_KEY = 'claude_code_user_agent:daily'
+    const CACHE_KEY = RedisKeys.claudeCode.userAgentDaily
 
     // 获取缓存的统一User-Agent
     const unifiedUserAgent = await redis.client.get(CACHE_KEY)
@@ -387,7 +392,7 @@ router.get('/claude-code-version', authenticateAdmin, async (req, res) => {
 // 🗑️ 清除统一Claude Code User-Agent缓存
 router.post('/claude-code-version/clear', authenticateAdmin, async (req, res) => {
   try {
-    const CACHE_KEY = 'claude_code_user_agent:daily'
+    const CACHE_KEY = RedisKeys.claudeCode.userAgentDaily
 
     // 删除缓存的统一User-Agent
     await redis.client.del(CACHE_KEY)
@@ -429,14 +434,48 @@ router.get('/models/pricing', authenticateAdmin, async (req, res) => {
   }
 })
 
-// 获取价格服务状态
+// 获取价格服务状态(含当前生效的数据源)
 router.get('/models/pricing/status', authenticateAdmin, async (req, res) => {
   try {
+    // 先解析:管理端可能在别处改过源,状态回显必须是最新生效值
+    await pricingService.resolveSource()
     const status = pricingService.getStatus()
     res.json({ success: true, data: status })
   } catch (error) {
     logger.error('Failed to get pricing status:', error)
+    console.error(error)
     res.status(500).json({ error: 'Failed to get pricing status', message: error.message })
+  }
+})
+
+// 保存模型定价数据源。pricingUrl 留空 = 恢复默认源
+router.put('/models/pricing/source', authenticateAdmin, async (req, res) => {
+  try {
+    const { pricingUrl, hashUrl } = req.body || {}
+    const source = await pricingService.setSource({ pricingUrl, hashUrl })
+    res.json({ success: true, data: source })
+  } catch (error) {
+    logger.error('Failed to update pricing source:', error)
+    console.error(error)
+    res.status(400).json({ error: 'Failed to update pricing source', message: error.message })
+  }
+})
+
+// 从当前数据源立即拉取定价文件(改源后无需重启)。
+// 注意与 POST /models/import 区分:本接口只更新价格数据,不改模型目录
+router.post('/models/pricing/pull', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pricingService.forceUpdate()
+    const status = pricingService.getStatus()
+    res.json({
+      success: result.success,
+      message: result.message,
+      data: { modelCount: status.modelCount, source: status.source }
+    })
+  } catch (error) {
+    logger.error('Failed to import pricing from source:', error)
+    console.error(error)
+    res.status(500).json({ error: 'Failed to import pricing', message: error.message })
   }
 })
 
@@ -448,6 +487,71 @@ router.post('/models/pricing/refresh', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Failed to refresh pricing:', error)
     res.status(500).json({ error: 'Failed to refresh pricing', message: error.message })
+  }
+})
+
+// ==================== 模型目录导入（从定价源导入模型） ====================
+
+const modelService = require('../../services/modelService')
+
+// 列出定价源里可导入的模型（定价有、目录还没有的对话类模型）
+router.get('/models/importable', authenticateAdmin, async (req, res) => {
+  try {
+    if (!pricingService.pricingData || Object.keys(pricingService.pricingData).length === 0) {
+      await pricingService.loadPricingData()
+    }
+    const models = modelService.listImportableModels(pricingService.pricingData)
+    res.json({ success: true, data: { models, total: models.length } })
+  } catch (error) {
+    logger.error('Failed to list importable models:', error)
+    console.error(error)
+    res.status(500).json({ error: 'Failed to list importable models', message: error.message })
+  }
+})
+
+// 导入选中的模型到目录
+router.post('/models/import', authenticateAdmin, async (req, res) => {
+  try {
+    const { models } = req.body || {}
+    if (!pricingService.pricingData || Object.keys(pricingService.pricingData).length === 0) {
+      await pricingService.loadPricingData()
+    }
+    const result = await modelService.importModels(models, pricingService.pricingData)
+    res.json({ success: true, ...result })
+  } catch (error) {
+    logger.error('Failed to import models:', error)
+    console.error(error)
+    res.status(400).json({ error: 'Failed to import models', message: error.message })
+  }
+})
+
+// 移除已导入的模型（内置模型不可移除）
+router.delete('/models/import', authenticateAdmin, async (req, res) => {
+  try {
+    const { models } = req.body || {}
+    const result = await modelService.removeImportedModels(models)
+    res.json({ success: true, ...result })
+  } catch (error) {
+    logger.error('Failed to remove imported models:', error)
+    console.error(error)
+    res.status(400).json({ error: 'Failed to remove imported models', message: error.message })
+  }
+})
+
+// 已导入的模型列表
+router.get('/models/imported', authenticateAdmin, async (req, res) => {
+  try {
+    const models = [...modelService.importedModels.entries()].map(([id, meta]) => ({
+      id,
+      provider: meta.provider,
+      mode: meta.mode,
+      importedAt: meta.importedAt
+    }))
+    res.json({ success: true, data: { models, total: models.length } })
+  } catch (error) {
+    logger.error('Failed to list imported models:', error)
+    console.error(error)
+    res.status(500).json({ error: 'Failed to list imported models', message: error.message })
   }
 })
 

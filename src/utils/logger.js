@@ -5,6 +5,7 @@ const { formatDateWithTimezone } = require('../utils/dateHelper')
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
+const crypto = require('crypto')
 
 // 安全的 JSON 序列化函数，处理循环引用和特殊字符
 const safeStringify = (obj, maxDepth = Infinity) => {
@@ -181,15 +182,208 @@ if (!fs.existsSync(config.logging.dirname)) {
   fs.mkdirSync(config.logging.dirname, { recursive: true, mode: 0o755 })
 }
 
+// === 跨平台日志审计自愈(登记: src/bootstrap/registry.js logger_audit_selfheal) ===
+// 根因: file-stream-rotator 读旧审计文件后沿用其中 auditLog 绝对路径写回(setAuditLog/writeAuditLog),
+// 旧日志裁剪只认 audit.files 记账(addLogToAudit), 且 removeFile 要求条目 hash 与 name+date 重算一致才删。
+// 同一 logs 目录被不同绝对路径视角访问(Windows D:\、WSL /mnt/d、Docker /app/logs 交替)时:
+// 1) 旧视角 auditLog 路径在 POSIX 下整串成为 cwd 里的字面文件名, 产生畸形审计文件
+// 2) 记账路径对不上导致旧日志脱离 maxFiles 裁剪, 孤儿 .log/.gz 无限堆积
+// 处理: 记账迁移到当前视角 + 孤儿日志收编回记账 + 超额最老孤儿按库裁剪同等语义清除 + 清理 cwd 畸形残留。
+// 运行期日志删除仍走库自身裁剪链路(removeFile 删 .log + logRemoved 事件删 .gz); heal 仅对启动时的超额
+// 孤儿执行同等裁剪——库在 transport 构造期同步执行的裁剪, 其 logRemoved 事件发射早于 winston 挂载监听
+// (daily-rotate-file.js 先 getStream 后 on('logRemoved')), .gz 删除丢失后下次启动又被收编, 永不收敛
+
+// 库同款条目 hash 公式(FileStreamRotator removeFile 按此校验, 不一致则拒删)
+const auditEntryHash = (hashType, name, date) =>
+  crypto.createHash(hashType).update(`${name}LOG_FILE${date}`).digest('hex')
+
+const healAuditFile = (auditFile, filename) => {
+  const logDirname = config.logging.dirname
+  let audit = null
+  if (fs.existsSync(auditFile)) {
+    try {
+      audit = JSON.parse(fs.readFileSync(auditFile, 'utf-8'))
+    } catch (error) {
+      console.error(`[logger] 审计文件损坏, 删除后按磁盘现状重建: ${auditFile}`, error)
+      try {
+        fs.unlinkSync(auditFile)
+      } catch (unlinkError) {
+        console.error('[logger] 删除损坏审计文件失败:', unlinkError)
+      }
+    }
+  }
+
+  const hashType = audit?.hashType || 'sha256'
+  let files = Array.isArray(audit?.files) ? audit.files : []
+  let changed = false
+
+  // 审计指针错位(另一视角进程写的): 修正为当前路径并触发写回
+  if (audit && audit.auditLog !== auditFile) {
+    changed = true
+    console.log(`[logger] 审计记账路径错位, 已迁移到当前视角: ${audit.auditLog} -> ${auditFile}`)
+  }
+
+  // 条目规范化: 旧 bug 会让混合视角条目并存于同一清单(实例: 同一文件以 D:\ 与 /mnt/d 各记一条;
+  // 且 auditLog 与当前一致时也可能混入他视角条目, 故不以指针比对为开关, 而是无条件逐条规范化)。
+  // 统一重写到当前视角并按逻辑文件名折叠去重, date 取最近一次记账——防止重复计数虚增 files.length
+  // 导致超额裁剪误删真实日志; hash 用新 name 重算(removeFile 按其校验), 丢弃磁盘上已不存在的条目
+  const byName = new Map()
+  for (const entry of files) {
+    const base = String(entry.name).split(/[\\/]/).pop()
+    if (!base) {
+      continue
+    }
+    const name = path.join(logDirname, base)
+    const prev = byName.get(name)
+    if (prev && entry.date <= prev.date) {
+      continue
+    }
+    byName.set(name, { ...entry, name, hash: auditEntryHash(hashType, name, entry.date) })
+  }
+  const normalized = [...byName.values()].filter(
+    (entry) => fs.existsSync(entry.name) || fs.existsSync(`${entry.name}.gz`)
+  )
+  if (
+    normalized.length !== files.length ||
+    normalized.some((entry, index) => entry.name !== files[index].name)
+  ) {
+    changed = true
+  }
+  files = normalized
+
+  // 孤儿收编: 磁盘上匹配本轮转器命名模式但不在记账里的日志(含 .gz), 补录进记账参与 maxFiles 留存管理
+  const escaped = filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const namePattern = new RegExp(
+    `^${escaped.replace('%DATE%', '\\d{4}-\\d{2}-\\d{2}')}(\\.\\d+)?(\\.gz)?$`
+  )
+  const knownNames = new Set(files.map((entry) => entry.name))
+  let adopted = 0
+  for (const item of fs.readdirSync(logDirname)) {
+    if (!namePattern.test(item)) {
+      continue
+    }
+    // .log 与其归档 .log.gz 共用同一逻辑名(库记账记 .log, 裁剪时经 logRemoved 事件连带删 .gz)
+    const logicalName = path.join(logDirname, item.replace(/\.gz$/, ''))
+    if (knownNames.has(logicalName)) {
+      continue
+    }
+    knownNames.add(logicalName)
+    const mtime = Math.floor(fs.statSync(path.join(logDirname, item)).mtimeMs)
+    files.push({
+      date: mtime,
+      name: logicalName,
+      hash: auditEntryHash(hashType, logicalName, mtime)
+    })
+    adopted++
+  }
+  if (adopted > 0) {
+    changed = true
+    console.log(`[logger] 已收编 ${adopted} 个脱离记账的日志文件: ${path.basename(auditFile)}`)
+  }
+
+  if (changed) {
+    // files 顺序即裁剪顺序(splice 保留末尾 N 个), 按时间升序使最旧的先被裁
+    files.sort((a, b) => a.date - b.date)
+
+    // 超额孤儿同步裁剪(仅数量模式, 本项目 LOG_MAX_FILES 恒为数量): 见顶部说明, 启动期库裁剪丢 logRemoved
+    // 事件导致 .gz 删不掉, 超额部分在此按库 removeFile+logRemoved 同等语义(.log 与 .gz 一并)删除。
+    // 当天文件即将由库在启动时 push 进记账, 尚不在册时给它留一个名额(maxFiles=1 时名额为 0、历史全清,
+    // 当天文件占唯一名额, 这正是 maxFiles=1 的语义; 强行保底 1 会让启动 push 再触发一次丢事件的裁剪,
+    // 稳态恒滞留一个 .gz 孤儿永不收敛); 当天文件名与库行为一致按本地时区生成(file-stream-rotator 用 moment)
+    if (!audit?.keep?.days) {
+      const now = new Date()
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+        now.getDate()
+      ).padStart(2, '0')}`
+      const todayName = path.join(logDirname, filename.replace('%DATE%', today))
+      const limit = knownNames.has(todayName)
+        ? config.logging.maxFiles
+        : config.logging.maxFiles - 1
+      let evictedCount = 0
+      while (files.length > limit) {
+        const evicted = files.shift()
+        for (const target of [evicted.name, `${evicted.name}.gz`]) {
+          try {
+            if (fs.existsSync(target)) {
+              fs.unlinkSync(target)
+            }
+          } catch (error) {
+            console.error(`[logger] 裁剪超额日志失败: ${target}`, error)
+          }
+        }
+        evictedCount++
+      }
+      if (evictedCount > 0) {
+        console.log(
+          `[logger] 已按 maxFiles=${config.logging.maxFiles} 裁剪 ${evictedCount} 个超额历史日志: ${path.basename(auditFile)}`
+        )
+      }
+    }
+
+    fs.writeFileSync(
+      auditFile,
+      JSON.stringify(
+        {
+          keep: audit?.keep || { days: false, amount: config.logging.maxFiles },
+          auditLog: auditFile,
+          files,
+          hashType
+        },
+        null,
+        4
+      )
+    )
+  }
+}
+
+// 历史畸形残留清理: 旧视角反斜杠审计路径在 POSIX 下整串落为 cwd 里的字面文件名
+// (如 "D:\...\logs\.claude-relay-audit.log.json"), 其文件名必然以 "\" + 本服务审计文件确切 basename 结尾。
+// logger 是公共模块、可能从任意 cwd 被 require, 删除条件必须字节级精确: 只认 "\" + 自家审计文件名结尾
+// 且内容含 auditLog 字段的文件, 不波及其它任何 JSON; Windows 文件名不允许反斜杠, 在 Windows 上天然空转。
+// 边界(有意止损, 非遗漏): 仅自动回收落入 cwd 的反斜杠塌缩类污染(在仓库根, git 可见、可能被误提交);
+// 他视角 POSIX 绝对路径上的历史残留(容器内 /mnt/...、宿主 /app/logs/... 等)是死文件——修复后任何视角
+// 只读写自己算出的审计路径, 残留不再被读——且落点不可枚举、无法与并存活部署的活文件区分, 自动扫除
+// 风险大于收益: 容器内的随容器重建消失, 宿主侧如确认存在可人工删除
+const cleanMangledAuditResidue = (auditBasename) => {
+  try {
+    for (const entry of fs.readdirSync(process.cwd())) {
+      if (!entry.endsWith(`\\${auditBasename}`)) {
+        continue
+      }
+      try {
+        const content = JSON.parse(fs.readFileSync(path.join(process.cwd(), entry), 'utf-8'))
+        if (content && typeof content.auditLog === 'string') {
+          fs.unlinkSync(path.join(process.cwd(), entry))
+          console.log(`[logger] 已清理跨平台错乱遗留的畸形审计文件: ${entry}`)
+        }
+      } catch (error) {
+        console.error(`[logger] 检查疑似畸形审计文件失败: ${entry}`, error)
+      }
+    }
+  } catch (error) {
+    console.error('[logger] 扫描畸形审计残留失败:', error)
+  }
+}
+
 // 🔄 增强的日志轮转配置
 const createRotateTransport = (filename, level = null) => {
+  const auditBasename = `.${filename.replace('%DATE%', 'audit')}.json`
+  const auditFile = path.join(config.logging.dirname, auditBasename)
+
+  cleanMangledAuditResidue(auditBasename)
+  try {
+    healAuditFile(auditFile, filename)
+  } catch (error) {
+    console.error(`[logger] 审计文件自愈失败(不阻塞日志初始化): ${auditFile}`, error)
+  }
+
   const transport = new DailyRotateFile({
     filename: path.join(config.logging.dirname, filename),
     datePattern: 'YYYY-MM-DD',
     zippedArchive: true,
     maxSize: config.logging.maxSize,
     maxFiles: config.logging.maxFiles,
-    auditFile: path.join(config.logging.dirname, `.${filename.replace('%DATE%', 'audit')}.json`),
+    auditFile,
     format: fileFormat
   })
 
