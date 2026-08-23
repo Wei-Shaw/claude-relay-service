@@ -6,8 +6,9 @@ version: '3.8'
 services:
   # 🚀 Claude Relay Service
   claude-relay:
-    build: .
-    image: weishaw/claude-relay-service:latest
+    # 自维护镜像（GHCR）。本地自行构建时取消下行注释并改用 docker compose up -d --build
+    # build: .
+    image: ghcr.io/sunseekerx/claude-relay-service:latest
     restart: unless-stopped
     ports:
       # 绑定地址：生产环境建议使用反向代理，设置 BIND_HOST=127.0.0.1
@@ -46,6 +47,17 @@ services:
       - CLAUDE_API_VERSION=${CLAUDE_API_VERSION:-2023-06-01}
       - CLAUDE_BETA_HEADER=${CLAUDE_BETA_HEADER:-claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14}
       
+      # 💰 模型定价数据源（可选，留空用内置默认；管理后台的设置存 Redis，优先级更高）
+      # 本 compose 用显式 environment 列表，不映射 .env 文件 —— 新增变量必须在这里透传，
+      # 否则 .env 里配了也进不到容器
+      - PRICE_MIRROR_REPO=${PRICE_MIRROR_REPO:-}
+      - PRICE_MIRROR_BRANCH=${PRICE_MIRROR_BRANCH:-}
+      - PRICE_MIRROR_BASE_URL=${PRICE_MIRROR_BASE_URL:-}
+      - PRICE_MIRROR_FILENAME=${PRICE_MIRROR_FILENAME:-}
+      - PRICE_MIRROR_HASH_FILENAME=${PRICE_MIRROR_HASH_FILENAME:-}
+      - PRICE_MIRROR_JSON_URL=${PRICE_MIRROR_JSON_URL:-}
+      - PRICE_MIRROR_HASH_URL=${PRICE_MIRROR_HASH_URL:-}
+
       # 🌐 代理配置
       - DEFAULT_PROXY_TIMEOUT=${DEFAULT_PROXY_TIMEOUT:-60000}
       - MAX_PROXY_RETRIES=${MAX_PROXY_RETRIES:-3}

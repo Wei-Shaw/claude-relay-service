@@ -34,9 +34,8 @@ RUN npm run build
 FROM node:18-alpine
 
 # 📋 设置标签
-LABEL maintainer="claude-relay-service@example.com"
-LABEL description="Claude Code API Relay Service"
-LABEL version="1.0.0"
+LABEL org.opencontainers.image.source="https://github.com/SunSeekerX/claude-relay-service"
+LABEL org.opencontainers.image.description="Claude Code API Relay Service (SunSeekerX maintained fork)"
 
 # 🔧 安装系统依赖
 RUN apk add --no-cache \

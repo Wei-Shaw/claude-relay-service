@@ -5,24 +5,80 @@ on:
     - cron: '*/10 * * * *'
   workflow_dispatch: {}
 
+# 串行：两个 run 同时推 price-mirror 会有一个因非快进失败（手动触发叠加定时触发就会出现）。
+# 这里不用 queue: max —— 同步价格是幂等的「取最新覆盖」，堆积的 pending 没有价值，
+# 让新的顶掉旧的正是想要的行为（与发布流水线不同，那里每个 pending 都对应一次不可丢的发版）。
+concurrency:
+  group: sync-model-pricing
+  cancel-in-progress: false
+
 jobs:
   sync-pricing:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: 检出 price-mirror 分支
+      - name: 检出仓库
         uses: actions/checkout@v4
         with:
-          ref: price-mirror
           fetch-depth: 0
+
+      - name: 切到 price-mirror 分支(不存在则建空分支)
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin price-mirror >/dev/null 2>&1; then
+            git fetch origin price-mirror:price-mirror
+            git checkout price-mirror
+          else
+            echo "price-mirror 分支不存在,创建空分支"
+            git checkout --orphan price-mirror
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
 
       - name: 下载上游价格文件
         id: fetch
+        env:
+          # 上游价格源:可用仓库变量 PRICING_UPSTREAM_URL 覆盖(如换成 litellm 原始源)
+          UPSTREAM_URL: ${{ vars.PRICING_UPSTREAM_URL || 'https://github.com/Wei-Shaw/model-price-repo/raw/refs/heads/main/model_prices_and_context_window.json' }}
         run: |
           set -euo pipefail
-          curl -fsSL https://github.com/Wei-Shaw/model-price-repo/raw/refs/heads/main/model_prices_and_context_window.json \
-            -o model_prices_and_context_window.json.new
+
+          # 日志里只出现 scheme + host。PRICING_UPSTREAM_URL 是仓库变量、可填任意地址，
+          # 签名式源会把 token 放 query(?token=)、路径(/token/SECRET/…)甚至 userinfo(user:pass@)，
+          # 而 Actions 日志对有仓库读权限的人都可见。与代码侧 pricingService.maskUrl 同口径。
+          #
+          # 用【白名单提取】而不是"删掉敏感部分"：只有能明确解析出 host 的才输出它，
+          # 其余一律输出固定占位符。反过来做（正则剥离）会漏——userinfo 会被当成 host 保留、
+          # 无协议或畸形的输入不匹配正则从而原样打出，凭据照样泄露。
+          MASKED_URL=$(printf '%s' "$UPSTREAM_URL" | sed -nE 's#^([a-zA-Z][a-zA-Z0-9+.-]*)://([^/?#@]*@)?([^/?#:@]+)(:[0-9]+)?([/?#].*)?$#\1://\3\4/…#p')
+          MASKED_URL=${MASKED_URL:-[已隐去：地址格式无法解析]}
+          echo "上游价格源：${MASKED_URL}"
+
+          # curl 的错误信息也会带完整 URL（-f 失败时打 URL），所以吞掉它自己的输出、由我们脱敏后报
+          if ! curl -fsSL "$UPSTREAM_URL" -o model_prices_and_context_window.json.new 2>/dev/null; then
+            echo "::error::下载上游价格文件失败（${MASKED_URL}），本次同步中止"
+            rm -f model_prices_and_context_window.json.new
+            exit 1
+          fi
+
+          # 内容校验：HTTP 200 不代表拿到的是定价数据。上游改路径、CDN 返错误页、
+          # 仓库变量 PRICING_UPSTREAM_URL 配错，都会让 HTML/错误 JSON 被提交进 price-mirror，
+          # 而部署端要等拉取后解析失败才发现，此后镜像源一直是坏的。宁可本次同步失败。
+          jq -e '
+            type == "object"
+            and (keys | length) >= 50
+            and ([to_entries[] | select(.value | type == "object")
+                  | select(.value.litellm_provider != null or .value.input_cost_per_token != null)]
+                 | length) >= 50
+          ' model_prices_and_context_window.json.new > /dev/null || {
+            echo "::error::上游返回的内容不是有效的模型定价数据（应为含 50+ 定价条目的 JSON 对象），本次同步中止"
+            echo "::error::请检查上游地址：${MASKED_URL}"
+            rm -f model_prices_and_context_window.json.new
+            exit 1
+          }
+
+          MODEL_COUNT=$(jq 'keys | length' model_prices_and_context_window.json.new)
+          echo "校验通过：$MODEL_COUNT 个条目"
 
           NEW_HASH=$(sha256sum model_prices_and_context_window.json.new | awk '{print $1}')
 
@@ -59,4 +115,4 @@ jobs:
             COMMIT_MSG="$COMMIT_MSG (${NEW_HASH})"
           fi
           git commit -m "$COMMIT_MSG"
-          git push origin price-mirror
+          git push origin HEAD:price-mirror

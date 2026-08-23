@@ -375,6 +375,11 @@ const RedisKeys = {
   billingEvents: 'billing:events', // Stream
   relayConfig: 'claude_relay_config', // String(JSON): Claude relay 全局配置
   testModelConfig: 'test_model_config', // String(JSON): 连通性测试默认模型配置
+  // String(JSON): 模型定价数据源(管理端可改,空/缺失回落 config/pricingSource.js)
+  pricingSource: 'system:pricing_source',
+  // Hash: 管理端从定价源导入的模型目录(modelId -> JSON{provider,importedAt})
+  // 叠加在 modelService 内置列表之上,不覆盖内置项;删除仅删本 Hash 内的条目
+  importedModels: 'system:imported_models',
 
   // ========== 配额卡 / 兑换 ==========
   quotaCard: {
@@ -535,7 +540,9 @@ const LIMITS = {
   waitTimesPerKey: 500,
   waitTimesGlobal: 2000,
   billingEventsStream: 100000,
-  apiKeyChangeHistory: 200
+  apiKeyChangeHistory: 200,
+  // 导入模型目录条目上限(单 Hash 不得无界增长)。上游全量定价约 226 个模型,1000 留足余量
+  importedModels: 1000
 }
 
 module.exports = { RedisKeys, TTL, LIMITS }

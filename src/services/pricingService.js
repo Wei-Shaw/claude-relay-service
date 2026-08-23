@@ -1,16 +1,156 @@
 const fs = require('fs')
 const path = require('path')
 const https = require('https')
+const http = require('http')
+const dns = require('dns')
 const crypto = require('crypto')
 const pricingSource = require('../../config/pricingSource')
 const logger = require('../utils/logger')
+const redis = require('../models/redis')
+const { RedisKeys } = require('../constants/redisKeys')
+const { createEncryptor } = require('../utils/commonHelper')
+
+// 定价源 URL 的 query 可能带私有 token（私有仓库 raw 链接、带签名的 CDN 地址），
+// 按项目约定敏感值必须 AES 加密存储：落 Redis 时只加密 query，origin+path 保持明文以便运维排查。
+const encryptor = createEncryptor('pricing-source-salt')
+
+// 远端响应体上限:定价源可由管理端改成任意地址,无上限时超大/无限响应会累积到内存后才解析,
+// 直接把进程打满。上游 litellm 全量定价约 1.5MB,16MB 留足余量。
+const MAX_PRICING_BYTES = 16 * 1024 * 1024
+// 哈希文件只有一行 sha256,给 1KB 足够
+const MAX_HASH_BYTES = 1024
+// 重定向跟随上限:GitHub/CDN 通常 1-2 跳,5 跳足够且能挡住跳转环
+const MAX_REDIRECTS = 5
+
+// 落库用:origin 明文(便于运维核对"数据从哪个站来"),pathname + query 一起加密。
+//
+// 为什么连 pathname 也加密:凭据不只出现在 query。签名式地址会把 token 放进路径,
+// 例如 /token/SECRET/prices.json、/s/AbCdEf123/pricing.json —— 只加密 query 的话
+// 这类凭据仍会明文进 Redis、进日志、并由状态接口回显。既然无法穷举凭据的位置,
+// 就把除 origin 以外的整段都当敏感数据处理。
+const splitUrlForStorage = (url) => {
+  const parsed = new URL(url)
+  // pathname 恒以 '/' 开头,解密后据此判断是否解出了有效内容(见 joinUrlFromStorage)
+  const secret = `${parsed.pathname}${parsed.search}`
+  return {
+    base: parsed.origin,
+    pathEncrypted: encryptor.encrypt(secret)
+  }
+}
+
+// 读库用:还原完整 URL。解密失败返回空串(视为"没有配置自定义源")并告警——
+// 换过 ENCRYPTION_KEY 的实例解不出旧值,此时路径都拿不到、拼不出可用地址,
+// 只能回落默认源(由 resolveSource 处理),但绝不能抛错中断定价服务。
+//
+// 关键:commonHelper 的 decrypt() 解密失败【不抛错,而是原样返回入参密文】(见其 catch),
+// 所以不能靠 try/catch 判失败,必须按返回值形态判断:成功解出的内容必以 '/' 开头(pathname),
+// 而密文是 "ivHex:cipherHex"。少了这一判,会把 iv:ciphertext 当路径拼进 URL。
+const joinUrlFromStorage = (base, pathEncrypted, label) => {
+  if (!base || !pathEncrypted) {
+    return ''
+  }
+  const decrypted = encryptor.decrypt(pathEncrypted)
+  if (!decrypted.startsWith('/')) {
+    logger.warn(`⚠️  ${label} 解密失败(可能换过 ENCRYPTION_KEY)，将回落默认源`)
+    return ''
+  }
+  return `${base}${decrypted}`
+}
+
+// 判定一个 IP 字面量是否属于禁止访问的网段。纯函数,字面量校验与 DNS 解析后校验共用,
+// 保证"填 IP"和"填域名解析出 IP"两条路的口径完全一致(不一致就等于留后门)。
+// 返回被命中的原因字符串,未命中返回 null。
+const privateIpReason = (ip) => {
+  const addr = String(ip || '')
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+
+  const ipv4 = addr.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (ipv4) {
+    const [a, b, c] = ipv4.slice(1).map(Number)
+    if (a === 127) {
+      return '回环地址'
+    }
+    if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) {
+      return '私有网段'
+    }
+    if (a === 169 && b === 254) {
+      return '链路本地/云元数据地址'
+    }
+    if (a === 100 && b >= 64 && b <= 127) {
+      return 'CGNAT 网段'
+    }
+    // 非公网可路由的 IANA 特殊用途段(RFC 6890)。定价源不可能合法落在这些段里,
+    // 而 DNS 劫持/内网解析常把域名指到这里(本机 WSL 的 DNS 就把 example.com 指到 198.18.2.42)
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) {
+      return 'IETF 协议保留段'
+    }
+    if (a === 192 && b === 88 && c === 99) {
+      return '6to4 中继任播段'
+    }
+    if (a === 198 && (b === 18 || b === 19)) {
+      return '网络设备基准测试段'
+    }
+    if (a === 198 && b === 51 && c === 100) {
+      return '文档示例段'
+    }
+    if (a === 203 && b === 0 && c === 113) {
+      return '文档示例段'
+    }
+    if (a === 0 || a >= 224) {
+      return '保留网段'
+    }
+    return null
+  }
+
+  if (addr.includes(':')) {
+    if (addr === '::' || addr === '::1') {
+      return '回环/未指定地址'
+    }
+    // new URL() 会把 ::ffff:127.0.0.1 规范化为 ::ffff:7f00:1,故按 "::" 前缀整段拒绝;
+    // dns.lookup 返回的 IPv4-mapped 仍是点分形态,上面的 ipv4 分支已覆盖
+    if (addr.startsWith('::')) {
+      return 'IPv4-mapped/compatible 地址'
+    }
+    if (/^(fc|fd)/.test(addr)) {
+      return '唯一本地地址'
+    }
+    if (/^fe[89ab]/.test(addr)) {
+      return '链路本地地址'
+    }
+    return null
+  }
+
+  return null
+}
+
+// 定价源地址进日志/回显前只保留 origin,丢掉 pathname、query 与 userinfo。
+// 与 splitUrlForStorage 同口径:凭据可能在 query(?token=)也可能在路径(/token/SECRET/…),
+// 无法穷举,所以除 origin 以外一律隐去。比 upstreamErrorHelper.sanitizeUrl(按已知参数名脱敏)更硬。
+// 管理端要核对"数据从哪个站来"看 origin 足够;要看完整地址应查自己填写时的记录。
+const maskUrl = (url) => {
+  if (!url) {
+    return url
+  }
+  try {
+    const parsed = new URL(url)
+    // 有路径或参数时标注省略号,让管理端知道"这里还有内容,只是没显示"
+    const suffix = parsed.pathname !== '/' || parsed.search ? '/…' : ''
+    return `${parsed.origin}${suffix}`
+  } catch {
+    return '[invalid-url]'
+  }
+}
 
 class PricingService {
   constructor() {
     this.dataDir = path.join(process.cwd(), 'data')
     this.pricingFile = path.join(this.dataDir, 'model_pricing.json')
+    // 生效源由 resolveSource() 运行时解析:Redis(管理端可改) > config/pricingSource.js(env > 默认)
+    // 这两个字段只是"当前生效值"的缓存快照,供 getStatus 回显;下载/校验一律先 resolveSource()
     this.pricingUrl = pricingSource.pricingUrl
     this.hashUrl = pricingSource.hashUrl
+    this.sourceFromRedis = false
     this.fallbackFile = path.join(
       process.cwd(),
       'resources',
@@ -43,6 +183,177 @@ class PricingService {
     }
   }
 
+  // 按 URL 协议选 http/https 模块。校验层放行 http:// 就必须能真的发出 http 请求
+  _clientFor(url) {
+    return url.startsWith('http://') ? http : https
+  }
+
+  // 第二道防线:DNS 解析后校验。传给 http.get 的 lookup 选项,把连接前的解析结果拦下来,
+  // 解析出的任一 IP 命中禁止网段就直接失败。
+  //
+  // 这是闭合"内部域名 / 解析到私网的公网域名 / DNS rebinding"的关键——字面量黑名单做不到,
+  // 因为要判的是解析结果而不是字面串。all:true 拿到全部记录逐个判(只判第一个会被多 A 记录绕过),
+  // 校验通过后【只把已校验的地址交给连接】,不让底层再解析一次,消除"校验用一个结果、连接用另一个"
+  // 的 TOCTOU 窗口(DNS rebinding 正是打这个窗口)。
+  _guardedLookup(label) {
+    return (hostname, options, callback) => {
+      dns.lookup(hostname, { ...options, all: true }, (error, addresses) => {
+        if (error) {
+          callback(error)
+          return
+        }
+        const list = Array.isArray(addresses) ? addresses : [addresses]
+        for (const entry of list) {
+          const ip = entry?.address || entry
+          const reason = privateIpReason(ip)
+          if (reason) {
+            logger.warn(`⚠️  ${label} 的域名 ${hostname} 解析到${reason}(${ip})，已阻止请求`)
+            callback(new Error(`${label}的域名解析到${reason}，已阻止访问内网`))
+            return
+          }
+        }
+        // 回传已校验过的地址,不让底层重新解析(否则校验结果与实际连接目标可能不同)
+        if (options?.all) {
+          callback(null, list)
+          return
+        }
+        const first = list[0]
+        callback(null, first?.address || first, first?.family)
+      })
+    }
+  }
+
+  // 校验管理端提交的定价源地址(第一道:字面量)。定价源会被服务端主动请求(定时轮询 + 手动拉取),
+  // 所以必须挡住"让服务端代为访问内网"和"把凭据存进 Redis/日志"两类问题。
+  //
+  // 两道防线共用 privateIpReason 判定,口径一致:
+  //   本函数     = 字面量校验(填的是 IP 就直接判;域名只查黑名单)
+  //   _guardedLookup = DNS 解析后校验(域名解析出的每个 IP 都判,挡内部域名/解析到私网/rebinding)
+  // 错误消息不回显原始 URL:畸形 URL 的 query 可能带 token,而错误会进日志(见 maskUrl 的理由)。
+  _assertSafeSourceUrl(rawUrl, label) {
+    let parsed
+    try {
+      parsed = new URL(rawUrl)
+    } catch {
+      // 只说"不是合法 URL",不带 rawUrl——非法 URL 无法用 URL 解析来剥 query,
+      // 拼进消息就会把 ?token=xxx 原样带进 logger/console.error
+      throw new Error(`${label}不是合法 URL（已隐去内容，请检查是否漏写协议或含非法字符）`)
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error(`${label}必须以 http:// 或 https:// 开头`)
+    }
+
+    // 凭据不能出现在定价源地址里:该地址会存 Redis、写日志、并由状态接口回显给管理端,
+    // 与项目"敏感凭据加密存储 + 日志脱敏"的约束冲突。需要鉴权的源请走网关或反代注入。
+    if (parsed.username || parsed.password) {
+      throw new Error(`${label}不能包含用户名/密码，请改用无凭据的公开地址`)
+    }
+
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+
+    if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '0.0.0.0') {
+      throw new Error(`${label}不允许指向本机地址：${hostname}`)
+    }
+
+    // 容器/编排环境里指向宿主或集群内部的常见域名。快速失败用,
+    // 真正兜底的是 _guardedLookup(解析后按 IP 判),故这里不必穷举
+    const internalHosts = [
+      'host.docker.internal',
+      'gateway.docker.internal',
+      'kubernetes.default',
+      'metadata.google.internal',
+      'instance-data'
+    ]
+    if (internalHosts.includes(hostname) || hostname.endsWith('.svc.cluster.local')) {
+      throw new Error(`${label}不允许指向容器/集群内部地址：${hostname}`)
+    }
+
+    const reason = privateIpReason(hostname)
+    if (reason) {
+      throw new Error(`${label}不允许指向${reason}：${hostname}`)
+    }
+
+    return parsed.toString()
+  }
+
+  // 解析当前生效的定价源:Redis(管理端可改) > config/pricingSource.js(env > 默认)
+  // Redis 不可用/无记录一律回落默认值,不抛错——定价源是配置读取,拿不到就用默认继续跑
+  async resolveSource() {
+    let stored = null
+    try {
+      // getClient() 未连接时返回 null(不抛),显式判空:定价源解析发生在启动早期,不该因此中断
+      const client = redis.getClient()
+      const raw = client ? await client.get(RedisKeys.pricingSource) : null
+      if (raw) {
+        stored = JSON.parse(raw)
+      }
+    } catch (error) {
+      logger.warn(`⚠️  读取定价源配置失败,回落默认源：${error.message}`)
+      console.error(error)
+    }
+
+    // 落库时 pathname+query 是加密的,这里拼回完整地址供实际请求使用。
+    // 解密失败(换过 ENCRYPTION_KEY)时 joinUrlFromStorage 返回空串 —— 此时按"无自定义源"处理、
+    // 回落默认源,而不是拿一个拼不全的地址去请求。
+    const storedPricingUrl = stored?.pricingOrigin
+      ? joinUrlFromStorage(stored.pricingOrigin, stored.pricingPathEncrypted, '定价 JSON 地址')
+      : ''
+    const overridden = Boolean(storedPricingUrl)
+
+    // 自定义源生效时 hashUrl 原样生效(含空串=该源不提供 sha256,不回落默认源的哈希地址,
+    // 否则会拿默认源的哈希与自定义源的文件比对、每轮都判定"有更新"从而反复下载)
+    const pricingUrl = overridden ? storedPricingUrl : pricingSource.pricingUrl
+    const hashUrl = overridden
+      ? joinUrlFromStorage(stored.hashOrigin || '', stored.hashPathEncrypted, 'sha256 校验地址')
+      : pricingSource.hashUrl
+    this.sourceFromRedis = overridden
+    this.pricingUrl = pricingUrl
+    this.hashUrl = hashUrl
+    return { pricingUrl, hashUrl }
+  }
+
+  // 管理端保存定价源。pricingUrl 为空视为「恢复默认」(删除 Redis 记录)
+  // hashUrl 可空:留空表示该源不提供 sha256 校验文件,此时跳过哈希轮询、仅靠 24h 定时与手动刷新
+  async setSource({ pricingUrl, hashUrl }) {
+    const client = redis.getClientSafe()
+    const trimmedPricingUrl = (pricingUrl || '').trim()
+    const trimmedHashUrl = (hashUrl || '').trim()
+
+    if (!trimmedPricingUrl) {
+      await client.del(RedisKeys.pricingSource)
+      logger.info('💰 定价源已恢复默认(删除 Redis 覆盖记录)')
+    } else {
+      // 校验通过后用 URL 归一化后的字符串落库(剥掉多余空白、统一编码)
+      const safePricingUrl = this._assertSafeSourceUrl(trimmedPricingUrl, '定价 JSON 地址')
+      const safeHashUrl = trimmedHashUrl
+        ? this._assertSafeSourceUrl(trimmedHashUrl, 'sha256 校验地址')
+        : ''
+
+      // 落库:只有 origin 明文,pathname+query 加密(凭据可能在两者任一处,见 splitUrlForStorage)
+      const pricingParts = splitUrlForStorage(safePricingUrl)
+      const hashParts = safeHashUrl ? splitUrlForStorage(safeHashUrl) : { base: '', pathEncrypted: '' }
+
+      await client.set(
+        RedisKeys.pricingSource,
+        JSON.stringify({
+          pricingOrigin: pricingParts.base,
+          pricingPathEncrypted: pricingParts.pathEncrypted,
+          hashOrigin: hashParts.base,
+          hashPathEncrypted: hashParts.pathEncrypted
+        })
+      )
+      // 日志只记 origin+path,不记 query(校验已挡掉 userinfo,query 里仍可能带 token 形态的参数)
+      logger.info(
+        `💰 定价源已更新 pricingUrl=${maskUrl(safePricingUrl)} hashUrl=${maskUrl(safeHashUrl) || '-'}`
+      )
+    }
+
+    await this.resolveSource()
+    // 与 getStatus 同口径:返回脱敏值,调用方(管理端)只用于展示
+    return { pricingUrl: maskUrl(this.pricingUrl), hashUrl: maskUrl(this.hashUrl) }
+  }
+
   // 初始化价格服务
   async initialize() {
     try {
@@ -51,6 +362,9 @@ class PricingService {
         fs.mkdirSync(this.dataDir, { recursive: true })
         logger.info('📁 Created data directory')
       }
+
+      // 先解析生效源(Redis 覆盖 > 默认),后续下载/校验都用它
+      await this.resolveSource()
 
       // 检查是否需要下载或更新价格数据
       await this.checkAndUpdatePricing()
@@ -149,7 +463,14 @@ class PricingService {
 
     this.hashSyncInProgress = true
     try {
-      const remoteHash = await this.fetchRemoteHash()
+      // 每轮重新解析:管理端改源后无需重启即生效
+      const { hashUrl } = await this.resolveSource()
+      if (!hashUrl) {
+        logger.debug('💰 当前定价源未配置哈希文件地址,跳过哈希校验')
+        return
+      }
+
+      const remoteHash = await this.fetchRemoteHash(hashUrl)
 
       if (!remoteHash) {
         return
@@ -174,10 +495,47 @@ class PricingService {
     }
   }
 
+  // 解析 3xx 的跳转目标。GitHub 文件链接、CDN 都会 302,不跟随会保存成功但拉取必失败。
+  // 关键:跳转目标必须重跑 SSRF 校验——否则一个公网 URL 可以 302 到内网,把前置校验绕干净。
+  // 返回 null 表示不是重定向。
+  _resolveRedirect(response, currentUrl, remaining, label) {
+    const status = response.statusCode
+    if (![301, 302, 303, 307, 308].includes(status)) {
+      return null
+    }
+    if (remaining <= 0) {
+      throw new Error(`${label}重定向次数过多`)
+    }
+    const location = response.headers.location
+    if (!location) {
+      throw new Error(`${label}返回 ${status} 但缺少 Location 头`)
+    }
+    // 相对跳转按当前 URL 解析
+    const target = new URL(location, currentUrl).toString()
+    this._assertSafeSourceUrl(target, `${label}的重定向目标`)
+    logger.debug(`[pricing] redirect status=${status} to=${maskUrl(target)}`)
+    return target
+  }
+
   // 获取远端哈希值
-  fetchRemoteHash() {
+  fetchRemoteHash(hashUrl = this.hashUrl, redirectsLeft = MAX_REDIRECTS) {
     return new Promise((resolve, reject) => {
-      const request = https.get(this.hashUrl, (response) => {
+      const options = { lookup: this._guardedLookup('哈希文件') }
+      const request = this._clientFor(hashUrl).get(hashUrl, options, (response) => {
+        let redirectTarget
+        try {
+          redirectTarget = this._resolveRedirect(response, hashUrl, redirectsLeft, '哈希文件')
+        } catch (error) {
+          response.resume()
+          reject(error)
+          return
+        }
+        if (redirectTarget) {
+          response.resume()
+          this.fetchRemoteHash(redirectTarget, redirectsLeft - 1).then(resolve, reject)
+          return
+        }
+
         if (response.statusCode !== 200) {
           reject(new Error(`哈希文件获取失败：HTTP ${response.statusCode}`))
           return
@@ -186,6 +544,10 @@ class PricingService {
         let data = ''
         response.on('data', (chunk) => {
           data += chunk
+          if (data.length > MAX_HASH_BYTES) {
+            request.destroy()
+            reject(new Error(`哈希文件超过大小上限 ${MAX_HASH_BYTES} 字节`))
+          }
         })
 
         response.on('end', () => {
@@ -236,18 +598,48 @@ class PricingService {
     return hash
   }
 
-  // 实际的下载逻辑
-  _downloadFromRemote() {
+  // 实际的下载逻辑。调用前先解析生效源,保证管理端改源后立即用新地址
+  async _downloadFromRemote() {
+    const { pricingUrl } = await this.resolveSource()
+    return this._downloadFromUrl(pricingUrl)
+  }
+
+  _downloadFromUrl(pricingUrl, redirectsLeft = MAX_REDIRECTS) {
     return new Promise((resolve, reject) => {
-      const request = https.get(this.pricingUrl, (response) => {
+      const options = { lookup: this._guardedLookup('定价文件') }
+      const request = this._clientFor(pricingUrl).get(pricingUrl, options, (response) => {
+        let redirectTarget
+        try {
+          redirectTarget = this._resolveRedirect(response, pricingUrl, redirectsLeft, '定价文件')
+        } catch (error) {
+          response.resume()
+          reject(error)
+          return
+        }
+        if (redirectTarget) {
+          response.resume()
+          this._downloadFromUrl(redirectTarget, redirectsLeft - 1).then(resolve, reject)
+          return
+        }
+
         if (response.statusCode !== 200) {
           reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`))
           return
         }
 
         const chunks = []
+        let received = 0
         response.on('data', (chunk) => {
           const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+          received += bufferChunk.length
+          // 超限立即断流:不能等 'end' 才判断,否则内存已经被吃掉了
+          if (received > MAX_PRICING_BYTES) {
+            request.destroy()
+            reject(
+              new Error(`定价文件超过大小上限 ${Math.round(MAX_PRICING_BYTES / 1024 / 1024)}MB`)
+            )
+            return
+          }
           chunks.push(bufferChunk)
         })
 
@@ -740,7 +1132,7 @@ class PricingService {
     return `$${cost.toFixed(2)}`
   }
 
-  // 获取服务状态
+  // 获取服务状态。source 段回显当前生效源,供管理端展示"数据从哪来"
   getStatus() {
     return {
       initialized: this.pricingData !== null,
@@ -748,7 +1140,16 @@ class PricingService {
       modelCount: this.pricingData ? Object.keys(this.pricingData).length : 0,
       nextUpdate: this.lastUpdated
         ? new Date(this.lastUpdated.getTime() + this.updateInterval)
-        : null
+        : null,
+      // 回显一律走 maskUrl:状态接口是管理端可读的,而 env 配的源(PRICE_MIRROR_JSON_URL)
+      // 也可能带私有 token,不能原样返回
+      source: {
+        pricingUrl: maskUrl(this.pricingUrl),
+        hashUrl: maskUrl(this.hashUrl),
+        custom: this.sourceFromRedis,
+        defaultPricingUrl: maskUrl(pricingSource.pricingUrl),
+        defaultHashUrl: maskUrl(pricingSource.hashUrl)
+      }
     }
   }
 

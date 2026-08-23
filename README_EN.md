@@ -150,7 +150,7 @@ sudo systemctl start redis
 
 ```bash
 # Download project
-git clone https://github.com/Wei-Shaw/claude-relay-service.git
+git clone https://github.com/SunSeekerX/claude-relay-service.git
 cd claude-relay-service
 
 # Install dependencies

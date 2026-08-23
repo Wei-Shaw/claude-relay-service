@@ -20,6 +20,9 @@ DEFAULT_REDIS_PORT="6379"
 DEFAULT_REDIS_PASSWORD=""
 DEFAULT_APP_PORT="3000"
 
+# 源码仓库（自维护 fork）。装到别的 fork 时用 CRS_REPO_URL 环境变量覆盖
+CRS_REPO_URL="${CRS_REPO_URL:-https://github.com/SunSeekerX/claude-relay-service.git}"
+
 # 全局变量
 INSTALL_DIR=""
 APP_DIR=""
@@ -422,7 +425,7 @@ install_service() {
         rm -rf "$APP_DIR"
     fi
     
-    if ! git clone https://github.com/Wei-Shaw/claude-relay-service.git "$APP_DIR"; then
+    if ! git clone "$CRS_REPO_URL" "$APP_DIR"; then
         print_error "克隆项目失败"
         return 1
     fi
@@ -488,7 +491,7 @@ EOF
         
         # 使用 sparse-checkout 来只获取需要的文件
         git clone --depth 1 --branch web-dist --single-branch \
-            https://github.com/Wei-Shaw/claude-relay-service.git \
+            "$CRS_REPO_URL" \
             "$TEMP_CLONE_DIR" 2>/dev/null || {
             # 如果 HTTPS 失败，尝试使用当前仓库的 remote URL
             REPO_URL=$(git config --get remote.origin.url)
@@ -691,7 +694,7 @@ update_service() {
             print_info "尝试下载前端文件 (第 $attempt 次)..."
             
             if git clone --depth 1 --branch web-dist --single-branch \
-                https://github.com/Wei-Shaw/claude-relay-service.git \
+                "$CRS_REPO_URL" \
                 "$TEMP_CLONE_DIR" 2>/dev/null; then
                 clone_success=true
                 break
@@ -1228,7 +1231,7 @@ switch_branch() {
             
             # 下载前端文件
             if git clone --depth 1 --branch "$web_branch" --single-branch \
-                https://github.com/Wei-Shaw/claude-relay-service.git \
+                "$CRS_REPO_URL" \
                 "$TEMP_CLONE_DIR" 2>/dev/null; then
                 
                 # 复制文件到目标目录

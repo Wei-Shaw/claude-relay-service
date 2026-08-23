@@ -9,6 +9,20 @@ export const getModelPricingStatusApi = () =>
   request({ url: '/admin/models/pricing/status', method: 'GET' })
 export const refreshModelPricingApi = () =>
   request({ url: '/admin/models/pricing/refresh', method: 'POST' })
+export const updateModelPricingSourceApi = (data) =>
+  request({ url: '/admin/models/pricing/source', method: 'PUT', data })
+// 拉取定价文件（只更新价格，不改模型目录）
+export const pullModelPricingApi = () =>
+  request({ url: '/admin/models/pricing/pull', method: 'POST' })
+// 模型目录导入（从定价源把新模型加进 /v1/models）
+export const getImportableModelsApi = () =>
+  request({ url: '/admin/models/importable', method: 'GET' })
+export const getImportedModelsApi = () =>
+  request({ url: '/admin/models/imported', method: 'GET' })
+export const importModelsApi = (models) =>
+  request({ url: '/admin/models/import', method: 'POST', data: { models } })
+export const removeImportedModelsApi = (models) =>
+  request({ url: '/admin/models/import', method: 'DELETE', data: { models } })
 // 模型价格（公开只读，api-stats 用户页）
 export const getPublicModelPricingApi = () =>
   request({ url: '/apiStats/model-pricing', method: 'GET' })

@@ -39,6 +39,195 @@
       </p>
     </div>
 
+    <!-- 数据源配置（管理端可改，改完点“拉取最新价格”即时生效，无需重启） -->
+    <div
+      v-if="!readonly"
+      class="mb-6 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+    >
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <i class="fas fa-cloud-download-alt text-blue-500" />
+          <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">模型定价数据源</span>
+          <span
+            v-if="pricingStatus.source"
+            :class="[
+              'rounded px-2 py-0.5 text-sm',
+              pricingStatus.source.custom
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+            ]"
+          >
+            {{ pricingStatus.source.custom ? '自定义' : '默认' }}
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            :disabled="savingSource || importing"
+            @click="handleResetSource"
+          >
+            恢复默认
+          </button>
+          <button
+            class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            :disabled="savingSource || importing"
+            @click="handleSaveSource"
+          >
+            <i :class="['fas mr-1', savingSource ? 'fa-spinner fa-spin' : 'fa-save']" />
+            保存
+          </button>
+          <button
+            class="rounded-lg bg-blue-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="savingSource || importing"
+            @click="handleImport"
+          >
+            <i :class="['fas mr-1', importing ? 'fa-spinner fa-spin' : 'fa-download']" />
+            {{ importing ? '拉取中...' : '拉取最新价格' }}
+          </button>
+        </div>
+      </div>
+      <div
+        class="mb-3 rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/50"
+      >
+        <p class="break-all text-sm text-gray-600 dark:text-gray-400">
+          当前生效：<span class="font-mono">{{ pricingStatus.source?.pricingUrl || '-' }}</span>
+        </p>
+        <p class="mt-1 break-all text-sm text-gray-500 dark:text-gray-500">
+          校验文件：<span class="font-mono">{{ pricingStatus.source?.hashUrl || '未配置' }}</span>
+        </p>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label class="mb-1 block text-sm text-gray-600 dark:text-gray-400">
+            定价 JSON 地址
+          </label>
+          <input
+            v-model="sourceForm.pricingUrl"
+            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+            :placeholder="pricingStatus.source?.defaultPricingUrl || 'https://...'"
+            type="text"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm text-gray-600 dark:text-gray-400">
+            sha256 校验地址（可留空）
+          </label>
+          <input
+            v-model="sourceForm.hashUrl"
+            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+            :placeholder="pricingStatus.source?.defaultHashUrl || '留空则跳过哈希校验'"
+            type="text"
+          />
+        </div>
+      </div>
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+        上方“当前生效”只显示来源站点，路径与查询参数已隐去（它们加密存储，因为令牌既可能在
+        <span class="font-mono">?token=</span> 也可能在路径里），故不回填到输入框。填入新地址点保存即替换；
+        用“恢复默认”回到内置源。配了 sha256 地址时系统每 10 分钟比对哈希、有变更自动拉取；留空则仅靠每
+        24 小时定时更新与手动拉取。地址不得包含用户名/密码；保存时校验字面量，请求前还会校验域名的
+        DNS 解析结果，指向回环/私网/链路本地的地址会被拒绝（含重定向目标）。
+      </p>
+    </div>
+
+    <!-- 模型目录导入：把定价源里有、/v1/models 还没有的模型加进目录 -->
+    <div
+      v-if="!readonly"
+      class="mb-6 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+    >
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <i class="fas fa-layer-group text-emerald-500" />
+          <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">模型目录</span>
+          <span class="text-sm text-gray-500 dark:text-gray-400">
+            已导入 {{ importedModels.length }} 个 · 可导入 {{ importableModels.length }} 个
+          </span>
+        </div>
+        <button
+          class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          :disabled="modelsLoading"
+          @click="loadModelCatalog"
+        >
+          <i :class="['fas mr-1', modelsLoading ? 'fa-spinner fa-spin' : 'fa-rotate']" />
+          刷新列表
+        </button>
+      </div>
+
+      <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+        这里管的是 <span class="font-mono">/v1/models</span> 对客户端暴露的模型列表。导入不影响转发能力（能不能用取决于账户的模型映射），
+        只决定模型是否出现在列表里。仅列出定价源中的对话类模型。
+      </p>
+
+      <!-- 可导入 -->
+      <div class="mb-4">
+        <div class="mb-2 flex flex-wrap items-center gap-2">
+          <span class="text-sm font-medium text-gray-600 dark:text-gray-300">可导入</span>
+          <el-select
+            v-model="selectedImportable"
+            class="min-w-0 flex-1"
+            clearable
+            collapse-tags
+            collapse-tags-tooltip
+            filterable
+            multiple
+            placeholder="选择要导入的模型（可搜索）"
+          >
+            <el-option
+              v-for="model in importableModels"
+              :key="model.id"
+              :label="`${model.id}　·　${model.provider}`"
+              :value="model.id"
+            />
+          </el-select>
+          <button
+            class="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="modelsLoading || selectedImportable.length === 0"
+            @click="handleImportModels"
+          >
+            <i class="fas fa-plus mr-1" />
+            导入 {{ selectedImportable.length || '' }}
+          </button>
+        </div>
+        <p v-if="importableModels.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+          定价源里没有目录之外的新模型。
+        </p>
+      </div>
+
+      <!-- 已导入 -->
+      <div>
+        <div class="mb-2 flex flex-wrap items-center gap-2">
+          <span class="text-sm font-medium text-gray-600 dark:text-gray-300">已导入</span>
+          <el-select
+            v-model="selectedImported"
+            class="min-w-0 flex-1"
+            clearable
+            collapse-tags
+            collapse-tags-tooltip
+            filterable
+            multiple
+            placeholder="选择要移除的模型（内置模型不在此列）"
+          >
+            <el-option
+              v-for="model in importedModels"
+              :key="model.id"
+              :label="`${model.id}　·　${model.provider}`"
+              :value="model.id"
+            />
+          </el-select>
+          <button
+            class="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/20"
+            :disabled="modelsLoading || selectedImported.length === 0"
+            @click="handleRemoveModels"
+          >
+            <i class="fas fa-minus mr-1" />
+            移除 {{ selectedImported.length || '' }}
+          </button>
+        </div>
+        <p v-if="importedModels.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+          还没有导入的模型（内置模型始终可用，不受此处影响）。
+        </p>
+      </div>
+    </div>
+
     <!-- 搜索 + 供应商筛选 -->
     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
       <div class="relative min-w-0 flex-1">
@@ -251,10 +440,16 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import ModalTransition from '@/components/common/ModalTransition.vue'
 import {
+  getImportableModelsApi,
+  getImportedModelsApi,
   getModelPricingApi,
   getModelPricingStatusApi,
   getPublicModelPricingApi,
-  refreshModelPricingApi
+  importModelsApi,
+  pullModelPricingApi,
+  refreshModelPricingApi,
+  removeImportedModelsApi,
+  updateModelPricingSourceApi
 } from '@/utils/http_apis'
 import { showToast, copyText } from '@/utils/tools'
 import { formatLocalDateTime } from '@/utils/time'
@@ -279,6 +474,16 @@ const sortAsc = ref(true)
 const tableWrapper = ref(null)
 const tableMaxHeight = ref('60vh')
 const rawModal = ref({ show: false, title: '', content: '' })
+const savingSource = ref(false)
+const importing = ref(false)
+// 数据源表单:只回显自定义值,默认源走 placeholder 展示(留空保存 = 恢复默认)
+const sourceForm = ref({ pricingUrl: '', hashUrl: '' })
+// 模型目录
+const modelsLoading = ref(false)
+const importableModels = ref([])
+const importedModels = ref([])
+const selectedImportable = ref([])
+const selectedImported = ref([])
 let visibilityObserver = null
 let layoutObserver = null
 
@@ -471,6 +676,12 @@ const observeVisibility = () => {
   visibilityObserver.observe(tableWrapper.value)
 }
 
+// 后端回显的地址已脱敏(隐去 query),不能回填输入框——否则保存会把脱敏值当真值写回、丢掉参数。
+// 输入框始终清空:填了才改,不填不动;要回默认走"恢复默认"按钮。
+const syncSourceForm = () => {
+  sourceForm.value = { pricingUrl: '', hashUrl: '' }
+}
+
 const loadData = async () => {
   loading.value = true
   if (props.readonly) {
@@ -493,6 +704,7 @@ const loadData = async () => {
     }
     if (statusResult.success) {
       pricingStatus.value = statusResult.data
+      syncSourceForm()
     } else {
       showToast(statusResult.message || '获取价格状态失败', 'error')
     }
@@ -515,8 +727,99 @@ const handleRefresh = async () => {
   refreshing.value = false
 }
 
+const saveSource = async (payload) => {
+  savingSource.value = true
+  const result = await updateModelPricingSourceApi(payload)
+  if (result.success) {
+    showToast('数据源已保存', 'success')
+    await loadData()
+  } else {
+    showToast(result.message || '保存数据源失败', 'error')
+  }
+  savingSource.value = false
+  return result.success
+}
+
+const handleSaveSource = () => {
+  // 两框皆空时不当作"恢复默认":那是"恢复默认"按钮的语义,避免误清配置
+  if (!sourceForm.value.pricingUrl.trim()) {
+    showToast('请填写定价 JSON 地址；要回到内置源请点「恢复默认」', 'error')
+    return
+  }
+  return saveSource({
+    pricingUrl: sourceForm.value.pricingUrl,
+    hashUrl: sourceForm.value.hashUrl
+  })
+}
+
+const handleResetSource = () => saveSource({ pricingUrl: '', hashUrl: '' })
+
+// 模型目录:可导入 + 已导入并行拉,两个列表独立无依赖
+const loadModelCatalog = async () => {
+  modelsLoading.value = true
+  const [importableResult, importedResult] = await Promise.all([
+    getImportableModelsApi(),
+    getImportedModelsApi()
+  ])
+  if (importableResult.success) {
+    importableModels.value = importableResult.data?.models || []
+  } else {
+    showToast(importableResult.message || '获取可导入模型失败', 'error')
+  }
+  if (importedResult.success) {
+    importedModels.value = importedResult.data?.models || []
+  } else {
+    showToast(importedResult.message || '获取已导入模型失败', 'error')
+  }
+  modelsLoading.value = false
+}
+
+const handleImportModels = async () => {
+  modelsLoading.value = true
+  const result = await importModelsApi(selectedImportable.value)
+  if (result.success) {
+    showToast(result.message || '导入完成', 'success')
+    selectedImportable.value = []
+  } else {
+    showToast(result.message || '导入失败', 'error')
+  }
+  modelsLoading.value = false
+  await loadModelCatalog()
+}
+
+const handleRemoveModels = async () => {
+  modelsLoading.value = true
+  const result = await removeImportedModelsApi(selectedImported.value)
+  if (result.success) {
+    showToast(result.message || '移除完成', 'success')
+    selectedImported.value = []
+  } else {
+    showToast(result.message || '移除失败', 'error')
+  }
+  modelsLoading.value = false
+  await loadModelCatalog()
+}
+
+const handleImport = async () => {
+  importing.value = true
+  const result = await pullModelPricingApi()
+  if (result.success) {
+    showToast(`已拉取最新价格，共 ${result.data?.modelCount ?? 0} 个模型`, 'success')
+  } else {
+    showToast(result.message || '拉取失败', 'error')
+  }
+  // 失败时也刷新:后端会回落 fallback 数据,展示需与实际一致
+  await loadData()
+  // 价格变了,可导入清单跟着变
+  await loadModelCatalog()
+  importing.value = false
+}
+
 onMounted(() => {
   loadData()
+  if (!props.readonly) {
+    loadModelCatalog()
+  }
   window.addEventListener('resize', calcTableHeight)
   // 上方布局（AppHeader 更新提示出现、站点标题加载后换行等）异步变化会改变表格 top，
   // 这些不触发 resize，用 ResizeObserver 兜住；计算幂等（不依赖表格自身高度）故不会循环
