@@ -1645,6 +1645,23 @@
             <div v-if="form.platform === 'openai-responses' && !isEdit" class="space-y-4">
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >Provider *</label
+                >
+                <select
+                  v-model="form.provider"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  @change="onProviderChange"
+                >
+                  <option value="orcarouter">OrcaRouter</option>
+                  <option value="custom">自定义（Custom）</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  OrcaRouter 使用预设接入地址，无需填写 URL；选择自定义时手动填写 API 基础地址
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >API 基础地址 *</label
                 >
                 <input
@@ -3427,6 +3444,17 @@
           <!-- OpenAI-Responses 特定字段（编辑模式）-->
           <div v-if="form.platform === 'openai-responses'" class="space-y-4">
             <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">Provider</label>
+              <select v-model="form.provider" class="form-input w-full" @change="onProviderChange">
+                <option value="orcarouter">OrcaRouter</option>
+                <option value="custom">自定义（Custom）</option>
+              </select>
+              <p class="mt-1 text-xs text-gray-500">
+                OrcaRouter 使用预设接入地址；选择自定义时手动填写 API 基础地址
+              </p>
+            </div>
+
+            <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700">API 基础地址</label>
               <input
                 v-model="form.baseApi"
@@ -4344,6 +4372,7 @@ const form = ref({
   // OpenAI-Responses 特定字段
   baseApi: props.account?.baseApi || '',
   providerEndpoint: props.account?.providerEndpoint || 'responses',
+  provider: props.account?.provider || 'custom',
   // Gemini-API 特定字段
   baseUrl: props.account?.baseUrl || 'https://generativelanguage.googleapis.com',
   rateLimitDuration: props.account?.rateLimitDuration || 60,
@@ -4920,6 +4949,22 @@ const onAuthMethodChange = () => {
     setupTokenAuthUrl.value = ''
     setupTokenAuthCode.value = ''
     setupTokenSessionId.value = ''
+  }
+}
+
+// Preset providers (e.g. OrcaRouter) auto-fill the base URL; custom is manual
+const ORCAROUTER_BASE_API = 'https://api.orcarouter.ai/v1'
+
+const onProviderChange = () => {
+  if (form.value.platform !== 'openai-responses') return
+  if (form.value.provider === 'orcarouter') {
+    form.value.baseApi = ORCAROUTER_BASE_API
+  } else if (form.value.provider === 'custom') {
+    // Only clear when the field still holds the preset URL, so a manually
+    // entered custom baseApi is never dropped by accident.
+    if (form.value.baseApi === ORCAROUTER_BASE_API) {
+      form.value.baseApi = ''
+    }
   }
 }
 
@@ -5519,6 +5564,7 @@ const createAccount = async () => {
       data.maxConcurrentTasks = form.value.maxConcurrentTasks || 0
     } else if (form.value.platform === 'openai-responses') {
       // OpenAI-Responses 账户特定数据
+      data.provider = form.value.provider || 'custom'
       data.baseApi = form.value.baseApi
       data.apiKey = form.value.apiKey
       data.userAgent = form.value.userAgent || ''
@@ -5869,6 +5915,7 @@ const updateAccount = async () => {
 
     // OpenAI-Responses 特定更新
     if (props.account.platform === 'openai-responses') {
+      data.provider = form.value.provider || 'custom'
       data.baseApi = form.value.baseApi
       if (form.value.apiKey) {
         data.apiKey = form.value.apiKey
