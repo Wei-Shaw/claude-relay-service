@@ -357,12 +357,29 @@ class ClaudeConsoleAccountService {
         updatedData.autoStoppedAt = ''
         updatedData.stoppedReason = ''
 
+        // 仅当调用方未显式携带自动停止标记时，才视为管理员手动操作
+        const isManualChange =
+          updates.quotaAutoStopped === undefined && updates.rateLimitAutoStopped === undefined
+
         // 记录日志
-        if (updates.schedulable === true || updates.schedulable === 'true') {
+        if (!isManualChange) {
+          logger.debug(
+            `🤖 Automatic scheduling change for Claude Console account ${accountId}: schedulable=${updatedData.schedulable}`
+          )
+        } else if (updates.schedulable === true || updates.schedulable === 'true') {
           logger.info(`✅ Manually enabled scheduling for Claude Console account ${accountId}`)
         } else {
           logger.info(`⛔ Manually disabled scheduling for Claude Console account ${accountId}`)
         }
+      }
+
+      // 自动停止标记（由额度/限流自动停用逻辑显式传入时必须落库，
+      // 否则超额停用后第二天无法自动恢复调度）
+      if (updates.quotaAutoStopped !== undefined) {
+        updatedData.quotaAutoStopped = String(updates.quotaAutoStopped)
+      }
+      if (updates.rateLimitAutoStopped !== undefined) {
+        updatedData.rateLimitAutoStopped = String(updates.rateLimitAutoStopped)
       }
 
       // 额度管理相关字段
