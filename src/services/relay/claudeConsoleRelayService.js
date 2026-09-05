@@ -4,16 +4,16 @@ const claudeConsoleAccountService = require('../account/claudeConsoleAccountServ
 const redis = require('../../models/redis')
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
-const {
-  sanitizeUpstreamError,
-  sanitizeErrorMessage,
-  isAccountDisabledError
-} = require('../../utils/errorSanitizer')
+const { isAccountDisabledError } = require('../../utils/errorSanitizer')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const { filterForClaude } = require('../../utils/headerFilter')
 const { rewriteSsePayloadModels } = require('../../utils/modelDisplayHelper')
+const {
+  buildClaudeConsoleClientError,
+  sanitizeClaudeConsoleStreamEvent
+} = require('../../utils/claudeConsoleErrorAdapter')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -321,18 +321,23 @@ class ClaudeConsoleRelayService {
           `📝 Upstream error response from ${account?.name || accountId}: ${rawData.substring(0, 500)}`
         )
 
-        // 记录清理后的数据到error
-        try {
-          const responseData =
-            typeof response.data === 'string' ? JSON.parse(response.data) : response.data
-          const sanitizedData = sanitizeUpstreamError(responseData)
-          logger.error(`🧹 [SANITIZED] Error response to client: ${JSON.stringify(sanitizedData)}`)
-        } catch (e) {
-          const rawText =
-            typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
-          const sanitizedText = sanitizeErrorMessage(rawText)
-          logger.error(`🧹 [SANITIZED] Error response to client: ${sanitizedText}`)
-        }
+        const responseData = (() => {
+          if (typeof response.data !== 'string') {
+            return response.data
+          }
+          try {
+            return JSON.parse(response.data)
+          } catch {
+            return response.data
+          }
+        })()
+        const safeErrorResponse = buildClaudeConsoleClientError(response.status, responseData, {
+          headers: response.headers,
+          originalBody: responseData
+        })
+        logger.error(
+          `🧹 [SANITIZED] Error response to client: ${JSON.stringify(safeErrorResponse.body)}`
+        )
       } else {
         logger.debug(
           `[DEBUG] Response data preview: ${typeof response.data === 'string' ? response.data.substring(0, 200) : JSON.stringify(response.data).substring(0, 200)}`
@@ -437,21 +442,28 @@ class ClaudeConsoleRelayService {
 
       // 准备响应体并清理错误信息（如果是错误响应）
       let responseBody
+      let responseStatusCode = response.status
       if (response.status < 200 || response.status >= 300) {
-        // 错误响应，清理供应商信息
-        try {
-          const responseData =
-            typeof response.data === 'string' ? JSON.parse(response.data) : response.data
-          const sanitizedData = sanitizeUpstreamError(responseData)
-          responseBody = JSON.stringify(sanitizedData)
-          logger.debug(`🧹 Sanitized error response`)
-        } catch (parseError) {
-          // 如果无法解析为JSON，尝试清理文本
-          const rawText =
-            typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
-          responseBody = sanitizeErrorMessage(rawText)
-          logger.debug(`🧹 Sanitized error text`)
-        }
+        const responseData = (() => {
+          if (typeof response.data !== 'string') {
+            return response.data
+          }
+          try {
+            return JSON.parse(response.data)
+          } catch {
+            return response.data
+          }
+        })()
+        const safeErrorResponse = buildClaudeConsoleClientError(response.status, responseData, {
+          headers: response.headers,
+          originalBody: responseData
+        })
+        responseStatusCode = safeErrorResponse.status
+        responseBody =
+          typeof safeErrorResponse.body === 'string'
+            ? safeErrorResponse.body
+            : JSON.stringify(safeErrorResponse.body)
+        logger.debug(`🧹 Sanitized error response`)
       } else {
         // 成功响应，不需要清理
         responseBody =
@@ -461,7 +473,7 @@ class ClaudeConsoleRelayService {
       logger.debug(`[DEBUG] Final response body to return: ${responseBody.substring(0, 200)}...`)
 
       return {
-        statusCode: response.status,
+        statusCode: responseStatusCode,
         headers: response.headers,
         body: responseBody,
         upstreamResponseBody:
@@ -489,6 +501,12 @@ class ClaudeConsoleRelayService {
       )
 
       // 不再因为模型不支持而block账号
+
+      error.vendorKey = 'claude-console'
+      error.upstreamResponseBody = error.upstreamResponseBody || {
+        message: error.message,
+        code: error.code
+      }
 
       throw error
     } finally {
@@ -743,6 +761,11 @@ class ClaudeConsoleRelayService {
           error
         )
       }
+      error.vendorKey = 'claude-console'
+      error.upstreamResponseBody = error.upstreamResponseBody || {
+        message: error.message,
+        code: error.code
+      }
       throw error
     } finally {
       // 🛑 清理租约刷新定时器
@@ -990,35 +1013,36 @@ class ClaudeConsoleRelayService {
               }
 
               // 设置响应头
+              const parsedErrorData = (() => {
+                try {
+                  return JSON.parse(fullErrorData)
+                } catch {
+                  return fullErrorData
+                }
+              })()
+              const safeErrorResponse = buildClaudeConsoleClientError(
+                response.status,
+                parsedErrorData,
+                {
+                  headers: response.headers,
+                  originalBody: parsedErrorData
+                }
+              )
               if (!responseStream.headersSent) {
-                responseStream.writeHead(response.status, {
-                  'Content-Type': 'application/json',
+                responseStream.writeHead(safeErrorResponse.status, {
+                  'Content-Type': 'text/event-stream',
                   'Cache-Control': 'no-cache'
                 })
               }
 
-              // 清理并发送错误响应
-              try {
-                const errorJson = JSON.parse(fullErrorData)
-                const sanitizedError = sanitizeUpstreamError(errorJson)
+              logger.error(
+                `🧹 [Stream] [SANITIZED] Error response to client: ${JSON.stringify(safeErrorResponse.body)}`
+              )
 
-                // 记录清理后的错误消息（发送给客户端的，完整记录）
-                logger.error(
-                  `🧹 [Stream] [SANITIZED] Error response to client: ${JSON.stringify(sanitizedError)}`
-                )
-
-                if (isStreamWritable(responseStream)) {
-                  responseStream.write(JSON.stringify(sanitizedError))
-                  responseStream.end()
-                }
-              } catch (parseError) {
-                const sanitizedText = sanitizeErrorMessage(errorDataForCheck)
-                logger.error(`🧹 [Stream] [SANITIZED] Error response to client: ${sanitizedText}`)
-
-                if (isStreamWritable(responseStream)) {
-                  responseStream.write(sanitizedText)
-                  responseStream.end()
-                }
+              if (isStreamWritable(responseStream)) {
+                responseStream.write('event: error\n')
+                responseStream.write(`data: ${JSON.stringify(safeErrorResponse.body)}\n\n`)
+                responseStream.end()
               }
               resolve() // 不抛出异常，正常完成流处理
             })
@@ -1097,11 +1121,15 @@ class ClaudeConsoleRelayService {
                 // 检查流是否可写（客户端连接是否有效）
                 if (isStreamWritable(responseStream)) {
                   const linesToForward = lines.join('\n') + (lines.length > 0 ? '\n' : '')
+                  const sanitizedLines = this._sanitizeClaudeConsoleSseEvent(
+                    linesToForward,
+                    response.headers
+                  )
 
                   // 应用流转换器如果有
-                  let dataToWrite = linesToForward
+                  let dataToWrite = sanitizedLines
                   if (streamTransformer) {
-                    const transformed = streamTransformer(linesToForward)
+                    const transformed = streamTransformer(sanitizedLines)
                     if (transformed) {
                       dataToWrite = transformed
                     } else {
@@ -1227,21 +1255,18 @@ class ClaudeConsoleRelayService {
                 `❌ Error processing Claude Console stream data (Account: ${account?.name || accountId}):`,
                 error
               )
+              const errorData = { message: error.message, code: error.code }
+              responseStream._upstreamResponseBody = errorData
+              const safeErrorResponse = buildClaudeConsoleClientError(502, errorData, {
+                fallbackStatus: 502,
+                originalBody: errorData
+              })
               if (isStreamWritable(responseStream)) {
-                // 如果有 streamTransformer（如测试请求），使用前端期望的格式
                 if (streamTransformer) {
-                  responseStream.write(
-                    `data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`
-                  )
+                  responseStream.write(`data: ${JSON.stringify(safeErrorResponse.body)}\n\n`)
                 } else {
                   responseStream.write('event: error\n')
-                  responseStream.write(
-                    `data: ${JSON.stringify({
-                      error: 'Stream processing error',
-                      message: error.message,
-                      timestamp: new Date().toISOString()
-                    })}\n\n`
-                  )
+                  responseStream.write(`data: ${JSON.stringify(safeErrorResponse.body)}\n\n`)
                 }
               }
             }
@@ -1252,12 +1277,19 @@ class ClaudeConsoleRelayService {
               // 处理缓冲区中剩余的数据
               if (buffer.trim() && isStreamWritable(responseStream)) {
                 if (streamTransformer) {
-                  const transformed = streamTransformer(buffer)
+                  const transformed = streamTransformer(
+                    this._sanitizeClaudeConsoleSseEvent(buffer, response.headers)
+                  )
                   if (transformed) {
                     responseStream.write(rewriteSsePayloadModels(transformed, clientDisplayModel))
                   }
                 } else {
-                  responseStream.write(rewriteSsePayloadModels(buffer, clientDisplayModel))
+                  responseStream.write(
+                    rewriteSsePayloadModels(
+                      this._sanitizeClaudeConsoleSseEvent(buffer, response.headers),
+                      clientDisplayModel
+                    )
+                  )
                 }
               }
 
@@ -1337,21 +1369,24 @@ class ClaudeConsoleRelayService {
               `❌ Claude Console stream error (Account: ${account?.name || accountId}):`,
               error
             )
+            const errorData = { message: error.message, code: error.code }
+            responseStream._upstreamResponseBody = errorData
+            const safeErrorResponse = buildClaudeConsoleClientError(502, errorData, {
+              fallbackStatus: 502,
+              originalBody: errorData
+            })
             if (isStreamWritable(responseStream)) {
-              // 如果有 streamTransformer（如测试请求），使用前端期望的格式
+              if (!responseStream.headersSent) {
+                responseStream.writeHead(safeErrorResponse.status, {
+                  'Content-Type': 'text/event-stream',
+                  'Cache-Control': 'no-cache'
+                })
+              }
               if (streamTransformer) {
-                responseStream.write(
-                  `data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`
-                )
+                responseStream.write(`data: ${JSON.stringify(safeErrorResponse.body)}\n\n`)
               } else {
                 responseStream.write('event: error\n')
-                responseStream.write(
-                  `data: ${JSON.stringify({
-                    error: 'Stream error',
-                    message: error.message,
-                    timestamp: new Date().toISOString()
-                  })}\n\n`
-                )
+                responseStream.write(`data: ${JSON.stringify(safeErrorResponse.body)}\n\n`)
               }
               responseStream.end()
             }
@@ -1418,11 +1453,28 @@ class ClaudeConsoleRelayService {
           }
 
           // 发送错误响应
+          const errorData =
+            error.response?.data && typeof error.response.data.pipe !== 'function'
+              ? error.response.data
+              : {
+                  message: error.message,
+                  code: error.code
+                }
+          responseStream._upstreamResponseBody = errorData
+          const safeErrorResponse = buildClaudeConsoleClientError(
+            error.response?.status || null,
+            errorData,
+            {
+              headers: error.response?.headers,
+              fallbackStatus: 502,
+              originalBody: errorData
+            }
+          )
           if (!responseStream.headersSent) {
             const existingConnection = responseStream.getHeader
               ? responseStream.getHeader('Connection')
               : null
-            responseStream.writeHead(error.response?.status || 500, {
+            responseStream.writeHead(safeErrorResponse.status, {
               'Content-Type': 'text/event-stream',
               'Cache-Control': 'no-cache',
               Connection: existingConnection || 'keep-alive'
@@ -1430,20 +1482,11 @@ class ClaudeConsoleRelayService {
           }
 
           if (isStreamWritable(responseStream)) {
-            // 如果有 streamTransformer（如测试请求），使用前端期望的格式
             if (streamTransformer) {
-              responseStream.write(
-                `data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`
-              )
+              responseStream.write(`data: ${JSON.stringify(safeErrorResponse.body)}\n\n`)
             } else {
               responseStream.write('event: error\n')
-              responseStream.write(
-                `data: ${JSON.stringify({
-                  error: error.message,
-                  code: error.code,
-                  timestamp: new Date().toISOString()
-                })}\n\n`
-              )
+              responseStream.write(`data: ${JSON.stringify(safeErrorResponse.body)}\n\n`)
             }
             responseStream.end()
           }
@@ -1460,6 +1503,36 @@ class ClaudeConsoleRelayService {
   }
 
   // 🔧 过滤客户端请求头
+  _sanitizeClaudeConsoleSseEvent(event, headers = {}) {
+    const lines = event.split('\n')
+    let changed = false
+    const rewrittenLines = lines.map((line) => {
+      if (!line.startsWith('data:')) {
+        return line
+      }
+
+      const jsonStr = line.slice(5).trim()
+      if (!jsonStr || jsonStr === '[DONE]') {
+        return line
+      }
+
+      try {
+        const eventData = JSON.parse(jsonStr)
+        const sanitizedResult = sanitizeClaudeConsoleStreamEvent(eventData, { headers })
+        if (!sanitizedResult.changed) {
+          return line
+        }
+
+        changed = true
+        return `data: ${JSON.stringify(sanitizedResult.data)}`
+      } catch {
+        return line
+      }
+    })
+
+    return changed ? rewrittenLines.join('\n') : event
+  }
+
   _filterClientHeaders(clientHeaders) {
     // 使用统一的 headerFilter 工具类（白名单模式）
     // 与 claudeRelayService 保持一致，避免透传 CDN headers 触发上游 API 安全检查

@@ -14,6 +14,7 @@ const apiKeyService = require('../services/apiKeyService')
 const unifiedClaudeScheduler = require('../services/scheduler/unifiedClaudeScheduler')
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 const { getSafeMessage } = require('../utils/errorSanitizer')
+const { buildClaudeConsoleClientError } = require('../utils/claudeConsoleErrorAdapter')
 const sessionHelper = require('../utils/sessionHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const pricingService = require('../services/pricingService')
@@ -532,6 +533,20 @@ async function handleChatCompletion(req, res, apiKeyData) {
       // 客户端断开使用 499 状态码 (Client Closed Request)
       if (error.message === 'Client disconnected') {
         res.status(499).end()
+      } else if (error.vendorKey === 'claude-console') {
+        const safeErrorResponse = buildClaudeConsoleClientError(
+          error.response?.status || error.status || null,
+          error.upstreamResponseBody || error,
+          {
+            headers: error.response?.headers,
+            fallbackStatus: 503,
+            originalBody: error.upstreamResponseBody || {
+              message: error.message,
+              code: error.code
+            }
+          }
+        )
+        res.status(safeErrorResponse.status).json({ error: safeErrorResponse.body.error })
       } else {
         const status = error.status || 500
         res.status(status).json({
