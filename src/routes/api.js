@@ -25,6 +25,7 @@ const {
   sendMockWarmupStream
 } = require('../utils/warmupInterceptor')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
+const { buildClaudeConsoleClientError } = require('../utils/claudeConsoleErrorAdapter')
 const { dumpAnthropicMessagesRequest } = require('../utils/anthropicRequestDump')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
 const {
@@ -1356,6 +1357,17 @@ async function handleMessagesRequest(req, res) {
         // 对错误响应进行清理，隐藏上游服务的敏感信息
         if (response.statusCode >= 400) {
           res._upstreamResponseBody = response.upstreamResponseBody ?? jsonData
+          if (accountType === 'claude-console') {
+            const safeErrorResponse = buildClaudeConsoleClientError(
+              response.statusCode,
+              response.upstreamResponseBody ?? jsonData,
+              {
+                headers: response.headers,
+                originalBody: response.upstreamResponseBody ?? jsonData
+              }
+            )
+            return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
+          }
           res.json(sanitizeUpstreamError(jsonData))
         } else {
           rewriteModelFieldsForClient(
@@ -1369,6 +1381,17 @@ async function handleMessagesRequest(req, res) {
         logger.info('📄 Raw response body:', response.body)
         if (response.statusCode >= 400) {
           res._upstreamResponseBody = response.upstreamResponseBody ?? response.body
+        }
+        if (accountType === 'claude-console' && response.statusCode >= 400) {
+          const safeErrorResponse = buildClaudeConsoleClientError(
+            response.statusCode,
+            response.upstreamResponseBody ?? response.body,
+            {
+              headers: response.headers,
+              originalBody: response.upstreamResponseBody ?? response.body
+            }
+          )
+          return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
         }
         // 使用 Express 内建的 res.send() 发送响应（简单可靠）
         res.send(response.body)
@@ -1450,6 +1473,26 @@ async function handleMessagesRequest(req, res) {
         }
         return undefined
       }
+    }
+
+    if (handledError.vendorKey === 'claude-console' && !res.headersSent) {
+      const safeErrorResponse = buildClaudeConsoleClientError(
+        handledError.response?.status || handledError.status || null,
+        handledError.upstreamResponseBody || handledError,
+        {
+          headers: handledError.response?.headers,
+          fallbackStatus: 503,
+          originalBody: handledError.upstreamResponseBody || {
+            message: handledError.message,
+            code: handledError.code
+          }
+        }
+      )
+      res._upstreamResponseBody = handledError.upstreamResponseBody || {
+        message: handledError.message,
+        code: handledError.code
+      }
+      return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
     }
 
     logger.error('❌ Claude relay error:', handledError.message, {
@@ -1866,6 +1909,17 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
       const jsonData = JSON.parse(response.body)
       if (response.statusCode < 200 || response.statusCode >= 300) {
         res._upstreamResponseBody = response.upstreamResponseBody ?? jsonData
+        if (accountType === 'claude-console') {
+          const safeErrorResponse = buildClaudeConsoleClientError(
+            response.statusCode,
+            response.upstreamResponseBody ?? jsonData,
+            {
+              headers: response.headers,
+              originalBody: response.upstreamResponseBody ?? jsonData
+            }
+          )
+          return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
+        }
         const sanitizedData = sanitizeUpstreamError(jsonData)
         res.json(sanitizedData)
       } else {
@@ -1874,6 +1928,17 @@ router.post('/v1/messages/count_tokens', authenticateApiKey, async (req, res) =>
     } catch (parseError) {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         res._upstreamResponseBody = response.upstreamResponseBody ?? response.body
+      }
+      if (accountType === 'claude-console' && response.statusCode >= 400) {
+        const safeErrorResponse = buildClaudeConsoleClientError(
+          response.statusCode,
+          response.upstreamResponseBody ?? response.body,
+          {
+            headers: response.headers,
+            originalBody: response.upstreamResponseBody ?? response.body
+          }
+        )
+        return res.status(safeErrorResponse.status).json(safeErrorResponse.body)
       }
       res.send(response.body)
     }
