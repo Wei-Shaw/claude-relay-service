@@ -13,6 +13,20 @@ const {
   createRequestDetailMeta,
   extractOpenAICacheReadTokens
 } = require('../../utils/requestDetailHelper')
+const {
+  RETRYABLE_CLIENT_CODE,
+  computeRetryDelayMs,
+  extractErrorCode,
+  extractErrorMessage,
+  isCapacityShedEvent,
+  isCapacityShedResponse,
+  resolveSettings: resolveCapacityShedSettings
+} = require('../../utils/openaiCapacityShed')
+const {
+  delay,
+  pipeWithCapacityShedBuffer,
+  readUpstreamBody
+} = require('../../utils/openaiCapacityShedStream')
 
 // lastUsedAt 更新节流（每账户 60 秒内最多更新一次，使用 LRU 防止内存泄漏）
 const lastUsedAtThrottle = new LRUCache(1000) // 最多缓存 1000 个账户
@@ -175,8 +189,77 @@ class OpenAIResponsesRelayService {
         userAgent: headers['User-Agent'] || 'not set'
       })
 
-      // 发送请求
-      const response = await axios(requestOptions)
+      // 🧯 容量降载（capacity shed）同账号有界重试
+      // 上游 server_is_overloaded / slow_down / "Selected model is at capacity…" 是请求级
+      // 瞬时信号：换账号不改变降载因素，只会把整池账号逐个消耗掉，且绝不能因此摘号。
+      const shedSettings = resolveCapacityShedSettings(config.openaiCapacityShed)
+      const isStreamRequest = Boolean(req.body?.stream)
+      // 断线判据只能看 res：Node 在请求体读完后会自动销毁 request 流，req.destroyed
+      // 在每个 POST 上开局就为真，用它判断客户端是否还在会让重试永远不触发。
+      const isClientGone = () =>
+        res.writableEnded !== true && (res.destroyed === true || res.writable === false)
+      let attempt = 0
+      let response = null
+      let upstreamBody = null
+
+      // eslint-disable-next-line no-constant-condition
+      for (;;) {
+        attempt += 1
+        upstreamBody = null
+
+        // 发送请求
+        response = await axios(requestOptions)
+
+        if (response.status === 429) {
+          break
+        }
+
+        if (response.status < 400 && !(!isStreamRequest && isCapacityShedEvent(response.data))) {
+          break
+        }
+
+        upstreamBody = await readUpstreamBody(response, isStreamRequest)
+        if (
+          !isCapacityShedResponse({
+            status: response.status,
+            payload: upstreamBody.payload,
+            rawBody: upstreamBody.rawBody
+          })
+        ) {
+          break
+        }
+
+        const shedCode = extractErrorCode(upstreamBody.payload) || 'n/a'
+        const shedMessage =
+          extractErrorMessage(upstreamBody.payload) || (upstreamBody.rawBody || '').trim()
+
+        if (attempt < shedSettings.maxAttempts && !isClientGone()) {
+          const delayMs = computeRetryDelayMs(
+            attempt,
+            response.headers?.['retry-after'],
+            shedSettings
+          )
+          logger.warn(
+            `⚠️ codex.capacity_shed_retry account=${account.id} attempt=${attempt}/${shedSettings.maxAttempts} status=${response.status} delay=${delayMs}ms code=${shedCode}`
+          )
+          await delay(delayMs)
+          continue
+        }
+
+        // 重试用尽：改写错误码后回给客户端；降载是请求级信号，绝不摘号
+        logger.warn(
+          `⚠️ codex.capacity_shed_rewrite account=${account.id} attempts=${attempt} status=${response.status} code=${shedCode}->${RETRYABLE_CLIENT_CODE}`
+        )
+        req.removeListener('close', handleClientDisconnect)
+        res.removeListener('close', handleClientDisconnect)
+        return res.status(503).json({
+          error: {
+            type: 'server_error',
+            code: RETRYABLE_CLIENT_CODE,
+            message: shedMessage || 'Upstream service is temporarily overloaded, please retry later'
+          }
+        })
+      }
 
       // 处理 429 限流错误
       if (response.status === 429) {
@@ -214,41 +297,10 @@ class OpenAIResponsesRelayService {
 
       // 处理其他错误状态码
       if (response.status >= 400) {
-        // 处理流式错误响应
-        let errorData = response.data
-        if (response.data && typeof response.data.pipe === 'function') {
-          // 流式响应需要先读取内容
-          const chunks = []
-          await new Promise((resolve) => {
-            response.data.on('data', (chunk) => chunks.push(chunk))
-            response.data.on('end', resolve)
-            response.data.on('error', resolve)
-            setTimeout(resolve, 5000) // 超时保护
-          })
-          const fullResponse = Buffer.concat(chunks).toString()
-
-          // 尝试解析错误响应
-          try {
-            if (fullResponse.includes('data: ')) {
-              // SSE格式
-              const lines = fullResponse.split('\n')
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const jsonStr = line.slice(6).trim()
-                  if (jsonStr && jsonStr !== '[DONE]') {
-                    errorData = JSON.parse(jsonStr)
-                    break
-                  }
-                }
-              }
-            } else {
-              // 普通JSON
-              errorData = JSON.parse(fullResponse)
-            }
-          } catch (e) {
-            logger.error('Failed to parse error response:', e)
-            errorData = { error: { message: fullResponse || 'Unknown error' } }
-          }
+        // 响应体已在降载判定阶段读取（流式错误响应也已读空，不能再 pipe）
+        let errorData = upstreamBody?.payload || response.data
+        if (upstreamBody?.drained && !upstreamBody.payload) {
+          errorData = { error: { message: upstreamBody.rawBody || 'Unknown error' } }
         }
 
         logger.error('OpenAI-Responses API error', {
@@ -341,15 +393,53 @@ class OpenAIResponsesRelayService {
 
       // 处理流式响应
       if (req.body?.stream && response.data && typeof response.data.pipe === 'function') {
-        return this._handleStreamResponse(
-          response,
-          res,
-          account,
-          apiKeyData,
-          req.body?.model,
-          handleClientDisconnect,
-          req
-        )
+        // eslint-disable-next-line no-constant-condition
+        for (;;) {
+          const outcome = await this._handleStreamResponse(
+            response,
+            res,
+            account,
+            apiKeyData,
+            req.body?.model,
+            handleClientDisconnect,
+            req,
+            { attempt, settings: shedSettings, isClientGone }
+          )
+
+          if (outcome !== 'shed' || attempt >= shedSettings.maxAttempts) {
+            return
+          }
+
+          // 流内降载：同账号重试，客户端还没收到任何字节
+          const delayMs = computeRetryDelayMs(
+            attempt,
+            response.headers?.['retry-after'],
+            shedSettings
+          )
+          logger.warn(
+            `⚠️ codex.capacity_shed_retry account=${account.id} attempt=${attempt}/${shedSettings.maxAttempts} stream=1 delay=${delayMs}ms`
+          )
+          await delay(delayMs)
+          attempt += 1
+          response = await axios(requestOptions)
+
+          if (
+            response.status >= 400 ||
+            !response.data ||
+            typeof response.data.pipe !== 'function'
+          ) {
+            // 重试后不再是可转发的 200 流：交回给客户端一个可重试的错误
+            req.removeListener('close', handleClientDisconnect)
+            res.removeListener('close', handleClientDisconnect)
+            return res.status(503).json({
+              error: {
+                type: 'server_error',
+                code: RETRYABLE_CLIENT_CODE,
+                message: 'Upstream service is temporarily overloaded, please retry later'
+              }
+            })
+          }
+        }
       }
 
       // 处理非流式响应
@@ -473,6 +563,16 @@ class OpenAIResponsesRelayService {
   }
 
   // 处理流式响应
+  /**
+   * 缓冲式转发上游 SSE。
+   *
+   * 上游降载（server_is_overloaded / slow_down）会在 HTTP 200 之后立刻推 error 帧，
+   * 一旦写给客户端，Codex CLI 就地终止会话。因此在出现真实输出之前先把事件攒住：
+   * 命中降载则返回 'shed'，由 handleRequest 在同一账号上重试；重试用尽时把错误码
+   * 改写成 server_error 再转发，让客户端走内置退避。
+   *
+   * @returns {Promise<'completed'|'shed'|'error'>}
+   */
   async _handleStreamResponse(
     response,
     res,
@@ -480,20 +580,33 @@ class OpenAIResponsesRelayService {
     apiKeyData,
     requestedModel,
     handleClientDisconnect,
-    req
+    req,
+    shedContext = {}
   ) {
-    // 设置 SSE 响应头
-    res.setHeader('Content-Type', 'text/event-stream')
-    res.setHeader('Cache-Control', 'no-cache')
-    res.setHeader('Connection', 'keep-alive')
-    res.setHeader('X-Accel-Buffering', 'no')
+    const {
+      attempt = 1,
+      settings = resolveCapacityShedSettings(config.openaiCapacityShed),
+      isClientGone = () => false
+    } = shedContext
+
+    // SSE 响应头惰性提交：降载重试期间不能先把头写出去
+    let headersCommitted = false
+    const commitHeaders = () => {
+      if (headersCommitted) {
+        return
+      }
+      headersCommitted = true
+      res.setHeader('Content-Type', 'text/event-stream')
+      res.setHeader('Cache-Control', 'no-cache')
+      res.setHeader('Connection', 'keep-alive')
+      res.setHeader('X-Accel-Buffering', 'no')
+    }
 
     let usageData = null
     let actualModel = null
     let buffer = ''
     let rateLimitDetected = false
     let rateLimitResetsInSeconds = null
-    let streamEnded = false
 
     // 解析 SSE 事件以捕获 usage 数据和 model
     const parseSSEForUsage = (data) => {
@@ -551,160 +664,22 @@ class OpenAIResponsesRelayService {
         }
       }
     }
-
-    // 监听数据流
-    response.data.on('data', (chunk) => {
-      try {
-        const chunkStr = chunk.toString()
-
-        // 转发数据给客户端
-        if (!res.destroyed && !streamEnded) {
-          res.write(chunk)
-        }
-
-        // 同时解析数据以捕获 usage 信息
-        buffer += chunkStr
-
-        // 处理完整的 SSE 事件
-        if (buffer.includes('\n\n')) {
-          const events = buffer.split('\n\n')
-          buffer = events.pop() || ''
-
-          for (const event of events) {
-            if (event.trim()) {
-              parseSSEForUsage(event)
-            }
-          }
-        }
-      } catch (error) {
-        logger.error('Error processing stream chunk:', error)
+    const feedUsageParser = (text) => {
+      buffer += text
+      if (!buffer.includes('\n\n')) {
+        return
       }
-    })
-
-    response.data.on('end', async () => {
-      streamEnded = true
-
-      // 处理剩余的 buffer
-      if (buffer.trim()) {
-        parseSSEForUsage(buffer)
-      }
-
-      // 记录使用统计
-      if (usageData) {
-        try {
-          // OpenAI-Responses 使用 input_tokens/output_tokens，标准 OpenAI 使用 prompt_tokens/completion_tokens
-          const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
-          const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
-
-          // 提取缓存相关的 tokens（如果存在）
-          const cacheReadTokens = extractOpenAICacheReadTokens(usageData)
-          const cacheCreateTokens = extractCacheCreationTokens(usageData)
-          // 计算实际输入token（总输入减去缓存部分）
-          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
-
-          const totalTokens =
-            usageData.total_tokens || totalInputTokens + outputTokens + cacheCreateTokens
-          const modelToRecord = actualModel || requestedModel || 'gpt-4'
-
-          const serviceTier = req._serviceTier || null
-          await apiKeyService.recordUsage(
-            apiKeyData.id,
-            actualInputTokens, // 传递实际输入（不含缓存）
-            outputTokens,
-            cacheCreateTokens,
-            cacheReadTokens,
-            modelToRecord,
-            account.id,
-            'openai-responses',
-            serviceTier,
-            createRequestDetailMeta(req, {
-              requestBody: req.body,
-              stream: true,
-              statusCode: res.statusCode
-            })
-          )
-
-          logger.info(
-            `📊 Recorded usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), CacheCreate: ${cacheCreateTokens}, Output: ${outputTokens}, Total: ${totalTokens}, Model: ${modelToRecord}`
-          )
-
-          // 更新账户的 token 使用统计
-          await openaiResponsesAccountService.updateAccountUsage(account.id, totalTokens)
-
-          // 更新账户使用额度（如果设置了额度限制）
-          if (parseFloat(account.dailyQuota) > 0) {
-            // 使用CostCalculator正确计算费用（考虑缓存token的不同价格）
-            const CostCalculator = require('../../utils/costCalculator')
-            const costInfo = CostCalculator.calculateCost(
-              {
-                input_tokens: actualInputTokens, // 实际输入（不含缓存）
-                output_tokens: outputTokens,
-                cache_creation_input_tokens: cacheCreateTokens,
-                cache_read_input_tokens: cacheReadTokens
-              },
-              modelToRecord,
-              serviceTier
-            )
-            await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
-          }
-        } catch (error) {
-          logger.error('Failed to record usage:', error)
+      const events = buffer.split('\n\n')
+      buffer = events.pop() || ''
+      for (const event of events) {
+        if (event.trim()) {
+          parseSSEForUsage(event)
         }
       }
-
-      // 如果在流式响应中检测到限流
-      if (rateLimitDetected) {
-        // 使用统一调度器处理限流（与非流式响应保持一致）
-        const sessionId = req.headers['session_id'] || req.body?.session_id
-        const sessionHash = sessionId
-          ? crypto.createHash('sha256').update(sessionId).digest('hex')
-          : null
-
-        await unifiedOpenAIScheduler.markAccountRateLimited(
-          account.id,
-          'openai-responses',
-          sessionHash,
-          rateLimitResetsInSeconds
-        )
-
-        logger.warn(
-          `🚫 Processing rate limit for OpenAI-Responses account ${account.id} from stream`
-        )
-      }
-
-      // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', handleClientDisconnect)
-
-      if (!res.destroyed) {
-        res.end()
-      }
-
-      logger.info('Stream response completed', {
-        accountId: account.id,
-        hasUsage: !!usageData,
-        actualModel: actualModel || 'unknown'
-      })
-    })
-
-    response.data.on('error', (error) => {
-      streamEnded = true
-      logger.error('Stream error:', error)
-
-      // 清理监听器
-      req.removeListener('close', handleClientDisconnect)
-      res.removeListener('close', handleClientDisconnect)
-
-      if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
-      } else if (!res.destroyed) {
-        res.end()
-      }
-    })
+    }
 
     // 处理客户端断开连接
     const cleanup = () => {
-      streamEnded = true
       try {
         response.data?.unpipe?.(res)
         response.data?.destroy?.()
@@ -715,6 +690,148 @@ class OpenAIResponsesRelayService {
 
     req.on('close', cleanup)
     req.on('aborted', cleanup)
+
+    const streamResult = await pipeWithCapacityShedBuffer({
+      stream: response.data,
+      res,
+      onEventText: feedUsageParser,
+      commitHeaders,
+      retryEnabled: attempt < settings.maxAttempts && !isClientGone(),
+      bufferLimitBytes: settings.bufferLimitBytes,
+      preOutputBufferMs: settings.preOutputBufferMs,
+      onShedRewrite: ({ outputStarted }) => {
+        logger.warn(
+          `⚠️ codex.capacity_shed_rewrite account=${account.id} attempts=${attempt} stream_output_started=${outputStarted} code=->${RETRYABLE_CLIENT_CODE}`
+        )
+        if (outputStarted) {
+          logger.warn(
+            `⚠️ codex.capacity_shed_suppressed_after_output account=${account.id} attempts=${attempt}`
+          )
+        }
+      }
+    })
+
+    if (streamResult.outcome === 'shed' && attempt < settings.maxAttempts) {
+      req.removeListener('close', cleanup)
+      req.removeListener('aborted', cleanup)
+      return 'shed'
+    }
+
+    if (streamResult.outcome === 'error') {
+      logger.error('Stream error:', streamResult.error)
+
+      // 清理监听器
+      req.removeListener('close', handleClientDisconnect)
+      res.removeListener('close', handleClientDisconnect)
+
+      if (!res.headersSent) {
+        res.status(502).json({ error: { message: 'Upstream stream error' } })
+      } else if (!res.destroyed) {
+        res.end()
+      }
+      return 'error'
+    }
+
+    // 处理剩余的 buffer
+    if (buffer.trim()) {
+      parseSSEForUsage(buffer)
+    }
+
+    // 记录使用统计
+    if (usageData) {
+      try {
+        // OpenAI-Responses 使用 input_tokens/output_tokens，标准 OpenAI 使用 prompt_tokens/completion_tokens
+        const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
+        const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
+
+        // 提取缓存相关的 tokens（如果存在）
+        const cacheReadTokens = extractOpenAICacheReadTokens(usageData)
+        const cacheCreateTokens = extractCacheCreationTokens(usageData)
+        // 计算实际输入token（总输入减去缓存部分）
+        const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
+
+        const totalTokens =
+          usageData.total_tokens || totalInputTokens + outputTokens + cacheCreateTokens
+        const modelToRecord = actualModel || requestedModel || 'gpt-4'
+
+        const serviceTier = req._serviceTier || null
+        await apiKeyService.recordUsage(
+          apiKeyData.id,
+          actualInputTokens, // 传递实际输入（不含缓存）
+          outputTokens,
+          cacheCreateTokens,
+          cacheReadTokens,
+          modelToRecord,
+          account.id,
+          'openai-responses',
+          serviceTier,
+          createRequestDetailMeta(req, {
+            requestBody: req.body,
+            stream: true,
+            statusCode: res.statusCode
+          })
+        )
+
+        logger.info(
+          `📊 Recorded usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), CacheCreate: ${cacheCreateTokens}, Output: ${outputTokens}, Total: ${totalTokens}, Model: ${modelToRecord}`
+        )
+
+        // 更新账户的 token 使用统计
+        await openaiResponsesAccountService.updateAccountUsage(account.id, totalTokens)
+
+        // 更新账户使用额度（如果设置了额度限制）
+        if (parseFloat(account.dailyQuota) > 0) {
+          // 使用CostCalculator正确计算费用（考虑缓存token的不同价格）
+          const CostCalculator = require('../../utils/costCalculator')
+          const costInfo = CostCalculator.calculateCost(
+            {
+              input_tokens: actualInputTokens, // 实际输入（不含缓存）
+              output_tokens: outputTokens,
+              cache_creation_input_tokens: cacheCreateTokens,
+              cache_read_input_tokens: cacheReadTokens
+            },
+            modelToRecord,
+            serviceTier
+          )
+          await openaiResponsesAccountService.updateUsageQuota(account.id, costInfo.costs.total)
+        }
+      } catch (error) {
+        logger.error('Failed to record usage:', error)
+      }
+    }
+
+    // 如果在流式响应中检测到限流
+    if (rateLimitDetected) {
+      // 使用统一调度器处理限流（与非流式响应保持一致）
+      const sessionId = req.headers['session_id'] || req.body?.session_id
+      const sessionHash = sessionId
+        ? crypto.createHash('sha256').update(sessionId).digest('hex')
+        : null
+
+      await unifiedOpenAIScheduler.markAccountRateLimited(
+        account.id,
+        'openai-responses',
+        sessionHash,
+        rateLimitResetsInSeconds
+      )
+
+      logger.warn(`🚫 Processing rate limit for OpenAI-Responses account ${account.id} from stream`)
+    }
+    // 清理监听器
+    req.removeListener('close', handleClientDisconnect)
+    res.removeListener('close', handleClientDisconnect)
+
+    if (!res.destroyed) {
+      res.end()
+    }
+
+    logger.info('Stream response completed', {
+      accountId: account.id,
+      hasUsage: !!usageData,
+      actualModel: actualModel || 'unknown'
+    })
+
+    return 'completed'
   }
 
   // 处理非流式响应
