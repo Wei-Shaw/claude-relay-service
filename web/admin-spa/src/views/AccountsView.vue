@@ -356,7 +356,7 @@
                               OpenAI
                             </div>
                             <div class="text-gray-200 dark:text-gray-600">
-                              进度条分别展示 5h 与周限窗口的额度使用比例，颜色含义与上方保持一致。
+                              进度条展示上游实际回传的额度窗口，标签按窗口长度自动生成，颜色含义与上方保持一致。
                             </div>
                             <div class="space-y-1 text-gray-200 dark:text-gray-600">
                               <div class="flex items-start gap-2">
@@ -369,6 +369,13 @@
                                 <i class="fas fa-history mt-[2px] text-[10px] text-emerald-500"></i>
                                 <span class="font-medium text-white dark:text-gray-900"
                                   >周限窗口：7天使用量进度，重置时同样回到 0%。</span
+                                >
+                              </div>
+                              <div class="flex items-start gap-2">
+                                <i class="fas fa-user-tag mt-[2px] text-[10px] text-amber-500"></i>
+                                <span class="font-medium text-white dark:text-gray-900"
+                                  >窗口数量随套餐而定：Pro 账号只有周限窗口，此时不会再显示 5h
+                                  进度条。</span
                                 >
                               </div>
                               <div class="flex items-start gap-2">
@@ -1146,13 +1153,16 @@
                     </div>
                   </div>
                   <div v-else-if="account.platform === 'openai'" class="space-y-2">
-                    <div v-if="account.codexUsage" class="space-y-2">
-                      <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
+                    <div v-if="hasAnyCodexWindow(account.codexUsage)" class="space-y-2">
+                      <div
+                        v-if="hasCodexWindow(account.codexUsage.primary)"
+                        class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
+                      >
                         <div class="flex items-center gap-2">
                           <span
                             class="inline-flex min-w-[32px] justify-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
                           >
-                            {{ getCodexWindowLabel('primary') }}
+                            {{ getCodexWindowLabel(account.codexUsage.primary, 'primary') }}
                           </span>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
@@ -1179,12 +1189,15 @@
                           重置剩余 {{ formatCodexRemaining(account.codexUsage.primary) }}
                         </div>
                       </div>
-                      <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
+                      <div
+                        v-if="hasCodexWindow(account.codexUsage.secondary)"
+                        class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
+                      >
                         <div class="flex items-center gap-2">
                           <span
                             class="inline-flex min-w-[32px] justify-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"
                           >
-                            {{ getCodexWindowLabel('secondary') }}
+                            {{ getCodexWindowLabel(account.codexUsage.secondary, 'secondary') }}
                           </span>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
@@ -1746,13 +1759,16 @@
               <div v-else class="text-xs text-gray-400">暂无统计</div>
             </div>
             <div v-else-if="account.platform === 'openai'" class="space-y-2">
-              <div v-if="account.codexUsage" class="space-y-2">
-                <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+              <div v-if="hasAnyCodexWindow(account.codexUsage)" class="space-y-2">
+                <div
+                  v-if="hasCodexWindow(account.codexUsage.primary)"
+                  class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
+                >
                   <div class="flex items-center gap-2">
                     <span
                       class="inline-flex min-w-[32px] justify-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
                     >
-                      {{ getCodexWindowLabel('primary') }}
+                      {{ getCodexWindowLabel(account.codexUsage.primary, 'primary') }}
                     </span>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
@@ -1779,12 +1795,15 @@
                     重置剩余 {{ formatCodexRemaining(account.codexUsage.primary) }}
                   </div>
                 </div>
-                <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <div
+                  v-if="hasCodexWindow(account.codexUsage.secondary)"
+                  class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
+                >
                   <div class="flex items-center gap-2">
                     <span
                       class="inline-flex min-w-[32px] justify-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"
                     >
-                      {{ getCodexWindowLabel('secondary') }}
+                      {{ getCodexWindowLabel(account.codexUsage.secondary, 'secondary') }}
                     </span>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
@@ -1812,7 +1831,9 @@
                   </div>
                 </div>
               </div>
-              <div v-if="!account.codexUsage" class="text-xs text-gray-400">暂无统计</div>
+              <div v-if="!hasAnyCodexWindow(account.codexUsage)" class="text-xs text-gray-400">
+                暂无统计
+              </div>
             </div>
 
             <!-- 最后使用时间 -->
@@ -4950,12 +4971,54 @@ const getCodexUsageWidth = (usageItem) => {
 }
 
 // 时间窗口标签
-const getCodexWindowLabel = (type) => {
-  if (type === 'secondary') {
-    return '周限'
+// 把窗口长度（分钟）转成展示名。
+const formatCodexWindowMinutes = (minutes) => {
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return ''
   }
-  return '5h'
+  if (minutes % 10080 === 0) {
+    const weeks = minutes / 10080
+    return weeks === 1 ? '周限' : `${weeks}周`
+  }
+  if (minutes % 1440 === 0) {
+    return `${minutes / 1440}天`
+  }
+  if (minutes % 60 === 0) {
+    return `${minutes / 60}h`
+  }
+  return `${minutes}m`
 }
+
+// Codex 用量窗口的展示名必须按 windowMinutes 推导，不能按槽位硬编码。
+// 上游会按套餐回传不同的窗口组合：Plus 一般是 5h(300) + 周限(10080) 两个；
+// 而 Pro 只回传一个窗口，且落在 primary 槽位里，windowMinutes = 10080（7 天）。
+// 旧代码固定 primary='5h' / secondary='周限'，Pro 账号就会显示成
+// 「5h 75%」+「周限 0% 重置剩余 0秒」——两个标签都是错的。
+const getCodexWindowLabel = (usageItem, fallbackType) => {
+  const label = formatCodexWindowMinutes(usageItem?.windowMinutes)
+  if (label) {
+    return label
+  }
+  return fallbackType === 'secondary' ? '周限' : '5h'
+}
+
+// 上游没有回传的窗口不应该渲染成一条 0% 的进度条。
+const hasCodexWindow = (usageItem) => {
+  if (!usageItem) {
+    return false
+  }
+  if (Number.isFinite(usageItem.windowMinutes) && usageItem.windowMinutes > 0) {
+    return true
+  }
+  // 兼容没有记录 windowMinutes 的旧数据：只要有用量或重置信息就仍然展示
+  return (
+    (Number.isFinite(usageItem.usedPercent) && usageItem.usedPercent > 0) ||
+    (Number.isFinite(usageItem.resetAfterSeconds) && usageItem.resetAfterSeconds > 0)
+  )
+}
+
+const hasAnyCodexWindow = (codexUsage) =>
+  !!codexUsage && (hasCodexWindow(codexUsage.primary) || hasCodexWindow(codexUsage.secondary))
 
 // 格式化剩余时间
 const formatCodexRemaining = (usageItem) => {
