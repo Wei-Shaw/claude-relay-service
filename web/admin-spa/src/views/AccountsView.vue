@@ -2745,6 +2745,7 @@ const closeAccountUsageModal = () => {
 
 // 测试账户连通性相关函数
 const supportedTestPlatforms = [
+  'openai',
   'claude',
   'claude-console',
   'bedrock',

@@ -284,6 +284,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { APP_CONFIG } from '@/utils/tools'
 import { getModelsApi } from '@/utils/http_apis'
+import request from '@/utils/request'
 import { useTestState } from '@/utils/useTestState'
 import ModelSelector from '@/components/common/ModelSelector.vue'
 
@@ -303,6 +304,7 @@ const state = useTestState()
 
 // ========== 模型相关 ==========
 const selectedModel = ref('')
+const loadingAccountModel = ref(false)
 const modelsFromApi = ref({ claude: [], gemini: [], openai: [], platforms: {} })
 
 const loadModels = async () => {
@@ -330,6 +332,7 @@ const availableModels = computed(() => {
 
 // 各平台回退默认模型（模型列表未加载时使用）
 const platformFallbackModels = {
+  openai: 'gpt-5.5',
   claude: 'claude-sonnet-4-5-20250929',
   'claude-console': 'claude-sonnet-4-5-20250929',
   gemini: 'gemini-2.5-pro',
@@ -342,6 +345,7 @@ const platformFallbackModels = {
 const defaultModel = computed(() => {
   if (props.mode === 'account') {
     const platform = props.account?.platform
+    if (platform === 'openai') return platformFallbackModels.openai
     if (platform === 'azure-openai') return props.account?.deploymentName
     // bedrock 优先用列表，列表为空时按凭证类型回退
     if (platform === 'bedrock') {
@@ -404,10 +408,17 @@ const maskedApiKey = computed(() => {
   return key.substring(0, 6) + '****' + key.substring(key.length - 4)
 })
 
-const disableTest = computed(() => props.mode === 'apikey' && !props.apiKeyValue)
+const disableTest = computed(
+  () => loadingAccountModel.value || (props.mode === 'apikey' && !props.apiKeyValue)
+)
 
 // ========== account 模式 - 平台信息 ==========
 const platformConfigs = {
+  openai: {
+    label: 'OpenAI OAuth',
+    icon: 'fas fa-code',
+    badge: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'
+  },
   claude: {
     label: 'Claude OAuth',
     icon: 'fas fa-brain',
@@ -522,6 +533,7 @@ const getAccountEndpoint = () => {
   if (!props.account) return ''
   const platform = props.account.platform
   const endpoints = {
+    openai: `${APP_CONFIG.apiPrefix}/admin/openai-accounts/${props.account.id}/test`,
     claude: `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test`,
     'claude-console': `${APP_CONFIG.apiPrefix}/admin/claude-console-accounts/${props.account.id}/test`,
     bedrock: `${APP_CONFIG.apiPrefix}/admin/bedrock-accounts/${props.account.id}/test`,
@@ -575,24 +587,40 @@ const handleClose = () => {
 
 // ========== 监听 ==========
 watch(
-  () => props.show,
-  (newVal) => {
-    if (newVal) {
+  () => [props.show, props.account?.id, props.serviceType],
+  async ([show], _, onCleanup) => {
+    let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
+    loadingAccountModel.value = false
+    if (show) {
       state.resetState()
       selectedModel.value = defaultModel.value
+      if (props.mode === 'account' && props.account?.platform === 'openai') {
+        loadingAccountModel.value = true
+        try {
+          const result = await request({
+            url: `/admin/openai-accounts/${props.account.id}/test-config`,
+            method: 'GET'
+          })
+          if (!result.success) throw new Error('CONFIG_READ_FAILED')
+          if (!cancelled) selectedModel.value = result.data?.config?.model || defaultModel.value
+        } catch {
+          if (!cancelled) {
+            state.testStatus.value = 'error'
+            state.errorMessage.value = '读取测试模型失败，请关闭后重试'
+          }
+          return
+        } finally {
+          if (!cancelled && state.testStatus.value !== 'error') loadingAccountModel.value = false
+        }
+      }
       if (props.mode === 'apikey') {
         testPrompt.value = 'hi'
         maxTokens.value = 1000
       }
     }
   }
-)
-
-watch(
-  () => [props.account, props.serviceType],
-  () => {
-    selectedModel.value = defaultModel.value
-  },
-  { deep: true }
 )
 </script>

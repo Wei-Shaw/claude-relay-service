@@ -114,7 +114,7 @@ function buildCodexUsageSnapshot(accountData) {
 }
 
 // 刷新访问令牌
-async function refreshAccessToken(refreshToken, proxy = null) {
+async function refreshAccessToken(refreshToken, proxy = null, signal) {
   try {
     // Codex CLI 的官方 CLIENT_ID
     const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
@@ -136,7 +136,8 @@ async function refreshAccessToken(refreshToken, proxy = null) {
         'Content-Length': requestData.length
       },
       data: requestData,
-      timeout: config.requestTimeout || 600000 // 使用统一的请求超时配置
+      timeout: config.requestTimeout || 600000, // 使用统一的请求超时配置
+      signal
     }
 
     // 配置代理（如果有）
@@ -268,7 +269,7 @@ function isSubscriptionExpired(account) {
 }
 
 // 刷新账户的 access token（带分布式锁）
-async function refreshAccountToken(accountId) {
+async function refreshAccountToken(accountId, options = {}) {
   let lockAcquired = false
   let account = null
   let accountName = accountId
@@ -332,7 +333,7 @@ async function refreshAccountToken(accountId) {
       }
     }
 
-    const newTokens = await refreshAccessToken(refreshToken, proxy)
+    const newTokens = await refreshAccessToken(refreshToken, proxy, options.signal)
     if (!newTokens) {
       throw new Error('Failed to refresh token')
     }
