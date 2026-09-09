@@ -9,6 +9,7 @@ const sessionHelper = require('../../utils/sessionHelper')
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 const { getRateLimitModelFamily } = require('../../utils/modelHelper')
+const { resolveRateLimitReset } = require('../../utils/rateLimitHeaderHelper')
 const claudeCodeHeadersService = require('../claudeCodeHeadersService')
 const redis = require('../../models/redis')
 const ClaudeCodeValidator = require('../../validators/clients/claudeCodeValidator')
@@ -252,6 +253,32 @@ class ClaudeRelayService {
       return false
     }
     return message.toLowerCase().includes('extra usage')
+  }
+
+  // ⏱️ 解析一次 429 应该使用的限流 reset 时间戳。
+  //
+  // 不能直接用 anthropic-ratelimit-unified-reset：那是「代表窗口」的 reset，会漂移。
+  // 当代表窗口是 7d 时，一次 5h 窗口打满引发的 429 会被记成「该模型限流到一周之后」，
+  // 把这个账号上的该模型白白停掉数天（实测：账号周用量 0%~4%，fable 却被停到 4~5 天后，
+  // 且 fableRateLimitEndAt 与 sevenDay.resetsAt 完全相同）。
+  //
+  // 这里优先采用「明确 status=rejected 的那个窗口」自己的 reset；拿不到窗口信息时
+  // 才退回 unified-reset，并按 maxModelRateLimitFallbackSeconds 钳制。
+  _resolveRateLimitReset(headers, modelFamily, tag = '') {
+    const resolution = resolveRateLimitReset(headers, modelFamily, {
+      maxFallbackSeconds: parseInt(config.claude?.maxModelRateLimitFallbackSeconds, 10) || undefined
+    })
+
+    if (resolution.resetTimestamp) {
+      const prefix = tag ? `${tag} ` : ''
+      logger.info(
+        `⏱️ ${prefix}Rate limit reset resolved to ${new Date(resolution.resetTimestamp * 1000).toISOString()} ` +
+          `(window: ${resolution.windowKey || 'unified-reset fallback'}, scope: ${resolution.scope}, ` +
+          `authoritative: ${resolution.authoritative}${resolution.clamped ? ', clamped' : ''})`
+      )
+    }
+
+    return resolution
   }
 
   _toPascalCaseToolName(name) {
@@ -841,10 +868,12 @@ class ClaudeRelayService {
               `💰 [Non-Stream] "Extra usage required" 429 for account ${accountId}, skipping rate limit marking`
             )
           } else {
-            const resetHeader = response.headers
-              ? response.headers['anthropic-ratelimit-unified-reset']
-              : null
-            const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
+            const rateLimitReset = this._resolveRateLimitReset(
+              response.headers,
+              requestModelFamily,
+              '[Non-Stream]'
+            )
+            const parsedResetTimestamp = rateLimitReset.resetTimestamp ?? NaN
 
             if (requestModelFamily && !Number.isNaN(parsedResetTimestamp)) {
               // 模型级限额：只停用该模型家族，不改写为账号级限流
@@ -2245,10 +2274,12 @@ class ClaudeRelayService {
             }
 
             // 真正的限流处理
-            const resetHeader = res.headers
-              ? res.headers['anthropic-ratelimit-unified-reset']
-              : null
-            const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
+            const rateLimitReset = this._resolveRateLimitReset(
+              res.headers,
+              requestModelFamily,
+              '[Stream]'
+            )
+            const parsedResetTimestamp = rateLimitReset.resetTimestamp ?? NaN
 
             if (requestModelFamily) {
               if (!Number.isNaN(parsedResetTimestamp)) {
@@ -2947,10 +2978,12 @@ class ClaudeRelayService {
 
           // 处理限流状态
           if (rateLimitDetected || res.statusCode === 429) {
-            const resetHeader = res.headers
-              ? res.headers['anthropic-ratelimit-unified-reset']
-              : null
-            const parsedResetTimestamp = resetHeader ? parseInt(resetHeader, 10) : NaN
+            const rateLimitReset = this._resolveRateLimitReset(
+              res.headers,
+              requestModelFamily,
+              '[Stream End]'
+            )
+            const parsedResetTimestamp = rateLimitReset.resetTimestamp ?? NaN
 
             if (requestModelFamily && !Number.isNaN(parsedResetTimestamp)) {
               // 模型级限额：只停用该模型家族，不改写为账号级限流

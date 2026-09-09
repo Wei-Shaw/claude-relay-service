@@ -51,6 +51,13 @@ const config = {
     betaHeader:
       process.env.CLAUDE_BETA_HEADER ||
       'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14',
+    // 模型级限流「兜底时长」上限（秒）。
+    // 上游 429 时会优先读取 status=rejected 的那个窗口（5h / 7d / 7d_oi）的 reset；
+    // 只有在上游没回传窗口信息时，才退回 anthropic-ratelimit-unified-reset。
+    // 而后者是「代表窗口」的 reset，可能指向一周之后 —— 不钳制就会把某个模型
+    // 在这个账号上误停数天。钳制后最坏是每小时多试一次（代价一个 429）。
+    maxModelRateLimitFallbackSeconds:
+      parseInt(process.env.CLAUDE_MAX_MODEL_RATE_LIMIT_FALLBACK_SECONDS) || 3600,
     overloadHandling: {
       enabled: (() => {
         const minutes = parseInt(process.env.CLAUDE_OVERLOAD_HANDLING_MINUTES) || 0
