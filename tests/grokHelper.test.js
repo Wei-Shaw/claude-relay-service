@@ -146,7 +146,12 @@ describe('grokHelper upstream modes', () => {
       ['CGNAT upper bound', 'https://100.127.255.254/v1'],
       ['cloud metadata hostname', 'https://metadata.google.internal/v1'],
       ['kubernetes service DNS', 'https://kubernetes.default.svc/v1'],
-      ['kubernetes cluster domain', 'https://svc.cluster.local/v1']
+      ['kubernetes cluster domain', 'https://svc.cluster.local/v1'],
+      // WHATWG URL 保留 FQDN 的根标签，而 DNS 与 socket 都把它当同一个名字，
+      // 不剥掉的话一个点就能绕过整张主机名黑名单
+      ['trailing-dot metadata FQDN', 'https://metadata.google.internal./v1'],
+      ['trailing-dot kubernetes FQDN', 'https://kubernetes.default.svc./v1'],
+      ['trailing-dot localhost', 'https://localhost./v1']
     ])('rejects %s', (_label, baseUrl) => {
       expect(() =>
         grokHelper.resolveAccountBaseUrl({

@@ -212,6 +212,10 @@ function isBlockedHost(host) {
   const normalized = String(host || '')
     .trim()
     .toLowerCase()
+    // 去掉 FQDN 的根标签。WHATWG URL 会保留末尾这个点，而 DNS 解析和 socket
+    // 连接都把 "metadata.google.internal." 当成 "metadata.google.internal"，
+    // 不剥掉的话一个点就能绕过下面整张主机名黑名单（localhost 也一样）。
+    .replace(/\.+$/, '')
   if (!normalized) {
     return true
   }

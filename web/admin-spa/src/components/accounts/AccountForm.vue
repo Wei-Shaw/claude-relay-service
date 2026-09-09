@@ -4508,6 +4508,9 @@ const toFormBoolean = (value) => value === true || value === 'true'
 const GEMINI_API_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com'
 const GROK_DEFAULT_API_BASE_URL = 'https://api.x.ai/v1'
 
+// 切到 Grok 时会清空与 Gemini API 共用的 baseUrl，这里暂存原值以便切回来时还原
+let nonGrokBaseUrlStash = ''
+
 // Grok 的「上游模式」下拉框只有 api / 三个区域 / custom 五个选项，没有 cli。
 // 新建账户时若默认成 cli，用户不主动展开下拉框就会带着 cli 提交，而提交分支里
 // 没有 cli 的处理，最终落到 form.baseUrl —— 那个字段的默认值是 Gemini 的地址，
@@ -4533,12 +4536,14 @@ function deriveBaseUrl(account) {
 // Grok API Key 账户的上游地址。只有 custom 模式才使用用户填的 baseUrl；任何其它
 // 取值（包括将来新增却漏了分支的模式）都回落到官方 api.x.ai，绝不落到 form.baseUrl
 // —— 那个字段是与 Gemini API 共用的，兜底到它就等于把 xai- 密钥发给别家。
-const GROK_REGIONAL_BASE_URLS = {
+// 用 null 原型：普通对象上 mode 取到 '__proto__' / 'constructor' 会顺着原型链拿到
+// 非字符串，`|| 默认值` 兜不住，注释里「其余一切取值都回落到官方」就不成立了。
+const GROK_REGIONAL_BASE_URLS = Object.assign(Object.create(null), {
   api: GROK_DEFAULT_API_BASE_URL,
   'us-east-1': 'https://us-east-1.api.x.ai/v1',
   'us-west-2': 'https://us-west-2.api.x.ai/v1',
   'eu-west-1': 'https://eu-west-1.api.x.ai/v1'
-}
+})
 
 function resolveGrokApiKeyBaseUrl(mode, customBaseUrl) {
   if (mode === 'custom') {
@@ -6494,17 +6499,19 @@ watch(
       form.value.addType = 'oauth'
       // baseUrl 是与 Gemini API 共用的字段，默认值是 Gemini 的地址。切到 Grok 后
       // 若不清掉，用户选「自定义中转」时输入框里会预填着 Google 的地址。
+      // 暂存原值，切回去时还给用户 —— 直接清掉会把他手输的私有代理地址吃掉。
       if (!isEdit.value) {
+        nonGrokBaseUrlStash = form.value.baseUrl || nonGrokBaseUrlStash
         form.value.baseUrl = ''
         form.value.grokBaseUrlMode = 'api'
       }
     } else if (newPlatform === 'gemini-api' || newPlatform === 'azure_openai') {
       // 切换到 Gemini API 或 Azure OpenAI 时，使用 apikey 模式（直接创建，不需要 OAuth 流程）
       form.value.addType = 'apikey'
-      // 上面切到 Grok 时会把共用的 baseUrl 清空，这里要把 Gemini 的默认地址补回去，
-      // 否则「先选 Grok 再改选 Gemini API」会落到一个空的必填项上。
+      // 上面切到 Grok 时清空了共用的 baseUrl，这里补回去，否则「先选 Grok 再改选
+      // Gemini API」会落到一个空的必填项上。优先还原用户之前输入的值。
       if (!isEdit.value && newPlatform === 'gemini-api' && !form.value.baseUrl) {
-        form.value.baseUrl = GEMINI_API_DEFAULT_BASE_URL
+        form.value.baseUrl = nonGrokBaseUrlStash || GEMINI_API_DEFAULT_BASE_URL
       }
     }
 

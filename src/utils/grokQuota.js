@@ -315,13 +315,13 @@ function canonicalPlan({ subscriptionTier = '', snapshot = null } = {}) {
   const fromJwt = normalizeSubscriptionTier(subscriptionTier)
   const from45 = normalizeSubscriptionTier(snapshot?.planFrom45Responses)
 
-  // 上游本次明说的套餐优先。此前把 fromJwt 也算进 heavy 的候选，而
-  // recordQuotaObservation 又会把「上次算出来的 tier」当作 subscriptionTier 回喂进来，
-  // 于是账号一旦被判成 heavy 就永远降不回去 —— xAI 侧真实降级不会反映到界面上。
-  if (fromHeader) {
-    return fromHeader
-  }
-  for (const candidate of [from45, fromJwt]) {
+  // fromJwt 不能参与 heavy 的短路判断：recordQuotaObservation 会把上一次算出来的
+  // tier 当作 subscriptionTier 回喂进来，于是账号一旦被判成 heavy 就永远降不回去，
+  // xAI 侧的真实降级不会反映到界面上。
+  // 但 heavy 的推断本身要保留 —— 上游经常根本不回 tier 头，配额形状是唯一线索。
+  // 因此这里只把「回喂值」踢出短路候选，仍让本次响应头与 4.5 探测、以及配额形状
+  // 说话；都没结论时才退回 fromHeader → fromJwt → from45。
+  for (const candidate of [fromHeader, from45]) {
     if (candidate === 'supergrok_heavy') {
       return 'supergrok_heavy'
     }
@@ -329,7 +329,7 @@ function canonicalPlan({ subscriptionTier = '', snapshot = null } = {}) {
   if (quotaLooksLikeHeavy(snapshot)) {
     return 'supergrok_heavy'
   }
-  return fromJwt || from45 || ''
+  return fromHeader || fromJwt || from45 || ''
 }
 
 function formatWindow(window, now = new Date()) {

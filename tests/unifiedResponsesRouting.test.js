@@ -83,8 +83,13 @@ const buildApp = () => {
 }
 
 describe('unified POST /v1/responses', () => {
+  // clearAllMocks 只清调用记录，不清 mockResolvedValue 设的实现，
+  // 所以每个用例都要显式把桩恢复成默认值，否则会互相污染。
   beforeEach(() => {
     jest.clearAllMocks()
+    mockHasPermission.mockReturnValue(true)
+    mockGetAllIdsByIndex.mockResolvedValue(['grok-1'])
+    mockSelectAccount.mockResolvedValue({ id: 'grok-1' })
   })
 
   it.each([['gpt-5-codex'], ['gpt-5'], ['claude-sonnet-4-5'], ['o3']])(
@@ -98,6 +103,20 @@ describe('unified POST /v1/responses', () => {
       expect(mockGrokHandleRequest).not.toHaveBeenCalled()
     }
   )
+
+  // /v1/responses 在 main 上是 Codex 的端点，用 claude-console / 自定义
+  // openai-responses 中转 grok-* 是既有用法。没有配置 Grok 账户时必须交回给
+  // 后面的 openaiRoutes，而不是抢走流量报 402/403。
+  it('没有配置 Grok 账户时，grok 模型也要交回 Codex', async () => {
+    mockGetAllIdsByIndex.mockResolvedValue([])
+
+    const res = await request(buildApp()).post('/openai/v1/responses').send({ model: 'grok-4.5' })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ via: 'codex' })
+    expect(mockGrokHandleRequest).not.toHaveBeenCalled()
+    expect(mockSelectAccount).not.toHaveBeenCalled()
+  })
 
   it('falls through when the body carries no model at all', async () => {
     const res = await request(buildApp()).post('/openai/v1/responses').send({})
@@ -148,6 +167,19 @@ describe('unified POST /v1/chat/completions - Grok 接管的前提', () => {
     expect(mockGrokHandleRequest).not.toHaveBeenCalled()
     // 回落路径不能去选账户：selectAccount 会写 sticky session 并 touch lastUsedAt
     expect(mockSelectAccount).not.toHaveBeenCalled()
+  })
+
+  // 这条钉住「探测必须在权限校验之前」：需要回落的正是那些 Key 只有 claude 权限的
+  // 老部署。若把探测挪到权限校验之后，它们会先撞上 grok 的 403，回落永远轮不到。
+  it('Key 没有 grok 权限 且 零 Grok 账户时，仍然回落到 Claude 而不是 403', async () => {
+    mockGetAllIdsByIndex.mockResolvedValue([])
+    mockHasPermission.mockImplementation((_perms, service) => service !== 'grok')
+
+    const res = await postGrok()
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ via: 'claude' })
+    expect(mockHandleChatCompletion).toHaveBeenCalledTimes(1)
   })
 
   it('回落时仍然按 claude 权限判定，不会绕过鉴权', async () => {

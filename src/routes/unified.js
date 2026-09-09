@@ -446,9 +446,16 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
 // 鉴权刻意放在「确认是 Grok」之后而不是写成路由级中间件：authenticateApiKey 不是
 // 幂等的（每次调用都用新的 requestId 占一个并发槽位、并累加限流计数），非 Grok 请求
 // 若在这里先认证一次、再由 openaiRoutes 认证一次，该 Key 的有效并发上限会直接减半。
-router.post('/v1/responses', (req, res, next) => {
+router.post('/v1/responses', async (req, res, next) => {
   const requestedModel = req.body?.model || ''
   if (detectBackendFromModel(requestedModel) !== 'grok') {
+    return next()
+  }
+  // 与 routeToBackend 的 grok 分支同一条前提：没有配置任何 Grok 账户时不接管。
+  // 这里必须交回给后面的 openaiRoutes（而不是像 chat/completions 那样回落到
+  // claude），因为 /v1/responses 在 main 上本来就是 Codex 的端点 —— 用
+  // claude-console / 自定义 openai-responses 中转 grok-* 是既有用法。
+  if (!(await hasAnyGrokAccount())) {
     return next()
   }
 

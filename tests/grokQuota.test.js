@@ -106,6 +106,19 @@ describe('grokQuota', () => {
     ).toBe('supergrok')
   })
 
+  // 修降级问题时不能顺手把 Heavy 推断关掉：上游经常根本不回 tier 头，配额形状是
+  // 唯一线索，而 mergeQuotaSnapshots 又会让 snapshot.subscriptionTier 粘住 ——
+  // 若「见过一次 tier 头就以它为准」，一次偶发的头就会永久禁用 Heavy 推断。
+  it('keeps inferring Heavy from the quota shape even when a tier header is present', () => {
+    const snapshot = grokQuota.parseQuotaHeaders({
+      'x-subscription-tier': 'SuperGrok',
+      'x-ratelimit-limit-requests': String(grokQuota.HEAVY_REQUEST_LIMIT),
+      'x-ratelimit-limit-tokens': String(grokQuota.HEAVY_TOKEN_LIMIT)
+    })
+
+    expect(grokQuota.canonicalPlan({ snapshot })).toBe('supergrok_heavy')
+  })
+
   it('still infers Heavy from the quota shape when no tier header is present', () => {
     const snapshot = grokQuota.parseQuotaHeaders({
       'x-ratelimit-limit-requests': String(grokQuota.HEAVY_REQUEST_LIMIT),
