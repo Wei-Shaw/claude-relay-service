@@ -1391,6 +1391,15 @@
                       <span class="ml-1">定时</span>
                     </button>
                     <button
+                      v-if="showReauthorizeButton(account)"
+                      class="rounded bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-800/50"
+                      title="重新授权（更新 OAuth 令牌）"
+                      @click="openReauthorizeModal(account)"
+                    >
+                      <i class="fas fa-key" />
+                      <span class="ml-1">重新授权</span>
+                    </button>
+                    <button
                       class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200"
                       title="编辑账户"
                       @click="editAccount(account)"
@@ -1931,6 +1940,15 @@
             </button>
 
             <button
+              v-if="showReauthorizeButton(account)"
+              class="flex-1 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-800/50"
+              @click="openReauthorizeModal(account)"
+            >
+              <i class="fas fa-key mr-1" />
+              重新授权
+            </button>
+
+            <button
               class="flex-1 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100"
               @click="editAccount(account)"
             >
@@ -2121,6 +2139,14 @@
       @saved="handleScheduledTestSaved"
     />
 
+    <!-- 重新授权弹窗 -->
+    <ReauthorizeModal
+      :account="reauthorizingAccount"
+      :show="showReauthorizeModal"
+      @close="closeReauthorizeModal"
+      @success="handleReauthSuccess"
+    />
+
     <AccountBalanceScriptModal
       :account="selectedAccountForScript"
       :show="showBalanceScriptModal"
@@ -2289,6 +2315,7 @@ import AccountErrorHistoryModal from '@/components/accounts/AccountErrorHistoryM
 import AccountExpiryEditModal from '@/components/accounts/AccountExpiryEditModal.vue'
 import UnifiedTestModal from '@/components/common/UnifiedTestModal.vue'
 import AccountScheduledTestModal from '@/components/accounts/AccountScheduledTestModal.vue'
+import ReauthorizeModal from '@/components/accounts/ReauthorizeModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 import ActionDropdown from '@/components/common/ActionDropdown.vue'
@@ -2434,6 +2461,8 @@ const testingAccount = ref(null)
 // 定时测试配置弹窗状态
 const showScheduledTestModal = ref(false)
 const scheduledTestAccount = ref(null)
+const showReauthorizeModal = ref(false)
+const reauthorizingAccount = ref(null)
 
 // 账户统计弹窗状态
 const showAccountStatsModal = ref(false)
@@ -2666,6 +2695,9 @@ const showResetButton = (account) => {
   return supportedPlatforms.includes(account.platform) && isAccountRoutingBlocked(account)
 }
 
+// 重新授权按钮：仅 Claude OAuth/Setup Token 账号（platform === 'claude'）
+const showReauthorizeButton = (account) => !!account && account.platform === 'claude'
+
 // 获取账户操作菜单项（用于小屏下拉菜单）
 const getAccountActions = (account) => {
   const actions = []
@@ -2678,6 +2710,17 @@ const getAccountActions = (account) => {
       icon: 'fa-redo',
       color: 'orange',
       handler: () => resetAccountStatus(account)
+    })
+  }
+
+  // 重新授权（仅 Claude OAuth/Setup Token 账号）
+  if (showReauthorizeButton(account)) {
+    actions.push({
+      key: 'reauth',
+      label: '重新授权',
+      icon: 'fa-key',
+      color: 'indigo',
+      handler: () => openReauthorizeModal(account)
     })
   }
 
@@ -2812,6 +2855,21 @@ const closeScheduledTestModal = () => {
 
 const handleScheduledTestSaved = () => {
   showToast('定时测试配置已保存', 'success')
+}
+
+// 重新授权相关函数
+const openReauthorizeModal = (account) => {
+  reauthorizingAccount.value = account
+  showReauthorizeModal.value = true
+}
+
+const closeReauthorizeModal = () => {
+  showReauthorizeModal.value = false
+  reauthorizingAccount.value = null
+}
+
+const handleReauthSuccess = () => {
+  loadAccounts()
 }
 
 // 余额脚本配置
