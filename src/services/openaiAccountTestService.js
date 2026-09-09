@@ -3,6 +3,7 @@ const { StringDecoder } = require('string_decoder')
 const accounts = require('./account/openaiAccountService')
 const ProxyHelper = require('../utils/proxyHelper')
 const { extractCodexUsageHeaders } = require('../utils/codexUsage')
+const { createOpenAITestPayload } = require('../utils/testPayloadHelper')
 
 const DEFAULT_MODEL = 'gpt-5.5'
 const errors = {
@@ -178,8 +179,8 @@ async function testAccount(accountId, model = DEFAULT_MODEL) {
       'https://chatgpt.com/backend-api/codex/responses',
       {
         model,
-        instructions: 'Reply briefly.',
-        input: [{ role: 'user', content: [{ type: 'input_text', text: 'Reply with OK.' }] }],
+        instructions: '',
+        input: createOpenAITestPayload(model).input,
         stream: true,
         store: false
       },

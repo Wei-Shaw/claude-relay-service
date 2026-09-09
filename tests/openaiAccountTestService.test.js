@@ -20,6 +20,7 @@ const axios = require('axios')
 const accounts = require('../src/services/account/openaiAccountService')
 const proxyHelper = require('../src/utils/proxyHelper')
 const { testAccount } = require('../src/services/openaiAccountTestService')
+const { createOpenAITestPayload } = require('../src/utils/testPayloadHelper')
 
 const completed = (text = 'OK') => ({
   type: 'response.completed',
@@ -125,7 +126,9 @@ describe('OpenAI OAuth account tests', () => {
         quotaUpdated: false,
         quotaError: 'QUOTA_SAVE_FAILED'
       })
-      if (status === 429) expectSafeFailure(result, 'RATE_LIMITED')
+      if (status === 429) {
+        expectSafeFailure(result, 'RATE_LIMITED')
+      }
       expect(JSON.stringify(result)).not.toContain('secret-token')
       expect(JSON.stringify(result)).not.toContain('private-upstream-payload')
     }
@@ -150,6 +153,15 @@ describe('OpenAI OAuth account tests', () => {
       })
     )
     expect(JSON.stringify(result)).not.toContain('secret-token')
+  })
+
+  test('uses the shared probe input with Codex-compatible request fields', async () => {
+    respond(completed())
+    await testAccount('selected-account', 'gpt-5.5')
+    const payload = axios.post.mock.calls[0][1]
+    expect(payload.input).toEqual(createOpenAITestPayload('gpt-5.5').input)
+    expect(payload).toMatchObject({ instructions: '', stream: true, store: false })
+    expect(payload).not.toHaveProperty('max_output_tokens')
   })
 
   test.each(['response.failed', 'error'])('rejects HTTP 200 SSE %s safely', async (type) => {
