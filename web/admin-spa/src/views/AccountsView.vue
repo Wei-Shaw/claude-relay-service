@@ -415,7 +415,8 @@
                                 <i class="fas fa-gem mt-[2px] text-[10px] text-purple-500"></i>
                                 <span class="font-medium text-white dark:text-gray-900"
                                   >模型窗口：上游按模型限定的 7 天专用限额（如
-                                  Fable），标签取自上游返回的模型名，没有则不显示。</span
+                                  Fable），标签取自上游返回的模型名；上游只给了顶层 Sonnet
+                                  窗口时显示为 Sonnet，两者都没有则不显示。</span
                                 >
                               </div>
                               <div class="flex items-start gap-2">
@@ -994,13 +995,11 @@
                           重置剩余 {{ formatClaudeRemaining(scoped) }}
                         </div>
                       </div>
-                      <!-- 回退：上游没有 limits[] 里的 weekly_scoped，但顶层具名窗口
-                           （seven_day_sonnet）有数据时，仍要把这条画出来 -->
+                      <!-- 顶层具名窗口（seven_day_sonnet）。对 Max 账号它一直是 null，
+                           模型级额度都在 limits[] 里；但只要它确实有数据就要画出来，
+                           哪怕 limits[] 同时也回传了 weekly_scoped 条目。 -->
                       <div
-                        v-if="
-                          getScopedModelUsage(account).length === 0 &&
-                          hasLegacySevenDayModelWindow(account.claudeUsage)
-                        "
+                        v-if="hasLegacySevenDayModelWindow(account.claudeUsage)"
                         class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
                       >
                         <div class="flex items-center gap-2">
@@ -1742,13 +1741,11 @@
                     重置剩余 {{ formatClaudeRemaining(scoped) }}
                   </div>
                 </div>
-                <!-- 回退：上游没有 limits[] 里的 weekly_scoped，但顶层具名窗口
-                     （seven_day_sonnet）有数据时，仍要把这条画出来 -->
+                <!-- 顶层具名窗口（seven_day_sonnet）。对 Max 账号它一直是 null，
+                     模型级额度都在 limits[] 里；但只要它确实有数据就要画出来，
+                     哪怕 limits[] 同时也回传了 weekly_scoped 条目。 -->
                 <div
-                  v-if="
-                    getScopedModelUsage(account).length === 0 &&
-                    hasLegacySevenDayModelWindow(account.claudeUsage)
-                  "
+                  v-if="hasLegacySevenDayModelWindow(account.claudeUsage)"
                   class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
                 >
                   <div class="flex items-center gap-2">
