@@ -73,14 +73,22 @@ async function selectGrokAccount(req) {
   return await grokScheduler.selectAccount(req.apiKey, sessionHash)
 }
 
-// 本部署是否配置过 Grok 账户（含未启用的）。只在 402 的兜底判断里用到。
+// 本部署是否配置过 Grok 账户（含未启用的）。只取 id，不做 hgetall —— 紧接着的
+// selectAccount 已经会把账户完整读一遍，这里没必要再拉一次。
+// 探测失败时返回 true（当作「配了」），让请求走正常的 Grok 路径去报它自己的错，
+// 而不是因为一次 Redis 抖动就把流量静默改道到 Claude。
 async function hasAnyGrokAccount() {
   try {
     const grokAccountService = require('../services/account/grokAccountService')
-    const accounts = await grokAccountService.getAllAccounts(true)
-    return Array.isArray(accounts) && accounts.length > 0
+    const redis = require('../models/redis')
+    const ids = await redis.getAllIdsByIndex(
+      grokAccountService.INDEX_KEY,
+      `${grokAccountService.ACCOUNT_KEY_PREFIX}*`,
+      /^grok_account:(.+)$/
+    )
+    return Array.isArray(ids) && ids.length > 0
   } catch (error) {
-    logger.warn('⚠️ Failed to probe Grok accounts, keeping the original error:', error.message)
+    logger.warn('⚠️ Failed to probe Grok accounts, assuming they exist:', error.message)
     return true
   }
 }
@@ -251,22 +259,18 @@ async function routeToBackend(req, res, requestedModel) {
   } else if (backend === 'grok') {
     // grok-* 在本平台支持 Grok 之前是落到 claude 分支的（claude-console / CCR 上游
     // 中转 grok 模型是既有用法）。把模型名直接改判成 grok 会让这类部署在合并当天
-    // 全部变成 403/402，所以这里只在「确实配置了可用的 Grok 账户」时才接管；
+    // 全部变成 403/402，所以这里只在「确实配置了 Grok 账户」时才接管；
     // 一个都没有就按老路走 claude，行为与本次改动之前完全一致。
-    let account = null
-    try {
-      account = await selectGrokAccount(req)
-    } catch (error) {
-      // 402 既可能是「一个 Grok 账户都没配」，也可能是「配了但此刻全被限流/临时不可用」。
-      // 只有前者才回落到 Claude；后者必须照常把 402 返回，否则一个 Grok 请求会被
-      // Claude 静默应答，那比报错更糟。
-      if (error?.statusCode === 402 && !(await hasAnyGrokAccount())) {
-        logger.info(
-          `↩️ No Grok account configured, falling back to the Claude backend for model: ${requestedModel}`
-        )
-        return await handleClaudeBackend(req, res, permissions)
-      }
-      throw error
+    //
+    // 这个探测必须放在权限校验**之前**：需要回落的正是那些 Key 只有 claude 权限的
+    // 老部署，先校验权限就会把它们挡在 403 上，回落根本轮不到。
+    // 同时也必须放在 selectAccount **之前** —— selectAccount 会写 sticky session
+    // 映射并 touch lastUsedAt，让一个最终要被 403 的请求先产生这些副作用是错的。
+    if (!(await hasAnyGrokAccount())) {
+      logger.info(
+        `↩️ No Grok account configured, falling back to the Claude backend for model: ${requestedModel}`
+      )
+      return await handleClaudeBackend(req, res, permissions)
     }
 
     if (!apiKeyService.hasPermission(permissions, 'grok')) {
@@ -279,6 +283,7 @@ async function routeToBackend(req, res, requestedModel) {
       })
     }
     const grokRelayService = require('../services/relay/grokRelayService')
+    const account = await selectGrokAccount(req)
     return grokRelayService.handleRequest(req, res, account, req.apiKey)
   } else if (backend === 'gemini') {
     // Gemini 后端

@@ -6501,6 +6501,11 @@ watch(
     } else if (newPlatform === 'gemini-api' || newPlatform === 'azure_openai') {
       // 切换到 Gemini API 或 Azure OpenAI 时，使用 apikey 模式（直接创建，不需要 OAuth 流程）
       form.value.addType = 'apikey'
+      // 上面切到 Grok 时会把共用的 baseUrl 清空，这里要把 Gemini 的默认地址补回去，
+      // 否则「先选 Grok 再改选 Gemini API」会落到一个空的必填项上。
+      if (!isEdit.value && newPlatform === 'gemini-api' && !form.value.baseUrl) {
+        form.value.baseUrl = GEMINI_API_DEFAULT_BASE_URL
+      }
     }
 
     // 平台变化时，清空分组选择
