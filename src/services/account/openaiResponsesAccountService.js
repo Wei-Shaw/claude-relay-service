@@ -35,6 +35,35 @@ class OpenAIResponsesAccountService {
     )
   }
 
+  // Preset third-party OpenAI-compatible gateway providers.
+  // When a named provider is selected, baseApi is auto-filled from the preset
+  // so users don't have to type the upstream URL by hand.
+  static get PROVIDER_BASE_URLS() {
+    return {
+      orcarouter: 'https://api.orcarouter.ai/v1',
+      custom: ''
+    }
+  }
+
+  // Resolve the provider selection: named providers use a preset base URL,
+  // while 'custom' keeps the baseApi the user entered.
+  _resolveProviderBaseApi(provider, baseApi) {
+    const normalizedProvider = (provider || 'custom').toLowerCase()
+    const presetUrl = OpenAIResponsesAccountService.PROVIDER_BASE_URLS[normalizedProvider]
+
+    if (normalizedProvider === 'custom') {
+      return { provider: 'custom', baseApi: baseApi || '' }
+    }
+
+    if (presetUrl) {
+      return { provider: normalizedProvider, baseApi: presetUrl }
+    }
+
+    throw new Error(
+      `Invalid provider: ${provider}. Must be one of: ${Object.keys(OpenAIResponsesAccountService.PROVIDER_BASE_URLS).join(', ')}`
+    )
+  }
+
   // 创建账户
   async createAccount(options = {}) {
     const {
@@ -52,11 +81,16 @@ class OpenAIResponsesAccountService {
       quotaResetTime = '00:00', // 额度重置时间（HH:mm格式）
       rateLimitDuration = 60, // 限流时间（分钟）
       disableAutoProtection = false, // 是否关闭自动防护（429/401/400/529 不自动禁用）
-      providerEndpoint = 'responses' // Provider 端点类型：responses | auto
+      providerEndpoint = 'responses', // Provider endpoint type: responses | auto
+      provider = 'custom' // Preset provider: orcarouter | custom
     } = options
 
+    // Resolve preset providers; a named provider auto-fills baseApi
+    const resolved = this._resolveProviderBaseApi(provider, baseApi)
+    const effectiveBaseApi = resolved.baseApi || baseApi
+
     // 验证必填字段
-    if (!baseApi || !apiKey) {
+    if (!effectiveBaseApi || !apiKey) {
       throw new Error('Base API URL and API Key are required for OpenAI-Responses account')
     }
 
@@ -69,7 +103,9 @@ class OpenAIResponsesAccountService {
     }
 
     // 规范化 baseApi（确保不以 / 结尾）
-    const normalizedBaseApi = baseApi.endsWith('/') ? baseApi.slice(0, -1) : baseApi
+    const normalizedBaseApi = effectiveBaseApi.endsWith('/')
+      ? effectiveBaseApi.slice(0, -1)
+      : effectiveBaseApi
 
     const accountId = uuidv4()
 
@@ -106,7 +142,8 @@ class OpenAIResponsesAccountService {
       quotaResetTime,
       quotaStoppedAt: '',
       disableAutoProtection: disableAutoProtection.toString(), // 关闭自动防护
-      providerEndpoint // Provider 端点类型：responses(默认) | auto
+      providerEndpoint, // Provider endpoint type: responses(default) | auto
+      provider: resolved.provider // Preset provider: orcarouter | custom
     }
 
     // 保存到 Redis
@@ -160,6 +197,17 @@ class OpenAIResponsesAccountService {
     // 处理 JSON 字段
     if (updates.proxy !== undefined) {
       updates.proxy = updates.proxy ? JSON.stringify(updates.proxy) : ''
+    }
+
+    // Resolve preset providers: switching to a named provider overwrites baseApi
+    // with the preset URL; switching to custom keeps the stored baseApi.
+    if (updates.provider !== undefined) {
+      const resolved = this._resolveProviderBaseApi(
+        updates.provider,
+        updates.baseApi || account.baseApi || ''
+      )
+      updates.provider = resolved.provider
+      updates.baseApi = resolved.baseApi
     }
 
     // 规范化 baseApi
@@ -281,6 +329,7 @@ class OpenAIResponsesAccountService {
       accountData.isActive = accountData.isActive === 'true'
       accountData.expiresAt = accountData.subscriptionExpiresAt || null
       accountData.platform = accountData.platform || 'openai-responses'
+      accountData.provider = accountData.provider || 'custom'
 
       accounts.push(accountData)
     })

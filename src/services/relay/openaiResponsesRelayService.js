@@ -80,6 +80,11 @@ class OpenAIResponsesRelayService {
         throw new Error('Account not found')
       }
 
+      // Accounts created with a preset provider (e.g. orcarouter) carry a
+      // fixed baseApi; legacy accounts without a provider field behave as
+      // 'custom' to preserve existing behavior.
+      fullAccount.provider = fullAccount.provider || 'custom'
+
       // 创建 AbortController 用于取消请求
       abortController = new AbortController()
 
