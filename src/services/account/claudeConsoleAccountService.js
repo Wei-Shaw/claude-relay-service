@@ -360,13 +360,23 @@ class ClaudeConsoleAccountService {
         // 仅当调用方未显式携带自动停止标记时，才视为管理员手动操作
         const isManualChange =
           updates.quotaAutoStopped === undefined && updates.rateLimitAutoStopped === undefined
+        const isManualEnable =
+          isManualChange && (updates.schedulable === true || updates.schedulable === 'true')
+
+        // 管理员手动开启调度时一并清除额度停用标记：残留的 quotaStoppedAt 会让账户
+        // 在选号时继续被判为超额而跳过，使"打开调度"当天不生效。清除后下次选号会
+        // 重新评估用量，若仍超过上限会立即再次停用（需先调高上限才能真正放开）
+        if (isManualEnable && existingAccount.quotaStoppedAt) {
+          updatedData.quotaStoppedAt = ''
+          updatedData.errorMessage = ''
+        }
 
         // 记录日志
         if (!isManualChange) {
           logger.debug(
             `🤖 Automatic scheduling change for Claude Console account ${accountId}: schedulable=${updatedData.schedulable}`
           )
-        } else if (updates.schedulable === true || updates.schedulable === 'true') {
+        } else if (isManualEnable) {
           logger.info(`✅ Manually enabled scheduling for Claude Console account ${accountId}`)
         } else {
           logger.info(`⛔ Manually disabled scheduling for Claude Console account ${accountId}`)

@@ -230,6 +230,65 @@ describe('Claude Console daily quota auto stop / auto recovery', () => {
     expect(saved.lastResetDate).toBe('2026-09-05')
   })
 
+  describe('manual re-enable clears the quota stop marker', () => {
+    it('clears quotaStoppedAt when an admin manually enables scheduling', async () => {
+      seedAccount({
+        schedulable: 'false',
+        quotaAutoStopped: 'true',
+        quotaStoppedAt: tz8(2026, 9, 4, 12, 0).toISOString(),
+        errorMessage: 'Daily quota exceeded: $12.00 / $10.00'
+      })
+
+      await service.updateAccount(ACCOUNT_ID, { schedulable: true })
+
+      const saved = store.get(ACCOUNT_KEY)
+      expect(saved.schedulable).toBe('true')
+      expect(saved.quotaStoppedAt).toBe('')
+      expect(saved.errorMessage).toBe('')
+      expect(saved.quotaAutoStopped).toBe('')
+    })
+
+    it('does not treat the account as exceeded after a manual re-enable', async () => {
+      seedAccount({
+        schedulable: 'false',
+        quotaAutoStopped: 'true',
+        quotaStoppedAt: tz8(2026, 9, 4, 12, 0).toISOString()
+      })
+      // 管理员先调高上限，再打开调度
+      await service.updateAccount(ACCOUNT_ID, { dailyQuota: 20 })
+      await service.updateAccount(ACCOUNT_ID, { schedulable: true })
+
+      redis.getAccountUsageStats.mockResolvedValue({ daily: { cost: 12 } })
+      const exceeded = await service.isAccountQuotaExceeded(ACCOUNT_ID)
+
+      expect(exceeded).toBe(false)
+      expect(store.get(ACCOUNT_KEY).schedulable).toBe('true')
+    })
+
+    it('keeps quotaStoppedAt when an admin disables scheduling', async () => {
+      const stoppedAt = tz8(2026, 9, 4, 12, 0).toISOString()
+      seedAccount({
+        schedulable: 'false',
+        quotaAutoStopped: 'true',
+        quotaStoppedAt: stoppedAt
+      })
+
+      await service.updateAccount(ACCOUNT_ID, { schedulable: false })
+
+      expect(store.get(ACCOUNT_KEY).quotaStoppedAt).toBe(stoppedAt)
+    })
+
+    it('keeps quotaStoppedAt when the change comes from automatic quota logic', async () => {
+      const stoppedAt = tz8(2026, 9, 4, 12, 0).toISOString()
+      seedAccount({ schedulable: 'false', quotaStoppedAt: stoppedAt })
+
+      // 自动逻辑会显式携带自动停止标记，不应被视为管理员手动操作
+      await service.updateAccount(ACCOUNT_ID, { schedulable: true, quotaAutoStopped: '' })
+
+      expect(store.get(ACCOUNT_KEY).quotaStoppedAt).toBe(stoppedAt)
+    })
+  })
+
   describe('custom quota reset time 08:00', () => {
     it('restores when stopped at 07:00 and checked at 09:00', async () => {
       seedAccount({
