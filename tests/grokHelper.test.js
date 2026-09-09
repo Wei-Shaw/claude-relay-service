@@ -133,6 +133,43 @@ describe('grokHelper upstream modes', () => {
     it('rejects official hosts that are not /v1', () => {
       expect(() => grokHelper.validateTrustedBaseURL('https://api.x.ai/openai')).toThrow(/\/v1/)
     })
+
+    // These all reached the upstream before. WHATWG `new URL` normalizes
+    // "::ffff:127.0.0.1" into "::ffff:7f00:1", which never matched the literal
+    // "::ffff:" prefix check, so the mapped-v4 branch was dead code and the address
+    // fell through to the generic IPv6 path where first === 0 matches nothing.
+    it.each([
+      ['IPv4-mapped IPv6 loopback', 'https://[::ffff:127.0.0.1]/v1'],
+      ['fully expanded IPv4-mapped loopback', 'https://[0:0:0:0:0:ffff:7f00:1]/v1'],
+      ['NAT64-embedded loopback', 'https://[64:ff9b::7f00:1]/v1'],
+      ['CGNAT / RFC 6598', 'https://100.64.1.5/v1'],
+      ['CGNAT upper bound', 'https://100.127.255.254/v1'],
+      ['cloud metadata hostname', 'https://metadata.google.internal/v1'],
+      ['kubernetes service DNS', 'https://kubernetes.default.svc/v1'],
+      ['kubernetes cluster domain', 'https://svc.cluster.local/v1']
+    ])('rejects %s', (_label, baseUrl) => {
+      expect(() =>
+        grokHelper.resolveAccountBaseUrl({
+          authType: grokHelper.AUTH_TYPES.API_KEY,
+          baseUrl
+        })
+      ).toThrow(/Private/)
+    })
+
+    // Guard against the CGNAT range over-blocking its neighbours, and make sure a
+    // legitimate public IPv6 relay is still reachable.
+    it.each([
+      ['just below the CGNAT range', 'https://100.63.255.254/v1'],
+      ['just above the CGNAT range', 'https://100.128.0.1/v1'],
+      ['public IPv6 relay', 'https://[2606:4700::1111]/v1']
+    ])('still allows %s', (_label, baseUrl) => {
+      expect(
+        grokHelper.resolveAccountBaseUrl({
+          authType: grokHelper.AUTH_TYPES.API_KEY,
+          baseUrl
+        })
+      ).toBe(baseUrl.replace(/\/$/, ''))
+    })
   })
 
   describe('OAuth endpoints stay on auth.x.ai', () => {

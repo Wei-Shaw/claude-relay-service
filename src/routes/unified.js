@@ -48,6 +48,43 @@ function detectBackendFromModel(modelName) {
 }
 
 // 🚀 智能后端路由处理器
+// Claude 后端：通过 OpenAI 兼容层。抽出来是因为 Grok 分支在「本部署根本没有配置
+// Grok 账户」时要回落到它 —— 详见 routeToBackend 里的 grok 分支。
+async function handleClaudeBackend(req, res, permissions) {
+  if (!apiKeyService.hasPermission(permissions, 'claude')) {
+    return res.status(403).json({
+      error: {
+        message: 'This API key does not have permission to access Claude',
+        type: 'permission_denied',
+        code: 'permission_denied'
+      }
+    })
+  }
+  return await handleChatCompletion(req, res, req.apiKey)
+}
+
+// Grok 账户选择。/v1/chat/completions 与 /v1/responses 两个入口共用，避免两处
+// 各自计算 sessionHash 后又慢慢跑偏。
+async function selectGrokAccount(req) {
+  const grokScheduler = require('../services/scheduler/grokScheduler')
+  const sessionHash = req.body?.session_id
+    ? require('crypto').createHash('sha256').update(String(req.body.session_id)).digest('hex')
+    : null
+  return await grokScheduler.selectAccount(req.apiKey, sessionHash)
+}
+
+// 本部署是否配置过 Grok 账户（含未启用的）。只在 402 的兜底判断里用到。
+async function hasAnyGrokAccount() {
+  try {
+    const grokAccountService = require('../services/account/grokAccountService')
+    const accounts = await grokAccountService.getAllAccounts(true)
+    return Array.isArray(accounts) && accounts.length > 0
+  } catch (error) {
+    logger.warn('⚠️ Failed to probe Grok accounts, keeping the original error:', error.message)
+    return true
+  }
+}
+
 async function routeToBackend(req, res, requestedModel) {
   const backend = detectBackendFromModel(requestedModel)
 
@@ -57,17 +94,7 @@ async function routeToBackend(req, res, requestedModel) {
   const { permissions } = req.apiKey
 
   if (backend === 'claude') {
-    // Claude 后端：通过 OpenAI 兼容层
-    if (!apiKeyService.hasPermission(permissions, 'claude')) {
-      return res.status(403).json({
-        error: {
-          message: 'This API key does not have permission to access Claude',
-          type: 'permission_denied',
-          code: 'permission_denied'
-        }
-      })
-    }
-    await handleChatCompletion(req, res, req.apiKey)
+    return await handleClaudeBackend(req, res, permissions)
   } else if (backend === 'openai') {
     // OpenAI 后端
     if (!apiKeyService.hasPermission(permissions, 'openai')) {
@@ -222,6 +249,26 @@ async function routeToBackend(req, res, requestedModel) {
 
     return await openaiRoutes.handleResponses(req, res)
   } else if (backend === 'grok') {
+    // grok-* 在本平台支持 Grok 之前是落到 claude 分支的（claude-console / CCR 上游
+    // 中转 grok 模型是既有用法）。把模型名直接改判成 grok 会让这类部署在合并当天
+    // 全部变成 403/402，所以这里只在「确实配置了可用的 Grok 账户」时才接管；
+    // 一个都没有就按老路走 claude，行为与本次改动之前完全一致。
+    let account = null
+    try {
+      account = await selectGrokAccount(req)
+    } catch (error) {
+      // 402 既可能是「一个 Grok 账户都没配」，也可能是「配了但此刻全被限流/临时不可用」。
+      // 只有前者才回落到 Claude；后者必须照常把 402 返回，否则一个 Grok 请求会被
+      // Claude 静默应答，那比报错更糟。
+      if (error?.statusCode === 402 && !(await hasAnyGrokAccount())) {
+        logger.info(
+          `↩️ No Grok account configured, falling back to the Claude backend for model: ${requestedModel}`
+        )
+        return await handleClaudeBackend(req, res, permissions)
+      }
+      throw error
+    }
+
     if (!apiKeyService.hasPermission(permissions, 'grok')) {
       return res.status(403).json({
         error: {
@@ -231,12 +278,7 @@ async function routeToBackend(req, res, requestedModel) {
         }
       })
     }
-    const grokScheduler = require('../services/scheduler/grokScheduler')
     const grokRelayService = require('../services/relay/grokRelayService')
-    const sessionHash = req.body?.session_id
-      ? require('crypto').createHash('sha256').update(String(req.body.session_id)).digest('hex')
-      : null
-    const account = await grokScheduler.selectAccount(req.apiKey, sessionHash)
     return grokRelayService.handleRequest(req, res, account, req.apiKey)
   } else if (backend === 'gemini') {
     // Gemini 后端
@@ -391,48 +433,51 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
   }
 })
 
-router.post('/v1/responses', authenticateApiKey, async (req, res) => {
-  try {
-    const requestedModel = req.body?.model || ''
-    const backend = detectBackendFromModel(requestedModel)
-    if (backend !== 'grok') {
-      return res.status(400).json({
-        error: {
-          message:
-            'Unified /v1/responses currently supports Grok models only. Use /grok/v1 or /openai/v1/responses for other backends.',
-          type: 'invalid_request_error',
-          code: 'unsupported_model'
-        }
-      })
-    }
-    if (!apiKeyService.hasPermission(req.apiKey.permissions, 'grok')) {
-      return res.status(403).json({
-        error: {
-          message: 'This API key does not have permission to access Grok',
-          type: 'permission_denied',
-          code: 'permission_denied'
-        }
-      })
-    }
-    const grokScheduler = require('../services/scheduler/grokScheduler')
-    const grokRelayService = require('../services/relay/grokRelayService')
-    const sessionHash = req.body?.session_id
-      ? require('crypto').createHash('sha256').update(String(req.body.session_id)).digest('hex')
-      : null
-    const account = await grokScheduler.selectAccount(req.apiKey, sessionHash)
-    return grokRelayService.handleRequest(req, res, account, req.apiKey)
-  } catch (error) {
-    logger.error('❌ OpenAI responses error:', error)
-    if (!res.headersSent) {
-      res.status(error.statusCode || 500).json({
-        error: {
-          message: error.message || 'Internal server error',
-          type: 'server_error',
-          code: 'internal_error'
-        }
-      })
-    }
+// ⚠️ 这个 router 同时挂在 /api 和 /openai 上，而 /openai 前缀下**紧随其后**的是
+// openaiRoutes —— Codex 的 POST /openai/v1/responses 就在那里（openaiRoutes.js）。
+// 因此本路由只能接管 Grok 模型，其余一律 next() 交回给后面的 router，否则所有
+// Codex 客户端都会被这里拦下。
+//
+// 鉴权刻意放在「确认是 Grok」之后而不是写成路由级中间件：authenticateApiKey 不是
+// 幂等的（每次调用都用新的 requestId 占一个并发槽位、并累加限流计数），非 Grok 请求
+// 若在这里先认证一次、再由 openaiRoutes 认证一次，该 Key 的有效并发上限会直接减半。
+router.post('/v1/responses', (req, res, next) => {
+  const requestedModel = req.body?.model || ''
+  if (detectBackendFromModel(requestedModel) !== 'grok') {
+    return next()
   }
+
+  return authenticateApiKey(req, res, async (authError) => {
+    if (authError) {
+      return next(authError)
+    }
+    try {
+      if (!apiKeyService.hasPermission(req.apiKey.permissions, 'grok')) {
+        return res.status(403).json({
+          error: {
+            message: 'This API key does not have permission to access Grok',
+            type: 'permission_denied',
+            code: 'permission_denied'
+          }
+        })
+      }
+      const grokRelayService = require('../services/relay/grokRelayService')
+      const account = await selectGrokAccount(req)
+      return grokRelayService.handleRequest(req, res, account, req.apiKey)
+    } catch (error) {
+      logger.error('❌ Unified responses error:', error)
+      if (!res.headersSent) {
+        res.status(error.statusCode || 500).json({
+          error: {
+            message: error.message || 'Internal server error',
+            type: 'server_error',
+            code: 'internal_error'
+          }
+        })
+      }
+      return undefined
+    }
+  })
 })
 
 // 🔄 OpenAI 兼容的 completions 端点（传统格式，智能后端路由）

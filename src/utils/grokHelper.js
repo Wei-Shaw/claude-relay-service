@@ -170,6 +170,44 @@ function expandIPv6(host) {
   return groups
 }
 
+// 云厂商 / 容器编排的内网元数据与服务发现域名。只做字面量匹配，够不着 DNS 层面的
+// 绕过（例如 169.254.169.254.nip.io 这类解析到内网的公网域名）—— 那需要在解析后
+// 复核并在连接期二次校验，不在本次范围内。
+const INTERNAL_HOST_PATTERNS = [
+  'metadata.google.internal',
+  '*.internal',
+  '*.svc',
+  '*.cluster.local',
+  'metadata',
+  'instance-data'
+]
+
+function isBlockedIPv4(octets) {
+  if (!Array.isArray(octets) || octets.length !== 4) {
+    return false
+  }
+  const [a, b] = octets
+  if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254)) {
+    return true
+  }
+  if (a === 192 && b === 168) {
+    return true
+  }
+  if (a === 172 && b >= 16 && b <= 31) {
+    return true
+  }
+  // 100.64.0.0/10 —— RFC 6598 运营商级 NAT，Tailscale 等覆盖网也用这一段
+  if (a === 100 && b >= 64 && b <= 127) {
+    return true
+  }
+  return false
+}
+
+// 从展开后的 IPv6 分组里取出末两组所承载的 IPv4 四段
+function ipv4FromIPv6Tail(groups) {
+  return [groups[6] >> 8, groups[6] & 0xff, groups[7] >> 8, groups[7] & 0xff]
+}
+
 function isBlockedHost(host) {
   const normalized = String(host || '')
     .trim()
@@ -180,20 +218,13 @@ function isBlockedHost(host) {
   if (normalized === 'localhost' || normalized.endsWith('.localhost')) {
     return true
   }
+  if (INTERNAL_HOST_PATTERNS.some((pattern) => hostnameMatches(normalized, pattern))) {
+    return true
+  }
 
   const v4 = ipv4Octets(normalized)
   if (v4) {
-    const [a, b] = v4
-    if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254)) {
-      return true
-    }
-    if (a === 192 && b === 168) {
-      return true
-    }
-    if (a === 172 && b >= 16 && b <= 31) {
-      return true
-    }
-    return false
+    return isBlockedIPv4(v4)
   }
 
   const v6 = expandIPv6(normalized)
@@ -213,6 +244,15 @@ function isBlockedHost(host) {
     }
     if (first === 0xfe80) {
       return true
+    }
+    // IPv4-mapped（::ffff:0:0/96）与 NAT64（64:ff9b::/96）都把一个 v4 地址藏在末两组里。
+    // 注意 WHATWG URL 会把 "::ffff:127.0.0.1" 归一化成 "::ffff:7f00:1"，所以上面
+    // expandIPv6 的 mapped-v4 快捷分支根本收不到这种写法 —— 必须在展开后再判一次，
+    // 否则 https://[::ffff:127.0.0.1] 会被放行并真的连到 127.0.0.1。
+    const isMappedV4 = v6.slice(0, 5).every((part) => part === 0) && v6[5] === 0xffff
+    const isNat64 = v6[0] === 0x0064 && v6[1] === 0xff9b
+    if (isMappedV4 || isNat64) {
+      return isBlockedIPv4(ipv4FromIPv6Tail(v6))
     }
     return false
   }

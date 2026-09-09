@@ -63,5 +63,55 @@ describe('grokQuota', () => {
     const merged = grokQuota.mergeQuotaSnapshots(previous, next)
     expect(merged.planFrom45Responses).toBe('supergrok_heavy')
     expect(grokQuota.canonicalPlan({ snapshot: merged })).toBe('supergrok_heavy')
+
+    // This case also exercises the shallow-merge data loss below: `next` carried no
+    // request headers, so the request window observed a moment ago must survive.
+    expect(merged.requests).not.toBeNull()
+    expect(merged.requests.limit).toBe(grokQuota.HEAVY_REQUEST_LIMIT)
+  })
+
+  // parseQuotaWindow returns null when a response carries no headers for that window,
+  // and xAI does not return both groups on every endpoint. A plain `{...previous,
+  // ...next}` therefore wiped out quota data that had already been measured, and the
+  // admin UI fell back to 「等待上游配额头」 for a window it already knew.
+  it('keeps windows the latest response did not report', () => {
+    const previous = grokQuota.parseQuotaHeaders({
+      'x-ratelimit-limit-requests': '8300',
+      'x-ratelimit-remaining-requests': '8000',
+      'xai-entitlement-status': 'active'
+    })
+    const next = grokQuota.parseQuotaHeaders({
+      'x-ratelimit-limit-tokens': '1000000',
+      'x-ratelimit-remaining-tokens': '900000'
+    })
+
+    const merged = grokQuota.mergeQuotaSnapshots(previous, next)
+
+    expect(merged.requests).toMatchObject({ limit: 8300, remaining: 8000 })
+    expect(merged.tokens).toMatchObject({ limit: 1000000, remaining: 900000 })
+    expect(merged.entitlementStatus).toBe('active')
+  })
+
+  // canonicalPlan's result is persisted and fed back in as `subscriptionTier` on the
+  // next observation, so treating that stored value as a Heavy candidate made the
+  // label irreversible — a real downgrade on xAI's side would never show up.
+  it('follows the tier the upstream reports now, even when it is a downgrade', () => {
+    const snapshot = grokQuota.parseQuotaHeaders({ 'x-subscription-tier': 'SuperGrok' })
+
+    expect(
+      grokQuota.canonicalPlan({
+        subscriptionTier: 'supergrok_heavy', // 上一次算出来、存进 Redis 的值
+        snapshot
+      })
+    ).toBe('supergrok')
+  })
+
+  it('still infers Heavy from the quota shape when no tier header is present', () => {
+    const snapshot = grokQuota.parseQuotaHeaders({
+      'x-ratelimit-limit-requests': String(grokQuota.HEAVY_REQUEST_LIMIT),
+      'x-ratelimit-limit-tokens': String(grokQuota.HEAVY_TOKEN_LIMIT)
+    })
+
+    expect(grokQuota.canonicalPlan({ snapshot })).toBe('supergrok_heavy')
   })
 })

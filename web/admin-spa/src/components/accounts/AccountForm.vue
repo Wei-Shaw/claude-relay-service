@@ -4505,6 +4505,48 @@ const normalizeAccountCooldownOverride = (value) => {
 
 const toFormBoolean = (value) => value === true || value === 'true'
 
+const GEMINI_API_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com'
+const GROK_DEFAULT_API_BASE_URL = 'https://api.x.ai/v1'
+
+// Grok 的「上游模式」下拉框只有 api / 三个区域 / custom 五个选项，没有 cli。
+// 新建账户时若默认成 cli，用户不主动展开下拉框就会带着 cli 提交，而提交分支里
+// 没有 cli 的处理，最终落到 form.baseUrl —— 那个字段的默认值是 Gemini 的地址，
+// 于是 xai- 密钥会被发到 generativelanguage.googleapis.com。默认必须是 api。
+// （OAuth 账户仍是 cli：那条路径不展示这个下拉框，cli 才是它的真实上游。）
+function deriveGrokBaseUrlMode(account) {
+  if (account?.platform !== 'grok') {
+    return 'api'
+  }
+  if (account?.authType === 'api_key') {
+    return toFormBoolean(account?.customUpstream) ? 'custom' : 'api'
+  }
+  return 'cli'
+}
+
+function deriveBaseUrl(account) {
+  if (account?.platform === 'grok') {
+    return account?.baseUrl || ''
+  }
+  return account?.baseUrl || GEMINI_API_DEFAULT_BASE_URL
+}
+
+// Grok API Key 账户的上游地址。只有 custom 模式才使用用户填的 baseUrl；任何其它
+// 取值（包括将来新增却漏了分支的模式）都回落到官方 api.x.ai，绝不落到 form.baseUrl
+// —— 那个字段是与 Gemini API 共用的，兜底到它就等于把 xai- 密钥发给别家。
+const GROK_REGIONAL_BASE_URLS = {
+  api: GROK_DEFAULT_API_BASE_URL,
+  'us-east-1': 'https://us-east-1.api.x.ai/v1',
+  'us-west-2': 'https://us-west-2.api.x.ai/v1',
+  'eu-west-1': 'https://eu-west-1.api.x.ai/v1'
+}
+
+function resolveGrokApiKeyBaseUrl(mode, customBaseUrl) {
+  if (mode === 'custom') {
+    return customBaseUrl
+  }
+  return GROK_REGIONAL_BASE_URLS[mode] || GROK_DEFAULT_API_BASE_URL
+}
+
 // 表单数据
 const form = ref({
   platform: props.account?.platform || 'claude',
@@ -4546,19 +4588,10 @@ const form = ref({
   // OpenAI-Responses 特定字段
   baseApi: props.account?.baseApi || '',
   providerEndpoint: props.account?.providerEndpoint || 'responses',
-  grokBaseUrlMode: (() => {
-    if (props.account?.platform !== 'grok') return 'cli'
-    if (props.account?.authType === 'api_key') {
-      return toFormBoolean(props.account?.customUpstream) ? 'custom' : 'api'
-    }
-    return 'cli'
-  })(),
+  grokBaseUrlMode: deriveGrokBaseUrlMode(props.account),
   customUpstream: toFormBoolean(props.account?.customUpstream),
   // Gemini-API 特定字段
-  baseUrl:
-    props.account?.platform === 'grok'
-      ? props.account?.baseUrl || ''
-      : props.account?.baseUrl || 'https://generativelanguage.googleapis.com',
+  baseUrl: deriveBaseUrl(props.account),
   rateLimitDuration: props.account?.rateLimitDuration || 60,
   supportedModels: (() => {
     const models = props.account?.supportedModels
@@ -5728,18 +5761,7 @@ const createAccount = async () => {
         data.authType = 'api_key'
         data.apiKey = form.value.apiKey
         data.baseUrlMode = form.value.grokBaseUrlMode
-        data.baseUrl =
-          form.value.grokBaseUrlMode === 'custom'
-            ? form.value.baseUrl
-            : form.value.grokBaseUrlMode === 'api'
-              ? 'https://api.x.ai/v1'
-              : form.value.grokBaseUrlMode === 'us-east-1'
-                ? 'https://us-east-1.api.x.ai/v1'
-                : form.value.grokBaseUrlMode === 'us-west-2'
-                  ? 'https://us-west-2.api.x.ai/v1'
-                  : form.value.grokBaseUrlMode === 'eu-west-1'
-                    ? 'https://eu-west-1.api.x.ai/v1'
-                    : form.value.baseUrl
+        data.baseUrl = resolveGrokApiKeyBaseUrl(form.value.grokBaseUrlMode, form.value.baseUrl)
         data.customUpstream = form.value.grokBaseUrlMode === 'custom'
       } else {
         data.authType = 'oauth'
@@ -6470,6 +6492,12 @@ watch(
       form.value.addType = 'oauth'
     } else if (newPlatform === 'grok') {
       form.value.addType = 'oauth'
+      // baseUrl 是与 Gemini API 共用的字段，默认值是 Gemini 的地址。切到 Grok 后
+      // 若不清掉，用户选「自定义中转」时输入框里会预填着 Google 的地址。
+      if (!isEdit.value) {
+        form.value.baseUrl = ''
+        form.value.grokBaseUrlMode = 'api'
+      }
     } else if (newPlatform === 'gemini-api' || newPlatform === 'azure_openai') {
       // 切换到 Gemini API 或 Azure OpenAI 时，使用 apikey 模式（直接创建，不需要 OAuth 流程）
       form.value.addType = 'apikey'
@@ -6795,8 +6823,12 @@ watch(
         // OpenAI-Responses 特定字段
         baseApi: newAccount.baseApi || '',
         providerEndpoint: newAccount.providerEndpoint || 'responses',
+        // Grok 特定字段。这里重建的是整个 form 对象，漏掉这两个键会让编辑 Grok 账户时
+        // grokBaseUrlMode 变成 undefined、baseUrl 变成 Gemini 的默认地址。
+        grokBaseUrlMode: deriveGrokBaseUrlMode(newAccount),
+        customUpstream: toFormBoolean(newAccount.customUpstream),
         // Gemini-API 特定字段
-        baseUrl: newAccount.baseUrl || 'https://generativelanguage.googleapis.com',
+        baseUrl: deriveBaseUrl(newAccount),
         // 额度管理字段
         dailyQuota: newAccount.dailyQuota || 0,
         dailyUsage: newAccount.dailyUsage || 0,

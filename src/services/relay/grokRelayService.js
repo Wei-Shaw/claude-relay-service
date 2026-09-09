@@ -324,7 +324,17 @@ class GrokRelayService {
     const actualModel = body.model || body.response?.model || requestedModel
     await this._recordUsage(account, apiKeyData, usageData, actualModel, req)
 
-    const skipHeaders = new Set(['transfer-encoding', 'connection', 'keep-alive'])
+    // 与仓库既有惯例对齐（api.js 的 /v1/messages 用的是 content-encoding /
+    // transfer-encoding / content-length），另外必须剥掉 set-cookie：上游账号是多个
+    // API Key 共享的，把它的会话 cookie 原样转给调用方等于把凭据发给了任意 Key 持有者。
+    const skipHeaders = new Set([
+      'content-encoding',
+      'content-length',
+      'transfer-encoding',
+      'connection',
+      'keep-alive',
+      'set-cookie'
+    ])
     Object.entries(response.headers || {}).forEach(([key, value]) => {
       if (!skipHeaders.has(key.toLowerCase())) {
         res.setHeader(key, value)

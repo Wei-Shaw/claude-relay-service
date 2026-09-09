@@ -295,6 +295,18 @@ function mergeQuotaSnapshots(previous, next) {
   if (!next.subscriptionTier && previous.subscriptionTier) {
     merged.subscriptionTier = previous.subscriptionTier
   }
+  // parseQuotaWindow 在本次响应没带这组头时返回 null，浅合并会把上一次真实测到的
+  // 窗口直接抹掉（xAI 并非每个端点都同时回传 requests 与 tokens 两组头）。已观测到
+  // 的数据要保留，否则界面会退回「等待上游配额头」。
+  if (!next.requests && previous.requests) {
+    merged.requests = previous.requests
+  }
+  if (!next.tokens && previous.tokens) {
+    merged.tokens = previous.tokens
+  }
+  if (!next.entitlementStatus && previous.entitlementStatus) {
+    merged.entitlementStatus = previous.entitlementStatus
+  }
   return merged
 }
 
@@ -302,7 +314,14 @@ function canonicalPlan({ subscriptionTier = '', snapshot = null } = {}) {
   const fromHeader = normalizeSubscriptionTier(snapshot?.subscriptionTier)
   const fromJwt = normalizeSubscriptionTier(subscriptionTier)
   const from45 = normalizeSubscriptionTier(snapshot?.planFrom45Responses)
-  for (const candidate of [fromHeader, fromJwt, from45]) {
+
+  // 上游本次明说的套餐优先。此前把 fromJwt 也算进 heavy 的候选，而
+  // recordQuotaObservation 又会把「上次算出来的 tier」当作 subscriptionTier 回喂进来，
+  // 于是账号一旦被判成 heavy 就永远降不回去 —— xAI 侧真实降级不会反映到界面上。
+  if (fromHeader) {
+    return fromHeader
+  }
+  for (const candidate of [from45, fromJwt]) {
     if (candidate === 'supergrok_heavy') {
       return 'supergrok_heavy'
     }
@@ -310,7 +329,7 @@ function canonicalPlan({ subscriptionTier = '', snapshot = null } = {}) {
   if (quotaLooksLikeHeavy(snapshot)) {
     return 'supergrok_heavy'
   }
-  return fromHeader || fromJwt || from45 || ''
+  return fromJwt || from45 || ''
 }
 
 function formatWindow(window, now = new Date()) {
