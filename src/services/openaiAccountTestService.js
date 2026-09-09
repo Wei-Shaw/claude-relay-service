@@ -2,6 +2,7 @@ const axios = require('axios')
 const { StringDecoder } = require('string_decoder')
 const accounts = require('./account/openaiAccountService')
 const ProxyHelper = require('../utils/proxyHelper')
+const { extractCodexUsageHeaders } = require('../utils/codexUsage')
 
 const DEFAULT_MODEL = 'gpt-5.5'
 const errors = {
@@ -114,9 +115,25 @@ async function readResult(stream) {
 
 async function testAccount(accountId, model = DEFAULT_MODEL) {
   const startedAt = Date.now()
+  let quotaUpdated = false
+  let quotaError
+  const updateQuota = async (headers) => {
+    const snapshot = extractCodexUsageHeaders(headers)
+    if (!snapshot) {
+      return
+    }
+    try {
+      await accounts.updateCodexUsageSnapshot(accountId, snapshot)
+      quotaUpdated = true
+    } catch {
+      quotaError = 'QUOTA_SAVE_FAILED'
+    }
+  }
   const finish = (result) => ({
     ...result,
     model,
+    quotaUpdated,
+    ...(quotaError ? { quotaError } : {}),
     latencyMs: Date.now() - startedAt,
     timestamp: new Date().toISOString()
   })
@@ -182,12 +199,17 @@ async function testAccount(accountId, model = DEFAULT_MODEL) {
       }
     )
     stream = response.data
+    await updateQuota(response.headers)
     if (response.status !== 200) {
       return finish(statusFailure(response.status))
     }
     const result = await readResult(stream)
     return finish(timedOut ? failure('TIMEOUT') : result)
   } catch (error) {
+    if (error.response) {
+      stream = error.response.data
+      await updateQuota(error.response.headers)
+    }
     if (timedOut || ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code)) {
       return finish(failure('TIMEOUT'))
     }

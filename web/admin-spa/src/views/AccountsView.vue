@@ -1147,12 +1147,15 @@
                   </div>
                   <div v-else-if="account.platform === 'openai'" class="space-y-2">
                     <div v-if="account.codexUsage" class="space-y-2">
-                      <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
+                      <div
+                        v-if="account.codexUsage.primary.windowMinutes !== 0"
+                        class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
+                      >
                         <div class="flex items-center gap-2">
                           <span
                             class="inline-flex min-w-[32px] justify-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
                           >
-                            {{ getCodexWindowLabel('primary') }}
+                            {{ getCodexWindowLabel(account.codexUsage.primary) }}
                           </span>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
@@ -1179,12 +1182,15 @@
                           重置剩余 {{ formatCodexRemaining(account.codexUsage.primary) }}
                         </div>
                       </div>
-                      <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70">
+                      <div
+                        v-if="account.codexUsage.secondary.windowMinutes !== 0"
+                        class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
+                      >
                         <div class="flex items-center gap-2">
                           <span
                             class="inline-flex min-w-[32px] justify-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"
                           >
-                            {{ getCodexWindowLabel('secondary') }}
+                            {{ getCodexWindowLabel(account.codexUsage.secondary) }}
                           </span>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
@@ -1747,12 +1753,15 @@
             </div>
             <div v-else-if="account.platform === 'openai'" class="space-y-2">
               <div v-if="account.codexUsage" class="space-y-2">
-                <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <div
+                  v-if="account.codexUsage.primary.windowMinutes !== 0"
+                  class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
+                >
                   <div class="flex items-center gap-2">
                     <span
                       class="inline-flex min-w-[32px] justify-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
                     >
-                      {{ getCodexWindowLabel('primary') }}
+                      {{ getCodexWindowLabel(account.codexUsage.primary) }}
                     </span>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
@@ -1779,12 +1788,15 @@
                     重置剩余 {{ formatCodexRemaining(account.codexUsage.primary) }}
                   </div>
                 </div>
-                <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <div
+                  v-if="account.codexUsage.secondary.windowMinutes !== 0"
+                  class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
+                >
                   <div class="flex items-center gap-2">
                     <span
                       class="inline-flex min-w-[32px] justify-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"
                     >
-                      {{ getCodexWindowLabel('secondary') }}
+                      {{ getCodexWindowLabel(account.codexUsage.secondary) }}
                     </span>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
@@ -2771,8 +2783,10 @@ const openAccountTestModal = (account) => {
 }
 
 const closeAccountTestModal = () => {
+  const refreshQuota = testingAccount.value?.platform === 'openai'
   showAccountTestModal.value = false
   testingAccount.value = null
+  if (refreshQuota) loadAccounts()
 }
 
 // 定时测试配置相关函数
@@ -4950,12 +4964,13 @@ const getCodexUsageWidth = (usageItem) => {
   return `${percent}%`
 }
 
-// 时间窗口标签
-const getCodexWindowLabel = (type) => {
-  if (type === 'secondary') {
-    return '周限'
-  }
-  return '5h'
+// 时间窗口由上游指定，primary 不固定代表五小时。
+const getCodexWindowLabel = (usageItem) => {
+  const minutes = usageItem?.windowMinutes
+  if (!Number.isFinite(minutes) || minutes <= 0) return '未提供窗口'
+  if (minutes % 1440 === 0) return `${minutes / 1440}天`
+  if (minutes % 60 === 0) return `${minutes / 60}小时`
+  return `${minutes}分钟`
 }
 
 // 格式化剩余时间

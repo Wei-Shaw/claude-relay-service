@@ -5,7 +5,8 @@ jest.mock('../src/services/account/openaiAccountService', () => ({
   getAccount: jest.fn(),
   isTokenExpired: jest.fn(),
   refreshAccountToken: jest.fn(),
-  decrypt: jest.fn()
+  decrypt: jest.fn(),
+  updateCodexUsageSnapshot: jest.fn()
 }))
 jest.mock('../src/utils/proxyHelper', () => ({ createProxyAgent: jest.fn() }))
 jest.mock('../src/utils/logger', () => ({
@@ -28,6 +29,23 @@ const completed = (text = 'OK') => ({
   }
 })
 const encode = (event) => `data: ${JSON.stringify(event)}\n\n`
+const quotaHeaders = {
+  'x-codex-primary-used-percent': '0',
+  'x-codex-primary-window-minutes': '10080',
+  'x-codex-primary-reset-after-seconds': '602505',
+  'x-codex-secondary-used-percent': '0',
+  'x-codex-secondary-window-minutes': '0',
+  'x-codex-secondary-reset-after-seconds': '0'
+}
+const quotaSnapshot = {
+  primaryUsedPercent: 0,
+  primaryWindowMinutes: 10080,
+  primaryResetAfterSeconds: 602505,
+  secondaryUsedPercent: 0,
+  secondaryWindowMinutes: 0,
+  secondaryResetAfterSeconds: 0,
+  primaryOverSecondaryPercent: null
+}
 const respond = (...events) => {
   const wire = events.map(encode).join('')
   axios.post.mockResolvedValue({
@@ -52,8 +70,66 @@ describe('OpenAI OAuth account tests', () => {
     })
     accounts.isTokenExpired.mockReturnValue(false)
     accounts.decrypt.mockReturnValue('secret-token')
+    accounts.updateCodexUsageSnapshot.mockResolvedValue(undefined)
     proxyHelper.createProxyAgent.mockReturnValue(null)
   })
+
+  test('saves zero usage and weekly quota from a successful OAuth probe', async () => {
+    axios.post.mockResolvedValue({
+      status: 200,
+      headers: quotaHeaders,
+      data: Readable.from([encode(completed())])
+    })
+    const result = await testAccount('selected-account')
+    expect(result).toMatchObject({ success: true, quotaUpdated: true })
+    expect(accounts.updateCodexUsageSnapshot).toHaveBeenCalledWith(
+      'selected-account',
+      quotaSnapshot
+    )
+  })
+
+  test('does not overwrite quota when the response has no quota headers', async () => {
+    respond(completed())
+    expect(await testAccount('selected-account')).toMatchObject({
+      success: true,
+      quotaUpdated: false
+    })
+    expect(accounts.updateCodexUsageSnapshot).not.toHaveBeenCalled()
+  })
+
+  test('saves quota on a rejected rate-limited request without reporting generation success', async () => {
+    axios.post.mockRejectedValue({ response: { status: 429, headers: quotaHeaders } })
+    const result = await testAccount('selected-account')
+    expectSafeFailure(result, 'RATE_LIMITED')
+    expect(result.quotaUpdated).toBe(true)
+    expect(accounts.updateCodexUsageSnapshot).toHaveBeenCalledWith(
+      'selected-account',
+      quotaSnapshot
+    )
+  })
+
+  test.each([200, 429])(
+    'quota persistence failure preserves the HTTP %s generation result',
+    async (status) => {
+      accounts.updateCodexUsageSnapshot.mockRejectedValue(
+        new Error('private-upstream-payload secret-token')
+      )
+      axios.post.mockResolvedValue({
+        status,
+        headers: quotaHeaders,
+        data: Readable.from([encode(completed())])
+      })
+      const result = await testAccount('selected-account')
+      expect(result).toMatchObject({
+        success: status === 200,
+        quotaUpdated: false,
+        quotaError: 'QUOTA_SAVE_FAILED'
+      })
+      if (status === 429) expectSafeFailure(result, 'RATE_LIMITED')
+      expect(JSON.stringify(result)).not.toContain('secret-token')
+      expect(JSON.stringify(result)).not.toContain('private-upstream-payload')
+    }
+  )
 
   test('tests the selected OAuth account and accepts completed text across SSE chunks', async () => {
     respond(completed())
