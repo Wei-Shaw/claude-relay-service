@@ -13,6 +13,7 @@ const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
 const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
+const { BEDROCK_CREDENTIAL_TYPES, normalizeBedrockRegion } = require('../../utils/bedrockConfig')
 
 // ☁️ Bedrock 账户管理
 
@@ -58,7 +59,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
     const accountsWithStats = await Promise.all(
       accounts.map(async (account) => {
         try {
-          const usageStats = await redis.getAccountUsageStats(account.id, 'openai')
+          const usageStats = await redis.getAccountUsageStats(account.id, 'bedrock')
           const groupInfos = await accountGroupService.getAccountGroups(account.id)
 
           const formattedAccount = formatAccountExpiry(account)
@@ -124,6 +125,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
       awsCredentials,
       bearerToken,
       defaultModel,
+      expiresAt,
+      subscriptionExpiresAt,
       priority,
       accountType,
       credentialType
@@ -146,19 +149,20 @@ router.post('/', authenticateAdmin, async (req, res) => {
     }
 
     // 验证credentialType的有效性
-    if (credentialType && !['access_key', 'bearer_token'].includes(credentialType)) {
+    if (credentialType && !BEDROCK_CREDENTIAL_TYPES.includes(credentialType)) {
       return res.status(400).json({
-        error: 'Invalid credential type. Must be "access_key" or "bearer_token"'
+        error: 'Invalid credential type. Must be "access_key", "bearer_token", or "default"'
       })
     }
 
     const result = await bedrockAccountService.createAccount({
       name,
       description: description || '',
-      region: region || 'us-east-1',
+      region: normalizeBedrockRegion(region, 'us-east-1'),
       awsCredentials,
       bearerToken,
       defaultModel,
+      subscriptionExpiresAt: subscriptionExpiresAt ?? expiresAt ?? null,
       priority: priority || 50,
       accountType: accountType || 'shared',
       credentialType: credentialType || 'access_key'
@@ -166,7 +170,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
 
     if (!result.success) {
       return res
-        .status(500)
+        .status(result.statusCode || 500)
         .json({ error: 'Failed to create Bedrock account', message: result.error })
     }
 
@@ -176,7 +180,7 @@ router.post('/', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to create Bedrock account:', error)
     return res
-      .status(500)
+      .status(error.statusCode || 500)
       .json({ error: 'Failed to create Bedrock account', message: error.message })
   }
 })
@@ -189,6 +193,10 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
 
     // ✅ 【新增】映射字段名：前端的 expiresAt -> 后端的 subscriptionExpiresAt
     const mappedUpdates = mapExpiryField(updates, 'Bedrock', accountId)
+
+    if (mappedUpdates.region !== undefined) {
+      mappedUpdates.region = normalizeBedrockRegion(mappedUpdates.region)
+    }
 
     // 验证priority的有效性（1-100）
     if (
@@ -208,10 +216,10 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
     // 验证credentialType的有效性
     if (
       mappedUpdates.credentialType &&
-      !['access_key', 'bearer_token'].includes(mappedUpdates.credentialType)
+      !BEDROCK_CREDENTIAL_TYPES.includes(mappedUpdates.credentialType)
     ) {
       return res.status(400).json({
-        error: 'Invalid credential type. Must be "access_key" or "bearer_token"'
+        error: 'Invalid credential type. Must be "access_key", "bearer_token", or "default"'
       })
     }
 
@@ -219,7 +227,7 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
 
     if (!result.success) {
       return res
-        .status(500)
+        .status(result.statusCode || 500)
         .json({ error: 'Failed to update Bedrock account', message: result.error })
     }
 
@@ -228,7 +236,7 @@ router.put('/:accountId', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to update Bedrock account:', error)
     return res
-      .status(500)
+      .status(error.statusCode || 500)
       .json({ error: 'Failed to update Bedrock account', message: error.message })
   }
 })
@@ -355,8 +363,9 @@ router.put('/:accountId/toggle-schedulable', authenticateAdmin, async (req, res)
 router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params
+    const { model } = req.body || {}
 
-    await bedrockAccountService.testAccountConnection(accountId, res)
+    await bedrockAccountService.testAccountConnection(accountId, res, model)
   } catch (error) {
     logger.error('❌ Failed to test Bedrock account:', error)
     // 错误已在服务层处理，这里仅做日志记录

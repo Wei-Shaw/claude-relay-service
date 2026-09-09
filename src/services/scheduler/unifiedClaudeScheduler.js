@@ -398,6 +398,7 @@ class UnifiedClaudeScheduler {
         if (
           boundBedrockAccountResult.success &&
           boundBedrockAccountResult.data.isActive === true &&
+          !bedrockAccountService.isSubscriptionExpired(boundBedrockAccountResult.data) &&
           isSchedulable(boundBedrockAccountResult.data.schedulable)
         ) {
           // 检查是否临时不可用
@@ -646,6 +647,7 @@ class UnifiedClaudeScheduler {
       if (
         boundBedrockAccountResult.success &&
         boundBedrockAccountResult.data.isActive === true &&
+        !bedrockAccountService.isSubscriptionExpired(boundBedrockAccountResult.data) &&
         isSchedulable(boundBedrockAccountResult.data.schedulable)
       ) {
         // 检查是否临时不可用
@@ -920,6 +922,8 @@ class UnifiedClaudeScheduler {
         if (
           account.isActive === true &&
           account.accountType === 'shared' &&
+          !bedrockAccountService.isSubscriptionExpired(account) &&
+          account.hasCredentials !== false &&
           isSchedulable(account.schedulable)
         ) {
           // 检查是否临时不可用
@@ -1181,6 +1185,10 @@ class UnifiedClaudeScheduler {
       } else if (accountType === 'bedrock') {
         const accountResult = await bedrockAccountService.getAccount(accountId)
         if (!accountResult.success || !accountResult.data.isActive) {
+          return false
+        }
+        if (bedrockAccountService.isSubscriptionExpired(accountResult.data)) {
+          logger.info(`🚫 Bedrock account ${accountId} subscription is expired`)
           return false
         }
         // 检查是否可调度

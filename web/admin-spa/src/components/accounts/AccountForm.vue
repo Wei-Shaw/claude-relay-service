@@ -1106,21 +1106,6 @@
                   </div>
                 </div>
               </div>
-
-              <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                  >小快速模型 (可选)</label
-                >
-                <input
-                  v-model="form.smallFastModel"
-                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
-                  placeholder="例如：us.anthropic.claude-3-5-haiku-20241022-v1:0"
-                  type="text"
-                />
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  用于快速响应的轻量级模型，留空将使用系统默认
-                </p>
-              </div>
             </div>
 
             <!-- Azure OpenAI 特定字段 -->
@@ -3676,19 +3661,6 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                >小快速模型 (可选)</label
-              >
-              <input
-                v-model="form.smallFastModel"
-                class="form-input w-full"
-                placeholder="例如：us.anthropic.claude-3-5-haiku-20241022-v1:0"
-                type="text"
-              />
-              <p class="mt-1 text-xs text-gray-500">用于快速响应的轻量级模型，留空将使用系统默认</p>
-            </div>
-
-            <div>
               <label class="mb-3 block text-sm font-semibold text-gray-700">限流机制</label>
               <div class="mb-3">
                 <label class="inline-flex cursor-pointer items-center">
@@ -4384,7 +4356,6 @@ const form = ref({
   sessionToken: props.account?.sessionToken || '',
   bearerToken: props.account?.bearerToken || '', // Bearer Token 字段
   defaultModel: props.account?.defaultModel || '',
-  smallFastModel: props.account?.smallFastModel || '',
   // Azure OpenAI 特定字段
   azureEndpoint: props.account?.azureEndpoint || '',
   apiVersion: props.account?.apiVersion || '',
@@ -5555,9 +5526,8 @@ const createAccount = async () => {
         data.bearerToken = form.value.bearerToken
       }
 
-      data.region = form.value.region
+      data.region = form.value.region.trim().toLowerCase()
       data.defaultModel = form.value.defaultModel || null
-      data.smallFastModel = form.value.smallFastModel || null
       data.priority = form.value.priority || 50
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
@@ -5899,8 +5869,8 @@ const updateAccount = async () => {
           if (form.value.secretAccessKey) {
             data.awsCredentials.secretAccessKey = form.value.secretAccessKey
           }
-          if (form.value.sessionToken !== undefined) {
-            data.awsCredentials.sessionToken = form.value.sessionToken || null
+          if (form.value.sessionToken) {
+            data.awsCredentials.sessionToken = form.value.sessionToken
           }
         }
       } else if (form.value.credentialType === 'bearer_token') {
@@ -5911,11 +5881,10 @@ const updateAccount = async () => {
       }
 
       if (form.value.region) {
-        data.region = form.value.region
+        data.region = form.value.region.trim().toLowerCase()
       }
       // 模型配置（支持设置为空来使用系统默认）
       data.defaultModel = form.value.defaultModel || null
-      data.smallFastModel = form.value.smallFastModel || null
       data.priority = form.value.priority || 50
       // 如果不启用限流，传递 0 表示不限流
       data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
@@ -6490,7 +6459,6 @@ watch(
         region: newAccount.region || '',
         sessionToken: '', // 编辑模式不显示现有的会话令牌
         defaultModel: newAccount.defaultModel || '',
-        smallFastModel: newAccount.smallFastModel || '',
         // Azure OpenAI 特定字段
         azureEndpoint: newAccount.azureEndpoint || '',
         apiVersion: newAccount.apiVersion || '',
