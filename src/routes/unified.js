@@ -38,6 +38,11 @@ function detectBackendFromModel(modelName) {
     return 'openai'
   }
 
+  // Grok / xAI 模型
+  if (model.startsWith('grok-') || model.startsWith('xai/')) {
+    return 'grok'
+  }
+
   // 默认使用 Claude
   return 'claude'
 }
@@ -216,6 +221,23 @@ async function routeToBackend(req, res, requestedModel) {
     req.url = '/v1/responses'
 
     return await openaiRoutes.handleResponses(req, res)
+  } else if (backend === 'grok') {
+    if (!apiKeyService.hasPermission(permissions, 'grok')) {
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access Grok',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
+    const grokScheduler = require('../services/scheduler/grokScheduler')
+    const grokRelayService = require('../services/relay/grokRelayService')
+    const sessionHash = req.body?.session_id
+      ? require('crypto').createHash('sha256').update(String(req.body.session_id)).digest('hex')
+      : null
+    const account = await grokScheduler.selectAccount(req.apiKey, sessionHash)
+    return grokRelayService.handleRequest(req, res, account, req.apiKey)
   } else if (backend === 'gemini') {
     // Gemini 后端
     if (!apiKeyService.hasPermission(permissions, 'gemini')) {
@@ -361,6 +383,50 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
       res.status(500).json({
         error: {
           message: 'Internal server error',
+          type: 'server_error',
+          code: 'internal_error'
+        }
+      })
+    }
+  }
+})
+
+router.post('/v1/responses', authenticateApiKey, async (req, res) => {
+  try {
+    const requestedModel = req.body?.model || ''
+    const backend = detectBackendFromModel(requestedModel)
+    if (backend !== 'grok') {
+      return res.status(400).json({
+        error: {
+          message:
+            'Unified /v1/responses currently supports Grok models only. Use /grok/v1 or /openai/v1/responses for other backends.',
+          type: 'invalid_request_error',
+          code: 'unsupported_model'
+        }
+      })
+    }
+    if (!apiKeyService.hasPermission(req.apiKey.permissions, 'grok')) {
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access Grok',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
+    const grokScheduler = require('../services/scheduler/grokScheduler')
+    const grokRelayService = require('../services/relay/grokRelayService')
+    const sessionHash = req.body?.session_id
+      ? require('crypto').createHash('sha256').update(String(req.body.session_id)).digest('hex')
+      : null
+    const account = await grokScheduler.selectAccount(req.apiKey, sessionHash)
+    return grokRelayService.handleRequest(req, res, account, req.apiKey)
+  } catch (error) {
+    logger.error('❌ OpenAI responses error:', error)
+    if (!res.headersSent) {
+      res.status(error.statusCode || 500).json({
+        error: {
+          message: error.message || 'Internal server error',
           type: 'server_error',
           code: 'internal_error'
         }

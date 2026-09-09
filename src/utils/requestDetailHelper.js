@@ -7,7 +7,7 @@ const DEFAULT_MAX_TOTAL_CHARS = 12000
 const ENCRYPTED_CONTENT_KEY = 'encrypted_content'
 const TOOLS_KEY = 'tools'
 const PREVIEW_TRUNCATION_SUFFIX_PATTERN = /\.\.\.\[(?:truncated )?(\d+) chars\]$/
-const OPENAI_RELATED_ACCOUNT_TYPES = new Set(['openai', 'openai-responses', 'azure-openai'])
+const OPENAI_RELATED_ACCOUNT_TYPES = new Set(['openai', 'openai-responses', 'azure-openai', 'grok'])
 const CACHE_HIT_FORMULA = 'cacheReadTokens / (inputTokens + cacheReadTokens + cacheCreateTokens)'
 
 function toFiniteNumber(value) {
@@ -635,7 +635,11 @@ function isOpenAIRelatedEndpoint(endpoint) {
     return false
   }
 
-  if (endpoint.startsWith('/azure/') || endpoint.startsWith('/droid/openai/')) {
+  if (
+    endpoint.startsWith('/azure/') ||
+    endpoint.startsWith('/droid/openai/') ||
+    endpoint.startsWith('/grok/')
+  ) {
     return true
   }
 

@@ -17,7 +17,8 @@ const ACCOUNT_TYPE_CONFIG = {
   'azure-openai': { prefix: 'azure_openai:account:' },
   gemini: { prefix: 'gemini_account:' },
   'gemini-api': { prefix: 'gemini_api_account:' },
-  droid: { prefix: 'droid:account:' }
+  droid: { prefix: 'droid:account:' },
+  grok: { prefix: 'grok_account:' }
 }
 
 const ACCOUNT_TYPE_PRIORITY = [
@@ -28,7 +29,8 @@ const ACCOUNT_TYPE_PRIORITY = [
   'claude-console',
   'gemini',
   'gemini-api',
-  'droid'
+  'droid',
+  'grok'
 ]
 
 const ACCOUNT_CATEGORY_MAP = {
@@ -39,7 +41,8 @@ const ACCOUNT_CATEGORY_MAP = {
   'azure-openai': 'openai',
   gemini: 'gemini',
   'gemini-api': 'gemini',
-  droid: 'droid'
+  droid: 'droid',
+  grok: 'grok'
 }
 
 /**
@@ -86,7 +89,7 @@ function normalizePermissions(permissions) {
 /**
  * 检查是否有访问特定服务的权限
  * @param {string|array} permissions - 权限数据
- * @param {string} service - 服务名称（claude/gemini/openai/droid）
+ * @param {string} service - 服务名称（claude/gemini/openai/droid/grok）
  * @returns {boolean} - 是否有权限
  */
 function hasPermission(permissions, service) {
@@ -183,6 +186,7 @@ class ApiKeyService {
       azureOpenaiAccountId = null,
       bedrockAccountId = null, // 添加 Bedrock 账号ID支持
       droidAccountId = null,
+      grokAccountId = null,
       permissions = [], // 数组格式，空数组表示全部服务，如 ['claude', 'gemini']
       isActive = true,
       concurrencyLimit = 0,
@@ -242,6 +246,7 @@ class ApiKeyService {
       azureOpenaiAccountId: azureOpenaiAccountId || '',
       bedrockAccountId: bedrockAccountId || '', // 添加 Bedrock 账号ID
       droidAccountId: droidAccountId || '',
+      grokAccountId: grokAccountId || '',
       permissions: JSON.stringify(normalizePermissions(permissions)),
       enableModelRestriction: String(enableModelRestriction),
       restrictedModels: JSON.stringify(restrictedModels || []),
@@ -318,6 +323,7 @@ class ApiKeyService {
       azureOpenaiAccountId: keyData.azureOpenaiAccountId,
       bedrockAccountId: keyData.bedrockAccountId, // 添加 Bedrock 账号ID
       droidAccountId: keyData.droidAccountId,
+      grokAccountId: keyData.grokAccountId,
       permissions: normalizePermissions(keyData.permissions),
       enableModelRestriction: keyData.enableModelRestriction === 'true',
       restrictedModels: JSON.parse(keyData.restrictedModels),
@@ -517,6 +523,7 @@ class ApiKeyService {
           azureOpenaiAccountId: keyData.azureOpenaiAccountId,
           bedrockAccountId: keyData.bedrockAccountId, // 添加 Bedrock 账号ID
           droidAccountId: keyData.droidAccountId,
+          grokAccountId: keyData.grokAccountId,
           permissions: normalizePermissions(keyData.permissions),
           tokenLimit: parseInt(keyData.tokenLimit),
           concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
@@ -663,6 +670,7 @@ class ApiKeyService {
           azureOpenaiAccountId: keyData.azureOpenaiAccountId,
           bedrockAccountId: keyData.bedrockAccountId,
           droidAccountId: keyData.droidAccountId,
+          grokAccountId: keyData.grokAccountId,
           permissions: normalizePermissions(keyData.permissions),
           tokenLimit: parseInt(keyData.tokenLimit),
           concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
@@ -1287,6 +1295,7 @@ class ApiKeyService {
           'geminiAccountId',
           'openaiAccountId',
           'droidAccountId',
+          'grokAccountId',
           'isDeleted'
         )
       }
@@ -1304,7 +1313,8 @@ class ApiKeyService {
             geminiAccountId: fields[1] || null,
             openaiAccountId: fields[2] || null,
             droidAccountId: fields[3] || null,
-            isDeleted: fields[4] === 'true'
+            grokAccountId: fields[4] || null,
+            isDeleted: fields[5] === 'true'
           }
         })
         .filter((k) => k && !k.isDeleted)
@@ -1339,6 +1349,7 @@ class ApiKeyService {
         'azureOpenaiAccountId',
         'bedrockAccountId', // 添加 Bedrock 账号ID
         'droidAccountId',
+        'grokAccountId',
         'permissions',
         'expiresAt',
         'activationDays', // 新增：激活后有效天数
@@ -2402,6 +2413,7 @@ class ApiKeyService {
           userUsername: key.userUsername,
           createdBy: key.createdBy,
           droidAccountId: key.droidAccountId,
+          grokAccountId: key.grokAccountId,
           // Include deletion fields for deleted keys
           isDeleted: key.isDeleted,
           deletedAt: key.deletedAt,
@@ -2453,6 +2465,7 @@ class ApiKeyService {
         openaiAccountId: keyData.openaiAccountId,
         bedrockAccountId: keyData.bedrockAccountId,
         droidAccountId: keyData.droidAccountId,
+        grokAccountId: keyData.grokAccountId,
         azureOpenaiAccountId: keyData.azureOpenaiAccountId,
         ccrAccountId: keyData.ccrAccountId,
         enableOpenAIResponsesCodexAdaptation: parseBooleanWithDefault(
@@ -2614,6 +2627,7 @@ class ApiKeyService {
         azure_openai: 'azureOpenaiAccountId',
         bedrock: 'bedrockAccountId',
         droid: 'droidAccountId',
+        grok: 'grokAccountId',
         ccr: null // CCR 账号没有对应的 API Key 字段
       }
 

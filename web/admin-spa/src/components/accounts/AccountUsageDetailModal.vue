@@ -66,6 +66,69 @@
             <div class="loading-spinner h-12 w-12 border-4 border-blue-500" />
           </div>
           <template v-else>
+            <div
+              v-if="account?.grokUsage"
+              class="mb-5 rounded-2xl border border-zinc-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+            >
+              <div class="mb-3 flex items-center justify-between">
+                <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                  {{ account.grokUsage.planLabel || 'Grok OAuth' }} 配额
+                </p>
+                <span class="text-xs text-gray-400">
+                  {{
+                    account.grokUsage.headersObserved
+                      ? '来自 xAI 响应头'
+                      : '尚未观察到上游配额头，可先点测试'
+                  }}
+                </span>
+              </div>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div v-for="window in grokQuotaCards" :key="window.key">
+                  <p class="text-xs uppercase tracking-wide text-gray-500">{{ window.label }}</p>
+                  <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    {{ window.value }}
+                  </p>
+                  <p class="text-xs text-gray-400">{{ window.subtitle }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-if="rollingWindows.length"
+              class="mb-5 rounded-2xl border border-zinc-100 bg-white/80 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+            >
+              <p
+                class="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
+                滚动用量
+              </p>
+              <div class="space-y-2">
+                <div
+                  v-for="window in rollingWindows"
+                  :key="window.key"
+                  class="flex items-center gap-2"
+                  :title="`${window.cost} · ${window.tokens} tokens · ${window.requests} 次`"
+                >
+                  <span
+                    class="w-7 shrink-0 text-xs font-semibold text-zinc-500 dark:text-zinc-300"
+                    >{{ window.label }}</span
+                  >
+                  <div
+                    class="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700"
+                  >
+                    <div
+                      class="h-full rounded-full bg-gradient-to-r from-zinc-500 to-indigo-500"
+                      :style="{ width: window.barWidth }"
+                    />
+                  </div>
+                  <span
+                    class="w-16 shrink-0 text-right text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100"
+                    >{{ window.cost }}</span
+                  >
+                </div>
+              </div>
+            </div>
+
             <!-- 关键指标 -->
             <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <div
@@ -367,6 +430,7 @@ const platformLabelMap = {
   gemini: 'Gemini',
   'gemini-api': 'Gemini API',
   droid: 'Droid',
+  grok: 'Grok',
   bedrock: 'Claude AWS Bedrock'
 }
 
@@ -390,6 +454,58 @@ const chartColors = computed(() => ({
 const totalTokens = computed(() => props.summary?.totalTokens || 0)
 const overviewInputTokens = computed(() => props.overview?.total?.inputTokens || 0)
 const overviewOutputTokens = computed(() => props.overview?.total?.outputTokens || 0)
+
+const rollingUsageData = computed(
+  () => props.summary?.rollingUsage || props.account?.rollingUsage || null
+)
+
+const grokQuotaCards = computed(() => {
+  const usage = props.account?.grokUsage
+  if (!usage) {
+    return []
+  }
+  const formatWindow = (window, suffix) => {
+    if (!window || window.used === null || window.used === undefined || !window.limit) {
+      return { value: '-', subtitle: '等待上游配额头' }
+    }
+    return {
+      value: `${formatNumber(window.used)} / ${formatNumber(window.limit)}`,
+      subtitle: window.utilization !== null ? `已用 ${window.utilization}% ${suffix}` : suffix
+    }
+  }
+  const tokens = formatWindow(usage.tokens, 'tokens')
+  const requests = formatWindow(usage.requests, 'requests')
+  return [
+    { key: 'tokens', label: 'Token 窗口', ...tokens },
+    { key: 'requests', label: '请求窗口', ...requests }
+  ]
+})
+
+const rollingWindows = computed(() => {
+  const rolling = rollingUsageData.value
+  if (!rolling) {
+    return []
+  }
+  const windows = [
+    { key: 'fiveHour', label: '5h' },
+    { key: 'oneDay', label: '1d' },
+    { key: 'sevenDay', label: '7d' },
+    { key: 'thirtyDay', label: '30d' }
+  ]
+  const maxCost = Math.max(...windows.map((window) => Number(rolling[window.key]?.cost || 0)), 0)
+  return windows.map((window) => {
+    const data = rolling[window.key] || {}
+    const cost = Number(data.cost || 0)
+    return {
+      ...window,
+      cost: data.formattedCost || formatCost(cost),
+      tokens: formatNumber(data.tokens || 0),
+      requests: formatNumber(data.requests || 0),
+      barWidth:
+        maxCost > 0 && cost > 0 ? `${Math.max(6, Math.min(100, (cost / maxCost) * 100))}%` : '0%'
+    }
+  })
+})
 
 const formatCost = (value) => {
   const num = Number(value || 0)

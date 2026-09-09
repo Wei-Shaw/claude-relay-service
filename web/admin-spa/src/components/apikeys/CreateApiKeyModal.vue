@@ -700,6 +700,16 @@
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">Droid</span>
               </label>
+              <label class="flex cursor-pointer items-center">
+                <input
+                  v-model="form.permissions"
+                  class="mr-2 rounded text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="checkbox"
+                  value="grok"
+                  @change="updatePermissions"
+                />
+                <span class="text-sm text-gray-700 dark:text-gray-300">Grok</span>
+              </label>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               不选择任何服务表示允许访问全部服务
@@ -797,6 +807,20 @@
                   :groups="localAccounts.droidGroups"
                   placeholder="请选择Droid账号"
                   platform="droid"
+                />
+              </div>
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >Grok 专属账号</label
+                >
+                <AccountSelector
+                  v-model="form.grokAccountId"
+                  :accounts="localAccounts.grok"
+                  default-option-text="使用共享账号池"
+                  :disabled="form.permissions.length > 0 && !form.permissions.includes('grok')"
+                  :groups="localAccounts.grokGroups"
+                  placeholder="请选择Grok账号"
+                  platform="grok"
                 />
               </div>
             </div>
@@ -1046,10 +1070,12 @@ const localAccounts = ref({
   openai: [],
   bedrock: [],
   droid: [],
+  grok: [],
   claudeGroups: [],
   geminiGroups: [],
   openaiGroups: [],
-  droidGroups: []
+  droidGroups: [],
+  grokGroups: []
 })
 
 // 表单验证状态
@@ -1076,6 +1102,7 @@ const availableServices = [
   { key: 'gemini', label: 'Gemini' },
   { key: 'codex', label: 'Codex' },
   { key: 'droid', label: 'Droid' },
+  { key: 'grok', label: 'Grok' },
   { key: 'bedrock', label: 'Bedrock' },
   { key: 'azure', label: 'Azure' },
   { key: 'ccr', label: 'CCR' }
@@ -1109,6 +1136,7 @@ const form = reactive({
   openaiAccountId: '',
   bedrockAccountId: '',
   droidAccountId: '',
+  grokAccountId: '',
   enableModelRestriction: false,
   restrictedModels: [],
   modelInput: '',
@@ -1163,10 +1191,15 @@ onMounted(async () => {
         ...account,
         platform: account.platform || 'droid'
       })),
+      grok: (props.accounts.grok || []).map((account) => ({
+        ...account,
+        platform: account.platform || 'grok'
+      })),
       claudeGroups: props.accounts.claudeGroups || [],
       geminiGroups: props.accounts.geminiGroups || [],
       openaiGroups: props.accounts.openaiGroups || [],
-      droidGroups: props.accounts.droidGroups || []
+      droidGroups: props.accounts.droidGroups || [],
+      grokGroups: props.accounts.grokGroups || []
     }
   }
 
@@ -1186,6 +1219,7 @@ const refreshAccounts = async () => {
       openaiResponsesData,
       bedrockData,
       droidData,
+      grokData,
       groupsData
     ] = await Promise.all([
       httpApis.getClaudeAccountsApi(),
@@ -1196,6 +1230,7 @@ const refreshAccounts = async () => {
       httpApis.getOpenAIResponsesAccountsApi(), // 获取 OpenAI-Responses 账号
       httpApis.getBedrockAccountsApi(),
       httpApis.getDroidAccountsApi(),
+      httpApis.getGrokAccountsApi(),
       httpApis.getAccountGroupsApi()
     ])
 
@@ -1289,6 +1324,14 @@ const refreshAccounts = async () => {
       }))
     }
 
+    if (grokData.success) {
+      localAccounts.value.grok = (grokData.data || []).map((account) => ({
+        ...account,
+        platform: 'grok',
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+
     // 处理分组数据
     if (groupsData.success) {
       const allGroups = groupsData.data || []
@@ -1296,6 +1339,7 @@ const refreshAccounts = async () => {
       localAccounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
       localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
       localAccounts.value.droidGroups = allGroups.filter((g) => g.platform === 'droid')
+      localAccounts.value.grokGroups = allGroups.filter((g) => g.platform === 'grok')
     }
 
     showToast('账号列表已刷新', 'success')
@@ -1576,6 +1620,9 @@ const createApiKey = async () => {
     }
     if (form.droidAccountId) {
       baseData.droidAccountId = form.droidAccountId
+    }
+    if (form.grokAccountId) {
+      baseData.grokAccountId = form.grokAccountId
     }
 
     if (form.createType === 'single') {

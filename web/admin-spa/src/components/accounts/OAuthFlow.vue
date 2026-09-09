@@ -442,8 +442,8 @@
       </div>
     </div>
 
-    <!-- OpenAI OAuth流程 -->
-    <div v-else-if="platform === 'openai'">
+    <!-- OpenAI / Grok OAuth流程 -->
+    <div v-else-if="platform === 'openai' || platform === 'grok'">
       <div
         class="rounded-lg border border-orange-200 bg-orange-50 p-6 dark:border-orange-700 dark:bg-orange-900/30"
       >
@@ -454,9 +454,11 @@
             <i class="fas fa-brain text-white" />
           </div>
           <div class="flex-1">
-            <h4 class="mb-3 font-semibold text-orange-900 dark:text-orange-200">OpenAI 账户授权</h4>
+            <h4 class="mb-3 font-semibold text-orange-900 dark:text-orange-200">
+              {{ platform === 'grok' ? 'Grok / xAI 账户授权' : 'OpenAI 账户授权' }}
+            </h4>
             <p class="mb-4 text-sm text-orange-800 dark:text-orange-300">
-              请按照以下步骤完成 OpenAI 账户的授权：
+              请按照以下步骤完成 {{ platform === 'grok' ? 'xAI / Grok' : 'OpenAI' }} 账户的授权：
             </p>
 
             <div class="space-y-4">
@@ -526,7 +528,8 @@
                       在浏览器中打开链接并完成授权
                     </p>
                     <p class="mb-2 text-sm text-orange-700 dark:text-orange-300">
-                      请在新标签页中打开授权链接，登录您的 OpenAI 账户并授权。
+                      请在新标签页中打开授权链接，登录您的
+                      {{ platform === 'grok' ? 'xAI / Grok' : 'OpenAI' }} 账户并授权。
                     </p>
                     <div
                       class="mb-3 rounded border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/30"
@@ -537,7 +540,11 @@
                       </p>
                       <p class="mt-2 text-xs text-amber-700 dark:text-amber-400">
                         当浏览器地址栏变为
-                        <strong class="font-mono">http://localhost:1455/...</strong>
+                        <strong class="font-mono">{{
+                          platform === 'grok'
+                            ? 'http://127.0.0.1:56121/...'
+                            : 'http://localhost:1455/...'
+                        }}</strong>
                         开头时，表示授权已完成。
                       </p>
                     </div>
@@ -570,7 +577,12 @@
                     </p>
                     <p class="mb-3 text-sm text-orange-700 dark:text-orange-300">
                       授权完成后，当页面地址变为
-                      <strong class="font-mono">http://localhost:1455/...</strong> 时：
+                      <strong class="font-mono">{{
+                        platform === 'grok'
+                          ? 'http://127.0.0.1:56121/...'
+                          : 'http://localhost:1455/...'
+                      }}</strong>
+                      时：
                     </p>
                     <div class="space-y-3">
                       <div>
@@ -918,7 +930,8 @@ watch(authCode, (newValue) => {
     // 检查是否是正确的 localhost 回调 URL
     if (
       trimmedValue.startsWith('http://localhost:45462') ||
-      trimmedValue.startsWith('http://localhost:1455')
+      trimmedValue.startsWith('http://localhost:1455') ||
+      trimmedValue.startsWith('http://127.0.0.1:56121')
     ) {
       try {
         const url = new URL(trimmedValue)
@@ -941,7 +954,8 @@ watch(authCode, (newValue) => {
     } else if (
       props.platform === 'gemini' ||
       props.platform === 'gemini-antigravity' ||
-      props.platform === 'openai'
+      props.platform === 'openai' ||
+      props.platform === 'grok'
     ) {
       // Gemini 和 OpenAI 平台可能使用不同的回调URL
       // 尝试从任何URL中提取code参数
@@ -1002,6 +1016,10 @@ const generateAuthUrl = async () => {
       sessionId.value = result.sessionId
     } else if (props.platform === 'openai') {
       const result = await accountsStore.generateOpenAIAuthUrl(proxyConfig)
+      authUrl.value = result.authUrl
+      sessionId.value = result.sessionId
+    } else if (props.platform === 'grok') {
+      const result = await accountsStore.generateGrokAuthUrl(proxyConfig)
       authUrl.value = result.authUrl
       sessionId.value = result.sessionId
     } else if (props.platform === 'droid') {
@@ -1112,8 +1130,8 @@ const exchangeCode = async () => {
         sessionId: sessionId.value,
         oauthProvider: geminiOauthProvider.value
       }
-    } else if (props.platform === 'openai') {
-      // OpenAI使用code和sessionId
+    } else if (props.platform === 'openai' || props.platform === 'grok') {
+      // OpenAI / Grok 使用 code 和 sessionId
       data = {
         code: authCode.value.trim(),
         sessionId: sessionId.value
@@ -1146,6 +1164,8 @@ const exchangeCode = async () => {
       }
     } else if (props.platform === 'openai') {
       tokenInfo = await accountsStore.exchangeOpenAICode(data)
+    } else if (props.platform === 'grok') {
+      tokenInfo = await accountsStore.exchangeGrokCode(data)
     } else if (props.platform === 'droid') {
       const response = await accountsStore.exchangeDroidCode(data)
       if (!response.success) {

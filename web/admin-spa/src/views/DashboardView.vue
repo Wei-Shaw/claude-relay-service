@@ -133,6 +133,19 @@
                     dashboardData.accountsByPlatform['openai-responses'].total
                   }}</span>
                 </div>
+                <div
+                  v-if="
+                    dashboardData.accountsByPlatform.grok &&
+                    dashboardData.accountsByPlatform.grok.total > 0
+                  "
+                  class="inline-flex items-center gap-0.5"
+                  :title="`Grok: ${dashboardData.accountsByPlatform.grok.total} 个 (正常: ${dashboardData.accountsByPlatform.grok.normal})`"
+                >
+                  <i class="fas fa-bolt text-xs text-zinc-700" />
+                  <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{
+                    dashboardData.accountsByPlatform.grok.total
+                  }}</span>
+                </div>
               </div>
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -832,7 +845,8 @@ const accountGroupOptions = [
   { value: 'claude', label: 'Claude' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Gemini' },
-  { value: 'droid', label: 'Droid' }
+  { value: 'droid', label: 'Droid' },
+  { value: 'grok', label: 'Grok' }
 ]
 
 const accountTrendUpdating = ref(false)
@@ -858,6 +872,7 @@ const getBalancePlatformLabel = (platform) => {
     azure_openai: 'Azure OpenAI',
     bedrock: 'Bedrock',
     droid: 'Droid',
+    grok: 'Grok',
     ccr: 'CCR'
   }
   return map[platform] || platform

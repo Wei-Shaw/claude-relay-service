@@ -23,6 +23,13 @@ const GEMINI_MODELS = [
   { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview' }
 ]
 
+const GROK_MODELS = [
+  { value: 'grok-4.5', label: 'Grok 4.5' },
+  { value: 'grok-4.3', label: 'Grok 4.3' },
+  { value: 'grok-build-0.1', label: 'Grok Build 0.1' },
+  { value: 'grok-composer-2.5-fast', label: 'Grok Composer 2.5 Fast' }
+]
+
 const OPENAI_MODELS = [
   { value: 'gpt-5', label: 'GPT-5' },
   { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
@@ -65,6 +72,7 @@ const PLATFORM_TEST_MODELS = {
   'openai-responses': OPENAI_MODELS,
   'azure-openai': [],
   droid: CLAUDE_MODELS,
+  grok: GROK_MODELS,
   ccr: CLAUDE_MODELS
 }
 
@@ -72,6 +80,7 @@ module.exports = {
   CLAUDE_MODELS,
   GEMINI_MODELS,
   OPENAI_MODELS,
+  GROK_MODELS,
   BEDROCK_MODELS,
   OTHER_MODELS,
   PLATFORM_TEST_MODELS,
@@ -84,10 +93,18 @@ module.exports = {
         return GEMINI_MODELS
       case 'openai':
         return OPENAI_MODELS
+      case 'grok':
+        return GROK_MODELS
       default:
         return []
     }
   },
   // 获取所有模型（用于账户编辑）
-  getAllModels: () => [...CLAUDE_MODELS, ...GEMINI_MODELS, ...OPENAI_MODELS, ...OTHER_MODELS]
+  getAllModels: () => [
+    ...CLAUDE_MODELS,
+    ...GEMINI_MODELS,
+    ...OPENAI_MODELS,
+    ...GROK_MODELS,
+    ...OTHER_MODELS
+  ]
 }
