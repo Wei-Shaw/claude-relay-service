@@ -394,7 +394,7 @@
                               Claude OAuth 账户
                             </div>
                             <div class="text-gray-200 dark:text-gray-600">
-                              展示三个窗口的使用率（utilization百分比），颜色含义同上。
+                              展示上游实际回传的窗口使用率（utilization百分比），模型窗口有几个就显示几条，颜色含义同上。
                             </div>
                             <div class="space-y-1 text-gray-200 dark:text-gray-600">
                               <div class="flex items-start gap-2">
@@ -805,7 +805,7 @@
                     <span
                       v-for="family in getLimitedModelFamilies(account)"
                       :key="family.key"
-                      class="inline-flex items-center rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800"
+                      class="inline-flex items-center rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800 dark:bg-purple-500/20 dark:text-purple-300"
                     >
                       <i class="fas fa-hourglass-half mr-1" />
                       {{ family.label }}限流
@@ -961,8 +961,8 @@
                       </div>
                       <!-- 按模型限定的周窗口（上游 limits[] 中的 weekly_scoped，如 Fable） -->
                       <div
-                        v-for="scoped in getScopedModelUsage(account)"
-                        :key="scoped.modelName"
+                        v-for="(scoped, scopedIndex) in getScopedModelUsage(account)"
+                        :key="`${scoped.modelName}-${scopedIndex}`"
                         class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
                       >
                         <div class="flex items-center gap-2">
@@ -992,6 +992,46 @@
                         </div>
                         <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                           重置剩余 {{ formatClaudeRemaining(scoped) }}
+                        </div>
+                      </div>
+                      <!-- 回退：上游没有 limits[] 里的 weekly_scoped，但顶层具名窗口
+                           （seven_day_sonnet）有数据时，仍要把这条画出来 -->
+                      <div
+                        v-if="
+                          getScopedModelUsage(account).length === 0 &&
+                          hasLegacySevenDayModelWindow(account.claudeUsage)
+                        "
+                        class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
+                      >
+                        <div class="flex items-center gap-2">
+                          <span
+                            class="inline-flex min-w-[32px] justify-center rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-600 dark:bg-purple-500/20 dark:text-purple-300"
+                          >
+                            Sonnet
+                          </span>
+                          <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                              <div class="h-2 flex-1 rounded-full bg-gray-200 dark:bg-gray-600">
+                                <div
+                                  :class="[
+                                    'h-2 rounded-full transition-all duration-300',
+                                    getClaudeUsageBarClass(account.claudeUsage.sevenDayOpus)
+                                  ]"
+                                  :style="{
+                                    width: getClaudeUsageWidth(account.claudeUsage.sevenDayOpus)
+                                  }"
+                                />
+                              </div>
+                              <span
+                                class="w-12 text-right text-xs font-semibold text-gray-800 dark:text-gray-100"
+                              >
+                                {{ formatClaudeUsagePercent(account.claudeUsage.sevenDayOpus) }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                          重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDayOpus) }}
                         </div>
                       </div>
                     </div>
@@ -1669,8 +1709,8 @@
                 </div>
                 <!-- 按模型限定的周窗口（上游 limits[] 中的 weekly_scoped，如 Fable） -->
                 <div
-                  v-for="scoped in getScopedModelUsage(account)"
-                  :key="scoped.modelName"
+                  v-for="(scoped, scopedIndex) in getScopedModelUsage(account)"
+                  :key="`${scoped.modelName}-${scopedIndex}`"
                   class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
                 >
                   <div class="flex items-center gap-2">
@@ -1700,6 +1740,46 @@
                   </div>
                   <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                     重置剩余 {{ formatClaudeRemaining(scoped) }}
+                  </div>
+                </div>
+                <!-- 回退：上游没有 limits[] 里的 weekly_scoped，但顶层具名窗口
+                     （seven_day_sonnet）有数据时，仍要把这条画出来 -->
+                <div
+                  v-if="
+                    getScopedModelUsage(account).length === 0 &&
+                    hasLegacySevenDayModelWindow(account.claudeUsage)
+                  "
+                  class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
+                >
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="inline-flex min-w-[32px] justify-center rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-600 dark:bg-purple-500/20 dark:text-purple-300"
+                    >
+                      Sonnet
+                    </span>
+                    <div class="flex-1">
+                      <div class="flex items-center gap-2">
+                        <div class="h-2 flex-1 rounded-full bg-gray-200 dark:bg-gray-600">
+                          <div
+                            :class="[
+                              'h-2 rounded-full transition-all duration-300',
+                              getClaudeUsageBarClass(account.claudeUsage.sevenDayOpus)
+                            ]"
+                            :style="{
+                              width: getClaudeUsageWidth(account.claudeUsage.sevenDayOpus)
+                            }"
+                          />
+                        </div>
+                        <span
+                          class="w-12 text-right text-xs font-semibold text-gray-800 dark:text-gray-100"
+                        >
+                          {{ formatClaudeUsagePercent(account.claudeUsage.sevenDayOpus) }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                    重置剩余 {{ formatClaudeRemaining(account.claudeUsage.sevenDayOpus) }}
                   </div>
                 </div>
               </div>
@@ -3807,6 +3887,17 @@ const getScopedModelUsage = (account) => {
     return []
   }
   return scoped.filter((item) => item?.modelName && item.utilization !== null)
+}
+
+// 顶层具名窗口（后端 sevenDayOpus，数据源其实是上游的 seven_day_sonnet）。
+// 对 Max 账号它一直是 null，模型级额度在 limits[] 里；但对确实回传了该窗口的账号
+// 不能因为没有 weekly_scoped 就把这条进度条整个删掉，所以保留一条回退渲染。
+const hasLegacySevenDayModelWindow = (claudeUsage) => {
+  const window = claudeUsage?.sevenDayOpus
+  if (!window) {
+    return false
+  }
+  return (window.utilization !== null && window.utilization !== undefined) || !!window.resetsAt
 }
 
 const formatRateLimitTime = (minutes) => {

@@ -153,4 +153,73 @@ describe('buildClaudeUsageSnapshot', () => {
   it('still returns null when the account has no usage data at all', () => {
     expect(claudeAccountService.buildClaudeUsageSnapshot({})).toBeNull()
   })
+
+  // Array.isArray('[null]' parsed) is true, so a corrupted Redis value used to reach
+  // `item.modelName` and throw. One of the two call sites (claudeAccounts.js, the
+  // cache-fresh branch) sits outside its try, where Promise.allSettled swallows the
+  // rejection with no log at all — every usage bar for that account just vanishes.
+  it('does not throw when the stored array holds null or primitive entries', () => {
+    const snapshot = claudeAccountService.buildClaudeUsageSnapshot({
+      claudeUsageUpdatedAt: '2026-09-05T05:00:00.000Z',
+      claudeWeeklyScopedModels: JSON.stringify([null, 'Fable', 42, { modelName: 'Fable' }])
+    })
+
+    expect(snapshot.sevenDayScopedModels).toHaveLength(1)
+    expect(snapshot.sevenDayScopedModels[0].modelName).toBe('Fable')
+  })
+})
+
+describe('updateClaudeUsageSnapshot', () => {
+  const redis = require('../src/models/redis')
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redis.getClaudeAccount.mockResolvedValue({ id: 'acc-1', name: 'test' })
+  })
+
+  const savedAccount = () => redis.setClaudeAccount.mock.calls[0][1]
+
+  it('persists the scoped models parsed out of limits[]', async () => {
+    await claudeAccountService.updateClaudeUsageSnapshot('acc-1', {
+      five_hour: { utilization: 12, resets_at: '2026-09-05T10:00:00Z' },
+      limits: [
+        {
+          kind: 'weekly_scoped',
+          percent: 49,
+          resets_at: '2026-09-09T07:00:00Z',
+          scope: { model: { display_name: 'Fable' } },
+          is_active: true
+        }
+      ]
+    })
+
+    const scoped = JSON.parse(savedAccount().claudeWeeklyScopedModels)
+    expect(scoped).toHaveLength(1)
+    expect(scoped[0]).toMatchObject({ modelName: 'Fable', utilization: 49 })
+  })
+
+  // Regression: the write used to be gated on `scopedModels.length > 0`, and
+  // setClaudeAccount merges via Object.assign, so once the upstream stopped
+  // returning a weekly_scoped entry the last snapshot stayed in Redis forever —
+  // resetsAt in the past, remainingSeconds pinned at 0, and the UI kept rendering
+  // a zombie bar with a frozen percentage.
+  it('clears a previously stored snapshot once the upstream stops returning it', async () => {
+    redis.getClaudeAccount.mockResolvedValue({
+      id: 'acc-1',
+      claudeWeeklyScopedModels: JSON.stringify([{ modelName: 'Fable', utilization: 49 }])
+    })
+
+    await claudeAccountService.updateClaudeUsageSnapshot('acc-1', {
+      five_hour: { utilization: 12, resets_at: '2026-09-05T10:00:00Z' },
+      limits: [{ kind: 'weekly_all', percent: 3 }]
+    })
+
+    expect(JSON.parse(savedAccount().claudeWeeklyScopedModels)).toEqual([])
+  })
+
+  it('does not touch the account when the upstream returned nothing at all', async () => {
+    await claudeAccountService.updateClaudeUsageSnapshot('acc-1', { limits: [] })
+
+    expect(redis.setClaudeAccount).not.toHaveBeenCalled()
+  })
 })

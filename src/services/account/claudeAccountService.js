@@ -2238,15 +2238,20 @@ class ClaudeAccountService {
           ? Math.max(0, Math.floor((new Date(sevenDayOpusResetsAt).getTime() - now) / 1000))
           : null
       },
-      // 上游按模型限定的周窗口（如 Fable），由 limits[] 解析而来
-      sevenDayScopedModels: scopedModels.map((item) => ({
-        modelName: item.modelName,
-        utilization: this._toNumberOrNull(item.utilization),
-        resetsAt: item.resetsAt || null,
-        severity: item.severity || null,
-        isActive: item.isActive === true,
-        remainingSeconds: remainingFrom(item.resetsAt)
-      }))
+      // 上游按模型限定的周窗口（如 Fable），由 limits[] 解析而来。
+      // Redis 里可能存着 [null] 这类脏数据（Array.isArray 放行），而本方法的调用点
+      // 之一在 claudeAccounts.js 的 try 之外，抛异常会被 Promise.allSettled 无声吞掉，
+      // 表现为该账号所有用量条凭空消失。先过滤掉非对象元素。
+      sevenDayScopedModels: scopedModels
+        .filter((item) => item && typeof item === 'object')
+        .map((item) => ({
+          modelName: item.modelName,
+          utilization: this._toNumberOrNull(item.utilization),
+          resetsAt: item.resetsAt || null,
+          severity: item.severity || null,
+          isActive: item.isActive === true,
+          remainingSeconds: remainingFrom(item.resetsAt)
+        }))
     }
   }
 
@@ -2295,13 +2300,17 @@ class ClaudeAccountService {
     // 顶层的 seven_day_opus / seven_day_sonnet 对这些账号一直是 null，
     // 真正有数据的是这里，所以模型级用量必须从 limits[] 取。
     const scopedModels = this._extractWeeklyScopedModels(usageData.limits)
-    if (scopedModels.length > 0) {
-      updates.claudeWeeklyScopedModels = JSON.stringify(scopedModels)
-    }
 
-    if (Object.keys(updates).length === 0) {
+    // 上游什么都没回传时保持原样返回，不去 bump claudeUsageUpdatedAt
+    if (Object.keys(updates).length === 0 && scopedModels.length === 0) {
       return
     }
+
+    // 只要本次有任何窗口数据，就连空数组一起写回（而不是「非空才写」）。
+    // setClaudeAccount 走的是 Object.assign 合并，只在非空时写会让上游停止返回该
+    // 条目之后旧快照永久留在 Redis —— resetsAt 落到过去、remainingSeconds 恒为 0，
+    // 前端就一直挂着一条百分比冻结的僵尸进度条。
+    updates.claudeWeeklyScopedModels = JSON.stringify(scopedModels)
 
     updates.claudeUsageUpdatedAt = new Date().toISOString()
 
