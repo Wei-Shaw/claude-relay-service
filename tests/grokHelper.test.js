@@ -151,7 +151,10 @@ describe('grokHelper upstream modes', () => {
       // 不剥掉的话一个点就能绕过整张主机名黑名单
       ['trailing-dot metadata FQDN', 'https://metadata.google.internal./v1'],
       ['trailing-dot kubernetes FQDN', 'https://kubernetes.default.svc./v1'],
-      ['trailing-dot localhost', 'https://localhost./v1']
+      ['trailing-dot localhost', 'https://localhost./v1'],
+      // IPv4-compatible IPv6（::a.b.c.d）—— RFC 4291 已废弃，但 new URL 照样接受
+      ['IPv4-compatible IPv6 loopback', 'https://[::7f00:1]/v1'],
+      ['IPv4-compatible IPv6 link-local', 'https://[::a9fe:a9fe]/v1']
     ])('rejects %s', (_label, baseUrl) => {
       expect(() =>
         grokHelper.resolveAccountBaseUrl({
@@ -174,6 +177,18 @@ describe('grokHelper upstream modes', () => {
           baseUrl
         })
       ).toBe(baseUrl.replace(/\/$/, ''))
+    })
+
+    // v4-mapped 的公网地址不能被新增的 mapped/compat 判定误伤。
+    // 单列是因为 WHATWG URL 会把 [::ffff:8.8.8.8] 归一化成 [::ffff:808:808]，
+    // 与上面那组「原样返回」的断言形式不同。
+    it('still allows an IPv4-mapped public address', () => {
+      expect(
+        grokHelper.resolveAccountBaseUrl({
+          authType: grokHelper.AUTH_TYPES.API_KEY,
+          baseUrl: 'https://[::ffff:8.8.8.8]/v1'
+        })
+      ).toBe('https://[::ffff:808:808]/v1')
     })
   })
 

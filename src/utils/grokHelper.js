@@ -255,7 +255,10 @@ function isBlockedHost(host) {
     // 否则 https://[::ffff:127.0.0.1] 会被放行并真的连到 127.0.0.1。
     const isMappedV4 = v6.slice(0, 5).every((part) => part === 0) && v6[5] === 0xffff
     const isNat64 = v6[0] === 0x0064 && v6[1] === 0xff9b
-    if (isMappedV4 || isNat64) {
+    // IPv4-compatible（::a.b.c.d，RFC 4291 已废弃但 new URL 照样接受）。
+    // 上面已经先行处理掉 :: 与 ::1，所以这里剩下的都是把 v4 藏在末 32 位的写法。
+    const isCompatV4 = v6.slice(0, 6).every((part) => part === 0)
+    if (isMappedV4 || isNat64 || isCompatV4) {
       return isBlockedIPv4(ipv4FromIPv6Tail(v6))
     }
     return false
