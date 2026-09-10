@@ -2208,6 +2208,7 @@ const serviceRates = ref({
     codex: 1.0,
     gemini: 1.0,
     droid: 1.0,
+    grok: 1.0,
     bedrock: 1.0,
     azure: 1.0,
     ccr: 1.0
@@ -2647,6 +2648,7 @@ const getServiceIcon = (service) => {
     codex: 'fas fa-code',
     gemini: 'fas fa-gem',
     droid: 'fas fa-android',
+    grok: 'fas fa-bolt',
     bedrock: 'fab fa-aws',
     azure: 'fab fa-microsoft',
     ccr: 'fas fa-server'
@@ -2660,6 +2662,7 @@ const getServiceIconClass = (service) => {
     codex: 'bg-gradient-to-br from-green-500 to-emerald-600',
     gemini: 'bg-gradient-to-br from-blue-500 to-indigo-600',
     droid: 'bg-gradient-to-br from-green-600 to-lime-600',
+    grok: 'bg-gradient-to-br from-zinc-700 to-black',
     bedrock: 'bg-gradient-to-br from-yellow-500 to-orange-600',
     azure: 'bg-gradient-to-br from-blue-600 to-cyan-600',
     ccr: 'bg-gradient-to-br from-purple-500 to-pink-600'
@@ -2673,6 +2676,7 @@ const getServiceName = (service) => {
     codex: 'Codex (OpenAI)',
     gemini: 'Gemini',
     droid: 'Droid',
+    grok: 'Grok',
     bedrock: 'AWS Bedrock',
     azure: 'Azure OpenAI',
     ccr: 'CCR'

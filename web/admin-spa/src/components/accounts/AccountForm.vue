@@ -71,7 +71,7 @@
               <!-- 平台分组选择器 -->
               <div class="space-y-3">
                 <!-- 分组选择器 -->
-                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   <!-- Claude 分组 -->
                   <div
                     class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
@@ -202,6 +202,37 @@
                         Droid
                       </h4>
                       <p class="text-xs text-gray-600 dark:text-gray-400">Claude Droid</p>
+                    </div>
+                  </div>
+
+                  <!-- Grok 分组 -->
+                  <div
+                    class="group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all duration-200"
+                    :class="[
+                      platformGroup === 'grok'
+                        ? 'border-zinc-800 bg-gradient-to-br from-zinc-50 to-neutral-100 shadow-md dark:from-zinc-900/40 dark:to-neutral-900/40'
+                        : 'border-gray-200 bg-white hover:border-zinc-400 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-zinc-500'
+                    ]"
+                    @click="selectPlatformGroup('grok')"
+                  >
+                    <div class="p-3">
+                      <div class="flex items-center justify-between">
+                        <div
+                          class="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-zinc-800 to-black"
+                        >
+                          <i class="fas fa-bolt text-sm text-white"></i>
+                        </div>
+                        <div
+                          v-if="platformGroup === 'grok'"
+                          class="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </div>
+                      <h4 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Grok
+                      </h4>
+                      <p class="text-xs text-gray-600 dark:text-gray-400">xAI</p>
                     </div>
                   </div>
                 </div>
@@ -540,6 +571,37 @@
                       </label>
                     </template>
 
+                    <!-- Grok 子选项 -->
+                    <template v-if="platformGroup === 'grok'">
+                      <label
+                        class="group relative flex cursor-pointer items-center rounded-md border p-2 transition-all"
+                        :class="[
+                          form.platform === 'grok'
+                            ? 'border-zinc-800 bg-zinc-50 dark:border-zinc-400 dark:bg-zinc-900/30'
+                            : 'border-gray-300 bg-white hover:border-zinc-500 hover:bg-zinc-50/50 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-zinc-400 dark:hover:bg-zinc-900/20'
+                        ]"
+                      >
+                        <input v-model="form.platform" class="sr-only" type="radio" value="grok" />
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-bolt text-sm text-zinc-800 dark:text-zinc-300"></i>
+                          <div>
+                            <span class="block text-xs font-medium text-gray-900 dark:text-gray-100"
+                              >Grok / xAI</span
+                            >
+                            <span class="text-xs text-gray-500 dark:text-gray-400"
+                              >OAuth / 官方 API / 自定义中转</span
+                            >
+                          </div>
+                        </div>
+                        <div
+                          v-if="form.platform === 'grok'"
+                          class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-800"
+                        >
+                          <i class="fas fa-check text-xs text-white"></i>
+                        </div>
+                      </label>
+                    </template>
+
                     <!-- Droid 子选项 -->
                     <template v-if="platformGroup === 'droid'">
                       <label
@@ -596,7 +658,13 @@
                     value="oauth"
                   />
                   <span class="text-sm text-gray-700 dark:text-gray-300">
-                    OAuth 授权<span v-if="form.platform === 'claude' || form.platform === 'openai'">
+                    OAuth 授权<span
+                      v-if="
+                        form.platform === 'claude' ||
+                        form.platform === 'openai' ||
+                        form.platform === 'grok'
+                      "
+                    >
                       (用量可视化)</span
                     >
                   </span>
@@ -630,6 +698,17 @@
                   />
                   <span class="text-sm text-gray-700 dark:text-gray-300"
                     >使用 API Key (支持多个)</span
+                  >
+                </label>
+                <label v-if="form.platform === 'grok'" class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.addType"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="apikey"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300"
+                    >官方 API Key / 自定义中转</span
                   >
                 </label>
               </div>
@@ -2048,6 +2127,13 @@
                   >
                     请输入有效的 Droid Access Token，并同时提供 Refresh Token 以支持自动刷新。
                   </p>
+                  <p
+                    v-else-if="form.platform === 'grok'"
+                    class="mb-2 text-sm text-blue-800 dark:text-blue-300"
+                  >
+                    请输入 xAI OAuth Access Token。建议同时填写 Refresh
+                    Token，以便自动刷新订阅凭证。
+                  </p>
                   <div
                     class="mb-2 mt-2 rounded-lg border border-blue-300 bg-white/80 p-3 dark:border-blue-600 dark:bg-gray-800/80"
                   >
@@ -2090,6 +2176,15 @@
                     >
                       请从已完成授权的 Droid CLI 或 Factory.ai 导出的凭证中获取 Access Token 与
                       Refresh Token。
+                    </p>
+                    <p
+                      v-else-if="form.platform === 'grok'"
+                      class="text-xs text-blue-800 dark:text-blue-300"
+                    >
+                      请粘贴 xAI OAuth Access Token / Refresh Token。OAuth 流量默认发往
+                      <code class="rounded bg-blue-100 px-1 py-0.5 font-mono dark:bg-blue-900/50"
+                        >https://cli-chat-proxy.grok.com/v1</code
+                      >。
                     </p>
                   </div>
                   <p
@@ -2137,7 +2232,13 @@
                 </p>
               </div>
 
-              <div v-if="form.platform === 'openai' || form.platform === 'droid'">
+              <div
+                v-if="
+                  form.platform === 'openai' ||
+                  form.platform === 'droid' ||
+                  form.platform === 'grok'
+                "
+              >
                 <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-300"
                   >Refresh Token *</label
                 >
@@ -2156,6 +2257,9 @@
                   <i class="fas fa-info-circle mr-1" />
                   <template v-if="form.platform === 'openai'">
                     系统将使用 Refresh Token 自动获取 Access Token 和用户信息
+                  </template>
+                  <template v-else-if="form.platform === 'grok'">
+                    系统将使用 Refresh Token 向官方 auth.x.ai 刷新 Grok CLI 订阅凭证。
                   </template>
                   <template v-else>
                     系统将使用 Refresh Token 自动刷新 Factory.ai 访问令牌，确保账户保持可用。
@@ -2190,6 +2294,101 @@
                   留空使用默认值 factory-cli/0.32.1，可根据需要自定义
                 </p>
               </div>
+            </div>
+
+            <!-- Grok API Key / 自定义中转。与其它平台一致只在新建时渲染：
+                 updateAccount 的 grok 分支读的是 form.customUpstream，从不读
+                 grokBaseUrlMode、也不发 baseUrlMode，所以编辑态显示这个下拉框
+                 只会让用户以为改了上游、实际被静默丢弃。 -->
+            <div
+              v-if="form.addType === 'apikey' && form.platform === 'grok' && !isEdit"
+              class="space-y-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/30"
+            >
+              <div class="mb-2 flex items-start gap-3">
+                <div
+                  class="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-800"
+                >
+                  <i class="fas fa-key text-sm text-white" />
+                </div>
+                <div>
+                  <h5 class="mb-2 font-semibold text-zinc-900 dark:text-zinc-100">
+                    官方 xAI API 或自定义中转
+                  </h5>
+                  <p class="text-sm text-zinc-700 dark:text-zinc-300">
+                    官方模式使用 <code class="font-mono">xai-...</code> 密钥访问
+                    api.x.ai；自定义中转则填写第三方 OpenAI 形态的 Grok 端点与对应密钥。
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >上游模式</label
+                >
+                <select
+                  v-model="form.grokBaseUrlMode"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                >
+                  <option value="api">官方 xAI API (api.x.ai)</option>
+                  <option value="us-east-1">区域 API (us-east-1)</option>
+                  <option value="us-west-2">区域 API (us-west-2)</option>
+                  <option value="eu-west-1">区域 API (eu-west-1)</option>
+                  <option value="custom">自定义中转</option>
+                </select>
+              </div>
+
+              <div v-if="form.grokBaseUrlMode === 'custom'">
+                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >自定义 Base URL *</label
+                >
+                <input
+                  v-model="form.baseUrl"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  placeholder="https://relay.example.com/v1"
+                  type="url"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  保留路径前缀（如 /xai/v1）。上游需提供 /responses、/chat/completions。
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  >API Key *</label
+                >
+                <input
+                  v-model="form.apiKey"
+                  class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  placeholder="xai-... 或中转站密钥"
+                  :type="showApiKey ? 'text' : 'password'"
+                />
+              </div>
+            </div>
+
+            <!-- Grok OAuth 自定义上游 overlay -->
+            <div
+              v-if="form.platform === 'grok' && form.addType !== 'apikey'"
+              class="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20"
+            >
+              <label class="flex cursor-pointer items-start gap-2">
+                <input v-model="form.customUpstream" class="mt-1" type="checkbox" />
+                <span>
+                  <span class="block text-sm font-semibold text-gray-800 dark:text-gray-200"
+                    >OAuth + 自定义上游 URL</span
+                  >
+                  <span class="text-xs text-gray-600 dark:text-gray-400">
+                    仍使用 OAuth 订阅凭证，但把 chat/media 发到自定义中转。授权与刷新始终走官方
+                    auth.x.ai。
+                  </span>
+                </span>
+              </label>
+              <input
+                v-if="form.customUpstream"
+                v-model="form.baseUrl"
+                class="form-input w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                placeholder="https://relay.example.com/v1"
+                type="url"
+              />
             </div>
 
             <!-- API Key 模式输入 -->
@@ -4102,7 +4301,8 @@ const autoProtectionPlatforms = [
   'gemini',
   'gemini-api',
   'openai',
-  'openai-responses'
+  'openai-responses',
+  'grok'
 ]
 
 // OAuthFlow 组件引用
@@ -4159,6 +4359,8 @@ const determinePlatformGroup = (platform) => {
     return 'gemini'
   } else if (platform === 'droid') {
     return 'droid'
+  } else if (platform === 'grok') {
+    return 'grok'
   }
   return ''
 }
@@ -4306,11 +4508,61 @@ const normalizeAccountCooldownOverride = (value) => {
 
 const toFormBoolean = (value) => value === true || value === 'true'
 
+const GEMINI_API_DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com'
+const GROK_DEFAULT_API_BASE_URL = 'https://api.x.ai/v1'
+
+// 切到 Grok 时会清空与 Gemini API 共用的 baseUrl，这里暂存原值以便切回来时还原
+let nonGrokBaseUrlStash = ''
+
+// Grok 的「上游模式」下拉框只有 api / 三个区域 / custom 五个选项，没有 cli。
+// 新建账户时若默认成 cli，用户不主动展开下拉框就会带着 cli 提交，而提交分支里
+// 没有 cli 的处理，最终落到 form.baseUrl —— 那个字段的默认值是 Gemini 的地址，
+// 于是 xai- 密钥会被发到 generativelanguage.googleapis.com。默认必须是 api。
+// （OAuth 账户仍是 cli：那条路径不展示这个下拉框，cli 才是它的真实上游。）
+function deriveGrokBaseUrlMode(account) {
+  if (account?.platform !== 'grok') {
+    return 'api'
+  }
+  if (account?.authType === 'api_key') {
+    return toFormBoolean(account?.customUpstream) ? 'custom' : 'api'
+  }
+  return 'cli'
+}
+
+function deriveBaseUrl(account) {
+  if (account?.platform === 'grok') {
+    return account?.baseUrl || ''
+  }
+  return account?.baseUrl || GEMINI_API_DEFAULT_BASE_URL
+}
+
+// Grok API Key 账户的上游地址。只有 custom 模式才使用用户填的 baseUrl；任何其它
+// 取值（包括将来新增却漏了分支的模式）都回落到官方 api.x.ai，绝不落到 form.baseUrl
+// —— 那个字段是与 Gemini API 共用的，兜底到它就等于把 xai- 密钥发给别家。
+// 用 null 原型：普通对象上 mode 取到 '__proto__' / 'constructor' 会顺着原型链拿到
+// 非字符串，`|| 默认值` 兜不住，注释里「其余一切取值都回落到官方」就不成立了。
+const GROK_REGIONAL_BASE_URLS = Object.assign(Object.create(null), {
+  api: GROK_DEFAULT_API_BASE_URL,
+  'us-east-1': 'https://us-east-1.api.x.ai/v1',
+  'us-west-2': 'https://us-west-2.api.x.ai/v1',
+  'eu-west-1': 'https://eu-west-1.api.x.ai/v1'
+})
+
+function resolveGrokApiKeyBaseUrl(mode, customBaseUrl) {
+  if (mode === 'custom') {
+    return customBaseUrl
+  }
+  return GROK_REGIONAL_BASE_URLS[mode] || GROK_DEFAULT_API_BASE_URL
+}
+
 // 表单数据
 const form = ref({
   platform: props.account?.platform || 'claude',
   addType: (() => {
     const platform = props.account?.platform || 'claude'
+    if (platform === 'grok') {
+      return props.account?.authType === 'api_key' ? 'apikey' : 'oauth'
+    }
     if (platform === 'gemini' || platform === 'gemini-antigravity' || platform === 'openai')
       return 'oauth'
     if (platform === 'claude') return 'oauth'
@@ -4344,8 +4596,10 @@ const form = ref({
   // OpenAI-Responses 特定字段
   baseApi: props.account?.baseApi || '',
   providerEndpoint: props.account?.providerEndpoint || 'responses',
+  grokBaseUrlMode: deriveGrokBaseUrlMode(props.account),
+  customUpstream: toFormBoolean(props.account?.customUpstream),
   // Gemini-API 特定字段
-  baseUrl: props.account?.baseUrl || 'https://generativelanguage.googleapis.com',
+  baseUrl: deriveBaseUrl(props.account),
   rateLimitDuration: props.account?.rateLimitDuration || 60,
   supportedModels: (() => {
     const models = props.account?.supportedModels
@@ -4678,6 +4932,8 @@ const selectPlatformGroup = (group) => {
     form.value.platform = 'gemini' // Default to Gemini CLI, user can select Antigravity
   } else if (group === 'droid') {
     form.value.platform = 'droid'
+  } else if (group === 'grok') {
+    form.value.platform = 'grok'
   }
 }
 
@@ -5107,6 +5363,19 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
       data.priority = form.value.priority || 50
+    } else if (currentPlatform === 'grok') {
+      data.authType = 'oauth'
+      data.accessToken =
+        tokenInfo.tokens?.accessToken || tokenInfo.accessToken || tokenInfo.access_token || ''
+      data.refreshToken =
+        tokenInfo.tokens?.refreshToken || tokenInfo.refreshToken || tokenInfo.refresh_token || ''
+      data.expiresAt = tokenInfo.tokens?.expiresAt || tokenInfo.expiresAt || ''
+      data.tokenType = tokenInfo.tokens?.tokenType || tokenInfo.tokenType || 'Bearer'
+      data.email = tokenInfo.accountInfo?.email || ''
+      data.priority = form.value.priority || 50
+      data.customUpstream = !!form.value.customUpstream
+      data.baseUrl = form.value.customUpstream ? form.value.baseUrl : ''
+      data.platform = 'grok'
     } else if (currentPlatform === 'droid') {
       const rawTokens = tokenInfo.tokens || tokenInfo || {}
 
@@ -5182,6 +5451,8 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       result = await accountsStore.createOpenAIAccount(data)
     } else if (currentPlatform === 'droid') {
       result = await accountsStore.createDroidAccount(data)
+    } else if (currentPlatform === 'grok') {
+      result = await accountsStore.createGrokAccount(data)
     } else {
       result = await accountsStore.createGeminiAccount(data)
     }
@@ -5324,6 +5595,11 @@ const createAccount = async () => {
         errors.value.accessToken = '请填写 Access Token'
         hasError = true
       }
+    } else if (form.value.platform === 'grok') {
+      if (!form.value.accessToken || form.value.accessToken.trim() === '') {
+        errors.value.accessToken = '请填写 Access Token'
+        hasError = true
+      }
     } else if (form.value.platform === 'droid') {
       if (!form.value.accessToken || form.value.accessToken.trim() === '') {
         errors.value.accessToken = '请填写 Access Token'
@@ -5350,6 +5626,15 @@ const createAccount = async () => {
       }
       if (!form.value.baseUrl || form.value.baseUrl.trim() === '') {
         errors.value.baseUrl = '请填写 API 基础地址'
+        hasError = true
+      }
+    } else if (form.value.platform === 'grok') {
+      if (!form.value.apiKey || form.value.apiKey.trim() === '') {
+        errors.value.apiKey = '请填写 API Key'
+        hasError = true
+      }
+      if (form.value.grokBaseUrlMode === 'custom' && !form.value.baseUrl?.trim()) {
+        errors.value.baseUrl = '请填写自定义 Base URL'
         hasError = true
       }
     } else {
@@ -5477,6 +5762,22 @@ const createAccount = async () => {
       data.needsImmediateRefresh = true
       data.requireRefreshSuccess = true // 必须刷新成功才能创建账户
       data.priority = form.value.priority || 50
+    } else if (form.value.platform === 'grok') {
+      data.priority = form.value.priority || 50
+      data.platform = 'grok'
+      if (form.value.addType === 'apikey') {
+        data.authType = 'api_key'
+        data.apiKey = form.value.apiKey
+        data.baseUrlMode = form.value.grokBaseUrlMode
+        data.baseUrl = resolveGrokApiKeyBaseUrl(form.value.grokBaseUrlMode, form.value.baseUrl)
+        data.customUpstream = form.value.grokBaseUrlMode === 'custom'
+      } else {
+        data.authType = 'oauth'
+        data.accessToken = form.value.accessToken?.trim() || ''
+        data.refreshToken = form.value.refreshToken?.trim() || ''
+        data.customUpstream = !!form.value.customUpstream
+        data.baseUrl = form.value.customUpstream ? form.value.baseUrl : ''
+      }
     } else if (form.value.platform === 'droid') {
       data.priority = form.value.priority || 50
       data.endpointType = form.value.endpointType || 'anthropic'
@@ -5588,6 +5889,8 @@ const createAccount = async () => {
       result = await accountsStore.createClaudeConsoleAccount(data)
     } else if (form.value.platform === 'droid') {
       result = await accountsStore.createDroidAccount(data)
+    } else if (form.value.platform === 'grok') {
+      result = await accountsStore.createGrokAccount(data)
     } else if (form.value.platform === 'openai-responses') {
       result = await accountsStore.createOpenAIResponsesAccount(data)
     } else if (form.value.platform === 'bedrock') {
@@ -5752,6 +6055,13 @@ const updateAccount = async () => {
           data.requireRefreshSuccess = true
         }
       } else if (props.account.platform === 'droid') {
+        if (trimmedAccessToken) {
+          data.accessToken = trimmedAccessToken
+        }
+        if (trimmedRefreshToken) {
+          data.refreshToken = trimmedRefreshToken
+        }
+      } else if (props.account.platform === 'grok') {
         if (trimmedAccessToken) {
           data.accessToken = trimmedAccessToken
         }
@@ -5936,6 +6246,19 @@ const updateAccount = async () => {
       }
     }
 
+    // Grok 特定更新
+    if (props.account.platform === 'grok') {
+      data.priority = form.value.priority || 50
+      data.authType = props.account.authType || 'oauth'
+      data.customUpstream = !!form.value.customUpstream
+      if (form.value.apiKey && form.value.apiKey.trim() && data.authType === 'api_key') {
+        data.apiKey = form.value.apiKey
+      }
+      if (form.value.customUpstream && form.value.baseUrl && form.value.baseUrl.trim()) {
+        data.baseUrl = form.value.baseUrl
+      }
+    }
+
     // Gemini API 特定更新
     if (props.account.platform === 'gemini-api') {
       data.baseUrl = form.value.baseUrl || 'https://generativelanguage.googleapis.com'
@@ -5972,6 +6295,8 @@ const updateAccount = async () => {
       await accountsStore.updateGeminiApiAccount(props.account.id, data)
     } else if (props.account.platform === 'droid') {
       await accountsStore.updateDroidAccount(props.account.id, data)
+    } else if (props.account.platform === 'grok') {
+      await accountsStore.updateGrokAccount(props.account.id, data)
     } else {
       throw new Error(`不支持的平台: ${props.account.platform}`)
     }
@@ -6173,9 +6498,24 @@ watch(
     } else if (newPlatform === 'openai') {
       // 切换到 OpenAI 时，使用 OAuth 作为默认方式
       form.value.addType = 'oauth'
+    } else if (newPlatform === 'grok') {
+      form.value.addType = 'oauth'
+      // baseUrl 是与 Gemini API 共用的字段，默认值是 Gemini 的地址。切到 Grok 后
+      // 若不清掉，用户选「自定义中转」时输入框里会预填着 Google 的地址。
+      // 暂存原值，切回去时还给用户 —— 直接清掉会把他手输的私有代理地址吃掉。
+      if (!isEdit.value) {
+        nonGrokBaseUrlStash = form.value.baseUrl || nonGrokBaseUrlStash
+        form.value.baseUrl = ''
+        form.value.grokBaseUrlMode = 'api'
+      }
     } else if (newPlatform === 'gemini-api' || newPlatform === 'azure_openai') {
       // 切换到 Gemini API 或 Azure OpenAI 时，使用 apikey 模式（直接创建，不需要 OAuth 流程）
       form.value.addType = 'apikey'
+      // 上面切到 Grok 时清空了共用的 baseUrl，这里补回去，否则「先选 Grok 再改选
+      // Gemini API」会落到一个空的必填项上。优先还原用户之前输入的值。
+      if (!isEdit.value && newPlatform === 'gemini-api' && !form.value.baseUrl) {
+        form.value.baseUrl = nonGrokBaseUrlStash || GEMINI_API_DEFAULT_BASE_URL
+      }
     }
 
     // 平台变化时，清空分组选择
@@ -6498,8 +6838,12 @@ watch(
         // OpenAI-Responses 特定字段
         baseApi: newAccount.baseApi || '',
         providerEndpoint: newAccount.providerEndpoint || 'responses',
+        // Grok 特定字段。这里重建的是整个 form 对象，漏掉这两个键会让编辑 Grok 账户时
+        // grokBaseUrlMode 变成 undefined、baseUrl 变成 Gemini 的默认地址。
+        grokBaseUrlMode: deriveGrokBaseUrlMode(newAccount),
+        customUpstream: toFormBoolean(newAccount.customUpstream),
         // Gemini-API 特定字段
-        baseUrl: newAccount.baseUrl || 'https://generativelanguage.googleapis.com',
+        baseUrl: deriveBaseUrl(newAccount),
         // 额度管理字段
         dailyQuota: newAccount.dailyQuota || 0,
         dailyUsage: newAccount.dailyUsage || 0,

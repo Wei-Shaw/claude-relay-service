@@ -15,6 +15,31 @@ const CodexToOpenAIConverter = require('../services/codexToOpenAI')
 
 const router = express.Router()
 
+// 统一的错误响应体。调度器在「无可用账户」时抛的是带 statusCode=402 的错误
+// （grokScheduler.js），把它压成 500 会让客户端按服务端故障处理 —— 要么无限重试，
+// 要么直接放弃，而 402 才能告诉调用方「换 Key 或等配额」。
+// 注意 claude/gemini/openai 三个分支各自有 catch，不会把带 statusCode 的错误抛到
+// 外层，所以这里对既有后端的行为等价于原来的固定 500。
+function buildRouteError(error) {
+  const status = error?.statusCode || 500
+  if (status === 500) {
+    return {
+      error: {
+        message: 'Internal server error',
+        type: 'server_error',
+        code: 'internal_error'
+      }
+    }
+  }
+  return {
+    error: {
+      message: error.message || 'Request failed',
+      type: status === 402 ? 'no_available_account' : 'server_error',
+      code: status === 402 ? 'no_available_account' : 'internal_error'
+    }
+  }
+}
+
 // 🔍 根据模型名称检测后端类型
 function detectBackendFromModel(modelName) {
   if (!modelName) {
@@ -38,11 +63,55 @@ function detectBackendFromModel(modelName) {
     return 'openai'
   }
 
+  // Grok / xAI 模型
+  if (model.startsWith('grok-') || model.startsWith('xai/')) {
+    return 'grok'
+  }
+
   // 默认使用 Claude
   return 'claude'
 }
 
 // 🚀 智能后端路由处理器
+// Claude 后端：通过 OpenAI 兼容层。抽出来是因为 Grok 分支在「本部署根本没有配置
+// Grok 账户」时要回落到它 —— 详见 routeToBackend 里的 grok 分支。
+async function handleClaudeBackend(req, res, permissions) {
+  if (!apiKeyService.hasPermission(permissions, 'claude')) {
+    return res.status(403).json({
+      error: {
+        message: 'This API key does not have permission to access Claude',
+        type: 'permission_denied',
+        code: 'permission_denied'
+      }
+    })
+  }
+  return await handleChatCompletion(req, res, req.apiKey)
+}
+
+// Grok 账户选择。/v1/chat/completions 与 /v1/responses 两个入口共用，避免两处
+// 各自计算 sessionHash 后又慢慢跑偏。
+async function selectGrokAccount(req) {
+  const grokScheduler = require('../services/scheduler/grokScheduler')
+  const sessionHash = req.body?.session_id
+    ? require('crypto').createHash('sha256').update(String(req.body.session_id)).digest('hex')
+    : null
+  return await grokScheduler.selectAccount(req.apiKey, sessionHash)
+}
+
+// 本部署是否配置过 Grok 账户（含未启用的）。只取 id，不做 hgetall —— 紧接着的
+// selectAccount 已经会把账户完整读一遍，这里没必要再拉一次。
+// 探测失败时返回 true（当作「配了」），让请求走正常的 Grok 路径去报它自己的错，
+// 而不是因为一次 Redis 抖动就把流量静默改道到 Claude。
+async function hasAnyGrokAccount() {
+  try {
+    const grokAccountService = require('../services/account/grokAccountService')
+    return await grokAccountService.hasAnyAccount()
+  } catch (error) {
+    logger.warn('⚠️ Failed to probe Grok accounts, assuming they exist:', error.message)
+    return true
+  }
+}
+
 async function routeToBackend(req, res, requestedModel) {
   const backend = detectBackendFromModel(requestedModel)
 
@@ -52,17 +121,7 @@ async function routeToBackend(req, res, requestedModel) {
   const { permissions } = req.apiKey
 
   if (backend === 'claude') {
-    // Claude 后端：通过 OpenAI 兼容层
-    if (!apiKeyService.hasPermission(permissions, 'claude')) {
-      return res.status(403).json({
-        error: {
-          message: 'This API key does not have permission to access Claude',
-          type: 'permission_denied',
-          code: 'permission_denied'
-        }
-      })
-    }
-    await handleChatCompletion(req, res, req.apiKey)
+    return await handleClaudeBackend(req, res, permissions)
   } else if (backend === 'openai') {
     // OpenAI 后端
     if (!apiKeyService.hasPermission(permissions, 'openai')) {
@@ -216,6 +275,35 @@ async function routeToBackend(req, res, requestedModel) {
     req.url = '/v1/responses'
 
     return await openaiRoutes.handleResponses(req, res)
+  } else if (backend === 'grok') {
+    // grok-* 在本平台支持 Grok 之前是落到 claude 分支的（claude-console / CCR 上游
+    // 中转 grok 模型是既有用法）。把模型名直接改判成 grok 会让这类部署在合并当天
+    // 全部变成 403/402，所以这里只在「确实配置了 Grok 账户」时才接管；
+    // 一个都没有就按老路走 claude，行为与本次改动之前完全一致。
+    //
+    // 这个探测必须放在权限校验**之前**：需要回落的正是那些 Key 只有 claude 权限的
+    // 老部署，先校验权限就会把它们挡在 403 上，回落根本轮不到。
+    // 同时也必须放在 selectAccount **之前** —— selectAccount 会写 sticky session
+    // 映射并 touch lastUsedAt，让一个最终要被 403 的请求先产生这些副作用是错的。
+    if (!(await hasAnyGrokAccount())) {
+      logger.info(
+        `↩️ No Grok account configured, falling back to the Claude backend for model: ${requestedModel}`
+      )
+      return await handleClaudeBackend(req, res, permissions)
+    }
+
+    if (!apiKeyService.hasPermission(permissions, 'grok')) {
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access Grok',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
+    const grokRelayService = require('../services/relay/grokRelayService')
+    const account = await selectGrokAccount(req)
+    return grokRelayService.handleRequest(req, res, account, req.apiKey)
   } else if (backend === 'gemini') {
     // Gemini 后端
     if (!apiKeyService.hasPermission(permissions, 'gemini')) {
@@ -358,15 +446,62 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
   } catch (error) {
     logger.error('❌ OpenAI chat/completions error:', error)
     if (!res.headersSent) {
-      res.status(500).json({
-        error: {
-          message: 'Internal server error',
-          type: 'server_error',
-          code: 'internal_error'
-        }
-      })
+      res.status(error.statusCode || 500).json(buildRouteError(error))
     }
   }
+})
+
+// ⚠️ 这个 router 同时挂在 /api 和 /openai 上，而 /openai 前缀下**紧随其后**的是
+// openaiRoutes —— Codex 的 POST /openai/v1/responses 就在那里（openaiRoutes.js）。
+// 因此本路由只能接管 Grok 模型，其余一律 next() 交回给后面的 router，否则所有
+// Codex 客户端都会被这里拦下。
+//
+// 鉴权刻意放在「确认是 Grok」之后而不是写成路由级中间件：authenticateApiKey 不是
+// 幂等的（每次调用都用新的 requestId 占一个并发槽位、并累加限流计数），非 Grok 请求
+// 若在这里先认证一次、再由 openaiRoutes 认证一次，该 Key 的有效并发上限会直接减半。
+router.post('/v1/responses', async (req, res, next) => {
+  const requestedModel = req.body?.model || ''
+  if (detectBackendFromModel(requestedModel) !== 'grok') {
+    return next()
+  }
+  // 与 routeToBackend 的 grok 分支同一条前提：没有配置任何 Grok 账户时不接管。
+  // 这里必须交回给后面的 openaiRoutes（而不是像 chat/completions 那样回落到
+  // claude），因为 /v1/responses 在 main 上本来就是 Codex 的端点 —— 用
+  // claude-console / 自定义 openai-responses 中转 grok-* 是既有用法。
+  if (!(await hasAnyGrokAccount())) {
+    return next()
+  }
+
+  // authenticateApiKey 失败时一律自己 res.status(...).json(...)，从不带参调 next，
+  // 所以这里不需要（也不会命中）错误分支。
+  return authenticateApiKey(req, res, async () => {
+    try {
+      if (!apiKeyService.hasPermission(req.apiKey.permissions, 'grok')) {
+        return res.status(403).json({
+          error: {
+            message: 'This API key does not have permission to access Grok',
+            type: 'permission_denied',
+            code: 'permission_denied'
+          }
+        })
+      }
+      const grokRelayService = require('../services/relay/grokRelayService')
+      const account = await selectGrokAccount(req)
+      return grokRelayService.handleRequest(req, res, account, req.apiKey)
+    } catch (error) {
+      logger.error('❌ Unified responses error:', error)
+      if (!res.headersSent) {
+        res.status(error.statusCode || 500).json({
+          error: {
+            message: error.message || 'Internal server error',
+            type: 'server_error',
+            code: 'internal_error'
+          }
+        })
+      }
+      return undefined
+    }
+  })
 })
 
 // 🔄 OpenAI 兼容的 completions 端点（传统格式，智能后端路由）
@@ -412,13 +547,7 @@ router.post('/v1/completions', authenticateApiKey, async (req, res) => {
   } catch (error) {
     logger.error('❌ OpenAI completions error:', error)
     if (!res.headersSent) {
-      res.status(500).json({
-        error: {
-          message: 'Failed to process completion request',
-          type: 'server_error',
-          code: 'internal_error'
-        }
-      })
+      res.status(error.statusCode || 500).json(buildRouteError(error))
     }
   }
 })

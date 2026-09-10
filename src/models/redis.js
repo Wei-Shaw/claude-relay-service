@@ -2162,6 +2162,178 @@ class RedisClient {
     return totalCost
   }
 
+  _getHourSlotKeys(now, count) {
+    const keys = []
+    for (let i = 0; i < count; i++) {
+      const at = new Date(now.getTime() - i * 3600000)
+      const hour = String(getHourInTimezone(at)).padStart(2, '0')
+      keys.push(`${getDateStringInTimezone(at)}:${hour}`)
+    }
+    return keys
+  }
+
+  _getDaySlotKeys(now, count) {
+    const keys = []
+    for (let i = 0; i < count; i++) {
+      const at = new Date(now.getTime() - i * 24 * 3600000)
+      keys.push(getDateStringInTimezone(at))
+    }
+    return keys
+  }
+
+  async _sumModelCostsForAccountDays(accountId, dateKeys) {
+    const CostCalculator = require('../utils/costCalculator')
+    const costs = new Map(dateKeys.map((dateKey) => [dateKey, 0]))
+    if (!accountId || dateKeys.length === 0) {
+      return costs
+    }
+
+    const uniqueDates = [...new Set(dateKeys)]
+    const indexKeys = uniqueDates.map((dateKey) => `account_usage:model:daily:index:${dateKey}`)
+    const indexPipeline = this.client.pipeline()
+    indexKeys.forEach((key) => indexPipeline.smembers(key))
+    const indexResults = await indexPipeline.exec()
+
+    const queries = []
+    uniqueDates.forEach((dateKey, index) => {
+      const [, members] = indexResults[index] || []
+      const accountPrefix = `${accountId}:`
+      const models = (members || [])
+        .filter((entry) => entry.startsWith(accountPrefix))
+        .map((entry) => entry.substring(accountPrefix.length))
+      models.forEach((model) => {
+        queries.push({
+          dateKey,
+          model,
+          redisKey: `account_usage:model:daily:${accountId}:${model}:${dateKey}`
+        })
+      })
+    })
+
+    if (queries.length === 0) {
+      return costs
+    }
+
+    const usagePipeline = this.client.pipeline()
+    queries.forEach((query) => usagePipeline.hgetall(query.redisKey))
+    const usageResults = await usagePipeline.exec()
+
+    for (let i = 0; i < queries.length; i++) {
+      const { dateKey, model } = queries[i]
+      const [err, modelUsage] = usageResults[i] || []
+      if (err || !modelUsage) {
+        continue
+      }
+
+      const usage = {
+        input_tokens: parseInt(modelUsage.inputTokens || 0),
+        output_tokens: parseInt(modelUsage.outputTokens || 0),
+        cache_creation_input_tokens: parseInt(modelUsage.cacheCreateTokens || 0),
+        cache_read_input_tokens: parseInt(modelUsage.cacheReadTokens || 0)
+      }
+      const eph5m = parseInt(modelUsage.ephemeral5mTokens || 0)
+      const eph1h = parseInt(modelUsage.ephemeral1hTokens || 0)
+      if (eph5m > 0 || eph1h > 0) {
+        usage.cache_creation = {
+          ephemeral_5m_input_tokens: eph5m,
+          ephemeral_1h_input_tokens: eph1h
+        }
+      }
+
+      const costResult = CostCalculator.calculateCost(usage, model)
+      costs.set(dateKey, (costs.get(dateKey) || 0) + (costResult.costs.total || 0))
+    }
+
+    return costs
+  }
+
+  async batchGetAccountRollingUsage(accountIds, options = {}) {
+    const rollingUsage = require('../utils/accountRollingUsage')
+    const { buildRollingUsage, usageFromHash, costFromUsageHash, formatWindow } = rollingUsage
+    const now = options.now || new Date()
+    const fallbackModel = options.fallbackModel || 'unknown'
+    const result = new Map()
+
+    if (!accountIds || accountIds.length === 0) {
+      return result
+    }
+
+    const hourKeys = this._getHourSlotKeys(now, 24)
+    const dayKeys = this._getDaySlotKeys(now, 30)
+    const client = this.getClientSafe()
+    const pipeline = client.pipeline()
+    const queryOrder = []
+
+    for (const accountId of accountIds) {
+      hourKeys.forEach((hourKey) => {
+        pipeline.hgetall(`account_usage:hourly:${accountId}:${hourKey}`)
+        queryOrder.push({ accountId, kind: 'hour', slot: hourKey })
+      })
+      dayKeys.forEach((dateKey) => {
+        pipeline.hgetall(`account_usage:daily:${accountId}:${dateKey}`)
+        queryOrder.push({ accountId, kind: 'day', slot: dateKey })
+      })
+    }
+
+    const hashes = await pipeline.exec()
+    const hourlyByAccount = new Map()
+    const dailyByAccount = new Map()
+
+    accountIds.forEach((accountId) => {
+      hourlyByAccount.set(accountId, new Map())
+      dailyByAccount.set(accountId, new Map())
+    })
+
+    hashes.forEach((item, index) => {
+      const meta = queryOrder[index]
+      const [, data] = item || []
+      if (meta.kind === 'hour') {
+        hourlyByAccount.get(meta.accountId).set(meta.slot, data || {})
+      } else {
+        dailyByAccount.get(meta.accountId).set(meta.slot, data || {})
+      }
+    })
+
+    for (const accountId of accountIds) {
+      const dailyCosts = await this._sumModelCostsForAccountDays(accountId, dayKeys)
+      const rolling = buildRollingUsage({
+        now,
+        getDateStringInTimezone,
+        getHourInTimezone,
+        hourlyHashes: hourlyByAccount.get(accountId),
+        dailyHashes: dailyByAccount.get(accountId),
+        dailyCosts,
+        fallbackModel
+      })
+
+      // Hourly buckets expire after 7 days; if 24h hashes are empty, fall back to today.
+      if (rolling.oneDay.requests === 0 && rolling.oneDay.tokens === 0) {
+        const today = getDateStringInTimezone(now)
+        const todayHash = dailyByAccount.get(accountId).get(today) || {}
+        const todayUsage = usageFromHash(todayHash)
+        todayUsage.cost = dailyCosts.get(today) || costFromUsageHash(todayHash, fallbackModel)
+        rolling.oneDay = formatWindow(todayUsage)
+      }
+
+      result.set(accountId, rolling)
+    }
+
+    return result
+  }
+
+  async getAccountRollingUsage(accountId, options = {}) {
+    const { formatWindow, emptyUsage } = require('../utils/accountRollingUsage')
+    const map = await this.batchGetAccountRollingUsage([accountId], options)
+    return (
+      map.get(accountId) || {
+        fiveHour: formatWindow(emptyUsage()),
+        oneDay: formatWindow(emptyUsage()),
+        sevenDay: formatWindow(emptyUsage()),
+        thirtyDay: formatWindow(emptyUsage())
+      }
+    )
+  }
+
   // 📊 获取账户使用统计
   async getAccountUsageStats(accountId, accountType = null) {
     const accountKey = `account_usage:${accountId}`
@@ -2188,6 +2360,8 @@ class RedisClient {
       accountData = await this.client.hgetall(`openai:account:${accountId}`)
     } else if (accountType === 'openai-responses') {
       accountData = await this.client.hgetall(`openai_responses_account:${accountId}`)
+    } else if (accountType === 'grok') {
+      accountData = await this.client.hgetall(`grok_account:${accountId}`)
     } else {
       // 尝试多个前缀（优先 claude:account:）
       accountData = await this.client.hgetall(`claude:account:${accountId}`)
@@ -2205,6 +2379,9 @@ class RedisClient {
       }
       if (!accountData.createdAt) {
         accountData = await this.client.hgetall(`droid:account:${accountId}`)
+      }
+      if (!accountData.createdAt) {
+        accountData = await this.client.hgetall(`grok_account:${accountId}`)
       }
     }
     const createdAt = accountData.createdAt ? new Date(accountData.createdAt) : new Date()

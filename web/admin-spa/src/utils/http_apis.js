@@ -211,6 +211,17 @@ export const exchangeDroidCodeApi = (data) =>
 export const getDroidAccountByIdApi = (id) =>
   request({ url: `/admin/droid-accounts/${id}`, method: 'GET' })
 
+// Grok 账户
+export const getGrokAccountsApi = () => request({ url: '/admin/grok-accounts', method: 'GET' })
+export const createGrokAccountApi = (data) =>
+  request({ url: '/admin/grok-accounts', method: 'POST', data })
+export const updateGrokAccountApi = (id, data) =>
+  request({ url: `/admin/grok-accounts/${id}`, method: 'PUT', data })
+export const generateGrokAuthUrlApi = (data) =>
+  request({ url: '/admin/grok-accounts/generate-auth-url', method: 'POST', data })
+export const exchangeGrokCodeApi = (data) =>
+  request({ url: '/admin/grok-accounts/exchange-code', method: 'POST', data })
+
 // CCR 账户
 export const getCcrAccountsApi = () => request({ url: '/admin/ccr-accounts', method: 'GET' })
 export const createCcrAccountApi = (data) =>

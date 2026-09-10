@@ -356,6 +356,7 @@ const platformDisplayName = computed(() => {
     gemini: 'Gemini',
     'gemini-api': 'Gemini API',
     droid: 'Droid',
+    grok: 'Grok',
     unknown: '未知渠道'
   }
   const key = accountInfo.platform || platform.value || 'unknown'
