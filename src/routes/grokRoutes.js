@@ -56,12 +56,24 @@ router.post('/v1/responses', authenticateApiKey, handleGrokRelay)
 router.post('/responses', authenticateApiKey, handleGrokRelay)
 router.post('/v1/chat/completions', authenticateApiKey, handleGrokRelay)
 router.post('/chat/completions', authenticateApiKey, handleGrokRelay)
-router.post('/v1/images/generations', authenticateApiKey, handleGrokRelay)
-router.post('/images/generations', authenticateApiKey, handleGrokRelay)
-router.post('/v1/images/edits', authenticateApiKey, handleGrokRelay)
-router.post('/images/edits', authenticateApiKey, handleGrokRelay)
-router.post('/v1/videos/generations', authenticateApiKey, handleGrokRelay)
-router.post('/videos/generations', authenticateApiKey, handleGrokRelay)
+
+// ⚠️ images / videos 端点暂不开放，等有了按张计费的定价模型再放出来。
+//
+// 原因：这几个端点按张计费，xAI 的响应里结构性地就没有 usage 字段，而本服务的
+// 费用额度（dailyCostLimit / totalCostLimit）完全由 recordUsage 的 token 数驱动。
+// 强制注入的 stream_options.include_usage 只作用于 chat/completions，对它们无效。
+// 结果是每一次调用都记 0 token / $0，任何持 grok 权限的 Key 都能在额度显示 $0.00
+// 的情况下无限调用 —— 而图片/视频恰恰是 xAI 上单请求最贵的东西。
+// 请求数限流（rateLimitRequests）是飞行前扣的，仍然有效，但默认不设上限。
+//
+// 恢复方式：给这些模型补上按张计费的定价，并让 _recordUsage 走该口径，然后把
+// 下面四行取消注释即可。转发链路本身（handleGrokRelay）无需改动。
+// router.post('/v1/images/generations', authenticateApiKey, handleGrokRelay)
+// router.post('/images/generations', authenticateApiKey, handleGrokRelay)
+// router.post('/v1/images/edits', authenticateApiKey, handleGrokRelay)
+// router.post('/images/edits', authenticateApiKey, handleGrokRelay)
+// router.post('/v1/videos/generations', authenticateApiKey, handleGrokRelay)
+// router.post('/videos/generations', authenticateApiKey, handleGrokRelay)
 
 const GROK_MODELS = [
   'grok-4.5',
