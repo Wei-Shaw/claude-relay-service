@@ -397,6 +397,9 @@ const handleResponses = async (req, res) => {
       return await openaiResponsesRelayService.handleRequest(req, res, account, apiKeyData)
     }
 
+    // The ChatGPT Codex backend rejects this Responses API parameter, regardless of client type.
+    delete req.body.prompt_cache_options
+
     if (schedulerModel !== requestedModel) {
       logger.info(
         `📝 Standard Responses request normalized model ${requestedModel} -> ${schedulerModel} for OpenAI Codex backend`
