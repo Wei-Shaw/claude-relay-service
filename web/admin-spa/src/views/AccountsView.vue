@@ -999,14 +999,14 @@
                            模型级额度都在 limits[] 里；但只要它确实有数据就要画出来，
                            哪怕 limits[] 同时也回传了 weekly_scoped 条目。 -->
                       <div
-                        v-if="hasLegacySevenDayModelWindow(account.claudeUsage)"
+                        v-if="hasLegacySevenDayModelWindow(account)"
                         class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
                       >
                         <div class="flex items-center gap-2">
                           <span
                             class="inline-flex min-w-[32px] justify-center rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-600 dark:bg-purple-500/20 dark:text-purple-300"
                           >
-                            Sonnet
+                            {{ LEGACY_SEVEN_DAY_MODEL_LABEL }}
                           </span>
                           <div class="flex-1">
                             <div class="flex items-center gap-2">
@@ -1745,14 +1745,14 @@
                      模型级额度都在 limits[] 里；但只要它确实有数据就要画出来，
                      哪怕 limits[] 同时也回传了 weekly_scoped 条目。 -->
                 <div
-                  v-if="hasLegacySevenDayModelWindow(account.claudeUsage)"
+                  v-if="hasLegacySevenDayModelWindow(account)"
                   class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700/70"
                 >
                   <div class="flex items-center gap-2">
                     <span
                       class="inline-flex min-w-[32px] justify-center rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-600 dark:bg-purple-500/20 dark:text-purple-300"
                     >
-                      Sonnet
+                      {{ LEGACY_SEVEN_DAY_MODEL_LABEL }}
                     </span>
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
@@ -3889,12 +3889,20 @@ const getScopedModelUsage = (account) => {
 // 顶层具名窗口（后端 sevenDayOpus，数据源其实是上游的 seven_day_sonnet）。
 // 对 Max 账号它一直是 null，模型级额度在 limits[] 里；但对确实回传了该窗口的账号
 // 不能因为没有 weekly_scoped 就把这条进度条整个删掉，所以保留一条回退渲染。
-const hasLegacySevenDayModelWindow = (claudeUsage) => {
-  const window = claudeUsage?.sevenDayOpus
-  if (!window) {
+const LEGACY_SEVEN_DAY_MODEL_LABEL = 'Sonnet'
+
+const hasLegacySevenDayModelWindow = (account) => {
+  const window = account?.claudeUsage?.sevenDayOpus
+  // 判据与 getScopedModelUsage 保持一致：只有 resetsAt 没有百分比时不画
+  // （否则会出现一条百分比恒为 "-" 的空条，而同样缺数据的 scoped 窗口是被隐藏的）
+  if (!window || window.utilization === null || window.utilization === undefined) {
     return false
   }
-  return (window.utilization !== null && window.utilization !== undefined) || !!window.resetsAt
+  // 上游若同时在 limits[] 里回传了同名的 weekly_scoped 条目，就以那条为准，
+  // 否则会出现两条都叫 Sonnet、百分比还不一样的进度条
+  return !getScopedModelUsage(account).some(
+    (item) => item.modelName === LEGACY_SEVEN_DAY_MODEL_LABEL
+  )
 }
 
 const formatRateLimitTime = (minutes) => {

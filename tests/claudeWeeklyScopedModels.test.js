@@ -222,4 +222,27 @@ describe('updateClaudeUsageSnapshot', () => {
 
     expect(redis.setClaudeAccount).not.toHaveBeenCalled()
   })
+
+  // 早退条件里的 `&& scopedModels.length === 0` 是有载荷的：上游只回 limits[]
+  // 而顶层三个窗口全缺时，没有这一半判断就会提前 return，scoped 数据永远落不了盘。
+  // 变异测试证明：退回成只判 Object.keys(updates).length === 0 时，其余用例全绿。
+  it('persists scoped models even when no top-level window was returned', async () => {
+    await claudeAccountService.updateClaudeUsageSnapshot('acc-1', {
+      limits: [
+        {
+          kind: 'weekly_scoped',
+          percent: 9,
+          resets_at: '2026-09-09T07:00:00Z',
+          scope: { model: { display_name: 'Fable' } },
+          is_active: true
+        }
+      ]
+    })
+
+    expect(redis.setClaudeAccount).toHaveBeenCalledTimes(1)
+    const saved = redis.setClaudeAccount.mock.calls[0][1]
+    expect(JSON.parse(saved.claudeWeeklyScopedModels)).toEqual([
+      expect.objectContaining({ modelName: 'Fable', utilization: 9 })
+    ])
+  })
 })
