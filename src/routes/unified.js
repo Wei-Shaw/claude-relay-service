@@ -15,6 +15,31 @@ const CodexToOpenAIConverter = require('../services/codexToOpenAI')
 
 const router = express.Router()
 
+// 统一的错误响应体。调度器在「无可用账户」时抛的是带 statusCode=402 的错误
+// （grokScheduler.js），把它压成 500 会让客户端按服务端故障处理 —— 要么无限重试，
+// 要么直接放弃，而 402 才能告诉调用方「换 Key 或等配额」。
+// 注意 claude/gemini/openai 三个分支各自有 catch，不会把带 statusCode 的错误抛到
+// 外层，所以这里对既有后端的行为等价于原来的固定 500。
+function buildRouteError(error) {
+  const status = error?.statusCode || 500
+  if (status === 500) {
+    return {
+      error: {
+        message: 'Internal server error',
+        type: 'server_error',
+        code: 'internal_error'
+      }
+    }
+  }
+  return {
+    error: {
+      message: error.message || 'Request failed',
+      type: status === 402 ? 'no_available_account' : 'server_error',
+      code: status === 402 ? 'no_available_account' : 'internal_error'
+    }
+  }
+}
+
 // 🔍 根据模型名称检测后端类型
 function detectBackendFromModel(modelName) {
   if (!modelName) {
@@ -80,13 +105,7 @@ async function selectGrokAccount(req) {
 async function hasAnyGrokAccount() {
   try {
     const grokAccountService = require('../services/account/grokAccountService')
-    const redis = require('../models/redis')
-    const ids = await redis.getAllIdsByIndex(
-      grokAccountService.INDEX_KEY,
-      `${grokAccountService.ACCOUNT_KEY_PREFIX}*`,
-      /^grok_account:(.+)$/
-    )
-    return Array.isArray(ids) && ids.length > 0
+    return await grokAccountService.hasAnyAccount()
   } catch (error) {
     logger.warn('⚠️ Failed to probe Grok accounts, assuming they exist:', error.message)
     return true
@@ -427,13 +446,7 @@ router.post('/v1/chat/completions', authenticateApiKey, async (req, res) => {
   } catch (error) {
     logger.error('❌ OpenAI chat/completions error:', error)
     if (!res.headersSent) {
-      res.status(500).json({
-        error: {
-          message: 'Internal server error',
-          type: 'server_error',
-          code: 'internal_error'
-        }
-      })
+      res.status(error.statusCode || 500).json(buildRouteError(error))
     }
   }
 })
@@ -459,10 +472,9 @@ router.post('/v1/responses', async (req, res, next) => {
     return next()
   }
 
-  return authenticateApiKey(req, res, async (authError) => {
-    if (authError) {
-      return next(authError)
-    }
+  // authenticateApiKey 失败时一律自己 res.status(...).json(...)，从不带参调 next，
+  // 所以这里不需要（也不会命中）错误分支。
+  return authenticateApiKey(req, res, async () => {
     try {
       if (!apiKeyService.hasPermission(req.apiKey.permissions, 'grok')) {
         return res.status(403).json({
@@ -535,13 +547,7 @@ router.post('/v1/completions', authenticateApiKey, async (req, res) => {
   } catch (error) {
     logger.error('❌ OpenAI completions error:', error)
     if (!res.headersSent) {
-      res.status(500).json({
-        error: {
-          message: 'Failed to process completion request',
-          type: 'server_error',
-          code: 'internal_error'
-        }
-      })
+      res.status(error.statusCode || 500).json(buildRouteError(error))
     }
   }
 })

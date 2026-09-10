@@ -54,13 +54,9 @@ const mockSelectAccount = jest.fn(async () => ({ id: 'grok-1' }))
 jest.mock('../src/services/scheduler/grokScheduler', () => ({
   selectAccount: (...args) => mockSelectAccount(...args)
 }))
+const mockHasAnyAccount = jest.fn(async () => true)
 jest.mock('../src/services/account/grokAccountService', () => ({
-  INDEX_KEY: 'grok_account:index',
-  ACCOUNT_KEY_PREFIX: 'grok_account:'
-}))
-const mockGetAllIdsByIndex = jest.fn(async () => ['grok-1'])
-jest.mock('../src/models/redis', () => ({
-  getAllIdsByIndex: (...args) => mockGetAllIdsByIndex(...args)
+  hasAnyAccount: (...args) => mockHasAnyAccount(...args)
 }))
 
 const unifiedRoutes = require('../src/routes/unified')
@@ -88,7 +84,7 @@ describe('unified POST /v1/responses', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockHasPermission.mockReturnValue(true)
-    mockGetAllIdsByIndex.mockResolvedValue(['grok-1'])
+    mockHasAnyAccount.mockResolvedValue(true)
     mockSelectAccount.mockResolvedValue({ id: 'grok-1' })
   })
 
@@ -108,7 +104,7 @@ describe('unified POST /v1/responses', () => {
   // openai-responses 中转 grok-* 是既有用法。没有配置 Grok 账户时必须交回给
   // 后面的 openaiRoutes，而不是抢走流量报 402/403。
   it('没有配置 Grok 账户时，grok 模型也要交回 Codex', async () => {
-    mockGetAllIdsByIndex.mockResolvedValue([])
+    mockHasAnyAccount.mockResolvedValue(false)
 
     const res = await request(buildApp()).post('/openai/v1/responses').send({ model: 'grok-4.5' })
 
@@ -148,7 +144,7 @@ describe('unified POST /v1/chat/completions - Grok 接管的前提', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockHasPermission.mockReturnValue(true)
-    mockGetAllIdsByIndex.mockResolvedValue(['grok-1'])
+    mockHasAnyAccount.mockResolvedValue(true)
     mockSelectAccount.mockResolvedValue({ id: 'grok-1' })
   })
 
@@ -158,7 +154,7 @@ describe('unified POST /v1/chat/completions - Grok 接管的前提', () => {
       .send({ model: 'grok-4.5', messages: [{ role: 'user', content: 'hi' }] })
 
   it('没有配置任何 Grok 账户时回落到 Claude', async () => {
-    mockGetAllIdsByIndex.mockResolvedValue([])
+    mockHasAnyAccount.mockResolvedValue(false)
 
     const res = await postGrok()
 
@@ -172,7 +168,7 @@ describe('unified POST /v1/chat/completions - Grok 接管的前提', () => {
   // 这条钉住「探测必须在权限校验之前」：需要回落的正是那些 Key 只有 claude 权限的
   // 老部署。若把探测挪到权限校验之后，它们会先撞上 grok 的 403，回落永远轮不到。
   it('Key 没有 grok 权限 且 零 Grok 账户时，仍然回落到 Claude 而不是 403', async () => {
-    mockGetAllIdsByIndex.mockResolvedValue([])
+    mockHasAnyAccount.mockResolvedValue(false)
     mockHasPermission.mockImplementation((_perms, service) => service !== 'grok')
 
     const res = await postGrok()
@@ -183,7 +179,7 @@ describe('unified POST /v1/chat/completions - Grok 接管的前提', () => {
   })
 
   it('回落时仍然按 claude 权限判定，不会绕过鉴权', async () => {
-    mockGetAllIdsByIndex.mockResolvedValue([])
+    mockHasAnyAccount.mockResolvedValue(false)
     mockHasPermission.mockImplementation((_perms, service) => service !== 'claude')
 
     const res = await postGrok()
@@ -214,17 +210,17 @@ describe('unified POST /v1/chat/completions - Grok 接管的前提', () => {
   })
 
   // 账户存在但此刻全被限流：必须照常报错，不能让 Grok 请求被 Claude 静默应答。
-  // 状态码是 500 而不是 402 —— 这是 /v1/chat/completions 的 catch 一律返回 500 的
-  // 既有行为（main 上对 claude/gemini/openai 也一样会吞掉 error.statusCode），
-  // 与本次改动无关，这里只钉住「不回落」这个语义。
-  it('账户全部不可用时照常报错，不改道 Claude', async () => {
+  it('账户全部不可用时返回 402 而不是改道 Claude', async () => {
     const err = new Error('No available Grok accounts')
     err.statusCode = 402
     mockSelectAccount.mockRejectedValue(err)
 
     const res = await postGrok()
 
-    expect(res.status).toBe(500)
+    // 402 会原样透传（不再被外层 catch 压成 500）：调度器抛的
+    // 「无可用账户」是可诊断、可重试的状态，压成 500 会让客户端当服务端故障处理。
+    expect(res.status).toBe(402)
+    expect(res.body.error.code).toBe('no_available_account')
     expect(mockHandleChatCompletion).not.toHaveBeenCalled()
     expect(mockGrokHandleRequest).not.toHaveBeenCalled()
   })

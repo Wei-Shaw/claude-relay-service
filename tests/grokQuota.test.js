@@ -119,6 +119,61 @@ describe('grokQuota', () => {
     expect(grokQuota.canonicalPlan({ snapshot })).toBe('supergrok_heavy')
   })
 
+  // 上游不再回配额头时快照会原样留着。窗口早就重置了，界面却一直显示
+  // 「1000/1000 已用、100%、重置剩余 0 秒」，运维会以为账号还卡在配额耗尽上。
+  it('treats a window whose reset time has passed as replenished', () => {
+    const past = new Date('2026-09-01T01:00:00.000Z').toISOString()
+    const snapshot = {
+      requests: { limit: 1000, remaining: 0, resetsAt: past },
+      subscriptionTier: 'supergrok'
+    }
+
+    const usage = grokQuota.buildGrokUsageSnapshot(
+      { grokQuotaSnapshot: JSON.stringify(snapshot) },
+      new Date('2026-09-10T00:00:00.000Z')
+    )
+
+    expect(usage.requests).toMatchObject({ limit: 1000, remaining: 1000, used: 0, utilization: 0 })
+  })
+
+  it('still reports a live window as used', () => {
+    const future = new Date(Date.now() + 3600 * 1000).toISOString()
+    const snapshot = { requests: { limit: 1000, remaining: 250, resetsAt: future } }
+
+    const usage = grokQuota.buildGrokUsageSnapshot({ grokQuotaSnapshot: JSON.stringify(snapshot) })
+
+    expect(usage.requests).toMatchObject({ used: 750, utilization: 75 })
+  })
+
+  // parseQuotaWindow 在只有 reset 头时返回 {limit:null,remaining:null,resetUnix:X}，
+  // 它是 truthy —— 整块保留判断会放它覆盖掉上一次真实测到的 limit/remaining。
+  it('keeps known limit/remaining when the next response carries only a reset header', () => {
+    const previous = grokQuota.parseQuotaHeaders({
+      'x-ratelimit-limit-requests': '1000',
+      'x-ratelimit-remaining-requests': '150'
+    })
+    const next = grokQuota.parseQuotaHeaders({ 'x-ratelimit-reset-requests': '3600' })
+
+    const merged = grokQuota.mergeQuotaSnapshots(previous, next)
+
+    expect(merged.requests.limit).toBe(1000)
+    expect(merged.requests.remaining).toBe(150)
+    expect(merged.requests.resetUnix).toBe(next.requests.resetUnix)
+  })
+
+  it('still lets a fresh reading overwrite an older one', () => {
+    const previous = grokQuota.parseQuotaHeaders({
+      'x-ratelimit-limit-requests': '1000',
+      'x-ratelimit-remaining-requests': '150'
+    })
+    const next = grokQuota.parseQuotaHeaders({
+      'x-ratelimit-limit-requests': '1000',
+      'x-ratelimit-remaining-requests': '20'
+    })
+
+    expect(grokQuota.mergeQuotaSnapshots(previous, next).requests.remaining).toBe(20)
+  })
+
   it('still infers Heavy from the quota shape when no tier header is present', () => {
     const snapshot = grokQuota.parseQuotaHeaders({
       'x-ratelimit-limit-requests': String(grokQuota.HEAVY_REQUEST_LIMIT),

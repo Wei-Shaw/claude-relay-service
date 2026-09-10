@@ -280,6 +280,23 @@ function parseQuotaHeaders(headers, { statusCode = 0, model = '', now = new Date
   return snapshot
 }
 
+// 单个配额窗口的合并：本次响应给了哪个字段就用哪个，没给的沿用上一次已知值。
+function mergeQuotaWindow(previous, next) {
+  if (!next) {
+    return previous || null
+  }
+  if (!previous) {
+    return next
+  }
+  const pick = (a, b) => (a === null || a === undefined ? b : a)
+  return {
+    limit: pick(next.limit, previous.limit),
+    remaining: pick(next.remaining, previous.remaining),
+    resetUnix: pick(next.resetUnix, previous.resetUnix),
+    resetsAt: pick(next.resetsAt, previous.resetsAt)
+  }
+}
+
 function mergeQuotaSnapshots(previous, next) {
   if (!next) {
     return previous || null
@@ -298,12 +315,11 @@ function mergeQuotaSnapshots(previous, next) {
   // parseQuotaWindow 在本次响应没带这组头时返回 null，浅合并会把上一次真实测到的
   // 窗口直接抹掉（xAI 并非每个端点都同时回传 requests 与 tokens 两组头）。已观测到
   // 的数据要保留，否则界面会退回「等待上游配额头」。
-  if (!next.requests && previous.requests) {
-    merged.requests = previous.requests
-  }
-  if (!next.tokens && previous.tokens) {
-    merged.tokens = previous.tokens
-  }
+  // 逐字段保留而不是整块保留：parseQuotaWindow 在只有 reset 头时会返回
+  // { limit:null, remaining:null, resetUnix:X } —— 它是 truthy，整块判断会放它
+  // 覆盖掉上一次真实测到的 limit/remaining，界面又退回「等待上游配额头」。
+  merged.requests = mergeQuotaWindow(previous.requests, next.requests)
+  merged.tokens = mergeQuotaWindow(previous.tokens, next.tokens)
   if (!next.entitlementStatus && previous.entitlementStatus) {
     merged.entitlementStatus = previous.entitlementStatus
   }
@@ -337,13 +353,19 @@ function formatWindow(window, now = new Date()) {
     return null
   }
   const limit = Number(window.limit)
-  const remaining = Number(window.remaining)
   const hasLimit = Number.isFinite(limit) && limit > 0
+  const resetsAt = window.resetsAt || null
+  const resetsAtMs = resetsAt ? new Date(resetsAt).getTime() : NaN
+  // 窗口的重置时刻已经过去，说明存的这份计数是上一个周期的残留：上游后续响应
+  // 若不再带配额头，快照就会原样留着，界面会一直显示「1000/1000 已用、100%、
+  // 重置剩余 0 秒」，让运维误以为账号还卡在配额耗尽上。已过期就按「已重置」算，
+  // 与 Codex 那条路径的既有处理一致（AccountsView 的 normalizeCodexUsagePercent）。
+  const hasExpired = Number.isFinite(resetsAtMs) && resetsAtMs <= now.getTime()
+  const remaining = hasExpired && hasLimit ? limit : Number(window.remaining)
   const hasRemaining = Number.isFinite(remaining)
   const used = hasLimit && hasRemaining ? Math.max(0, limit - remaining) : null
   const utilization =
     hasLimit && used !== null ? Math.min(100, Math.round((used / limit) * 1000) / 10) : null
-  const resetsAt = window.resetsAt || null
   const remainingSeconds = resetsAt
     ? Math.max(0, Math.floor((new Date(resetsAt).getTime() - now.getTime()) / 1000))
     : null

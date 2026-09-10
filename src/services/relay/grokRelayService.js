@@ -217,6 +217,11 @@ class GrokRelayService {
         )
       }
 
+      // 非流式路径：先摘掉断连监听器再回包。其余四条出口（429 / 其它 4xx-5xx /
+      // 流式 end / 流式 error）都摘了，只有这里漏掉，导致每个**成功**的非流式请求
+      // 在 res 正常关闭时都打印一条「客户端断开」的 INFO，把真实断连淹没掉。
+      req.removeListener('close', handleClientDisconnect)
+      res.removeListener('close', handleClientDisconnect)
       return this._handleNormalResponse(response, res, account, apiKeyData, req.body?.model, req)
     } catch (error) {
       if (abortController && !abortController.signal.aborted) {
@@ -257,6 +262,15 @@ class GrokRelayService {
     let usageData = null
     let actualModel = requestedModel
     let buffer = ''
+    // 'end' 与 'error' 都可能触发，用量只能记一次
+    let usageRecorded = false
+    const recordUsageOnce = async () => {
+      if (usageRecorded) {
+        return
+      }
+      usageRecorded = true
+      await this._recordUsage(account, apiKeyData, usageData, actualModel, req)
+    }
 
     const parseSSEForUsage = (data) => {
       const lines = data.split('\n')
@@ -305,16 +319,19 @@ class GrokRelayService {
       if (!res.destroyed) {
         res.end()
       }
-      await this._recordUsage(account, apiKeyData, usageData, actualModel, req)
+      await recordUsageOnce()
     })
 
-    response.data.on('error', (error) => {
+    response.data.on('error', async (error) => {
       logger.error('Grok stream error:', error.message)
       req.removeListener('close', handleClientDisconnect)
       res.removeListener('close', handleClientDisconnect)
       if (!res.destroyed) {
         res.end()
       }
+      // 流中断时也要把已经捕获到的 usage 记下来 —— 客户端在收尾前断开或上游报错，
+      // 之前已经生成并计费的 token 会一条都不记，等于免费。
+      await recordUsageOnce()
     })
   }
 
@@ -344,13 +361,23 @@ class GrokRelayService {
   }
 
   async _recordUsage(account, apiKeyData, usageData, model, req) {
-    if (!usageData || !apiKeyData?.id) {
+    if (!apiKeyData?.id) {
       return
     }
+    // 上游没回 usage 时不能直接 return —— 那样这次请求在费用统计、每日/总额度、
+    // 账号用量、请求详情里会完全不存在。images / videos 这类端点按张计费，响应里
+    // 结构性地就没有 usage 字段，直接 return 等于让它们永远记 0 且不可见。
+    // 记一条 0 token 的请求，至少请求数与调用记录是真实的。
+    if (!usageData) {
+      logger.warn(
+        `⚠️ Grok upstream returned no usage for ${req?.path || 'unknown path'} (model: ${model || 'unknown'}); recording a zero-token request — 该请求不会计入按 token 的费用额度`
+      )
+    }
     try {
-      const totalInputTokens = Number(usageData.input_tokens || usageData.prompt_tokens || 0) || 0
-      const outputTokens = Number(usageData.output_tokens || usageData.completion_tokens || 0) || 0
-      const cacheReadTokens = extractOpenAICacheReadTokens(usageData)
+      const usage = usageData || {}
+      const totalInputTokens = Number(usage.input_tokens || usage.prompt_tokens || 0) || 0
+      const outputTokens = Number(usage.output_tokens || usage.completion_tokens || 0) || 0
+      const cacheReadTokens = extractOpenAICacheReadTokens(usage)
       const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
       await apiKeyService.recordUsage(
         apiKeyData.id,

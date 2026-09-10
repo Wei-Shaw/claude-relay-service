@@ -193,6 +193,17 @@ class GrokAccountService {
     return accountData
   }
 
+  // 本部署是否配置过 Grok 账户（含未启用的）。只取 id，不做 hgetall。
+  // 路由层用它判断「要不要接管 grok-* 模型」，键方案必须只有这里一份。
+  async hasAnyAccount() {
+    const accountIds = await redis.getAllIdsByIndex(
+      this.INDEX_KEY,
+      `${this.ACCOUNT_KEY_PREFIX}*`,
+      /^grok_account:(.+)$/
+    )
+    return Array.isArray(accountIds) && accountIds.length > 0
+  }
+
   async getAllAccounts(includeInactive = false) {
     const client = redis.getClientSafe()
     const accountIds = await redis.getAllIdsByIndex(

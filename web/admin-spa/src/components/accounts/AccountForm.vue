@@ -2296,9 +2296,12 @@
               </div>
             </div>
 
-            <!-- Grok API Key / 自定义中转 -->
+            <!-- Grok API Key / 自定义中转。与其它平台一致只在新建时渲染：
+                 updateAccount 的 grok 分支读的是 form.customUpstream，从不读
+                 grokBaseUrlMode、也不发 baseUrlMode，所以编辑态显示这个下拉框
+                 只会让用户以为改了上游、实际被静默丢弃。 -->
             <div
-              v-if="form.addType === 'apikey' && form.platform === 'grok'"
+              v-if="form.addType === 'apikey' && form.platform === 'grok' && !isEdit"
               class="space-y-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/30"
             >
               <div class="mb-2 flex items-start gap-3">
