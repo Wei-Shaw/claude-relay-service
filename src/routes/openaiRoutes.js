@@ -397,7 +397,9 @@ const handleResponses = async (req, res) => {
       return await openaiResponsesRelayService.handleRequest(req, res, account, apiKeyData)
     }
 
-    // The ChatGPT Codex backend rejects this Responses API parameter, regardless of client type.
+    // ChatGPT Codex 后端不支持此 body 参数；放在账号分流后，保留标准 Responses 后端的支持。
+    // 这是后端兼容限制，不受 CLI 适配开关控制；放进 applyCodexCliAdaptation 会被
+    // 原生 Codex 客户端或关闭适配的请求绕过。删除后使用后端默认缓存行为。
     delete req.body.prompt_cache_options
 
     if (schedulerModel !== requestedModel) {
