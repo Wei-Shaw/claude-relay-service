@@ -28,6 +28,19 @@ const {
 } = require('../services/anthropicGeminiBridgeService')
 const router = express.Router()
 
+function getHeaderValueCaseInsensitive(headers, key) {
+  if (!headers || typeof headers !== 'object') {
+    return undefined
+  }
+  const lowerKey = key.toLowerCase()
+  for (const candidate of Object.keys(headers)) {
+    if (candidate.toLowerCase() === lowerKey) {
+      return headers[candidate]
+    }
+  }
+  return undefined
+}
+
 function queueRateLimitUpdate(
   rateLimitInfo,
   usageSummary,
@@ -566,6 +579,7 @@ async function handleMessagesRequest(req, res) {
         const _requestBodyConsole = req.body
         const _apiKeyConsole = req.apiKey
         const _headersConsole = req.headers
+        const _betaHeaderConsole = getHeaderValueCaseInsensitive(_headersConsole, 'anthropic-beta')
 
         await claudeConsoleRelayService.relayStreamRequestWithUsageCapture(
           _requestBodyConsole,
@@ -693,7 +707,8 @@ async function handleMessagesRequest(req, res) {
               )
             }
           },
-          accountId
+          accountId,
+          { betaHeader: _betaHeaderConsole }
         )
       } else if (accountType === 'bedrock') {
         // Bedrock账号使用Bedrock转发服务
@@ -797,6 +812,7 @@ async function handleMessagesRequest(req, res) {
         const _requestBodyCcr = req.body
         const _apiKeyCcr = req.apiKey
         const _headersCcr = req.headers
+        const _betaHeaderCcr = getHeaderValueCaseInsensitive(_headersCcr, 'anthropic-beta')
 
         await ccrRelayService.relayStreamRequestWithUsageCapture(
           _requestBodyCcr,
@@ -921,7 +937,8 @@ async function handleMessagesRequest(req, res) {
               )
             }
           },
-          accountId
+          accountId,
+          { betaHeader: _betaHeaderCcr }
         )
       }
 
@@ -1152,7 +1169,8 @@ async function handleMessagesRequest(req, res) {
           req, // clientRequest 保留用于断开检测
           res,
           _headersNonStream,
-          accountId
+          accountId,
+          { betaHeader: getHeaderValueCaseInsensitive(_headersNonStream, 'anthropic-beta') }
         )
       } else if (accountType === 'bedrock') {
         // Bedrock账号使用Bedrock转发服务
@@ -1201,7 +1219,8 @@ async function handleMessagesRequest(req, res) {
           req, // clientRequest 保留用于断开检测
           res,
           _headersNonStream,
-          accountId
+          accountId,
+          { betaHeader: getHeaderValueCaseInsensitive(_headersNonStream, 'anthropic-beta') }
         )
       }
 
