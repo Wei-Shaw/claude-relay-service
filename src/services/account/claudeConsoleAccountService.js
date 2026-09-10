@@ -357,12 +357,39 @@ class ClaudeConsoleAccountService {
         updatedData.autoStoppedAt = ''
         updatedData.stoppedReason = ''
 
+        // 仅当调用方未显式携带自动停止标记时，才视为管理员手动操作
+        const isManualChange =
+          updates.quotaAutoStopped === undefined && updates.rateLimitAutoStopped === undefined
+        const isManualEnable =
+          isManualChange && (updates.schedulable === true || updates.schedulable === 'true')
+
+        // 管理员手动开启调度时一并清除额度停用标记：残留的 quotaStoppedAt 会让账户
+        // 在选号时继续被判为超额而跳过，使"打开调度"当天不生效。清除后下次选号会
+        // 重新评估用量，若仍超过上限会立即再次停用（需先调高上限才能真正放开）
+        if (isManualEnable && existingAccount.quotaStoppedAt) {
+          updatedData.quotaStoppedAt = ''
+          updatedData.errorMessage = ''
+        }
+
         // 记录日志
-        if (updates.schedulable === true || updates.schedulable === 'true') {
+        if (!isManualChange) {
+          logger.debug(
+            `🤖 Automatic scheduling change for Claude Console account ${accountId}: schedulable=${updatedData.schedulable}`
+          )
+        } else if (isManualEnable) {
           logger.info(`✅ Manually enabled scheduling for Claude Console account ${accountId}`)
         } else {
           logger.info(`⛔ Manually disabled scheduling for Claude Console account ${accountId}`)
         }
+      }
+
+      // 自动停止标记（由额度/限流自动停用逻辑显式传入时必须落库，
+      // 否则超额停用后第二天无法自动恢复调度）
+      if (updates.quotaAutoStopped !== undefined) {
+        updatedData.quotaAutoStopped = String(updates.quotaAutoStopped)
+      }
+      if (updates.rateLimitAutoStopped !== undefined) {
+        updatedData.rateLimitAutoStopped = String(updates.rateLimitAutoStopped)
       }
 
       // 额度管理相关字段
@@ -696,24 +723,57 @@ class ClaudeConsoleAccountService {
 
   // 🔍 判断是否应该重置账户额度
   _shouldResetQuota(account) {
-    // 与 Redis 统计一致：按配置时区判断“今天”与时间点
-    const tzNow = redis.getDateInTimezone(new Date())
-    const today = redis.getDateStringInTimezone(tzNow)
+    const now = new Date()
+    // ⚠️ 这里必须传入真实时间 now：redis.getDateStringInTimezone() 内部会自行调用
+    // getDateInTimezone() 做一次时区偏移，若把已偏移过的 tzNow 再传进去就会叠加两次
+    // 偏移（+16 小时），导致每天 16:00 之后算出的“今天”变成明天，进而把刚停用的账户
+    // 立刻误判为应重置，出现“停用→秒恢复”的死循环。
+    const today = redis.getDateStringInTimezone(now)
 
     // 如果已经是今天重置过的，不需要重置
     if (account.lastResetDate === today) {
       return false
     }
 
-    // 检查是否到了重置时间点（按配置时区的小时/分钟）
-    const resetTime = account.quotaResetTime || '00:00'
-    const [resetHour, resetMinute] = resetTime.split(':').map((n) => parseInt(n))
+    // 解析重置时间点（HH:mm，非法值回退 00:00）
+    const resetParts = String(account.quotaResetTime || '00:00').split(':')
+    let resetHour = parseInt(resetParts[0], 10)
+    let resetMinute = parseInt(resetParts[1], 10)
+    if (isNaN(resetHour) || resetHour < 0 || resetHour > 23) {
+      resetHour = 0
+    }
+    if (isNaN(resetMinute) || resetMinute < 0 || resetMinute > 59) {
+      resetMinute = 0
+    }
 
-    const currentHour = tzNow.getUTCHours()
-    const currentMinute = tzNow.getUTCMinutes()
+    // 计算“最近一次重置时间点”：配置时区下今天的 resetHour:resetMinute；
+    // 若当前还没到今天的重置时间，则取昨天的重置时间点
+    const tzNow = redis.getDateInTimezone(now)
+    let boundary = Date.UTC(
+      tzNow.getUTCFullYear(),
+      tzNow.getUTCMonth(),
+      tzNow.getUTCDate(),
+      resetHour,
+      resetMinute
+    )
+    if (tzNow.getUTCHours() * 60 + tzNow.getUTCMinutes() < resetHour * 60 + resetMinute) {
+      boundary -= 24 * 3600000
+    }
 
-    // 如果当前时间已过重置时间且不是同一天重置的，应该重置
-    return currentHour > resetHour || (currentHour === resetHour && currentMinute >= resetMinute)
+    // boundary 处于“偏移空间”，减去时区偏移才能换回真实时间轴上的时刻
+    const offset = (config.system && config.system.timezoneOffset) || 8
+    const boundaryReal = new Date(boundary - offset * 3600000)
+
+    // 只有当最近一次重置时间点晚于停用时刻时，才说明已经跨过重置点，应该恢复
+    if (account.quotaStoppedAt) {
+      const stoppedAt = new Date(account.quotaStoppedAt)
+      if (!isNaN(stoppedAt.getTime())) {
+        return stoppedAt < boundaryReal
+      }
+    }
+
+    // 没有可用的停用时间时，退化为“不是今天重置的就重置”
+    return account.lastResetDate !== today
   }
 
   // 🚫 标记账号为未授权状态（401错误）
