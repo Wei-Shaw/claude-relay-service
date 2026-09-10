@@ -298,6 +298,7 @@ const handleResponses = async (req, res) => {
   let account = null
   let proxy = null
   let accessToken = null
+  let cancelled = false
 
   try {
     // 从中间件获取 API Key 数据
@@ -433,11 +434,36 @@ const handleResponses = async (req, res) => {
     // 创建代理 agent
     const proxyAgent = createProxyAgent(proxy)
 
+    const abortController = new AbortController()
+    const cleanup = () => {
+      if (cancelled) {
+        return
+      }
+      cancelled = true
+      try {
+        if (!abortController.signal.aborted) {
+          abortController.abort()
+        }
+        upstream?.data?.unpipe?.(res)
+        upstream?.data?.destroy?.()
+      } catch (_) {
+        //
+      }
+      req.removeListener('close', cleanup)
+      req.removeListener('aborted', cleanup)
+      res.removeListener('close', cleanup)
+    }
+
+    req.on('close', cleanup)
+    req.on('aborted', cleanup)
+    res.on('close', cleanup)
+
     // 配置请求选项
     const axiosConfig = {
       headers,
       timeout: config.requestTimeout || 600000,
-      validateStatus: () => true
+      validateStatus: () => true,
+      signal: abortController.signal
     }
 
     // 如果有代理，添加代理配置
@@ -739,6 +765,9 @@ const handleResponses = async (req, res) => {
         }
 
         // 返回响应
+        req.removeListener('close', cleanup)
+        req.removeListener('aborted', cleanup)
+        res.removeListener('close', cleanup)
         res.json(responseData)
         return
       } catch (error) {
@@ -784,6 +813,10 @@ const handleResponses = async (req, res) => {
 
     upstream.data.on('data', (chunk) => {
       try {
+        if (cancelled) {
+          return
+        }
+
         // 转发数据给客户端
         if (!res.destroyed) {
           res.write(chunk)
@@ -802,6 +835,17 @@ const handleResponses = async (req, res) => {
     })
 
     upstream.data.on('end', async () => {
+      req.removeListener('close', cleanup)
+      req.removeListener('aborted', cleanup)
+      res.removeListener('close', cleanup)
+
+      if (cancelled) {
+        if (!res.destroyed && !res.writableEnded) {
+          res.end()
+        }
+        return
+      }
+
       // 处理剩余的 buffer
       const remaining = sseParser.getRemaining()
       if (remaining.trim()) {
@@ -889,26 +933,21 @@ const handleResponses = async (req, res) => {
     })
 
     upstream.data.on('error', (err) => {
+      if (cancelled) {
+        return
+      }
       logger.error('Upstream stream error:', err)
       if (!res.headersSent) {
         res.status(502).json({ error: { message: 'Upstream stream error' } })
-      } else {
+      } else if (!res.destroyed && !res.writableEnded) {
         res.end()
       }
     })
-
-    // 客户端断开时清理上游流
-    const cleanup = () => {
-      try {
-        upstream.data?.unpipe?.(res)
-        upstream.data?.destroy?.()
-      } catch (_) {
-        //
-      }
-    }
-    req.on('close', cleanup)
-    req.on('aborted', cleanup)
   } catch (error) {
+    if (cancelled || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+      logger.info('OpenAI request aborted due to client disconnect')
+      return
+    }
     logger.error('Proxy to ChatGPT codex/responses failed:', error)
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
     const status = error.statusCode || error.response?.status || 500
