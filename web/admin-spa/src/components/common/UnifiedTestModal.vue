@@ -332,7 +332,7 @@ const availableModels = computed(() => {
 
 // 各平台回退默认模型（模型列表未加载时使用）
 const platformFallbackModels = {
-  openai: 'gpt-5.5',
+  openai: 'gpt-6-astra',
   claude: 'claude-sonnet-4-5-20250929',
   'claude-console': 'claude-sonnet-4-5-20250929',
   gemini: 'gemini-2.5-pro',

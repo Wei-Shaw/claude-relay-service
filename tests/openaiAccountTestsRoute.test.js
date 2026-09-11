@@ -62,7 +62,7 @@ describe('OpenAI admin test routes', () => {
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(res.body.data.result.success).toBe(true)
-      expect(scheduler.triggerTest).toHaveBeenCalledWith('account-1', 'openai', 'gpt-5.5')
+      expect(scheduler.triggerTest).toHaveBeenCalledWith('account-1', 'openai', 'gpt-6-astra')
     }
   )
 
@@ -115,6 +115,17 @@ describe('OpenAI admin test routes', () => {
     scheduler.triggerTest.mockResolvedValue(undefined)
     const res = await admin(request(app).post(`${base}/test`)).send({})
     expect(res.status).toBe(409)
+  })
+
+  test('an unconfigured account receives the default test model', async () => {
+    const res = await admin(request(app).get(`${base}/test-config`))
+    expect(res.status).toBe(200)
+    expect(res.body.data.config).toEqual({
+      enabled: false,
+      cronExpression: '0 */6 * * *',
+      model: 'gpt-6-astra'
+    })
+    expect(scheduler.setTestConfig).not.toHaveBeenCalled()
   })
 
   test('configuration updates use the OpenAI platform', async () => {

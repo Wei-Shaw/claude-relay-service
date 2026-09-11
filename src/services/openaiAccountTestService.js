@@ -5,7 +5,7 @@ const ProxyHelper = require('../utils/proxyHelper')
 const { extractCodexUsageHeaders } = require('../utils/codexUsage')
 const { createOpenAITestPayload } = require('../utils/testPayloadHelper')
 
-const DEFAULT_MODEL = 'gpt-5.5'
+const DEFAULT_MODEL = 'gpt-6-astra'
 const errors = {
   ACCOUNT_NOT_FOUND: '账号不存在',
   TOKEN_REFRESH_FAILED: '令牌刷新失败，请检查账号授权',

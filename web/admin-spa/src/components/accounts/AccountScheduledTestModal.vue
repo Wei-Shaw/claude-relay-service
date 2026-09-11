@@ -241,7 +241,7 @@ const cronPresets = [
 ]
 
 const defaultModel = () =>
-  props.account?.platform === 'openai' ? 'gpt-5.5' : 'claude-sonnet-4-5-20250929'
+  props.account?.platform === 'openai' ? 'gpt-6-astra' : 'claude-sonnet-4-5-20250929'
 
 // 模型选项（从 API 动态获取）
 const modelOptions = ref([])

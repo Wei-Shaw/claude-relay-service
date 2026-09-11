@@ -55,7 +55,7 @@ const respond = (...events) => {
   })
 }
 const expectSafeFailure = (result, code) => {
-  expect(result).toMatchObject({ success: false, code, model: 'gpt-5.5' })
+  expect(result).toMatchObject({ success: false, code, model: 'gpt-6-astra' })
   expect(typeof result.error).toBe('string')
   expect(JSON.stringify(result)).not.toContain('secret-token')
   expect(JSON.stringify(result)).not.toContain('private-upstream-payload')
@@ -137,13 +137,13 @@ describe('OpenAI OAuth account tests', () => {
   test('tests the selected OAuth account and accepts completed text across SSE chunks', async () => {
     respond(completed())
     const result = await testAccount('selected-account')
-    expect(result).toMatchObject({ success: true, model: 'gpt-5.5' })
+    expect(result).toMatchObject({ success: true, model: 'gpt-6-astra' })
     expect(result.latencyMs).toBeGreaterThanOrEqual(0)
     expect(Number.isNaN(Date.parse(result.timestamp))).toBe(false)
     expect(accounts.getAccount).toHaveBeenCalledWith('selected-account')
     expect(axios.post).toHaveBeenCalledWith(
       'https://chatgpt.com/backend-api/codex/responses',
-      expect.objectContaining({ model: 'gpt-5.5', stream: true, store: false }),
+      expect.objectContaining({ model: 'gpt-6-astra', stream: true, store: false }),
       expect.objectContaining({
         responseType: 'stream',
         headers: expect.objectContaining({
