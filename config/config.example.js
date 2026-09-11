@@ -115,6 +115,17 @@ const config = {
   // ⏱️ 请求超时配置
   requestTimeout: parseInt(process.env.REQUEST_TIMEOUT) || 600000, // 默认 10 分钟
 
+  // 🧯 Codex/OpenAI 容量降载（capacity shed）同账号有界重试
+  // 上游 server_is_overloaded / slow_down / "Selected model is at capacity…" 是请求级
+  // 瞬时信号，换账号无用；这里控制同账号重试次数、退避上限，以及首个真实输出出现前
+  // 的 SSE 缓冲上限（字节 / 时间）
+  openaiCapacityShed: {
+    maxAttempts: parseInt(process.env.OPENAI_CAPACITY_SHED_MAX_ATTEMPTS) || 3,
+    maxDelayMs: parseInt(process.env.OPENAI_CAPACITY_SHED_MAX_DELAY_MS) || 8000,
+    bufferLimitBytes: parseInt(process.env.OPENAI_CAPACITY_SHED_BUFFER_BYTES) || 256 * 1024,
+    preOutputBufferMs: parseInt(process.env.OPENAI_CAPACITY_SHED_BUFFER_MS) || 15000
+  },
+
   // 📈 使用限制
   limits: {
     defaultTokenLimit: parseInt(process.env.DEFAULT_TOKEN_LIMIT) || 1000000

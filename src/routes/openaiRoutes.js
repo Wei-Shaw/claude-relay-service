@@ -14,6 +14,20 @@ const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
 const { updateRateLimitCounters } = require('../utils/rateLimitHelper')
 const { IncrementalSSEParser } = require('../utils/sseParser')
+const {
+  RETRYABLE_CLIENT_CODE,
+  computeRetryDelayMs,
+  extractErrorCode,
+  extractErrorMessage,
+  isCapacityShedEvent,
+  isCapacityShedResponse,
+  resolveSettings: resolveCapacityShedSettings
+} = require('../utils/openaiCapacityShed')
+const {
+  delay,
+  pipeWithCapacityShedBuffer,
+  readUpstreamBody
+} = require('../utils/openaiCapacityShedStream')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 const {
   createRequestDetailMeta,
@@ -454,225 +468,6 @@ const handleResponses = async (req, res) => {
       ? 'https://chatgpt.com/backend-api/codex/responses/compact'
       : 'https://chatgpt.com/backend-api/codex/responses'
 
-    // 根据 stream 参数决定请求类型
-    if (isStream) {
-      // 流式请求
-      upstream = await axios.post(codexEndpoint, req.body, {
-        ...axiosConfig,
-        responseType: 'stream'
-      })
-    } else {
-      // 非流式请求
-      upstream = await axios.post(codexEndpoint, req.body, axiosConfig)
-    }
-
-    const codexUsageSnapshot = extractCodexUsageHeaders(upstream.headers)
-    if (codexUsageSnapshot) {
-      try {
-        await openaiAccountService.updateCodexUsageSnapshot(accountId, codexUsageSnapshot)
-      } catch (codexError) {
-        logger.error('⚠️ 更新 Codex 使用统计失败:', codexError)
-      }
-    }
-
-    // 处理 429 限流错误
-    if (upstream.status === 429) {
-      logger.warn(`🚫 Rate limit detected for OpenAI account ${accountId} (Codex API)`)
-
-      // 解析响应体中的限流信息
-      let resetsInSeconds = null
-      let errorData = null
-
-      try {
-        // 对于429错误，无论是否是流式请求，响应都会是完整的JSON错误对象
-        if (isStream && upstream.data) {
-          // 流式响应需要先收集数据
-          const chunks = []
-          await new Promise((resolve, reject) => {
-            upstream.data.on('data', (chunk) => chunks.push(chunk))
-            upstream.data.on('end', resolve)
-            upstream.data.on('error', reject)
-            // 设置超时防止无限等待
-            setTimeout(resolve, 5000)
-          })
-
-          const fullResponse = Buffer.concat(chunks).toString()
-          try {
-            errorData = JSON.parse(fullResponse)
-          } catch (e) {
-            logger.error('Failed to parse 429 error response:', e)
-            logger.debug('Raw response:', fullResponse)
-          }
-        } else {
-          // 非流式响应直接使用data
-          errorData = upstream.data
-        }
-
-        // 提取重置时间
-        if (errorData && errorData.error && errorData.error.resets_in_seconds) {
-          resetsInSeconds = errorData.error.resets_in_seconds
-          logger.info(
-            `🕐 Codex rate limit will reset in ${resetsInSeconds} seconds (${Math.ceil(resetsInSeconds / 60)} minutes / ${Math.ceil(resetsInSeconds / 3600)} hours)`
-          )
-        } else {
-          logger.warn(
-            '⚠️ Could not extract resets_in_seconds from 429 response, using default 60 minutes'
-          )
-        }
-      } catch (e) {
-        logger.error('⚠️ Failed to parse rate limit error:', e)
-      }
-
-      // 标记账户为限流状态
-      await unifiedOpenAIScheduler.markAccountRateLimited(
-        accountId,
-        'openai',
-        sessionHash,
-        resetsInSeconds
-      )
-
-      // 返回错误响应给客户端
-      const errorResponse = errorData || {
-        error: {
-          type: 'usage_limit_reached',
-          message: 'The usage limit has been reached',
-          resets_in_seconds: resetsInSeconds
-        }
-      }
-
-      if (isStream) {
-        // 流式响应也需要设置正确的状态码
-        res.status(429)
-        res.setHeader('Content-Type', 'text/event-stream')
-        res.setHeader('Cache-Control', 'no-cache')
-        res.setHeader('Connection', 'keep-alive')
-        res.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
-        res.end()
-      } else {
-        res.status(429).json(errorResponse)
-      }
-
-      return
-    } else if (upstream.status === 401 || upstream.status === 402) {
-      const unauthorizedStatus = upstream.status
-      const statusDescription = unauthorizedStatus === 401 ? 'Unauthorized' : 'Payment required'
-      logger.warn(
-        `🔐 ${statusDescription} error detected for OpenAI account ${accountId} (Codex API)`
-      )
-
-      let errorData = null
-
-      try {
-        if (isStream && upstream.data && typeof upstream.data.on === 'function') {
-          const chunks = []
-          await new Promise((resolve, reject) => {
-            upstream.data.on('data', (chunk) => chunks.push(chunk))
-            upstream.data.on('end', resolve)
-            upstream.data.on('error', reject)
-            setTimeout(resolve, 5000)
-          })
-
-          const fullResponse = Buffer.concat(chunks).toString()
-          try {
-            errorData = JSON.parse(fullResponse)
-          } catch (parseError) {
-            logger.error(`Failed to parse ${unauthorizedStatus} error response:`, parseError)
-            logger.debug(`Raw ${unauthorizedStatus} response:`, fullResponse)
-            errorData = { error: { message: fullResponse || 'Unauthorized' } }
-          }
-        } else {
-          errorData = upstream.data
-        }
-      } catch (parseError) {
-        logger.error(`⚠️ Failed to handle ${unauthorizedStatus} error response:`, parseError)
-      }
-
-      const statusLabel = unauthorizedStatus === 401 ? '401错误' : '402错误'
-      const extraHint = unauthorizedStatus === 402 ? '，可能欠费' : ''
-      let reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）`
-      if (errorData) {
-        const messageCandidate =
-          errorData.error &&
-          typeof errorData.error.message === 'string' &&
-          errorData.error.message.trim()
-            ? errorData.error.message.trim()
-            : typeof errorData.message === 'string' && errorData.message.trim()
-              ? errorData.message.trim()
-              : null
-        if (messageCandidate) {
-          reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${messageCandidate}`
-        }
-      }
-
-      try {
-        await unifiedOpenAIScheduler.markAccountUnauthorized(
-          accountId,
-          'openai',
-          sessionHash,
-          reason
-        )
-      } catch (markError) {
-        logger.error(
-          `❌ Failed to mark OpenAI account unauthorized after ${unauthorizedStatus}:`,
-          markError
-        )
-      }
-
-      let errorResponse = errorData
-      if (!errorResponse || typeof errorResponse !== 'object' || Buffer.isBuffer(errorResponse)) {
-        const fallbackMessage =
-          typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
-        errorResponse = {
-          error: {
-            message: fallbackMessage,
-            type: 'unauthorized',
-            code: 'unauthorized'
-          }
-        }
-      }
-
-      res.status(unauthorizedStatus).json(errorResponse)
-      return
-    } else if (upstream.status === 200 || upstream.status === 201) {
-      // 请求成功，检查并移除限流状态
-      const isRateLimited = await unifiedOpenAIScheduler.isAccountRateLimited(accountId)
-      if (isRateLimited) {
-        logger.info(
-          `✅ Removing rate limit for OpenAI account ${accountId} after successful request`
-        )
-        await unifiedOpenAIScheduler.removeAccountRateLimit(accountId, 'openai')
-      }
-    }
-
-    res.status(upstream.status)
-
-    if (isStream) {
-      // 流式响应头
-      res.setHeader('Content-Type', 'text/event-stream')
-      res.setHeader('Cache-Control', 'no-cache')
-      res.setHeader('Connection', 'keep-alive')
-      res.setHeader('X-Accel-Buffering', 'no')
-    } else {
-      // 非流式响应头
-      res.setHeader('Content-Type', 'application/json')
-    }
-
-    // 透传关键诊断头，避免传递不安全或与传输相关的头
-    const passThroughHeaderKeys = ['openai-version', 'x-request-id', 'openai-processing-ms']
-    for (const key of passThroughHeaderKeys) {
-      const val = upstream.headers?.[key]
-      if (val !== undefined) {
-        res.setHeader(key, val)
-      }
-    }
-
-    if (isStream) {
-      // 立即刷新响应头，开始 SSE
-      if (typeof res.flushHeaders === 'function') {
-        res.flushHeaders()
-      }
-    }
-
     // 处理响应并捕获 usage 数据和真实的 model
     let usageData = null
     let actualModel = null
@@ -680,78 +475,8 @@ const handleResponses = async (req, res) => {
     let rateLimitDetected = false
     let rateLimitResetsInSeconds = null
 
-    if (!isStream) {
-      // 非流式响应处理
-      try {
-        logger.info(`📄 Processing OpenAI non-stream response for model: ${upstreamRequestedModel}`)
-
-        // 直接获取完整响应
-        const responseData = upstream.data
-
-        // 从响应中获取实际的 model 和 usage
-        actualModel = responseData.model || upstreamRequestedModel || 'gpt-4'
-        usageData = responseData.usage
-
-        logger.debug(`📊 Non-stream response - Model: ${actualModel}, Usage:`, usageData)
-
-        // 记录使用统计
-        if (usageData) {
-          const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
-          const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
-          const cacheReadTokens = extractOpenAICacheReadTokens(usageData)
-          // 计算实际输入token（总输入减去缓存部分）
-          const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
-
-          const nonStreamCosts = await apiKeyService.recordUsage(
-            apiKeyData.id,
-            actualInputTokens, // 传递实际输入（不含缓存）
-            outputTokens,
-            0, // OpenAI没有cache_creation_tokens
-            cacheReadTokens,
-            actualModel,
-            accountId,
-            'openai',
-            req._serviceTier,
-            createRequestDetailMeta(req, {
-              requestBody: req.body,
-              stream: false,
-              statusCode: upstream.status
-            })
-          )
-
-          logger.info(
-            `📊 Recorded OpenAI non-stream usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${usageData.total_tokens || totalInputTokens + outputTokens}, Model: ${actualModel}`
-          )
-
-          await applyRateLimitTracking(
-            req,
-            {
-              inputTokens: actualInputTokens,
-              outputTokens,
-              cacheCreateTokens: 0,
-              cacheReadTokens
-            },
-            actualModel,
-            'openai-non-stream',
-            'openai',
-            nonStreamCosts
-          )
-        }
-
-        // 返回响应
-        res.json(responseData)
-        return
-      } catch (error) {
-        logger.error('Failed to process non-stream response:', error)
-        if (!res.headersSent) {
-          res.status(500).json({ error: { message: 'Failed to process response' } })
-        }
-        return
-      }
-    }
-
-    // 使用增量 SSE 解析器
-    const sseParser = new IncrementalSSEParser()
+    // 使用增量 SSE 解析器（每次上游尝试重建一次）
+    let sseParser = new IncrementalSSEParser()
 
     // 处理解析出的事件
     const processSSEEvent = (eventData) => {
@@ -781,27 +506,462 @@ const handleResponses = async (req, res) => {
         }
       }
     }
+    const feedUsageParser = (text) => {
+      const events = sseParser.feed(text)
+      for (const event of events) {
+        if (event.type === 'data' && event.data) {
+          processSSEEvent(event.data)
+        }
+      }
+    }
 
-    upstream.data.on('data', (chunk) => {
+    // 响应头惰性提交：容量降载重试期间不能先把状态码和 SSE 头写出去，
+    // 否则一旦重试成功就再也改不了响应状态了
+    let responseHeadersCommitted = false
+    const commitResponseHeaders = () => {
+      if (responseHeadersCommitted) {
+        return
+      }
+      responseHeadersCommitted = true
+
+      res.status(upstream.status)
+
+      if (isStream) {
+        // 流式响应头
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader('Connection', 'keep-alive')
+        res.setHeader('X-Accel-Buffering', 'no')
+      } else {
+        // 非流式响应头
+        res.setHeader('Content-Type', 'application/json')
+      }
+
+      // 透传关键诊断头，避免传递不安全或与传输相关的头
+      const passThroughHeaderKeys = ['openai-version', 'x-request-id', 'openai-processing-ms']
+      for (const key of passThroughHeaderKeys) {
+        const val = upstream.headers?.[key]
+        if (val !== undefined) {
+          res.setHeader(key, val)
+        }
+      }
+
+      if (isStream) {
+        // 立即刷新响应头，开始 SSE
+        if (typeof res.flushHeaders === 'function') {
+          res.flushHeaders()
+        }
+      }
+    }
+
+    // 客户端断开时清理上游流（仅流式路径需要，监听器在首次进入流转发前注册一次）
+    let abortListenersBound = false
+    const cleanup = () => {
       try {
-        // 转发数据给客户端
-        if (!res.destroyed) {
-          res.write(chunk)
+        upstream?.data?.unpipe?.(res)
+        upstream?.data?.destroy?.()
+      } catch (_) {
+        //
+      }
+    }
+    const bindAbortListeners = () => {
+      if (abortListenersBound) {
+        return
+      }
+      abortListenersBound = true
+      req.on('close', cleanup)
+      req.on('aborted', cleanup)
+    }
+    // 断线判据只能看 res。Node 在请求体读完后会自动销毁 request 流，所以
+    // req.destroyed 和 req 的 'close' 在每个 POST 上开局几毫秒内就为真 —— 拿它们
+    // 判断客户端是否还在必然全是误判，重试会被整体跳过。
+    const isClientGone = () =>
+      res.writableEnded !== true && (res.destroyed === true || res.writable === false)
+
+    // 🧯 容量降载（capacity shed）同账号有界重试
+    // 上游在模型容量紧张时返回 server_is_overloaded / slow_down / "Selected model is at
+    // capacity…"。Codex CLI 把前两个码判为致命并直接结束回合，而这是请求级瞬时信号：
+    // 换账号不改变降载因素，只会让一个请求把整池账号逐个消耗掉。所以先在同一账号上
+    // 重试，用尽后再把错误码改写成 server_error 让客户端自己退避。
+    const shedSettings = resolveCapacityShedSettings(config.openaiCapacityShed)
+    let attempt = 0
+
+    for (;;) {
+      attempt += 1
+      usageData = null
+      actualModel = null
+      usageReported = false
+      rateLimitDetected = false
+      rateLimitResetsInSeconds = null
+      sseParser = new IncrementalSSEParser()
+
+      // 根据 stream 参数决定请求类型
+      if (isStream) {
+        // 流式请求
+        upstream = await axios.post(codexEndpoint, req.body, {
+          ...axiosConfig,
+          responseType: 'stream'
+        })
+      } else {
+        // 非流式请求
+        upstream = await axios.post(codexEndpoint, req.body, axiosConfig)
+      }
+
+      const codexUsageSnapshot = extractCodexUsageHeaders(upstream.headers)
+      if (codexUsageSnapshot) {
+        try {
+          await openaiAccountService.updateCodexUsageSnapshot(accountId, codexUsageSnapshot)
+        } catch (codexError) {
+          logger.error('⚠️ 更新 Codex 使用统计失败:', codexError)
+        }
+      }
+
+      // 处理 429 限流错误
+      if (upstream.status === 429) {
+        logger.warn(`🚫 Rate limit detected for OpenAI account ${accountId} (Codex API)`)
+
+        // 解析响应体中的限流信息
+        let resetsInSeconds = null
+        let errorData = null
+
+        try {
+          // 对于429错误，无论是否是流式请求，响应都会是完整的JSON错误对象
+          if (isStream && upstream.data) {
+            // 流式响应需要先收集数据
+            const chunks = []
+            await new Promise((resolve, reject) => {
+              upstream.data.on('data', (chunk) => chunks.push(chunk))
+              upstream.data.on('end', resolve)
+              upstream.data.on('error', reject)
+              // 设置超时防止无限等待
+              setTimeout(resolve, 5000)
+            })
+
+            const fullResponse = Buffer.concat(chunks).toString()
+            try {
+              errorData = JSON.parse(fullResponse)
+            } catch (e) {
+              logger.error('Failed to parse 429 error response:', e)
+              logger.debug('Raw response:', fullResponse)
+            }
+          } else {
+            // 非流式响应直接使用data
+            errorData = upstream.data
+          }
+
+          // 提取重置时间
+          if (errorData && errorData.error && errorData.error.resets_in_seconds) {
+            resetsInSeconds = errorData.error.resets_in_seconds
+            logger.info(
+              `🕐 Codex rate limit will reset in ${resetsInSeconds} seconds (${Math.ceil(resetsInSeconds / 60)} minutes / ${Math.ceil(resetsInSeconds / 3600)} hours)`
+            )
+          } else {
+            logger.warn(
+              '⚠️ Could not extract resets_in_seconds from 429 response, using default 60 minutes'
+            )
+          }
+        } catch (e) {
+          logger.error('⚠️ Failed to parse rate limit error:', e)
         }
 
-        // 使用增量解析器处理数据
-        const events = sseParser.feed(chunk.toString())
-        for (const event of events) {
-          if (event.type === 'data' && event.data) {
-            processSSEEvent(event.data)
+        // 标记账户为限流状态
+        await unifiedOpenAIScheduler.markAccountRateLimited(
+          accountId,
+          'openai',
+          sessionHash,
+          resetsInSeconds
+        )
+
+        // 返回错误响应给客户端
+        const errorResponse = errorData || {
+          error: {
+            type: 'usage_limit_reached',
+            message: 'The usage limit has been reached',
+            resets_in_seconds: resetsInSeconds
           }
         }
-      } catch (error) {
-        logger.error('Error processing OpenAI stream chunk:', error)
-      }
-    })
 
-    upstream.data.on('end', async () => {
+        if (isStream) {
+          // 流式响应也需要设置正确的状态码
+          res.status(429)
+          res.setHeader('Content-Type', 'text/event-stream')
+          res.setHeader('Cache-Control', 'no-cache')
+          res.setHeader('Connection', 'keep-alive')
+          res.write(`data: ${JSON.stringify(errorResponse)}\n\n`)
+          res.end()
+        } else {
+          res.status(429).json(errorResponse)
+        }
+
+        return
+      } else if (upstream.status === 401 || upstream.status === 402) {
+        const unauthorizedStatus = upstream.status
+        const statusDescription = unauthorizedStatus === 401 ? 'Unauthorized' : 'Payment required'
+        logger.warn(
+          `🔐 ${statusDescription} error detected for OpenAI account ${accountId} (Codex API)`
+        )
+
+        let errorData = null
+
+        try {
+          if (isStream && upstream.data && typeof upstream.data.on === 'function') {
+            const chunks = []
+            await new Promise((resolve, reject) => {
+              upstream.data.on('data', (chunk) => chunks.push(chunk))
+              upstream.data.on('end', resolve)
+              upstream.data.on('error', reject)
+              setTimeout(resolve, 5000)
+            })
+
+            const fullResponse = Buffer.concat(chunks).toString()
+            try {
+              errorData = JSON.parse(fullResponse)
+            } catch (parseError) {
+              logger.error(`Failed to parse ${unauthorizedStatus} error response:`, parseError)
+              logger.debug(`Raw ${unauthorizedStatus} response:`, fullResponse)
+              errorData = { error: { message: fullResponse || 'Unauthorized' } }
+            }
+          } else {
+            errorData = upstream.data
+          }
+        } catch (parseError) {
+          logger.error(`⚠️ Failed to handle ${unauthorizedStatus} error response:`, parseError)
+        }
+
+        const statusLabel = unauthorizedStatus === 401 ? '401错误' : '402错误'
+        const extraHint = unauthorizedStatus === 402 ? '，可能欠费' : ''
+        let reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）`
+        if (errorData) {
+          const messageCandidate =
+            errorData.error &&
+            typeof errorData.error.message === 'string' &&
+            errorData.error.message.trim()
+              ? errorData.error.message.trim()
+              : typeof errorData.message === 'string' && errorData.message.trim()
+                ? errorData.message.trim()
+                : null
+          if (messageCandidate) {
+            reason = `OpenAI账号认证失败（${statusLabel}${extraHint}）：${messageCandidate}`
+          }
+        }
+
+        try {
+          await unifiedOpenAIScheduler.markAccountUnauthorized(
+            accountId,
+            'openai',
+            sessionHash,
+            reason
+          )
+        } catch (markError) {
+          logger.error(
+            `❌ Failed to mark OpenAI account unauthorized after ${unauthorizedStatus}:`,
+            markError
+          )
+        }
+
+        let errorResponse = errorData
+        if (!errorResponse || typeof errorResponse !== 'object' || Buffer.isBuffer(errorResponse)) {
+          const fallbackMessage =
+            typeof errorData === 'string' && errorData.trim() ? errorData.trim() : 'Unauthorized'
+          errorResponse = {
+            error: {
+              message: fallbackMessage,
+              type: 'unauthorized',
+              code: 'unauthorized'
+            }
+          }
+        }
+
+        res.status(unauthorizedStatus).json(errorResponse)
+        return
+      } else if (upstream.status === 200 || upstream.status === 201) {
+        // 请求成功，检查并移除限流状态
+        const isRateLimited = await unifiedOpenAIScheduler.isAccountRateLimited(accountId)
+        if (isRateLimited) {
+          logger.info(
+            `✅ Removing rate limit for OpenAI account ${accountId} after successful request`
+          )
+          await unifiedOpenAIScheduler.removeAccountRateLimit(accountId, 'openai')
+        }
+      }
+
+      // ---- 容量降载判定（HTTP 层）----
+      if (upstream.status >= 400 || (!isStream && isCapacityShedEvent(upstream.data))) {
+        const upstreamBody = await readUpstreamBody(upstream, isStream)
+        const upstreamRequestId = upstream.headers?.['x-request-id'] || 'n/a'
+
+        if (
+          isCapacityShedResponse({
+            status: upstream.status,
+            payload: upstreamBody.payload,
+            rawBody: upstreamBody.rawBody
+          })
+        ) {
+          const shedCode = extractErrorCode(upstreamBody.payload) || 'n/a'
+          const shedMessage =
+            extractErrorMessage(upstreamBody.payload) || (upstreamBody.rawBody || '').trim()
+
+          if (attempt < shedSettings.maxAttempts && !isClientGone()) {
+            const delayMs = computeRetryDelayMs(
+              attempt,
+              upstream.headers?.['retry-after'],
+              shedSettings
+            )
+            logger.warn(
+              `⚠️ codex.capacity_shed_retry account=${accountId} attempt=${attempt}/${shedSettings.maxAttempts} status=${upstream.status} delay=${delayMs}ms request_id=${upstreamRequestId} code=${shedCode}`
+            )
+            await delay(delayMs)
+            continue
+          }
+
+          // 重试用尽（或客户端已断开）：把致命码改写成 server_error 再回给客户端，
+          // Codex 会走内置退避重试而不是打印 "Selected model is at capacity…" 后退出
+          logger.warn(
+            `⚠️ codex.capacity_shed_rewrite account=${accountId} attempts=${attempt} status=${upstream.status} request_id=${upstreamRequestId} code=${shedCode}->${RETRYABLE_CLIENT_CODE}`
+          )
+          if (!res.headersSent) {
+            res.status(503).json({
+              error: {
+                type: 'server_error',
+                code: RETRYABLE_CLIENT_CODE,
+                message:
+                  shedMessage || 'Upstream service is temporarily overloaded, please retry later'
+              }
+            })
+          }
+          return
+        }
+
+        if (upstreamBody.drained) {
+          // 流式请求上的非降载错误响应：上游流已被读空，按原字节回写
+          commitResponseHeaders()
+          if (upstreamBody.rawBody) {
+            res.write(upstreamBody.rawBody)
+          }
+          res.end()
+          return
+        }
+      }
+
+      if (!isStream) {
+        // 非流式响应处理
+        commitResponseHeaders()
+        try {
+          logger.info(
+            `📄 Processing OpenAI non-stream response for model: ${upstreamRequestedModel}`
+          )
+
+          // 直接获取完整响应
+          const responseData = upstream.data
+
+          // 从响应中获取实际的 model 和 usage
+          actualModel = responseData.model || upstreamRequestedModel || 'gpt-4'
+          usageData = responseData.usage
+
+          logger.debug(`📊 Non-stream response - Model: ${actualModel}, Usage:`, usageData)
+
+          // 记录使用统计
+          if (usageData) {
+            const totalInputTokens = usageData.input_tokens || usageData.prompt_tokens || 0
+            const outputTokens = usageData.output_tokens || usageData.completion_tokens || 0
+            const cacheReadTokens = extractOpenAICacheReadTokens(usageData)
+            // 计算实际输入token（总输入减去缓存部分）
+            const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
+
+            const nonStreamCosts = await apiKeyService.recordUsage(
+              apiKeyData.id,
+              actualInputTokens, // 传递实际输入（不含缓存）
+              outputTokens,
+              0, // OpenAI没有cache_creation_tokens
+              cacheReadTokens,
+              actualModel,
+              accountId,
+              'openai',
+              req._serviceTier,
+              createRequestDetailMeta(req, {
+                requestBody: req.body,
+                stream: false,
+                statusCode: upstream.status
+              })
+            )
+
+            logger.info(
+              `📊 Recorded OpenAI non-stream usage - Input: ${totalInputTokens}(actual:${actualInputTokens}+cached:${cacheReadTokens}), Output: ${outputTokens}, Total: ${usageData.total_tokens || totalInputTokens + outputTokens}, Model: ${actualModel}`
+            )
+
+            await applyRateLimitTracking(
+              req,
+              {
+                inputTokens: actualInputTokens,
+                outputTokens,
+                cacheCreateTokens: 0,
+                cacheReadTokens
+              },
+              actualModel,
+              'openai-non-stream',
+              'openai',
+              nonStreamCosts
+            )
+          }
+
+          // 返回响应
+          res.json(responseData)
+          return
+        } catch (error) {
+          logger.error('Failed to process non-stream response:', error)
+          if (!res.headersSent) {
+            res.status(500).json({ error: { message: 'Failed to process response' } })
+          }
+          return
+        }
+      }
+      bindAbortListeners()
+
+      // 缓冲式转发上游 SSE：客户端收到真实输出前先把事件攒住，
+      // 期间命中降载即可丢弃缓冲并在同账号上重试；重试用尽时由缓冲器改写错误码
+      const streamResult = await pipeWithCapacityShedBuffer({
+        stream: upstream.data,
+        res,
+        onEventText: feedUsageParser,
+        commitHeaders: commitResponseHeaders,
+        retryEnabled: attempt < shedSettings.maxAttempts && !isClientGone(),
+        bufferLimitBytes: shedSettings.bufferLimitBytes,
+        preOutputBufferMs: shedSettings.preOutputBufferMs,
+        onShedRewrite: ({ outputStarted }) => {
+          logger.warn(
+            `⚠️ codex.capacity_shed_rewrite account=${accountId} attempts=${attempt} stream_output_started=${outputStarted} code=->${RETRYABLE_CLIENT_CODE}`
+          )
+          if (outputStarted) {
+            logger.warn(
+              `⚠️ codex.capacity_shed_suppressed_after_output account=${accountId} attempts=${attempt}`
+            )
+          }
+        }
+      })
+
+      if (streamResult.outcome === 'shed' && attempt < shedSettings.maxAttempts) {
+        const delayMs = computeRetryDelayMs(
+          attempt,
+          upstream.headers?.['retry-after'],
+          shedSettings
+        )
+        logger.warn(
+          `⚠️ codex.capacity_shed_retry account=${accountId} attempt=${attempt}/${shedSettings.maxAttempts} stream=1 delay=${delayMs}ms request_id=${upstream.headers?.['x-request-id'] || 'n/a'} code=${extractErrorCode(streamResult.shedPayload) || 'n/a'}`
+        )
+        await delay(delayMs)
+        continue
+      }
+
+      if (streamResult.outcome === 'error') {
+        logger.error('Upstream stream error:', streamResult.error)
+        if (!res.headersSent) {
+          res.status(502).json({ error: { message: 'Upstream stream error' } })
+        } else {
+          res.end()
+        }
+        return
+      }
+
       // 处理剩余的 buffer
       const remaining = sseParser.getRemaining()
       if (remaining.trim()) {
@@ -886,28 +1046,8 @@ const handleResponses = async (req, res) => {
       }
 
       res.end()
-    })
-
-    upstream.data.on('error', (err) => {
-      logger.error('Upstream stream error:', err)
-      if (!res.headersSent) {
-        res.status(502).json({ error: { message: 'Upstream stream error' } })
-      } else {
-        res.end()
-      }
-    })
-
-    // 客户端断开时清理上游流
-    const cleanup = () => {
-      try {
-        upstream.data?.unpipe?.(res)
-        upstream.data?.destroy?.()
-      } catch (_) {
-        //
-      }
+      return
     }
-    req.on('close', cleanup)
-    req.on('aborted', cleanup)
   } catch (error) {
     logger.error('Proxy to ChatGPT codex/responses failed:', error)
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
