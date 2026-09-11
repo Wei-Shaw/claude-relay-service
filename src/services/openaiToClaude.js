@@ -183,12 +183,39 @@ class OpenAIToClaudeConverter {
    */
   _convertMessages(messages) {
     const claudeMessages = []
+    let pendingToolResults = []
+
+    const flushPendingToolResults = () => {
+      if (pendingToolResults.length === 0) {
+        return
+      }
+
+      claudeMessages.push({
+        role: 'user',
+        content: pendingToolResults
+      })
+      pendingToolResults = []
+    }
 
     for (const msg of messages) {
       // 跳过系统消息（已经在 system 字段处理）
       if (msg.role === 'system') {
         continue
       }
+
+      // OpenAI chat.completions 会把同一轮多个工具结果拆成连续的 role=tool 消息。
+      // Anthropic 侧要求 tool_use 后的下一条 user message 只包含 tool_result blocks，
+      // 因此这里需要将连续的 tool 消息聚合为单条 user message。
+      if (msg.role === 'tool') {
+        pendingToolResults.push({
+          type: 'tool_result',
+          tool_use_id: msg.tool_call_id,
+          content: msg.content
+        })
+        continue
+      }
+
+      flushPendingToolResults()
 
       // 转换角色名称
       const role = msg.role === 'user' ? 'user' : 'assistant'
@@ -216,20 +243,10 @@ class OpenAIToClaudeConverter {
         claudeMsg.content = this._convertToolCalls(msg.tool_calls)
       }
 
-      // 处理工具响应
-      if (msg.role === 'tool') {
-        claudeMsg.role = 'user'
-        claudeMsg.content = [
-          {
-            type: 'tool_result',
-            tool_use_id: msg.tool_call_id,
-            content: msg.content
-          }
-        ]
-      }
-
       claudeMessages.push(claudeMsg)
     }
+
+    flushPendingToolResults()
 
     return claudeMessages
   }
