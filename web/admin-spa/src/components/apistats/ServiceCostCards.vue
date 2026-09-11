@@ -1,5 +1,8 @@
 <template>
-  <div v-if="serviceRates && modelStats.length > 0" class="card p-3 sm:p-4 md:p-6">
+  <div
+    v-if="!billingDetailsHidden && serviceRates && modelStats.length > 0"
+    class="card p-3 sm:p-4 md:p-6"
+  >
     <h3
       class="mb-2 flex items-center justify-between text-base font-bold text-gray-900 dark:text-gray-100 sm:mb-3 sm:text-lg md:mb-4 md:text-xl"
     >
@@ -118,7 +121,8 @@ import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
 
 const apiStatsStore = useApiStatsStore()
-const { modelStats, serviceRates, keyServiceRates, multiKeyMode } = storeToRefs(apiStatsStore)
+const { modelStats, serviceRates, keyServiceRates, multiKeyMode, billingDetailsHidden } =
+  storeToRefs(apiStatsStore)
 
 // 服务标签映射
 const serviceLabels = {
