@@ -17,6 +17,7 @@ const webhookNotifier = require('../../utils/webhookNotifier')
 const { formatAccountExpiry, mapExpiryField } = require('./utils')
 
 const router = express.Router()
+router.use(require('./openaiAccountTests'))
 
 // OpenAI OAuth 配置
 const OPENAI_CONFIG = {

@@ -3074,6 +3074,7 @@ const closeAccountUsageModal = () => {
 
 // 测试账户连通性相关函数
 const supportedTestPlatforms = [
+  'openai',
   'claude',
   'claude-console',
   'bedrock',
@@ -3100,8 +3101,10 @@ const openAccountTestModal = (account) => {
 }
 
 const closeAccountTestModal = () => {
+  const refreshQuota = testingAccount.value?.platform === 'openai'
   showAccountTestModal.value = false
   testingAccount.value = null
+  if (refreshQuota) loadAccounts()
 }
 
 // 定时测试配置相关函数

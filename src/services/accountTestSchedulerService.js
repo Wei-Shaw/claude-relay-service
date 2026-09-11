@@ -295,12 +295,8 @@ class AccountTestSchedulerService {
    * @private
    */
   async _testOpenAIAccount(_accountId, _model) {
-    // OpenAI 测试暂时返回未实现
-    return {
-      success: false,
-      error: 'OpenAI scheduled test not implemented yet',
-      timestamp: new Date().toISOString()
-    }
+    const { testAccount } = require('./openaiAccountTestService')
+    return await testAccount(_accountId, _model)
   }
 
   /**
