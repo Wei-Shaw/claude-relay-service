@@ -24,10 +24,7 @@ onMounted(() => {
   // 监听系统主题变化
   themeStore.watchSystemTheme()
 
-  // 检查本地存储的认证状态
-  authStore.checkAuth()
-
-  // 加载OEM设置（包括网站图标）
+  // 鉴权由路由守卫统一处理，此处只加载 OEM 设置
   authStore.loadOemSettings()
 })
 </script>

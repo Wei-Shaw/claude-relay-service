@@ -381,6 +381,28 @@ class PricingService {
       }
     }
 
+    // 特殊处理：gpt-5.x-codex 版本统一回退
+    // 例如：gpt-5.1-codex / gpt-5.2-codex / gpt-5.3-codex
+    // 优先回退到同后缀的 gpt-5-codex 变体，再回退到 gpt-5
+    const normalizedModelName = modelName.toLowerCase()
+    const isGpt5CodexVariant = /^gpt-5(?:\.\d+)?-codex(?:[-:].+)?$/.test(normalizedModelName)
+    if (isGpt5CodexVariant) {
+      const codexSuffix = normalizedModelName.replace(/^gpt-5(?:\.\d+)?-codex/, '')
+      const fallbackCandidates = []
+
+      if (codexSuffix) {
+        fallbackCandidates.push(`gpt-5-codex${codexSuffix}`)
+      }
+      fallbackCandidates.push('gpt-5-codex', 'gpt-5')
+
+      for (const candidate of fallbackCandidates) {
+        if (candidate !== normalizedModelName && this.pricingData[candidate]) {
+          logger.info(`💰 Using ${candidate} pricing as fallback for ${modelName}`)
+          return this.pricingData[candidate]
+        }
+      }
+    }
+
     // 对于Bedrock区域前缀模型（如 us.anthropic.claude-sonnet-4-20250514-v1:0），
     // 尝试去掉区域前缀进行匹配
     if (modelName.includes('.anthropic.') || modelName.includes('.claude')) {

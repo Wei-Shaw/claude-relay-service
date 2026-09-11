@@ -18,6 +18,7 @@ const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
 const QuotaCardsView = () => import('@/views/QuotaCardsView.vue')
 const RequestDetailsView = () => import('@/views/RequestDetailsView.vue')
+const ServiceQualityView = () => import('@/views/ServiceQualityView.vue')
 
 const routes = [
   {
@@ -50,13 +51,13 @@ const routes = [
     path: '/user-login',
     name: 'UserLogin',
     component: UserLoginView,
-    meta: { requiresAuth: false, userAuth: true }
+    meta: { requiresAuth: false, userAuth: true, requiresUserSystem: true }
   },
   {
     path: '/user-dashboard',
     name: 'UserDashboard',
     component: UserDashboardView,
-    meta: { requiresUserAuth: true }
+    meta: { requiresUserAuth: true, requiresUserSystem: true }
   },
   {
     path: '/api-stats',
@@ -172,6 +173,18 @@ const routes = [
       }
     ]
   },
+  {
+    path: '/service-quality',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'ServiceQuality',
+        component: ServiceQualityView
+      }
+    ]
+  },
   // 捕获所有未匹配的路由
   {
     path: '/:pathMatch(.*)*',
@@ -189,19 +202,11 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const userStore = useUserStore()
 
-  console.log('路由导航:', {
-    to: to.path,
-    from: from.path,
-    fullPath: to.fullPath,
-    requiresAuth: to.meta.requiresAuth,
-    requiresUserAuth: to.meta.requiresUserAuth,
-    isAuthenticated: authStore.isAuthenticated,
-    isUserAuthenticated: userStore.isAuthenticated
-  })
-
-  // 防止重定向循环：如果已经在目标路径，直接放行
-  if (to.path === from.path && to.fullPath === from.fullPath) {
-    return next()
+  if (to.meta.requiresUserSystem) {
+    await authStore.loadOemSettings()
+    if (!authStore.oemSettings.userSystemEnabled) {
+      return next('/api-stats')
+    }
   }
 
   // 检查用户认证状态
@@ -226,21 +231,38 @@ router.beforeEach(async (to, from, next) => {
 
   // API Stats 页面不需要认证，直接放行
   if (to.path === '/api-stats' || to.path.startsWith('/api-stats')) {
-    next()
-  } else if (to.path === '/user-login') {
+    return next()
+  }
+
+  if (to.path === '/user-login') {
     // 如果已经是用户登录状态，重定向到用户仪表板
     if (userStore.isAuthenticated) {
-      next('/user-dashboard')
-    } else {
-      next()
+      return next('/user-dashboard')
     }
-  } else if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next('/login')
-  } else if (to.path === '/login' && authStore.isAuthenticated) {
-    next('/dashboard')
-  } else {
-    next()
+    return next()
   }
+
+  // 管理员受保护路由：始终 await checkAuth（authReady 时快速返回）
+  if (to.meta.requiresAuth) {
+    await authStore.checkAuth()
+    if (!authStore.isAuthenticated) {
+      return next('/login')
+    }
+    return next()
+  }
+
+  // 登录页：有 token 或尚未就绪时先校验，再决定是否去 dashboard
+  if (to.path === '/login') {
+    if (authStore.authToken || !authStore.authReady) {
+      await authStore.checkAuth()
+    }
+    if (authStore.isAuthenticated) {
+      return next('/dashboard')
+    }
+    return next()
+  }
+
+  return next()
 })
 
 export default router

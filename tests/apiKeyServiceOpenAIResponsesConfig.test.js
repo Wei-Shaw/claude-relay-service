@@ -51,6 +51,7 @@ jest.mock('../src/utils/modelHelper', () => ({
   isClaudeFamilyModel: jest.fn(() => false)
 }))
 jest.mock('../src/utils/requestDetailHelper', () => ({
+  ...jest.requireActual('../src/utils/requestDetailHelper'),
   finalizeRequestDetailMeta: jest.fn((value) => value)
 }))
 
@@ -60,6 +61,7 @@ const requestDetailService = require('../src/services/requestDetailService')
 const billingEventPublisher = require('../src/services/billingEventPublisher')
 const CostCalculator = require('../src/utils/costCalculator')
 const apiKeyService = require('../src/services/apiKeyService')
+const { runWithoutApiKeyUsage } = require('../src/utils/apiKeyUsageContext')
 
 describe('apiKeyService openai responses config', () => {
   beforeEach(() => {
@@ -89,10 +91,12 @@ describe('apiKeyService openai responses config', () => {
     expect(storedKeyData.enableOpenAIResponsesCodexAdaptation).toBe('true')
     expect(storedKeyData.enableOpenAIResponsesPayloadRules).toBe('false')
     expect(storedKeyData.openaiResponsesPayloadRules).toBe('[]')
+    expect(storedKeyData.scheduledActivationAt).toBe('')
 
     expect(result.enableOpenAIResponsesCodexAdaptation).toBe(true)
     expect(result.enableOpenAIResponsesPayloadRules).toBe(false)
     expect(result.openaiResponsesPayloadRules).toEqual([])
+    expect(result.scheduledActivationAt).toBeNull()
   })
 
   test('updateApiKey serializes toggle and payload rule fields', async () => {
@@ -117,6 +121,42 @@ describe('apiKeyService openai responses config', () => {
     expect(storedKeyData.openaiResponsesPayloadRules).toBe(
       JSON.stringify([{ path: 'model', valueType: 'string', value: 'gpt-5' }])
     )
+  })
+
+  test('activates only inactive keys whose scheduled time has arrived', async () => {
+    const now = new Date('2026-07-20T10:00:00.000Z')
+    const getKeys = jest.spyOn(apiKeyService, 'getAllApiKeysFast').mockResolvedValue([
+      {
+        id: 'due-key',
+        name: 'Due Key',
+        isActive: false,
+        scheduledActivationAt: '2026-07-20T09:59:00.000Z'
+      },
+      {
+        id: 'future-key',
+        name: 'Future Key',
+        isActive: false,
+        scheduledActivationAt: '2026-07-20T10:01:00.000Z'
+      },
+      {
+        id: 'active-key',
+        name: 'Active Key',
+        isActive: true,
+        scheduledActivationAt: '2026-07-20T09:59:00.000Z'
+      }
+    ])
+    const updateKey = jest.spyOn(apiKeyService, 'updateApiKey').mockResolvedValue({ success: true })
+
+    const activated = await apiKeyService.activateScheduledKeys(now)
+
+    expect(activated).toBe(1)
+    expect(updateKey).toHaveBeenCalledWith('due-key', {
+      isActive: true,
+      scheduledActivationAt: null
+    })
+
+    getKeys.mockRestore()
+    updateKey.mockRestore()
   })
 
   test('getApiKeyById returns parsed toggle and rule values', async () => {
@@ -174,6 +214,12 @@ describe('apiKeyService openai responses config', () => {
         pricingSource: 'unknown-fallback',
         isLongContextRequest: false
       },
+      pricing: {
+        input: 3,
+        output: 15,
+        cacheWrite: 3.75,
+        cacheRead: 0.3
+      },
       usingDynamicPricing: false
     })
 
@@ -203,7 +249,9 @@ describe('apiKeyService openai responses config', () => {
         cache_creation_input_tokens: 0,
         cache_read_input_tokens: 2048
       },
-      'mimo-v2.5-pro'
+      'mimo-v2.5-pro',
+      null,
+      { requestLevel: true }
     )
     expect(result.realCost).toBeCloseTo(0.0529974, 10)
     expect(result.ratedCost).toBeCloseTo(0.0529974, 10)
@@ -218,6 +266,12 @@ describe('apiKeyService openai responses config', () => {
         realCost: 0.052997,
         usedFallbackPricing: true,
         pricingSource: 'unknown-fallback',
+        unitPricing: {
+          input: 3,
+          output: 15,
+          cacheCreate: 3.75,
+          cacheRead: 0.3
+        },
         costBreakdown: expect.objectContaining({
           input: 0.051618,
           output: 0.000765,
@@ -233,7 +287,170 @@ describe('apiKeyService openai responses config', () => {
         cost: 0.052997,
         realCost: 0.052997,
         usedFallbackPricing: true,
-        pricingSource: 'unknown-fallback'
+        pricingSource: 'unknown-fallback',
+        unitPricing: {
+          input: 3,
+          output: 15,
+          cacheCreate: 3.75,
+          cacheRead: 0.3
+        }
+      })
+    )
+  })
+
+  test('_captureRequestDetail forwards all four model trace fields', async () => {
+    await apiKeyService._captureRequestDetail(
+      'key-1',
+      {
+        model: 'gpt-5.6-luna',
+        actualModel: 'gpt-5.6-luna',
+        accountId: 'acct-1',
+        accountType: 'openai-responses'
+      },
+      {
+        requestId: 'req-model-trace',
+        requestedModel: 'codex-auto-review',
+        mappedModel: 'codex-auto-review',
+        outboundModel: 'codex-auto-review',
+        responseModel: 'gpt-5.6-luna'
+      }
+    )
+
+    expect(requestDetailService.captureRequestDetail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'req-model-trace',
+        requestedModel: 'codex-auto-review',
+        mappedModel: 'codex-auto-review',
+        outboundModel: 'codex-auto-review',
+        responseModel: 'gpt-5.6-luna'
+      })
+    )
+  })
+
+  test('admin tests keep account stats but skip API key quota and usage writes', async () => {
+    CostCalculator.calculateCost.mockReturnValue({
+      costs: { input: 0.01, output: 0.02, total: 0.03 },
+      debug: { isLongContextRequest: false },
+      pricingTier: null
+    })
+
+    const result = await runWithoutApiKeyUsage(() =>
+      apiKeyService.recordUsage('key-1', 10, 5, 0, 0, 'test-model', 'account-1', 'openai-responses')
+    )
+
+    expect(result).toEqual({ realCost: 0.03, ratedCost: 0.03, pricingTier: null })
+    expect(redis.incrementAccountUsage).toHaveBeenCalledWith(
+      'account-1',
+      15,
+      10,
+      5,
+      0,
+      0,
+      0,
+      0,
+      'test-model',
+      false
+    )
+    expect(redis.incrementTokenUsage).not.toHaveBeenCalled()
+    expect(redis.incrementDailyCost).not.toHaveBeenCalled()
+    expect(redis.setApiKey).not.toHaveBeenCalled()
+    expect(redis.addUsageRecord).not.toHaveBeenCalled()
+  })
+
+  test('admin tests skip detailed API key usage writes', async () => {
+    CostCalculator.calculateCost.mockReturnValue({
+      costs: { input: 0.01, output: 0.02, total: 0.03 },
+      debug: { isLongContextRequest: false },
+      pricingTier: null
+    })
+
+    const result = await runWithoutApiKeyUsage(() =>
+      apiKeyService.recordUsageWithDetails(
+        'key-1',
+        { input_tokens: 10, output_tokens: 5 },
+        'test-model',
+        'account-1',
+        'claude-official'
+      )
+    )
+
+    expect(result).toEqual({ realCost: 0.03, ratedCost: 0.03, pricingTier: null })
+    expect(redis.incrementAccountUsage).toHaveBeenCalledWith(
+      'account-1',
+      15,
+      10,
+      5,
+      0,
+      0,
+      0,
+      0,
+      'test-model',
+      false
+    )
+    expect(redis.incrementTokenUsage).not.toHaveBeenCalled()
+    expect(redis.incrementDailyCost).not.toHaveBeenCalled()
+    expect(redis.setApiKey).not.toHaveBeenCalled()
+    expect(redis.addUsageRecord).not.toHaveBeenCalled()
+  })
+
+  test('recordUsageWithDetails persists request pricing tier snapshots', async () => {
+    const pricingTier = {
+      name: 'gpt-5.6-long-input',
+      applied: true,
+      eligible: true,
+      threshold: 272000,
+      thresholdType: 'exclusive',
+      contextInputTokens: 272001,
+      inputMultiplier: 2,
+      cachedInputMultiplier: 2,
+      outputMultiplier: 1.5,
+      baseCost: 0.217201,
+      surcharge: 0.212201,
+      totalCost: 0.429402
+    }
+    CostCalculator.calculateCost.mockReturnValue({
+      costs: {
+        input: 0.400002,
+        output: 0.015,
+        cacheCreate: 0,
+        cacheWrite: 0,
+        cacheRead: 0.0144,
+        total: 0.429402
+      },
+      debug: {
+        usedFallbackPricing: false,
+        pricingSource: 'dynamic',
+        isLongContextRequest: false
+      },
+      pricingTier,
+      usingDynamicPricing: true
+    })
+
+    await apiKeyService.recordUsageWithDetails(
+      'key-1',
+      {
+        input_tokens: 200001,
+        output_tokens: 1000,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 72000
+      },
+      'gpt-5.6-sol',
+      'acct-1',
+      'openai-responses'
+    )
+
+    expect(redis.addUsageRecord).toHaveBeenCalledWith(
+      'key-1',
+      expect.objectContaining({
+        model: 'gpt-5.6-sol',
+        realCost: 0.429402,
+        pricingTier
+      })
+    )
+    expect(billingEventPublisher.publishBillingEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-5.6-sol',
+        pricingTier
       })
     )
   })

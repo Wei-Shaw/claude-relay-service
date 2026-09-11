@@ -40,6 +40,7 @@ const tabRouteMap = computed(() => {
     apiKeys: '/api-keys',
     accounts: '/accounts',
     requestDetails: '/request-details',
+    serviceQuality: '/service-quality',
     quotaCards: '/quota-cards',
     settings: '/settings'
   }
@@ -69,6 +70,7 @@ const initActiveTab = () => {
       ApiKeys: 'apiKeys',
       Accounts: 'accounts',
       RequestDetails: 'requestDetails',
+      ServiceQuality: 'serviceQuality',
       QuotaCards: 'quotaCards',
       Settings: 'settings'
     }
@@ -99,6 +101,7 @@ watch(
         ApiKeys: 'apiKeys',
         Accounts: 'accounts',
         RequestDetails: 'requestDetails',
+        ServiceQuality: 'serviceQuality',
         QuotaCards: 'quotaCards',
         Tutorial: 'tutorial',
         Settings: 'settings'

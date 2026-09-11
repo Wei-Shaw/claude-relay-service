@@ -229,6 +229,15 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
+import {
+  formatExpireDate,
+  getExpiryIsoFromDuration,
+  getExpiryStatus,
+  getMinDateTime,
+  isExpired,
+  parseCustomExpiryDateTime
+} from '@/utils/useExpiryEditor'
 
 const props = defineProps({
   show: {
@@ -246,37 +255,8 @@ const emit = defineEmits(['close', 'save'])
 const saving = ref(false)
 
 // ConfirmModal 状态
-const showConfirmModal = ref(false)
-const confirmModalConfig = ref({
-  title: '',
-  message: '',
-  type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
-})
-const confirmResolve = ref(null)
-
-const showConfirm = (
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  type = 'primary'
-) => {
-  return new Promise((resolve) => {
-    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
-    confirmResolve.value = resolve
-    showConfirmModal.value = true
-  })
-}
-const handleConfirmModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(true)
-}
-const handleCancelModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(false)
-}
+const { showConfirmModal, confirmModalConfig, showConfirm, handleConfirmModal, handleCancelModal } =
+  useConfirmModal()
 
 // 表单数据
 const localForm = reactive({
@@ -298,11 +278,7 @@ const quickOptions = [
 ]
 
 // 计算最小日期时间
-const minDateTime = computed(() => {
-  const now = new Date()
-  now.setMinutes(now.getMinutes() + 1)
-  return now.toISOString().slice(0, 16)
-})
+const minDateTime = computed(getMinDateTime)
 
 // 监听显示状态，初始化表单
 watch(
@@ -352,88 +328,14 @@ const selectQuickOption = (value) => {
     return
   }
 
-  const now = new Date()
-  const match = value.match(/(\d+)([dhmy])/)
-
-  if (match) {
-    const [, num, unit] = match
-    const amount = parseInt(num)
-
-    switch (unit) {
-      case 'd':
-        now.setDate(now.getDate() + amount)
-        break
-      case 'h':
-        now.setHours(now.getHours() + amount)
-        break
-      case 'm':
-        now.setMonth(now.getMonth() + amount)
-        break
-      case 'y':
-        now.setFullYear(now.getFullYear() + amount)
-        break
-    }
-
-    localForm.expiresAt = now.toISOString()
-  }
+  const expiresAt = getExpiryIsoFromDuration(value)
+  if (expiresAt !== undefined) localForm.expiresAt = expiresAt
 }
 
 // 更新自定义过期时间
 const updateCustomExpiryPreview = () => {
-  if (localForm.customExpireDate) {
-    localForm.expiresAt = new Date(localForm.customExpireDate).toISOString()
-  }
-}
-
-// 格式化过期日期
-const formatExpireDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-// 检查是否已过期
-const isExpired = (dateString) => {
-  if (!dateString) return false
-  return new Date(dateString) < new Date()
-}
-
-// 获取过期状态
-const getExpiryStatus = (expiresAt) => {
-  if (!expiresAt) return null
-
-  const now = new Date()
-  const expiryDate = new Date(expiresAt)
-  const diffMs = expiryDate - now
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffMs < 0) {
-    return {
-      text: '已过期',
-      class: 'text-red-600'
-    }
-  } else if (diffDays <= 7) {
-    return {
-      text: `${diffDays} 天后过期`,
-      class: 'text-orange-600'
-    }
-  } else if (diffDays <= 30) {
-    return {
-      text: `${diffDays} 天后过期`,
-      class: 'text-yellow-600'
-    }
-  } else {
-    return {
-      text: `${Math.ceil(diffDays / 30)} 个月后过期`,
-      class: 'text-green-600'
-    }
-  }
+  const expiresAt = parseCustomExpiryDateTime(localForm.customExpireDate)
+  if (expiresAt) localForm.expiresAt = expiresAt
 }
 
 // 保存

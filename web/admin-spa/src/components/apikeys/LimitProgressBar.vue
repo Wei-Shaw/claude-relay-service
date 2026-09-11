@@ -124,9 +124,6 @@ const progress = computed(() => {
   return Math.min(percentage, 100)
 })
 
-// 移除百分比显示
-// const compactPercentage = computed(() => `${Math.min(progress.value, 100).toFixed(0)}%`)
-
 // 容器样式 - 使用柔和的渐变边框与阴影
 const containerClass = computed(() => {
   switch (props.type) {

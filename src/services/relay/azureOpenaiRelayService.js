@@ -219,7 +219,20 @@ async function handleAzureOpenAIRequest({
     if (account?.id && !azureAutoProtectionDisabled) {
       const statusCode = error.response?.status || 503
       await upstreamErrorHelper
-        .markTempUnavailable(account.id, 'azure-openai', statusCode)
+        .markTempUnavailable(
+          account.id,
+          'azure-openai',
+          statusCode,
+          null,
+          upstreamErrorHelper.buildErrorHistoryContext(null, {
+            model: requestBody?.model || deploymentName,
+            path: endpoint,
+            errorBody: error.response?.data || {
+              message: error.message,
+              code: error.code || 'azure_openai_request_error'
+            }
+          })
+        )
         .catch(() => {})
     }
 

@@ -3,6 +3,8 @@ import { ref } from 'vue'
 
 import { getOemSettingsApi, updateOemSettingsApi } from '@/utils/http_apis'
 
+const DEFAULT_CODEX_TUTORIAL_MODEL = 'gpt-5.5'
+
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
   const oemSettings = ref({
@@ -10,6 +12,7 @@ export const useSettingsStore = defineStore('settings', () => {
     siteIcon: '',
     siteIconData: '',
     showAdminButton: true,
+    codexTutorialModel: DEFAULT_CODEX_TUTORIAL_MODEL,
     apiStatsNotice: { enabled: false, title: '', content: '' },
     updatedAt: null
   })
@@ -46,6 +49,7 @@ export const useSettingsStore = defineStore('settings', () => {
       siteIcon: '',
       siteIconData: '',
       showAdminButton: true,
+      codexTutorialModel: DEFAULT_CODEX_TUTORIAL_MODEL,
       apiStatsNotice: { enabled: false, title: '', content: '' },
       updatedAt: null
     }
@@ -94,9 +98,18 @@ export const useSettingsStore = defineStore('settings', () => {
       errors.push('图标文件大小不能超过 350KB')
     }
 
-    // 检查文件类型
-    const allowedTypes = ['image/x-icon', 'image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml']
-    if (!allowedTypes.includes(file.type)) {
+    // 浏览器对 ICO 的 MIME 类型实现不一致，因此同时检查 MIME 和扩展名。
+    const allowedTypes = [
+      'image/x-icon',
+      'image/vnd.microsoft.icon',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/svg+xml'
+    ]
+    const extension = file.name?.split('.').pop()?.toLowerCase()
+    const allowedExtensions = ['ico', 'png', 'jpg', 'jpeg', 'svg']
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(extension)) {
       errors.push('不支持的文件类型，请选择 .ico, .png, .jpg 或 .svg 文件')
     }
 

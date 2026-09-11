@@ -100,20 +100,26 @@
             <div class="summary-card">
               <p class="summary-label">总请求</p>
               <p class="summary-value">{{ formatNumber(summary.totalRequests) }}</p>
+              <p class="summary-sub">成功 {{ formatNumber(summary.successRequests) }}</p>
             </div>
             <div class="summary-card">
-              <p class="summary-label">输入 / 输出</p>
-              <p class="summary-value">{{ formatNumber(summary.inputTokens) }}</p>
-              <p class="summary-sub">输出 {{ formatNumber(summary.outputTokens) }}</p>
-            </div>
-            <div class="summary-card">
-              <p class="summary-label">缓存命中率</p>
-              <p class="summary-value text-cyan-600 dark:text-cyan-400">
-                {{ formatPercent(summary.cacheHitRate) }}
+              <p class="summary-label">SLA 成功率</p>
+              <p class="summary-value text-emerald-600 dark:text-emerald-400">
+                {{ formatPercent(summary.slaSuccessRate) }}
               </p>
               <p class="summary-sub">
-                读 / (输入 + 读 + 建)：{{ formatNumber(summary.cacheHitNumerator) }} /
-                {{ formatNumber(summary.cacheHitDenominator) }}
+                eligible {{ formatNumber(summary.slaEligibleRequests) }}，失败
+                {{ formatNumber(summary.slaFailureRequests) }}
+              </p>
+            </div>
+            <div class="summary-card">
+              <p class="summary-label">错误请求</p>
+              <p class="summary-value text-rose-600 dark:text-rose-400">
+                {{ formatNumber(summary.failedRequests) }}
+              </p>
+              <p class="summary-sub">
+                5xx {{ formatNumber(summary.serverErrorRequests) }}，上游
+                {{ formatNumber(summary.upstreamErrorRequests) }}
               </p>
             </div>
             <div class="summary-card">
@@ -250,6 +256,46 @@
 
                   <div class="toolbar-control group">
                     <div
+                      class="toolbar-control-glow bg-gradient-to-r from-rose-500 to-red-500"
+                    ></div>
+                    <el-select
+                      v-model="filters.outcome"
+                      class="toolbar-element w-full"
+                      clearable
+                      filterable
+                      placeholder="所有结果"
+                    >
+                      <el-option
+                        v-for="item in availableOutcomes"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value"
+                      />
+                    </el-select>
+                  </div>
+
+                  <div class="toolbar-control group">
+                    <div
+                      class="toolbar-control-glow bg-gradient-to-r from-fuchsia-500 to-pink-500"
+                    ></div>
+                    <el-select
+                      v-model="filters.failureStage"
+                      class="toolbar-element w-full"
+                      clearable
+                      filterable
+                      placeholder="所有阶段"
+                    >
+                      <el-option
+                        v-for="item in availableFailureStages"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value"
+                      />
+                    </el-select>
+                  </div>
+
+                  <div class="toolbar-control group">
+                    <div
                       class="toolbar-control-glow bg-gradient-to-r from-slate-500 to-gray-500"
                     ></div>
                     <el-select
@@ -261,6 +307,17 @@
                       <el-option label="时间升序" value="asc" />
                     </el-select>
                   </div>
+
+                  <label
+                    class="flex min-h-[40px] items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 shadow-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                  >
+                    <input
+                      v-model="filters.slaOnly"
+                      class="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                      type="checkbox"
+                    />
+                    仅 SLA 请求
+                  </label>
                 </div>
               </div>
 
@@ -386,9 +443,9 @@
                     模型
                   </th>
                   <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
                   >
-                    推理
+                    结果
                   </th>
                   <th
                     class="min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -396,24 +453,10 @@
                     接口
                   </th>
                   <th
-                    class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                    class="min-w-[184px] px-3 py-4 text-left text-xs font-bold tracking-wider text-gray-700 dark:text-gray-300"
+                    title="输入 / 输出；缓存读取 / 缓存创建"
                   >
-                    输入
-                  </th>
-                  <th
-                    class="min-w-[96px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    输出
-                  </th>
-                  <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    缓存读取
-                  </th>
-                  <th
-                    class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
-                  >
-                    缓存创建
+                    Tokens
                   </th>
                   <th
                     class="min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
@@ -467,27 +510,68 @@
                       {{ record.accountTypeName || record.accountType || '-' }}
                     </div>
                   </td>
-                  <td class="table-cell">{{ record.model }}</td>
-                  <td class="table-cell">{{ formatReasoning(record.reasoningDisplay) }}</td>
+                  <td class="table-cell min-w-[140px]">
+                    <div class="font-semibold text-gray-900 dark:text-gray-100">
+                      {{ record.model }}
+                    </div>
+                    <div class="mt-1.5">
+                      <span
+                        :class="reasoningBadgeClass(record.reasoningDisplay)"
+                        :title="`推理强度：${formatReasoning(record.reasoningDisplay)}`"
+                      >
+                        <i aria-hidden="true" class="fas fa-brain text-[9px]" />
+                        <span class="font-medium opacity-60">推理</span>
+                        <span class="tracking-wide">
+                          {{ formatReasoning(record.reasoningDisplay) }}
+                        </span>
+                      </span>
+                    </div>
+                  </td>
+                  <td class="table-cell">
+                    <span :class="statusBadgeClass(record)">
+                      {{ record.statusCode || '-' }} {{ record.outcomeName || '未知' }}
+                    </span>
+                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {{ record.failureStageName || '-' }}
+                    </div>
+                  </td>
                   <td class="table-cell">
                     <div>{{ record.endpoint || '-' }}</div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">
                       {{ record.method || 'POST' }}
                     </div>
                   </td>
-                  <td class="table-cell text-blue-600 dark:text-blue-400">
-                    {{ formatNumber(record.inputTokens) }}
-                  </td>
-                  <td class="table-cell text-green-600 dark:text-green-400">
-                    {{ formatNumber(record.outputTokens) }}
-                  </td>
-                  <td class="table-cell text-cyan-600 dark:text-cyan-400">
-                    {{ formatNumber(record.cacheReadTokens) }}
-                  </td>
-                  <td class="table-cell text-purple-600 dark:text-purple-400">
-                    {{
-                      formatCacheCreate(record.cacheCreateTokens, record.cacheCreateNotApplicable)
-                    }}
+                  <td class="table-cell min-w-[184px] whitespace-nowrap">
+                    <div class="flex items-baseline gap-2 font-semibold tabular-nums">
+                      <span class="text-blue-600 dark:text-blue-400" title="输入 Token">
+                        {{ formatNumber(record.inputTokens) }}
+                      </span>
+                      <span class="font-normal text-gray-300 dark:text-gray-600">/</span>
+                      <span class="text-green-600 dark:text-green-400" title="输出 Token">
+                        {{ formatNumber(record.outputTokens) }}
+                      </span>
+                    </div>
+                    <div
+                      class="mt-1 flex items-center gap-1.5 text-xs font-medium tabular-nums text-gray-400 dark:text-gray-500"
+                    >
+                      <span>缓存</span>
+                      <span class="text-cyan-600/80 dark:text-cyan-400/80" title="缓存读取 Token">
+                        ↓ {{ formatNumber(record.cacheReadTokens) }}
+                      </span>
+                      <span class="text-gray-300 dark:text-gray-600">·</span>
+                      <span
+                        class="text-purple-600/80 dark:text-purple-400/80"
+                        title="缓存创建 Token"
+                      >
+                        ↑
+                        {{
+                          formatCacheCreate(
+                            record.cacheCreateTokens,
+                            record.cacheCreateNotApplicable
+                          )
+                        }}
+                      </span>
+                    </div>
                   </td>
                   <td class="table-cell">{{ formatPercent(record.cacheHitRate) }}</td>
                   <td class="table-cell text-amber-600 dark:text-amber-400">
@@ -518,11 +602,28 @@
                   <p class="text-sm font-bold text-gray-900 dark:text-gray-100">
                     {{ record.model }}
                   </p>
+                  <div class="mt-1.5">
+                    <span
+                      :class="reasoningBadgeClass(record.reasoningDisplay)"
+                      :title="`推理强度：${formatReasoning(record.reasoningDisplay)}`"
+                    >
+                      <i aria-hidden="true" class="fas fa-brain text-[9px]" />
+                      <span class="font-medium opacity-60">推理</span>
+                      <span class="tracking-wide">
+                        {{ formatReasoning(record.reasoningDisplay) }}
+                      </span>
+                    </span>
+                  </div>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     {{ formatDate(record.timestamp) }}
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     {{ record.endpoint || '-' }}
+                  </p>
+                  <p class="mt-1">
+                    <span :class="statusBadgeClass(record)">
+                      {{ record.statusCode || '-' }} {{ record.outcomeName || '未知' }}
+                    </span>
                   </p>
                 </div>
                 <button
@@ -535,7 +636,7 @@
               <div class="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <div>API Key：{{ record.apiKeyName || '-' }}</div>
                 <div>账户：{{ record.accountName || '-' }}</div>
-                <div>推理：{{ formatReasoning(record.reasoningDisplay) }}</div>
+                <div class="col-span-2">阶段：{{ record.failureStageName || '-' }}</div>
                 <div>输入：{{ formatNumber(record.inputTokens) }}</div>
                 <div>输出：{{ formatNumber(record.outputTokens) }}</div>
                 <div>缓存读：{{ formatNumber(record.cacheReadTokens) }}</div>
@@ -593,10 +694,17 @@ import {
   getRequestDetailBodyPreviewStatsApi,
   purgeRequestDetailBodyPreviewApi
 } from '@/utils/http_apis'
-import { showToast, formatDate, formatNumber } from '@/utils/tools'
+import {
+  showToast,
+  formatDate,
+  formatDurationSeconds,
+  formatNumber,
+  formatRequestCost as formatCost
+} from '@/utils/tools'
 import RequestDetailModal from '@/components/admin/RequestDetailModal.vue'
 
 const router = useRouter()
+const route = router.currentRoute
 
 let fetchVersion = 0
 const loading = ref(false)
@@ -613,6 +721,8 @@ const availableApiKeys = ref([])
 const availableAccounts = ref([])
 const availableModels = ref([])
 const availableEndpoints = ref([])
+const availableOutcomes = ref([])
+const availableFailureStages = ref([])
 
 const pagination = reactive({
   currentPage: 1,
@@ -627,6 +737,9 @@ const filters = reactive({
   accountId: '',
   model: '',
   endpoint: '',
+  outcome: '',
+  failureStage: '',
+  slaOnly: false,
   sortOrder: 'desc'
 })
 
@@ -637,6 +750,9 @@ const hasActiveFilters = computed(() => {
     filters.accountId ||
     filters.model ||
     filters.endpoint ||
+    filters.outcome ||
+    filters.failureStage ||
+    filters.slaOnly ||
     (filters.dateRange && filters.dateRange.length === 2)
   )
 })
@@ -649,6 +765,13 @@ const summary = reactive({
   cacheCreateTokens: 0,
   totalCost: 0,
   avgDurationMs: 0,
+  successRequests: 0,
+  failedRequests: 0,
+  serverErrorRequests: 0,
+  upstreamErrorRequests: 0,
+  slaEligibleRequests: 0,
+  slaFailureRequests: 0,
+  slaSuccessRate: 0,
   cacheHitRate: 0,
   cacheHitNumerator: 0,
   cacheHitDenominator: 0,
@@ -668,7 +791,10 @@ const emptyHint = computed(() => {
     filters.apiKeyId ||
     filters.accountId ||
     filters.model ||
-    filters.endpoint
+    filters.endpoint ||
+    filters.outcome ||
+    filters.failureStage ||
+    filters.slaOnly
   ) {
     return '当前筛选条件下没有结果，请尝试放宽搜索条件。'
   }
@@ -699,6 +825,25 @@ const areDateRangesEqual = (currentRange = [], nextRange = []) => {
   )
 }
 
+const applyRouteQueryFilters = () => {
+  const query = route.value.query || {}
+  filters.keyword = query.keyword ? String(query.keyword) : filters.keyword
+  filters.apiKeyId = query.apiKeyId ? String(query.apiKeyId) : filters.apiKeyId
+  filters.accountId = query.accountId ? String(query.accountId) : filters.accountId
+  filters.model = query.model ? String(query.model) : filters.model
+  filters.endpoint = query.endpoint ? String(query.endpoint) : filters.endpoint
+  filters.outcome = query.outcome ? String(query.outcome) : filters.outcome
+  filters.failureStage = query.failureStage ? String(query.failureStage) : filters.failureStage
+  filters.slaOnly = query.slaOnly === 'true' || query.slaOnly === true
+
+  if (query.startDate && query.endDate) {
+    const nextRange = [toPickerDate(query.startDate), toPickerDate(query.endDate)]
+    if (nextRange.every(Boolean)) {
+      filters.dateRange = nextRange
+    }
+  }
+}
+
 const buildParams = (page, snapshotId = activeSnapshotId.value) => {
   const params = {
     page,
@@ -711,6 +856,9 @@ const buildParams = (page, snapshotId = activeSnapshotId.value) => {
   if (filters.accountId) params.accountId = filters.accountId
   if (filters.model) params.model = filters.model
   if (filters.endpoint) params.endpoint = filters.endpoint
+  if (filters.outcome) params.outcome = filters.outcome
+  if (filters.failureStage) params.failureStage = filters.failureStage
+  if (filters.slaOnly) params.slaOnly = 'true'
   if (filters.dateRange && filters.dateRange.length === 2) {
     const [startDate, endDate] = filters.dateRange
     const parsedStart = dayjs(startDate)
@@ -745,6 +893,9 @@ const syncResponseState = (data) => {
   filters.accountId = filterEcho.accountId || ''
   filters.model = filterEcho.model || ''
   filters.endpoint = filterEcho.endpoint || ''
+  filters.outcome = filterEcho.outcome || ''
+  filters.failureStage = filterEcho.failureStage || ''
+  filters.slaOnly = filterEcho.slaOnly === true
   filters.sortOrder = filterEcho.sortOrder || 'desc'
   if (filterEcho.startDate && filterEcho.endDate) {
     const nextRange = [toPickerDate(filterEcho.startDate), toPickerDate(filterEcho.endDate)]
@@ -762,6 +913,8 @@ const syncResponseState = (data) => {
   availableAccounts.value = data.availableFilters?.accounts || []
   availableModels.value = data.availableFilters?.models || []
   availableEndpoints.value = data.availableFilters?.endpoints || []
+  availableOutcomes.value = data.availableFilters?.outcomes || []
+  availableFailureStages.value = data.availableFilters?.failureStages || []
 
   const summaryData = data.summary || {}
   summary.totalRequests = summaryData.totalRequests || 0
@@ -771,6 +924,13 @@ const syncResponseState = (data) => {
   summary.cacheCreateTokens = summaryData.cacheCreateTokens || 0
   summary.totalCost = summaryData.totalCost || 0
   summary.avgDurationMs = summaryData.avgDurationMs || 0
+  summary.successRequests = summaryData.successRequests || 0
+  summary.failedRequests = summaryData.failedRequests || 0
+  summary.serverErrorRequests = summaryData.serverErrorRequests || 0
+  summary.upstreamErrorRequests = summaryData.upstreamErrorRequests || 0
+  summary.slaEligibleRequests = summaryData.slaEligibleRequests || 0
+  summary.slaFailureRequests = summaryData.slaFailureRequests || 0
+  summary.slaSuccessRate = summaryData.slaSuccessRate || 0
   summary.cacheHitRate = summaryData.cacheHitRate || 0
   summary.cacheHitNumerator = summaryData.cacheHitNumerator || 0
   summary.cacheHitDenominator = summaryData.cacheHitDenominator || 0
@@ -832,6 +992,9 @@ const resetFilters = () => {
   filters.accountId = ''
   filters.model = ''
   filters.endpoint = ''
+  filters.outcome = ''
+  filters.failureStage = ''
+  filters.slaOnly = false
   filters.sortOrder = 'desc'
   pagination.currentPage = 1
   fetchRecords(1)
@@ -934,6 +1097,11 @@ const exportCsv = async () => {
       '使用账户',
       '消费类型',
       '模型',
+      'HTTP状态',
+      '结果',
+      '失败阶段',
+      'SLA Eligible',
+      'SLA Failure',
       '推理',
       '接口',
       '输入',
@@ -942,7 +1110,7 @@ const exportCsv = async () => {
       '缓存创建',
       '缓存命中率',
       '费用',
-      '耗时(ms)'
+      '耗时(s)'
     ]
 
     const rows = [headers.join(',')]
@@ -954,6 +1122,11 @@ const exportCsv = async () => {
         record.accountName || record.accountId || '',
         record.accountTypeName || record.accountType || '',
         record.model || '',
+        record.statusCode || '',
+        record.outcomeName || record.outcome || '',
+        record.failureStageName || record.failureStage || '',
+        record.isSlaEligible ? '是' : '否',
+        record.isSlaFailure ? '是' : '否',
         formatReasoning(record.reasoningDisplay),
         record.endpoint || '',
         record.inputTokens || 0,
@@ -962,7 +1135,7 @@ const exportCsv = async () => {
         formatCacheCreate(record.cacheCreateTokens, record.cacheCreateNotApplicable),
         formatPercent(record.cacheHitRate),
         formatCost(record.cost),
-        record.durationMs || 0
+        formatDurationSeconds(record.durationMs)
       ]
       rows.push(row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     })
@@ -982,12 +1155,6 @@ const exportCsv = async () => {
   }
 }
 
-const formatCost = (value) => {
-  const num = Number(value || 0)
-  if (num >= 1) return `$${num.toFixed(2)}`
-  if (num >= 0.001) return `$${num.toFixed(4)}`
-  return `$${num.toFixed(6)}`
-}
 const formatCacheCreate = (value, notApplicable = false) =>
   notApplicable ? '-' : formatNumber(value)
 const formatRetentionHours = (value) => {
@@ -1007,9 +1174,33 @@ const formatRetentionHours = (value) => {
 
   return `保留 ${hours} 小时`
 }
-const formatDuration = (value) => `${Number(value || 0)}ms`
+const formatDuration = formatDurationSeconds
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`
 const formatReasoning = (value) => value || '-'
+const reasoningBadgeClass = (value) => {
+  const base =
+    'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-4 shadow-sm'
+
+  if (!value || value === '-') {
+    return `${base} border-gray-200/80 bg-gray-50 text-gray-400 shadow-none dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-500`
+  }
+
+  return `${base} border-cyan-200/80 bg-gradient-to-r from-cyan-50 to-sky-50 text-cyan-700 shadow-cyan-950/5 dark:border-cyan-800/70 dark:from-cyan-950/50 dark:to-sky-950/40 dark:text-cyan-300`
+}
+const statusBadgeClass = (record = {}) => {
+  const base =
+    'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap'
+  if (record.isSlaFailure || record.statusClass === '5xx') {
+    return `${base} bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300`
+  }
+  if (record.statusClass === '4xx') {
+    return `${base} bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300`
+  }
+  if (record.outcome === 'success') {
+    return `${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300`
+  }
+  return `${base} bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300`
+}
 
 const debouncedKeywordFetch = debounce(() => {
   pagination.currentPage = 1
@@ -1025,7 +1216,16 @@ watch(
 )
 
 watch(
-  () => [filters.apiKeyId, filters.accountId, filters.model, filters.endpoint, filters.sortOrder],
+  () => [
+    filters.apiKeyId,
+    filters.accountId,
+    filters.model,
+    filters.endpoint,
+    filters.outcome,
+    filters.failureStage,
+    filters.slaOnly,
+    filters.sortOrder
+  ],
   () => {
     debouncedKeywordFetch.cancel()
     pagination.currentPage = 1
@@ -1049,6 +1249,7 @@ watch(
 )
 
 onMounted(() => {
+  applyRouteQueryFilters()
   fetchRecords()
 })
 </script>
@@ -1211,13 +1412,13 @@ onMounted(() => {
 }
 
 .table-container table {
-  min-width: 1500px;
+  min-width: 1540px;
   border-collapse: collapse;
   table-layout: auto;
 }
 
 .request-table {
-  width: max(100%, 1500px);
+  width: max(100%, 1540px);
 }
 
 .table-container::-webkit-scrollbar {
@@ -1282,7 +1483,7 @@ onMounted(() => {
   }
 
   .request-filter-row-secondary {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .request-toolbar-actions {

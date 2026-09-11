@@ -2,16 +2,17 @@ const express = require('express')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const apiKeyService = require('../services/apiKeyService')
+const apiStatsUsageService = require('../services/apiStatsUsageService')
 const CostCalculator = require('../utils/costCalculator')
-const claudeAccountService = require('../services/account/claudeAccountService')
-const openaiAccountService = require('../services/account/openaiAccountService')
 const serviceRatesService = require('../services/serviceRatesService')
+const openaiResponsesTestService = require('../services/openaiResponsesTestService')
 const {
   createClaudeTestPayload,
   extractErrorMessage,
   sanitizeErrorMsg
 } = require('../utils/testPayloadHelper')
 const modelsConfig = require('../../config/models')
+const connectivityTestModelConfigService = require('../services/connectivityTestModelConfigService')
 const { getSafeMessage } = require('../utils/errorSanitizer')
 
 const router = express.Router()
@@ -41,6 +42,20 @@ router.get('/models', (req, res) => {
       platforms: modelsConfig.PLATFORM_TEST_MODELS
     }
   })
+})
+
+// 📋 获取连通性测试使用的模型列表（公开接口）
+router.get('/connectivity-test-models', async (_req, res) => {
+  try {
+    const data = await connectivityTestModelConfigService.getPublicConfig()
+    return res.json({ success: true, data })
+  } catch (error) {
+    logger.error('❌ Failed to get connectivity test models:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get connectivity test models'
+    })
+  }
 })
 
 // 🏠 重定向页面请求到新版 admin-spa
@@ -428,50 +443,6 @@ router.post('/api/user-stats', async (req, res) => {
       logger.warn(`Failed to get current usage for key ${keyId}:`, error)
     }
 
-    const boundAccountDetails = {}
-
-    const accountDetailTasks = []
-
-    if (fullKeyData.claudeAccountId) {
-      accountDetailTasks.push(
-        (async () => {
-          try {
-            const overview = await claudeAccountService.getAccountOverview(
-              fullKeyData.claudeAccountId
-            )
-
-            if (overview && overview.accountType === 'dedicated') {
-              boundAccountDetails.claude = overview
-            }
-          } catch (error) {
-            logger.warn(`⚠️ Failed to load Claude account overview for key ${keyId}:`, error)
-          }
-        })()
-      )
-    }
-
-    if (fullKeyData.openaiAccountId) {
-      accountDetailTasks.push(
-        (async () => {
-          try {
-            const overview = await openaiAccountService.getAccountOverview(
-              fullKeyData.openaiAccountId
-            )
-
-            if (overview && overview.accountType === 'dedicated') {
-              boundAccountDetails.openai = overview
-            }
-          } catch (error) {
-            logger.warn(`⚠️ Failed to load OpenAI account overview for key ${keyId}:`, error)
-          }
-        })()
-      )
-    }
-
-    if (accountDetailTasks.length > 0) {
-      await Promise.allSettled(accountDetailTasks)
-    }
-
     // 构建响应数据（只返回该API Key自己的信息，确保不泄露其他信息）
     const responseData = {
       id: keyId,
@@ -534,23 +505,6 @@ router.post('/api/user-stats', async (req, res) => {
         windowRemainingSeconds
       },
 
-      // 绑定的账户信息（只显示ID，不显示敏感信息）
-      accounts: {
-        claudeAccountId:
-          fullKeyData.claudeAccountId && fullKeyData.claudeAccountId !== ''
-            ? fullKeyData.claudeAccountId
-            : null,
-        geminiAccountId:
-          fullKeyData.geminiAccountId && fullKeyData.geminiAccountId !== ''
-            ? fullKeyData.geminiAccountId
-            : null,
-        openaiAccountId:
-          fullKeyData.openaiAccountId && fullKeyData.openaiAccountId !== ''
-            ? fullKeyData.openaiAccountId
-            : null,
-        details: Object.keys(boundAccountDetails).length > 0 ? boundAccountDetails : null
-      },
-
       // 模型和客户端限制信息
       restrictions: {
         enableModelRestriction: fullKeyData.enableModelRestriction || false,
@@ -586,355 +540,23 @@ router.post('/api/user-stats', async (req, res) => {
   }
 })
 
-// 📊 批量查询统计数据接口
-router.post('/api/batch-stats', async (req, res) => {
+// 📋 API Key 自查询的周期用量与安全请求明细
+router.post('/api/usage-workspace', async (req, res) => {
   try {
-    const { apiIds } = req.body
-
-    // 验证输入
-    if (!apiIds || !Array.isArray(apiIds) || apiIds.length === 0) {
-      return res.status(400).json({
-        error: 'Invalid input',
-        message: 'API IDs array is required'
-      })
-    }
-
-    // 限制最多查询 30 个
-    if (apiIds.length > 30) {
-      return res.status(400).json({
-        error: 'Too many keys',
-        message: 'Maximum 30 API keys can be queried at once'
-      })
-    }
-
-    // 验证所有 ID 格式
-    const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
-    const invalidIds = apiIds.filter((id) => !uuidRegex.test(id))
-    if (invalidIds.length > 0) {
-      return res.status(400).json({
-        error: 'Invalid API ID format',
-        message: `Invalid API IDs: ${invalidIds.join(', ')}`
-      })
-    }
-
-    const individualStats = []
-    const aggregated = {
-      totalKeys: apiIds.length,
-      activeKeys: 0,
-      usage: {
-        requests: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreateTokens: 0,
-        cacheReadTokens: 0,
-        allTokens: 0,
-        cost: 0,
-        formattedCost: '$0.000000'
-      },
-      dailyUsage: {
-        requests: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreateTokens: 0,
-        cacheReadTokens: 0,
-        allTokens: 0,
-        cost: 0,
-        formattedCost: '$0.000000'
-      },
-      monthlyUsage: {
-        requests: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreateTokens: 0,
-        cacheReadTokens: 0,
-        allTokens: 0,
-        cost: 0,
-        formattedCost: '$0.000000'
-      }
-    }
-
-    // 并行查询所有 API Key 数据（复用单key查询逻辑）
-    const results = await Promise.allSettled(
-      apiIds.map(async (apiId) => {
-        const keyData = await redis.getApiKey(apiId)
-
-        if (!keyData || Object.keys(keyData).length === 0) {
-          return { error: 'Not found', apiId }
-        }
-
-        // 检查是否激活
-        if (keyData.isActive !== 'true') {
-          return { error: 'Disabled', apiId }
-        }
-
-        // 检查是否过期
-        if (keyData.expiresAt && new Date() > new Date(keyData.expiresAt)) {
-          return { error: 'Expired', apiId }
-        }
-
-        // 复用单key查询的逻辑：获取使用统计
-        const usage = await redis.getUsageStats(apiId)
-
-        // 获取费用统计（与单key查询一致）
-        const costStats = await redis.getCostStats(apiId)
-
-        return {
-          apiId,
-          name: keyData.name,
-          description: keyData.description || '',
-          isActive: true,
-          createdAt: keyData.createdAt,
-          usage: usage.total || {},
-          dailyStats: {
-            ...usage.daily,
-            cost: costStats.daily
-          },
-          monthlyStats: {
-            ...usage.monthly,
-            cost: costStats.monthly
-          },
-          totalCost: costStats.total,
-          serviceRates: (() => {
-            try {
-              return keyData.serviceRates
-                ? typeof keyData.serviceRates === 'string'
-                  ? JSON.parse(keyData.serviceRates)
-                  : keyData.serviceRates
-                : {}
-            } catch (e) {
-              return {}
-            }
-          })()
-        }
-      })
-    )
-
-    // 处理结果并聚合
-    results.forEach((result) => {
-      if (result.status === 'fulfilled' && result.value && !result.value.error) {
-        const stats = result.value
-        aggregated.activeKeys++
-
-        // 聚合总使用量
-        if (stats.usage) {
-          aggregated.usage.requests += stats.usage.requests || 0
-          aggregated.usage.inputTokens += stats.usage.inputTokens || 0
-          aggregated.usage.outputTokens += stats.usage.outputTokens || 0
-          aggregated.usage.cacheCreateTokens += stats.usage.cacheCreateTokens || 0
-          aggregated.usage.cacheReadTokens += stats.usage.cacheReadTokens || 0
-          aggregated.usage.allTokens += stats.usage.allTokens || 0
-        }
-
-        // 聚合总费用
-        aggregated.usage.cost += stats.totalCost || 0
-
-        // 聚合今日使用量
-        aggregated.dailyUsage.requests += stats.dailyStats.requests || 0
-        aggregated.dailyUsage.inputTokens += stats.dailyStats.inputTokens || 0
-        aggregated.dailyUsage.outputTokens += stats.dailyStats.outputTokens || 0
-        aggregated.dailyUsage.cacheCreateTokens += stats.dailyStats.cacheCreateTokens || 0
-        aggregated.dailyUsage.cacheReadTokens += stats.dailyStats.cacheReadTokens || 0
-        aggregated.dailyUsage.allTokens += stats.dailyStats.allTokens || 0
-        aggregated.dailyUsage.cost += stats.dailyStats.cost || 0
-
-        // 聚合本月使用量
-        aggregated.monthlyUsage.requests += stats.monthlyStats.requests || 0
-        aggregated.monthlyUsage.inputTokens += stats.monthlyStats.inputTokens || 0
-        aggregated.monthlyUsage.outputTokens += stats.monthlyStats.outputTokens || 0
-        aggregated.monthlyUsage.cacheCreateTokens += stats.monthlyStats.cacheCreateTokens || 0
-        aggregated.monthlyUsage.cacheReadTokens += stats.monthlyStats.cacheReadTokens || 0
-        aggregated.monthlyUsage.allTokens += stats.monthlyStats.allTokens || 0
-        aggregated.monthlyUsage.cost += stats.monthlyStats.cost || 0
-
-        // 添加到个体统计
-        individualStats.push({
-          apiId: stats.apiId,
-          name: stats.name,
-          isActive: true,
-          usage: stats.usage,
-          dailyUsage: {
-            ...stats.dailyStats,
-            formattedCost: CostCalculator.formatCost(stats.dailyStats.cost || 0)
-          },
-          monthlyUsage: {
-            ...stats.monthlyStats,
-            formattedCost: CostCalculator.formatCost(stats.monthlyStats.cost || 0)
-          }
-        })
-      }
-    })
-
-    // 格式化费用显示
-    aggregated.usage.formattedCost = CostCalculator.formatCost(aggregated.usage.cost)
-    aggregated.dailyUsage.formattedCost = CostCalculator.formatCost(aggregated.dailyUsage.cost)
-    aggregated.monthlyUsage.formattedCost = CostCalculator.formatCost(aggregated.monthlyUsage.cost)
-
-    logger.api(`📊 Batch stats query for ${apiIds.length} keys from ${req.ip || 'unknown'}`)
-
-    return res.json({
-      success: true,
-      data: {
-        aggregated,
-        individual: individualStats
-      }
-    })
+    const data = await apiStatsUsageService.getUsageWorkspace(req.body || {})
+    return res.json({ success: true, data })
   } catch (error) {
-    logger.error('❌ Failed to process batch stats query:', error)
+    if (error?.statusCode && error.statusCode < 500) {
+      return res.status(error.statusCode).json({
+        error: 'Invalid usage query',
+        message: error.message
+      })
+    }
+
+    logger.error('❌ Failed to load API key usage workspace:', error)
     return res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to retrieve batch statistics'
-    })
-  }
-})
-
-// 📊 批量模型统计查询接口
-router.post('/api/batch-model-stats', async (req, res) => {
-  try {
-    const { apiIds, period = 'daily' } = req.body
-
-    // 验证输入
-    if (!apiIds || !Array.isArray(apiIds) || apiIds.length === 0) {
-      return res.status(400).json({
-        error: 'Invalid input',
-        message: 'API IDs array is required'
-      })
-    }
-
-    // 限制最多查询 30 个
-    if (apiIds.length > 30) {
-      return res.status(400).json({
-        error: 'Too many keys',
-        message: 'Maximum 30 API keys can be queried at once'
-      })
-    }
-
-    const _client = redis.getClientSafe()
-    const tzDate = redis.getDateInTimezone()
-    const today = redis.getDateStringInTimezone()
-    const currentMonth = `${tzDate.getFullYear()}-${String(tzDate.getMonth() + 1).padStart(2, '0')}`
-
-    const modelUsageMap = new Map()
-
-    // 并行查询所有 API Key 的模型统计
-    await Promise.all(
-      apiIds.map(async (apiId) => {
-        const pattern =
-          period === 'daily'
-            ? `usage:${apiId}:model:daily:*:${today}`
-            : `usage:${apiId}:model:monthly:*:${currentMonth}`
-
-        const results = await redis.scanAndGetAllChunked(pattern)
-
-        for (const { key, data } of results) {
-          const match = key.match(
-            period === 'daily'
-              ? /usage:.+:model:daily:(.+):\d{4}-\d{2}-\d{2}$/
-              : /usage:.+:model:monthly:(.+):\d{4}-\d{2}$/
-          )
-
-          if (!match) {
-            continue
-          }
-
-          const model = match[1]
-
-          if (data && Object.keys(data).length > 0) {
-            if (!modelUsageMap.has(model)) {
-              modelUsageMap.set(model, {
-                requests: 0,
-                inputTokens: 0,
-                outputTokens: 0,
-                cacheCreateTokens: 0,
-                cacheReadTokens: 0,
-                ephemeral5mTokens: 0,
-                ephemeral1hTokens: 0,
-                allTokens: 0,
-                realCostMicro: 0,
-                ratedCostMicro: 0,
-                hasStoredCost: false
-              })
-            }
-
-            const modelUsage = modelUsageMap.get(model)
-            modelUsage.requests += parseInt(data.requests) || 0
-            modelUsage.inputTokens += parseInt(data.inputTokens) || 0
-            modelUsage.outputTokens += parseInt(data.outputTokens) || 0
-            modelUsage.cacheCreateTokens += parseInt(data.cacheCreateTokens) || 0
-            modelUsage.cacheReadTokens += parseInt(data.cacheReadTokens) || 0
-            modelUsage.ephemeral5mTokens += parseInt(data.ephemeral5mTokens) || 0
-            modelUsage.ephemeral1hTokens += parseInt(data.ephemeral1hTokens) || 0
-            modelUsage.allTokens += parseInt(data.allTokens) || 0
-            modelUsage.realCostMicro += parseInt(data.realCostMicro) || 0
-            modelUsage.ratedCostMicro += parseInt(data.ratedCostMicro) || 0
-            // 检查 Redis 数据是否包含成本字段
-            if ('realCostMicro' in data || 'ratedCostMicro' in data) {
-              modelUsage.hasStoredCost = true
-            }
-          }
-        }
-      })
-    )
-
-    // 转换为数组并处理费用
-    const modelStats = []
-    for (const [model, usage] of modelUsageMap) {
-      const usageData = {
-        input_tokens: usage.inputTokens,
-        output_tokens: usage.outputTokens,
-        cache_creation_input_tokens: usage.cacheCreateTokens,
-        cache_read_input_tokens: usage.cacheReadTokens
-      }
-
-      // 如果有 ephemeral 5m/1h 拆分数据，添加 cache_creation 子对象以实现精确计费
-      if (usage.ephemeral5mTokens > 0 || usage.ephemeral1hTokens > 0) {
-        usageData.cache_creation = {
-          ephemeral_5m_input_tokens: usage.ephemeral5mTokens,
-          ephemeral_1h_input_tokens: usage.ephemeral1hTokens
-        }
-      }
-
-      // 优先使用存储的费用，否则回退到重新计算
-      const { hasStoredCost } = usage
-      const costData = CostCalculator.calculateCost(usageData, model)
-
-      // 如果有存储的费用，覆盖计算的费用
-      if (hasStoredCost) {
-        costData.costs.real = (usage.realCostMicro || 0) / 1000000
-        costData.costs.rated = (usage.ratedCostMicro || 0) / 1000000
-        costData.costs.total = costData.costs.real // 保持兼容
-        costData.formatted.total = `$${costData.costs.real.toFixed(6)}`
-      }
-
-      modelStats.push({
-        model,
-        requests: usage.requests,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        cacheCreateTokens: usage.cacheCreateTokens,
-        cacheReadTokens: usage.cacheReadTokens,
-        allTokens: usage.allTokens,
-        costs: costData.costs,
-        formatted: costData.formatted,
-        pricing: costData.pricing,
-        isLegacy: !hasStoredCost
-      })
-    }
-
-    // 按总 token 数降序排列
-    modelStats.sort((a, b) => b.allTokens - a.allTokens)
-
-    logger.api(`📊 Batch model stats query for ${apiIds.length} keys, period: ${period}`)
-
-    return res.json({
-      success: true,
-      data: modelStats,
-      period
-    })
-  } catch (error) {
-    logger.error('❌ Failed to process batch model stats query:', error)
-    return res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to retrieve batch model statistics'
+      error: 'Usage workspace error',
+      message: 'Failed to retrieve usage details'
     })
   }
 })
@@ -967,7 +589,9 @@ router.post('/api-key/test', async (req, res) => {
       })
     }
 
-    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey, {
+      adminTestService: 'claude'
+    })
     if (!validation.valid) {
       return res.status(401).json({
         error: 'Invalid API key',
@@ -1032,7 +656,9 @@ router.post('/api-key/test-gemini', async (req, res) => {
       })
     }
 
-    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey, {
+      adminTestService: 'gemini'
+    })
     if (!validation.valid) {
       return res.status(401).json({
         error: 'Invalid API key',
@@ -1163,9 +789,6 @@ router.post('/api-key/test-gemini', async (req, res) => {
 
 // 🧪 OpenAI/Codex API Key 端点测试接口
 router.post('/api-key/test-openai', async (req, res) => {
-  const config = require('../../config/config')
-  const { createOpenAITestPayload } = require('../utils/testPayloadHelper')
-
   try {
     const { apiKey, model = 'gpt-5', prompt = 'hi' } = req.body
     const maxTokens = sanitizeMaxTokens(req.body.maxTokens)
@@ -1184,7 +807,9 @@ router.post('/api-key/test-openai', async (req, res) => {
       })
     }
 
-    const validation = await apiKeyService.validateApiKeyForStats(apiKey)
+    const validation = await apiKeyService.validateApiKeyForStats(apiKey, {
+      adminTestService: 'openai'
+    })
     if (!validation.valid) {
       return res.status(401).json({
         error: 'Invalid API key',
@@ -1204,102 +829,13 @@ router.post('/api-key/test-openai', async (req, res) => {
       `🧪 OpenAI API Key test started for: ${validation.keyData.name} (${validation.keyData.id})`
     )
 
-    const port = config.server.port || 3000
-    const apiUrl = `http://127.0.0.1:${port}/openai/responses`
-
-    // 设置 SSE 响应头
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no'
+    await openaiResponsesTestService.sendApiKeyTestStream({
+      apiKey,
+      model,
+      prompt,
+      maxTokens,
+      responseStream: res
     })
-
-    res.write(`data: ${JSON.stringify({ type: 'test_start', message: 'Test started' })}\n\n`)
-
-    const axios = require('axios')
-    const payload = createOpenAITestPayload(model, { prompt, maxTokens })
-
-    try {
-      const response = await axios.post(apiUrl, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'User-Agent': 'codex_cli_rs/1.0.0'
-        },
-        timeout: 60000,
-        responseType: 'stream',
-        validateStatus: () => true
-      })
-
-      if (response.status !== 200) {
-        const chunks = []
-        response.data.on('data', (chunk) => chunks.push(chunk))
-        response.data.on('end', () => {
-          const errorData = Buffer.concat(chunks).toString()
-          let errorMsg = `API Error: ${response.status}`
-          try {
-            const json = JSON.parse(errorData)
-            errorMsg = extractErrorMessage(json, errorMsg)
-          } catch {
-            if (errorData.length < 200) {
-              errorMsg = errorData || errorMsg
-            }
-          }
-          res.write(
-            `data: ${JSON.stringify({ type: 'test_complete', success: false, error: sanitizeErrorMsg(errorMsg) })}\n\n`
-          )
-          res.end()
-        })
-        return
-      }
-
-      let buffer = ''
-      response.data.on('data', (chunk) => {
-        buffer += chunk.toString()
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data:')) {
-            continue
-          }
-          const jsonStr = line.substring(5).trim()
-          if (!jsonStr || jsonStr === '[DONE]') {
-            continue
-          }
-
-          try {
-            const data = JSON.parse(jsonStr)
-            // OpenAI Responses 格式: output[].content[].text 或 delta
-            if (data.type === 'response.output_text.delta' && data.delta) {
-              res.write(`data: ${JSON.stringify({ type: 'content', text: data.delta })}\n\n`)
-            } else if (data.type === 'response.content_part.delta' && data.delta?.text) {
-              res.write(`data: ${JSON.stringify({ type: 'content', text: data.delta.text })}\n\n`)
-            }
-          } catch {
-            // ignore
-          }
-        }
-      })
-
-      response.data.on('end', () => {
-        res.write(`data: ${JSON.stringify({ type: 'test_complete', success: true })}\n\n`)
-        res.end()
-      })
-
-      response.data.on('error', (err) => {
-        res.write(
-          `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(err) })}\n\n`
-        )
-        res.end()
-      })
-    } catch (axiosError) {
-      res.write(
-        `data: ${JSON.stringify({ type: 'test_complete', success: false, error: getSafeMessage(axiosError) })}\n\n`
-      )
-      res.end()
-    }
   } catch (error) {
     logger.error('❌ OpenAI API Key test failed:', error)
 

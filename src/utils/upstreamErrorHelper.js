@@ -5,6 +5,102 @@ const TEMP_UNAVAILABLE_PREFIX = 'temp_unavailable'
 const ERROR_HISTORY_PREFIX = 'error_history'
 const ERROR_HISTORY_MAX = 5000
 const ERROR_HISTORY_TTL = 3 * 24 * 60 * 60 // 3天
+const ERROR_HISTORY_BODY_MAX = 2000
+const ERROR_HISTORY_REDACTED = '[REDACTED]'
+
+const ERROR_HISTORY_SENSITIVE_KEY_PATTERN =
+  /^(authorization|cookie|x[-_a-z]*api[-_]?key|api[-_]?key|access[-_]?token|refresh[-_]?token|id[-_]?token|token|secret|password)$/i
+
+const sanitizeSensitiveText = (value) =>
+  value
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(/([?&](?:key|api_key|api-key)=)[^&\s]+/gi, '$1[REDACTED]')
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, ERROR_HISTORY_REDACTED)
+    .replace(/(sk-[A-Za-z0-9_-]{8,})/g, ERROR_HISTORY_REDACTED)
+
+const sanitizeErrorHistoryValue = (value, depth = 0) => {
+  if (value === null || value === undefined) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    return sanitizeSensitiveText(value)
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return sanitizeSensitiveText(value.toString('utf8'))
+  }
+
+  if (typeof value !== 'object') {
+    return value
+  }
+
+  if (depth >= 6) {
+    return '[MaxDepth]'
+  }
+
+  if (typeof value.pipe === 'function') {
+    return '[Stream]'
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeErrorHistoryValue(item, depth + 1))
+  }
+
+  const sanitized = {}
+  for (const [key, item] of Object.entries(value)) {
+    sanitized[key] = ERROR_HISTORY_SENSITIVE_KEY_PATTERN.test(key)
+      ? ERROR_HISTORY_REDACTED
+      : sanitizeErrorHistoryValue(item, depth + 1)
+  }
+  return sanitized
+}
+
+const serializeErrorHistoryBody = (errorBody) => {
+  if (errorBody === null || errorBody === undefined) {
+    return undefined
+  }
+
+  try {
+    const sanitized = sanitizeErrorHistoryValue(errorBody)
+    if (typeof sanitized === 'string') {
+      return sanitized.slice(0, ERROR_HISTORY_BODY_MAX)
+    }
+    return JSON.stringify(sanitized).slice(0, ERROR_HISTORY_BODY_MAX)
+  } catch (error) {
+    return sanitizeSensitiveText(String(errorBody)).slice(0, ERROR_HISTORY_BODY_MAX)
+  }
+}
+
+const sanitizeErrorHistoryContext = (context) => {
+  if (!context || typeof context !== 'object') {
+    return context || null
+  }
+
+  const sanitized = sanitizeErrorHistoryValue(context)
+  if (Object.prototype.hasOwnProperty.call(context, 'errorBody')) {
+    sanitized.errorBody = serializeErrorHistoryBody(context.errorBody)
+  }
+  return sanitized
+}
+
+const buildErrorHistoryContext = (baseContext = null, details = {}) => {
+  const merged = {}
+
+  if (baseContext && typeof baseContext === 'object') {
+    Object.assign(merged, baseContext)
+  }
+
+  if (details && typeof details === 'object') {
+    for (const [key, value] of Object.entries(details)) {
+      if (value !== undefined && value !== null && value !== '') {
+        merged[key] = value
+      }
+    }
+  }
+
+  return Object.keys(merged).length ? merged : null
+}
 
 // 默认 TTL（秒）
 const DEFAULT_TTL = {
@@ -13,7 +109,8 @@ const DEFAULT_TTL = {
   overload: 600, // 529: 10分钟
   auth_error: 1800, // 401/403: 30分钟
   timeout: 300, // 504/网络超时: 5分钟
-  rate_limit: 300 // 429: 5分钟（优先使用响应头解析值）
+  rate_limit: 300, // 429: 5分钟（优先使用响应头解析值）
+  client_error: 180 // 其他4xx客户端错误：3分钟
 }
 
 // 上游 retry-after 派生 TTL 的上限（秒）。
@@ -52,6 +149,7 @@ const getTtlConfig = () => {
     auth_error: config.upstreamError?.authErrorTtlSeconds ?? DEFAULT_TTL.auth_error,
     timeout: config.upstreamError?.timeoutTtlSeconds ?? DEFAULT_TTL.timeout,
     rate_limit: DEFAULT_TTL.rate_limit,
+    client_error: DEFAULT_TTL.client_error,
     max_custom:
       config.upstreamError?.maxCustomTtlSeconds ??
       parseEnvPositiveInt('UPSTREAM_ERROR_MAX_CUSTOM_TTL_SECONDS') ??
@@ -78,6 +176,359 @@ const EMPTY_TEMP_UNAVAILABLE_POLICY = {
   disableTempUnavailable: false,
   ttl503Seconds: null,
   ttl5xxSeconds: null
+}
+
+const ACCOUNT_TYPE_TO_GROUP_PLATFORM = {
+  'claude-official': 'claude',
+  claude: 'claude',
+  'claude-console': 'claude',
+  ccr: 'claude',
+  gemini: 'gemini',
+  'gemini-api': 'gemini',
+  openai: 'openai',
+  'openai-responses': 'openai',
+  droid: 'droid'
+}
+
+const GROUP_ACCOUNT_TYPES_BY_PLATFORM = {
+  claude: ['claude-official', 'claude-console', 'ccr'],
+  gemini: ['gemini', 'gemini-api'],
+  openai: ['openai', 'openai-responses'],
+  droid: ['droid']
+}
+
+const isTruthy = (value) => value === true || value === 'true'
+const isSchedulableValue = (value) => value !== false && value !== 'false'
+
+const parseGroupIds = (value) => {
+  if (!value) {
+    return []
+  }
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).map(String)
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return []
+    }
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        return Array.isArray(parsed) ? parsed.filter(Boolean).map(String) : []
+      } catch {
+        return []
+      }
+    }
+    return trimmed
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+const parseGroupInfoIds = (value) => {
+  if (!value) {
+    return []
+  }
+
+  let items = value
+  if (typeof value === 'string') {
+    try {
+      items = JSON.parse(value)
+    } catch {
+      return []
+    }
+  }
+
+  if (!Array.isArray(items)) {
+    return []
+  }
+
+  return items
+    .map((item) => {
+      if (!item) {
+        return null
+      }
+      if (typeof item === 'string') {
+        return item
+      }
+      return item.id || item.groupId || null
+    })
+    .filter(Boolean)
+    .map(String)
+}
+
+const normalizeBinding = (value) => (typeof value === 'string' ? value.trim() : '')
+
+const bindingToGroupId = (binding) => {
+  const normalized = normalizeBinding(binding)
+  return normalized.startsWith('group:') ? normalized.slice('group:'.length) : null
+}
+
+const directBindingMatches = (binding, accountId, prefix = '') => {
+  const normalized = normalizeBinding(binding)
+  if (!normalized || normalized.startsWith('group:')) {
+    return false
+  }
+  const normalizedAccountId = String(accountId)
+  return normalized === `${prefix}${normalizedAccountId}` || normalized === normalizedAccountId
+}
+
+const buildSchedulingContext = (apiKeyData, accountId, accountType) => {
+  if (!apiKeyData || !accountId || !accountType) {
+    return null
+  }
+
+  const direct = () => ({
+    schedulingMode: 'dedicated',
+    reason: 'api_key_dedicated_binding'
+  })
+  const group = (groupId) =>
+    groupId
+      ? {
+          schedulingMode: 'group',
+          groupId,
+          reason: 'api_key_group_binding'
+        }
+      : null
+
+  switch (accountType) {
+    case 'claude-official': {
+      const groupId = bindingToGroupId(apiKeyData.claudeAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.claudeAccountId, accountId) ? direct() : null
+    }
+    case 'claude-console': {
+      if (directBindingMatches(apiKeyData.claudeConsoleAccountId, accountId)) {
+        return direct()
+      }
+      return group(bindingToGroupId(apiKeyData.claudeAccountId))
+    }
+    case 'bedrock':
+      return directBindingMatches(apiKeyData.bedrockAccountId, accountId) ? direct() : null
+    case 'gemini': {
+      const groupId = bindingToGroupId(apiKeyData.geminiAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.geminiAccountId, accountId) ? direct() : null
+    }
+    case 'gemini-api': {
+      const groupId = bindingToGroupId(apiKeyData.geminiAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.geminiAccountId, accountId, 'api:') ? direct() : null
+    }
+    case 'openai': {
+      const groupId = bindingToGroupId(apiKeyData.openaiAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.openaiAccountId, accountId) ? direct() : null
+    }
+    case 'openai-responses': {
+      const groupId = bindingToGroupId(apiKeyData.openaiAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.openaiAccountId, accountId, 'responses:')
+        ? direct()
+        : null
+    }
+    case 'droid': {
+      const groupId = bindingToGroupId(apiKeyData.droidAccountId)
+      if (groupId) {
+        return group(groupId)
+      }
+      return directBindingMatches(apiKeyData.droidAccountId, accountId) ? direct() : null
+    }
+    case 'azure-openai':
+      return directBindingMatches(apiKeyData.azureOpenaiAccountId, accountId) ? direct() : null
+    default:
+      return null
+  }
+}
+
+const normalizeServiceAccountResult = (result) => {
+  if (!result) {
+    return null
+  }
+  if (result.success === true && result.data) {
+    return result.data
+  }
+  return result
+}
+
+const loadAccountForPauseDecision = async (accountId, accountType) => {
+  try {
+    switch (accountType) {
+      case 'claude':
+      case 'claude-official': {
+        const redis = getRedis()
+        if (typeof redis.getClaudeAccount === 'function') {
+          return await redis.getClaudeAccount(accountId)
+        }
+        const client = redis.getClientSafe()
+        return await client.hgetall(`claude:account:${accountId}`)
+      }
+      case 'claude-console':
+        return await require('../services/account/claudeConsoleAccountService').getAccount(
+          accountId
+        )
+      case 'ccr':
+        return await require('../services/account/ccrAccountService').getAccount(accountId)
+      case 'gemini':
+        return await require('../services/account/geminiAccountService').getAccount(accountId)
+      case 'gemini-api':
+        return await require('../services/account/geminiApiAccountService').getAccount(accountId)
+      case 'openai':
+        return await require('../services/account/openaiAccountService').getAccount(accountId)
+      case 'openai-responses':
+        return await require('../services/account/openaiResponsesAccountService').getAccount(
+          accountId
+        )
+      case 'bedrock':
+        return normalizeServiceAccountResult(
+          await require('../services/account/bedrockAccountService').getAccount(accountId)
+        )
+      case 'droid':
+        return await require('../services/account/droidAccountService').getAccount(accountId)
+      case 'azure-openai':
+        return await require('../services/account/azureOpenaiAccountService').getAccount(accountId)
+      default:
+        return null
+    }
+  } catch (error) {
+    logger.debug(
+      `⚠️ [UpstreamError] Failed to load account for pause decision ${accountType}:${accountId}: ${error.message}`
+    )
+    return null
+  }
+}
+
+const isEnabledForGroupPauseDecision = (account, accountType) => {
+  if (!account || !isTruthy(account.isActive) || !isSchedulableValue(account.schedulable)) {
+    return false
+  }
+
+  const status = String(account.status || 'active').toLowerCase()
+  if (accountType === 'claude-official' || accountType === 'claude') {
+    return !['error', 'blocked', 'temp_error'].includes(status)
+  }
+  if (accountType === 'claude-console' || accountType === 'ccr') {
+    return status === 'active'
+  }
+
+  return ![
+    'error',
+    'unauthorized',
+    'blocked',
+    'temp_error',
+    'account_blocked',
+    'quota_exceeded',
+    'rate_limited',
+    'ratelimited'
+  ].includes(status)
+}
+
+const loadGroupMemberAccount = async (memberId, platform, preferredAccountType) => {
+  const accountTypes = GROUP_ACCOUNT_TYPES_BY_PLATFORM[platform] || []
+  const orderedTypes =
+    preferredAccountType && accountTypes.includes(preferredAccountType)
+      ? [preferredAccountType, ...accountTypes.filter((type) => type !== preferredAccountType)]
+      : accountTypes
+
+  for (const accountType of orderedTypes) {
+    const account = await loadAccountForPauseDecision(memberId, accountType)
+    if (account) {
+      return { account, accountType }
+    }
+  }
+  return { account: null, accountType: preferredAccountType }
+}
+
+const getEnabledGroupMemberCount = async (groupId, preferredAccountType) => {
+  if (!groupId) {
+    return null
+  }
+
+  try {
+    const accountGroupService = require('../services/accountGroupService')
+    const group = await accountGroupService.getGroup(groupId)
+    const platform = group?.platform || ACCOUNT_TYPE_TO_GROUP_PLATFORM[preferredAccountType]
+    if (!platform) {
+      return null
+    }
+
+    const memberIds = await accountGroupService.getGroupMembers(groupId)
+    let enabledCount = 0
+    for (const memberId of memberIds) {
+      const { account, accountType } = await loadGroupMemberAccount(
+        memberId,
+        platform,
+        preferredAccountType
+      )
+      if (isEnabledForGroupPauseDecision(account, accountType)) {
+        enabledCount += 1
+      }
+    }
+    return enabledCount
+  } catch (error) {
+    logger.warn(
+      `⚠️ [UpstreamError] Failed to count enabled accounts in group ${groupId}: ${error.message}`
+    )
+    return null
+  }
+}
+
+const shouldSkipTempUnavailableForScheduling = async (accountId, accountType, context = null) => {
+  const schedulingMode =
+    context?.schedulingMode || context?.selectionMode || context?.routingMode || null
+
+  if (schedulingMode === 'dedicated') {
+    return { skip: true, reason: 'dedicated_scheduling' }
+  }
+
+  if (schedulingMode === 'group' && context?.groupId) {
+    const explicitCount = Number(context.enabledAccountCount ?? context.groupEnabledAccountCount)
+    const enabledCount = Number.isFinite(explicitCount)
+      ? explicitCount
+      : await getEnabledGroupMemberCount(context.groupId, accountType)
+    if (enabledCount !== null && enabledCount <= 1) {
+      return { skip: true, reason: 'single_enabled_group_account' }
+    }
+    return { skip: false }
+  }
+
+  const account = await loadAccountForPauseDecision(accountId, accountType)
+  if (account?.accountType === 'dedicated') {
+    return { skip: true, reason: 'dedicated_account' }
+  }
+
+  if (account?.accountType === 'group') {
+    const groupIds = [
+      account.groupId,
+      ...parseGroupIds(account.groupIds),
+      ...parseGroupInfoIds(account.groupInfos)
+    ]
+      .filter(Boolean)
+      .map(String)
+    const uniqueGroupIds = [...new Set(groupIds)]
+
+    for (const groupId of uniqueGroupIds) {
+      const enabledCount = await getEnabledGroupMemberCount(groupId, accountType)
+      if (enabledCount !== null && enabledCount <= 1) {
+        return { skip: true, reason: 'single_enabled_group_account' }
+      }
+    }
+  }
+
+  return { skip: false }
 }
 
 const getAccountTempUnavailablePolicy = async (accountId, accountType) => {
@@ -230,22 +681,13 @@ const recordErrorHistory = async (
     const redis = getRedis()
     const client = redis.getClientSafe()
     const redisKey = `${ERROR_HISTORY_PREFIX}:${accountType}:${accountId}`
+    const safeContext = sanitizeErrorHistoryContext(context)
 
     const entry = JSON.stringify({
       time: new Date().toISOString(),
       status: statusCode,
       errorType,
-      context: context
-        ? {
-            ...context,
-            errorBody:
-              typeof context.errorBody === 'string'
-                ? context.errorBody.slice(0, 2000)
-                : context.errorBody
-                  ? JSON.stringify(context.errorBody).slice(0, 2000)
-                  : undefined
-          }
-        : null
+      context: safeContext
     })
 
     const pipeline = client.pipeline()
@@ -303,9 +745,32 @@ const markTempUnavailable = async (
   context = null
 ) => {
   try {
-    const errorType = classifyError(statusCode)
+    const errorTypeOverride =
+      context &&
+      typeof context === 'object' &&
+      typeof context.errorTypeOverride === 'string' &&
+      context.errorTypeOverride.trim()
+        ? context.errorTypeOverride.trim()
+        : null
+    const errorType = errorTypeOverride || classifyError(statusCode)
     if (!errorType) {
       return { success: false, reason: 'not_a_pausable_error' }
+    }
+
+    const key = `${TEMP_UNAVAILABLE_PREFIX}:${accountType}:${accountId}`
+    const schedulingDecision = await shouldSkipTempUnavailableForScheduling(
+      accountId,
+      accountType,
+      context
+    )
+    if (schedulingDecision.skip) {
+      const redis = getRedis()
+      const client = redis.getClientSafe()
+      await client.del(key).catch(() => {})
+      logger.info(
+        `⏭️ [UpstreamError] Skip temp-unavailable for account ${accountId} (${accountType}), reason: ${schedulingDecision.reason}`
+      )
+      return { success: true, skipped: true, reason: schedulingDecision.reason }
     }
 
     const policy = await getAccountTempUnavailablePolicy(accountId, accountType)
@@ -315,7 +780,6 @@ const markTempUnavailable = async (
       errorType
     })
 
-    const key = `${TEMP_UNAVAILABLE_PREFIX}:${accountType}:${accountId}`
     if (policyDecision.skip) {
       const redis = getRedis()
       const client = redis.getClientSafe()
@@ -523,6 +987,9 @@ module.exports = {
   recordErrorHistory,
   getErrorHistory,
   clearErrorHistory,
+  buildSchedulingContext,
+  buildErrorHistoryContext,
+  shouldSkipTempUnavailableForScheduling,
   TEMP_UNAVAILABLE_PREFIX,
   ERROR_HISTORY_PREFIX
 }
