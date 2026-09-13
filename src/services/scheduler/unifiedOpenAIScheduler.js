@@ -395,6 +395,17 @@ class UnifiedOpenAIScheduler {
             logger.warn(
               `⚠️ OpenAI account ${account.name} token expired and no refresh token available`
             )
+            await this.markAccountUnauthorized(
+              accountId,
+              'openai',
+              null,
+              `OpenAI账号认证失败（Refresh Token 缺失）：Token expired and no refresh token available for account ${account.name}`
+            ).catch((markError) => {
+              logger.error(
+                `❌ Failed to mark OpenAI account ${account.name} unauthorized after missing refresh token:`,
+                markError
+              )
+            })
             continue
           }
 
@@ -407,6 +418,19 @@ class UnifiedOpenAIScheduler {
             logger.info(`✅ Token refreshed successfully for ${account.name}`)
           } catch (refreshError) {
             logger.error(`❌ Failed to refresh token for ${account.name}:`, refreshError.message)
+            if (openaiAccountService.isTokenRefreshUnauthorizedError(refreshError)) {
+              await this.markAccountUnauthorized(
+                account.id,
+                'openai',
+                null,
+                `OpenAI账号认证失败（Refresh Token 无效）：${refreshError.message}`
+              ).catch((markError) => {
+                logger.error(
+                  `❌ Failed to mark OpenAI account ${account.name} unauthorized after refresh failure:`,
+                  markError
+                )
+              })
+            }
             continue // 刷新失败，跳过此账户
           }
         }
