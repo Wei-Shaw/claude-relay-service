@@ -38,15 +38,32 @@ const safeStringify = (obj, maxDepth = Infinity) => {
       }
       seen.add(value)
 
-      // 过滤掉常见的循环引用对象
+      // 过滤掉常见的循环引用对象及 HTTP/网络内部对象
       if (value.constructor) {
         const constructorName = value.constructor.name
         if (
-          ['Socket', 'TLSSocket', 'HTTPParser', 'IncomingMessage', 'ServerResponse'].includes(
-            constructorName
-          )
+          [
+            'Socket',
+            'TLSSocket',
+            'HTTPParser',
+            'IncomingMessage',
+            'ServerResponse',
+            'ClientRequest',
+            'RedirectableRequest',
+            'Agent',
+          ].includes(constructorName)
         ) {
           return `[${constructorName} Object]`
+        }
+      }
+
+      // 检测 Buffer/TLS session 以数字键存储的二进制对象（如 {0:48,1:130,...}）
+      // 这类对象来自 Axios config.httpsAgent._sessionCache，序列化后体积极大
+      const objKeys = Object.keys(value)
+      if (objKeys.length > 50 && objKeys.every(k => /^\d+$/.test(k))) {
+        const sample = objKeys.slice(0, 8).map(k => value[k])
+        if (sample.every(v => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 255)) {
+          return `[Binary: ${objKeys.length} bytes]`
         }
       }
 
