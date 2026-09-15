@@ -1038,6 +1038,7 @@ router.post('/api-keys/batch-stats', authenticateAdmin, async (req, res) => {
             formattedCost: '$0.00',
             dailyCost: 0,
             weeklyOpusCost: 0,
+            weeklyCost: 0,
             currentWindowCost: 0,
             currentWindowRequests: 0,
             currentWindowTokens: 0,
@@ -1122,6 +1123,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   // 获取实时限制数据（窗口数据不受时间范围筛选影响，始终获取当前窗口状态）
   let dailyCost = 0
   let weeklyOpusCost = 0 // 字段名沿用 weeklyOpusCost*，语义为"Claude 周费用"
+  let weeklyCost = 0 // 全模型周费用
   let currentWindowCost = 0
   let currentWindowRequests = 0 // 当前窗口请求次数
   let currentWindowTokens = 0 // 当前窗口 Token 使用量
@@ -1136,6 +1138,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
     const rateLimitWindow = parseInt(apiKey?.rateLimitWindow) || 0
     const dailyCostLimit = parseFloat(apiKey?.dailyCostLimit) || 0
     const weeklyOpusCostLimit = parseFloat(apiKey?.weeklyOpusCostLimit) || 0
+    const weeklyCostLimit = parseFloat(apiKey?.weeklyCostLimit) || 0
 
     // 只在启用了每日费用限制时查询
     if (dailyCostLimit > 0) {
@@ -1151,6 +1154,13 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
       const resetDay = parseInt(apiKey?.weeklyResetDay || 1)
       const resetHour = parseInt(apiKey?.weeklyResetHour || 0)
       weeklyOpusCost = await redis.getWeeklyOpusCost(keyId, resetDay, resetHour)
+    }
+
+    // 只在启用了全模型周费用限制时查询
+    if (weeklyCostLimit > 0) {
+      const resetDay = parseInt(apiKey?.weeklyResetDay || 1)
+      const resetHour = parseInt(apiKey?.weeklyResetHour || 0)
+      weeklyCost = await redis.getWeeklyCost(keyId, resetDay, resetHour)
     }
 
     // 只在启用了窗口限制时查询窗口数据
@@ -1192,6 +1202,7 @@ async function calculateKeyStats(keyId, timeRange, startDate, endDate) {
   const limitData = {
     dailyCost,
     weeklyOpusCost,
+    weeklyCost,
     currentWindowCost,
     currentWindowRequests,
     currentWindowTokens,
@@ -1495,6 +1506,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       dailyCostLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
+      weeklyCostLimit,
       tags,
       activationDays, // 新增：激活后有效天数
       activationUnit, // 新增：激活时间单位 (hours/days)
@@ -1701,6 +1713,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       dailyCostLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
+      weeklyCostLimit,
       tags,
       activationDays,
       activationUnit,
@@ -1760,6 +1773,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       dailyCostLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
+      weeklyCostLimit,
       tags,
       activationDays,
       activationUnit,
@@ -1826,6 +1840,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           dailyCostLimit,
           totalCostLimit,
           weeklyOpusCostLimit,
+          weeklyCostLimit,
           tags,
           activationDays,
           activationUnit,
@@ -1965,6 +1980,9 @@ router.put('/api-keys/batch', authenticateAdmin, async (req, res) => {
         }
         if (updates.weeklyOpusCostLimit !== undefined) {
           finalUpdates.weeklyOpusCostLimit = updates.weeklyOpusCostLimit
+        }
+        if (updates.weeklyCostLimit !== undefined) {
+          finalUpdates.weeklyCostLimit = updates.weeklyCostLimit
         }
         if (updates.permissions !== undefined) {
           finalUpdates.permissions = updates.permissions
@@ -2132,6 +2150,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       dailyCostLimit,
       totalCostLimit,
       weeklyOpusCostLimit,
+      weeklyCostLimit,
       tags,
       ownerId, // 新增：所有者ID字段
       serviceRates, // API Key 级别服务倍率
@@ -2316,6 +2335,15 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
           .json({ error: 'Weekly Opus cost limit must be a non-negative number' })
       }
       updates.weeklyOpusCostLimit = costLimit
+    }
+
+    // 处理全模型周费用限制
+    if (weeklyCostLimit !== undefined && weeklyCostLimit !== null && weeklyCostLimit !== '') {
+      const costLimit = Number(weeklyCostLimit)
+      if (isNaN(costLimit) || costLimit < 0) {
+        return res.status(400).json({ error: 'Weekly cost limit must be a non-negative number' })
+      }
+      updates.weeklyCostLimit = costLimit
     }
 
     // 处理标签
