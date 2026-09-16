@@ -782,6 +782,7 @@
     "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
+    "supports_fast_mode": true,
     "supports_function_calling": true,
     "supports_max_reasoning_effort": true,
     "supports_mid_conversation_system": true,
