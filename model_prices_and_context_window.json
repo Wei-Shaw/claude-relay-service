@@ -3032,6 +3032,7 @@
     "supports_audio_input": true,
     "supports_audio_output": true,
     "supports_function_calling": true,
+    "supports_response_schema": false,
     "supports_vision": true,
     "supports_web_search": true
   },
@@ -3066,6 +3067,7 @@
     "supports_audio_output": true,
     "supports_function_calling": true,
     "supports_reasoning": true,
+    "supports_response_schema": false,
     "supports_vision": true,
     "supports_web_search": true
   },
