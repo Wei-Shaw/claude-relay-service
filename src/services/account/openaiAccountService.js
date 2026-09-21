@@ -569,14 +569,52 @@ async function getAccount(accountId) {
   return accountData
 }
 
+// The pause owner must be selected at the write boundary, not from a stale
+// protection snapshot that can race an administrator's pause.
+const RATE_LIMIT_CLAIM = `-- openai-rate-limit-claim
+if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
+local fields = cjson.decode(ARGV[1])
+local owns = redis.call('HGET', KEYS[1], 'schedulable') ~= 'false'
+  or (redis.call('HGET', KEYS[1], 'rateLimitOwnsSchedulable') == 'true'
+      and redis.call('HGET', KEYS[1], 'rateLimitStatus') == 'limited')
+if redis.call('HGET', KEYS[1], 'isActive') ~= 'true'
+  or redis.call('HGET', KEYS[1], 'status') ~= 'active' then owns = false end
+fields.rateLimitOwnsSchedulable = owns and 'true' or 'false'
+local args = {}
+for key, value in pairs(fields) do
+  table.insert(args, key)
+  table.insert(args, value == cjson.null and '' or tostring(value))
+end
+redis.call('HSET', KEYS[1], unpack(args))
+return owns and 1 or 2`
+
 // 更新账户
-async function updateAccount(accountId, updates) {
+async function updateAccount(accountId, updates, { claimRateLimitPause = false } = {}) {
   const existingAccount = await getAccount(accountId)
   if (!existingAccount) {
     throw new Error('Account not found')
   }
 
   updates.updatedAt = new Date().toISOString()
+
+  // 显式调度/停用操作取消限流的自动恢复权；普通 Token 和额度更新不影响归属。
+  const hasRateLimitOwnership = Object.prototype.hasOwnProperty.call(
+    updates,
+    'rateLimitOwnsSchedulable'
+  )
+  if (
+    (Object.prototype.hasOwnProperty.call(updates, 'schedulable') && !hasRateLimitOwnership) ||
+    updates.isActive === false ||
+    updates.isActive === 'false' ||
+    (updates.status !== undefined && updates.status !== 'active')
+  ) {
+    updates.rateLimitOwnsSchedulable = 'false'
+  } else if (hasRateLimitOwnership) {
+    updates.rateLimitOwnsSchedulable =
+      updates.rateLimitOwnsSchedulable === true || updates.rateLimitOwnsSchedulable === 'true'
+        ? 'true'
+        : 'false'
+  }
 
   // 加密敏感数据
   if (updates.openaiOauth) {
@@ -629,7 +667,23 @@ async function updateAccount(accountId, updates) {
     }
   }
 
-  await client.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+  if (claimRateLimitPause) {
+    if (updates.rateLimitStatus !== 'limited' || updates.schedulable !== 'false') {
+      throw new Error('Invalid rate-limit claim')
+    }
+    const claimed = await client.eval(
+      RATE_LIMIT_CLAIM,
+      1,
+      `${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`,
+      JSON.stringify(updates)
+    )
+    if (claimed !== 1 && claimed !== 2) {
+      throw new Error('Account not found')
+    }
+    updates.rateLimitOwnsSchedulable = claimed === 1 ? 'true' : 'false'
+  } else {
+    await client.hset(`${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`, updates)
+  }
 
   logger.info(`Updated OpenAI account: ${accountId}`)
 
@@ -940,6 +994,7 @@ function isRateLimited(account) {
 
 // 设置账户限流状态
 async function setAccountRateLimited(accountId, isLimited, resetsInSeconds = null) {
+  let rateLimitOwnsSchedulable = false
   // disableAutoProtection 检查（仅在设置限流时）
   if (isLimited) {
     const account = await getAccount(accountId)
@@ -953,11 +1008,17 @@ async function setAccountRateLimited(accountId, isLimited, resetsInSeconds = nul
       upstreamErrorHelper.recordErrorHistory(accountId, 'openai', 429, 'rate_limit').catch(() => {})
       return
     }
+    // 仅认领此次自动暂停，或延续已有的限流归属；旧的人工暂停不能推断为自动暂停。
+    rateLimitOwnsSchedulable =
+      !!account &&
+      ((account.schedulable !== false && account.schedulable !== 'false') ||
+        (account.rateLimitOwnsSchedulable === 'true' && account.rateLimitStatus === 'limited'))
   }
 
   const updates = {
     rateLimitStatus: isLimited ? 'limited' : 'normal',
     rateLimitedAt: isLimited ? new Date().toISOString() : null,
+    rateLimitOwnsSchedulable: rateLimitOwnsSchedulable ? 'true' : 'false',
     // 限流时停止调度，解除限流时恢复调度
     schedulable: isLimited ? 'false' : 'true'
   }
@@ -981,7 +1042,7 @@ async function setAccountRateLimited(accountId, isLimited, resetsInSeconds = nul
     updates.rateLimitResetAt = null
   }
 
-  await updateAccount(accountId, updates)
+  await updateAccount(accountId, updates, { claimRateLimitPause: Boolean(isLimited) })
   logger.info(
     `Set rate limit status for OpenAI account ${accountId}: ${updates.rateLimitStatus}, schedulable: ${updates.schedulable}`
   )
