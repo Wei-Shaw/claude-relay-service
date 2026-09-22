@@ -37,6 +37,7 @@ class CodexCliValidator {
       const userAgent = req.headers['user-agent'] || ''
       const originator = req.headers['originator'] || ''
       const sessionId = req.headers['session_id']
+      const requestPath = (req.originalUrl || req.path || '').split('?')[0]
 
       // 1. 基础 User-Agent 检查
       // Codex CLI 的 UA 格式:
@@ -49,6 +50,23 @@ class CodexCliValidator {
       if (!uaMatch) {
         logger.debug(`Codex CLI validation failed - UA mismatch: ${userAgent}`)
         return false
+      }
+
+      // Image generation and model discovery are Codex-owned requests that do
+      // not carry the Responses API session_id header.
+      const isImagesPath = /^\/openai\/(?:v1\/)?images\/(?:generations|edits)$/i.test(requestPath)
+      const isModelsPath = /^\/openai\/models$/i.test(requestPath)
+      if (isImagesPath || isModelsPath) {
+        const clientType = uaMatch[1].toLowerCase()
+        if (originator.toLowerCase() !== clientType) {
+          logger.debug(
+            `Codex sessionless request validation failed - originator mismatch. UA: ${clientType}, originator: ${originator}`
+          )
+          return false
+        }
+
+        logger.debug(`Codex sessionless request validation passed for UA: ${userAgent}`)
+        return true
       }
 
       // 2. 对于特定路径，进行额外的严格验证
