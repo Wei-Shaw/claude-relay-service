@@ -2240,6 +2240,7 @@
     "cache_read_input_token_cost": 2e-07,
     "cache_read_input_token_cost_above_200k_tokens": 4e-07,
     "cache_read_input_token_cost_above_200k_tokens_priority": 7.2e-07,
+    "cache_read_input_token_cost_batches": 1e-07,
     "cache_read_input_token_cost_flex": 1e-07,
     "cache_read_input_token_cost_priority": 3.6e-07,
     "deprecation_date": "2027-05-28",
@@ -2468,6 +2469,7 @@
   "gemini-3.1-flash-lite": {
     "cache_read_input_audio_token_cost": 5e-08,
     "cache_read_input_token_cost": 2.5e-08,
+    "cache_read_input_token_cost_batches": 1.25e-08,
     "cache_read_input_token_cost_flex": 1.25e-08,
     "cache_read_input_token_cost_priority": 4.5e-08,
     "deprecation_date": "2027-05-07",
@@ -2527,6 +2529,7 @@
   },
   "gemini-3.1-flash-lite-image": {
     "cache_read_input_token_cost": 2.5e-08,
+    "cache_read_input_token_cost_batches": 1.25e-08,
     "cache_read_input_token_cost_flex": 1.25e-08,
     "input_cost_per_image": 0.00028,
     "input_cost_per_token": 2.5e-07,
@@ -2901,6 +2904,7 @@
   },
   "gemini-3.5-flash": {
     "cache_read_input_token_cost": 1.5e-07,
+    "cache_read_input_token_cost_batches": 7.5e-08,
     "cache_read_input_token_cost_flex": 7.5e-08,
     "cache_read_input_token_cost_priority": 2.7e-07,
     "deprecation_date": "2027-05-19",
@@ -2961,6 +2965,7 @@
   },
   "gemini-3.5-flash-lite": {
     "cache_read_input_token_cost": 3e-08,
+    "cache_read_input_token_cost_batches": 1.5e-08,
     "cache_read_input_token_cost_flex": 1.5e-08,
     "cache_read_input_token_cost_priority": 5e-08,
     "deprecation_date": "2027-07-21",
@@ -3018,6 +3023,7 @@
   },
   "gemini-3.6-flash": {
     "cache_read_input_token_cost": 7.5e-08,
+    "cache_read_input_token_cost_batches": 3.75e-08,
     "cache_read_input_token_cost_flex": 3.75e-08,
     "cache_read_input_token_cost_priority": 1.35e-07,
     "google_maps_grounding_cost_per_query": 0.014,
@@ -3075,6 +3081,7 @@
   },
   "gemini-3.7-flash": {
     "cache_read_input_token_cost": 7.5e-08,
+    "cache_read_input_token_cost_batches": 3.75e-08,
     "cache_read_input_token_cost_flex": 3.75e-08,
     "cache_read_input_token_cost_priority": 1.35e-07,
     "google_maps_grounding_cost_per_query": 0.014,
@@ -3133,6 +3140,7 @@
   },
   "gemini-3.8-flash": {
     "cache_read_input_token_cost": 7.5e-08,
+    "cache_read_input_token_cost_batches": 3.75e-08,
     "cache_read_input_token_cost_flex": 3.75e-08,
     "cache_read_input_token_cost_priority": 1.35e-07,
     "google_maps_grounding_cost_per_query": 0.014,
@@ -4820,6 +4828,7 @@
   },
   "gpt-5-2025-08-07": {
     "cache_read_input_token_cost": 1.25e-07,
+    "cache_read_input_token_cost_batches": 6.25e-08,
     "cache_read_input_token_cost_flex": 6.25e-08,
     "cache_read_input_token_cost_priority": 2.5e-07,
     "deprecation_date": "2026-12-11",
@@ -5033,6 +5042,7 @@
   },
   "gpt-5-mini-2025-08-07": {
     "cache_read_input_token_cost": 2.5e-08,
+    "cache_read_input_token_cost_batches": 1.25e-08,
     "cache_read_input_token_cost_flex": 1.25e-08,
     "cache_read_input_token_cost_priority": 4.5e-08,
     "deprecation_date": "2026-12-11",
@@ -5133,6 +5143,7 @@
   },
   "gpt-5-nano-2025-08-07": {
     "cache_read_input_token_cost": 5e-09,
+    "cache_read_input_token_cost_batches": 2.5e-09,
     "cache_read_input_token_cost_flex": 2.5e-09,
     "deprecation_date": "2026-12-11",
     "input_cost_per_token": 5e-08,
