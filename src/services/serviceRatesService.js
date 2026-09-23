@@ -5,6 +5,7 @@
  */
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const { getEffectiveModel } = require('../utils/modelHelper')
 
 class ServiceRatesService {
   constructor() {
@@ -30,6 +31,7 @@ class ServiceRatesService {
         azure: 1.0,
         ccr: 1.0
       },
+      modelRates: {},
       updatedAt: null,
       updatedBy: null
     }
@@ -60,6 +62,10 @@ class ServiceRatesService {
         ...defaultRates.rates,
         ...storedConfig.rates
       }
+      // 兼容旧配置：无 modelRates 字段时默认为空
+      if (!storedConfig.modelRates || typeof storedConfig.modelRates !== 'object') {
+        storedConfig.modelRates = {}
+      }
 
       this.cachedRates = storedConfig
       this.cacheExpiry = Date.now() + this.CACHE_TTL
@@ -86,6 +92,7 @@ class ServiceRatesService {
           ...defaultRates.rates,
           ...config.rates
         },
+        modelRates: config.modelRates || {},
         updatedAt: new Date().toISOString(),
         updatedBy
       }
@@ -119,6 +126,20 @@ class ServiceRatesService {
         }
       }
     }
+
+    if (config.modelRates !== undefined && config.modelRates !== null) {
+      if (typeof config.modelRates !== 'object' || Array.isArray(config.modelRates)) {
+        throw new Error('无效的模型倍率配置格式')
+      }
+      for (const [model, rate] of Object.entries(config.modelRates)) {
+        if (!model || typeof model !== 'string' || !model.trim()) {
+          throw new Error('模型名称不能为空')
+        }
+        if (typeof rate !== 'number' || rate <= 0) {
+          throw new Error(`模型 ${model} 的倍率必须是正数`)
+        }
+      }
+    }
   }
 
   /**
@@ -127,6 +148,54 @@ class ServiceRatesService {
   async getServiceRate(service) {
     const config = await this.getRates()
     return config.rates[service] || 1.0
+  }
+
+  /**
+   * 归一化模型名：剥厂商前缀、[1m] 后缀，转小写
+   */
+  normalizeModelName(model) {
+    return getEffectiveModel(String(model))
+      .replace(/\[1m\]/gi, '')
+      .trim()
+      .toLowerCase()
+  }
+
+  /**
+   * 获取单个模型的倍率（精确匹配优先，否则最长前缀匹配）
+   * @param {string} model - 模型名称
+   * @returns {number} 模型倍率，未配置时返回 1.0
+   */
+  async getModelRate(model) {
+    if (!model || typeof model !== 'string') {
+      return 1.0
+    }
+
+    const config = await this.getRates()
+    const modelRates = config.modelRates || {}
+    const keys = Object.keys(modelRates)
+    if (keys.length === 0) {
+      return 1.0
+    }
+
+    const target = this.normalizeModelName(model)
+    if (modelRates[target] !== undefined) {
+      return modelRates[target]
+    }
+
+    let bestRate = null
+    let bestLen = -1
+    for (const key of keys) {
+      const normalizedKey = this.normalizeModelName(key)
+      if (!normalizedKey) {
+        continue
+      }
+      if (target.startsWith(normalizedKey) && normalizedKey.length > bestLen) {
+        bestRate = modelRates[key]
+        bestLen = normalizedKey.length
+      }
+    }
+
+    return bestRate === null ? 1.0 : bestRate
   }
 
   /**
