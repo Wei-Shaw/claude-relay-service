@@ -1485,6 +1485,7 @@ router.post('/responses/compact', authenticateApiKey, handleResponses)
 router.post('/v1/responses/compact', authenticateApiKey, handleResponses)
 
 router.get('/models', authenticateApiKey, handleCodexModels)
+router.get('/v1/models', authenticateApiKey, handleCodexModels)
 
 // 使用情况统计端点
 router.get('/usage', authenticateApiKey, async (req, res) => {

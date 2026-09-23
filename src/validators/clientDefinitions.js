@@ -61,6 +61,7 @@ const CLIENT_DEFINITIONS = {
       '/openai/images/edits',
       '/openai/v1/images/edits',
       '/openai/models',
+      '/openai/v1/models',
       '/azure/'
     ]
   },
