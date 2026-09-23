@@ -27,7 +27,7 @@ router.get('/service-rates', authenticateAdmin, async (req, res) => {
 // 更新服务倍率配置
 router.put('/service-rates', authenticateAdmin, async (req, res) => {
   try {
-    const { rates, baseService } = req.body
+    const { rates, modelRates, baseService } = req.body
 
     if (!rates || typeof rates !== 'object') {
       return res.status(400).json({
@@ -36,8 +36,20 @@ router.put('/service-rates', authenticateAdmin, async (req, res) => {
       })
     }
 
+    if (modelRates !== undefined && modelRates !== null) {
+      if (typeof modelRates !== 'object' || Array.isArray(modelRates)) {
+        return res.status(400).json({
+          success: false,
+          error: 'modelRates must be an object'
+        })
+      }
+    }
+
     const updatedBy = req.session?.username || 'admin'
-    const result = await serviceRatesService.saveRates({ rates, baseService }, updatedBy)
+    const result = await serviceRatesService.saveRates(
+      { rates, modelRates: modelRates || {}, baseService },
+      updatedBy
+    )
 
     res.json({
       success: true,

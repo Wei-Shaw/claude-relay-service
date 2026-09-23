@@ -96,7 +96,7 @@ async function updateRateLimitCounters(
         const apiKeyService = require('../services/apiKeyService')
         const serviceRatesService = require('../services/serviceRatesService')
         const service = serviceRatesService.getService(accountType, model)
-        ratedCost = await apiKeyService.calculateRatedCost(keyId, service, totalCost)
+        ratedCost = await apiKeyService.calculateRatedCost(keyId, service, totalCost, model)
       } catch (error) {
         ratedCost = totalCost
       }

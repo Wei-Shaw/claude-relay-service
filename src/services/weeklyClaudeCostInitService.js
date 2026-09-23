@@ -111,6 +111,7 @@ class WeeklyClaudeCostInitService {
       // 预加载所有 API Key 数据和全局倍率
       const keyDataCache = new Map()
       const globalRateCache = new Map()
+      const modelRateCache = new Map()
       const batchSize = 500
       for (let i = 0; i < keyIds.length; i += batchSize) {
         const batch = keyIds.slice(i, i + batchSize)
@@ -221,6 +222,12 @@ class WeeklyClaudeCostInitService {
               globalRateCache.set(service, globalRate)
             }
 
+            let modelRate = modelRateCache.get(entry.model)
+            if (modelRate === undefined) {
+              modelRate = await serviceRatesService.getModelRate(entry.model)
+              modelRateCache.set(entry.model, modelRate)
+            }
+
             let keyRates = {}
             try {
               keyRates = JSON.parse(keyData?.serviceRates || '{}')
@@ -228,7 +235,7 @@ class WeeklyClaudeCostInitService {
               keyRates = {}
             }
             const keyRate = keyRates[service] ?? 1.0
-            const ratedCost = realCost * globalRate * keyRate
+            const ratedCost = realCost * globalRate * modelRate * keyRate
 
             // 按 keyId+dateStr 累加
             if (!costByKeyDate.has(entry.keyId)) {
@@ -346,6 +353,7 @@ class WeeklyClaudeCostInitService {
       // 扫描最近 8 天的每日使用数据
       const dates = this._getLast7DaysInTimezone()
       const globalRateCache = new Map()
+      const modelRateCache = new Map()
       let totalCost = 0
 
       for (const dateStr of dates) {
@@ -428,6 +436,12 @@ class WeeklyClaudeCostInitService {
               globalRateCache.set(service, globalRate)
             }
 
+            let modelRate = modelRateCache.get(model)
+            if (modelRate === undefined) {
+              modelRate = await serviceRatesService.getModelRate(model)
+              modelRateCache.set(model, modelRate)
+            }
+
             let keyRates = {}
             try {
               keyRates = JSON.parse(keyData.serviceRates || '{}')
@@ -435,7 +449,7 @@ class WeeklyClaudeCostInitService {
               keyRates = {}
             }
             const keyRate = keyRates[service] ?? 1.0
-            totalCost += realCost * globalRate * keyRate
+            totalCost += realCost * globalRate * modelRate * keyRate
           }
         } while (cursor !== '0')
       }
