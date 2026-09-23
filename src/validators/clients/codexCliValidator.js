@@ -55,7 +55,7 @@ class CodexCliValidator {
       // Image generation and model discovery are Codex-owned requests that do
       // not carry the Responses API session_id header.
       const isImagesPath = /^\/openai\/(?:v1\/)?images\/(?:generations|edits)$/i.test(requestPath)
-      const isModelsPath = /^\/openai\/(?:v1\/)?models$/i.test(requestPath)
+      const isModelsPath = /^\/(?:(?:openai|api)\/(?:v1\/)?|v1\/)?models$/i.test(requestPath)
       if (isImagesPath || isModelsPath) {
         const clientType = uaMatch[1].toLowerCase()
         if (originator.toLowerCase() !== clientType) {

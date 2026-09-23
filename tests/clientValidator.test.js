@@ -28,7 +28,11 @@ describe('Codex client validation', () => {
     '/openai/images/edits',
     '/openai/v1/images/edits',
     '/openai/models?client_version=0.155.1',
-    '/openai/v1/models?client_version=0.156.0'
+    '/openai/v1/models?client_version=0.156.0',
+    '/models?client_version=0.156.0',
+    '/v1/models?client_version=0.156.0',
+    '/api/models?client_version=0.156.0',
+    '/api/v1/models?client_version=0.156.0'
   ])('allows the Codex path %s', (path) => {
     expect(isPathAllowedForClient('codex_cli', path)).toBe(true)
   })
@@ -39,7 +43,11 @@ describe('Codex client validation', () => {
     '/openai/images/edits',
     '/openai/v1/images/edits',
     '/openai/models?client_version=0.155.1',
-    '/openai/v1/models?client_version=0.156.0'
+    '/openai/v1/models?client_version=0.156.0',
+    '/models?client_version=0.156.0',
+    '/v1/models?client_version=0.156.0',
+    '/api/models?client_version=0.156.0',
+    '/api/v1/models?client_version=0.156.0'
   ])('allows the sessionless Codex request %s', (path) => {
     expect(CodexCliValidator.validate(createRequest(path))).toBe(true)
   })

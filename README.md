@@ -500,9 +500,16 @@ preferred_auth_method = "apikey"
 [model_providers.crs]
 name = "crs"
 base_url = "http://127.0.0.1:3000/openai"  # 根据实际填写你服务器的ip地址或者域名
+model_catalog_url = "http://127.0.0.1:3000/openai/models"
 wire_api = "responses"
 requires_openai_auth = true
+
+[features]
+api_key_model_discovery = true
 ```
+
+使用 API Key 登录的 Codex 默认可能只显示内置模型。配置 `model_catalog_url` 并启用
+`api_key_model_discovery` 后，Codex 会从 CRS 动态刷新模型目录，新模型无需等待客户端内置列表更新。
 
 在 `~/.codex/auth.json` 文件中配置API密钥为 null：
 
