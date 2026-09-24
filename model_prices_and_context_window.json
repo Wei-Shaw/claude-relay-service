@@ -2295,8 +2295,12 @@
     "web_search_billing_unit": "per_query"
   },
   "gemini-3-pro-image-preview": {
+    "cache_read_input_token_cost": 2e-07,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07,
+    "cache_read_input_token_cost_batches": 1e-07,
     "input_cost_per_image": 0.0011,
     "input_cost_per_token": 2e-06,
+    "input_cost_per_token_above_200k_tokens": 4e-06,
     "input_cost_per_token_batches": 1e-06,
     "litellm_provider": "vertex_ai-language-models",
     "max_input_tokens": 65536,
@@ -2306,6 +2310,7 @@
     "output_cost_per_image": 0.134,
     "output_cost_per_image_token": 0.00012,
     "output_cost_per_token": 1.2e-05,
+    "output_cost_per_token_above_200k_tokens": 1.8e-05,
     "output_cost_per_token_batches": 6e-06,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.014,
@@ -2394,8 +2399,11 @@
     "web_search_billing_unit": "per_query"
   },
   "gemini-3.1-flash-image": {
+    "cache_read_input_token_cost": 5e-08,
+    "cache_read_input_token_cost_batches": 2.5e-08,
     "input_cost_per_image": 0.00056,
     "input_cost_per_token": 5e-07,
+    "input_cost_per_token_batches": 2.5e-07,
     "litellm_provider": "vertex_ai-language-models",
     "max_input_tokens": 65536,
     "max_output_tokens": 32768,
@@ -2404,6 +2412,7 @@
     "output_cost_per_image": 0.0672,
     "output_cost_per_image_token": 6e-05,
     "output_cost_per_token": 3e-06,
+    "output_cost_per_token_batches": 1.5e-06,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.014,
       "search_context_size_low": 0.014,
@@ -2432,8 +2441,11 @@
     "web_search_billing_unit": "per_query"
   },
   "gemini-3.1-flash-image-preview": {
+    "cache_read_input_token_cost": 5e-08,
+    "cache_read_input_token_cost_batches": 2.5e-08,
     "input_cost_per_image": 0.00056,
     "input_cost_per_token": 5e-07,
+    "input_cost_per_token_batches": 2.5e-07,
     "litellm_provider": "vertex_ai-language-models",
     "max_input_tokens": 65536,
     "max_output_tokens": 32768,
@@ -2442,6 +2454,7 @@
     "output_cost_per_image": 0.0672,
     "output_cost_per_image_token": 6e-05,
     "output_cost_per_token": 3e-06,
+    "output_cost_per_token_batches": 1.5e-06,
     "search_context_cost_per_query": {
       "search_context_size_high": 0.014,
       "search_context_size_low": 0.014,
