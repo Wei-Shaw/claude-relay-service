@@ -350,6 +350,7 @@
     "cache_creation_input_token_cost": 1.25e-05,
     "cache_creation_input_token_cost_above_1hr": 2e-05,
     "cache_read_input_token_cost": 1e-06,
+    "deprecation_date": "2026-06-09",
     "input_cost_per_token": 1e-05,
     "litellm_provider": "anthropic",
     "max_input_tokens": 1000000,
@@ -3262,6 +3263,52 @@
     "supports_web_search": true,
     "web_search_billing_unit": "per_query"
   },
+  "gemini-3.8-flash-cyber": {
+    "cache_read_input_token_cost": 1.5e-07,
+    "cache_read_input_token_cost_flex": 7.5e-08,
+    "cache_read_input_token_cost_priority": 2.7e-07,
+    "input_cost_per_token": 1.5e-06,
+    "input_cost_per_token_flex": 7.5e-07,
+    "input_cost_per_token_priority": 2.7e-06,
+    "litellm_provider": "vertex_ai-language-models",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 65536,
+    "max_tokens": 65536,
+    "mode": "chat",
+    "output_cost_per_reasoning_token": 7.5e-06,
+    "output_cost_per_token": 7.5e-06,
+    "output_cost_per_token_flex": 3.75e-06,
+    "output_cost_per_token_priority": 1.35e-05,
+    "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
+    "supported_endpoints": [
+      "/v1/chat/completions",
+      "/v1/completions"
+    ],
+    "supported_modalities": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true,
+    "supports_audio_output": false,
+    "supports_function_calling": false,
+    "supports_minimal_reasoning_effort": false,
+    "supports_native_streaming": true,
+    "supports_pdf_input": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_system_messages": true,
+    "supports_tool_choice": false,
+    "supports_url_context": false,
+    "supports_video_input": true,
+    "supports_vision": true,
+    "supports_web_search": false
+  },
   "gemini-3.8-live": {
     "gemini_audio_only_live": true,
     "input_cost_per_audio_token": 3e-06,
@@ -5098,6 +5145,7 @@
   },
   "gpt-5-chat": {
     "cache_read_input_token_cost": 1.25e-07,
+    "deprecation_date": "2026-07-23",
     "input_cost_per_token": 1.25e-06,
     "litellm_provider": "openai",
     "max_input_tokens": 128000,
@@ -5141,6 +5189,7 @@
     "max_tokens": 16384,
     "mode": "chat",
     "output_cost_per_token": 1e-05,
+    "source": "https://developers.openai.com/api/docs/models/gpt-5-chat-latest",
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/batch",
@@ -5182,6 +5231,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/gpt-5-codex",
     "supported_endpoints": [
       "/v1/responses"
     ],
@@ -5672,6 +5722,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/gpt-5.1-chat-latest",
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/responses"
@@ -5717,6 +5768,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/gpt-5.1-codex",
     "supported_endpoints": [
       "/v1/responses"
     ],
@@ -5757,6 +5809,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/gpt-5.1-codex-max",
     "supported_endpoints": [
       "/v1/responses"
     ],
@@ -5800,6 +5853,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/gpt-5.1-codex-mini",
     "supported_endpoints": [
       "/v1/responses"
     ],
@@ -5949,6 +6003,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/gpt-5.2-chat-latest",
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/responses"
@@ -5993,6 +6048,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/gpt-5.2-codex",
     "supported_endpoints": [
       "/v1/responses"
     ],
@@ -6120,6 +6176,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/gpt-5.3-chat-latest",
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/responses"
@@ -8851,6 +8908,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/o3-deep-research",
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/batch",
@@ -9118,6 +9176,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "source": "https://developers.openai.com/api/docs/models/o4-mini-deep-research",
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/batch",
