@@ -303,6 +303,27 @@ class WebhookConfigService {
         break
       }
     }
+
+    // 验证 filterByAccountGroups（布尔值）
+    if (
+      platform.filterByAccountGroups !== undefined &&
+      typeof platform.filterByAccountGroups !== 'boolean'
+    ) {
+      throw new Error('filterByAccountGroups 必须是布尔值')
+    }
+
+    // 验证 accountGroupIds（通用验证，所有平台类型都适用）
+    if (platform.accountGroupIds !== undefined) {
+      if (!Array.isArray(platform.accountGroupIds)) {
+        throw new Error('accountGroupIds 必须是数组')
+      }
+      // 验证每个 groupId 是否为有效的字符串
+      for (const groupId of platform.accountGroupIds) {
+        if (typeof groupId !== 'string' || groupId.trim() === '') {
+          throw new Error('accountGroupIds 中包含无效的分组ID')
+        }
+      }
+    }
   }
 
   /**
@@ -353,6 +374,13 @@ class WebhookConfigService {
       platform.id = platform.id || uuidv4()
       platform.enabled = platform.enabled !== false
       platform.createdAt = new Date().toISOString()
+
+      // 初始化分组过滤相关字段
+      // filterByAccountGroups: false = 接收所有通知（默认，向后兼容）
+      // filterByAccountGroups: true + accountGroupIds = 按分组过滤
+      // filterByAccountGroups: true + 空数组 = 不接收任何账号维度通知
+      platform.filterByAccountGroups = platform.filterByAccountGroups || false
+      platform.accountGroupIds = platform.accountGroupIds || []
 
       // 验证平台配置
       this.validatePlatformConfig(platform)
@@ -460,6 +488,43 @@ class WebhookConfigService {
     } catch (error) {
       logger.error('获取启用的webhook平台失败:', error)
       return []
+    }
+  }
+
+  /**
+   * 从所有平台配置中移除指定分组ID（用于分组删除时的级联清理）
+   * @param {string} groupId - 要移除的分组ID
+   * @returns {number} 受影响的平台数量
+   */
+  async removeGroupFromAllPlatforms(groupId) {
+    try {
+      const config = await this.getConfig()
+
+      if (!config.platforms || config.platforms.length === 0) {
+        return 0
+      }
+
+      let affectedCount = 0
+
+      // 遍历所有平台，从 accountGroupIds 中移除指定分组
+      for (const platform of config.platforms) {
+        if (platform.accountGroupIds && platform.accountGroupIds.includes(groupId)) {
+          platform.accountGroupIds = platform.accountGroupIds.filter((id) => id !== groupId)
+          platform.updatedAt = new Date().toISOString()
+          affectedCount++
+        }
+      }
+
+      // 如果有平台受影响，保存配置
+      if (affectedCount > 0) {
+        await this.saveConfig(config)
+        logger.info(`✅ 已从 ${affectedCount} 个webhook平台中移除分组 ${groupId}`)
+      }
+
+      return affectedCount
+    } catch (error) {
+      logger.error(`从webhook平台中移除分组 ${groupId} 失败:`, error)
+      throw error
     }
   }
 }

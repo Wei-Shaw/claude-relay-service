@@ -199,6 +199,15 @@ class AccountGroupService {
       // 从分组集合中移除
       await client.srem(this.GROUPS_KEY, groupId)
 
+      // 级联清理：从所有webhook平台配置中移除此分组
+      try {
+        const webhookConfigService = require('./webhookConfigService')
+        await webhookConfigService.removeGroupFromAllPlatforms(groupId)
+      } catch (webhookError) {
+        // 即使webhook清理失败，也不影响分组删除
+        logger.warn(`清理webhook平台中的分组引用失败: ${webhookError.message}`)
+      }
+
       logger.success(`删除账户分组成功: ${group.name}`)
     } catch (error) {
       logger.error('❌ 删除账户分组失败:', error)
