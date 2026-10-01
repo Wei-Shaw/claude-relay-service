@@ -6,6 +6,7 @@
 
 jest.mock('../src/models/redis', () => ({
   getClaudeAccount: jest.fn(async () => ({})),
+  getAllClaudeAccounts: jest.fn(async () => []),
   setClaudeAccount: jest.fn(async () => {}),
   client: { hdel: jest.fn(async () => 1) }
 }))
@@ -226,6 +227,105 @@ describe('updateClaudeUsageSnapshot', () => {
   // 早退条件里的 `&& scopedModels.length === 0` 是有载荷的：上游只回 limits[]
   // 而顶层三个窗口全缺时，没有这一半判断就会提前 return，scoped 数据永远落不了盘。
   // 变异测试证明：退回成只判 Object.keys(updates).length === 0 时，其余用例全绿。
+  it('drops a stale Opus lock when the fresh usage snapshot has no Opus cap', async () => {
+    redis.getClaudeAccount.mockResolvedValue({
+      id: 'acc-1',
+      name: 'san@runanywhere.ai',
+      claudeFiveHourUtilization: '59',
+      claudeSevenDayUtilization: '26',
+      opusRateLimitedAt: '2026-09-30T23:55:38.582Z',
+      opusRateLimitEndAt: '2026-10-03T14:00:00.000Z',
+      sonnetRateLimitedAt: '2026-09-30T23:55:28.681Z',
+      sonnetRateLimitEndAt: '2026-10-03T14:00:00.000Z',
+      fableRateLimitEndAt: '2026-10-03T14:00:00.000Z'
+    })
+
+    await claudeAccountService.updateClaudeUsageSnapshot('acc-1', {
+      five_hour: { utilization: 0, resets_at: '2026-10-01T07:09:59.551352+00:00' },
+      seven_day: { utilization: 0, resets_at: '2026-10-03T13:59:59.551376+00:00' },
+      seven_day_opus: null,
+      limits: [
+        {
+          kind: 'weekly_scoped',
+          percent: 0,
+          resets_at: '2026-10-03T14:00:00+00:00',
+          scope: { model: { display_name: 'Fable' } },
+          is_active: false
+        }
+      ]
+    })
+
+    const saved = savedAccount()
+    expect(saved.claudeFiveHourUtilization).toBe('0')
+    expect(saved.claudeSevenDayUtilization).toBe('0')
+    expect(saved.opusRateLimitEndAt).toBeUndefined()
+    expect(saved.sonnetRateLimitEndAt).toBeUndefined()
+    expect(saved.fableRateLimitEndAt).toBeUndefined()
+    expect(redis.client.hdel).toHaveBeenCalledWith(
+      'claude:account:acc-1',
+      'opusRateLimitedAt',
+      'opusRateLimitEndAt',
+      'sonnetRateLimitedAt',
+      'sonnetRateLimitEndAt',
+      'fableRateLimitedAt',
+      'fableRateLimitEndAt'
+    )
+  })
+
+  it('keeps a family lock only while that scoped model is active and full', async () => {
+    redis.getClaudeAccount.mockResolvedValue({ id: 'acc-1', name: 'test' })
+
+    await claudeAccountService.updateClaudeUsageSnapshot('acc-1', {
+      five_hour: { utilization: 10, resets_at: '2026-10-01T07:00:00Z' },
+      limits: [
+        {
+          kind: 'weekly_scoped',
+          percent: 100,
+          resets_at: '2026-10-06T01:00:00Z',
+          scope: { model: { display_name: 'Fable' } },
+          is_active: true
+        }
+      ]
+    })
+
+    expect(savedAccount().fableRateLimitEndAt).toBe('2026-10-06T01:00:00.000Z')
+    expect(savedAccount().opusRateLimitEndAt).toBeUndefined()
+  })
+
+  it('refreshes only active oauth accounts from the cleanup cycle', async () => {
+    const redis = require('../src/models/redis')
+    redis.getAllClaudeAccounts.mockResolvedValue([
+      {
+        id: 'acc-1',
+        isActive: 'true',
+        status: 'active',
+        accessToken: 'present',
+        scopes: 'user:profile user:inference'
+      },
+      {
+        id: 'setup-token',
+        isActive: 'true',
+        status: 'active',
+        accessToken: 'present',
+        scopes: 'user:inference'
+      }
+    ])
+    const usage = {
+      five_hour: { utilization: 0, resets_at: '2026-10-01T07:00:00Z' },
+      limits: []
+    }
+    const fetch = jest.spyOn(claudeAccountService, 'fetchOAuthUsage').mockResolvedValue(usage)
+    const update = jest.spyOn(claudeAccountService, 'updateClaudeUsageSnapshot').mockResolvedValue()
+
+    await expect(claudeAccountService.refreshAllOAuthUsageSnapshots()).resolves.toBe(1)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith('acc-1')
+    expect(update).toHaveBeenCalledWith('acc-1', usage)
+
+    fetch.mockRestore()
+    update.mockRestore()
+  })
+
   it('persists scoped models even when no top-level window was returned', async () => {
     await claudeAccountService.updateClaudeUsageSnapshot('acc-1', {
       limits: [
