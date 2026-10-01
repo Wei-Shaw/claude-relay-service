@@ -18,6 +18,7 @@ const tokenRefreshService = require('../tokenRefreshService')
 const LRUCache = require('../../utils/lruCache')
 const { formatDateWithTimezone, getISOStringWithTimezone } = require('../../utils/dateHelper')
 const { isOpus45OrNewer, RATE_LIMITED_MODEL_FAMILIES } = require('../../utils/modelHelper')
+const { reconcileModelFamilyLocks } = require('../../utils/rateLimitHeaderHelper')
 const {
   parseBooleanLike,
   normalizeOptionalNonNegativeInteger,
@@ -2255,6 +2256,34 @@ class ClaudeAccountService {
     }
   }
 
+  // Pull a fresh oauth usage snapshot for every active OAuth account and let
+  // updateClaudeUsageSnapshot drop family locks the upstream no longer reports.
+  // The admin usage route is not on the request path, so without this a stale
+  // Opus lock survives a container restart and keeps failing Claude Code.
+  async refreshAllOAuthUsageSnapshots() {
+    const accounts = await redis.getAllClaudeAccounts()
+    let refreshed = 0
+    for (const account of accounts) {
+      const scopes = account.scopes && account.scopes.trim() ? account.scopes.split(' ') : []
+      const isOAuth = scopes.includes('user:profile') && scopes.includes('user:inference')
+      if (!isOAuth || account.isActive !== 'true' || account.status !== 'active' || !account.accessToken) {
+        continue
+      }
+      try {
+        const usageData = await this.fetchOAuthUsage(account.id)
+        if (!usageData) continue
+        await this.updateClaudeUsageSnapshot(account.id, usageData)
+        refreshed += 1
+      } catch (error) {
+        logger.warn(`⚠️ Failed to refresh usage snapshot for account ${account.id}: ${error.message}`)
+      }
+    }
+    if (refreshed > 0) {
+      logger.info(`📊 Refreshed Claude usage snapshots for ${refreshed} account(s)`)
+    }
+    return refreshed
+  }
+
   // 📊 更新 Claude Usage 快照到 Redis
   async updateClaudeUsageSnapshot(accountId, usageData) {
     if (!usageData || typeof usageData !== 'object') {
@@ -2316,8 +2345,13 @@ class ClaudeAccountService {
 
     const accountData = await redis.getClaudeAccount(accountId)
     if (accountData && Object.keys(accountData).length > 0) {
-      Object.assign(accountData, updates)
+      const reconciled = reconcileModelFamilyLocks(accountData, scopedModels)
+      for (const field of reconciled.fieldsToDelete) delete accountData[field]
+      Object.assign(accountData, updates, reconciled.updates)
       await redis.setClaudeAccount(accountId, accountData)
+      if (reconciled.fieldsToDelete.length > 0) {
+        await redis.client.hdel(`claude:account:${accountId}`, ...reconciled.fieldsToDelete)
+      }
       logger.debug(
         `📊 Updated Claude usage snapshot for account ${accountId}:`,
         Object.keys(updates)
