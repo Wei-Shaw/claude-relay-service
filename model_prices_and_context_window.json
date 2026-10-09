@@ -8801,6 +8801,14 @@
     ],
     "supports_audio_input": true
   },
+  "gpt-rosalind-discovery": {
+    "cache_read_input_token_cost": 5e-07,
+    "input_cost_per_token": 5e-06,
+    "litellm_provider": "openai",
+    "mode": "chat",
+    "output_cost_per_token": 2.5e-05,
+    "source": "https://developers.openai.com/api/docs/pricing"
+  },
   "gpt-rosalind-research": {
     "cache_read_input_token_cost": 5e-07,
     "input_cost_per_token": 5e-06,
