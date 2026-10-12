@@ -9,6 +9,19 @@ export const getModelPricingStatusApi = () =>
   request({ url: '/admin/models/pricing/status', method: 'GET' })
 export const refreshModelPricingApi = () =>
   request({ url: '/admin/models/pricing/refresh', method: 'POST' })
+export const getCustomCachePricingApi = () =>
+  request({ url: '/admin/models/pricing/custom', method: 'GET' })
+export const setCustomCachePricingApi = (model, data) =>
+  request({
+    url: `/admin/models/pricing/custom/${encodeURIComponent(model)}`,
+    method: 'PUT',
+    data
+  })
+export const deleteCustomCachePricingApi = (model) =>
+  request({
+    url: `/admin/models/pricing/custom/${encodeURIComponent(model)}`,
+    method: 'DELETE'
+  })
 
 // API Stats
 export const getKeyIdApi = (apiKey) =>

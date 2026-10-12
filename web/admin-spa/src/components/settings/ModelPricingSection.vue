@@ -119,6 +119,11 @@
             >
               上下文窗口
             </th>
+            <th
+              class="hidden px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 md:table-cell"
+            >
+              自定义缓存 $/MTok
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
@@ -156,9 +161,60 @@
             >
               {{ formatContext(model.maxTokens) }}
             </td>
+            <td class="hidden whitespace-nowrap px-3 py-2.5 md:table-cell">
+              <div class="flex items-center justify-end gap-2">
+                <div class="flex flex-col gap-1">
+                  <input
+                    v-model="customDraft[model.name].cacheCreation"
+                    :placeholder="placeholderFor(model.cacheCreateCost)"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="w-24 rounded-md border border-gray-200 bg-white px-2 py-1 text-right font-mono text-xs text-gray-700 placeholder-gray-300 transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-600"
+                    title="自定义缓存创建价格 ($/MTok)"
+                  />
+                  <input
+                    v-model="customDraft[model.name].cacheRead"
+                    :placeholder="placeholderFor(model.cacheReadCost)"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="w-24 rounded-md border border-gray-200 bg-white px-2 py-1 text-right font-mono text-xs text-gray-700 placeholder-gray-300 transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-600"
+                    title="自定义缓存读取价格 ($/MTok)"
+                  />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <button
+                    :disabled="!canSaveCustom(model.name) || savingModel === model.name"
+                    :class="[
+                      'rounded-md px-2 py-1 text-xs font-medium transition',
+                      canSaveCustom(model.name) && savingModel !== model.name
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
+                    ]"
+                    @click="saveCustom(model.name)"
+                  >
+                    <i v-if="savingModel === model.name" class="fas fa-spinner fa-spin" />
+                    <span v-else>保存</span>
+                  </button>
+                  <button
+                    :disabled="!hasCustom(model.name) || savingModel === model.name"
+                    :class="[
+                      'rounded-md px-2 py-1 text-xs font-medium transition',
+                      hasCustom(model.name) && savingModel !== model.name
+                        ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                        : 'cursor-not-allowed bg-gray-50 text-gray-300 dark:bg-gray-800 dark:text-gray-600'
+                    ]"
+                    @click="resetCustom(model.name)"
+                  >
+                    重置
+                  </button>
+                </div>
+              </div>
+            </td>
           </tr>
           <tr v-if="sortedModels.length === 0">
-            <td class="px-3 py-8 text-center text-gray-500 dark:text-gray-400" colspan="6">
+            <td class="px-3 py-8 text-center text-gray-500 dark:text-gray-400" colspan="7">
               <i class="fas fa-search mb-2 text-2xl text-gray-300 dark:text-gray-600" />
               <p>没有匹配的模型</p>
             </td>
@@ -175,11 +231,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import {
   getModelPricingApi,
   getModelPricingStatusApi,
-  refreshModelPricingApi
+  refreshModelPricingApi,
+  getCustomCachePricingApi,
+  setCustomCachePricingApi,
+  deleteCustomCachePricingApi
 } from '@/utils/http_apis'
 import { showToast } from '@/utils/tools'
 
@@ -188,6 +247,9 @@ const loading = ref(false)
 const refreshing = ref(false)
 const pricingData = ref({})
 const pricingStatus = ref({})
+const customCachePricing = ref({}) // model -> { cacheCreation, cacheRead, updatedAt } (per-token)
+const customDraft = reactive({}) // model -> { cacheCreation: string, cacheRead: string } ($/MTok)
+const savingModel = ref('')
 const searchQuery = ref('')
 const activePlatform = ref('all')
 const sortField = ref('name')
@@ -320,9 +382,10 @@ const toggleSort = (field) => {
 
 const loadData = async () => {
   loading.value = true
-  const [pricingResult, statusResult] = await Promise.all([
+  const [pricingResult, statusResult, customResult] = await Promise.all([
     getModelPricingApi(),
-    getModelPricingStatusApi()
+    getModelPricingStatusApi(),
+    getCustomCachePricingApi()
   ])
   if (pricingResult.success) {
     pricingData.value = pricingResult.data
@@ -334,6 +397,10 @@ const loadData = async () => {
   } else {
     showToast(statusResult.message || '获取价格状态失败', 'error')
   }
+  if (customResult && customResult.success) {
+    customCachePricing.value = customResult.data || {}
+  }
+  syncCustomDraft()
   loading.value = false
 }
 
@@ -347,6 +414,116 @@ const handleRefresh = async () => {
     showToast(result.message || '刷新失败', 'error')
   }
   refreshing.value = false
+}
+
+// ========== 自定义缓存价格 ==========
+const perTokenToMTok = (v) => {
+  if (v === null || v === undefined) return ''
+  const n = Number(v) * 1e6
+  if (!Number.isFinite(n)) return ''
+  // 去除无用的尾零
+  return Number(n.toFixed(6)).toString()
+}
+
+const ensureDraft = (name) => {
+  if (!customDraft[name]) {
+    customDraft[name] = { cacheCreation: '', cacheRead: '' }
+  }
+  return customDraft[name]
+}
+
+const syncCustomDraft = () => {
+  // 为所有模型预建 draft 行（保证模板中 customDraft[model.name] 可访问）
+  for (const name of Object.keys(pricingData.value)) {
+    const override = customCachePricing.value[name]
+    customDraft[name] = {
+      cacheCreation: override ? perTokenToMTok(override.cacheCreation) : '',
+      cacheRead: override ? perTokenToMTok(override.cacheRead) : ''
+    }
+  }
+}
+
+watch(
+  () => Object.keys(pricingData.value).length,
+  () => syncCustomDraft()
+)
+
+const placeholderFor = (mtokPrice) => {
+  if (!mtokPrice || mtokPrice === 0) return '官方价'
+  if (mtokPrice < 0.01) return mtokPrice.toFixed(4)
+  if (mtokPrice < 1) return mtokPrice.toFixed(3)
+  return mtokPrice.toFixed(2)
+}
+
+const parseMTokInput = (value) => {
+  if (value === '' || value === null || value === undefined) return null
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 0) return NaN
+  return n / 1e6
+}
+
+const hasCustom = (name) => Boolean(customCachePricing.value[name])
+
+const canSaveCustom = (name) => {
+  const draft = ensureDraft(name)
+  const create = parseMTokInput(draft.cacheCreation)
+  const read = parseMTokInput(draft.cacheRead)
+  if (Number.isNaN(create) || Number.isNaN(read)) return false
+  if (create === null && read === null) return false
+  const override = customCachePricing.value[name]
+  if (!override) return true
+  return create !== (override.cacheCreation ?? null) || read !== (override.cacheRead ?? null)
+}
+
+const saveCustom = async (name) => {
+  const draft = ensureDraft(name)
+  const create = parseMTokInput(draft.cacheCreation)
+  const read = parseMTokInput(draft.cacheRead)
+  if (Number.isNaN(create) || Number.isNaN(read)) {
+    showToast('请输入有效的非负数', 'error')
+    return
+  }
+  if (create === null && read === null) {
+    showToast('请至少填写一个字段', 'error')
+    return
+  }
+  savingModel.value = name
+  try {
+    const result = await setCustomCachePricingApi(name, {
+      cacheCreation: create,
+      cacheRead: read
+    })
+    if (result.success) {
+      customCachePricing.value = { ...customCachePricing.value, [name]: result.data }
+      showToast('已保存', 'success')
+    } else {
+      showToast(result.message || '保存失败', 'error')
+    }
+  } catch (error) {
+    showToast(error?.message || '保存失败', 'error')
+  } finally {
+    savingModel.value = ''
+  }
+}
+
+const resetCustom = async (name) => {
+  savingModel.value = name
+  try {
+    const result = await deleteCustomCachePricingApi(name)
+    if (result.success) {
+      const next = { ...customCachePricing.value }
+      delete next[name]
+      customCachePricing.value = next
+      customDraft[name] = { cacheCreation: '', cacheRead: '' }
+      showToast('已重置为官方价', 'success')
+    } else {
+      showToast(result.message || '重置失败', 'error')
+    }
+  } catch (error) {
+    showToast(error?.message || '重置失败', 'error')
+  } finally {
+    savingModel.value = ''
+  }
 }
 
 onMounted(loadData)
