@@ -2,6 +2,7 @@ const apiKeyService = require('../apiKeyService')
 const { convertMessagesToGemini, convertGeminiResponse } = require('./geminiRelayService')
 const { normalizeAntigravityModelInput } = require('../../utils/antigravityModel')
 const antigravityClient = require('../antigravityClient')
+const StreamTextCollector = require('../../utils/streamTextCollector')
 
 function buildRequestData({ messages, model, temperature, maxTokens, sessionId }) {
   const requestedModel = normalizeAntigravityModelInput(model)
@@ -37,10 +38,22 @@ async function* handleStreamResponse(response, model, apiKeyId, accountId, reque
     totalTokenCount: 0
   }
   let usageRecorded = false
+  const textCollector = new StreamTextCollector({ format: 'gemini' })
+
+  const buildMeta = () => {
+    const meta = requestMeta ? { ...requestMeta } : {}
+    meta.responseText = textCollector.getText()
+    if (textCollector.isTruncated()) {
+      meta.outputTruncated = true
+    }
+    return meta
+  }
 
   try {
     for await (const chunk of response.data) {
       buffer += chunk.toString()
+      // 同时投喂给文本累积器（Langfuse 输出捕获）
+      textCollector.onChunk(chunk)
 
       const lines = buffer.split('\n')
       buffer = lines.pop() || ''
@@ -85,7 +98,7 @@ async function* handleStreamResponse(response, model, apiKeyId, accountId, reque
                   accountId,
                   'gemini',
                   null,
-                  requestMeta
+                  buildMeta()
                 )
                 usageRecorded = true
               }
@@ -109,7 +122,7 @@ async function* handleStreamResponse(response, model, apiKeyId, accountId, reque
         accountId,
         'gemini',
         null,
-        requestMeta
+        buildMeta()
       )
     }
   }
@@ -158,6 +171,13 @@ async function sendAntigravityRequest({
   const openaiResponse = convertGeminiResponse(payload, requestedModel, false)
 
   if (apiKeyId && openaiResponse?.usage) {
+    let responseText = ''
+    try {
+      responseText = openaiResponse?.choices?.[0]?.message?.content || ''
+    } catch (_error) {
+      responseText = ''
+    }
+    const meta = requestMeta ? { ...requestMeta, responseText } : { responseText }
     await apiKeyService.recordUsage(
       apiKeyId,
       openaiResponse.usage.prompt_tokens || 0,
@@ -168,7 +188,7 @@ async function sendAntigravityRequest({
       accountId,
       'gemini',
       null,
-      requestMeta
+      meta
     )
   }
 
