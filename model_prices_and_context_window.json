@@ -7227,6 +7227,15 @@
     "source": "https://developers.openai.com/api/docs/pricing",
     "supports_reasoning": true
   },
+  "gpt-5.5-cyber-preview": {
+    "cache_read_input_token_cost": 1.25e-06,
+    "input_cost_per_token": 1.25e-05,
+    "litellm_provider": "openai",
+    "mode": "chat",
+    "output_cost_per_token": 7.5e-05,
+    "source": "https://developers.openai.com/api/docs/pricing",
+    "supports_reasoning": true
+  },
   "gpt-5.5-pro": {
     "cache_read_input_token_cost": 3e-06,
     "cache_read_input_token_cost_above_272k_tokens": 6e-06,
