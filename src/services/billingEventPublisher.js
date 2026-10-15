@@ -67,7 +67,8 @@ class BillingEventPublisher {
             cacheCreate: eventData.costBreakdown?.cacheCreate || 0,
             cacheRead: eventData.costBreakdown?.cacheRead || 0,
             ephemeral5m: eventData.costBreakdown?.ephemeral5m || 0,
-            ephemeral1h: eventData.costBreakdown?.ephemeral1h || 0
+            ephemeral1h: eventData.costBreakdown?.ephemeral1h || 0,
+            webSearch: eventData.costBreakdown?.webSearch || 0
           }
         },
 

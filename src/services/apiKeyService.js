@@ -1886,6 +1886,7 @@ class ApiKeyService {
         cacheReadCost: 0,
         ephemeral5mCost: 0,
         ephemeral1hCost: 0,
+        webSearchCost: 0,
         isLongContextRequest: false,
         usedFallbackPricing: false,
         pricingSource: null
@@ -1910,6 +1911,7 @@ class ApiKeyService {
           cacheReadCost: Number(costs.cacheRead ?? calculatedCost?.cacheReadCost ?? 0) || 0,
           ephemeral5mCost: Number(costs.ephemeral5m ?? calculatedCost?.ephemeral5mCost ?? 0) || 0,
           ephemeral1hCost: Number(costs.ephemeral1h ?? calculatedCost?.ephemeral1hCost ?? 0) || 0,
+          webSearchCost: Number(costs.webSearch ?? 0) || 0,
           isLongContextRequest:
             calculatedCost?.isLongContextRequest === true ||
             calculatedCost?.debug?.isLongContextRequest === true,
@@ -2060,6 +2062,7 @@ class ApiKeyService {
           cacheRead: costInfo.cacheReadCost || 0,
           ephemeral5m: costInfo.ephemeral5mCost || 0,
           ephemeral1h: costInfo.ephemeral1hCost || 0,
+          webSearch: costInfo.webSearchCost || 0,
           total: realCostWithDetails
         },
         realCostBreakdown: {
@@ -2069,6 +2072,7 @@ class ApiKeyService {
           cacheRead: costInfo.cacheReadCost || 0,
           ephemeral5m: costInfo.ephemeral5mCost || 0,
           ephemeral1h: costInfo.ephemeral1hCost || 0,
+          webSearch: costInfo.webSearchCost || 0,
           total: realCostWithDetails
         },
         pricingSource: costInfo.pricingSource || null,
@@ -2124,7 +2128,8 @@ class ApiKeyService {
           cacheCreate: costInfo.cacheCreateCost || 0,
           cacheRead: costInfo.cacheReadCost || 0,
           ephemeral5m: costInfo.ephemeral5mCost || 0,
-          ephemeral1h: costInfo.ephemeral1hCost || 0
+          ephemeral1h: costInfo.ephemeral1hCost || 0,
+          webSearch: costInfo.webSearchCost || 0
         },
         accountId,
         accountType,
