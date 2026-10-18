@@ -20,6 +20,7 @@ const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const metadataUserIdHelper = require('../../utils/metadataUserIdHelper')
+const { mergeMessageDeltaUsage } = require('../../utils/anthropicUsage')
 const {
   getHttpsAgentForStream,
   getHttpsAgentForNonStream,
@@ -2792,13 +2793,14 @@ class ClaudeRelayService {
                     )
                   }
 
-                  // message_delta包含最终的output tokens
+                  // message_delta 的 usage 是整条消息的累计值：output tokens，以及（存在时）
+                  // 含服务端工具（web_search 等）结果的 input/cache tokens 和 server_tool_use
                   if (
                     data.type === 'message_delta' &&
                     data.usage &&
                     data.usage.output_tokens !== undefined
                   ) {
-                    currentUsageData.output_tokens = data.usage.output_tokens || 0
+                    mergeMessageDeltaUsage(currentUsageData, data.usage)
 
                     logger.debug(
                       '📊 Collected output data from message_delta:',
@@ -2907,6 +2909,11 @@ class ClaudeRelayService {
                   (acc.cache_creation_input_tokens || 0) + (usage.cache_creation_input_tokens || 0),
                 cache_read_input_tokens:
                   (acc.cache_read_input_tokens || 0) + (usage.cache_read_input_tokens || 0),
+                web_search_requests:
+                  (acc.web_search_requests || 0) +
+                  (usage.server_tool_use?.web_search_requests || 0),
+                web_fetch_requests:
+                  (acc.web_fetch_requests || 0) + (usage.server_tool_use?.web_fetch_requests || 0),
                 models: [...(acc.models || []), usage.model].filter(Boolean)
               }),
               {}
@@ -2925,6 +2932,12 @@ class ClaudeRelayService {
               cache_creation_input_tokens: totalUsage.cache_creation_input_tokens,
               cache_read_input_tokens: totalUsage.cache_read_input_tokens,
               model: allUsageData[allUsageData.length - 1].model || requestedModel // 使用最后一个模型或请求模型
+            }
+            if (totalUsage.web_search_requests > 0 || totalUsage.web_fetch_requests > 0) {
+              finalUsage.server_tool_use = {
+                web_search_requests: totalUsage.web_search_requests,
+                web_fetch_requests: totalUsage.web_fetch_requests
+              }
             }
 
             // 如果有详细的cache_creation数据，合并它们
