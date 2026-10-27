@@ -27,9 +27,7 @@
               保留 {{ retentionHours }} 小时
             </span>
           </div>
-          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            这里展示系统可用性、错误口径和延迟分布；点击分布项可下钻到请求明细。
-          </p>
+          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">点击分布项可下钻到请求明细</p>
         </div>
 
         <div class="flex flex-col gap-2 sm:flex-row">

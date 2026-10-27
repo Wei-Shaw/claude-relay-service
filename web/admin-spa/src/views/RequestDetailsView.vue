@@ -31,9 +31,6 @@
                 {{ formatRetentionHours(retentionHours) }}
               </span>
             </div>
-            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-              {{ pageDescription }}
-            </p>
           </div>
         </div>
 
@@ -715,7 +712,6 @@ const activeRequestId = ref('')
 const activeSnapshotId = ref(null)
 const captureEnabled = ref(false)
 const retentionHours = ref(6)
-const bodyPreviewEnabled = ref(false)
 const records = ref([])
 const availableApiKeys = ref([])
 const availableAccounts = ref([])
@@ -778,12 +774,6 @@ const summary = reactive({
   cacheHitFormula: 'cacheReadTokens / (inputTokens + cacheReadTokens + cacheCreateTokens)',
   cacheCreateNotApplicable: false
 })
-
-const pageDescription = computed(() =>
-  bodyPreviewEnabled.value
-    ? '搜索每次请求的 API Key、使用账户、模型、接口、Token、费用、耗时与脱敏后的请求快照'
-    : '搜索每次请求的 API Key、使用账户、模型、接口、Token、费用、耗时与请求摘要'
-)
 
 const emptyHint = computed(() => {
   if (
@@ -878,7 +868,6 @@ const buildParams = (page, snapshotId = activeSnapshotId.value) => {
 const syncResponseState = (data) => {
   captureEnabled.value = data.captureEnabled === true
   retentionHours.value = data.retentionHours || 6
-  bodyPreviewEnabled.value = data.bodyPreviewEnabled === true
   activeSnapshotId.value = data.snapshotId || null
   records.value = data.records || []
 

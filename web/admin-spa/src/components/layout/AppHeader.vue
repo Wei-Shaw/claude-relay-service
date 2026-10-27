@@ -184,9 +184,6 @@
             type="text"
             :value="currentUser.username || 'Admin'"
           />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            当前用户名，输入新用户名以修改
-          </p>
         </div>
 
         <div>
@@ -199,7 +196,6 @@
             placeholder="输入新用户名（留空保持不变）"
             type="text"
           />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">留空表示不修改用户名</p>
         </div>
 
         <div>

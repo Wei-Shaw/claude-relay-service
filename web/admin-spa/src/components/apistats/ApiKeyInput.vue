@@ -1,17 +1,12 @@
 <template>
   <section class="api-query-panel">
     <div class="query-intro">
-      <p>API KEY SELF-SERVICE</p>
       <h1>查询你的用量</h1>
-      <span>输入 API Key，即可查看消费、Token 和每笔请求的计费明细。</span>
     </div>
 
     <div class="query-form">
       <div class="query-form-head">
-        <label for="api-stats-key">
-          API Key
-          <small>仅用于本次安全查询</small>
-        </label>
+        <label for="api-stats-key">API Key</label>
       </div>
 
       <div class="query-entry">
@@ -78,15 +73,6 @@ const hasValidInput = computed(() => apiKey.value && apiKey.value.trim().length 
   border-bottom: 1px solid var(--page-line, #d8dad3);
 }
 
-.query-intro p {
-  margin: 0 0 0.75rem;
-  color: var(--page-green, #55a782);
-  font:
-    600 0.62rem ui-monospace,
-    monospace;
-  letter-spacing: 0.13em;
-}
-
 .query-intro h1 {
   margin: 0;
   color: var(--page-ink, #18201d);
@@ -94,15 +80,6 @@ const hasValidInput = computed(() => apiKey.value && apiKey.value.trim().length 
   line-height: 0.98;
   letter-spacing: -0.065em;
   font-weight: 700;
-}
-
-.query-intro span {
-  display: block;
-  max-width: 28rem;
-  margin-top: 1rem;
-  color: var(--page-muted, #727a74);
-  font-size: 0.78rem;
-  line-height: 1.7;
 }
 
 .query-form {
@@ -125,13 +102,6 @@ const hasValidInput = computed(() => apiKey.value && apiKey.value.trim().length 
   font:
     600 0.7rem ui-monospace,
     monospace;
-}
-
-.query-form-head label small {
-  margin-left: 0.45rem;
-  color: var(--page-muted, #727a74);
-  font-family: 'Avenir Next', 'PingFang SC', sans-serif;
-  font-weight: 400;
 }
 
 .query-entry {

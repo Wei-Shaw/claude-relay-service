@@ -3,7 +3,6 @@
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
         <h1 class="text-2xl font-semibold text-gray-900">Usage Statistics</h1>
-        <p class="mt-2 text-sm text-gray-700">View your API usage statistics and costs</p>
       </div>
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
         <select

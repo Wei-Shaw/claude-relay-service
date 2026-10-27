@@ -5,12 +5,9 @@
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
               额度卡管理
             </h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-              管理额度卡和时间卡，用户可核销增加额度
-            </p>
           </div>
           <button
             class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"

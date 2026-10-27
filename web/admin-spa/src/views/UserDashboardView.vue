@@ -95,9 +95,6 @@
       <div v-if="activeTab === 'overview'" class="space-y-6">
         <div>
           <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard Overview</h1>
-          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Welcome to your Claude Relay dashboard
-          </p>
         </div>
 
         <!-- Stats Cards -->

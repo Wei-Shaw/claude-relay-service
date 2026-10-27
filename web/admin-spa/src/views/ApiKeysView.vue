@@ -3,12 +3,9 @@
     <div class="card p-4 sm:p-6">
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
         <div>
-          <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">
             API Keys 管理
           </h3>
-          <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-            管理和监控您的 API 密钥
-          </p>
         </div>
 
         <!-- Tab Navigation -->

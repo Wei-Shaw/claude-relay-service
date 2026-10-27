@@ -60,10 +60,8 @@
         <section class="quota-workbench fade-in" :class="{ locked: !canUseQuotaCard }">
           <div class="quota-workbench-head">
             <div class="quota-heading">
-              <p>CREDIT DESK / 02</p>
               <div>
                 <h2>为当前 Key 补充额度</h2>
-                <span>验证 API Key 后，可直接兑换额度卡并查看历史记录。</span>
               </div>
             </div>
 
@@ -877,34 +875,11 @@ watch(apiId, (newValue, previousValue) => {
   min-width: 0;
 }
 
-.quota-heading > p {
-  flex: 0 0 auto;
-  margin: 0;
-  color: var(--page-green);
-  font:
-    700 0.58rem ui-monospace,
-    monospace;
-  letter-spacing: 0.11em;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-}
-
-.quota-heading h2,
-.quota-heading span {
-  display: block;
-}
-
 .quota-heading h2 {
+  display: block;
   margin: 0;
   font-size: 0.95rem;
   letter-spacing: -0.025em;
-}
-
-.quota-heading span {
-  margin-top: 0.25rem;
-  color: var(--page-muted);
-  font-size: 0.65rem;
-  line-height: 1.55;
 }
 
 .quota-head-actions {

@@ -3,12 +3,7 @@
     <div class="card p-4 sm:p-6">
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
         <div>
-          <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
-            账户管理
-          </h3>
-          <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-            管理 Claude、Gemini、OpenAI 等账户与代理配置
-          </p>
+          <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">账户管理</h3>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <!-- 筛选器组 -->

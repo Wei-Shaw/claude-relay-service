@@ -2,9 +2,7 @@
   <div class="usage-shell">
     <header class="usage-heading">
       <div>
-        <p class="usage-eyebrow">工作区 / 用量</p>
-        <h1>用量，一目了然。</h1>
-        <p class="usage-subtitle">查看消费趋势、额度状态，以及每一笔请求如何计费。</p>
+        <h1>用量</h1>
       </div>
       <div aria-label="统计周期" class="period-switcher">
         <button
@@ -671,26 +669,12 @@ watch(
   gap: 2rem;
   margin-bottom: 2rem;
 }
-.usage-eyebrow {
-  margin: 0 0 0.7rem;
-  color: var(--usage-muted);
-  font:
-    500 0.65rem ui-monospace,
-    monospace;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
 .usage-heading h1 {
   margin: 0;
   font-size: clamp(2.35rem, 5vw, 3.75rem);
   line-height: 1;
   letter-spacing: -0.07em;
   font-weight: 700;
-}
-.usage-subtitle {
-  margin: 0.8rem 0 0;
-  color: var(--usage-muted);
-  font-size: 0.86rem;
 }
 .period-switcher {
   display: flex;

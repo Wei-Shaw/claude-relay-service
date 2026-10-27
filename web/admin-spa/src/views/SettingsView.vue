@@ -3,10 +3,7 @@
     <div class="card p-4 sm:p-6">
       <!-- 页面标题 -->
       <div class="mb-4 sm:mb-6">
-        <h3 class="mb-1 text-lg font-bold text-gray-900 dark:text-gray-100 sm:mb-2 sm:text-xl">
-          系统设置
-        </h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 sm:text-base">网站定制和通知配置</p>
+        <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">系统设置</h3>
       </div>
 
       <!-- 设置分类导航 -->

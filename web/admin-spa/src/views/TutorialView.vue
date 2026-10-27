@@ -1,28 +1,15 @@
 <template>
   <section class="help-center">
     <header class="help-hero">
-      <div class="help-kicker">SETUP FIELD GUIDE / 01</div>
       <div class="help-hero-copy">
-        <p>从安装到连接</p>
-        <h1>把你的终端接入 Relay</h1>
-        <span> 选择正在使用的系统与 CLI，我们会给出对应路径、环境变量和验证步骤。 </span>
-      </div>
-      <div class="help-hero-meta">
-        <div>
-          <small>当前指南</small>
-          <strong>{{ currentToolTitle }}</strong>
-        </div>
-        <div>
-          <small>运行平台</small>
-          <strong>{{ currentSystemTitle }}</strong>
-        </div>
+        <h1>接入指南</h1>
       </div>
     </header>
 
     <div class="help-layout">
       <aside class="help-sidebar">
         <div class="selector-group">
-          <p>01 / 选择平台</p>
+          <p>选择平台</p>
           <div class="platform-options">
             <button
               v-for="system in tutorialSystems"
@@ -39,7 +26,7 @@
         </div>
 
         <div class="selector-group">
-          <p>02 / 选择工具</p>
+          <p>选择工具</p>
           <div class="tool-options">
             <button
               v-for="tool in cliTools"
@@ -70,7 +57,6 @@
             <p>{{ currentSystemTitle }} / {{ currentToolTitle }}</p>
             <h2>{{ currentToolTitle }} 配置指南</h2>
           </div>
-          <span><i class="fas fa-circle-check" />按顺序完成并验证</span>
         </div>
 
         <div class="tutorial-surface">
@@ -151,7 +137,7 @@ const currentTutorialComponent = computed(() => currentTool.value?.component || 
   position: relative;
   min-height: 15rem;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: end;
   gap: clamp(1.2rem, 4vw, 3.5rem);
   overflow: hidden;
@@ -181,32 +167,10 @@ const currentTutorialComponent = computed(() => currentTool.value?.component || 
   content: '';
 }
 
-.help-kicker {
-  position: relative;
-  z-index: 1;
-  align-self: stretch;
-  display: flex;
-  align-items: flex-start;
-  color: var(--page-green);
-  font:
-    700 0.58rem ui-monospace,
-    monospace;
-  letter-spacing: 0.12em;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-}
-
 .help-hero-copy {
   position: relative;
   z-index: 1;
   max-width: 43rem;
-}
-
-.help-hero-copy p {
-  margin: 0 0 0.55rem;
-  color: var(--page-green);
-  font-size: 0.68rem;
-  font-weight: 700;
 }
 
 .help-hero-copy h1 {
@@ -215,52 +179,6 @@ const currentTutorialComponent = computed(() => currentTool.value?.component || 
   font-size: clamp(2.1rem, 5vw, 3.65rem);
   line-height: 0.98;
   letter-spacing: -0.065em;
-}
-
-.help-hero-copy > span {
-  display: block;
-  max-width: 34rem;
-  margin-top: 1rem;
-  color: var(--page-muted);
-  font-size: 0.75rem;
-  line-height: 1.75;
-}
-
-.help-hero-meta {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(7rem, 1fr));
-  border: 1px solid var(--page-line);
-  border-radius: 0.55rem;
-  background: color-mix(in srgb, var(--page-card) 76%, transparent);
-  backdrop-filter: blur(8px);
-}
-
-.help-hero-meta > div {
-  padding: 0.9rem 1rem;
-}
-
-.help-hero-meta > div + div {
-  border-left: 1px solid var(--page-line);
-}
-
-.help-hero-meta small,
-.help-hero-meta strong {
-  display: block;
-}
-
-.help-hero-meta small {
-  color: var(--page-muted);
-  font:
-    600 0.52rem ui-monospace,
-    monospace;
-  letter-spacing: 0.08em;
-}
-
-.help-hero-meta strong {
-  margin-top: 0.3rem;
-  font-size: 0.72rem;
 }
 
 .help-layout {
@@ -438,18 +356,6 @@ const currentTutorialComponent = computed(() => currentTool.value?.component || 
   letter-spacing: -0.045em;
 }
 
-.document-heading > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--page-muted);
-  font-size: 0.58rem;
-}
-
-.document-heading > span i {
-  color: var(--page-green);
-}
-
 .tutorial-surface {
   padding-top: 1.5rem;
 }
@@ -549,15 +455,6 @@ const currentTutorialComponent = computed(() => currentTool.value?.component || 
 }
 
 @media (max-width: 960px) {
-  .help-hero {
-    grid-template-columns: auto 1fr;
-  }
-
-  .help-hero-meta {
-    grid-column: 2;
-    width: min(100%, 22rem);
-  }
-
   .help-layout {
     grid-template-columns: 1fr;
   }
@@ -583,18 +480,12 @@ const currentTutorialComponent = computed(() => currentTool.value?.component || 
     padding: 1.5rem 1rem;
   }
 
-  .help-hero::after,
-  .help-kicker {
+  .help-hero::after {
     display: none;
   }
 
   .help-hero-copy h1 {
     font-size: 2.25rem;
-  }
-
-  .help-hero-meta {
-    grid-column: 1;
-    width: 100%;
   }
 
   .help-sidebar,
