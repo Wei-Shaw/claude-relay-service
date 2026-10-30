@@ -1,4 +1,5 @@
 const axios = require('axios')
+const { StringDecoder } = require('string_decoder')
 const { v4: uuidv4 } = require('uuid')
 const claudeConsoleAccountService = require('../account/claudeConsoleAccountService')
 const redis = require('../../models/redis')
@@ -994,6 +995,8 @@ class ClaudeConsoleRelayService {
           }
 
           let buffer = ''
+          // Keep incomplete UTF-8 characters until the next network chunk arrives.
+          const decoder = new StringDecoder('utf8')
           let finalUsageReported = false
           const collectedUsageData = {
             model: body.model || account?.defaultModel || null
@@ -1006,7 +1009,7 @@ class ClaudeConsoleRelayService {
                 return
               }
 
-              const chunkStr = chunk.toString()
+              const chunkStr = decoder.write(chunk)
               buffer += chunkStr
 
               // 处理完整的SSE行
@@ -1170,6 +1173,7 @@ class ClaudeConsoleRelayService {
 
           response.data.on('end', () => {
             try {
+              buffer += decoder.end()
               // 处理缓冲区中剩余的数据
               if (buffer.trim() && isStreamWritable(responseStream)) {
                 if (streamTransformer) {
