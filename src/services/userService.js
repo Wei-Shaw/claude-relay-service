@@ -422,6 +422,34 @@ class UserService {
     }
   }
 
+  // 🚫 使用户除当前会话外的其他会话失效
+  async invalidateOtherUserSessions(userId, preserveSessionToken) {
+    try {
+      const client = redis.getClientSafe()
+      const pattern = `${this.userSessionPrefix}*`
+      const keys = await redis.scanKeys(pattern)
+      const dataList = await redis.batchGetChunked(keys)
+
+      for (let i = 0; i < keys.length; i++) {
+        const sessionData = dataList[i]
+        if (!sessionData) {
+          continue
+        }
+
+        const session = JSON.parse(sessionData)
+        if (session.userId !== userId || session.token === preserveSessionToken) {
+          continue
+        }
+
+        await client.del(keys[i])
+      }
+
+      logger.info(`🚫 Invalidated other sessions for user: ${userId}`)
+    } catch (error) {
+      logger.error('❌ Error invalidating other user sessions:', error)
+    }
+  }
+
   // 🗑️ 删除用户（软删除，标记为不活跃）
   async deleteUser(userId) {
     try {
