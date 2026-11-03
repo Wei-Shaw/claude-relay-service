@@ -8269,7 +8269,8 @@
     "supported_output_modalities": [
       "text"
     ],
-    "supports_audio_input": true
+    "supports_audio_input": true,
+    "supports_native_streaming": true
   },
   "gpt-realtime": {
     "cache_creation_input_audio_token_cost": 4e-07,
@@ -8354,6 +8355,9 @@
     "mode": "realtime",
     "output_cost_per_audio_token": 6.4e-05,
     "output_cost_per_token": 2.4e-05,
+    "provider_specific_entry": {
+      "realtime_ga_only": 1
+    },
     "source": "https://developers.openai.com/api/docs/pricing",
     "supported_endpoints": [
       "/v1/realtime"
@@ -8407,6 +8411,8 @@
     "supports_audio_output": true,
     "supports_function_calling": true,
     "supports_parallel_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
     "supports_system_messages": true,
     "supports_tool_choice": true
   },
@@ -8443,6 +8449,8 @@
     "supports_audio_output": true,
     "supports_function_calling": true,
     "supports_parallel_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
     "supports_system_messages": true,
     "supports_tool_choice": true
   },
@@ -8566,7 +8574,8 @@
       "audio"
     ],
     "supports_audio_input": true,
-    "supports_audio_output": true
+    "supports_audio_output": true,
+    "supports_native_streaming": true
   },
   "gpt-realtime-whisper": {
     "input_cost_per_second": 0.000283333333333,
@@ -8605,6 +8614,10 @@
     "input_cost_per_second": 7.5e-05,
     "litellm_provider": "openai",
     "mode": "audio_transcription",
+    "provider_specific_entry": {
+      "transcription_json_or_text_only": 1,
+      "transcription_usage_duration": 1
+    },
     "source": "https://developers.openai.com/api/docs/pricing",
     "supported_endpoints": [
       "/v1/audio/transcriptions",
@@ -8617,7 +8630,8 @@
     "supported_output_modalities": [
       "text"
     ],
-    "supports_audio_input": true
+    "supports_audio_input": true,
+    "supports_native_streaming": true
   },
   "grok-4.20-0309-non-reasoning": {
     "cache_read_input_token_cost": 2e-07,
