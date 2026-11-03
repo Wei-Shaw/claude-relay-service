@@ -3224,6 +3224,7 @@
     "output_cost_per_token": 0,
     "output_vector_size": 3072,
     "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
+    "supports_embedding_image_input": true,
     "supports_multimodal": true,
     "uses_embed_content": true
   },
@@ -3242,6 +3243,7 @@
     "output_cost_per_token": 0,
     "output_vector_size": 3072,
     "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
+    "supports_embedding_image_input": true,
     "uses_embed_content": true
   },
   "gemini-exp-1206": {
