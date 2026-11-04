@@ -853,7 +853,11 @@
     "supports_response_schema": true,
     "supports_tool_choice": true,
     "supports_tool_search": true,
-    "supports_vision": true
+    "supports_vision": true,
+    "token_count_model": {
+      "litellm_provider": "bedrock",
+      "model": "anthropic.claude-sonnet-4-5-20250929-v1:0"
+    }
   },
   "claude-sonnet-4-6": {
     "cache_creation_input_token_cost": 3.75e-06,
