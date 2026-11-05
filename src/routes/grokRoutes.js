@@ -76,6 +76,8 @@ router.post('/chat/completions', authenticateApiKey, handleGrokRelay)
 // router.post('/videos/generations', authenticateApiKey, handleGrokRelay)
 
 const GROK_MODELS = [
+  'grok-4.7',
+  'grok-4.6',
   'grok-4.5',
   'grok-4.3',
   'grok-build-0.1',

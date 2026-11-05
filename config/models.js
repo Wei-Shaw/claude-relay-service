@@ -24,6 +24,8 @@ const GEMINI_MODELS = [
 ]
 
 const GROK_MODELS = [
+  { value: 'grok-4.7', label: 'Grok 4.7' },
+  { value: 'grok-4.6', label: 'Grok 4.6' },
   { value: 'grok-4.5', label: 'Grok 4.5' },
   { value: 'grok-4.3', label: 'Grok 4.3' },
   { value: 'grok-build-0.1', label: 'Grok Build 0.1' },
