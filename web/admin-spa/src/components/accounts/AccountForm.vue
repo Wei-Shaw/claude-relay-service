@@ -1886,6 +1886,24 @@
                     v-model="form.subscriptionType"
                     class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                     type="radio"
+                    value="claude_team_premium"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Claude Team Premium</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.subscriptionType"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
+                    value="claude_team_standard"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Claude Team Standard</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.subscriptionType"
+                    class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                    type="radio"
                     value="claude_pro"
                   />
                   <span class="text-sm text-gray-700 dark:text-gray-300">Claude Pro</span>
@@ -3026,6 +3044,24 @@
                   value="claude_max"
                 />
                 <span class="text-sm text-gray-700 dark:text-gray-300">Claude Max</span>
+              </label>
+              <label class="flex cursor-pointer items-center">
+                <input
+                  v-model="form.subscriptionType"
+                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="radio"
+                  value="claude_team_premium"
+                />
+                <span class="text-sm text-gray-700 dark:text-gray-300">Claude Team Premium</span>
+              </label>
+              <label class="flex cursor-pointer items-center">
+                <input
+                  v-model="form.subscriptionType"
+                  class="mr-2 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  type="radio"
+                  value="claude_team_standard"
+                />
+                <span class="text-sm text-gray-700 dark:text-gray-300">Claude Team Standard</span>
               </label>
               <label class="flex cursor-pointer items-center">
                 <input
@@ -4662,6 +4698,24 @@ const form = ref({
   expiresAt: props.account?.expiresAt || null
 })
 
+const isClaudeMaxSubscriptionType = (subscriptionType) =>
+  subscriptionType === 'claude_max' ||
+  subscriptionType === 'claude_team_premium' ||
+  subscriptionType === 'claude_team_max'
+
+const isClaudeProSubscriptionType = (subscriptionType) =>
+  subscriptionType === 'claude_pro' || subscriptionType === 'claude_team_standard'
+
+const getClaudePlanKind = (subscriptionType) => {
+  if (subscriptionType === 'claude_team_premium' || subscriptionType === 'claude_team_max') {
+    return 'team_premium'
+  }
+  if (subscriptionType === 'claude_team_standard') {
+    return 'team_standard'
+  }
+  return undefined
+}
+
 const buildClaudeTempUnavailablePolicyPayload = () => ({
   disableTempUnavailable: !!form.value.disableTempUnavailable,
   tempUnavailable503TtlSeconds: normalizeAccountCooldownOverride(
@@ -5202,8 +5256,9 @@ const buildClaudeAccountData = (tokenInfo, accountName, clientId) => {
     maxConcurrency: form.value.serialQueueEnabled ? 1 : 0,
     subscriptionInfo: {
       accountType: form.value.subscriptionType || 'claude_max',
-      hasClaudeMax: form.value.subscriptionType === 'claude_max',
-      hasClaudePro: form.value.subscriptionType === 'claude_pro',
+      hasClaudeMax: isClaudeMaxSubscriptionType(form.value.subscriptionType),
+      hasClaudePro: isClaudeProSubscriptionType(form.value.subscriptionType),
+      planKind: getClaudePlanKind(form.value.subscriptionType),
       manuallySet: true
     }
   }
@@ -5342,8 +5397,9 @@ const handleOAuthSuccess = async (tokenInfoOrList) => {
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
-        hasClaudeMax: form.value.subscriptionType === 'claude_max',
-        hasClaudePro: form.value.subscriptionType === 'claude_pro',
+        hasClaudeMax: isClaudeMaxSubscriptionType(form.value.subscriptionType),
+        hasClaudePro: isClaudeProSubscriptionType(form.value.subscriptionType),
+        planKind: getClaudePlanKind(form.value.subscriptionType),
         manuallySet: true // 标记为手动设置
       }
     } else if (currentPlatform === 'gemini' || currentPlatform === 'gemini-antigravity') {
@@ -5709,8 +5765,9 @@ const createAccount = async () => {
       // 添加订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
-        hasClaudeMax: form.value.subscriptionType === 'claude_max',
-        hasClaudePro: form.value.subscriptionType === 'claude_pro',
+        hasClaudeMax: isClaudeMaxSubscriptionType(form.value.subscriptionType),
+        hasClaudePro: isClaudeProSubscriptionType(form.value.subscriptionType),
+        planKind: getClaudePlanKind(form.value.subscriptionType),
         manuallySet: true // 标记为手动设置
       }
     } else if (form.value.platform === 'gemini') {
@@ -6141,8 +6198,9 @@ const updateAccount = async () => {
       // 更新订阅类型信息
       data.subscriptionInfo = {
         accountType: form.value.subscriptionType || 'claude_max',
-        hasClaudeMax: form.value.subscriptionType === 'claude_max',
-        hasClaudePro: form.value.subscriptionType === 'claude_pro',
+        hasClaudeMax: isClaudeMaxSubscriptionType(form.value.subscriptionType),
+        hasClaudePro: isClaudeProSubscriptionType(form.value.subscriptionType),
+        planKind: getClaudePlanKind(form.value.subscriptionType),
         manuallySet: true // 标记为手动设置
       }
     }
@@ -6769,7 +6827,11 @@ watch(
             ? JSON.parse(newAccount.subscriptionInfo)
             : newAccount.subscriptionInfo
 
-        if (info.accountType) {
+        if (info.accountType === 'claude_team_max') {
+          subscriptionType = 'claude_team_premium'
+        } else if (info.planKind === 'team_max_premium') {
+          subscriptionType = 'claude_team_premium'
+        } else if (info.accountType) {
           subscriptionType = info.accountType
         } else if (info.hasClaudeMax) {
           subscriptionType = 'claude_max'

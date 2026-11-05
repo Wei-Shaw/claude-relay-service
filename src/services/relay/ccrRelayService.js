@@ -6,6 +6,9 @@ const { parseVendorPrefixedModel } = require('../../utils/modelHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
+const {
+  normalizeClaudePayloadForUpstream
+} = require('../../utils/claudeLongContextHelper')
 
 class CcrRelayService {
   constructor() {
@@ -117,9 +120,18 @@ class CcrRelayService {
       }
 
       // 创建修改后的请求体，使用去前缀后的模型名
-      const modifiedRequestBody = {
+      let modifiedRequestBody = {
         ...requestBody,
         model: mappedModel
+      }
+      const normalizedLongContext = normalizeClaudePayloadForUpstream(
+        modifiedRequestBody,
+        options.betaHeader || this._getHeaderValueCaseInsensitive(clientHeaders, 'anthropic-beta')
+      )
+      modifiedRequestBody = normalizedLongContext.body
+      options = {
+        ...options,
+        betaHeader: normalizedLongContext.betaHeader
       }
 
       // 创建代理agent
@@ -481,9 +493,18 @@ class CcrRelayService {
       }
 
       // 创建修改后的请求体，使用去前缀后的模型名
-      const modifiedRequestBody = {
+      let modifiedRequestBody = {
         ...requestBody,
         model: mappedModel
+      }
+      const normalizedLongContext = normalizeClaudePayloadForUpstream(
+        modifiedRequestBody,
+        options.betaHeader || this._getHeaderValueCaseInsensitive(clientHeaders, 'anthropic-beta')
+      )
+      modifiedRequestBody = normalizedLongContext.body
+      options = {
+        ...options,
+        betaHeader: normalizedLongContext.betaHeader
       }
 
       // 创建代理agent
@@ -952,6 +973,19 @@ class CcrRelayService {
     }
 
     return filteredHeaders
+  }
+
+  _getHeaderValueCaseInsensitive(headers, key) {
+    if (!headers || typeof headers !== 'object') {
+      return undefined
+    }
+    const lowerKey = key.toLowerCase()
+    for (const candidate of Object.keys(headers)) {
+      if (candidate.toLowerCase() === lowerKey) {
+        return headers[candidate]
+      }
+    }
+    return undefined
   }
 
   // ⏰ 更新账户最后使用时间
