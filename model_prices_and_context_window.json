@@ -6922,6 +6922,8 @@
   },
   "gpt-5.5-cyber-preview": {
     "cache_read_input_token_cost": 1.25e-06,
+    "deprecation_date": "2027-02-01",
+    "deprecation_source": "https://developers.openai.com/api/docs/deprecations",
     "fedramp_uplift_multiplier": 1.1,
     "input_cost_per_token": 1.25e-05,
     "litellm_provider": "openai",
@@ -7629,6 +7631,7 @@
     "cache_read_input_token_cost": 2e-06,
     "input_cost_per_token": 2e-05,
     "litellm_provider": "openai",
+    "max_input_tokens": 922000,
     "max_output_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 0.0001,
