@@ -909,7 +909,15 @@ const handleResponses = async (req, res) => {
     req.on('close', cleanup)
     req.on('aborted', cleanup)
   } catch (error) {
-    logger.error('Proxy to ChatGPT codex/responses failed:', error)
+    logger.error(`Proxy to ChatGPT codex/responses failed: ${error.message}`, {
+      name: error.name,
+      code: error.code,
+      url: error.config?.url,
+      method: error.config?.method,
+      timeout: error.config?.timeout,
+      status: error.response?.status,
+      stack: error.stack,
+    })
     // 优先使用主动设置的 statusCode，然后是上游响应的状态码，最后默认 500
     const status = error.statusCode || error.response?.status || 500
 
