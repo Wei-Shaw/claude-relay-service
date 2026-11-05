@@ -430,6 +430,8 @@ function isChatCompletionsPath(requestPath) {
 // grokSupportsReasoningEffort). Others reject or ignore the field, so it is
 // dropped rather than forwarded.
 const REASONING_EFFORT_MODELS = new Set([
+  'grok-4.7',
+  'grok-4.7-latest',
   'grok-4.5',
   'grok-4.5-latest',
   'grok-4.6',
@@ -442,7 +444,12 @@ const REASONING_EFFORT_MODELS = new Set([
   'grok-4.20-reasoning',
   'grok-4.20-multi-agent-0309'
 ])
-const XHIGH_REASONING_EFFORT_MODELS = new Set(['grok-4.6', 'grok-4.6-latest'])
+const XHIGH_REASONING_EFFORT_MODELS = new Set([
+  'grok-4.7',
+  'grok-4.7-latest',
+  'grok-4.6',
+  'grok-4.6-latest'
+])
 
 function stripGrokProviderPrefix(model) {
   const trimmed = String(model || '').trim()

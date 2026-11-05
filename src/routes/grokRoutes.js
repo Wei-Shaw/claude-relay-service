@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 const express = require('express')
 const { authenticateApiKey } = require('../middleware/auth')
+const { GROK_MODELS: GROK_MODEL_OPTIONS } = require('../../config/models')
 const grokRelayService = require('../services/relay/grokRelayService')
 const grokScheduler = require('../services/scheduler/grokScheduler')
 const logger = require('../utils/logger')
@@ -75,11 +76,10 @@ router.post('/chat/completions', authenticateApiKey, handleGrokRelay)
 // router.post('/v1/videos/generations', authenticateApiKey, handleGrokRelay)
 // router.post('/videos/generations', authenticateApiKey, handleGrokRelay)
 
+// Keep the public /models catalog in sync with config/models.js; only route-only
+// ids (not shown in admin test pickers) are appended here.
 const GROK_MODELS = [
-  'grok-4.5',
-  'grok-4.3',
-  'grok-build-0.1',
-  'grok-composer-2.5-fast',
+  ...GROK_MODEL_OPTIONS.map((model) => model.value),
   'grok-4.20-0309-reasoning',
   'grok-4.20-0309-non-reasoning',
   'grok-4.20-multi-agent-0309'
