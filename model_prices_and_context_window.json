@@ -198,7 +198,8 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_xhigh_reasoning_effort": true,
-    "thinking_always_on": false
+    "thinking_always_on": false,
+    "thinking_on_by_default": true
   },
   "claude-mythos-5": {
     "cache_creation_input_token_cost": 1.25e-05,
@@ -701,7 +702,8 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_web_search": true,
-    "supports_xhigh_reasoning_effort": true
+    "supports_xhigh_reasoning_effort": true,
+    "thinking_on_by_default": true
   },
   "claude-opus-5-5": {
     "cache_creation_input_token_cost": 5e-06,
@@ -944,7 +946,8 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_web_search": true,
-    "supports_xhigh_reasoning_effort": true
+    "supports_xhigh_reasoning_effort": true,
+    "thinking_on_by_default": true
   },
   "claude-sonnet-5-5": {
     "cache_creation_input_token_cost": 2.5e-06,
