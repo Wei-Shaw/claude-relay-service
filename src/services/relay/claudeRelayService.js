@@ -1,5 +1,6 @@
 const https = require('https')
 const zlib = require('zlib')
+const { StringDecoder } = require('string_decoder')
 const path = require('path')
 const ProxyHelper = require('../../utils/proxyHelper')
 const { filterForClaude } = require('../../utils/headerFilter')
@@ -2678,6 +2679,8 @@ class ClaudeRelayService {
         }
 
         let buffer = ''
+        // Network/decompression chunks may split a UTF-8 character across buffers.
+        const decoder = new StringDecoder('utf8')
         const allUsageData = [] // 收集所有的usage事件
         let currentUsageData = {} // 当前正在收集的usage数据
         let rateLimitDetected = false // 限流检测标志
@@ -2711,7 +2714,7 @@ class ClaudeRelayService {
 
         dataSource.on('data', (chunk) => {
           try {
-            const chunkStr = chunk.toString()
+            const chunkStr = decoder.write(chunk)
 
             buffer += chunkStr
 
@@ -2856,6 +2859,7 @@ class ClaudeRelayService {
 
         dataSource.on('end', async () => {
           try {
+            buffer += decoder.end()
             // 处理缓冲区中剩余的数据
             if (buffer.trim() && isStreamWritable(responseStream)) {
               if (toolNameStreamTransformer) {
