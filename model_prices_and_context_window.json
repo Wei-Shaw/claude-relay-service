@@ -92,6 +92,9 @@
     "supports_xhigh_reasoning_effort": true,
     "thinking_always_on": true
   },
+  "claude-fable-latest": {
+    "alias_of": "claude-fable-5-1"
+  },
   "claude-haiku-4-5": {
     "cache_creation_input_token_cost": 1.25e-06,
     "cache_creation_input_token_cost_above_1hr": 2e-06,
@@ -200,6 +203,9 @@
     "supports_xhigh_reasoning_effort": true,
     "thinking_always_on": false,
     "thinking_on_by_default": true
+  },
+  "claude-haiku-latest": {
+    "alias_of": "claude-haiku-5-5"
   },
   "claude-mythos-5": {
     "cache_creation_input_token_cost": 1.25e-05,
@@ -753,6 +759,9 @@
     "supports_xhigh_reasoning_effort": true,
     "thinking_always_on": true
   },
+  "claude-opus-latest": {
+    "alias_of": "claude-opus-5-5"
+  },
   "claude-sonnet-4-5": {
     "cache_creation_input_token_cost": 3.75e-06,
     "cache_creation_input_token_cost_above_1hr": 6e-06,
@@ -993,6 +1002,9 @@
     "supports_web_search": true,
     "supports_xhigh_reasoning_effort": true,
     "thinking_always_on": true
+  },
+  "claude-sonnet-latest": {
+    "alias_of": "claude-sonnet-5-5"
   },
   "codex-auto-review": {
     "cache_creation_input_token_cost": 2.5e-07,
@@ -8090,6 +8102,9 @@
     "supports_web_search": true,
     "supports_xhigh_reasoning_effort": true
   },
+  "gpt-astra-latest": {
+    "alias_of": "gpt-6-astra"
+  },
   "gpt-audio": {
     "deprecation_date": "2027-01-20",
     "deprecation_source": "https://developers.openai.com/api/docs/deprecations",
@@ -8659,6 +8674,12 @@
     "supports_audio_input": true,
     "supports_native_streaming": true
   },
+  "gpt-luna-latest": {
+    "alias_of": "gpt-6-luna"
+  },
+  "gpt-mini-latest": {
+    "alias_of": "gpt-5.4-mini"
+  },
   "gpt-realtime": {
     "cache_creation_input_audio_token_cost": 4e-07,
     "cache_read_input_audio_token_cost": 4e-07,
@@ -9004,6 +9025,12 @@
     "mode": "chat",
     "output_cost_per_token": 2.5e-05,
     "source": "https://developers.openai.com/api/docs/pricing"
+  },
+  "gpt-sol-latest": {
+    "alias_of": "gpt-6.1-sol"
+  },
+  "gpt-terra-latest": {
+    "alias_of": "gpt-6.1-terra"
   },
   "gpt-transcribe": {
     "input_cost_per_second": 7.5e-05,
