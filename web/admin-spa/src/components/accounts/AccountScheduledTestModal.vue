@@ -240,6 +240,9 @@ const cronPresets = [
   { label: '工作日 9:00', value: '0 9 * * 1-5' }
 ]
 
+const defaultModel = () =>
+  props.account?.platform === 'openai' ? 'gpt-6-astra' : 'claude-sonnet-4-5-20250929'
+
 // 模型选项（从 API 动态获取）
 const modelOptions = ref([])
 
@@ -276,8 +279,8 @@ async function loadConfig() {
 
     // 根据平台获取配置端点
     let endpoint = ''
-    if (platform === 'claude') {
-      endpoint = `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test-config`
+    if (['claude', 'openai'].includes(platform)) {
+      endpoint = `${APP_CONFIG.apiPrefix}/admin/${platform}-accounts/${props.account.id}/test-config`
     } else {
       // 其他平台暂不支持
       loading.value = false
@@ -297,7 +300,7 @@ async function loadConfig() {
         config.value = {
           enabled: data.data.config.enabled || false,
           cronExpression: data.data.config.cronExpression || '0 8 * * *',
-          model: data.data.config.model || 'claude-sonnet-4-5-20250929'
+          model: data.data.config.model || defaultModel()
         }
       }
     }
@@ -333,8 +336,8 @@ async function saveConfig() {
     const platform = props.account.platform
 
     let endpoint = ''
-    if (platform === 'claude') {
-      endpoint = `${APP_CONFIG.apiPrefix}/admin/claude-accounts/${props.account.id}/test-config`
+    if (['claude', 'openai'].includes(platform)) {
+      endpoint = `${APP_CONFIG.apiPrefix}/admin/${platform}-accounts/${props.account.id}/test-config`
     } else {
       saving.value = false
       return
@@ -382,9 +385,10 @@ watch(
       config.value = {
         enabled: false,
         cronExpression: '0 8 * * *',
-        model: 'claude-sonnet-4-5-20250929'
+        model: defaultModel()
       }
       testHistory.value = []
+      loadModels()
       loadConfig()
     }
   }

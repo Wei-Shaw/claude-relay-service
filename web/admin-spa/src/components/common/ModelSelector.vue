@@ -8,7 +8,7 @@
       :value="modelValue"
       @change="handleSelectChange"
     >
-      <option v-for="m in models" :key="m.value" :value="m.value">
+      <option v-for="m in modelOptions" :key="m.value" :value="m.value">
         {{ m.label }}
       </option>
       <option value="__custom__">自定义模型...</option>
@@ -37,7 +37,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -49,6 +49,12 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const customMode = ref(false)
+const modelOptions = computed(() => {
+  if (!props.modelValue || props.models.some((model) => model.value === props.modelValue)) {
+    return props.models
+  }
+  return [{ value: props.modelValue, label: props.modelValue }, ...props.models]
+})
 
 const handleSelectChange = (e) => {
   if (e.target.value === '__custom__') {
@@ -61,8 +67,7 @@ const handleSelectChange = (e) => {
 
 const exitCustomMode = () => {
   customMode.value = false
-  // 切回列表时选中第一个预设模型
-  if (props.models.length > 0) {
+  if (!props.modelValue && props.models.length > 0) {
     emit('update:modelValue', props.models[0].value)
   }
 }
