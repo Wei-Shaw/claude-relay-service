@@ -30,6 +30,13 @@ const {
 const safeClone =
   typeof structuredClone === 'function' ? structuredClone : (obj) => JSON.parse(JSON.stringify(obj))
 
+// 🏷️ 判断某个 system 元素是否是 Claude Code 的 billing header 标识
+const isBillingHeaderSystemBlock = (item) =>
+  !!item &&
+  item.type === 'text' &&
+  typeof item.text === 'string' &&
+  item.text.trim().startsWith('x-anthropic-billing-header')
+
 class ClaudeRelayService {
   constructor() {
     this.claudeApiUrl = 'https://api.anthropic.com/v1/messages?beta=true'
@@ -155,7 +162,21 @@ class ClaudeRelayService {
   }
 
   // 🔍 判断是否是真实的 Claude Code 请求
+  // 注意：判定前必须先剔除 billing header 元素。它在模板库中有对应条目
+  // （contents.js 的 claudeOtherSystemPrompt5），单独就能让判定通过；但转发前
+  // _removeBillingHeaderFromSystem 又会把它删掉。若不在此处对齐，Claude Code 的辅助请求
+  // （如 auto 模式的 Bash 安全分类器，system 为 [billing header, 分类器提示词]）会被判成
+  // 真实 Claude Code 而跳过身份提示词注入，剥离 billing header 后上游收到的 system 里
+  // 不含任何 Claude Code 标识，被 Anthropic 拒绝并返回无 reset 头的 429。
   isRealClaudeCodeRequest(requestBody) {
+    const system = requestBody?.system
+    if (Array.isArray(system) && system.some(isBillingHeaderSystemBlock)) {
+      const withoutBillingHeader = system.filter((item) => !isBillingHeaderSystemBlock(item))
+      return ClaudeCodeValidator.includesClaudeCodeSystemPrompt(
+        { ...requestBody, system: withoutBillingHeader },
+        1
+      )
+    }
     return ClaudeCodeValidator.includesClaudeCodeSystemPrompt(requestBody, 1)
   }
 
@@ -1362,13 +1383,7 @@ class ClaudeRelayService {
     if (Array.isArray(processedBody.system)) {
       const originalLength = processedBody.system.length
       processedBody.system = processedBody.system.filter(
-        (item) =>
-          !(
-            item &&
-            item.type === 'text' &&
-            typeof item.text === 'string' &&
-            item.text.trim().startsWith('x-anthropic-billing-header')
-          )
+        (item) => !isBillingHeaderSystemBlock(item)
       )
       if (processedBody.system.length < originalLength) {
         logger.debug(
