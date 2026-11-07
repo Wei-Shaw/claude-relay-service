@@ -9,7 +9,7 @@ const sessionHelper = require('../../utils/sessionHelper')
 const logger = require('../../utils/logger')
 const config = require('../../../config/config')
 const { getRateLimitModelFamily } = require('../../utils/modelHelper')
-const { resolveRateLimitReset } = require('../../utils/rateLimitHeaderHelper')
+const { resolveRateLimitReset, classifyRateLimitMark } = require('../../utils/rateLimitHeaderHelper')
 const claudeCodeHeadersService = require('../claudeCodeHeadersService')
 const redis = require('../../models/redis')
 const ClaudeCodeValidator = require('../../validators/clients/claudeCodeValidator')
@@ -873,21 +873,20 @@ class ClaudeRelayService {
               requestModelFamily,
               '[Non-Stream]'
             )
-            const parsedResetTimestamp = rateLimitReset.resetTimestamp ?? NaN
+            const mark = classifyRateLimitMark(rateLimitReset, requestModelFamily)
 
-            if (requestModelFamily && !Number.isNaN(parsedResetTimestamp)) {
-              // 模型级限额：只停用该模型家族，不改写为账号级限流
+            if (mark.action === 'model') {
               await claudeAccountService.markAccountModelRateLimited(
                 accountId,
-                requestModelFamily,
-                parsedResetTimestamp
+                mark.family,
+                mark.resetTimestamp
               )
               logger.warn(
-                `🚫 Account ${accountId} hit ${requestModelFamily} limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+                `🚫 Account ${accountId} hit ${mark.family} limit, resets at ${new Date(mark.resetTimestamp * 1000).toISOString()}`
               )
 
               if (isOpusModelRequest && isDedicatedOfficialAccount) {
-                const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
+                const limitMessage = this._buildOpusLimitMessage(mark.resetTimestamp)
                 return {
                   statusCode: 403,
                   headers: { 'Content-Type': 'application/json' },
@@ -898,14 +897,12 @@ class ClaudeRelayService {
                   accountId
                 }
               }
-            } else {
+            } else if (mark.action === 'account') {
               isRateLimited = true
-              if (!Number.isNaN(parsedResetTimestamp)) {
-                rateLimitResetTimestamp = parsedResetTimestamp
-                logger.info(
-                  `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
-                )
-              }
+              rateLimitResetTimestamp = mark.resetTimestamp
+              logger.info(
+                `🕐 Extracted rate limit reset timestamp: ${rateLimitResetTimestamp} (${new Date(rateLimitResetTimestamp * 1000).toISOString()})`
+              )
               // 仅在拿到权威 reset 头时构建专属限流提示；无 reset 头的 429 大概率不是真实限流，
               // 直接透传上游错误，避免被改写为 403 "upstream_rate_limited" 误导客户端
               if (isDedicatedOfficialAccount && rateLimitResetTimestamp) {
@@ -2279,23 +2276,20 @@ class ClaudeRelayService {
               requestModelFamily,
               '[Stream]'
             )
-            const parsedResetTimestamp = rateLimitReset.resetTimestamp ?? NaN
+            const mark = classifyRateLimitMark(rateLimitReset, requestModelFamily)
 
-            if (requestModelFamily) {
-              if (!Number.isNaN(parsedResetTimestamp)) {
-                // 模型级限额：只停用该模型家族，不改写为账号级限流
-                await claudeAccountService.markAccountModelRateLimited(
-                  accountId,
-                  requestModelFamily,
-                  parsedResetTimestamp
-                )
-                logger.warn(
-                  `🚫 [Stream] Account ${accountId} hit ${requestModelFamily} limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
-                )
-              }
+            if (mark.action === 'model') {
+              await claudeAccountService.markAccountModelRateLimited(
+                accountId,
+                mark.family,
+                mark.resetTimestamp
+              )
+              logger.warn(
+                `🚫 [Stream] Account ${accountId} hit ${mark.family} limit, resets at ${new Date(mark.resetTimestamp * 1000).toISOString()}`
+              )
 
               if (isOpusModelRequest && isDedicatedOfficialAccount) {
-                const limitMessage = this._buildOpusLimitMessage(parsedResetTimestamp)
+                const limitMessage = this._buildOpusLimitMessage(mark.resetTimestamp)
                 if (!responseStream.headersSent) {
                   responseStream.status(403)
                   responseStream.setHeader('Content-Type', 'application/json')
@@ -2310,10 +2304,12 @@ class ClaudeRelayService {
                 resolve()
                 return
               }
+            } else if (mark.action !== 'account') {
+              logger.warn(
+                `⚠️ [Stream] 429 without an authoritative account window for account ${accountId}, skipping rate limit marking`
+              )
             } else {
-              const rateLimitResetTimestamp = Number.isNaN(parsedResetTimestamp)
-                ? null
-                : parsedResetTimestamp
+              const rateLimitResetTimestamp = mark.resetTimestamp
               const isAgentViewAuxiliaryRequest = this._isAgentViewAuxiliaryRequest(
                 body,
                 clientHeaders
@@ -2983,37 +2979,35 @@ class ClaudeRelayService {
               requestModelFamily,
               '[Stream End]'
             )
-            const parsedResetTimestamp = rateLimitReset.resetTimestamp ?? NaN
+            const mark = classifyRateLimitMark(rateLimitReset, requestModelFamily)
 
-            if (requestModelFamily && !Number.isNaN(parsedResetTimestamp)) {
-              // 模型级限额：只停用该模型家族，不改写为账号级限流
+            if (mark.action === 'model') {
               await claudeAccountService.markAccountModelRateLimited(
                 accountId,
-                requestModelFamily,
-                parsedResetTimestamp
+                mark.family,
+                mark.resetTimestamp
               )
               logger.warn(
-                `🚫 [Stream] Account ${accountId} hit ${requestModelFamily} limit, resets at ${new Date(parsedResetTimestamp * 1000).toISOString()}`
+                `🚫 [Stream] Account ${accountId} hit ${mark.family} limit, resets at ${new Date(mark.resetTimestamp * 1000).toISOString()}`
               )
             } else if (this._isAgentViewAuxiliaryRequest(body, clientHeaders)) {
               logger.warn(
                 `🚫 [Stream] Agent View auxiliary request hit rate limit at stream end for account ${accountId}; skipping account-level rate-limit marking`
               )
-            } else if (Number.isNaN(parsedResetTimestamp)) {
-              // 无权威 reset 头的 429 大概率不是真实限流，不标记账号、不进入冷却，直接透传错误
+            } else if (mark.action !== 'account') {
               logger.warn(
-                `⚠️ [Stream] Rate limit at stream end without reset header for account ${accountId}, skipping rate limit marking`
+                `⚠️ [Stream] Rate limit at stream end without an authoritative account window for account ${accountId}, skipping rate limit marking`
               )
             } else {
               logger.info(
-                `🕐 Extracted rate limit reset timestamp from stream: ${parsedResetTimestamp} (${new Date(parsedResetTimestamp * 1000).toISOString()})`
+                `🕐 Extracted rate limit reset timestamp from stream: ${mark.resetTimestamp} (${new Date(mark.resetTimestamp * 1000).toISOString()})`
               )
 
               await unifiedClaudeScheduler.markAccountRateLimited(
                 accountId,
                 accountType,
                 sessionHash,
-                parsedResetTimestamp
+                mark.resetTimestamp
               )
               await upstreamErrorHelper
                 .markTempUnavailable(

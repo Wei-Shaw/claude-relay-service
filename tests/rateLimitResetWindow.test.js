@@ -19,6 +19,7 @@ jest.mock('../src/utils/logger', () => ({
 const {
   parseRateLimitWindows,
   resolveRateLimitReset,
+  classifyRateLimitMark,
   DEFAULT_MAX_FALLBACK_SECONDS
 } = require('../src/utils/rateLimitHeaderHelper')
 
@@ -61,35 +62,65 @@ describe('resolveRateLimitReset', () => {
     expect(result.authoritative).toBe(true)
   })
 
-  it('prefers the model-scoped window when it is the one rejected', () => {
+  it('does not apply a rejected Fable 7d_oi window to an Opus request', () => {
     const result = resolveRateLimitReset(
       headers({
         'anthropic-ratelimit-unified-7d_oi-status': 'rejected',
+        'anthropic-ratelimit-unified-7d_oi-reset': String(SEVEN_DAY_RESET),
         'anthropic-ratelimit-unified-5h-status': 'rejected'
       }),
       'opus',
       { now: NOW }
     )
 
-    expect(result.resetTimestamp).toBe(SEVEN_DAY_RESET)
-    expect(result.windowKey).toBe('7d_oi')
-    expect(result.scope).toBe('model')
-    expect(result.authoritative).toBe(true)
+    expect(result.windowKey).toBe('5h')
+    expect(result.scope).toBe('account')
+    expect(classifyRateLimitMark(result, 'opus')).toEqual({
+      action: 'account',
+      family: null,
+      resetTimestamp: FIVE_HOUR_RESET
+    })
   })
 
-  it('does not hand the opus-only window to a different family', () => {
+  it('keeps a rejected 7d_oi window on Fable only', () => {
+    const onlyFable = headers({
+      'anthropic-ratelimit-unified-7d_oi-status': 'rejected',
+      'anthropic-ratelimit-unified-7d_oi-reset': String(SEVEN_DAY_RESET)
+    })
+    const fable = resolveRateLimitReset(onlyFable, 'fable', { now: NOW })
+    const opus = resolveRateLimitReset(onlyFable, 'opus', { now: NOW })
+
+    expect(fable.windowKey).toBe('7d_oi')
+    expect(fable.scope).toBe('model')
+    expect(classifyRateLimitMark(fable, 'fable')).toEqual({
+      action: 'model',
+      family: 'fable',
+      resetTimestamp: SEVEN_DAY_RESET
+    })
+    expect(classifyRateLimitMark(opus, 'opus').action).toBe('none')
+  })
+
+  it('does not park Opus on the shared 7-day reset when that window is the one rejected', () => {
     const result = resolveRateLimitReset(
-      headers({
-        'anthropic-ratelimit-unified-7d_oi-status': 'rejected',
-        'anthropic-ratelimit-unified-5h-status': 'rejected'
-      }),
-      'fable',
+      headers({ 'anthropic-ratelimit-unified-7d-status': 'rejected' }),
+      'opus',
       { now: NOW }
     )
 
-    // fable has no dedicated window upstream, so it falls to the account-wide one
-    expect(result.windowKey).toBe('5h')
     expect(result.scope).toBe('account')
+    expect(result.resetTimestamp).toBe(SEVEN_DAY_RESET)
+    expect(classifyRateLimitMark(result, 'opus').action).toBe('account')
+  })
+
+  it('does not mark any lock from the floating unified-reset fallback', () => {
+    const result = resolveRateLimitReset(headers(), 'opus', { now: NOW })
+
+    expect(result.authoritative).toBe(false)
+    expect(classifyRateLimitMark(result, 'opus')).toEqual({
+      action: 'none',
+      family: null,
+      resetTimestamp: null
+    })
   })
 
   it('takes the latest reset when several account windows are rejected', () => {
@@ -188,8 +219,8 @@ describe('parseRateLimitWindows', () => {
       isAccountWide: true
     })
 
-    const opusWindow = windows.find((w) => w.key === '7d_oi')
-    expect(opusWindow).toMatchObject({ family: 'opus', isAccountWide: false })
+    const fableWindow = windows.find((w) => w.key === '7d_oi')
+    expect(fableWindow).toMatchObject({ family: 'fable', isAccountWide: false })
   })
 
   it('skips windows the upstream did not report', () => {

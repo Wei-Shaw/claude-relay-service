@@ -83,6 +83,15 @@ class RateLimitCleanupService {
       // 清理 Claude 账号
       await this.cleanupClaudeAccounts(results.claude)
 
+      // Re-read oauth usage so a family lock that no longer matches Anthropic
+      // (for example Opus, which has no weekly_scoped row) is deleted on
+      // startup and on each cleanup cycle, not only when an admin opens usage.
+      try {
+        await claudeAccountService.refreshAllOAuthUsageSnapshots()
+      } catch (error) {
+        logger.warn(`⚠️ Claude usage snapshot refresh failed: ${error.message}`)
+      }
+
       // 清理 Claude Console 账号
       await this.cleanupClaudeConsoleAccounts(results.claudeConsole)
 

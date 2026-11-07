@@ -5,7 +5,6 @@
  *
  *   anthropic-ratelimit-unified-5h-{status,reset,utilization}      账号级 5 小时窗口
  *   anthropic-ratelimit-unified-7d-{status,reset,utilization}      账号级 7 天窗口
- *   anthropic-ratelimit-unified-7d_oi-{status,reset,utilization}   Opus 专属 7 天窗口
  *   anthropic-ratelimit-unified-representative-claim               当前「代表窗口」(five_hour / seven_day)
  *   anthropic-ratelimit-unified-status                             代表窗口的状态
  *   anthropic-ratelimit-unified-reset                              代表窗口的 reset —— 会漂移！
@@ -20,14 +19,17 @@
  */
 
 const logger = require('./logger')
+const { RATE_LIMITED_MODEL_FAMILIES } = require('./modelHelper')
 
-// 上游会回传的窗口后缀。7d_oi = seven day opus intensive（Opus 专属周窗口）
+// 5h / 7d 是整个账号共享的窗口。oauth usage 的 seven_day_opus / seven_day_sonnet
+// 从 2026-07 起固定为 null，模型周额度只出现在 limits[] 的 weekly_scoped 里
+// （目前是 Fable）。Claude Code 把响应头 7d_oi 标成 “Fable 5 limit”
+// （seven_day_overage_included），不是 Opus。旧逻辑把 7d_oi 当成 Opus，
+// 于是一次 Fable 或共享窗口的 429 会把 Opus 停到 seven_day.resetsAt。
 const RATE_LIMIT_WINDOW_KEYS = ['5h', '7d', '7d_oi']
 
-// 窗口 → 模型家族。只有 Opus 专属周窗口是真正「按模型」的，
-// 5h / 7d 是整个账号共享的窗口，不隶属于任何单一模型家族。
 const WINDOW_MODEL_FAMILY = {
-  '7d_oi': 'opus'
+  '7d_oi': 'fable'
 }
 
 // 被拒绝的窗口状态。上游取值：allowed / allowed_warning / rejected
@@ -114,7 +116,7 @@ function parseRateLimitWindows(headers) {
  * 解析一次 429 应该使用的 reset 时间戳。
  *
  * 优先级：
- *   1. 与请求模型家族匹配、且 status=rejected 的模型级窗口（如 Opus 的 7d_oi）
+ *   1. 与请求模型家族匹配、且 status=rejected 的模型级窗口（如 Fable 的 7d_oi）
  *   2. status=rejected 的账号级窗口（5h / 7d），取最晚的那个 —— 只有它们全部
  *      恢复后账号才真正可用
  *   3. 兜底：代表窗口的 unified-reset，并按 maxFallbackSeconds 钳制
@@ -200,10 +202,75 @@ function resolveRateLimitReset(headers, modelFamily = null, options = {}) {
   }
 }
 
+/**
+ * 一次 429 该记到哪里。
+ *
+ * 只有权威的、模型专属的窗口才能停一个模型家族。共享的 5h/7d 窗口被拒绝时
+ * 停整个账号。没有权威窗口时（代表窗口的 unified-reset 会漂到一周之后）
+ * 什么都不记，避免把「用量已经是 0%」的账号按模型停到 seven_day.resetsAt。
+ */
+function classifyRateLimitMark(resolution, modelFamily) {
+  const resetTimestamp = resolution && Number.isFinite(resolution.resetTimestamp)
+    ? resolution.resetTimestamp
+    : null
+  if (resetTimestamp === null || resolution.authoritative !== true) {
+    return { action: 'none', family: null, resetTimestamp: null }
+  }
+  if (resolution.scope === 'model' && modelFamily) {
+    return { action: 'model', family: modelFamily, resetTimestamp }
+  }
+  if (resolution.scope === 'account') {
+    return { action: 'account', family: null, resetTimestamp }
+  }
+  return { action: 'none', family: null, resetTimestamp: null }
+}
+
+function familyForScopedModel(modelName) {
+  const name = String(modelName || '').toLowerCase()
+  return RATE_LIMITED_MODEL_FAMILIES.find((family) => name.includes(family)) || null
+}
+
+/**
+ * 让 Redis 里的模型家族锁跟得上刚拉到的 oauth usage。
+ * 只有 limits[] 里仍然有效、并且已经用满的模型才保留锁。
+ * 没有对应条目（当前的 Opus）或用量已重置时，删掉旧的 *RateLimitEndAt。
+ */
+function reconcileModelFamilyLocks(accountData, scopedModels) {
+  const exhaustedResets = new Map()
+  for (const item of scopedModels || []) {
+    const family = familyForScopedModel(item && item.modelName)
+    const utilization = item && Number(item.utilization)
+    if (!family || item.isActive !== true || !Number.isFinite(utilization) || utilization < 100) {
+      continue
+    }
+    if (item.resetsAt) exhaustedResets.set(family, item.resetsAt)
+  }
+
+  const updates = {}
+  const fieldsToDelete = []
+  for (const family of RATE_LIMITED_MODEL_FAMILIES) {
+    const atField = `${family}RateLimitedAt`
+    const endField = `${family}RateLimitEndAt`
+    const resetAt = exhaustedResets.get(family)
+    if (resetAt) {
+      const endAt = new Date(resetAt)
+      if (!Number.isNaN(endAt.getTime())) updates[endField] = endAt.toISOString()
+      if (!accountData[atField]) updates[atField] = new Date().toISOString()
+      continue
+    }
+    if (accountData[atField] || accountData[endField]) {
+      fieldsToDelete.push(atField, endField)
+    }
+  }
+  return { updates, fieldsToDelete }
+}
+
 module.exports = {
   RATE_LIMIT_WINDOW_KEYS,
   WINDOW_MODEL_FAMILY,
   DEFAULT_MAX_FALLBACK_SECONDS,
   parseRateLimitWindows,
-  resolveRateLimitReset
+  resolveRateLimitReset,
+  classifyRateLimitMark,
+  reconcileModelFamilyLocks
 }
