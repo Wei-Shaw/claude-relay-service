@@ -209,6 +209,74 @@ describe('openai responses payload toggles', () => {
     )
   })
 
+  test.each([false, true])(
+    'preserves prompt_cache_options for Responses accounts with Codex adaptation=%s',
+    async (enableOpenAIResponsesCodexAdaptation) => {
+      const req = createReq({
+        body: {
+          model: 'gpt-5.6',
+          prompt_cache_options: { mode: 'explicit' },
+          prompt_cache_key: 'cache-key'
+        },
+        apiKeyOverrides: { enableOpenAIResponsesCodexAdaptation }
+      })
+
+      await openaiRoutes.handleResponses(req, createRes())
+
+      expect(openaiResponsesRelayService.handleRequest).toHaveBeenCalled()
+      expect(openaiResponsesRelayService.handleRequest.mock.calls[0][0].body).toMatchObject({
+        prompt_cache_options: { mode: 'explicit' },
+        prompt_cache_key: 'cache-key'
+      })
+      expect(axios.post).not.toHaveBeenCalled()
+    }
+  )
+
+  test.each([
+    ['my-client/1.0', false],
+    ['my-client/1.0', true],
+    ['codex_cli_rs/0.100.0', false],
+    ['codex_cli_rs/0.100.0', true]
+  ])(
+    'strips unsupported prompt_cache_options for Codex backend (%s, adaptation=%s)',
+    async (userAgent, enableOpenAIResponsesCodexAdaptation) => {
+      unifiedOpenAIScheduler.selectAccountForApiKey.mockResolvedValue({
+        accountId: 'openai-1',
+        accountType: 'openai'
+      })
+      openaiAccountService.getAccount.mockResolvedValue({
+        id: 'openai-1',
+        name: 'OpenAI Account',
+        accessToken: 'encrypted-token',
+        accountId: 'chatgpt-account-1'
+      })
+      axios.post.mockResolvedValue({ status: 200, data: {}, headers: {} })
+
+      const req = createReq({
+        userAgent,
+        body: {
+          model: 'gpt-5.6',
+          prompt_cache_options: { mode: 'explicit' },
+          prompt_cache_key: 'cache-key',
+          stream: false
+        },
+        apiKeyOverrides: { enableOpenAIResponsesCodexAdaptation }
+      })
+      const res = createRes()
+
+      await openaiRoutes.handleResponses(req, res)
+
+      expect(res.statusCode).toBe(200)
+      expect(axios.post).toHaveBeenCalledWith(
+        'https://chatgpt.com/backend-api/codex/responses',
+        expect.objectContaining({ model: 'gpt-5.6', prompt_cache_key: 'cache-key' }),
+        expect.any(Object)
+      )
+      expect(axios.post.mock.calls[0][1]).not.toHaveProperty('prompt_cache_options')
+      expect(openaiResponsesRelayService.handleRequest).not.toHaveBeenCalled()
+    }
+  )
+
   test('applies Codex adaptation only when adaptation toggle is on', async () => {
     const req = createReq({
       body: {
