@@ -4,9 +4,19 @@
  */
 
 const crypto = require('crypto')
+const { execFile } = require('child_process')
+const path = require('path')
 const ProxyHelper = require('./proxyHelper')
 const axios = require('axios')
 const logger = require('./logger')
+
+// Cookie 自动授权助手二进制路径。
+// claude.ai 的「组织查询 + 授权」两步位于 Cloudflare 之后，会按 TLS/JA3 指纹拦截
+// Node/axios（返回 cf-mitigated: challenge → 403，被误判为「无效的sessionKey」）。
+// 该 Go 助手使用真实 Chrome 指纹绕过；token 交换仍由本文件的 axios 流程完成。
+const COOKIE_HELPER_BIN =
+  process.env.CLAUDE_COOKIE_HELPER_BIN ||
+  path.join(__dirname, '..', '..', 'bin', 'claude-cookie-helper')
 
 // OAuth 配置常量 - 从claude-code-login.js提取
 // 注：console.anthropic.com 已迁移至 platform.claude.com，旧域名对 refresh_token grant 返回 404
@@ -826,6 +836,87 @@ async function authorizeWithCookie(sessionKey, organizationUuid, scope, proxyCon
 }
 
 /**
+ * 将代理配置转换为助手可用的代理 URL（与 ProxyHelper 的构建规则保持一致）
+ * @param {object|null} proxyConfig
+ * @returns {string} 代理 URL，未配置时返回空串
+ */
+function buildProxyUrlForHelper(proxyConfig) {
+  if (!proxyConfig || !proxyConfig.type || !proxyConfig.host || !proxyConfig.port) {
+    return ''
+  }
+  const auth =
+    proxyConfig.username && proxyConfig.password
+      ? `${encodeURIComponent(proxyConfig.username)}:${encodeURIComponent(proxyConfig.password)}@`
+      : ''
+  // Go 侧 socks5h 不被识别，统一用 socks5
+  const scheme = proxyConfig.type === 'socks5' ? 'socks5' : proxyConfig.type
+  return `${scheme}://${auth}${proxyConfig.host}:${proxyConfig.port}`
+}
+
+/**
+ * 调用浏览器指纹助手完成 Cookie 授权的步骤1+2（组织查询 + 授权码），绕过 Cloudflare。
+ * @param {string} sessionKey
+ * @param {string} scope
+ * @param {object|null} proxyConfig
+ * @returns {Promise<{organizationUuid: string, capabilities: string[], authorizationCode: string, codeVerifier: string, state: string}>}
+ */
+function runCookieAuthHelper(sessionKey, scope, proxyConfig = null) {
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      COOKIE_HELPER_BIN,
+      [],
+      { timeout: 60000, maxBuffer: 1024 * 1024 },
+      (err, stdout, stderr) => {
+        const text = (stdout || '').trim()
+        let parsed = null
+        if (text) {
+          try {
+            parsed = JSON.parse(text)
+          } catch (_) {
+            // 输出无法解析时走下方错误分支
+          }
+        }
+
+        if (parsed && parsed.error) {
+          if (parsed.cloudflare) {
+            return reject(
+              new Error('请求被 Cloudflare 拦截（TLS 指纹校验）。请稍后重试，或为该账号配置可用代理')
+            )
+          }
+          return reject(new Error(parsed.error))
+        }
+        if (parsed) {
+          return resolve(parsed)
+        }
+        if (err && err.code === 'ENOENT') {
+          return reject(
+            new Error(`Cookie 授权助手未找到（${COOKIE_HELPER_BIN}），请先构建 claude-cookie-helper`)
+          )
+        }
+        return reject(
+          new Error(
+            `Cookie 授权助手执行失败：${(stderr || '').trim() || (err && err.message) || '未知错误'}`
+          )
+        )
+      }
+    )
+
+    child.on('error', () => {
+      // 错误统一在 execFile 回调里处理
+    })
+
+    try {
+      child.stdin.write(
+        JSON.stringify({ sessionKey, scope, proxyUrl: buildProxyUrlForHelper(proxyConfig) })
+      )
+      child.stdin.end()
+    } catch (_) {
+      // stdin 写入失败时由回调统一报错
+    }
+  })
+}
+
+/**
  * 完整的Cookie自动授权流程
  * @param {string} sessionKey - sessionKey值
  * @param {object|null} proxyConfig - 代理配置（可选）
@@ -838,20 +929,13 @@ async function oauthWithCookie(sessionKey, proxyConfig = null, isSetupToken = fa
     hasProxy: !!proxyConfig
   })
 
-  // 步骤1：获取组织信息
-  logger.debug('Step 1/3: Fetching organization info...')
-  const { organizationUuid, capabilities } = await getOrganizationInfo(sessionKey, proxyConfig)
-
-  // 步骤2：确定scope并获取授权code
+  // 步骤1+2：通过浏览器指纹助手完成组织查询与授权码获取（绕过 Cloudflare 的 TLS 指纹拦截）
   const scope = isSetupToken ? OAUTH_CONFIG.SCOPES_SETUP : OAUTH_CONFIG.SCOPES_API
-
-  logger.debug('Step 2/3: Getting authorization code...', { scope })
-  const { authorizationCode, codeVerifier, state } = await authorizeWithCookie(
-    sessionKey,
-    organizationUuid,
-    scope,
-    proxyConfig
-  )
+  logger.debug('Step 1-2/3: Fetching organization & authorization code via impersonation helper...', {
+    scope
+  })
+  const { organizationUuid, capabilities, authorizationCode, codeVerifier, state } =
+    await runCookieAuthHelper(sessionKey, scope, proxyConfig)
 
   // 步骤3：交换token
   logger.debug('Step 3/3: Exchanging token...')
