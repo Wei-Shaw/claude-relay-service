@@ -573,9 +573,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
       dateFilter.value.customStart = value[0].split(' ')[0]
       dateFilter.value.customEnd = value[1].split(' ')[0]
 
-      // 检查日期范围限制 - value中的时间已经是系统时区时间
-      // const systemTz = dashboardData.value.systemTimezone || 8
-
       // 解析系统时区时间
       const parseSystemTime = (timeStr) => {
         const [datePart, timePart] = timeStr.split(' ')

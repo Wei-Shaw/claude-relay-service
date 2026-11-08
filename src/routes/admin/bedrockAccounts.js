@@ -8,6 +8,7 @@ const router = express.Router()
 const bedrockAccountService = require('../../services/account/bedrockAccountService')
 const apiKeyService = require('../../services/apiKeyService')
 const accountGroupService = require('../../services/accountGroupService')
+const connectivityTestModelConfigService = require('../../services/connectivityTestModelConfigService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
 const logger = require('../../utils/logger')
@@ -355,11 +356,20 @@ router.put('/:accountId/toggle-schedulable', authenticateAdmin, async (req, res)
 router.post('/:accountId/test', authenticateAdmin, async (req, res) => {
   try {
     const { accountId } = req.params
+    const requestedModel = connectivityTestModelConfigService.normalizeTestModel(req.body?.model)
+    if (req.body?.model !== undefined && !requestedModel) {
+      return res.status(400).json({ error: 'model must be a valid string (max 256 characters)' })
+    }
+    const model =
+      requestedModel ||
+      (await connectivityTestModelConfigService.getDefaultModelForPlatform('bedrock'))
 
-    await bedrockAccountService.testAccountConnection(accountId, res)
+    await bedrockAccountService.testAccountConnection(accountId, res, model)
   } catch (error) {
     logger.error('❌ Failed to test Bedrock account:', error)
-    // 错误已在服务层处理，这里仅做日志记录
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Failed to test Bedrock account' })
+    }
   }
 })
 

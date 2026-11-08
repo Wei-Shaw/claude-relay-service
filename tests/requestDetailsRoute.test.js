@@ -18,6 +18,7 @@ jest.mock('../src/middleware/auth', () => ({
 jest.mock('../src/services/requestDetailService', () => ({
   listRequestDetails: jest.fn(),
   getRequestDetail: jest.fn(),
+  replayRequest: jest.fn(),
   getRequestBodyPreviewStats: jest.fn(),
   purgeRequestBodySnapshots: jest.fn()
 }))
@@ -63,6 +64,7 @@ describe('requestDetails admin routes', () => {
   beforeEach(() => {
     requestDetailService.listRequestDetails.mockReset()
     requestDetailService.getRequestDetail.mockReset()
+    requestDetailService.replayRequest.mockReset()
     requestDetailService.getRequestBodyPreviewStats.mockReset()
     requestDetailService.purgeRequestBodySnapshots.mockReset()
   })
@@ -137,5 +139,26 @@ describe('requestDetails admin routes', () => {
     expect(res.body.success).toBe(true)
     expect(res.body.message).toBe('清理完毕')
     expect(res.body.data.updatedRecords).toBe(7)
+  })
+
+  test('replays a stored request with the edited body', async () => {
+    requestDetailService.replayRequest.mockResolvedValue({
+      statusCode: 200,
+      body: { id: 'response_1' }
+    })
+
+    const handler = findPostHandler('/request-details/:requestId/replay')
+    const res = createResponse()
+
+    await handler(
+      { params: { requestId: 'req_1' }, body: { body: { model: 'gpt-5.4-mini' } } },
+      res
+    )
+
+    expect(requestDetailService.replayRequest).toHaveBeenCalledWith('req_1', {
+      body: { model: 'gpt-5.4-mini' }
+    })
+    expect(res.body.success).toBe(true)
+    expect(res.body.data.statusCode).toBe(200)
   })
 })

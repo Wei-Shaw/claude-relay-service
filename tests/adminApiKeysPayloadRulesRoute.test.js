@@ -22,7 +22,9 @@ jest.mock('../src/services/apiKeyService', () => ({
   updateApiKey: jest.fn()
 }))
 
-jest.mock('../src/models/redis', () => ({}))
+jest.mock('../src/models/redis', () => ({
+  getApiKey: jest.fn()
+}))
 
 jest.mock('../src/utils/logger', () => ({
   error: jest.fn(),
@@ -52,6 +54,7 @@ jest.mock('../src/services/requestBodyRuleService', () => ({
 }))
 
 const apiKeyService = require('../src/services/apiKeyService')
+const redis = require('../src/models/redis')
 const requestBodyRuleService = require('../src/services/requestBodyRuleService')
 require('../src/routes/admin/apiKeys')
 
@@ -77,10 +80,18 @@ function findPutHandler(path) {
   return route?.[2]
 }
 
+function findPatchHandler(path) {
+  const route = mockRouter.patch.mock.calls.find((call) => call[0] === path)
+  return route?.[2]
+}
+
 describe('admin api keys route payload rule updates', () => {
   beforeEach(() => {
     apiKeyService.updateApiKey.mockReset()
     apiKeyService.updateApiKey.mockResolvedValue()
+
+    redis.getApiKey.mockReset()
+    redis.getApiKey.mockResolvedValue({ id: 'key-1', isActive: 'false' })
 
     requestBodyRuleService.validateAndNormalizeRules.mockReset()
     requestBodyRuleService.validateAndNormalizeRules.mockImplementation((rules) => ({
@@ -167,5 +178,85 @@ describe('admin api keys route payload rule updates', () => {
 
     expect(res.status).not.toHaveBeenCalled()
     expect(res.body.success).toBe(true)
+  })
+})
+
+describe('admin API key activation route', () => {
+  beforeEach(() => {
+    apiKeyService.updateApiKey.mockReset()
+    apiKeyService.updateApiKey.mockResolvedValue()
+    redis.getApiKey.mockReset()
+    redis.getApiKey.mockResolvedValue({ id: 'key-1', isActive: 'false' })
+  })
+
+  test('activates an inactive key immediately', async () => {
+    const handler = findPatchHandler('/api-keys/:keyId/activation')
+    const res = createResponse()
+
+    await handler({ params: { keyId: 'key-1' }, body: { mode: 'immediate' } }, res)
+
+    expect(apiKeyService.updateApiKey).toHaveBeenCalledWith('key-1', {
+      isActive: true,
+      scheduledActivationAt: null
+    })
+    expect(res.body).toEqual({
+      success: true,
+      message: 'API key activated',
+      scheduledActivationAt: null
+    })
+  })
+
+  test('stores a future scheduled activation time and keeps the key inactive', async () => {
+    const handler = findPatchHandler('/api-keys/:keyId/activation')
+    const res = createResponse()
+    const scheduledAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+
+    await handler(
+      { params: { keyId: 'key-1' }, body: { mode: 'scheduled', scheduledAt } },
+      res
+    )
+
+    expect(apiKeyService.updateApiKey).toHaveBeenCalledWith('key-1', {
+      isActive: false,
+      scheduledActivationAt: scheduledAt
+    })
+    expect(res.body).toEqual({
+      success: true,
+      message: 'API key activation scheduled',
+      scheduledActivationAt: scheduledAt
+    })
+  })
+
+  test('cancels a saved scheduled activation without changing the key status', async () => {
+    const handler = findPatchHandler('/api-keys/:keyId/activation')
+    const res = createResponse()
+
+    await handler({ params: { keyId: 'key-1' }, body: { mode: 'cancel' } }, res)
+
+    expect(apiKeyService.updateApiKey).toHaveBeenCalledWith('key-1', {
+      scheduledActivationAt: null
+    })
+    expect(res.body).toEqual({
+      success: true,
+      message: 'Scheduled activation cancelled',
+      scheduledActivationAt: null
+    })
+  })
+
+  test('rejects a scheduled activation time in the past', async () => {
+    const handler = findPatchHandler('/api-keys/:keyId/activation')
+    const res = createResponse()
+
+    await handler(
+      {
+        params: { keyId: 'key-1' },
+        body: { mode: 'scheduled', scheduledAt: '2020-01-01T00:00:00.000Z' }
+      },
+      res
+    )
+
+    expect(apiKeyService.updateApiKey).not.toHaveBeenCalled()
+    expect(res.statusCode).toBe(400)
+    expect(res.body).toEqual({ error: 'Scheduled activation time must be in the future' })
   })
 })

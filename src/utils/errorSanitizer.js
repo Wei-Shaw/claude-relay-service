@@ -1,6 +1,7 @@
 /**
- * 错误消息清理工具 - 白名单错误码制
- * 所有错误映射到预定义的标准错误码，原始消息只记日志不返回前端
+ * 错误消息清理工具
+ * - 对外错误：白名单错误码（避免泄露上游细节）
+ * - 上游错误透传：深度清理敏感字段（URL/供应商标识等）
  */
 
 const logger = require('./logger')
@@ -146,17 +147,129 @@ function mapToErrorCode(error, options = {}) {
 }
 
 /**
+ * 清理错误消息中的 URL 和供应商引用
+ * @param {string} message - 原始错误消息
+ * @returns {string} - 清理后的消息
+ */
+function sanitizeErrorMessage(message) {
+  if (typeof message !== 'string') {
+    return message
+  }
+
+  // 移除 URL（http:// 或 https://）
+  let cleaned = message.replace(/https?:\/\/[^\s]+/gi, '')
+
+  // 移除常见的供应商引用模式
+  cleaned = cleaned.replace(/For more (?:details|information|help)[,\s]*/gi, '')
+  cleaned = cleaned.replace(/(?:please\s+)?visit\s+\S*/gi, '')
+  cleaned = cleaned.replace(/(?:see|check)\s+(?:our|the)\s+\S*/gi, '')
+  cleaned = cleaned.replace(/(?:contact|reach)\s+(?:us|support)\s+at\s+\S*/gi, '')
+
+  // 移除供应商特定关键词（包括整个单词）
+  cleaned = cleaned.replace(/88code\S*/gi, '')
+  cleaned = cleaned.replace(/duck\S*/gi, '')
+  cleaned = cleaned.replace(/packy\S*/gi, '')
+  cleaned = cleaned.replace(/ikun\S*/gi, '')
+  cleaned = cleaned.replace(/privnode\S*/gi, '')
+  cleaned = cleaned.replace(/yescode\S*/gi, '')
+  cleaned = cleaned.replace(/yes\.vg\S*/gi, '')
+  cleaned = cleaned.replace(/share\S*/gi, '')
+  cleaned = cleaned.replace(/yhlxj\S*/gi, '')
+  cleaned = cleaned.replace(/gac\S*/gi, '')
+  cleaned = cleaned.replace(/driod\S*/gi, '')
+
+  // 移除上游网关特定信息（如 New API 等）
+  cleaned = cleaned.replace(/分组\s*.+?\s*下/gi, '') // 移除 "分组 xxx 下"（xxx可能包含空格）
+  cleaned = cleaned.replace(/无可用渠道[（(]?\s*distributor\s*[)）]?/gi, '') // 移除 "无可用渠道（distributor）"
+  cleaned = cleaned.replace(/\(request\s+id:\s*[^)]+\)/gi, '') // 移除 "(request id: xxx)"
+  cleaned = cleaned.replace(/request\s+id:\s*\S+/gi, '') // 移除 "request id: xxx"
+
+  cleaned = cleaned.replace(/\s+/g, ' ').trim()
+
+  // 如果消息被清理得太短或为空，返回通用消息
+  if (cleaned.length < 5) {
+    return 'The requested model is currently unavailable'
+  }
+
+  return cleaned
+}
+
+/**
+ * 递归清理对象中的所有错误消息字段
+ * @param {Object} errorData - 原始错误数据对象
+ * @returns {Object} - 清理后的错误数据
+ */
+function sanitizeUpstreamError(errorData) {
+  if (!errorData || typeof errorData !== 'object') {
+    return typeof errorData === 'string' ? sanitizeErrorMessage(errorData) : errorData
+  }
+
+  let sanitized
+  try {
+    // 深拷贝避免修改原始对象
+    sanitized = JSON.parse(JSON.stringify(errorData))
+  } catch {
+    // 避免极端情况下深拷贝失败导致链路中断
+    sanitized = { ...errorData }
+  }
+
+  // 需要替换的上游特定 error type
+  const upstreamErrorTypes = ['new_api_error', 'one_api_error', 'upstream_error']
+
+  // 递归清理嵌套对象
+  const sanitizeObject = (obj) => {
+    if (!obj || typeof obj !== 'object') {
+      return obj
+    }
+
+    for (const key in obj) {
+      if (typeof obj[key] === 'string') {
+        if (key === 'type' && upstreamErrorTypes.includes(obj[key])) {
+          obj[key] = 'api_error'
+        } else {
+          obj[key] = sanitizeErrorMessage(obj[key])
+        }
+      } else if (typeof obj[key] === 'object') {
+        sanitizeObject(obj[key])
+      }
+    }
+
+    return obj
+  }
+
+  return sanitizeObject(sanitized)
+}
+
+/**
  * 提取原始错误消息
  */
 function extractOriginalMessage(error) {
   if (!error) {
     return ''
   }
+
+  // 处理字符串类型（包括 JSON 字符串）
   if (typeof error === 'string') {
-    return error
+    const trimmed = error.trim()
+    if (!trimmed) {
+      return ''
+    }
+    try {
+      const parsed = JSON.parse(trimmed)
+      return extractOriginalMessage(parsed)
+    } catch {
+      return trimmed
+    }
   }
-  if (error.message) {
+
+  // 常见 Error 对象
+  if (typeof error.message === 'string' && error.message) {
     return error.message
+  }
+
+  // 常见响应体格式
+  if (error.error && typeof error.error === 'string') {
+    return error.error
   }
   if (error.error?.message) {
     return error.error.message
@@ -164,12 +277,27 @@ function extractOriginalMessage(error) {
   if (error.response?.data?.error?.message) {
     return error.response.data.error.message
   }
-  if (error.response?.data?.error) {
-    return String(error.response.data.error)
+  if (error.error?.error && typeof error.error.error === 'string') {
+    return error.error.error
   }
-  if (error.response?.data?.message) {
-    return error.response.data.message
+  if (typeof error.message === 'string') {
+    return error.message
   }
+  if (error.msg?.error?.message) {
+    return error.msg.error.message
+  }
+  if (typeof error.msg?.message === 'string') {
+    return error.msg.message
+  }
+  if (typeof error.msg === 'string') {
+    return error.msg
+  }
+
+  // Axios 风格
+  if (error.response?.data) {
+    return extractOriginalMessage(error.response.data)
+  }
+
   return ''
 }
 
@@ -216,17 +344,6 @@ function getSafeMessage(error, options = {}) {
 }
 
 // 兼容旧接口
-function sanitizeErrorMessage(message) {
-  if (!message) {
-    return 'Service temporarily unavailable'
-  }
-  return mapToErrorCode({ message }, { logOriginal: false }).message
-}
-
-function sanitizeUpstreamError(errorData) {
-  return createSafeErrorResponse(errorData, { logOriginal: false })
-}
-
 function extractErrorMessage(body) {
   return extractOriginalMessage(body)
 }

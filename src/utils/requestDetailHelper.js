@@ -23,6 +23,21 @@ function toFiniteNumber(value) {
   return num
 }
 
+function normalizeUnitPricing(pricing) {
+  if (!pricing || typeof pricing !== 'object' || Array.isArray(pricing)) {
+    return null
+  }
+
+  const normalized = {
+    input: toFiniteNumber(pricing.input),
+    output: toFiniteNumber(pricing.output),
+    cacheCreate: toFiniteNumber(pricing.cacheCreate ?? pricing.cacheWrite),
+    cacheRead: toFiniteNumber(pricing.cacheRead)
+  }
+
+  return Object.values(normalized).some((value) => value !== null) ? normalized : null
+}
+
 function maskSensitiveValue(value) {
   if (value === null || value === undefined) {
     return value
@@ -571,6 +586,7 @@ function createRequestDetailMeta(req, overrides = {}) {
   const reqStartedAt = toFiniteNumber(req?.requestStartedAt)
   const effectiveStart = requestStartedAt ?? reqStartedAt
   const requestBody = overrides.requestBody !== undefined ? overrides.requestBody : req?.body
+  const modelTrace = req?._modelTrace && typeof req._modelTrace === 'object' ? req._modelTrace : {}
 
   return {
     requestId: overrides.requestId || req?.requestId || null,
@@ -583,7 +599,14 @@ function createRequestDetailMeta(req, overrides = {}) {
         : Boolean(requestBody && requestBody.stream === true),
     durationMs: durationMs ?? (effectiveStart ? Math.max(0, nowMs - effectiveStart) : null),
     requestStartedAt: effectiveStart ? new Date(effectiveStart).toISOString() : null,
-    requestBody
+    requestBody,
+    actualModel: overrides.actualModel || null,
+    requestedModel:
+      overrides.requestedModel ?? modelTrace.requestedModel ?? req?._originalRequestedModel ?? null,
+    mappedModel: overrides.mappedModel ?? modelTrace.mappedModel ?? null,
+    outboundModel: overrides.outboundModel ?? modelTrace.outboundModel ?? null,
+    responseModel: overrides.responseModel ?? modelTrace.responseModel ?? null,
+    displayModel: overrides.displayModel || null
   }
 }
 
@@ -715,6 +738,7 @@ module.exports = {
   finalizeRequestDetailMeta,
   extractOpenAICacheReadTokens,
   isOpenAIRelatedEndpoint,
+  normalizeUnitPricing,
   CACHE_HIT_FORMULA,
   getRequestDetailCacheMetrics,
   calculateCacheHitRate

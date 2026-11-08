@@ -46,6 +46,15 @@
               <span class="font-medium">{{ record?.model || '未知模型' }}</span>
             </li>
             <li class="flex items-center justify-between">
+              <span class="text-gray-500 dark:text-gray-400">状态</span>
+              <span
+                class="font-medium"
+                :class="isUsageMissing ? 'text-red-600 dark:text-red-400' : ''"
+              >
+                {{ usageStatusText }}
+              </span>
+            </li>
+            <li class="flex items-center justify-between">
               <span class="text-gray-500 dark:text-gray-400">账户</span>
               <span class="font-medium">{{ record?.accountName || '未知账户' }}</span>
             </li>
@@ -174,6 +183,24 @@ const emitClose = () => emit('close')
 const formattedTime = computed(() => {
   if (!props.record?.timestamp) return '未知时间'
   return dayjs(props.record.timestamp).format('YYYY-MM-DD HH:mm:ss')
+})
+
+const isUsageMissing = computed(
+  () => props.record?.usageMissing === true || props.record?.billableUsageUnknown === true
+)
+
+const usageStatusText = computed(() => {
+  if (props.record?.usageStatusName) return props.record.usageStatusName
+
+  const map = {
+    started: '已发起',
+    completed: '已完成',
+    aborted: '客户端中断',
+    stream_error: '流错误',
+    completed_without_usage: '无用量结束',
+    record_failed: '记录失败'
+  }
+  return map[props.record?.usageStatus] || props.record?.usageStatus || '已完成'
 })
 
 const formattedCosts = computed(() => {

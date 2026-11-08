@@ -360,6 +360,7 @@ async function sendGeminiRequest({
       const geminiError = error.response.data?.error
       const err = new Error(geminiError?.message || 'Gemini API request failed')
       err.status = error.response.status
+      err.upstreamResponseBody = error.response.data
       err.error = {
         message: geminiError?.message || 'Gemini API request failed',
         type: geminiError?.code || 'api_error',

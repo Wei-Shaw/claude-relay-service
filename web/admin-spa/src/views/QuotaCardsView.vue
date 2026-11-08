@@ -779,20 +779,14 @@ import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
 import * as httpApis from '@/utils/http_apis'
 import { showToast, copyText, formatDate } from '@/utils/tools'
+import { useConfirmModal } from '@/utils/useConfirmModal'
 
 const loading = ref(false)
 const creating = ref(false)
 const showCreateModal = ref(false)
 const showResultModal = ref(false)
-const showConfirmModal = ref(false)
-const confirmModalConfig = ref({
-  title: '',
-  message: '',
-  type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
-})
-const confirmResolve = ref(null)
+const { showConfirmModal, confirmModalConfig, showConfirm, handleConfirmModal, handleCancelModal } =
+  useConfirmModal()
 const createdCards = ref([])
 const showRevokeModal = ref(false)
 const revokeReason = ref('')
@@ -869,28 +863,6 @@ const newCard = ref({
   count: 1,
   note: ''
 })
-
-const showConfirm = (
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  type = 'primary'
-) => {
-  return new Promise((resolve) => {
-    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
-    confirmResolve.value = resolve
-    showConfirmModal.value = true
-  })
-}
-const handleConfirmModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(true)
-}
-const handleCancelModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(false)
-}
 
 const loadCards = async () => {
   loading.value = true

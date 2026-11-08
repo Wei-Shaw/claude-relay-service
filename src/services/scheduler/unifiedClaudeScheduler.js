@@ -1367,10 +1367,17 @@ class UnifiedClaudeScheduler {
     accountType,
     sessionHash = null,
     ttlSeconds = null,
-    statusCode = 500
+    statusCode = 500,
+    context = null
   ) {
     try {
-      await upstreamErrorHelper.markTempUnavailable(accountId, accountType, statusCode, ttlSeconds)
+      await upstreamErrorHelper.markTempUnavailable(
+        accountId,
+        accountType,
+        statusCode,
+        ttlSeconds,
+        context
+      )
       if (sessionHash) {
         await this._deleteSessionMapping(sessionHash)
       }

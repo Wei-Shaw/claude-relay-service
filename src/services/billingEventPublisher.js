@@ -80,6 +80,7 @@ class BillingEventPublisher {
         // 请求上下文
         context: {
           isLongContext: eventData.isLongContext || false,
+          pricingTier: eventData.pricingTier || null,
           requestTimestamp: eventData.requestTimestamp || new Date().toISOString()
         }
       }

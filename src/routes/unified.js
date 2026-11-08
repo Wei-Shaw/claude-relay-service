@@ -8,7 +8,7 @@ const {
   handleStandardStreamGenerateContent: geminiHandleStreamGenerateContent
 } = require('../handlers/geminiHandlers')
 const openaiRoutes = require('./openaiRoutes')
-const { CODEX_CLI_INSTRUCTIONS } = require('./openaiRoutes')
+const { CODEX_CLI_INSTRUCTIONS } = require('../utils/codexCliInstructions')
 const apiKeyService = require('../services/apiKeyService')
 const GeminiToOpenAIConverter = require('../services/geminiToOpenAI')
 const CodexToOpenAIConverter = require('../services/codexToOpenAI')

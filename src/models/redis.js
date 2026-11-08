@@ -1778,7 +1778,7 @@ class RedisClient {
     }
   }
 
-  async addUsageRecord(keyId, record, maxRecords = 200) {
+  async addUsageRecord(keyId, record, maxRecords = 5000) {
     const listKey = `usage:records:${keyId}`
     const client = this.getClientSafe()
 
@@ -1791,6 +1791,61 @@ class RedisClient {
         .exec()
     } catch (error) {
       logger.error(`❌ Failed to append usage record for key ${keyId}:`, error)
+    }
+  }
+
+  async updateUsageRecord(keyId, recordId, updates = {}, maxRecords = 5000) {
+    const listKey = `usage:records:${keyId}`
+    const client = this.getClientSafe()
+
+    if (!keyId || !recordId) {
+      return false
+    }
+
+    try {
+      const rawRecords = await client.lrange(listKey, 0, Math.max(0, maxRecords - 1))
+
+      for (let index = 0; index < rawRecords.length; index += 1) {
+        let existingRecord
+        try {
+          existingRecord = JSON.parse(rawRecords[index])
+        } catch (error) {
+          logger.warn('⚠️ Failed to parse usage record while updating:', error)
+          continue
+        }
+
+        const matches =
+          existingRecord.lifecycleRecordId === recordId ||
+          existingRecord.requestLifecycleId === recordId ||
+          existingRecord.requestId === recordId
+
+        if (!matches) {
+          continue
+        }
+
+        const updatedRecord = {
+          ...existingRecord,
+          ...updates,
+          lifecycleRecordId:
+            existingRecord.lifecycleRecordId || updates.lifecycleRecordId || recordId,
+          requestLifecycleId:
+            existingRecord.requestLifecycleId || updates.requestLifecycleId || recordId,
+          updatedAt: updates.updatedAt || new Date().toISOString()
+        }
+
+        await client
+          .multi()
+          .lset(listKey, index, JSON.stringify(updatedRecord))
+          .expire(listKey, 86400 * 90)
+          .exec()
+
+        return true
+      }
+
+      return false
+    } catch (error) {
+      logger.error(`❌ Failed to update usage record for key ${keyId}:`, error)
+      return false
     }
   }
 
@@ -2865,30 +2920,6 @@ class RedisClient {
     await this.client.del(key, localKey)
   }
 
-  // 🧩 账户余额脚本配置
-  async setBalanceScriptConfig(platform, accountId, scriptConfig) {
-    const key = `account_balance_script:${platform}:${accountId}`
-    await this.client.set(key, JSON.stringify(scriptConfig || {}))
-  }
-
-  async getBalanceScriptConfig(platform, accountId) {
-    const key = `account_balance_script:${platform}:${accountId}`
-    const raw = await this.client.get(key)
-    if (!raw) {
-      return null
-    }
-    try {
-      return JSON.parse(raw)
-    } catch (error) {
-      return null
-    }
-  }
-
-  async deleteBalanceScriptConfig(platform, accountId) {
-    const key = `account_balance_script:${platform}:${accountId}`
-    return await this.client.del(key)
-  }
-
   // 📈 系统统计（使用 scanKeys 替代 keys）
   async getSystemStats() {
     const keys = await Promise.all([
@@ -3444,9 +3475,7 @@ class RedisClient {
         local member = ARGV[1]
         local now = tonumber(ARGV[2])
 
-        if member then
-          redis.call('ZREM', key, member)
-        end
+        redis.call('ZREM', key, member)
 
         redis.call('ZREMRANGEBYSCORE', key, '-inf', now)
 

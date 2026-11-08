@@ -6,8 +6,51 @@ const fs = require('fs')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const { RateLimiterRedis } = require('rate-limiter-flexible')
 
 const router = express.Router()
+
+let adminLoginIpLimiter = null
+let adminLoginAccountLimiter = null
+
+function getAdminLoginLimiters() {
+  if (!adminLoginIpLimiter || !adminLoginAccountLimiter) {
+    const redisClient = redis.getClientSafe()
+    const ipLimiter = new RateLimiterRedis({
+      storeClient: redisClient,
+      keyPrefix: 'admin_login_ip_limiter',
+      points: 30,
+      duration: 900,
+      blockDuration: 900,
+      rejectIfRedisNotReady: true
+    })
+    const accountLimiter = new RateLimiterRedis({
+      storeClient: redisClient,
+      keyPrefix: 'admin_login_account_limiter',
+      points: 5,
+      duration: 900,
+      blockDuration: 1800,
+      rejectIfRedisNotReady: true
+    })
+
+    adminLoginIpLimiter = ipLimiter
+    adminLoginAccountLimiter = accountLimiter
+  }
+
+  return { adminLoginIpLimiter, adminLoginAccountLimiter }
+}
+
+function hashAdminUsername(username) {
+  return crypto
+    .createHash('sha256')
+    .update(String(username).trim().toLowerCase())
+    .digest('hex')
+    .slice(0, 32)
+}
+
+function isRateLimitRejection(error) {
+  return error && typeof error.msBeforeNext === 'number' && Number.isFinite(error.msBeforeNext)
+}
 
 // 🏠 服务静态文件
 router.use('/assets', express.static(path.join(__dirname, '../../web/assets')))
@@ -26,6 +69,35 @@ router.post('/auth/login', async (req, res) => {
       return res.status(400).json({
         error: 'Missing credentials',
         message: 'Username and password are required'
+      })
+    }
+
+    const clientIp = req.ip || req.connection?.remoteAddress || 'unknown'
+    const accountLimitKey = `${clientIp}:${hashAdminUsername(username)}`
+    let limiters
+
+    try {
+      limiters = getAdminLoginLimiters()
+      await Promise.all([
+        limiters.adminLoginIpLimiter.consume(clientIp),
+        limiters.adminLoginAccountLimiter.consume(accountLimitKey)
+      ])
+    } catch (error) {
+      if (isRateLimitRejection(error)) {
+        const retryAfter = Math.max(1, Math.ceil(error.msBeforeNext / 1000))
+        res.set('Retry-After', String(retryAfter))
+        logger.security(`Admin login rate limit exceeded for IP: ${clientIp}`)
+        return res.status(429).json({
+          error: 'Too many login attempts',
+          message: 'Too many login attempts. Please try again later.',
+          retryAfter
+        })
+      }
+
+      logger.error('Admin login rate limiter unavailable:', error)
+      return res.status(503).json({
+        error: 'Service unavailable',
+        message: 'Login service is temporarily unavailable'
       })
     }
 
@@ -78,6 +150,16 @@ router.post('/auth/login', async (req, res) => {
       return res.status(401).json({
         error: 'Invalid credentials',
         message: 'Invalid username or password'
+      })
+    }
+
+    try {
+      await limiters.adminLoginAccountLimiter.delete(accountLimitKey)
+    } catch (error) {
+      logger.error('Failed to reset admin login account rate limit:', error)
+      return res.status(503).json({
+        error: 'Service unavailable',
+        message: 'Login service is temporarily unavailable'
       })
     }
 

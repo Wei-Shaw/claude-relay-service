@@ -13,6 +13,9 @@ pnpm-debug.log*
 # Claude specific directories
 .claude/
 
+# Qoder local review artifacts
+.qoder/
+
 # MCP configuration (local only)
 .mcp.json
 .spec-workflow/

@@ -6,6 +6,7 @@ const {
   finalizeRequestDetailMeta,
   extractOpenAICacheReadTokens,
   isOpenAIRelatedEndpoint,
+  normalizeUnitPricing,
   getRequestDetailCacheMetrics,
   calculateCacheHitRate
 } = require('../src/utils/requestDetailHelper')
@@ -252,6 +253,23 @@ describe('requestDetailHelper', () => {
         prompt_tokens_details: { cached_tokens: null }
       })
     ).toBe(0)
+  })
+
+  test('normalizeUnitPricing preserves per-million prices and cache-write aliases', () => {
+    expect(
+      normalizeUnitPricing({
+        input: 5,
+        output: '30',
+        cacheWrite: 6.25,
+        cacheRead: 0.5
+      })
+    ).toEqual({
+      input: 5,
+      output: 30,
+      cacheCreate: 6.25,
+      cacheRead: 0.5
+    })
+    expect(normalizeUnitPricing({ input: 'invalid' })).toBeNull()
   })
 
   test('calculateCacheHitRate uses cacheRead / (input + cacheRead + cacheCreate)', () => {
