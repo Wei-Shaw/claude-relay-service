@@ -18,6 +18,8 @@ const { formatAccountExpiry, mapExpiryField } = require('./utils')
 
 const router = express.Router()
 
+router.use('/:accountId/codex', require('./codexResetCredits')())
+
 // OpenAI OAuth 配置
 const OPENAI_CONFIG = {
   BASE_URL: 'https://auth.openai.com',

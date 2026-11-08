@@ -60,5 +60,9 @@ router.use('/ccr-accounts', ccrAccountsRoutes)
 router.use('/bedrock-accounts', bedrockAccountsRoutes)
 router.use('/gemini-accounts', geminiAccountsRoutes)
 router.use('/openai-accounts', openaiAccountsRoutes)
+router.use(
+  '/codex-management-keys',
+  require('./codexManagementKeys').createCodexManagementKeysRouter()
+)
 
 module.exports = router
