@@ -1707,7 +1707,7 @@ class ApiKeyService {
       let ratedCost = realCost
       if (realCost > 0) {
         const service = serviceRatesService.getService(accountType, model)
-        ratedCost = await this.calculateRatedCost(keyId, service, realCost)
+        ratedCost = await this.calculateRatedCost(keyId, service, realCost, model)
       }
 
       // 记录API Key级别的使用统计（包含费用）
@@ -1937,7 +1937,12 @@ class ApiKeyService {
       let ratedCostWithDetails = realCostWithDetails
       if (realCostWithDetails > 0) {
         const service = serviceRatesService.getService(accountType, model)
-        ratedCostWithDetails = await this.calculateRatedCost(keyId, service, realCostWithDetails)
+        ratedCostWithDetails = await this.calculateRatedCost(
+          keyId,
+          service,
+          realCostWithDetails,
+          model
+        )
       }
 
       // 记录API Key级别的使用统计（包含费用）
@@ -2719,16 +2724,23 @@ class ApiKeyService {
 
   /**
    * 计算应用倍率后的费用
-   * 公式：消费计费 = 真实消费 × 全局倍率 × Key 倍率
+   * 公式：消费计费 = 真实消费 × 全局倍率 × 模型倍率 × Key 倍率
    * @param {string} keyId - API Key ID
    * @param {string} service - 服务类型
    * @param {number} realCost - 真实成本（USD）
+   * @param {string} [model] - 模型名称（用于模型倍率）
    * @returns {Promise<number>} 应用倍率后的费用
    */
-  async calculateRatedCost(keyId, service, realCost) {
+  async calculateRatedCost(keyId, service, realCost, model = null) {
     try {
       // 获取全局倍率
       const globalRate = await serviceRatesService.getServiceRate(service)
+
+      // 获取模型倍率
+      let modelRate = 1.0
+      if (model) {
+        modelRate = await serviceRatesService.getModelRate(model)
+      }
 
       // 获取 Key 倍率
       const keyData = await redis.getApiKey(keyId)
@@ -2741,7 +2753,7 @@ class ApiKeyService {
       const keyRate = keyRates[service] ?? 1.0
 
       // 相乘计算
-      return realCost * globalRate * keyRate
+      return realCost * globalRate * modelRate * keyRate
     } catch (error) {
       logger.error('❌ Failed to calculate rated cost:', error)
       // 出错时返回原始费用

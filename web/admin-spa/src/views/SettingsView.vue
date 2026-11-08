@@ -1359,6 +1359,62 @@
                     <span class="text-sm text-gray-500 dark:text-gray-400">倍</span>
                   </div>
                 </div>
+
+                <!-- 模型倍率 -->
+                <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                  <div class="mb-3 flex items-center justify-between">
+                    <div>
+                      <div class="font-medium text-gray-900 dark:text-gray-100">模型倍率</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">
+                        按模型覆盖倍率，支持前缀匹配（如
+                        <code>claude-fable</code> 匹配所有
+                        <code>claude-fable-*</code>
+                        模型）；自动忽略 <code>[1m]</code> 后缀与厂商前缀
+                      </div>
+                    </div>
+                    <button
+                      class="rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                      @click="addModelRateRow"
+                    >
+                      <i class="fas fa-plus mr-1"></i>
+                      添加模型
+                    </button>
+                  </div>
+
+                  <div v-if="modelRateRows.length === 0" class="text-sm text-gray-400">
+                    暂无模型倍率配置
+                  </div>
+
+                  <div class="space-y-2">
+                    <div
+                      v-for="(row, idx) in modelRateRows"
+                      :key="idx"
+                      class="flex items-center gap-3"
+                    >
+                      <input
+                        v-model="row.key"
+                        class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                        placeholder="claude-fable"
+                        type="text"
+                      />
+                      <input
+                        v-model.number="row.rate"
+                        class="w-24 rounded-lg border border-gray-300 px-3 py-2 text-center text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                        max="10"
+                        min="0.1"
+                        step="0.1"
+                        type="number"
+                      />
+                      <span class="text-sm text-gray-500 dark:text-gray-400">倍</span>
+                      <button
+                        class="rounded-lg px-2 py-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
+                        @click="modelRateRows.splice(idx, 1)"
+                      >
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <!-- 更新信息 -->
@@ -2216,6 +2272,11 @@ const serviceRates = ref({
   updatedAt: null,
   updatedBy: null
 })
+const modelRateRows = ref([])
+
+const addModelRateRow = () => {
+  modelRateRows.value.push({ key: '', rate: 1.0 })
+}
 
 // 平台表单相关
 const showAddPlatformModal = ref(false)
@@ -2600,6 +2661,10 @@ const loadServiceRates = async () => {
         updatedAt: response.data?.updatedAt,
         updatedBy: response.data?.updatedBy
       }
+      modelRateRows.value = Object.entries(response.data?.modelRates || {}).map(([key, rate]) => ({
+        key,
+        rate
+      }))
     }
   } catch (error) {
     if (error.name === 'AbortError') return
@@ -2615,11 +2680,25 @@ const loadServiceRates = async () => {
 // 保存服务倍率配置
 const saveServiceRates = async () => {
   if (!isMounted.value) return
+
+  const modelRates = {}
+  for (const row of modelRateRows.value) {
+    const key = (row.key || '').trim()
+    if (!key) continue
+    const rate = Number(row.rate)
+    if (!Number.isFinite(rate) || rate <= 0) {
+      showToast(`模型 ${key} 的倍率必须是正数`, 'error')
+      return
+    }
+    modelRates[key] = rate
+  }
+
   serviceRatesSaving.value = true
   try {
     const response = await httpApis.updateAdminServiceRatesApi(
       {
         rates: serviceRates.value.rates,
+        modelRates,
         baseService: serviceRates.value.baseService
       },
       { signal: abortController.value.signal }
