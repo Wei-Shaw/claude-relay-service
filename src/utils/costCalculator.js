@@ -1,7 +1,12 @@
 const pricingService = require('../services/pricingService')
 const logger = require('./logger')
+const { getWebSearchRequests } = require('./anthropicUsage')
 
 const warnedDetailedPricingFallbackModels = new Set()
+
+// Anthropic web search 服务端工具：$10 / 1000 次（另计搜索结果的 input tokens）
+// https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool#usage-and-pricing
+const DEFAULT_CLAUDE_WEB_SEARCH_COST_PER_REQUEST = 0.01
 
 // Claude模型价格配置 (USD per 1M tokens) - 备用定价
 const MODEL_PRICING = {
@@ -309,6 +314,57 @@ class CostCalculator {
    * @returns {Object} 费用详情
    */
   static calculateCost(usage, model = 'unknown', serviceTier = null) {
+    const result = this.calculateTokenCost(usage, model, serviceTier)
+    return this.applyServerToolCost(result, usage, model)
+  }
+
+  /**
+   * 单次 web search 的价格：优先 model_pricing.json 的 search_context_cost_per_query，
+   * Claude 模型缺失时按 Anthropic 官方价 $0.01/次兜底
+   */
+  static getWebSearchCostPerRequest(model) {
+    const pricingData = pricingService.getModelPricing(model)
+    const perQuery = pricingData?.search_context_cost_per_query
+    const configured = Number(
+      perQuery && typeof perQuery === 'object'
+        ? (perQuery.search_context_size_medium ?? perQuery.search_context_size_low)
+        : perQuery
+    )
+    if (Number.isFinite(configured) && configured > 0) {
+      return configured
+    }
+    const isClaudeModel =
+      (typeof model === 'string' && model.toLowerCase().includes('claude')) ||
+      (typeof pricingData?.litellm_provider === 'string' &&
+        pricingData.litellm_provider.toLowerCase().includes('anthropic'))
+    return isClaudeModel ? DEFAULT_CLAUDE_WEB_SEARCH_COST_PER_REQUEST : 0
+  }
+
+  /**
+   * 将 usage.server_tool_use 中按次计费的服务端工具费用（web search）计入总费用
+   */
+  static applyServerToolCost(result, usage, model) {
+    const webSearchRequests = getWebSearchRequests(usage)
+    if (!result || !result.costs || webSearchRequests <= 0) {
+      return result
+    }
+    const webSearchCost = webSearchRequests * this.getWebSearchCostPerRequest(model)
+    result.costs.webSearch = webSearchCost
+    result.costs.total = (result.costs.total || 0) + webSearchCost
+    if (result.formatted) {
+      result.formatted.webSearch = this.formatCost(webSearchCost)
+      result.formatted.total = this.formatCost(result.costs.total)
+    }
+    if (result.usage) {
+      result.usage.webSearchRequests = webSearchRequests
+    }
+    if (result.debug) {
+      result.debug.webSearchRequests = webSearchRequests
+    }
+    return result
+  }
+
+  static calculateTokenCost(usage, model = 'unknown', serviceTier = null) {
     // 如果 usage 包含详细的 cache_creation 对象或是 1M 模型，优先使用 pricingService
     if (this.isDetailedPricingRequest(usage, model)) {
       const result = pricingService.calculateCost(usage, model)

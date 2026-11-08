@@ -22,6 +22,7 @@ const {
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const { dumpAnthropicMessagesRequest } = require('../utils/anthropicRequestDump')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
+const { extractServerToolUse } = require('../utils/anthropicUsage')
 const {
   handleAnthropicMessagesToGemini,
   handleAnthropicCountTokensToGemini
@@ -477,6 +478,11 @@ async function handleMessagesRequest(req, res) {
                 cache_creation_input_tokens: cacheCreateTokens,
                 cache_read_input_tokens: cacheReadTokens
               }
+              // 服务端工具（web_search 按次计费）的调用次数，随 usage 一起计费
+              const serverToolUse = extractServerToolUse(usageData)
+              if (serverToolUse) {
+                usageObject.server_tool_use = serverToolUse
+              }
               const requestBetaHeader =
                 _headers['anthropic-beta'] ||
                 _headers['Anthropic-Beta'] ||
@@ -610,6 +616,11 @@ async function handleMessagesRequest(req, res) {
                 output_tokens: outputTokens,
                 cache_creation_input_tokens: cacheCreateTokens,
                 cache_read_input_tokens: cacheReadTokens
+              }
+              // 服务端工具（web_search 按次计费）的调用次数，随 usage 一起计费
+              const serverToolUse = extractServerToolUse(usageData)
+              if (serverToolUse) {
+                usageObject.server_tool_use = serverToolUse
               }
               const requestBetaHeader =
                 _headersConsole['anthropic-beta'] ||
@@ -1268,6 +1279,11 @@ async function handleMessagesRequest(req, res) {
             output_tokens: outputTokens,
             cache_creation_input_tokens: cacheCreateTokens,
             cache_read_input_tokens: cacheReadTokens
+          }
+          // 服务端工具（web_search 按次计费）的调用次数，随 usage 一起计费
+          const serverToolUse = extractServerToolUse(jsonData.usage)
+          if (serverToolUse) {
+            usageObject.server_tool_use = serverToolUse
           }
 
           // 添加请求元信息

@@ -13,6 +13,7 @@ const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const userMessageQueueService = require('../userMessageQueueService')
 const { isStreamWritable } = require('../../utils/streamHelper')
 const { filterForClaude } = require('../../utils/headerFilter')
+const { extractServerToolUse } = require('../../utils/anthropicUsage')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -1109,6 +1110,12 @@ class ClaudeConsoleRelayService {
                             ephemeral_1h_input_tokens:
                               data.usage.cache_creation.ephemeral_1h_input_tokens || 0
                           }
+                        }
+
+                        // 服务端工具调用次数（web_search 按次计费）
+                        const serverToolUse = extractServerToolUse(data.usage)
+                        if (serverToolUse) {
+                          collectedUsageData.server_tool_use = serverToolUse
                         }
 
                         logger.info(
