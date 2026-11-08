@@ -14,6 +14,7 @@ const {
   logRefreshSkipped
 } = require('../../utils/tokenRefreshLogger')
 const tokenRefreshService = require('../tokenRefreshService')
+const { isTokenRefreshUnauthorizedError } = require('./openaiTokenErrors')
 const { createEncryptor } = require('../../utils/commonHelper')
 
 // 使用 commonHelper 的加密器
@@ -1240,6 +1241,7 @@ module.exports = {
   selectAvailableAccount,
   refreshAccountToken,
   isTokenExpired,
+  isTokenRefreshUnauthorizedError,
   setAccountRateLimited,
   markAccountUnauthorized,
   resetAccountStatus,

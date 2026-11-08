@@ -242,11 +242,31 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
             logger.info(`✅ Token refreshed successfully in route handler`)
           } catch (refreshError) {
             logger.error(`Failed to refresh token for ${account.name}:`, refreshError)
+            if (openaiAccountService.isTokenRefreshUnauthorizedError(refreshError)) {
+              const reason = `OpenAI账号认证失败（Refresh Token 无效）：${refreshError.message}`
+              await unifiedOpenAIScheduler
+                .markAccountUnauthorized(result.accountId, 'openai', sessionHash, reason)
+                .catch((markError) => {
+                  logger.error(
+                    '❌ Failed to mark OpenAI account unauthorized after refresh failure:',
+                    markError
+                  )
+                })
+            }
             const error = new Error(`Token expired and refresh failed: ${refreshError.message}`)
             error.statusCode = 403 // Forbidden - 认证失败
             throw error
           }
         } else {
+          const reason = `OpenAI账号认证失败（Refresh Token 缺失）：Token expired and no refresh token available for account ${account.name}`
+          await unifiedOpenAIScheduler
+            .markAccountUnauthorized(result.accountId, 'openai', sessionHash, reason)
+            .catch((markError) => {
+              logger.error(
+                '❌ Failed to mark OpenAI account unauthorized after missing refresh token:',
+                markError
+              )
+            })
           const error = new Error(
             `Token expired and no refresh token available for account ${account.name}`
           )
