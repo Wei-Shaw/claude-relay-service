@@ -58,6 +58,23 @@ jest.mock('../src/services/apiKeyService', () => ({
   recordUsage: jest.fn()
 }))
 
+jest.mock('../src/services/modelService', () => ({
+  getAllModels: jest.fn(() => [
+    {
+      id: 'gpt-5.5',
+      object: 'model',
+      created: 1770000000,
+      owned_by: 'openai'
+    },
+    {
+      id: 'claude-sonnet-4-20250514',
+      object: 'model',
+      created: 1770000000,
+      owned_by: 'anthropic'
+    }
+  ])
+}))
+
 jest.mock('../src/models/redis', () => ({
   getUsageStats: jest.fn()
 }))
@@ -546,5 +563,45 @@ describe('openai responses payload toggles', () => {
     expect(req.body.model).toBe('o1-mini')
     expect(req.body.prompt_cache_key).toBe('compact-key')
     expect(req.body.instructions).toBe(openaiRoutes.CODEX_CLI_INSTRUCTIONS)
+  })
+})
+
+describe('openai models endpoint', () => {
+  test('returns OpenAI-compatible data and Codex-compatible models metadata', async () => {
+    const req = {
+      apiKey: {
+        id: 'key_1',
+        permissions: ['openai']
+      }
+    }
+    const res = createRes()
+
+    await openaiRoutes.handleModels(req, res)
+
+    expect(res.payload.object).toBe('list')
+    expect(res.payload.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'gpt-5.5',
+          object: 'model',
+          owned_by: 'openai'
+        })
+      ])
+    )
+    expect(res.payload.models).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          slug: 'gpt-5.5',
+          display_name: 'gpt-5.5',
+          shell_type: 'shell_command',
+          visibility: 'list',
+          supported_in_api: true,
+          truncation_policy: {
+            mode: 'tokens',
+            limit: 10000
+          }
+        })
+      ])
+    )
   })
 })
