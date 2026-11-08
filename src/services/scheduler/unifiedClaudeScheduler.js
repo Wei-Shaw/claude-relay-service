@@ -1690,8 +1690,42 @@ class UnifiedClaudeScheduler {
       // 使用现有的优先级排序逻辑
       const sortedAccounts = sortAccountsByPriority(availableAccounts)
 
-      // 选择第一个账户
-      const selectedAccount = sortedAccounts[0]
+      // 💰 按优先级惰性检查每日额度（避免对全部成员批量查询用量）
+      // 与共享池路径语义一致：选号时主动触发一次额度检查，超额账户跳过
+      let selectedAccount = null
+      for (const candidate of sortedAccounts) {
+        const quotaService =
+          candidate.accountType === 'claude-console'
+            ? claudeConsoleAccountService
+            : candidate.accountType === 'ccr'
+              ? ccrAccountService
+              : null
+
+        if (quotaService && parseFloat(candidate.dailyQuota || '0') > 0) {
+          try {
+            await quotaService.checkQuotaUsage(candidate.accountId)
+            const isQuotaExceeded = await quotaService.isAccountQuotaExceeded(candidate.accountId)
+            if (isQuotaExceeded) {
+              logger.info(
+                `🚫 Skipping group member ${candidate.name} (${candidate.accountId}) due to daily quota exceeded: $${candidate.dailyQuota}`
+              )
+              continue
+            }
+          } catch (error) {
+            // 额度检查失败不能阻塞调度，宁可放过一次
+            logger.warn(
+              `⚠️ Failed to check quota for group member ${candidate.name} (${candidate.accountId}): ${error.message}`
+            )
+          }
+        }
+
+        selectedAccount = candidate
+        break
+      }
+
+      if (!selectedAccount) {
+        throw new Error(`No available accounts in group ${group.name} (all quota exceeded)`)
+      }
 
       // 如果有会话哈希，建立新的映射
       if (sessionHash) {
