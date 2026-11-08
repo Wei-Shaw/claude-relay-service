@@ -131,7 +131,9 @@ function createReq({
       openaiResponsesPayloadRules: [],
       ...apiKeyOverrides
     },
-    _fromUnifiedEndpoint: fromUnifiedEndpoint
+    _fromUnifiedEndpoint: fromUnifiedEndpoint,
+    on: jest.fn(),
+    removeListener: jest.fn()
   }
 }
 
@@ -156,7 +158,9 @@ function createRes() {
     set: jest.fn((key, value) => {
       res.headers[key] = value
       return res
-    })
+    }),
+    on: jest.fn(),
+    removeListener: jest.fn()
   }
   return res
 }
