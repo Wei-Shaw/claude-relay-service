@@ -24,6 +24,7 @@ const openaiGeminiRoutes = require('./routes/openaiGeminiRoutes')
 const standardGeminiRoutes = require('./routes/standardGeminiRoutes')
 const openaiClaudeRoutes = require('./routes/openaiClaudeRoutes')
 const openaiRoutes = require('./routes/openaiRoutes')
+const codexModelsCompatibilityRoutes = require('./routes/codexModelsCompatibility')
 const droidRoutes = require('./routes/droidRoutes')
 const grokRoutes = require('./routes/grokRoutes')
 const userRoutes = require('./routes/userRoutes')
@@ -329,6 +330,7 @@ class Application {
       }
 
       // 🛣️ 路由
+      this.app.use(codexModelsCompatibilityRoutes)
       this.app.use('/api', apiRoutes)
       this.app.use('/api', unifiedRoutes) // 统一智能路由（支持 /v1/chat/completions 等）
       this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同

@@ -20,6 +20,14 @@ const {
   extractOpenAICacheReadTokens
 } = require('../utils/requestDetailHelper')
 const requestBodyRuleService = require('../services/requestBodyRuleService')
+const codexModelsCatalogService = require('../services/codexModelsCatalogService')
+const {
+  captureImageResult,
+  normalizeEditImages,
+  createImageInput
+} = require('../services/codexImageBridgeService')
+
+const CODEX_MODELS_URL = 'https://chatgpt.com/backend-api/codex/models'
 
 // Codex CLI 系统提示词（非 Codex CLI 客户端请求时注入，统一端点也使用）
 const CODEX_CLI_INSTRUCTIONS =
@@ -286,6 +294,121 @@ async function getOpenAIAuthToken(apiKeyData, sessionId = null, requestedModel =
   } catch (error) {
     logger.error('Failed to get OpenAI auth token:', error)
     throw error
+  }
+}
+
+async function fetchCodexModelsFromOAuth(req, clientVersion, upstreamEtag = null) {
+  const { accessToken, accountId, accountType, proxy, account } = await getOpenAIAuthToken(
+    req.apiKey || {},
+    null,
+    null
+  )
+
+  if (accountType !== 'openai' || !accessToken) {
+    const error = new Error('No OAuth-backed OpenAI account is available for model discovery')
+    error.statusCode = 503
+    throw error
+  }
+
+  const headers = {
+    authorization: `Bearer ${accessToken}`,
+    'chatgpt-account-id': account.accountId || account.chatgptUserId || accountId,
+    host: 'chatgpt.com',
+    accept: 'application/json'
+  }
+  if (req.headers['user-agent']) {
+    headers['user-agent'] = req.headers['user-agent']
+  }
+  if (upstreamEtag) {
+    headers['if-none-match'] = upstreamEtag
+  }
+
+  const proxyAgent = createProxyAgent(proxy)
+  const axiosConfig = {
+    headers,
+    params: { client_version: clientVersion },
+    timeout: Math.min(config.requestTimeout || 600000, 15000),
+    validateStatus: () => true
+  }
+  if (proxyAgent) {
+    axiosConfig.httpAgent = proxyAgent
+    axiosConfig.httpsAgent = proxyAgent
+    axiosConfig.proxy = false
+  }
+
+  const upstream = await axios.get(CODEX_MODELS_URL, axiosConfig)
+  if (upstream.status === 304) {
+    return { notModified: true, etag: upstream.headers?.etag || upstreamEtag }
+  }
+  if (upstream.status !== 200) {
+    const error = new Error(`Codex models upstream returned HTTP ${upstream.status}`)
+    error.statusCode = upstream.status
+    throw error
+  }
+
+  return {
+    payload: upstream.data,
+    etag: upstream.headers?.etag || null,
+    notModified: false
+  }
+}
+
+const handleCodexModels = async (req, res) => {
+  try {
+    const apiKeyData = req.apiKey || {}
+    if (!checkOpenAIPermissions(apiKeyData)) {
+      return res.status(403).json({
+        error: {
+          message: 'This API key does not have permission to access OpenAI',
+          type: 'permission_denied',
+          code: 'permission_denied'
+        }
+      })
+    }
+
+    const clientVersion = codexModelsCatalogService.normalizeClientVersion(
+      req.query?.client_version
+    )
+    if (!clientVersion) {
+      return res.status(400).json({
+        error: {
+          message: 'client_version must be a semantic version',
+          type: 'invalid_request_error',
+          code: 'invalid_client_version'
+        }
+      })
+    }
+
+    const result = await codexModelsCatalogService.getOrRefresh(clientVersion, (upstreamEtag) =>
+      fetchCodexModelsFromOAuth(req, clientVersion, upstreamEtag)
+    )
+    const payload = codexModelsCatalogService.filterForApiKey(result.payload, apiKeyData)
+    const clientEtag = codexModelsCatalogService.createClientEtag(payload)
+
+    res.set('Cache-Control', 'private, max-age=300')
+    res.set('ETag', clientEtag)
+    res.set('Vary', 'Authorization')
+    res.set('X-CRS-Model-Catalog', result.source)
+
+    if (req.headers['if-none-match'] === clientEtag) {
+      return res.status(304).end()
+    }
+    if (result.refreshError) {
+      logger.warn(
+        `Codex model refresh failed; serving validated stale cache: ${result.refreshError.message}`
+      )
+    }
+
+    return res.status(200).json(payload)
+  } catch (error) {
+    logger.error('Codex models discovery error:', error)
+    return res.status(error.statusCode === 403 ? 403 : 502).json({
+      error: {
+        message: 'Unable to refresh the Codex model catalog',
+        type: 'upstream_error',
+        code: 'model_catalog_unavailable'
+      }
+    })
   }
 }
 
@@ -987,6 +1110,7 @@ async function handleImages(req, res) {
     }
 
     const body = req.body || {}
+    const isEditRequest = /\/images\/edits$/i.test(req.path || '')
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
     if (!prompt) {
       return res
@@ -1009,6 +1133,16 @@ async function handleImages(req, res) {
       })
     }
     const n = body.n || 1
+    let editImageUrls = []
+    if (isEditRequest) {
+      try {
+        editImageUrls = normalizeEditImages(body.images)
+      } catch (error) {
+        return res.status(400).json({
+          error: { message: error.message, type: 'invalid_request_error' }
+        })
+      }
+    }
     const sessionId = req.headers['session_id'] || req.body?.session_id || null
     sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
 
@@ -1024,7 +1158,11 @@ async function handleImages(req, res) {
       })
     }
 
-    const tool = { type: 'image_generation', action: 'generate', model: imageModel }
+    const tool = {
+      type: 'image_generation',
+      action: isEditRequest ? 'edit' : 'generate',
+      model: imageModel
+    }
     if (body.size) {
       tool.size = String(body.size)
     }
@@ -1056,7 +1194,7 @@ async function handleImages(req, res) {
       model: 'gpt-5.4-mini',
       store: false,
       tool_choice: { type: 'image_generation' },
-      input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: prompt }] }],
+      input: createImageInput(prompt, editImageUrls),
       tools: [tool]
     }
 
@@ -1204,11 +1342,9 @@ async function handleImages(req, res) {
         } catch (e) {
           continue
         }
-        if (j && typeof j.partial_image_b64 === 'string') {
-          const i = Number.isInteger(j.partial_image_index) ? j.partial_image_index : 0
-          if (!best[i] || j.partial_image_b64.length >= best[i].length) {
-            best[i] = j.partial_image_b64
-          }
+        const completedImage = captureImageResult(j, best)
+        if (completedImage) {
+          meta = completedImage
         }
         if (j && j.type === 'response.completed' && j.response) {
           if (Array.isArray(j.response.tools) && j.response.tools[0]) {
@@ -1340,11 +1476,16 @@ async function handleImages(req, res) {
 
 router.post('/images/generations', authenticateApiKey, handleImages)
 router.post('/v1/images/generations', authenticateApiKey, handleImages)
+router.post('/images/edits', authenticateApiKey, handleImages)
+router.post('/v1/images/edits', authenticateApiKey, handleImages)
 
 router.post('/responses', authenticateApiKey, handleResponses)
 router.post('/v1/responses', authenticateApiKey, handleResponses)
 router.post('/responses/compact', authenticateApiKey, handleResponses)
 router.post('/v1/responses/compact', authenticateApiKey, handleResponses)
+
+router.get('/models', authenticateApiKey, handleCodexModels)
+router.get('/v1/models', authenticateApiKey, handleCodexModels)
 
 // 使用情况统计端点
 router.get('/usage', authenticateApiKey, async (req, res) => {
@@ -1412,4 +1553,5 @@ router.get('/key-info', authenticateApiKey, async (req, res) => {
 
 module.exports = router
 module.exports.handleResponses = handleResponses
+module.exports.handleCodexModels = handleCodexModels
 module.exports.CODEX_CLI_INSTRUCTIONS = CODEX_CLI_INSTRUCTIONS
