@@ -8529,6 +8529,7 @@
   },
   "gpt-image-1-mini": {
     "cache_read_input_image_token_cost": 2.5e-07,
+    "cache_read_input_image_token_cost_batches": 1.3e-07,
     "cache_read_input_token_cost": 2e-07,
     "cache_read_input_token_cost_batches": 1e-07,
     "deprecation_date": "2026-12-01",
@@ -8550,6 +8551,7 @@
   },
   "gpt-image-1.5": {
     "cache_read_input_image_token_cost": 2e-06,
+    "cache_read_input_image_token_cost_batches": 1e-06,
     "cache_read_input_token_cost": 1.25e-06,
     "cache_read_input_token_cost_batches": 6.3e-07,
     "deprecation_date": "2026-12-01",
@@ -8598,6 +8600,7 @@
   },
   "gpt-image-2": {
     "cache_read_input_image_token_cost": 2e-06,
+    "cache_read_input_image_token_cost_batches": 1e-06,
     "cache_read_input_token_cost": 1.25e-06,
     "cache_read_input_token_cost_batches": 6.25e-07,
     "deprecation_date": "2027-02-10",
@@ -8640,6 +8643,7 @@
   },
   "gpt-image-2.5-flare": {
     "cache_read_input_image_token_cost": 2e-06,
+    "cache_read_input_image_token_cost_batches": 1e-06,
     "cache_read_input_token_cost": 1.25e-06,
     "cache_read_input_token_cost_batches": 6.25e-07,
     "input_cost_per_image_token": 8e-06,
@@ -8676,6 +8680,7 @@
   },
   "gpt-image-2.5-sunburst": {
     "cache_read_input_image_token_cost": 2e-06,
+    "cache_read_input_image_token_cost_batches": 1e-06,
     "cache_read_input_token_cost": 1.25e-06,
     "cache_read_input_token_cost_batches": 6.25e-07,
     "input_cost_per_image_token": 8e-06,
