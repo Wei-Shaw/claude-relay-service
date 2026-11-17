@@ -21,7 +21,21 @@ const {
 } = require('../utils/warmupInterceptor')
 const { sanitizeUpstreamError } = require('../utils/errorSanitizer')
 const { dumpAnthropicMessagesRequest } = require('../utils/anthropicRequestDump')
+const {
+  dumpAnthropicNonStreamResponse,
+  dumpAnthropicStreamSummary,
+  dumpAnthropicStreamError
+} = require('../utils/anthropicResponseDump')
+const {
+  createAnthropicStreamCapture,
+  wireResponseDumpFromCapture
+} = require('../utils/anthropicStreamCapture')
 const { createRequestDetailMeta } = require('../utils/requestDetailHelper')
+
+const RESPONSE_DUMPERS = {
+  onSummary: dumpAnthropicStreamSummary,
+  onError: dumpAnthropicStreamError
+}
 const {
   handleAnthropicMessagesToGemini,
   handleAnthropicCountTokensToGemini
@@ -433,10 +447,21 @@ async function handleMessagesRequest(req, res) {
         const _apiKey = req.apiKey
         const _headers = req.headers
 
+        // SSE tap: when ANTHROPIC_DEBUG_RESPONSE_DUMP=true, _capture.proxy
+        // intercepts every res.write/end to accumulate emittedText + tool_use
+        // + usage + stop_reason and dumps the full summary on stream finish.
+        // Zero-cost when the env var is off (_capture.proxy === res).
+        const _capture = createAnthropicStreamCapture(res)
+        wireResponseDumpFromCapture(req, res, _capture, RESPONSE_DUMPERS, {
+          vendor: 'claude-official',
+          accountType,
+          route: '/v1/messages'
+        })
+
         await claudeRelayService.relayStreamRequestWithUsageCapture(
           _requestBody,
           _apiKey,
-          res,
+          _capture.proxy,
           _headers,
           (usageData) => {
             // 回调函数：当检测到完整usage数据时记录真实token使用量
@@ -567,10 +592,17 @@ async function handleMessagesRequest(req, res) {
         const _apiKeyConsole = req.apiKey
         const _headersConsole = req.headers
 
+        const _captureConsole = createAnthropicStreamCapture(res)
+        wireResponseDumpFromCapture(req, res, _captureConsole, RESPONSE_DUMPERS, {
+          vendor: 'claude-console',
+          accountType,
+          route: '/v1/messages'
+        })
+
         await claudeConsoleRelayService.relayStreamRequestWithUsageCapture(
           _requestBodyConsole,
           _apiKeyConsole,
-          res,
+          _captureConsole.proxy,
           _headersConsole,
           (usageData) => {
             // 回调函数：当检测到完整usage数据时记录真实token使用量
@@ -798,10 +830,17 @@ async function handleMessagesRequest(req, res) {
         const _apiKeyCcr = req.apiKey
         const _headersCcr = req.headers
 
+        const _captureCcr = createAnthropicStreamCapture(res)
+        wireResponseDumpFromCapture(req, res, _captureCcr, RESPONSE_DUMPERS, {
+          vendor: 'ccr',
+          accountType,
+          route: '/v1/messages'
+        })
+
         await ccrRelayService.relayStreamRequestWithUsageCapture(
           _requestBodyCcr,
           _apiKeyCcr,
-          res,
+          _captureCcr.proxy,
           _headersCcr,
           (usageData) => {
             // 回调函数：当检测到完整usage数据时记录真实token使用量
@@ -1229,6 +1268,25 @@ async function handleMessagesRequest(req, res) {
           res.setHeader(key, response.headers[key])
         }
       })
+
+      // Dump full non-stream response body for offline analysis / finetuning
+      // (no-op unless ANTHROPIC_DEBUG_RESPONSE_DUMP=true). Body is parsed below
+      // for usage metrics; we record the raw body here so the dump captures
+      // everything including malformed JSON cases.
+      try {
+        let _nonStreamBody = null
+        try {
+          _nonStreamBody = JSON.parse(response.body)
+        } catch {
+          _nonStreamBody = { _raw: typeof response.body === 'string' ? response.body : null }
+        }
+        dumpAnthropicNonStreamResponse(req, response.statusCode, _nonStreamBody, {
+          vendor: 'claude-official',
+          route: '/v1/messages'
+        })
+      } catch {
+        // dumping must never break the request flow
+      }
 
       let usageRecorded = false
 
