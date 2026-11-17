@@ -1293,6 +1293,41 @@ const authenticateApiKey = async (req, res, next) => {
       }
     }
 
+    // 检查全模型周费用限制（所有模型都计入此限额）
+    const weeklyCostLimit = validation.keyData.weeklyCostLimit || 0
+    if (weeklyCostLimit > 0) {
+      const weeklyCost = validation.keyData.weeklyCost || 0
+
+      if (weeklyCost >= weeklyCostLimit) {
+        logger.security(
+          `💰 Weekly cost limit exceeded for key: ${validation.keyData.id} (${
+            validation.keyData.name
+          }), cost: $${weeklyCost.toFixed(2)}/$${weeklyCostLimit}`
+        )
+
+        const resetDay = validation.keyData.weeklyResetDay || 1
+        const resetHour = validation.keyData.weeklyResetHour || 0
+        const resetDate = redis.getNextResetTime(resetDay, resetHour)
+
+        return res.status(402).json({
+          error: {
+            type: 'insufficient_quota',
+            message: `已达到全模型周费用限制 ($${weeklyCostLimit})`,
+            code: 'weekly_cost_limit_exceeded'
+          },
+          currentCost: weeklyCost,
+          costLimit: weeklyCostLimit,
+          resetAt: resetDate.toISOString()
+        })
+      }
+
+      logger.api(
+        `💰 Weekly cost usage for key: ${validation.keyData.id} (${
+          validation.keyData.name
+        }), current: $${weeklyCost.toFixed(2)}/$${weeklyCostLimit}`
+      )
+    }
+
     // 将验证信息添加到请求对象（只包含必要信息）
     req.apiKey = {
       id: validation.keyData.id,

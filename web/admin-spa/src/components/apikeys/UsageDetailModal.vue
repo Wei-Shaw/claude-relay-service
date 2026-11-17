@@ -181,6 +181,19 @@
                 </div>
               </div>
 
+              <div v-if="Number(apiKey.weeklyCostLimit) > 0" class="space-y-1.5">
+                <LimitProgressBar
+                  :current="Number(weeklyCost) || 0"
+                  label="全模型周费用限制"
+                  :limit="Number(apiKey.weeklyCostLimit) || 0"
+                  :show-shine="true"
+                  type="total"
+                />
+                <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+                  已使用 {{ Math.min(weeklyUsagePercentage, 100).toFixed(1) }}%
+                </div>
+              </div>
+
               <div v-if="Number(apiKey.totalCostLimit) > 0" class="space-y-1.5">
                 <LimitProgressBar
                   :current="Number(totalCost) || 0"
@@ -350,6 +363,8 @@ const dailyCost = computed(() => props.apiKey.dailyCost || 0)
 const totalCostLimit = computed(() => props.apiKey.totalCostLimit || 0)
 const weeklyOpusCost = computed(() => props.apiKey.weeklyOpusCost || 0)
 const weeklyOpusCostLimit = computed(() => props.apiKey.weeklyOpusCostLimit || 0)
+const weeklyCost = computed(() => props.apiKey.weeklyCost || 0)
+const weeklyCostLimit = computed(() => props.apiKey.weeklyCostLimit || 0)
 const inputTokens = computed(() => props.apiKey.usage?.total?.inputTokens || 0)
 const outputTokens = computed(() => props.apiKey.usage?.total?.outputTokens || 0)
 const cacheCreateTokens = computed(() => props.apiKey.usage?.total?.cacheCreateTokens || 0)
@@ -394,6 +409,7 @@ const hasLimits = computed(() => {
     Number(props.apiKey.totalCostLimit) > 0 ||
     Number(props.apiKey.concurrencyLimit) > 0 ||
     Number(props.apiKey.weeklyOpusCostLimit) > 0 ||
+    Number(props.apiKey.weeklyCostLimit) > 0 ||
     Number(props.apiKey.rateLimitWindow) > 0 ||
     Number(props.apiKey.rateLimitRequests) > 0 ||
     Number(props.apiKey.rateLimitCost) > 0 ||
@@ -415,6 +431,11 @@ const totalUsagePercentage = computed(() => {
 const opusUsagePercentage = computed(() => {
   if (!weeklyOpusCostLimit.value || weeklyOpusCostLimit.value === 0) return 0
   return (weeklyOpusCost.value / weeklyOpusCostLimit.value) * 100
+})
+
+const weeklyUsagePercentage = computed(() => {
+  if (!weeklyCostLimit.value || weeklyCostLimit.value === 0) return 0
+  return (weeklyCost.value / weeklyCostLimit.value) * 100
 })
 
 // 方法

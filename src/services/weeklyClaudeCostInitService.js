@@ -27,7 +27,40 @@ function inferAccountType(keyData) {
   if (keyData?.claudeAccountId) {
     return 'claude-official'
   }
-  // bedrock/azure/gemini 等不计入周费用
+  // bedrock/azure/gemini 等不计入 Opus 周费用
+  return null
+}
+
+// 用于全模型周费用回填：覆盖所有 account 类型（按 Claude 优先，其次 OpenAI/Gemini/Bedrock/Droid）
+// serviceRatesService.getService 接受 null accountType 时会按 model fallback，所以推断不到也没关系
+function inferAnyAccountType(keyData) {
+  if (!keyData) {
+    return null
+  }
+  if (keyData.ccrAccountId) {
+    return 'ccr'
+  }
+  if (keyData.claudeConsoleAccountId) {
+    return 'claude-console'
+  }
+  if (keyData.claudeAccountId) {
+    return 'claude-official'
+  }
+  if (keyData.azureOpenaiAccountId) {
+    return 'azure-openai'
+  }
+  if (keyData.openaiAccountId) {
+    return 'openai'
+  }
+  if (keyData.geminiAccountId) {
+    return 'gemini'
+  }
+  if (keyData.bedrockAccountId) {
+    return 'bedrock'
+  }
+  if (keyData.droidAccountId) {
+    return 'droid'
+  }
   return null
 }
 
@@ -56,54 +89,60 @@ class WeeklyClaudeCostInitService {
     return `usage:opus:weekly:${keyId}:${periodString}`
   }
 
+  _buildWeeklyKey(keyId, periodString) {
+    return `usage:weekly:${keyId}:${periodString}`
+  }
+
   /**
-   * 启动回填：从"按日/按模型"统计中反算 Claude 模型费用，
-   * 根据每个 API Key 的 weeklyResetDay/weeklyResetHour 计算周期，
-   * 写入 `usage:opus:weekly:*`，保证周限额在重启后不归零。
+   * 启动回填：从"按日/按模型"统计中反算费用，根据每个 API Key 的
+   * weeklyResetDay/weeklyResetHour 计算周期，双写两个 bucket：
+   *   - `usage:opus:weekly:*`：仅 Claude 模型 + claude-official/claude-console/ccr 账户
+   *   - `usage:weekly:*`：全模型 + 全账户类型
    *
    * 说明：
    * - 回填最近 8 天数据（覆盖任意重置配置的完整 7 天周期）
    * - 会加分布式锁，避免多实例重复跑
    * - 会写 done 标记：同一天内重启默认不重复回填
+   * - done 标记 key 名已升级（init:weekly_cost），旧标记会被忽略，第一次启动会重新回填一次以确保两个 bucket 都填上
    */
   async backfillCurrentWeekClaudeCosts() {
     const client = redis.getClientSafe()
     if (!client) {
-      logger.warn('⚠️ Claude 周费用回填跳过：Redis client 不可用')
+      logger.warn('⚠️ 周费用回填跳过：Redis client 不可用')
       return { success: false, reason: 'redis_unavailable' }
     }
 
     if (!pricingService || !pricingService.pricingData) {
-      logger.warn('⚠️ Claude 周费用回填跳过：pricing service 未初始化')
+      logger.warn('⚠️ 周费用回填跳过：pricing service 未初始化')
       return { success: false, reason: 'pricing_uninitialized' }
     }
 
     const todayStr = redis.getDateStringInTimezone()
-    const doneKey = `init:weekly_opus_cost:${todayStr}:done`
+    const doneKey = `init:weekly_cost:${todayStr}:done`
 
     try {
       const alreadyDone = await client.get(doneKey)
       if (alreadyDone) {
-        logger.info(`ℹ️ Claude 周费用回填已完成（${todayStr}），跳过`)
+        logger.info(`ℹ️ 周费用回填已完成（${todayStr}），跳过`)
         return { success: true, skipped: true }
       }
     } catch (e) {
       // 尽力而为：读取失败不阻断启动回填流程。
     }
 
-    const lockKey = `lock:init:weekly_opus_cost:${todayStr}`
+    const lockKey = `lock:init:weekly_cost:${todayStr}`
     const lockValue = `${process.pid}:${Date.now()}`
     const lockTtlMs = 15 * 60 * 1000
 
     const lockAcquired = await redis.setAccountLock(lockKey, lockValue, lockTtlMs)
     if (!lockAcquired) {
-      logger.info(`ℹ️ Claude 周费用回填已在运行（${todayStr}），跳过`)
+      logger.info(`ℹ️ 周费用回填已在运行（${todayStr}），跳过`)
       return { success: true, skipped: true, reason: 'locked' }
     }
 
     const startedAt = Date.now()
     try {
-      logger.info(`💰 开始回填 Claude 周费用（${todayStr}）...`)
+      logger.info(`💰 开始回填周费用（${todayStr}）...`)
 
       const keyIds = await redis.scanApiKeyIds()
       const dates = this._getLast7DaysInTimezone()
@@ -128,10 +167,14 @@ class WeeklyClaudeCostInitService {
       }
       logger.info(`💰 预加载 ${keyDataCache.size} 个 API Key 数据`)
 
-      // 收集每个 key 每天的费用: Map<keyId, Map<dateStr, ratedCost>>
-      const costByKeyDate = new Map()
+      // 两个独立累加桶：
+      // - opusCostByKeyDate：仅 Claude 模型 + claude-official/claude-console/ccr 账户（保留运行时 recordOpusCost 逻辑）
+      // - allCostByKeyDate：全模型 + 全账户类型（对应运行时 recordWeeklyCost）
+      const opusCostByKeyDate = new Map()
+      const allCostByKeyDate = new Map()
       let scannedKeys = 0
-      let matchedClaudeKeys = 0
+      let matchedClaudeEntries = 0
+      let totalEntries = 0
 
       for (const dateStr of dates) {
         let cursor = '0'
@@ -142,19 +185,14 @@ class WeeklyClaudeCostInitService {
           cursor = nextCursor
           scannedKeys += keys.length
 
+          // 不在准备阶段过滤 model，全部进入处理（Opus 桶在后面按需累加）
           const entries = []
           for (const usageKey of keys) {
             const match = usageKey.match(/^usage:([^:]+):model:daily:(.+):(\d{4}-\d{2}-\d{2})$/)
             if (!match) {
               continue
             }
-            const keyId = match[1]
-            const model = match[2]
-            if (!isClaudeFamilyModel(model)) {
-              continue
-            }
-            matchedClaudeKeys++
-            entries.push({ usageKey, keyId, model, dateStr })
+            entries.push({ usageKey, keyId: match[1], model: match[2], dateStr })
           }
 
           if (entries.length === 0) {
@@ -205,44 +243,74 @@ class WeeklyClaudeCostInitService {
             if (realCost <= 0) {
               continue
             }
+            totalEntries++
 
             const keyData = keyDataCache.get(entry.keyId)
-            const accountType = inferAccountType(keyData)
+            const isClaudeModel = isClaudeFamilyModel(entry.model)
 
-            if (!accountType || !OPUS_ACCOUNT_TYPES.includes(accountType)) {
-              continue
+            // ----- Opus bucket：保留运行时 recordOpusCost 的过滤条件 -----
+            const opusAccountType = inferAccountType(keyData)
+            if (isClaudeModel && opusAccountType && OPUS_ACCOUNT_TYPES.includes(opusAccountType)) {
+              matchedClaudeEntries++
+              const opusService = serviceRatesService.getService(opusAccountType, entry.model)
+
+              let globalRate = globalRateCache.get(opusService)
+              if (globalRate === undefined) {
+                globalRate = await serviceRatesService.getServiceRate(opusService)
+                globalRateCache.set(opusService, globalRate)
+              }
+
+              let keyRates = {}
+              try {
+                keyRates = JSON.parse(keyData?.serviceRates || '{}')
+              } catch (e) {
+                keyRates = {}
+              }
+              const keyRate = keyRates[opusService] ?? 1.0
+              const opusRatedCost = realCost * globalRate * keyRate
+
+              if (!opusCostByKeyDate.has(entry.keyId)) {
+                opusCostByKeyDate.set(entry.keyId, new Map())
+              }
+              const opusDateMap = opusCostByKeyDate.get(entry.keyId)
+              opusDateMap.set(entry.dateStr, (opusDateMap.get(entry.dateStr) || 0) + opusRatedCost)
             }
 
-            const service = serviceRatesService.getService(accountType, entry.model)
+            // ----- 全模型 bucket：所有模型 + 所有账户类型 -----
+            const anyAccountType = inferAnyAccountType(keyData)
+            const anyService = serviceRatesService.getService(anyAccountType, entry.model)
 
-            let globalRate = globalRateCache.get(service)
-            if (globalRate === undefined) {
-              globalRate = await serviceRatesService.getServiceRate(service)
-              globalRateCache.set(service, globalRate)
+            let anyRatedCost = realCost
+            if (anyService) {
+              let anyGlobalRate = globalRateCache.get(anyService)
+              if (anyGlobalRate === undefined) {
+                anyGlobalRate = await serviceRatesService.getServiceRate(anyService)
+                globalRateCache.set(anyService, anyGlobalRate)
+              }
+
+              let anyKeyRates = {}
+              try {
+                anyKeyRates = JSON.parse(keyData?.serviceRates || '{}')
+              } catch (e) {
+                anyKeyRates = {}
+              }
+              const anyKeyRate = anyKeyRates[anyService] ?? 1.0
+              anyRatedCost = realCost * anyGlobalRate * anyKeyRate
             }
 
-            let keyRates = {}
-            try {
-              keyRates = JSON.parse(keyData?.serviceRates || '{}')
-            } catch (e) {
-              keyRates = {}
+            if (!allCostByKeyDate.has(entry.keyId)) {
+              allCostByKeyDate.set(entry.keyId, new Map())
             }
-            const keyRate = keyRates[service] ?? 1.0
-            const ratedCost = realCost * globalRate * keyRate
-
-            // 按 keyId+dateStr 累加
-            if (!costByKeyDate.has(entry.keyId)) {
-              costByKeyDate.set(entry.keyId, new Map())
-            }
-            const dateMap = costByKeyDate.get(entry.keyId)
-            dateMap.set(entry.dateStr, (dateMap.get(entry.dateStr) || 0) + ratedCost)
+            const allDateMap = allCostByKeyDate.get(entry.keyId)
+            allDateMap.set(entry.dateStr, (allDateMap.get(entry.dateStr) || 0) + anyRatedCost)
           }
         } while (cursor !== '0')
       }
 
-      // 为每个 API Key 按其重置配置计算当前周期费用
+      // 为每个 API Key 按其重置配置计算当前周期费用，双写两个 bucket
       const ttlSeconds = 14 * 24 * 3600
-      let filledCount = 0
+      let filledOpus = 0
+      let filledAll = 0
       for (let i = 0; i < keyIds.length; i += batchSize) {
         const batch = keyIds.slice(i, i + batchSize)
         const pipeline = client.pipeline()
@@ -251,28 +319,42 @@ class WeeklyClaudeCostInitService {
           const resetDay = parseInt(keyData?.weeklyResetDay || 1)
           const resetHour = parseInt(keyData?.weeklyResetHour || 0)
 
-          // 获取当前周期的起始日期
           const periodStart = redis.getPeriodStartDate(resetDay, resetHour)
           const periodStartDateStr = formatTzDateYmd(periodStart)
           const periodString = redis.getPeriodString(resetDay, resetHour)
 
-          // 汇总该 key 在当前周期内的费用
-          const dateMap = costByKeyDate.get(keyId)
-          let periodCost = 0
-          if (dateMap) {
-            for (const [dateStr, cost] of dateMap) {
+          // Opus bucket
+          let opusPeriodCost = 0
+          const opusDateMap = opusCostByKeyDate.get(keyId)
+          if (opusDateMap) {
+            for (const [dateStr, cost] of opusDateMap) {
               if (dateStr >= periodStartDateStr) {
-                periodCost += cost
+                opusPeriodCost += cost
               }
             }
           }
-
-          if (periodCost > 0) {
-            filledCount++
+          if (opusPeriodCost > 0) {
+            filledOpus++
           }
+          const opusKey = this._buildWeeklyOpusKey(keyId, periodString)
+          pipeline.set(opusKey, String(opusPeriodCost))
+          pipeline.expire(opusKey, ttlSeconds)
 
-          const weeklyKey = this._buildWeeklyOpusKey(keyId, periodString)
-          pipeline.set(weeklyKey, String(periodCost))
+          // 全模型 bucket
+          let allPeriodCost = 0
+          const allDateMap = allCostByKeyDate.get(keyId)
+          if (allDateMap) {
+            for (const [dateStr, cost] of allDateMap) {
+              if (dateStr >= periodStartDateStr) {
+                allPeriodCost += cost
+              }
+            }
+          }
+          if (allPeriodCost > 0) {
+            filledAll++
+          }
+          const weeklyKey = this._buildWeeklyKey(keyId, periodString)
+          pipeline.set(weeklyKey, String(allPeriodCost))
           pipeline.expire(weeklyKey, ttlSeconds)
         }
         await pipeline.exec()
@@ -283,7 +365,7 @@ class WeeklyClaudeCostInitService {
 
       const durationMs = Date.now() - startedAt
       logger.info(
-        `✅ Claude 周费用回填完成（${todayStr}）：keys=${keyIds.length}, scanned=${scannedKeys}, matchedClaude=${matchedClaudeKeys}, filled=${filledCount}（${durationMs}ms）`
+        `✅ 周费用回填完成（${todayStr}）：keys=${keyIds.length}, scanned=${scannedKeys}, entries=${totalEntries}, matchedClaude=${matchedClaudeEntries}, filledOpus=${filledOpus}, filledAll=${filledAll}（${durationMs}ms）`
       )
 
       return {
@@ -291,12 +373,14 @@ class WeeklyClaudeCostInitService {
         todayStr,
         keyCount: keyIds.length,
         scannedKeys,
-        matchedClaudeKeys,
-        filledKeys: filledCount,
+        totalEntries,
+        matchedClaudeEntries,
+        filledOpus,
+        filledAll,
         durationMs
       }
     } catch (error) {
-      logger.error(`❌ Claude 周费用回填失败（${todayStr}）：`, error)
+      logger.error(`❌ 周费用回填失败（${todayStr}）：`, error)
       return { success: false, error: error.message }
     } finally {
       await redis.releaseAccountLock(lockKey, lockValue)
@@ -331,22 +415,26 @@ class WeeklyClaudeCostInitService {
       const resetDay = parseInt(keyData.weeklyResetDay || 1)
       const resetHour = parseInt(keyData.weeklyResetHour || 0)
 
-      const accountType = inferAccountType(keyData)
-      if (!accountType || !OPUS_ACCOUNT_TYPES.includes(accountType)) {
-        // 非 Claude 账户，写入 0 即可
-        const periodString = redis.getPeriodString(resetDay, resetHour)
-        await redis.setWeeklyOpusCost(keyId, 0, periodString)
-        return { success: true, cost: 0, reason: 'non_claude_account' }
-      }
-
       const periodStart = redis.getPeriodStartDate(resetDay, resetHour)
       const periodStartDateStr = formatTzDateYmd(periodStart)
       const periodString = redis.getPeriodString(resetDay, resetHour)
 
+      const opusAccountType = inferAccountType(keyData)
+      const anyAccountType = inferAnyAccountType(keyData)
+      const opusEligible = opusAccountType && OPUS_ACCOUNT_TYPES.includes(opusAccountType)
+
       // 扫描最近 8 天的每日使用数据
       const dates = this._getLast7DaysInTimezone()
       const globalRateCache = new Map()
-      let totalCost = 0
+      let opusCost = 0
+      let allCost = 0
+
+      let keyRates = {}
+      try {
+        keyRates = JSON.parse(keyData.serviceRates || '{}')
+      } catch (e) {
+        keyRates = {}
+      }
 
       for (const dateStr of dates) {
         if (dateStr < periodStartDateStr) {
@@ -364,11 +452,12 @@ class WeeklyClaudeCostInitService {
             continue
           }
 
+          // 不过滤 model，全部进入处理
           const pipeline = client.pipeline()
           const models = []
           for (const usageKey of keys) {
             const match = usageKey.match(/^usage:[^:]+:model:daily:(.+):(\d{4}-\d{2}-\d{2})$/)
-            if (!match || !isClaudeFamilyModel(match[1])) {
+            if (!match) {
               continue
             }
             models.push(match[1])
@@ -420,32 +509,45 @@ class WeeklyClaudeCostInitService {
               continue
             }
 
-            const service = serviceRatesService.getService(accountType, model)
+            const isClaudeModel = isClaudeFamilyModel(model)
 
-            let globalRate = globalRateCache.get(service)
-            if (globalRate === undefined) {
-              globalRate = await serviceRatesService.getServiceRate(service)
-              globalRateCache.set(service, globalRate)
+            // Opus bucket：保留现有过滤
+            if (opusEligible && isClaudeModel) {
+              const opusService = serviceRatesService.getService(opusAccountType, model)
+              let globalRate = globalRateCache.get(opusService)
+              if (globalRate === undefined) {
+                globalRate = await serviceRatesService.getServiceRate(opusService)
+                globalRateCache.set(opusService, globalRate)
+              }
+              const keyRate = keyRates[opusService] ?? 1.0
+              opusCost += realCost * globalRate * keyRate
             }
 
-            let keyRates = {}
-            try {
-              keyRates = JSON.parse(keyData.serviceRates || '{}')
-            } catch (e) {
-              keyRates = {}
+            // 全模型 bucket：所有模型
+            const anyService = serviceRatesService.getService(anyAccountType, model)
+            if (anyService) {
+              let anyGlobalRate = globalRateCache.get(anyService)
+              if (anyGlobalRate === undefined) {
+                anyGlobalRate = await serviceRatesService.getServiceRate(anyService)
+                globalRateCache.set(anyService, anyGlobalRate)
+              }
+              const anyKeyRate = keyRates[anyService] ?? 1.0
+              allCost += realCost * anyGlobalRate * anyKeyRate
+            } else {
+              allCost += realCost
             }
-            const keyRate = keyRates[service] ?? 1.0
-            totalCost += realCost * globalRate * keyRate
           }
         } while (cursor !== '0')
       }
 
-      await redis.setWeeklyOpusCost(keyId, totalCost, periodString)
+      // 双写两个 bucket（即使 cost=0 也要写，确保旧值被覆盖）
+      await redis.setWeeklyOpusCost(keyId, opusCost, periodString)
+      await redis.setWeeklyCost(keyId, allCost, periodString)
       logger.info(
-        `💰 单 Key 回填完成 (${keyId})：period=${periodString}, cost=$${totalCost.toFixed(6)}`
+        `💰 单 Key 回填完成 (${keyId})：period=${periodString}, opus=$${opusCost.toFixed(6)}, all=$${allCost.toFixed(6)}`
       )
 
-      return { success: true, cost: totalCost, periodString }
+      return { success: true, opusCost, allCost, periodString }
     } catch (error) {
       logger.error(`❌ 单 Key 回填失败 (${keyId})：`, error)
       return { success: false, error: error.message }
