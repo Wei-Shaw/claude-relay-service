@@ -68,7 +68,7 @@ class OpenAIResponsesRelayService {
   async handleRequest(req, res, account, apiKeyData) {
     let abortController = null
     // 获取会话哈希（如果有的话）
-    const sessionId = req.headers['session_id'] || req.body?.session_id
+    const sessionId = req.headers['session_id'] || req.headers['session-id'] || req.body?.session_id
     const sessionHash = sessionId
       ? crypto.createHash('sha256').update(sessionId).digest('hex')
       : null
@@ -655,7 +655,8 @@ class OpenAIResponsesRelayService {
       // 如果在流式响应中检测到限流
       if (rateLimitDetected) {
         // 使用统一调度器处理限流（与非流式响应保持一致）
-        const sessionId = req.headers['session_id'] || req.body?.session_id
+        const sessionId =
+          req.headers['session_id'] || req.headers['session-id'] || req.body?.session_id
         const sessionHash = sessionId
           ? crypto.createHash('sha256').update(sessionId).digest('hex')
           : null

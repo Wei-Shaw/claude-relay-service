@@ -36,7 +36,7 @@ class CodexCliValidator {
     try {
       const userAgent = req.headers['user-agent'] || ''
       const originator = req.headers['originator'] || ''
-      const sessionId = req.headers['session_id']
+      const sessionId = req.headers['session_id'] || req.headers['session-id']
 
       // 1. 基础 User-Agent 检查
       // Codex CLI 的 UA 格式:
