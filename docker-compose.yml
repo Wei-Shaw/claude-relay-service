@@ -7,7 +7,7 @@ services:
   # 🚀 Claude Relay Service
   claude-relay:
     build: .
-    image: weishaw/claude-relay-service:latest
+    image: weishaw/claude-relay-service:v1.1.291
     restart: unless-stopped
     ports:
       # 绑定地址：生产环境建议使用反向代理，设置 BIND_HOST=127.0.0.1
@@ -15,12 +15,15 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
+      - ./custom/api.js:/app/src/routes/api.js:ro
     environment:
       # 🌐 服务器配置
       - NODE_ENV=production
       - PORT=3000
       - HOST=0.0.0.0
       
+      - DISABLE_WEB_TOOLS=true
+
       # 🔧 请求体大小配置
       - REQUEST_MAX_SIZE_MB=60
       
