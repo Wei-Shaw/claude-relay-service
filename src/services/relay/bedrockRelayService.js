@@ -374,6 +374,26 @@ class BedrockRelayService {
       })
 
       let totalUsage = null
+      // 📡 Langfuse 输出文本捕获（按 Anthropic SSE 文本累积）
+      let _langfuseResponseText = ''
+      const _LANGFUSE_RESPONSE_MAX = 1024 * 1024
+      let _langfuseTruncated = false
+      const _appendLangfuseText = (text) => {
+        if (!text || _langfuseTruncated) {
+          return
+        }
+        const remaining = _LANGFUSE_RESPONSE_MAX - _langfuseResponseText.length
+        if (remaining <= 0) {
+          _langfuseTruncated = true
+          return
+        }
+        if (text.length <= remaining) {
+          _langfuseResponseText += text
+        } else {
+          _langfuseResponseText += text.slice(0, remaining)
+          _langfuseTruncated = true
+        }
+      }
 
       // 处理流式响应
       // Bedrock InvokeModelWithResponseStream 返回的 JSON 事件结构与 Claude API 完全一致，
@@ -403,6 +423,18 @@ class BedrockRelayService {
           if (chunkData.type === 'message_delta' && chunkData.usage) {
             totalUsage = chunkData.usage
           }
+
+          // 📡 Langfuse 输出文本累积
+          if (chunkData.type === 'content_block_delta' && chunkData.delta) {
+            if (chunkData.delta.type === 'text_delta' && typeof chunkData.delta.text === 'string') {
+              _appendLangfuseText(chunkData.delta.text)
+            } else if (
+              chunkData.delta.type === 'thinking_delta' &&
+              typeof chunkData.delta.thinking === 'string'
+            ) {
+              _appendLangfuseText(chunkData.delta.thinking)
+            }
+          }
         }
       }
 
@@ -418,7 +450,9 @@ class BedrockRelayService {
         success: true,
         usage: totalUsage,
         model: modelId,
-        duration
+        duration,
+        responseText: _langfuseResponseText,
+        responseTextTruncated: _langfuseTruncated
       }
     } catch (error) {
       // 客户端主动断开，不算错误

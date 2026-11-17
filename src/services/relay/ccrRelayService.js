@@ -769,6 +769,14 @@ class CcrRelayService {
 
             try {
               const chunkStr = chunk.toString('utf8')
+              // 📡 Langfuse 输出文本捕获
+              if (options && options.langfuseCollector) {
+                try {
+                  options.langfuseCollector.onChunk(chunkStr)
+                } catch (_collectErr) {
+                  // ignore
+                }
+              }
               rawBuffer += chunkStr
 
               // 按行分割处理 SSE 数据

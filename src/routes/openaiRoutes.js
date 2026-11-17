@@ -20,6 +20,7 @@ const {
   extractOpenAICacheReadTokens
 } = require('../utils/requestDetailHelper')
 const requestBodyRuleService = require('../services/requestBodyRuleService')
+const StreamTextCollector = require('../utils/streamTextCollector')
 
 // Codex CLI 系统提示词（非 Codex CLI 客户端请求时注入，统一端点也使用）
 const CODEX_CLI_INSTRUCTIONS =
@@ -702,6 +703,34 @@ const handleResponses = async (req, res) => {
           // 计算实际输入token（总输入减去缓存部分）
           const actualInputTokens = Math.max(0, totalInputTokens - cacheReadTokens)
 
+          // 📡 Langfuse 输出文本提取
+          let _openaiNonStreamText = ''
+          try {
+            const choices = responseData?.choices
+            if (Array.isArray(choices)) {
+              for (const choice of choices) {
+                const msg = choice?.message
+                if (typeof msg?.content === 'string') {
+                  _openaiNonStreamText += msg.content
+                } else if (Array.isArray(msg?.content)) {
+                  for (const part of msg.content) {
+                    if (part && typeof part.text === 'string') {
+                      _openaiNonStreamText += part.text
+                    }
+                  }
+                }
+              }
+            }
+          } catch (_textErr) {
+            _openaiNonStreamText = ''
+          }
+          const _openaiNonStreamMeta =
+            createRequestDetailMeta(req, {
+              requestBody: req.body,
+              stream: false,
+              statusCode: upstream.status
+            }) || {}
+          _openaiNonStreamMeta.responseText = _openaiNonStreamText
           const nonStreamCosts = await apiKeyService.recordUsage(
             apiKeyData.id,
             actualInputTokens, // 传递实际输入（不含缓存）
@@ -712,11 +741,7 @@ const handleResponses = async (req, res) => {
             accountId,
             'openai',
             req._serviceTier,
-            createRequestDetailMeta(req, {
-              requestBody: req.body,
-              stream: false,
-              statusCode: upstream.status
-            })
+            _openaiNonStreamMeta
           )
 
           logger.info(
@@ -752,6 +777,8 @@ const handleResponses = async (req, res) => {
 
     // 使用增量 SSE 解析器
     const sseParser = new IncrementalSSEParser()
+    // 📡 Langfuse 输出文本捕获器
+    const _langfuseStreamCollector = new StreamTextCollector({ format: 'openai' })
 
     // 处理解析出的事件
     const processSSEEvent = (eventData) => {
@@ -787,6 +814,13 @@ const handleResponses = async (req, res) => {
         // 转发数据给客户端
         if (!res.destroyed) {
           res.write(chunk)
+        }
+
+        // 📡 Langfuse 输出文本累积
+        try {
+          _langfuseStreamCollector.onChunk(chunk)
+        } catch (_collectErr) {
+          // ignore
         }
 
         // 使用增量解析器处理数据
@@ -825,6 +859,16 @@ const handleResponses = async (req, res) => {
           // 使用响应中的真实 model，如果没有则使用请求中的 model，最后回退到默认值
           const modelToRecord = actualModel || upstreamRequestedModel || 'gpt-4'
 
+          const _openaiStreamMeta =
+            createRequestDetailMeta(req, {
+              requestBody: req.body,
+              stream: true,
+              statusCode: res.statusCode
+            }) || {}
+          _openaiStreamMeta.responseText = _langfuseStreamCollector.getText()
+          if (_langfuseStreamCollector.isTruncated()) {
+            _openaiStreamMeta.outputTruncated = true
+          }
           const streamCosts = await apiKeyService.recordUsage(
             apiKeyData.id,
             actualInputTokens, // 传递实际输入（不含缓存）
@@ -835,11 +879,7 @@ const handleResponses = async (req, res) => {
             accountId,
             'openai',
             req._serviceTier,
-            createRequestDetailMeta(req, {
-              requestBody: req.body,
-              stream: true,
-              statusCode: res.statusCode
-            })
+            _openaiStreamMeta
           )
 
           logger.info(

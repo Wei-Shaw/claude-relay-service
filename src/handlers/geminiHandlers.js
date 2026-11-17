@@ -1733,6 +1733,31 @@ async function handleGenerateContent(req, res) {
     if (response?.response?.usageMetadata) {
       try {
         const usage = response.response.usageMetadata
+        // 📡 Langfuse 输出文本提取
+        let _geminiNonStreamText = ''
+        try {
+          const candidates = response?.response?.candidates
+          if (Array.isArray(candidates)) {
+            for (const candidate of candidates) {
+              const parts = candidate?.content?.parts
+              if (Array.isArray(parts)) {
+                for (const part of parts) {
+                  if (part && typeof part.text === 'string') {
+                    _geminiNonStreamText += part.text
+                  }
+                }
+              }
+            }
+          }
+        } catch (_textErr) {
+          _geminiNonStreamText = ''
+        }
+        const _geminiMeta = createRequestDetailMeta(req, {
+          requestBody: req.body,
+          stream: false,
+          statusCode: res.statusCode || 200
+        })
+        _geminiMeta.responseText = _geminiNonStreamText
         const geminiNonStreamCosts = await apiKeyService.recordUsage(
           req.apiKey.id,
           usage.promptTokenCount || 0,
@@ -1743,11 +1768,7 @@ async function handleGenerateContent(req, res) {
           account.id,
           'gemini',
           null,
-          createRequestDetailMeta(req, {
-            requestBody: req.body,
-            stream: false,
-            statusCode: res.statusCode || 200
-          })
+          _geminiMeta
         )
         logger.info(
           `📊 Recorded Gemini usage - Input: ${usage.promptTokenCount}, Output: ${usage.candidatesTokenCount}, Total: ${usage.totalTokenCount}`
