@@ -880,21 +880,32 @@ async function handleModels(req, res) {
         const apiUrl = buildGeminiApiUrl(account.baseUrl, null, null, account.apiKey, {
           listModels: true
         })
+        logger.info('Gemini API models URL constructed', {
+          apiUrl,
+          baseUrl: account.baseUrl,
+          accountId: account.id
+        })
         const axiosConfig = {
           method: 'GET',
           url: apiUrl,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': account.apiKey,
+            'x-goog-api-key': account.apiKey
+          }
         }
         if (proxyConfig) {
           axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
           axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
         }
         const response = await axios(axiosConfig)
-        models = (response.data.models || []).map((m) => ({
-          id: m.name?.replace('models/', '') || m.name,
+        // 兼容 Gemini API 格式 (response.data.models) 和中转格式 (response.data.data)
+        const rawModels = response.data.models || response.data.data || []
+        models = rawModels.map((m) => ({
+          id: m.name?.replace('models/', '') || m.id || m.name,
           object: 'model',
-          created: Date.now() / 1000,
-          owned_by: 'google'
+          created: m.created || Date.now() / 1000,
+          owned_by: m.owned_by || 'google'
         }))
       } catch (error) {
         logger.warn('Failed to fetch models from Gemini API:', error.message)
@@ -1137,16 +1148,62 @@ async function handleLoadCodeAssist(req, res) {
     )
     const { accountId, accountType } = schedulerResult
 
-    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
+    // API Key 账户：智能判断是否可以转发
     if (accountType === 'gemini-api') {
-      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
-      return res.status(400).json({
-        error: {
-          message:
-            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
-          type: 'invalid_account_type'
-        }
+      const apiAccount = await geminiApiAccountService.getAccount(accountId)
+      if (!apiAccount) {
+        return res.status(404).json({
+          error: { message: 'Gemini API account not found', type: 'account_not_found' }
+        })
+      }
+
+      const normalizedBaseUrl = (apiAccount.baseUrl || '').replace(/\/+$/, '')
+      if (
+        normalizedBaseUrl.includes('googleapis.com') ||
+        normalizedBaseUrl.includes('google.com')
+      ) {
+        // baseUrl 指向 Google 官方 API，不支持 loadCodeAssist
+        logger.warn('loadCodeAssist: API Key account points to Google API, not supported')
+        return res.status(400).json({
+          error: {
+            message:
+              'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts pointing to Google API are not compatible.',
+            type: 'invalid_account_type'
+          }
+        })
+      }
+
+      // baseUrl 指向中转实例，转发请求
+      logger.info('loadCodeAssist: Forwarding to upstream relay via API Key account', {
+        baseUrl: normalizedBaseUrl,
+        accountId
       })
+      const proxyConfig = parseProxyConfig(apiAccount)
+      const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
+      const modelName = requestedModel || 'gemini-2.5-flash'
+      let forwardUrl
+      if (version === 'v1internal') {
+        forwardUrl = `${normalizedBaseUrl}/v1internal:loadCodeAssist?key=${apiAccount.apiKey}`
+      } else {
+        forwardUrl = `${normalizedBaseUrl}/v1beta/models/${modelName}:loadCodeAssist?key=${apiAccount.apiKey}`
+      }
+      logger.info('loadCodeAssist: Forward URL constructed', { forwardUrl, version, modelName })
+      const axiosConfig = {
+        method: 'POST',
+        url: forwardUrl,
+        data: req.body,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiAccount.apiKey,
+          'x-goog-api-key': apiAccount.apiKey
+        }
+      }
+      if (proxyConfig) {
+        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
+        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+      }
+      const forwardResponse = await axios(axiosConfig)
+      return res.json(forwardResponse.data)
     }
 
     const account = await geminiAccountService.getAccount(accountId)
@@ -1241,16 +1298,62 @@ async function handleOnboardUser(req, res) {
     )
     const { accountId, accountType } = schedulerResult
 
-    // v1internal 路由只支持 OAuth 账户，不支持 API Key 账户
+    // API Key 账户：智能判断是否可以转发
     if (accountType === 'gemini-api') {
-      logger.error(`❌ v1internal routes do not support Gemini API accounts. Account: ${accountId}`)
-      return res.status(400).json({
-        error: {
-          message:
-            'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts are not compatible with v1internal format.',
-          type: 'invalid_account_type'
-        }
+      const apiAccount = await geminiApiAccountService.getAccount(accountId)
+      if (!apiAccount) {
+        return res.status(404).json({
+          error: { message: 'Gemini API account not found', type: 'account_not_found' }
+        })
+      }
+
+      const normalizedBaseUrl = (apiAccount.baseUrl || '').replace(/\/+$/, '')
+      if (
+        normalizedBaseUrl.includes('googleapis.com') ||
+        normalizedBaseUrl.includes('google.com')
+      ) {
+        // baseUrl 指向 Google 官方 API，不支持 onboardUser
+        logger.warn('onboardUser: API Key account points to Google API, not supported')
+        return res.status(400).json({
+          error: {
+            message:
+              'This endpoint only supports Gemini OAuth accounts. Gemini API Key accounts pointing to Google API are not compatible.',
+            type: 'invalid_account_type'
+          }
+        })
+      }
+
+      // baseUrl 指向中转实例，转发请求
+      logger.info('onboardUser: Forwarding to upstream relay via API Key account', {
+        baseUrl: normalizedBaseUrl,
+        accountId
       })
+      const proxyConfig = parseProxyConfig(apiAccount)
+      const version = req.path.includes('v1beta') ? 'v1beta' : 'v1internal'
+      const modelName = requestedModel || 'gemini-2.5-flash'
+      let forwardUrl
+      if (version === 'v1internal') {
+        forwardUrl = `${normalizedBaseUrl}/v1internal:onboardUser?key=${apiAccount.apiKey}`
+      } else {
+        forwardUrl = `${normalizedBaseUrl}/v1beta/models/${modelName}:onboardUser?key=${apiAccount.apiKey}`
+      }
+      logger.info('onboardUser: Forward URL constructed', { forwardUrl, version, modelName })
+      const axiosConfig = {
+        method: 'POST',
+        url: forwardUrl,
+        data: req.body,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiAccount.apiKey,
+          'x-goog-api-key': apiAccount.apiKey
+        }
+      }
+      if (proxyConfig) {
+        axiosConfig.httpsAgent = ProxyHelper.createProxyAgent(proxyConfig)
+        axiosConfig.httpAgent = ProxyHelper.createProxyAgent(proxyConfig)
+      }
+      const forwardResponse = await axios(axiosConfig)
+      return res.json(forwardResponse.data)
     }
 
     const account = await geminiAccountService.getAccount(accountId)
@@ -1504,12 +1607,22 @@ async function handleCountTokens(req, res) {
       // API Key 账户：直接使用 API Key 请求
       const modelName = model.startsWith('models/') ? model.replace('models/', '') : model
       const apiUrl = buildGeminiApiUrl(account.baseUrl, modelName, 'countTokens', account.apiKey)
+      logger.info('Gemini API countTokens URL constructed', {
+        apiUrl,
+        model: modelName,
+        baseUrl: account.baseUrl,
+        accountId
+      })
 
       const axiosConfig = {
         method: 'POST',
         url: apiUrl,
         data: { contents },
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': account.apiKey,
+          'x-goog-api-key': account.apiKey
+        }
       }
 
       if (proxyConfig) {
@@ -2222,7 +2335,7 @@ async function handleStandardGenerateContent(req, res) {
     }
 
     // 从路径参数中获取模型名
-    const model = req.params.modelName || 'gemini-2.0-flash-exp'
+    const model = req.params.modelName || 'gemini-2.5-flash'
     sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 标准 Gemini API 请求体直接包含 contents 等字段
@@ -2335,6 +2448,12 @@ async function handleStandardGenerateContent(req, res) {
     if (isApiAccount) {
       // Gemini API 账户：直接使用 API Key 请求
       const apiUrl = buildGeminiApiUrl(account.baseUrl, model, 'generateContent', account.apiKey)
+      logger.info('Gemini API generateContent URL constructed', {
+        apiUrl,
+        model,
+        baseUrl: account.baseUrl,
+        accountId: actualAccountId
+      })
 
       logger.info('📤 Gemini upstream request', {
         targetUrl: apiUrl.replace(/key=[^&]+/, 'key=***'),
@@ -2347,7 +2466,9 @@ async function handleStandardGenerateContent(req, res) {
         url: apiUrl,
         data: actualRequestData,
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-api-key': account.apiKey,
+          'x-goog-api-key': account.apiKey
         }
       }
 
@@ -2517,7 +2638,7 @@ async function handleStandardStreamGenerateContent(req, res) {
     }
 
     // 从路径参数中获取模型名
-    const model = req.params.modelName || 'gemini-2.0-flash-exp'
+    const model = req.params.modelName || 'gemini-2.5-flash'
     sessionHash = sessionHelper.generateSessionHash(req.body)
 
     // 标准 Gemini API 请求体直接包含 contents 等字段
@@ -2653,6 +2774,12 @@ async function handleStandardStreamGenerateContent(req, res) {
           stream: true
         }
       )
+      logger.info('Gemini API streamGenerateContent URL constructed', {
+        apiUrl,
+        model,
+        baseUrl: account.baseUrl,
+        accountId: actualAccountId
+      })
 
       logger.info('📤 Gemini upstream request', {
         targetUrl: apiUrl.replace(/key=[^&]+/, 'key=***'),
