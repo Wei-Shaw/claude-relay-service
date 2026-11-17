@@ -366,6 +366,7 @@ const handleResponses = async (req, res) => {
     // NOTE: For some clients, prompt_cache_key is the only stable per-session key.
     const sessionId =
       req.headers['session_id'] ||
+      req.headers['session-id'] ||
       req.headers['x-session-id'] ||
       req.body?.session_id ||
       req.body?.conversation_id ||
@@ -409,7 +410,8 @@ const handleResponses = async (req, res) => {
     // 基于白名单构造上游所需的请求头，确保键为小写且值受控
     const incoming = req.headers || {}
 
-    const allowedKeys = ['version', 'openai-beta', 'session_id']
+    // Current Codex clients send session-id; the backend uses it to keep a conversation on its prompt cache.
+    const allowedKeys = ['version', 'openai-beta', 'session_id', 'session-id']
 
     const headers = {}
     for (const key of allowedKeys) {
@@ -1009,7 +1011,8 @@ async function handleImages(req, res) {
       })
     }
     const n = body.n || 1
-    const sessionId = req.headers['session_id'] || req.body?.session_id || null
+    const sessionId =
+      req.headers['session_id'] || req.headers['session-id'] || req.body?.session_id || null
     sessionHash = sessionId ? crypto.createHash('sha256').update(sessionId).digest('hex') : null
 
     const authResult = await getOpenAIAuthToken(apiKeyData, sessionId, 'gpt-5.4-mini')
