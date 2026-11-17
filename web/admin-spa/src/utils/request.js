@@ -17,7 +17,7 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !error.config?.skipAuthRedirect) {
       const path = window.location.pathname + window.location.hash
       // api-stats 和 user-login 是公开页面，401 是业务错误不是认证错误
       const isPublicPage = path.includes('/api-stats') || path.includes('/user-login')
