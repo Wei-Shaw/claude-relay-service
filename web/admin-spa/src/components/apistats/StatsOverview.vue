@@ -311,7 +311,8 @@ const {
   multiKeyMode,
   aggregatedStats,
   individualStats,
-  invalidKeys
+  invalidKeys,
+  billingDetailsHidden
 } = storeToRefs(apiStatsStore)
 
 const topContributors = computed(() => {
@@ -323,7 +324,11 @@ const topContributors = computed(() => {
 
 // 是否有自定义服务倍率
 const hasServiceRates = computed(() => {
-  return statsData.value?.serviceRates && Object.keys(statsData.value.serviceRates).length > 0
+  return (
+    !billingDetailsHidden.value &&
+    statsData.value?.serviceRates &&
+    Object.keys(statsData.value.serviceRates).length > 0
+  )
 })
 
 const calculateContribution = (stat) => {

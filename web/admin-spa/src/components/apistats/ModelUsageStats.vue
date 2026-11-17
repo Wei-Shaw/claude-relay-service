@@ -48,11 +48,11 @@
             </div>
           </div>
           <div class="flex-shrink-0 text-xs sm:text-sm">
-            <span class="text-gray-500">官方API</span>
+            <span class="text-gray-500">{{ costLabel }}</span>
             <span class="ml-1 font-semibold text-green-600">
               {{ model.formatted?.total || '$0.00' }}
             </span>
-            <template v-if="serviceRates?.rates">
+            <template v-if="!billingDetailsHidden && serviceRates?.rates">
               <span class="ml-2 text-gray-500">计费</span>
               <span class="ml-1 font-semibold text-amber-600 dark:text-amber-400">
                 {{ calculateCcCost(model) }}
@@ -86,8 +86,14 @@ const props = defineProps({
 })
 
 const apiStatsStore = useApiStatsStore()
-const { dailyModelStats, monthlyModelStats, alltimeModelStats, modelStatsLoading, serviceRates } =
-  storeToRefs(apiStatsStore)
+const {
+  dailyModelStats,
+  monthlyModelStats,
+  alltimeModelStats,
+  modelStatsLoading,
+  serviceRates,
+  billingDetailsHidden
+} = storeToRefs(apiStatsStore)
 
 // 根据 period 选择对应的数据
 const stats = computed(() => {
@@ -98,6 +104,8 @@ const stats = computed(() => {
 })
 
 const loading = computed(() => modelStatsLoading.value)
+
+const costLabel = computed(() => (billingDetailsHidden.value ? '使用费用' : '官方API'))
 
 const periodLabel = computed(() => {
   if (props.period === 'daily') return '今日'
