@@ -184,9 +184,6 @@
             type="text"
             :value="currentUser.username || 'Admin'"
           />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            当前用户名，输入新用户名以修改
-          </p>
         </div>
 
         <div>
@@ -199,7 +196,6 @@
             placeholder="输入新用户名（留空保持不变）"
             type="text"
           />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">留空表示不修改用户名</p>
         </div>
 
         <div>
@@ -296,6 +292,7 @@ import { checkUpdatesApi, changePasswordApi } from '@/utils/http_apis'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import { useConfirmModal } from '@/utils/useConfirmModal'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -333,37 +330,8 @@ const changePasswordForm = reactive({
 })
 
 // ConfirmModal 状态
-const showConfirmModal = ref(false)
-const confirmModalConfig = ref({
-  title: '',
-  message: '',
-  type: 'primary',
-  confirmText: '确认',
-  cancelText: '取消'
-})
-const confirmResolve = ref(null)
-
-const showConfirm = (
-  title,
-  message,
-  confirmText = '确认',
-  cancelText = '取消',
-  type = 'primary'
-) => {
-  return new Promise((resolve) => {
-    confirmModalConfig.value = { title, message, confirmText, cancelText, type }
-    confirmResolve.value = resolve
-    showConfirmModal.value = true
-  })
-}
-const handleConfirmModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(true)
-}
-const handleCancelModal = () => {
-  showConfirmModal.value = false
-  confirmResolve.value?.(false)
-}
+const { showConfirmModal, confirmModalConfig, showConfirm, handleConfirmModal, handleCancelModal } =
+  useConfirmModal()
 
 // 检查更新（同时获取版本信息）
 const checkForUpdates = async () => {
@@ -507,11 +475,14 @@ const handleClickOutside = (event) => {
   }
 }
 
+// 组件实例作用域，避免多实例共享
+let updateCheckTimer = null
+
 onMounted(() => {
   checkForUpdates()
 
   // 设置自动检查更新（每小时检查一次）
-  setInterval(() => {
+  updateCheckTimer = setInterval(() => {
     checkForUpdates()
   }, 3600000) // 1小时
 
@@ -519,6 +490,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (updateCheckTimer) {
+    clearInterval(updateCheckTimer)
+    updateCheckTimer = null
+  }
   document.removeEventListener('click', handleClickOutside)
 })
 </script>

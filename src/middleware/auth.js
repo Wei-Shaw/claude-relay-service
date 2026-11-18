@@ -4,12 +4,34 @@ const apiKeyService = require('../services/apiKeyService')
 const userService = require('../services/userService')
 const logger = require('../utils/logger')
 const redis = require('../models/redis')
+const requestDetailService = require('../services/requestDetailService')
 // const { RateLimiterRedis } = require('rate-limiter-flexible') // 暂时未使用
 const ClientValidator = require('../validators/clientValidator')
 const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 const claudeRelayConfigService = require('../services/claudeRelayConfigService')
 const { calculateWaitTimeStats } = require('../utils/statsHelper')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
+const adminApiKeyTestCredentialService = require('../services/adminApiKeyTestCredentialService')
+const { runWithoutApiKeyUsage } = require('../utils/apiKeyUsageContext')
+
+function getApiKeyTestService(req) {
+  const normalizedPath = (req.originalUrl || req.path || '').toLowerCase()
+  if (normalizedPath.startsWith('/gemini/')) {
+    return 'gemini'
+  }
+  if (normalizedPath.startsWith('/openai/')) {
+    return 'openai'
+  }
+  if (
+    normalizedPath.startsWith('/api/') ||
+    normalizedPath.startsWith('/claude/') ||
+    normalizedPath.startsWith('/antigravity/api/') ||
+    normalizedPath.startsWith('/gemini-cli/api/')
+  ) {
+    return 'claude'
+  }
+  return null
+}
 
 // 工具函数
 function sleep(ms) {
@@ -469,8 +491,18 @@ const authenticateApiKey = async (req, res, next) => {
       })
     }
 
+    const adminTestCredential = adminApiKeyTestCredentialService.consumeCredential(
+      apiKey,
+      getApiKeyTestService(req)
+    )
+
     // 验证API Key（带缓存优化）
-    const validation = await apiKeyService.validateApiKey(apiKey)
+    const validation = adminTestCredential
+      ? await apiKeyService.validateApiKey(apiKey, {
+          keyId: adminTestCredential.keyId,
+          skipActivation: true
+        })
+      : await apiKeyService.validateApiKey(apiKey)
 
     if (!validation.valid) {
       const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
@@ -479,6 +511,12 @@ const authenticateApiKey = async (req, res, next) => {
         error: 'Invalid API key',
         message: validation.error
       })
+    }
+
+    // Preserve the validated key identity for request details when a later restriction rejects it.
+    req.apiKey = {
+      id: validation.keyData.id,
+      name: validation.keyData.name
     }
 
     const skipKeyRestrictions = isTokenCountRequest(req)
@@ -1077,22 +1115,26 @@ const authenticateApiKey = async (req, res, next) => {
       let windowStart = await redis.getClient().get(windowStartKey)
 
       if (!windowStart) {
-        // 第一次请求，设置窗口开始时间
-        await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
-        await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
-        await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
-        await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
+        // 管理端测试不启动新的 Key 限额窗口。
+        if (!adminTestCredential) {
+          await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
+          await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
+          await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
+          await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
+        }
         windowStart = now
       } else {
         windowStart = parseInt(windowStart)
 
         // 检查窗口是否已过期
         if (now - windowStart >= windowDuration) {
-          // 窗口已过期，重置
-          await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
-          await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
-          await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
-          await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
+          if (!adminTestCredential) {
+            // 窗口已过期，重置
+            await redis.getClient().set(windowStartKey, now, 'PX', windowDuration)
+            await redis.getClient().set(requestCountKey, 0, 'PX', windowDuration)
+            await redis.getClient().set(tokenCountKey, 0, 'PX', windowDuration)
+            await redis.getClient().set(costCountKey, 0, 'PX', windowDuration) // 新增：重置费用
+          }
           windowStart = now
         }
       }
@@ -1165,22 +1207,26 @@ const authenticateApiKey = async (req, res, next) => {
         }
       }
 
-      // 增加请求计数
-      await redis.getClient().incr(requestCountKey)
+      // 管理端测试只校验现有额度，不增加 Key 的请求计数。
+      if (!adminTestCredential) {
+        await redis.getClient().incr(requestCountKey)
+      }
 
       // 存储限流信息到请求对象
-      req.rateLimitInfo = {
-        windowStart,
-        windowDuration,
-        requestCountKey,
-        tokenCountKey,
-        costCountKey, // 新增：费用计数器
-        currentRequests: currentRequests + 1,
-        currentTokens,
-        currentCost, // 新增：当前费用
-        rateLimitRequests,
-        tokenLimit,
-        rateLimitCost // 新增：费用限制
+      if (!adminTestCredential) {
+        req.rateLimitInfo = {
+          windowStart,
+          windowDuration,
+          requestCountKey,
+          tokenCountKey,
+          costCountKey, // 新增：费用计数器
+          currentRequests: currentRequests + 1,
+          currentTokens,
+          currentCost, // 新增：当前费用
+          rateLimitRequests,
+          tokenLimit,
+          rateLimitCost // 新增：费用限制
+        }
       }
     }
 
@@ -1294,6 +1340,7 @@ const authenticateApiKey = async (req, res, next) => {
     }
 
     // 将验证信息添加到请求对象（只包含必要信息）
+    req._replayApiKey = apiKey
     req.apiKey = {
       id: validation.keyData.id,
       name: validation.keyData.name,
@@ -1328,6 +1375,11 @@ const authenticateApiKey = async (req, res, next) => {
       `🔓 Authenticated request from key: ${validation.keyData.name} (${validation.keyData.id}) in ${authDuration}ms`
     )
     logger.api(`   User-Agent: "${userAgent}"`)
+
+    if (adminTestCredential) {
+      req.isAdminApiKeyTest = true
+      return runWithoutApiKeyUsage(() => next())
+    }
 
     return next()
   } catch (error) {
@@ -1476,6 +1528,13 @@ const authenticateUser = async (req, res, next) => {
   const startTime = Date.now()
 
   try {
+    if (config.userManagement?.enabled !== true || config.ldap?.enabled !== true) {
+      return res.status(503).json({
+        error: 'Service unavailable',
+        message: 'User system is not enabled'
+      })
+    }
+
     // 安全提取用户session token，支持多种方式
     const sessionToken =
       req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
@@ -1775,6 +1834,17 @@ const requestLogger = (req, res, next) => {
   const clientIP = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown'
   const userAgent = req.get('User-Agent') || 'unknown'
   const referer = req.get('Referer') || 'none'
+  let lifecycleCaptured = false
+
+  const scheduleLifecycleCapture = (options = {}) => {
+    if (lifecycleCaptured) {
+      return
+    }
+    lifecycleCaptured = true
+    requestDetailService.captureLifecycleRequest(req, res, options).catch((error) => {
+      logger.debug(`⚠️ Failed to capture lifecycle request detail: ${error.message}`)
+    })
+  }
 
   // 请求开始 → debug 级别（减少正常请求的日志量）
   const isDebugRoute = req.originalUrl.includes('event_logging')
@@ -1790,6 +1860,14 @@ const requestLogger = (req, res, next) => {
   res.json = (body) => {
     res._responseBody = body
     return originalJson(body)
+  }
+
+  const originalSend = res.send.bind(res)
+  res.send = (body) => {
+    if (res.statusCode >= 400 && res._responseBody === undefined) {
+      res._responseBody = body
+    }
+    return originalSend(body)
   }
 
   res.on('finish', () => {
@@ -1851,11 +1929,54 @@ const requestLogger = (req, res, next) => {
     if (duration > 5000) {
       logger.warn(`🐌 Slow request: ${duration}ms ${req.method} ${req.originalUrl}`)
     }
+
+    scheduleLifecycleCapture({
+      completed: true,
+      clientAborted: false,
+      durationMs: duration,
+      statusCode: status
+    })
   })
 
   res.on('error', (error) => {
     const duration = Date.now() - start
     logger.error(`💥 [${requestId}] Response error after ${duration}ms:`, error)
+    scheduleLifecycleCapture({
+      completed: false,
+      clientAborted: false,
+      durationMs: duration,
+      statusCode: res.statusCode || 500,
+      errorType: 'response_error',
+      errorMessage: error?.message || 'Response error',
+      failureStage: 'internal'
+    })
+  })
+
+  res.on('close', () => {
+    if (res.writableEnded || lifecycleCaptured) {
+      return
+    }
+
+    const duration = Date.now() - start
+    if (req._relayResponseTerminalForwarded === true) {
+      scheduleLifecycleCapture({
+        completed: true,
+        clientAborted: false,
+        durationMs: duration,
+        statusCode: res.statusCode
+      })
+      return
+    }
+
+    scheduleLifecycleCapture({
+      completed: false,
+      clientAborted: true,
+      durationMs: duration,
+      statusCode: 499,
+      errorType: 'client_aborted',
+      errorMessage: 'Client connection closed before response completed',
+      failureStage: 'client_abort'
+    })
   })
 
   next()

@@ -84,7 +84,7 @@ class AccountTestSchedulerService {
    */
   async _refreshAllTasks() {
     try {
-      const platforms = ['claude', 'gemini', 'openai']
+      const platforms = ['claude', 'gemini', 'openai', 'openai-responses']
       const activeAccountKeys = new Set()
 
       // 并行加载所有平台的配置
@@ -218,6 +218,9 @@ class AccountTestSchedulerService {
         case 'openai':
           testResult = await this._testOpenAIAccount(accountId, model)
           break
+        case 'openai-responses':
+          testResult = await this._testOpenAIResponsesAccount(accountId, model)
+          break
         default:
           testResult = {
             success: false,
@@ -299,6 +302,24 @@ class AccountTestSchedulerService {
     return {
       success: false,
       error: 'OpenAI scheduled test not implemented yet',
+      timestamp: new Date().toISOString()
+    }
+  }
+
+  /**
+   * 测试 OpenAI Responses 账户
+   * @param {string} accountId
+   * @param {string} model
+   * @private
+   */
+  async _testOpenAIResponsesAccount(accountId, model) {
+    const openaiResponsesRelayService = require('./relay/openaiResponsesRelayService')
+    const result = await openaiResponsesRelayService.testAccountConnection(accountId, model)
+
+    return {
+      ...result,
+      success: true,
+      latencyMs: result.latency,
       timestamp: new Date().toISOString()
     }
   }

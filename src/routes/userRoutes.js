@@ -336,9 +336,6 @@ router.post('/api-keys', authenticateUser, async (req, res) => {
 
     const newApiKey = await apiKeyService.createApiKey(apiKeyData)
 
-    // 更新用户API Key数量
-    await userService.updateUserApiKeyCount(req.user.id, userApiKeys.length + 1)
-
     logger.info(`🔑 User ${req.user.username} created API key: ${name}`)
 
     res.status(201).json({
@@ -389,10 +386,6 @@ router.delete('/api-keys/:keyId', authenticateUser, async (req, res) => {
     }
 
     await apiKeyService.deleteApiKey(keyId, req.user.username, 'user')
-
-    // 更新用户API Key数量
-    const userApiKeys = await apiKeyService.getUserApiKeys(req.user.id)
-    await userService.updateUserApiKeyCount(req.user.id, userApiKeys.length)
 
     logger.info(`🗑️ User ${req.user.username} deleted API key: ${existingKey.name}`)
 

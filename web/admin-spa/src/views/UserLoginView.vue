@@ -28,9 +28,6 @@
         <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
           User Sign In
         </h2>
-        <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-          Sign in to your account to manage your API keys
-        </p>
       </div>
 
       <div class="rounded-lg bg-white px-6 py-8 shadow dark:bg-gray-800 dark:shadow-xl">

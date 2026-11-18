@@ -21,7 +21,11 @@ axiosInstance.interceptors.response.use(
       const path = window.location.pathname + window.location.hash
       // api-stats 和 user-login 是公开页面，401 是业务错误不是认证错误
       const isPublicPage = path.includes('/api-stats') || path.includes('/user-login')
-      if (!path.includes('/login') && !path.endsWith('/') && !isPublicPage) {
+      const shouldHandleAuth = !path.includes('/login') && !path.endsWith('/') && !isPublicPage
+
+      // 启动校验（skipAuthRedirect）由 auth store 清态、路由守卫导航；
+      // 普通业务 API 401 仍由拦截器清持久化并全页跳登录
+      if (shouldHandleAuth && !error.config?.skipAuthRedirect) {
         localStorage.removeItem('authToken')
         window.location.href = getLoginUrl()
       }

@@ -6,8 +6,11 @@ const logger = require('../utils/logger')
 const serviceRatesService = require('./serviceRatesService')
 const requestDetailService = require('./requestDetailService')
 const { isClaudeFamilyModel } = require('../utils/modelHelper')
-const { finalizeRequestDetailMeta } = require('../utils/requestDetailHelper')
+const { finalizeRequestDetailMeta, normalizeUnitPricing } = require('../utils/requestDetailHelper')
+const { normalizeDisplayModel } = require('../utils/modelDisplayHelper')
+const { shouldSkipApiKeyUsage } = require('../utils/apiKeyUsageContext')
 const requestBodyRuleService = require('./requestBodyRuleService')
+const adminApiKeyTestCredentialService = require('./adminApiKeyTestCredentialService')
 
 const ACCOUNT_TYPE_CONFIG = {
   claude: { prefix: 'claude:account:' },
@@ -261,6 +264,7 @@ class ApiKeyService {
       expirationMode: expirationMode || 'fixed', // 新增：过期模式
       isActivated: expirationMode === 'fixed' ? 'true' : 'false', // 根据模式决定激活状态
       activatedAt: expirationMode === 'fixed' ? new Date().toISOString() : '', // 激活时间
+      scheduledActivationAt: '', // 定时启用时间
       createdAt: new Date().toISOString(),
       lastUsedAt: '',
       expiresAt: expirationMode === 'fixed' ? expiresAt || '' : '', // 固定模式才设置过期时间
@@ -338,6 +342,7 @@ class ApiKeyService {
       expirationMode: keyData.expirationMode || 'fixed',
       isActivated: keyData.isActivated === 'true',
       activatedAt: keyData.activatedAt,
+      scheduledActivationAt: keyData.scheduledActivationAt || null,
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
       createdBy: keyData.createdBy,
@@ -357,23 +362,36 @@ class ApiKeyService {
   }
 
   // 🔍 验证API Key
-  async validateApiKey(apiKey) {
+  async validateApiKey(apiKey, options = {}) {
     try {
-      if (!apiKey || !apiKey.startsWith(this.prefix)) {
-        return { valid: false, error: 'Invalid API key format' }
+      const { keyId = null, skipActivation = false } = options
+      let keyData
+
+      if (keyId) {
+        const storedKey = await redis.getApiKey(keyId)
+        keyData =
+          storedKey && Object.keys(storedKey).length > 0 ? { id: keyId, ...storedKey } : null
+      } else {
+        if (!apiKey || !apiKey.startsWith(this.prefix)) {
+          return { valid: false, error: 'Invalid API key format' }
+        }
+
+        // 计算API Key的哈希值
+        const hashedKey = this._hashApiKey(apiKey)
+
+        // 通过哈希值直接查找API Key（性能优化）
+        keyData = await redis.findApiKeyByHash(hashedKey)
+
+        if (!keyData) {
+          // ⚠️ 警告：映射表查找失败，可能是竞态条件或映射表损坏
+          logger.warn(
+            `⚠️ API key not found in hash map: ${hashedKey.substring(0, 16)}... (possible race condition or corrupted hash map)`
+          )
+          return { valid: false, error: 'API key not found' }
+        }
       }
 
-      // 计算API Key的哈希值
-      const hashedKey = this._hashApiKey(apiKey)
-
-      // 通过哈希值直接查找API Key（性能优化）
-      const keyData = await redis.findApiKeyByHash(hashedKey)
-
       if (!keyData) {
-        // ⚠️ 警告：映射表查找失败，可能是竞态条件或映射表损坏
-        logger.warn(
-          `⚠️ API key not found in hash map: ${hashedKey.substring(0, 16)}... (possible race condition or corrupted hash map)`
-        )
         return { valid: false, error: 'API key not found' }
       }
 
@@ -383,7 +401,11 @@ class ApiKeyService {
       }
 
       // 处理激活逻辑（仅在 activation 模式下）
-      if (keyData.expirationMode === 'activation' && keyData.isActivated !== 'true') {
+      if (
+        !skipActivation &&
+        keyData.expirationMode === 'activation' &&
+        keyData.isActivated !== 'true'
+      ) {
         // 首次使用，需要激活
         const now = new Date()
         const activationPeriod = parseInt(keyData.activationDays || 30) // 默认30
@@ -556,8 +578,19 @@ class ApiKeyService {
   }
 
   // 🔍 验证API Key（仅用于统计查询，不触发激活）
-  async validateApiKeyForStats(apiKey) {
+  async validateApiKeyForStats(apiKey, options = {}) {
     try {
+      const adminTestCredential = adminApiKeyTestCredentialService.peekCredential(
+        apiKey,
+        options.adminTestService || null
+      )
+      if (adminTestCredential) {
+        return this.validateApiKey(apiKey, {
+          keyId: adminTestCredential.keyId,
+          skipActivation: true
+        })
+      }
+
       if (!apiKey || !apiKey.startsWith(this.prefix)) {
         return { valid: false, error: 'Invalid API key format' }
       }
@@ -663,6 +696,7 @@ class ApiKeyService {
           activationDays: parseInt(keyData.activationDays || 0),
           activationUnit: keyData.activationUnit || 'days',
           activatedAt: keyData.activatedAt || null,
+          scheduledActivationAt: keyData.scheduledActivationAt || null,
           claudeAccountId: keyData.claudeAccountId,
           claudeConsoleAccountId: keyData.claudeConsoleAccountId,
           geminiAccountId: keyData.geminiAccountId,
@@ -919,6 +953,7 @@ class ApiKeyService {
         key.expirationMode = key.expirationMode || 'fixed'
         key.isActivated = key.isActivated === 'true'
         key.activatedAt = key.activatedAt || null
+        key.scheduledActivationAt = key.scheduledActivationAt || null
 
         // 获取当前时间窗口的请求次数、Token使用量和费用
         if (key.rateLimitWindow > 0) {
@@ -1172,6 +1207,7 @@ class ApiKeyService {
         key.activationUnit = key.activationUnit || 'days'
         key.expirationMode = key.expirationMode || 'fixed'
         key.activatedAt = key.activatedAt || null
+        key.scheduledActivationAt = key.scheduledActivationAt || null
 
         // Rate limit 窗口数据
         if (key.rateLimitWindow > 0) {
@@ -1357,6 +1393,7 @@ class ApiKeyService {
         'expirationMode', // 新增：过期模式
         'isActivated', // 新增：是否已激活
         'activatedAt', // 新增：激活时间
+        'scheduledActivationAt', // 定时启用时间
         'enableModelRestriction',
         'restrictedModels',
         'enableClientRestriction',
@@ -1400,7 +1437,11 @@ class ApiKeyService {
           ) {
             // 布尔值转字符串
             updatedData[field] = String(value)
-          } else if (field === 'expiresAt' || field === 'activatedAt') {
+          } else if (
+            field === 'expiresAt' ||
+            field === 'activatedAt' ||
+            field === 'scheduledActivationAt'
+          ) {
             // 日期字段保持原样，不要toString()
             updatedData[field] = value || ''
           } else {
@@ -1665,6 +1706,144 @@ class ApiKeyService {
     }
   }
 
+  async _persistUsageRecord(keyId, usageRecord, lifecycleRecordId = null) {
+    if (!lifecycleRecordId) {
+      await redis.addUsageRecord(keyId, usageRecord)
+      return
+    }
+
+    const updated = await redis.updateUsageRecord(keyId, lifecycleRecordId, {
+      ...usageRecord,
+      lifecycleRecordId,
+      requestLifecycleId: lifecycleRecordId
+    })
+
+    if (!updated) {
+      logger.warn(
+        `⚠️ Lifecycle usage record ${lifecycleRecordId} not found for ${keyId}, appending completed record`
+      )
+      await redis.addUsageRecord(keyId, {
+        ...usageRecord,
+        lifecycleRecordId,
+        requestLifecycleId: lifecycleRecordId
+      })
+    }
+  }
+
+  async recordUsageAttempt(
+    keyId,
+    {
+      model = 'unknown',
+      accountId = null,
+      accountType = null,
+      requestMeta = null,
+      status = 'started',
+      statusMessage = null
+    } = {}
+  ) {
+    try {
+      if (shouldSkipApiKeyUsage()) {
+        return { lifecycleRecordId: null, usageRecord: null }
+      }
+
+      const finalizedRequestMeta = finalizeRequestDetailMeta(requestMeta)
+      const lifecycleRecordId =
+        finalizedRequestMeta?.lifecycleRecordId ||
+        finalizedRequestMeta?.requestLifecycleId ||
+        uuidv4()
+      const now = new Date().toISOString()
+
+      const usageRecord = {
+        timestamp: now,
+        startedAt: now,
+        updatedAt: now,
+        lifecycleRecordId,
+        requestLifecycleId: lifecycleRecordId,
+        model: model || 'unknown',
+        accountId: accountId || null,
+        accountType: accountType || null,
+        requestId: finalizedRequestMeta?.requestId || lifecycleRecordId,
+        endpoint: finalizedRequestMeta?.endpoint || null,
+        method: finalizedRequestMeta?.method || null,
+        statusCode: finalizedRequestMeta?.statusCode || null,
+        stream: finalizedRequestMeta?.stream === true,
+        durationMs: finalizedRequestMeta?.durationMs ?? null,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreateTokens: 0,
+        cacheReadTokens: 0,
+        totalTokens: 0,
+        cost: 0,
+        realCost: 0,
+        costBreakdown: {
+          input: 0,
+          output: 0,
+          cacheCreate: 0,
+          cacheRead: 0,
+          total: 0
+        },
+        realCostBreakdown: {
+          input: 0,
+          output: 0,
+          cacheCreate: 0,
+          cacheRead: 0,
+          total: 0
+        },
+        usageStatus: status,
+        lifecycleStatus: status,
+        statusMessage,
+        usageMissing: true,
+        billableUsageUnknown: true,
+        isUsageFinal: false
+      }
+
+      await redis.addUsageRecord(keyId, usageRecord)
+
+      logger.database(
+        `📊 Recorded usage lifecycle start: ${keyId} - ${lifecycleRecordId}, model: ${usageRecord.model}, status: ${status}`
+      )
+
+      return { lifecycleRecordId, usageRecord }
+    } catch (error) {
+      logger.error('❌ Failed to record usage lifecycle start:', error)
+      return { lifecycleRecordId: null, usageRecord: null }
+    }
+  }
+
+  async updateUsageLifecycleRecord(keyId, lifecycleRecordId, updates = {}) {
+    if (shouldSkipApiKeyUsage()) {
+      return false
+    }
+
+    if (!keyId || !lifecycleRecordId) {
+      return false
+    }
+
+    const now = new Date().toISOString()
+    const status = updates.usageStatus || updates.lifecycleStatus || 'updated'
+    const shouldMarkMissing = status !== 'completed'
+
+    const updated = await redis.updateUsageRecord(keyId, lifecycleRecordId, {
+      ...updates,
+      timestamp: updates.timestamp || now,
+      updatedAt: now,
+      endedAt: updates.endedAt || now,
+      lifecycleRecordId,
+      requestLifecycleId: lifecycleRecordId,
+      usageStatus: status,
+      lifecycleStatus: status,
+      usageMissing: updates.usageMissing ?? shouldMarkMissing,
+      billableUsageUnknown: updates.billableUsageUnknown ?? shouldMarkMissing,
+      isUsageFinal: updates.isUsageFinal ?? true
+    })
+
+    if (!updated) {
+      logger.warn(`⚠️ Lifecycle usage record ${lifecycleRecordId} not found for ${keyId}`)
+    }
+
+    return updated
+  }
+
   // 📊 记录使用情况（支持缓存token和账户级别统计，应用服务倍率）
   async recordUsage(
     keyId,
@@ -1680,6 +1859,8 @@ class ApiKeyService {
   ) {
     try {
       const finalizedRequestMeta = finalizeRequestDetailMeta(requestMeta)
+      const lifecycleRecordId =
+        finalizedRequestMeta?.lifecycleRecordId || finalizedRequestMeta?.requestLifecycleId || null
       const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
 
       // 计算费用
@@ -1692,7 +1873,8 @@ class ApiKeyService {
           cache_read_input_tokens: cacheReadTokens
         },
         model,
-        serviceTier
+        serviceTier,
+        { requestLevel: true }
       )
 
       // 检查是否为 1M 上下文请求
@@ -1708,6 +1890,25 @@ class ApiKeyService {
       if (realCost > 0) {
         const service = serviceRatesService.getService(accountType, model)
         ratedCost = await this.calculateRatedCost(keyId, service, realCost)
+      }
+
+      if (shouldSkipApiKeyUsage()) {
+        if (accountId) {
+          await redis.incrementAccountUsage(
+            accountId,
+            totalTokens,
+            inputTokens,
+            outputTokens,
+            cacheCreateTokens,
+            cacheReadTokens,
+            0,
+            0,
+            model,
+            isLongContextRequest
+          )
+        }
+        logger.database(`🧪 Skipped API key usage for admin test: ${keyId}, model: ${model}`)
+        return { realCost, ratedCost, pricingTier: costInfo?.pricingTier || null }
       }
 
       // 记录API Key级别的使用统计（包含费用）
@@ -1780,8 +1981,13 @@ class ApiKeyService {
       }
 
       // 记录单次请求的使用详情（同时保存真实成本和倍率成本）
+      const recordTimestamp = new Date().toISOString()
       const usageRecord = {
-        timestamp: new Date().toISOString(),
+        timestamp: recordTimestamp,
+        completedAt: recordTimestamp,
+        updatedAt: recordTimestamp,
+        lifecycleRecordId,
+        requestLifecycleId: lifecycleRecordId,
         model,
         accountId: accountId || null,
         accountType: accountType || null,
@@ -1800,10 +2006,17 @@ class ApiKeyService {
         realCost: Number(realCost.toFixed(6)),
         costBreakdown: costInfo?.costs || undefined,
         realCostBreakdown: costInfo?.costs || undefined,
-        isLongContext: isLongContextRequest
+        unitPricing: normalizeUnitPricing(costInfo?.pricing),
+        pricingTier: costInfo?.pricingTier || null,
+        isLongContext: isLongContextRequest,
+        usageStatus: 'completed',
+        lifecycleStatus: 'completed',
+        usageMissing: false,
+        billableUsageUnknown: false,
+        isUsageFinal: true
       }
 
-      await redis.addUsageRecord(keyId, usageRecord)
+      await this._persistUsageRecord(keyId, usageRecord, lifecycleRecordId)
       this._captureRequestDetail(keyId, usageRecord, finalizedRequestMeta).catch((captureError) => {
         logger.warn(`⚠️ Failed to schedule request detail capture: ${captureError.message}`)
       })
@@ -1819,7 +2032,7 @@ class ApiKeyService {
 
       logger.database(`📊 Recorded usage: ${keyId} - ${logParts.join(', ')}`)
 
-      return { realCost, ratedCost }
+      return { realCost, ratedCost, pricingTier: costInfo?.pricingTier || null }
     } catch (error) {
       logger.error('❌ Failed to record usage:', error)
       return { realCost: 0, ratedCost: 0 }
@@ -1869,6 +2082,15 @@ class ApiKeyService {
   ) {
     try {
       const finalizedRequestMeta = finalizeRequestDetailMeta(requestMeta)
+      const lifecycleRecordId =
+        finalizedRequestMeta?.lifecycleRecordId || finalizedRequestMeta?.requestLifecycleId || null
+      const actualModel = normalizeDisplayModel(model) || 'unknown'
+      const requestedModel =
+        normalizeDisplayModel(finalizedRequestMeta?.requestedModel) ||
+        normalizeDisplayModel(finalizedRequestMeta?.requestBody?.model)
+      const displayModel =
+        normalizeDisplayModel(finalizedRequestMeta?.displayModel) || requestedModel
+      const recordModel = displayModel || actualModel
       // 提取 token 数量
       const inputTokens = usageObject.input_tokens || 0
       const outputTokens = usageObject.output_tokens || 0
@@ -1888,16 +2110,20 @@ class ApiKeyService {
         ephemeral1hCost: 0,
         isLongContextRequest: false,
         usedFallbackPricing: false,
-        pricingSource: null
+        pricingSource: null,
+        pricingTier: null,
+        unitPricing: null
       }
       try {
         const CostCalculator = require('../utils/costCalculator')
-        const calculatedCost = CostCalculator.calculateCost(usageObject, model)
+        const calculatedCost = CostCalculator.calculateCost(usageObject, actualModel, null, {
+          requestLevel: true
+        })
         const costs = calculatedCost?.costs || {}
         const totalCost = Number(costs.total ?? calculatedCost?.totalCost ?? 0)
 
         if (!Number.isFinite(totalCost)) {
-          throw new Error(`Invalid cost calculation result for model ${model}`)
+          throw new Error(`Invalid cost calculation result for model ${actualModel}`)
         }
 
         costInfo = {
@@ -1916,10 +2142,12 @@ class ApiKeyService {
           usedFallbackPricing: calculatedCost?.debug?.usedFallbackPricing === true,
           pricingSource:
             calculatedCost?.debug?.pricingSource ||
-            (calculatedCost?.usingDynamicPricing ? 'dynamic' : 'unknown-fallback')
+            (calculatedCost?.usingDynamicPricing ? 'dynamic' : 'unknown-fallback'),
+          pricingTier: calculatedCost?.pricingTier || null,
+          unitPricing: normalizeUnitPricing(calculatedCost?.pricing)
         }
       } catch (pricingError) {
-        logger.error(`❌ Failed to calculate cost for model ${model}:`, pricingError)
+        logger.error(`❌ Failed to calculate cost for model ${actualModel}:`, pricingError)
         logger.error(`   Usage object:`, JSON.stringify(usageObject))
       }
 
@@ -1936,8 +2164,31 @@ class ApiKeyService {
       const realCostWithDetails = costInfo.totalCost || 0
       let ratedCostWithDetails = realCostWithDetails
       if (realCostWithDetails > 0) {
-        const service = serviceRatesService.getService(accountType, model)
+        const service = serviceRatesService.getService(accountType, actualModel)
         ratedCostWithDetails = await this.calculateRatedCost(keyId, service, realCostWithDetails)
+      }
+
+      if (shouldSkipApiKeyUsage()) {
+        if (accountId) {
+          await redis.incrementAccountUsage(
+            accountId,
+            totalTokens,
+            inputTokens,
+            outputTokens,
+            cacheCreateTokens,
+            cacheReadTokens,
+            ephemeral5mTokens,
+            ephemeral1hTokens,
+            actualModel,
+            costInfo.isLongContextRequest || false
+          )
+        }
+        logger.database(`🧪 Skipped API key usage for admin test: ${keyId}, model: ${recordModel}`)
+        return {
+          realCost: realCostWithDetails,
+          ratedCost: ratedCostWithDetails,
+          pricingTier: costInfo.pricingTier
+        }
       }
 
       // 记录API Key级别的使用统计（包含费用）
@@ -1948,7 +2199,7 @@ class ApiKeyService {
         outputTokens,
         cacheCreateTokens,
         cacheReadTokens,
-        model,
+        recordModel,
         ephemeral5mTokens,
         ephemeral1hTokens,
         costInfo.isLongContextRequest || false,
@@ -1961,15 +2212,15 @@ class ApiKeyService {
         // 记录倍率成本和真实成本
         await redis.incrementDailyCost(keyId, ratedCostWithDetails, realCostWithDetails)
         logger.database(
-          `💰 Recorded cost for ${keyId}: rated=$${ratedCostWithDetails.toFixed(6)}, real=$${realCostWithDetails.toFixed(6)}, model: ${model}`
+          `💰 Recorded cost for ${keyId}: rated=$${ratedCostWithDetails.toFixed(6)}, real=$${realCostWithDetails.toFixed(6)}, model: ${recordModel}, actualModel: ${actualModel}`
         )
 
-        // 记录 Opus 周费用（如果适用，也应用倍率）
+        // 记录 Claude 周费用（如果适用，也应用倍率）
         await this.recordOpusCost(
           keyId,
           ratedCostWithDetails,
           realCostWithDetails,
-          model,
+          actualModel,
           accountType
         )
 
@@ -1985,11 +2236,11 @@ class ApiKeyService {
         // 如果有 token 使用但费用为 0，记录警告
         if (totalTokens > 0) {
           logger.warn(
-            `⚠️ No cost recorded for ${keyId} - zero cost for model: ${model} (tokens: ${totalTokens})`
+            `⚠️ No cost recorded for ${keyId} - zero cost for model: ${actualModel} (tokens: ${totalTokens})`
           )
           logger.warn(`   This may indicate a pricing issue or model not found in pricing data`)
         } else {
-          logger.debug(`💰 No cost recorded for ${keyId} - zero tokens for model: ${model}`)
+          logger.debug(`💰 No cost recorded for ${keyId} - zero tokens for model: ${actualModel}`)
         }
       }
 
@@ -2020,7 +2271,7 @@ class ApiKeyService {
             cacheReadTokens,
             ephemeral5mTokens,
             ephemeral1hTokens,
-            model,
+            actualModel,
             costInfo.isLongContextRequest || false
           )
           logger.database(
@@ -2033,9 +2284,17 @@ class ApiKeyService {
         }
       }
 
+      const recordTimestamp = new Date().toISOString()
       const usageRecord = {
-        timestamp: new Date().toISOString(),
-        model,
+        timestamp: recordTimestamp,
+        completedAt: recordTimestamp,
+        updatedAt: recordTimestamp,
+        lifecycleRecordId,
+        requestLifecycleId: lifecycleRecordId,
+        model: recordModel,
+        actualModel,
+        requestedModel: requestedModel || null,
+        displayModel: displayModel || recordModel,
         accountId: accountId || null,
         accountType: accountType || null,
         requestId: finalizedRequestMeta?.requestId || null,
@@ -2073,15 +2332,27 @@ class ApiKeyService {
         },
         pricingSource: costInfo.pricingSource || null,
         usedFallbackPricing: costInfo.usedFallbackPricing === true,
-        isLongContext: costInfo.isLongContextRequest || false
+        pricingTier: costInfo.pricingTier,
+        unitPricing: costInfo.unitPricing,
+        isLongContext: costInfo.isLongContextRequest || false,
+        usageStatus: 'completed',
+        lifecycleStatus: 'completed',
+        usageMissing: false,
+        billableUsageUnknown: false,
+        isUsageFinal: true
       }
 
-      await redis.addUsageRecord(keyId, usageRecord)
+      await this._persistUsageRecord(keyId, usageRecord, lifecycleRecordId)
       this._captureRequestDetail(keyId, usageRecord, finalizedRequestMeta).catch((captureError) => {
         logger.warn(`⚠️ Failed to schedule request detail capture: ${captureError.message}`)
       })
 
-      const logParts = [`Model: ${model}`, `Input: ${inputTokens}`, `Output: ${outputTokens}`]
+      const logParts = [
+        `Model: ${recordModel}`,
+        `Actual Model: ${actualModel}`,
+        `Input: ${inputTokens}`,
+        `Output: ${outputTokens}`
+      ]
       if (cacheCreateTokens > 0) {
         logParts.push(`Cache Create: ${cacheCreateTokens}`)
 
@@ -2109,7 +2380,10 @@ class ApiKeyService {
         keyId,
         keyName: keyData?.name,
         userId: keyData?.userId,
-        model,
+        model: recordModel,
+        actualModel,
+        requestedModel: requestedModel || null,
+        displayModel: displayModel || recordModel,
         inputTokens,
         outputTokens,
         cacheCreateTokens,
@@ -2129,13 +2403,18 @@ class ApiKeyService {
         accountId,
         accountType,
         isLongContext: costInfo.isLongContextRequest || false,
+        pricingTier: costInfo.pricingTier,
         requestTimestamp: usageRecord.timestamp
       }).catch((err) => {
         // 发布失败不影响主流程，只记录错误
         logger.warn('⚠️ Failed to publish billing event:', err.message)
       })
 
-      return { realCost: realCostWithDetails, ratedCost: ratedCostWithDetails }
+      return {
+        realCost: realCostWithDetails,
+        ratedCost: ratedCostWithDetails,
+        pricingTier: costInfo.pricingTier
+      }
     } catch (error) {
       logger.error('❌ Failed to record usage:', error)
       return { realCost: 0, ratedCost: 0 }
@@ -2161,6 +2440,12 @@ class ApiKeyService {
       accountId: usageRecord.accountId || null,
       accountType: usageRecord.accountType || null,
       model: usageRecord.model || 'unknown',
+      actualModel: usageRecord.actualModel || usageRecord.model || 'unknown',
+      requestedModel: requestMeta?.requestedModel || usageRecord.requestedModel || null,
+      mappedModel: requestMeta?.mappedModel || usageRecord.mappedModel || null,
+      outboundModel: requestMeta?.outboundModel || usageRecord.outboundModel || null,
+      responseModel: requestMeta?.responseModel || usageRecord.responseModel || null,
+      displayModel: usageRecord.displayModel || usageRecord.model || 'unknown',
       inputTokens: usageRecord.inputTokens || 0,
       outputTokens: usageRecord.outputTokens || 0,
       cacheReadTokens: usageRecord.cacheReadTokens || 0,
@@ -2170,8 +2455,10 @@ class ApiKeyService {
       realCost: usageRecord.realCost || usageRecord.cost || 0,
       costBreakdown: usageRecord.costBreakdown || null,
       realCostBreakdown: usageRecord.realCostBreakdown || usageRecord.costBreakdown || null,
+      unitPricing: usageRecord.unitPricing || null,
       pricingSource: usageRecord.pricingSource || null,
       usedFallbackPricing: usageRecord.usedFallbackPricing === true,
+      pricingTier: usageRecord.pricingTier || null,
       isLongContextRequest:
         usageRecord.isLongContext === true || usageRecord.isLongContextRequest === true
     })
@@ -2681,6 +2968,38 @@ class ApiKeyService {
       return boundKeys.length
     } catch (error) {
       logger.error(`❌ 解绑 API Keys 失败 (${accountType} 账号 ${accountId}):`, error)
+      return 0
+    }
+  }
+
+  // ⏰ 激活到期的定时 API Keys
+  async activateScheduledKeys(now = new Date()) {
+    try {
+      const apiKeys = await this.getAllApiKeysFast()
+      let activatedCount = 0
+
+      for (const key of apiKeys) {
+        const scheduledAt = key.scheduledActivationAt && new Date(key.scheduledActivationAt)
+        if (
+          key.isActive ||
+          !scheduledAt ||
+          Number.isNaN(scheduledAt.getTime()) ||
+          scheduledAt > now
+        ) {
+          continue
+        }
+
+        await this.updateApiKey(key.id, {
+          isActive: true,
+          scheduledActivationAt: null
+        })
+        logger.success(`⏰ Scheduled API key activated: ${key.id} (${key.name})`)
+        activatedCount++
+      }
+
+      return activatedCount
+    } catch (error) {
+      logger.error('❌ Failed to activate scheduled API keys:', error)
       return 0
     }
   }

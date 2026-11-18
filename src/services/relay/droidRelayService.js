@@ -10,6 +10,7 @@ const logger = require('../../utils/logger')
 const runtimeAddon = require('../../utils/runtimeAddon')
 const upstreamErrorHelper = require('../../utils/upstreamErrorHelper')
 const { createRequestDetailMeta } = require('../../utils/requestDetailHelper')
+const { buildDroidClientError, sanitizeDroidStreamEvent } = require('../../utils/droidErrorAdapter')
 
 const SYSTEM_PROMPT = 'You are Droid, an AI software engineering agent built by Factory.'
 const RUNTIME_EVENT_FMT_PAYLOAD = 'fmtPayload'
@@ -203,6 +204,15 @@ class DroidRelayService {
     let account = null
     let selectedApiKey = null
     let accessToken = null
+    let tempUnavailableContext = null
+    let endpointPath = null
+    const buildErrorHistoryContext = (details = {}) =>
+      upstreamErrorHelper.buildErrorHistoryContext(tempUnavailableContext, {
+        model: normalizedRequestBody?.model,
+        path: endpointPath,
+        apiKeyName: keyInfo.name || keyInfo.id,
+        ...details
+      })
 
     try {
       logger.info(
@@ -217,6 +227,11 @@ class DroidRelayService {
       if (!account) {
         throw new Error(`No available Droid account for endpoint type: ${normalizedEndpoint}`)
       }
+      tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+        keyInfo,
+        account.id,
+        'droid'
+      )
 
       // 获取认证凭据：支持 Access Token 和 API Key 两种模式
       if (
@@ -230,7 +245,7 @@ class DroidRelayService {
       }
 
       // 获取 Factory.ai API URL
-      let endpointPath = this.endpoints[normalizedEndpoint]
+      endpointPath = this.endpoints[normalizedEndpoint]
 
       if (typeof customPath === 'string' && customPath.trim()) {
         endpointPath = customPath.startsWith('/') ? customPath : `/${customPath}`
@@ -360,7 +375,17 @@ class DroidRelayService {
         account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
       // 5xx 错误
       if (status >= 500 && account?.id && !droidAutoProtectionDisabled) {
-        await upstreamErrorHelper.markTempUnavailable(account.id, 'droid', status).catch(() => {})
+        await upstreamErrorHelper
+          .markTempUnavailable(
+            account.id,
+            'droid',
+            status,
+            null,
+            buildErrorHistoryContext({
+              errorBody: error.response?.data || error.message
+            })
+          )
+          .catch(() => {})
       } else if (
         !status &&
         account?.id &&
@@ -368,7 +393,20 @@ class DroidRelayService {
         !droidAutoProtectionDisabled
       ) {
         // 网络错误（非客户端断开），临时不可用
-        await upstreamErrorHelper.markTempUnavailable(account.id, 'droid', 503).catch(() => {})
+        await upstreamErrorHelper
+          .markTempUnavailable(
+            account.id,
+            'droid',
+            503,
+            null,
+            buildErrorHistoryContext({
+              errorBody: {
+                message: error.message,
+                code: error.code || 'network_error'
+              }
+            })
+          )
+          .catch(() => {})
       }
 
       if (status >= 400 && status < 500) {
@@ -378,7 +416,10 @@ class DroidRelayService {
             selectedAccountApiKey: selectedApiKey,
             endpointType: normalizedEndpoint,
             sessionHash,
-            clientApiKeyId
+            clientApiKeyId,
+            tempUnavailableContext: buildErrorHistoryContext({
+              errorBody: error.response?.data || error.message
+            })
           })
         } catch (handlingError) {
           logger.error('❌ 处理 Droid 4xx 异常失败:', handlingError)
@@ -386,25 +427,42 @@ class DroidRelayService {
       }
 
       if (error.response) {
-        // HTTP 错误响应
-        return {
-          statusCode: error.response.status,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            error.response.data || {
+        if (clientResponse) {
+          clientResponse._upstreamResponseBody = error.response.data
+        }
+        const safeErrorResponse = buildDroidClientError(
+          error.response.status,
+          error.response.data,
+          {
+            headers: error.response.headers,
+            endpointType: normalizedEndpoint,
+            originalBody: error.response.data || {
               error: 'upstream_error',
               message: error.message
             }
-          )
+          }
+        )
+
+        // HTTP 错误响应
+        return {
+          statusCode: safeErrorResponse.status,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(safeErrorResponse.body)
         }
       }
 
       // 网络错误或其他错误（统一返回 4xx）
       const mappedStatus = this._mapNetworkErrorStatus(error)
+      const safeErrorResponse = buildDroidClientError(null, error, {
+        endpointType: normalizedEndpoint,
+        fallbackStatus: mappedStatus,
+        originalBody: this._buildNetworkErrorBody(error)
+      })
+
       return {
-        statusCode: mappedStatus,
+        statusCode: safeErrorResponse.status,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(this._buildNetworkErrorBody(error))
+        body: JSON.stringify(safeErrorResponse.body)
       }
     }
   }
@@ -428,6 +486,18 @@ class DroidRelayService {
     sessionHash = null,
     clientApiKeyId = null
   ) {
+    const tempUnavailableContext = upstreamErrorHelper.buildSchedulingContext(
+      apiKeyData,
+      account?.id,
+      'droid'
+    )
+    const buildErrorHistoryContext = (details = {}) =>
+      upstreamErrorHelper.buildErrorHistoryContext(tempUnavailableContext, {
+        model: requestBody?.model,
+        path: new URL(apiUrl).pathname,
+        apiKeyName: apiKeyData?.name || apiKeyData?.id,
+        ...details
+      })
     return new Promise((resolve, reject) => {
       const url = new URL(apiUrl)
       const keyId = apiKeyData?.id
@@ -482,7 +552,11 @@ class DroidRelayService {
 
           logger.error('❌ Droid stream error:', error)
           const mappedStatus = this._mapNetworkErrorStatus(error)
-          const errorBody = this._buildNetworkErrorBody(error)
+          const safeErrorResponse = buildDroidClientError(null, error, {
+            endpointType,
+            fallbackStatus: mappedStatus,
+            originalBody: this._buildNetworkErrorBody(error)
+          })
 
           if (!clientResponse.destroyed) {
             if (!clientResponse.writableEnded) {
@@ -492,9 +566,9 @@ class DroidRelayService {
                 typeof clientResponse.json === 'function'
 
               if (canUseJson) {
-                clientResponse.status(mappedStatus).json(errorBody)
+                clientResponse.status(safeErrorResponse.status).json(safeErrorResponse.body)
               } else {
-                const errorPayload = JSON.stringify(errorBody)
+                const errorPayload = JSON.stringify(safeErrorResponse.body)
 
                 if (!hasForwardedData) {
                   if (typeof clientResponse.setHeader === 'function') {
@@ -510,7 +584,7 @@ class DroidRelayService {
             }
           }
 
-          resolveOnce({ statusCode: mappedStatus, streaming: true, error })
+          resolveOnce({ statusCode: safeErrorResponse.status, streaming: true, error })
         } else {
           rejectOnce(error)
         }
@@ -542,13 +616,22 @@ class DroidRelayService {
           res.on('end', () => {
             logger.info('✅ res.end() reached')
             const body = Buffer.concat(chunks).toString()
+            const parsedBody = this._parseJsonSafe(body)
             logger.error(`❌ Factory.ai error response body: ${body || '(empty)'}`)
             if (res.statusCode >= 500) {
               const streamAutoProtectionDisabled =
                 account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
               if (!streamAutoProtectionDisabled) {
                 upstreamErrorHelper
-                  .markTempUnavailable(account.id, 'droid', res.statusCode)
+                  .markTempUnavailable(
+                    account.id,
+                    'droid',
+                    res.statusCode,
+                    null,
+                    buildErrorHistoryContext({
+                      errorBody: parsedBody || body || `HTTP ${res.statusCode}`
+                    })
+                  )
                   .catch(() => {})
               }
             }
@@ -558,16 +641,22 @@ class DroidRelayService {
                 selectedAccountApiKey,
                 endpointType,
                 sessionHash,
-                clientApiKeyId
+                clientApiKeyId,
+                tempUnavailableContext: buildErrorHistoryContext({
+                  errorBody: parsedBody || body || `HTTP ${res.statusCode}`
+                })
               }).catch((handlingError) => {
                 logger.error('❌ 处理 Droid 流式4xx 异常失败:', handlingError)
               })
             }
             if (!clientResponse.headersSent) {
-              clientResponse.status(res.statusCode).json({
-                error: 'upstream_error',
-                details: body
+              const safeErrorResponse = buildDroidClientError(res.statusCode, parsedBody || body, {
+                endpointType,
+                headers: res.headers,
+                originalBody: parsedBody || { error: 'upstream_error', details: body }
               })
+
+              clientResponse.status(safeErrorResponse.status).json(safeErrorResponse.body)
             }
             resolveOnce({ statusCode: res.statusCode, streaming: true })
           })
@@ -590,6 +679,7 @@ class DroidRelayService {
 
         // Usage 数据收集
         let buffer = ''
+        let lineBuffer = ''
         const currentUsageData = {}
         const model = requestBody.model || 'unknown'
 
@@ -599,9 +689,17 @@ class DroidRelayService {
           completionWindow = (completionWindow + chunkStr).slice(-1024)
           hasForwardedData = true
 
-          // 转发数据到客户端
-          clientResponse.write(chunk)
-          hasForwardedData = true
+          lineBuffer += chunkStr
+          const lines = lineBuffer.split('\n')
+          lineBuffer = lines.pop() || ''
+
+          for (const line of lines) {
+            const outputLine = this._rewriteDroidStreamLineForClient(line, { endpointType })
+
+            if (!clientResponse.destroyed) {
+              clientResponse.write(`${outputLine}\n`)
+            }
+          }
 
           // 解析 usage 数据（根据端点类型）
           if (endpointType === 'anthropic') {
@@ -621,6 +719,11 @@ class DroidRelayService {
 
         res.on('end', async () => {
           responseCompleted = true
+
+          if (lineBuffer && !clientResponse.destroyed) {
+            clientResponse.write(lineBuffer)
+          }
+
           clientResponse.end()
 
           // 记录 usage 数据
@@ -1368,7 +1471,8 @@ class DroidRelayService {
       selectedAccountApiKey = null,
       endpointType = null,
       sessionHash = null,
-      clientApiKeyId = null
+      clientApiKeyId = null,
+      tempUnavailableContext = null
     } = context
 
     const accountId = this._extractAccountId(account)
@@ -1447,7 +1551,13 @@ class DroidRelayService {
     const clientErrorAutoProtectionDisabled =
       account?.disableAutoProtection === true || account?.disableAutoProtection === 'true'
     if (!clientErrorAutoProtectionDisabled) {
-      await upstreamErrorHelper.markTempUnavailable(accountId, 'droid', statusCode)
+      await upstreamErrorHelper.markTempUnavailable(
+        accountId,
+        'droid',
+        statusCode,
+        null,
+        tempUnavailableContext
+      )
     }
     await this._clearAccountStickyMapping(normalizedEndpoint, sessionHash, clientApiKeyId)
   }
@@ -1513,6 +1623,46 @@ class DroidRelayService {
         `⚠️ 清理 Droid API Key 粘性映射失败：${accountId}（endpoint: ${endpointType}）`,
         error
       )
+    }
+  }
+
+  _parseJsonSafe(value) {
+    if (typeof value !== 'string') {
+      return value && typeof value === 'object' ? value : null
+    }
+
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return null
+    }
+
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      return null
+    }
+  }
+
+  _rewriteDroidStreamLineForClient(line, options = {}) {
+    if (typeof line !== 'string' || !line.startsWith('data: ')) {
+      return line
+    }
+
+    const jsonStr = line.slice(6).trim()
+    if (!jsonStr || jsonStr === '[DONE]') {
+      return line
+    }
+
+    try {
+      const eventData = JSON.parse(jsonStr)
+      const sanitizedResult = sanitizeDroidStreamEvent(eventData, options)
+      if (!sanitizedResult.changed) {
+        return line
+      }
+
+      return `data: ${JSON.stringify(sanitizedResult.data)}`
+    } catch {
+      return line
     }
   }
 

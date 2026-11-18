@@ -10,6 +10,7 @@ const claudeAccountService = require('../../services/account/claudeAccountServic
 const claudeRelayService = require('../../services/relay/claudeRelayService')
 const accountGroupService = require('../../services/accountGroupService')
 const accountTestSchedulerService = require('../../services/accountTestSchedulerService')
+const connectivityTestModelConfigService = require('../../services/connectivityTestModelConfigService')
 const apiKeyService = require('../../services/apiKeyService')
 const redis = require('../../models/redis')
 const { authenticateAdmin } = require('../../middleware/auth')
@@ -962,11 +963,20 @@ router.post('/claude-accounts/:accountId/test', authenticateAdmin, async (req, r
   const { accountId } = req.params
 
   try {
+    const requestedModel = connectivityTestModelConfigService.normalizeTestModel(req.body?.model)
+    if (req.body?.model !== undefined && !requestedModel) {
+      return res.status(400).json({ error: 'model must be a valid string (max 256 characters)' })
+    }
+    const model =
+      requestedModel ||
+      (await connectivityTestModelConfigService.getDefaultModelForPlatform('claude'))
     // 直接调用服务层的测试方法
-    await claudeRelayService.testAccountConnection(accountId, res)
+    await claudeRelayService.testAccountConnection(accountId, res, model)
   } catch (error) {
     logger.error(`❌ Failed to test Claude OAuth account:`, error)
-    // 错误已在服务层处理，这里仅做日志记录
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Failed to test Claude OAuth account' })
+    }
   }
 })
 
@@ -1003,6 +1013,8 @@ router.get('/claude-accounts/:accountId/test-config', authenticateAdmin, async (
 
   try {
     const testConfig = await redis.getAccountTestConfig(accountId, 'claude')
+    const defaultModel =
+      await connectivityTestModelConfigService.getDefaultModelForPlatform('claude')
     return res.json({
       success: true,
       data: {
@@ -1011,7 +1023,7 @@ router.get('/claude-accounts/:accountId/test-config', authenticateAdmin, async (
         config: testConfig || {
           enabled: false,
           cronExpression: '0 8 * * *',
-          model: 'claude-sonnet-4-5-20250929'
+          model: defaultModel
         }
       }
     })
@@ -1064,13 +1076,16 @@ router.put('/claude-accounts/:accountId/test-config', authenticateAdmin, async (
     }
 
     // 验证模型参数
-    const testModel = model || 'claude-sonnet-4-5-20250929'
-    if (typeof testModel !== 'string' || testModel.length > 256) {
+    const requestedModel = connectivityTestModelConfigService.normalizeTestModel(model)
+    if (model !== undefined && !requestedModel) {
       return res.status(400).json({
         error: 'Invalid parameter',
         message: 'model must be a valid string (max 256 characters)'
       })
     }
+    const testModel =
+      requestedModel ||
+      (await connectivityTestModelConfigService.getDefaultModelForPlatform('claude'))
 
     // 检查账户是否存在
     const account = await claudeAccountService.getAccount(accountId)

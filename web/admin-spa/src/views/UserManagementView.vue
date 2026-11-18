@@ -4,9 +4,6 @@
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">User Management</h1>
-        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
-          Manage users, their API keys, and view usage statistics
-        </p>
       </div>
       <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
         <button

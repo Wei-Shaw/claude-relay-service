@@ -7,6 +7,8 @@ jest.mock('../src/services/claudeRelayConfigService', () => ({
   getConfig: jest.fn()
 }))
 
+jest.mock('axios', () => ({ request: jest.fn() }))
+
 jest.mock('../src/utils/logger', () => ({
   warn: jest.fn(),
   debug: jest.fn(),
@@ -32,13 +34,16 @@ jest.mock('../src/utils/costCalculator', () => ({
 }))
 
 const redis = require('../src/models/redis')
+const axios = require('axios')
 const claudeRelayConfigService = require('../src/services/claudeRelayConfigService')
 const claudeAccountService = require('../src/services/account/claudeAccountService')
 const claudeConsoleAccountService = require('../src/services/account/claudeConsoleAccountService')
 const openaiAccountService = require('../src/services/account/openaiAccountService')
 const bedrockAccountService = require('../src/services/account/bedrockAccountService')
 const CostCalculator = require('../src/utils/costCalculator')
+const { createEncryptor } = require('../src/utils/commonHelper')
 const requestDetailService = require('../src/services/requestDetailService')
+const replayCredentialEncryptor = createEncryptor('request-detail-replay')
 
 describe('requestDetailService', () => {
   beforeEach(() => {
@@ -48,6 +53,29 @@ describe('requestDetailService', () => {
 
   afterEach(() => {
     jest.useRealTimers()
+  })
+
+  test('formats service-quality latency bucket labels in seconds', () => {
+    const accumulator = requestDetailService._createSlaAccumulator()
+
+    expect(accumulator.latencyBuckets.map((bucket) => bucket.label)).toEqual([
+      '<=0.5s',
+      '0.5-1s',
+      '1-2s',
+      '2-5s',
+      '5-10s',
+      '10-30s',
+      '>30s'
+    ])
+    expect(accumulator.latencyBuckets.map((bucket) => bucket.upperBoundMs)).toEqual([
+      500,
+      1000,
+      2000,
+      5000,
+      10000,
+      30000,
+      null
+    ])
   })
 
   test('captureRequestDetail stores normalized request detail records when enabled', async () => {
@@ -76,11 +104,21 @@ describe('requestDetailService', () => {
       accountId: 'acct_1',
       accountType: 'openai',
       model: 'gpt-5.4',
+      requestedModel: 'codex-auto-review',
+      mappedModel: 'codex-auto-review',
+      outboundModel: 'codex-auto-review',
+      responseModel: 'gpt-5.6-luna',
       inputTokens: 10,
       outputTokens: 4,
       cacheReadTokens: 3,
       cacheCreateTokens: 2,
       cost: 0.123456,
+      unitPricing: {
+        input: 5,
+        output: 30,
+        cacheWrite: 6.25,
+        cacheRead: 0.5
+      },
       requestBody: {
         apiKey: 'super-secret',
         model: 'gpt-5.4',
@@ -102,10 +140,224 @@ describe('requestDetailService', () => {
     const storedPayload = JSON.parse(multi.set.mock.calls[0][1])
     expect(storedPayload.requestBodySnapshot.apiKey).toContain('***')
     expect(storedPayload.endpoint).toBe('/openai/v1/responses')
+    expect(storedPayload.requestedModel).toBe('codex-auto-review')
+    expect(storedPayload.mappedModel).toBe('codex-auto-review')
+    expect(storedPayload.outboundModel).toBe('codex-auto-review')
+    expect(storedPayload.responseModel).toBe('gpt-5.6-luna')
+    expect(storedPayload.unitPricing).toEqual({
+      input: 5,
+      output: 30,
+      cacheCreate: 6.25,
+      cacheRead: 0.5
+    })
     expect(storedPayload.reasoningDisplay).toBe('medium')
     expect(storedPayload.reasoningSource).toBe('reasoning.effort')
     expect(multi.zadd).toHaveBeenCalled()
     expect(exec).toHaveBeenCalled()
+  })
+
+  test('later lifecycle merges preserve the four model trace fields', async () => {
+    const multi = {
+      set: jest.fn().mockReturnThis(),
+      zadd: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([])
+    }
+    const existing = {
+      requestId: 'req_model_trace',
+      timestamp: '2026-04-07T12:00:00.000Z',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      statusCode: 200,
+      model: 'gpt-5.6-luna',
+      requestedModel: 'codex-auto-review',
+      mappedModel: 'codex-auto-review',
+      outboundModel: 'codex-auto-review',
+      responseModel: 'gpt-5.6-luna',
+      unitPricing: {
+        input: 5,
+        output: 30,
+        cacheCreate: 5,
+        cacheRead: 0.5
+      }
+    }
+
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false
+    })
+    redis.getClient.mockReturnValue({
+      get: jest.fn().mockResolvedValue(JSON.stringify(existing)),
+      multi: jest.fn(() => multi)
+    })
+
+    await requestDetailService.captureRequestDetail({
+      requestId: 'req_model_trace',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      statusCode: 200
+    })
+
+    const storedPayload = JSON.parse(multi.set.mock.calls[0][1])
+    expect(storedPayload.model).toBe('gpt-5.6-luna')
+    expect(storedPayload.requestedModel).toBe('codex-auto-review')
+    expect(storedPayload.mappedModel).toBe('codex-auto-review')
+    expect(storedPayload.outboundModel).toBe('codex-auto-review')
+    expect(storedPayload.responseModel).toBe('gpt-5.6-luna')
+    expect(storedPayload.unitPricing).toEqual(existing.unitPricing)
+  })
+
+  test('stores full request and upstream response only for errors when enabled', async () => {
+    const exec = jest.fn().mockResolvedValue([])
+    const multi = {
+      set: jest.fn().mockReturnThis(),
+      zadd: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec
+    }
+    const client = {
+      get: jest.fn().mockResolvedValue(null),
+      multi: jest.fn(() => multi)
+    }
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false,
+      requestDetailErrorFullCaptureEnabled: true,
+      requestReplayEnabled: true
+    })
+    redis.getClient.mockReturnValue(client)
+
+    await requestDetailService.captureRequestDetail({
+      requestId: 'req_error_full',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      statusCode: 502,
+      requestBody: { model: 'gpt-5.4', input: 'x'.repeat(200) },
+      upstreamResponseBody: { error: { message: 'raw upstream failure' } },
+      replayCredential: 'cr_1234567890',
+      replayHeaders: { 'user-agent': 'codex_cli_rs/1.0.0' },
+      replayPath: '/openai/v1/responses'
+    })
+
+    const storedPayload = JSON.parse(multi.set.mock.calls[0][1])
+    expect(storedPayload.fullRequestBody.input).toBe('x'.repeat(200))
+    expect(storedPayload.upstreamResponseBody).toEqual({
+      error: { message: 'raw upstream failure' }
+    })
+    expect(storedPayload.replayCredentialEncrypted).not.toContain('cr_1234567890')
+    expect(storedPayload.replayCredentialStored).toBe(true)
+  })
+
+  test('does not store full payloads for successful requests', async () => {
+    const exec = jest.fn().mockResolvedValue([])
+    const multi = {
+      set: jest.fn().mockReturnThis(),
+      zadd: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec
+    }
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false,
+      requestDetailErrorFullCaptureEnabled: true,
+      requestReplayEnabled: true
+    })
+    redis.getClient.mockReturnValue({
+      get: jest.fn().mockResolvedValue(null),
+      multi: jest.fn(() => multi)
+    })
+
+    await requestDetailService.captureRequestDetail({
+      requestId: 'req_success_no_full',
+      endpoint: '/openai/v1/responses',
+      method: 'POST',
+      statusCode: 200,
+      requestBody: { model: 'gpt-5.4', input: 'secret' },
+      upstreamResponseBody: { id: 'response_1' },
+      replayCredential: 'cr_1234567890'
+    })
+
+    const storedPayload = JSON.parse(multi.set.mock.calls[0][1])
+    expect(storedPayload.fullRequestBody).toBeUndefined()
+    expect(storedPayload.upstreamResponseBody).toBeUndefined()
+    expect(storedPayload.replayCredentialEncrypted).toBeUndefined()
+  })
+
+  test('replays an error request through the original internal endpoint', async () => {
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false,
+      requestDetailErrorFullCaptureEnabled: true,
+      requestReplayEnabled: true
+    })
+    redis.getClient.mockReturnValue({
+      get: jest.fn().mockResolvedValue(
+        JSON.stringify({
+          requestId: 'req_replay',
+          timestamp: '2026-04-07T17:00:00.000Z',
+          endpoint: '/openai/v1/responses',
+          replayPath: '/openai/v1/responses',
+          method: 'POST',
+          statusCode: 500,
+          fullRequestBody: { model: 'gpt-5.4' },
+          replayCredentialEncrypted: replayCredentialEncryptor.encrypt('cr_1234567890'),
+          replayHeaders: { 'user-agent': 'codex_cli_rs/1.0.0' }
+        })
+      )
+    })
+    axios.request.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json', 'x-request-id': 'replayed_1' },
+      data: '{"id":"response_1"}'
+    })
+
+    const result = await requestDetailService.replayRequest('req_replay', {
+      body: { model: 'gpt-5.4-mini' }
+    })
+
+    expect(axios.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining('/openai/v1/responses'),
+        data: { model: 'gpt-5.4-mini' },
+        proxy: false,
+        maxRedirects: 0,
+        headers: expect.objectContaining({ 'x-api-key': 'cr_1234567890' })
+      })
+    )
+    expect(result.statusCode).toBe(200)
+    expect(result.body).toEqual({ id: 'response_1' })
+  })
+
+  test('does not expose the encrypted replay credential in request detail responses', async () => {
+    claudeRelayConfigService.getConfig.mockResolvedValue({
+      requestDetailCaptureEnabled: true,
+      requestDetailRetentionHours: 6,
+      requestDetailBodyPreviewEnabled: false,
+      requestDetailErrorFullCaptureEnabled: true,
+      requestReplayEnabled: true
+    })
+    redis.getClient.mockReturnValue({
+      get: jest.fn().mockResolvedValue(
+        JSON.stringify({
+          requestId: 'req_hidden_credential',
+          timestamp: '2026-04-07T17:00:00.000Z',
+          endpoint: '/openai/v1/responses',
+          statusCode: 500,
+          model: 'gpt-5.4',
+          replayCredentialEncrypted: replayCredentialEncryptor.encrypt('cr_1234567890'),
+          replayCredentialStored: true
+        })
+      )
+    })
+
+    const result = await requestDetailService.getRequestDetail('req_hidden_credential')
+
+    expect(result.record.replayCredentialEncrypted).toBeUndefined()
+    expect(result.record.replayCredentialStored).toBe(true)
   })
 
   test('listRequestDetails applies openai cache display flags and openai hit-rate formula', async () => {
@@ -310,6 +562,12 @@ describe('requestDetailService', () => {
         usedFallbackPricing: true,
         pricingSource: 'unknown-fallback'
       },
+      pricing: {
+        input: 3,
+        output: 15,
+        cacheWrite: 3.75,
+        cacheRead: 0.3
+      },
       usingDynamicPricing: false
     })
 
@@ -360,6 +618,12 @@ describe('requestDetailService', () => {
     expect(result.records[0].costRecomputed).toBe(true)
     expect(result.records[0].usedFallbackPricing).toBe(true)
     expect(result.records[0].pricingSource).toBe('unknown-fallback')
+    expect(result.records[0].unitPricing).toEqual({
+      input: 3,
+      output: 15,
+      cacheCreate: 3.75,
+      cacheRead: 0.3
+    })
     expect(result.records[0].realCostBreakdown).toEqual(
       expect.objectContaining({
         input: 0.051618,

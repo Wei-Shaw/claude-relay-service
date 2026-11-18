@@ -95,9 +95,6 @@
       <div v-if="activeTab === 'overview'" class="space-y-6">
         <div>
           <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard Overview</h1>
-          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Welcome to your Claude Relay dashboard
-          </p>
         </div>
 
         <!-- Stats Cards -->
@@ -384,17 +381,11 @@ const loadUserProfile = async () => {
 const loadApiKeysStats = async () => {
   try {
     const allApiKeys = await userStore.getUserApiKeys(true) // Include deleted keys
-    console.log('All API Keys received:', allApiKeys)
 
     const activeKeys = allApiKeys.filter(
       (key) => !(key.isDeleted === 'true' || key.deletedAt) && key.isActive
     )
     const deletedKeys = allApiKeys.filter((key) => key.isDeleted === 'true' || key.deletedAt)
-
-    console.log('Active keys:', activeKeys)
-    console.log('Deleted keys:', deletedKeys)
-    console.log('Active count:', activeKeys.length)
-    console.log('Deleted count:', deletedKeys.length)
 
     apiKeysStats.value = { active: activeKeys.length, deleted: deletedKeys.length }
   } catch (error) {

@@ -110,7 +110,7 @@
               class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300 sm:mb-2 sm:text-sm"
               >名称 <span class="text-red-500">*</span></label
             >
-            <div>
+            <div class="flex gap-2">
               <input
                 v-model="form.name"
                 class="form-input flex-1 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder-gray-400"
@@ -124,6 +124,15 @@
                 type="text"
                 @input="errors.name = ''"
               />
+              <button
+                class="rounded-lg bg-purple-500 px-3 py-2 text-sm text-white transition-colors hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700"
+                title="生成随机名称"
+                type="button"
+                @click="generateRandomName"
+              >
+                <i class="fas fa-random mr-1" />
+                随机
+              </button>
             </div>
             <p v-if="errors.name" class="mt-1 text-xs text-red-500 dark:text-red-400">
               {{ errors.name }}
@@ -533,7 +542,7 @@
                   class="form-input w-24 border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                   min="0"
                   placeholder="1.0"
-                  step="0.1"
+                  step="0.01"
                   type="number"
                 />
                 <span class="text-xs text-gray-400">默认 1.0</span>
@@ -908,7 +917,7 @@
                   </div>
                 </div>
                 <p class="mt-2 text-xs text-gray-500">
-                  设置此API Key无法访问的模型，例如：claude-opus-4-20250514
+                  设置此API Key无法访问的模型，支持 * 通配符，例如：claude-opus-4-*、gpt-5.6*
                 </p>
               </div>
             </div>
@@ -1495,6 +1504,17 @@ const updateActivationValue = () => {
       form.activationDays = 1
     }
   }
+}
+
+// 生成随机名称（16位字符：字母+数字）
+const generateRandomName = () => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  for (let i = 0; i < 16; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length))
+  }
+  form.name = result
+  errors.value.name = ''
 }
 
 // 创建 API Key
