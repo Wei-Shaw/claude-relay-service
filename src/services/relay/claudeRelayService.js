@@ -39,7 +39,6 @@ class ClaudeRelayService {
     this._bodyStoreIdCounter = 0
     this.apiVersion = config.claude.apiVersion
     this.betaHeader = config.claude.betaHeader
-    this.systemPrompt = config.claude.systemPrompt
     this.claudeCodeSystemPrompt = "You are Claude Code, Anthropic's official CLI for Claude."
     this.toolNameSuffix = null
     this.toolNameSuffixGeneratedAt = 0
@@ -1329,35 +1328,13 @@ class ClaudeRelayService {
 
     this._enforceCacheControlLimit(processedBody)
 
-    // 处理原有的系统提示（如果配置了）
-    if (this.systemPrompt && this.systemPrompt.trim()) {
-      const systemPrompt = {
-        type: 'text',
-        text: this.systemPrompt
-      }
-
-      // 经过上面的处理，system 现在应该总是数组格式
-      if (processedBody.system && Array.isArray(processedBody.system)) {
-        // 不要重复添加相同的系统提示
-        const hasSystemPrompt = processedBody.system.some(
-          (item) => item && item.text && item.text === this.systemPrompt
-        )
-        if (!hasSystemPrompt) {
-          processedBody.system.push(systemPrompt)
-        }
-      } else {
-        // 理论上不应该走到这里，但为了安全起见
-        processedBody.system = [systemPrompt]
-      }
-    } else {
-      // 如果没有配置系统提示，且system字段为空，则删除它
-      if (processedBody.system && Array.isArray(processedBody.system)) {
-        const hasValidContent = processedBody.system.some(
-          (item) => item && item.text && item.text.trim()
-        )
-        if (!hasValidContent) {
-          delete processedBody.system
-        }
+    // 如果 system 字段为空数组（无有效内容），则删除它
+    if (processedBody.system && Array.isArray(processedBody.system)) {
+      const hasValidContent = processedBody.system.some(
+        (item) => item && item.text && item.text.trim()
+      )
+      if (!hasValidContent) {
+        delete processedBody.system
       }
     }
 
@@ -3301,27 +3278,6 @@ class ClaudeRelayService {
     } catch (handlingError) {
       logger.error(`❌ Failed to handle ${context} server error:`, handlingError)
     }
-  }
-
-  // 🔄 重试逻辑
-  async _retryRequest(requestFunc, maxRetries = 3) {
-    let lastError
-
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        return await requestFunc()
-      } catch (error) {
-        lastError = error
-
-        if (i < maxRetries - 1) {
-          const delay = Math.pow(2, i) * 1000 // 指数退避
-          logger.warn(`⏳ Retry ${i + 1}/${maxRetries} in ${delay}ms: ${error.message}`)
-          await new Promise((resolve) => setTimeout(resolve, delay))
-        }
-      }
-    }
-
-    throw lastError
   }
 
   // 🔐 记录401未授权错误

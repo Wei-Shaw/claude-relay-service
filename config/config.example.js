@@ -42,7 +42,6 @@ const config = {
 
   // 🎯 Claude API配置
   claude: {
-    apiUrl: process.env.CLAUDE_API_URL || 'https://api.anthropic.com/v1/messages',
     apiVersion: process.env.CLAUDE_API_VERSION || '2023-06-01',
     // 专属账号不可用时是否回退到共享池。
     // 默认 false：API Key 绑定了专属账号就必须使用该账号，不可用时直接报错，
@@ -69,15 +68,8 @@ const config = {
 
   // ☁️ Bedrock API配置
   bedrock: {
-    enabled: process.env.CLAUDE_CODE_USE_BEDROCK === '1',
     defaultRegion: process.env.AWS_REGION || 'us-east-1',
-    smallFastModelRegion: process.env.ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION,
-    defaultModel: process.env.ANTHROPIC_MODEL || 'us.anthropic.claude-sonnet-4-20250514-v1:0',
-    smallFastModel:
-      process.env.ANTHROPIC_SMALL_FAST_MODEL || 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
-    maxOutputTokens: parseInt(process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS) || 4096,
-    maxThinkingTokens: parseInt(process.env.MAX_THINKING_TOKENS) || 1024,
-    enablePromptCaching: process.env.DISABLE_PROMPT_CACHING !== '1'
+    smallFastModelRegion: process.env.ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION
   },
 
   // 🌐 代理配置
@@ -140,13 +132,7 @@ const config = {
 
   // 🎨 Web界面配置
   web: {
-    title: process.env.WEB_TITLE || 'Claude Relay Service',
-    description:
-      process.env.WEB_DESCRIPTION ||
-      'Multi-account Claude API relay service with beautiful management interface',
-    logoUrl: process.env.WEB_LOGO_URL || '/assets/logo.png',
-    enableCors: process.env.ENABLE_CORS === 'true',
-    sessionSecret: process.env.WEB_SESSION_SECRET || 'CHANGE-THIS-SESSION-SECRET'
+    enableCors: process.env.ENABLE_CORS === 'true'
   },
 
   // 🔐 LDAP 认证配置
@@ -199,22 +185,6 @@ const config = {
     userSessionTimeout: parseInt(process.env.USER_SESSION_TIMEOUT) || 86400000, // 24小时
     maxApiKeysPerUser: parseInt(process.env.MAX_API_KEYS_PER_USER) || 1,
     allowUserDeleteApiKeys: process.env.ALLOW_USER_DELETE_API_KEYS === 'true' // 默认不允许用户删除自己的API Keys
-  },
-
-  // 📢 Webhook通知配置
-  webhook: {
-    enabled: process.env.WEBHOOK_ENABLED !== 'false', // 默认启用
-    urls: process.env.WEBHOOK_URLS
-      ? process.env.WEBHOOK_URLS.split(',').map((url) => url.trim())
-      : [],
-    timeout: parseInt(process.env.WEBHOOK_TIMEOUT) || 10000, // 10秒超时
-    retries: parseInt(process.env.WEBHOOK_RETRIES) || 3 // 重试3次
-  },
-
-  // 🛠️ 开发配置
-  development: {
-    debug: process.env.DEBUG === 'true',
-    hotReload: process.env.HOT_RELOAD === 'true'
   },
 
   // 🧼 供应商上游错误对外脱敏配置

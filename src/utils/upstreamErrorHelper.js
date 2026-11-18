@@ -187,14 +187,16 @@ const ACCOUNT_TYPE_TO_GROUP_PLATFORM = {
   'gemini-api': 'gemini',
   openai: 'openai',
   'openai-responses': 'openai',
-  droid: 'droid'
+  droid: 'droid',
+  grok: 'grok'
 }
 
 const GROUP_ACCOUNT_TYPES_BY_PLATFORM = {
   claude: ['claude-official', 'claude-console', 'ccr'],
   gemini: ['gemini', 'gemini-api'],
   openai: ['openai', 'openai-responses'],
-  droid: ['droid']
+  droid: ['droid'],
+  grok: ['grok']
 }
 
 const isTruthy = (value) => value === true || value === 'true'
@@ -398,6 +400,8 @@ const loadAccountForPauseDecision = async (accountId, accountType) => {
         )
       case 'droid':
         return await require('../services/account/droidAccountService').getAccount(accountId)
+      case 'grok':
+        return await require('../services/account/grokAccountService').getAccount(accountId)
       case 'azure-openai':
         return await require('../services/account/azureOpenaiAccountService').getAccount(accountId)
       default:

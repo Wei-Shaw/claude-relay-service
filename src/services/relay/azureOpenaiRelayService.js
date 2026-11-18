@@ -267,10 +267,6 @@ class StreamManager {
       }
     }
   }
-
-  getActiveStreamCount() {
-    return this.activeStreams.size
-  }
 }
 
 const streamManager = new StreamManager()

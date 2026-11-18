@@ -1427,32 +1427,6 @@ class OpenAIResponsesRelayService {
   _filterRequestHeaders(headers) {
     return filterForOpenAI(headers)
   }
-
-  // 估算费用（简化版本，实际应该根据不同的定价模型）
-  _estimateCost(model, inputTokens, outputTokens) {
-    // 这是一个简化的费用估算，实际应该根据不同的 API 提供商和模型定价
-    const rates = {
-      'gpt-4': { input: 0.03, output: 0.06 }, // per 1K tokens
-      'gpt-4-turbo': { input: 0.01, output: 0.03 },
-      'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
-      'claude-3-opus': { input: 0.015, output: 0.075 },
-      'claude-3-sonnet': { input: 0.003, output: 0.015 },
-      'claude-3-haiku': { input: 0.00025, output: 0.00125 }
-    }
-
-    // 查找匹配的模型定价
-    let rate = rates['gpt-3.5-turbo'] // 默认使用 GPT-3.5 的价格
-    for (const [modelKey, modelRate] of Object.entries(rates)) {
-      if (model.toLowerCase().includes(modelKey.toLowerCase())) {
-        rate = modelRate
-        break
-      }
-    }
-
-    const inputCost = (inputTokens / 1000) * rate.input
-    const outputCost = (outputTokens / 1000) * rate.output
-    return inputCost + outputCost
-  }
 }
 
 module.exports = new OpenAIResponsesRelayService()

@@ -42,7 +42,6 @@ services:
       - REDIS_ENABLE_TLS=${REDIS_ENABLE_TLS:-}
       
       # 🎯 Claude API 配置
-      - CLAUDE_API_URL=${CLAUDE_API_URL:-https://api.anthropic.com/v1/messages}
       - CLAUDE_API_VERSION=${CLAUDE_API_VERSION:-2023-06-01}
       - CLAUDE_BETA_HEADER=${CLAUDE_BETA_HEADER:-claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14}
       
@@ -68,13 +67,7 @@ services:
       - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-60000}
       - TIMEZONE_OFFSET=${TIMEZONE_OFFSET:-8}
       
-      # 🎨 Web 界面配置
-      - WEB_TITLE=${WEB_TITLE:-Claude Relay Service}
-      - WEB_DESCRIPTION=${WEB_DESCRIPTION:-Multi-account Claude API relay service}
-      - WEB_LOGO_URL=${WEB_LOGO_URL:-/assets/logo.png}
-      
       # 🛠️ 开发配置
-      - DEBUG=${DEBUG:-false}
       - ENABLE_CORS=${ENABLE_CORS:-true}
       - TRUST_PROXY=${TRUST_PROXY:-true}
     depends_on:
