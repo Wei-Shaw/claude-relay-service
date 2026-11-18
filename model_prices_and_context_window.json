@@ -4074,6 +4074,7 @@
       "image"
     ],
     "supports_function_calling": false,
+    "supports_minimal_reasoning_effort": true,
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
