@@ -1268,7 +1268,8 @@
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_tool_choice": true,
-    "supports_vision": true
+    "supports_vision": true,
+    "supports_web_search": true
   },
   "deepseek-reasoner": {
     "cache_read_input_token_cost": 2.8e-08,
@@ -1357,7 +1358,8 @@
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_tool_choice": true,
-    "supports_vision": true
+    "supports_vision": true,
+    "supports_web_search": true
   },
   "deepseek-v4-flash-vision-exp": {
     "cache_creation_input_token_cost": 0.0,
@@ -1410,7 +1412,8 @@
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_tool_choice": true,
-    "supports_vision": true
+    "supports_vision": true,
+    "supports_web_search": true
   },
   "deepseek-v4-pro": {
     "cache_creation_input_token_cost": 0.0,
@@ -1463,7 +1466,8 @@
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_tool_choice": true,
-    "supports_vision": false
+    "supports_vision": false,
+    "supports_web_search": true
   },
   "gemini-2.0-flash-exp-image-generation": {
     "deprecation_date": "2025-11-14",
