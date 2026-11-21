@@ -9,6 +9,7 @@ const openaiAccountService = require('../services/account/openaiAccountService')
 const openaiResponsesAccountService = require('../services/account/openaiResponsesAccountService')
 const openaiResponsesRelayService = require('../services/relay/openaiResponsesRelayService')
 const apiKeyService = require('../services/apiKeyService')
+const modelService = require('../services/modelService')
 const redis = require('../models/redis')
 const crypto = require('crypto')
 const ProxyHelper = require('../utils/proxyHelper')
@@ -1340,6 +1341,27 @@ async function handleImages(req, res) {
 
 router.post('/images/generations', authenticateApiKey, handleImages)
 router.post('/v1/images/generations', authenticateApiKey, handleImages)
+
+function handleModels(req, res) {
+  if (!checkOpenAIPermissions(req.apiKey)) {
+    return res.status(403).json({
+      error: {
+        message: 'This API key does not have permission to access OpenAI',
+        type: 'permission_denied',
+        code: 'permission_denied'
+      }
+    })
+  }
+
+  let models = modelService.getModelsByProvider('openai')
+  if (req.apiKey.enableModelRestriction && req.apiKey.restrictedModels?.length > 0) {
+    models = models.filter((model) => !req.apiKey.restrictedModels.includes(model.id))
+  }
+  return res.json({ object: 'list', data: models })
+}
+
+router.get('/models', authenticateApiKey, handleModels)
+router.get('/v1/models', authenticateApiKey, handleModels)
 
 router.post('/responses', authenticateApiKey, handleResponses)
 router.post('/v1/responses', authenticateApiKey, handleResponses)
