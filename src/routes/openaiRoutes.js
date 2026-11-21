@@ -1360,7 +1360,6 @@ function handleModels(req, res) {
   return res.json({ object: 'list', data: models })
 }
 
-router.get('/models', authenticateApiKey, handleModels)
 router.get('/v1/models', authenticateApiKey, handleModels)
 
 router.post('/responses', authenticateApiKey, handleResponses)

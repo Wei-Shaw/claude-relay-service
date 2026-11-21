@@ -43,14 +43,11 @@ app.use('/openai', openaiRoutes)
 describe('OpenAI model discovery', () => {
   beforeEach(() => modelService.getModelsByProvider.mockClear())
 
-  test.each(['/openai/models', '/openai/v1/models'])(
-    '%s requires API key authentication',
-    async (path) => {
-      const res = await request(app).get(path)
-      expect(res.status).toBe(401)
-      expect(modelService.getModelsByProvider).not.toHaveBeenCalled()
-    }
-  )
+  test('requires API key authentication', async () => {
+    const res = await request(app).get('/openai/v1/models')
+    expect(res.status).toBe(401)
+    expect(modelService.getModelsByProvider).not.toHaveBeenCalled()
+  })
 
   test('requires OpenAI permission', async () => {
     const res = await request(app)
@@ -61,19 +58,16 @@ describe('OpenAI model discovery', () => {
     expect(modelService.getModelsByProvider).not.toHaveBeenCalled()
   })
 
-  test.each(['/openai/models', '/openai/v1/models'])(
-    '%s returns only OpenAI models allowed by the key',
-    async (path) => {
-      const res = await request(app)
-        .get(path)
-        .set('Authorization', 'Bearer test-key')
-        .set('x-test-blocked', 'gpt-5.4')
-      expect(res.status).toBe(200)
-      expect(modelService.getModelsByProvider).toHaveBeenCalledWith('openai')
-      expect(res.body).toEqual({
-        object: 'list',
-        data: [{ id: 'gpt-5.6-sol', object: 'model', owned_by: 'openai' }]
-      })
-    }
-  )
+  test('returns only OpenAI models allowed by the key', async () => {
+    const res = await request(app)
+      .get('/openai/v1/models')
+      .set('Authorization', 'Bearer test-key')
+      .set('x-test-blocked', 'gpt-5.4')
+    expect(res.status).toBe(200)
+    expect(modelService.getModelsByProvider).toHaveBeenCalledWith('openai')
+    expect(res.body).toEqual({
+      object: 'list',
+      data: [{ id: 'gpt-5.6-sol', object: 'model', owned_by: 'openai' }]
+    })
+  })
 })
