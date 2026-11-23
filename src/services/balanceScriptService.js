@@ -1,6 +1,20 @@
 const vm = require('vm')
+const net = require('net')
 const axios = require('axios')
 const { isBalanceScriptEnabled } = require('../utils/featureFlags')
+
+// 禁止访问的地址段（按数值判断，而不是按字符串前缀）
+const blockedAddresses = new net.BlockList()
+blockedAddresses.addSubnet('0.0.0.0', 8, 'ipv4') // 0.0.0.0/8
+blockedAddresses.addSubnet('10.0.0.0', 8, 'ipv4')
+blockedAddresses.addSubnet('127.0.0.0', 8, 'ipv4')
+blockedAddresses.addSubnet('169.254.0.0', 16, 'ipv4') // link-local / cloud metadata
+blockedAddresses.addSubnet('172.16.0.0', 12, 'ipv4')
+blockedAddresses.addSubnet('192.168.0.0', 16, 'ipv4')
+blockedAddresses.addAddress('::', 'ipv6')
+blockedAddresses.addAddress('::1', 'ipv6')
+blockedAddresses.addSubnet('fc00::', 7, 'ipv6') // unique local
+blockedAddresses.addSubnet('fe80::', 10, 'ipv6') // link-local
 
 /**
  * SSRF防护：检查URL是否访问内网或敏感地址
@@ -10,34 +24,39 @@ const { isBalanceScriptEnabled } = require('../utils/featureFlags')
 function isUrlSafe(url) {
   try {
     const parsed = new URL(url)
-    const hostname = parsed.hostname.toLowerCase()
 
     // 禁止的协议
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       return false
     }
 
-    // 禁止访问localhost和私有IP
-    const privatePatterns = [
-      /^localhost$/i,
-      /^127\./,
-      /^10\./,
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
-      /^192\.168\./,
-      /^169\.254\./, // AWS metadata
-      /^0\./, // 0.0.0.0
-      /^::1$/,
-      /^fc00:/i,
-      /^fe80:/i,
-      /\.local$/i,
-      /\.internal$/i,
-      /\.localhost$/i
-    ]
+    // URL 里 IPv6 字面量带方括号（http://[::1]/），去掉后再判断
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '')
 
-    for (const pattern of privatePatterns) {
-      if (pattern.test(hostname)) {
-        return false
+    // 禁止访问 localhost 和内部域名
+    if (
+      hostname === 'localhost' ||
+      /\.local$/.test(hostname) ||
+      /\.internal$/.test(hostname) ||
+      /\.localhost$/.test(hostname)
+    ) {
+      return false
+    }
+
+    if (net.isIPv4(hostname)) {
+      return !blockedAddresses.check(hostname, 'ipv4')
+    }
+
+    if (net.isIPv6(hostname)) {
+      // ::ffff:a.b.c.d 是披着 IPv6 外壳的 IPv4，按其内嵌的 IPv4 判断
+      const mapped = hostname.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+      if (mapped) {
+        const hi = parseInt(mapped[1], 16)
+        const lo = parseInt(mapped[2], 16)
+        const ipv4 = [hi >> 8, hi & 0xff, lo >> 8, lo & 0xff].join('.')
+        return !blockedAddresses.check(ipv4, 'ipv4')
       }
+      return !blockedAddresses.check(hostname, 'ipv6')
     }
 
     return true
