@@ -1766,6 +1766,25 @@ const requestLogger = (req, res, next) => {
   const start = Date.now()
   const requestId = Math.random().toString(36).substring(2, 15)
 
+  // 敏感字段在写日志前一律打码：请求体里可能是登录密码、API Key、token
+  const SENSITIVE_KEYS = /^(password|newPassword|currentPassword|confirmPassword|oldPassword|apiKey|api_key|token|access_token|refresh_token|secret|clientSecret|authorization)$/i
+  const redact = (value, depth = 0) => {
+    if (depth > 4 || value === null || typeof value !== 'object') {
+      return value
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => redact(item, depth + 1))
+    }
+    const result = {}
+    for (const [key, entry] of Object.entries(value)) {
+      result[key] =
+        SENSITIVE_KEYS.test(key) && entry !== undefined && entry !== null
+          ? '[REDACTED]'
+          : redact(entry, depth + 1)
+    }
+    return result
+  }
+
   // 添加请求ID到请求对象
   req.requestId = requestId
   req.requestStartedAt = start
@@ -1781,7 +1800,7 @@ const requestLogger = (req, res, next) => {
   if (req.originalUrl !== '/health') {
     logger.debug(`▶ [${requestId}] ${req.method} ${req.originalUrl}`, {
       ip: clientIP,
-      body: req.body && Object.keys(req.body).length > 0 ? req.body : undefined
+      body: req.body && Object.keys(req.body).length > 0 ? redact(req.body) : undefined
     })
   }
 
@@ -1812,7 +1831,7 @@ const requestLogger = (req, res, next) => {
 
     // 请求体（非 GET 且有内容时显示）
     if (req.method !== 'GET' && req.body && Object.keys(req.body).length > 0) {
-      meta.req = req.body
+      meta.req = redact(req.body)
     }
 
     // 查询参数（GET 请求且有查询参数时单独显示）
